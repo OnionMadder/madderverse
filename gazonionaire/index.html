@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tub's Cookie Cache</title>
+    <link rel="canonical" href="https://madderverse.org/gazonionaire/" />
+    <meta property="og:url" content="https://madderverse.org/gazonionaire/" />
+    <meta name="twitter:url" content="https://madderverse.org/gazonionaire/" />
+    <meta name="title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="keywords" content="FYMZ, Find Your Madder Zone, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta property="og:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" /> <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" /> 
+    <meta name="apple-mobile-web-app-title" content="FYMZ" />
+    <meta name="application-name" content="FYMZ" />
+    <link rel="stylesheet" href="https://madderverse.org/gazonionaire/style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+
+<div id="splash" class="screen">
+  <img class="logo" src="assets/images/logo.png" alt="logo" onerror="this.style.visibility='hidden'"/>
+  <h1>GAZONIONAIRE</h1>
+  <p class="tagline">Buy low. Sell high. Get out before the law catches up.</p>
+  <div class="splash-actions">
+    <button id="btn-new">New Game</button>
+  </div>
+  <p class="hint">A trading game in the spirit of Gazillionaire (1994).</p>
+</div>
+
+<div id="mode-select" class="screen hidden">
+  <div class="ms-overlay"></div>
+  <div class="ms-content">
+    <h2 class="ms-heading">SELECT YOUR RUN</h2>
+
+    <div class="ms-intro">
+      <p>Gazonionaire drops you into an open galaxy with a ship, a credit balance, and a deadline. Your objective is simple: reach a target net worth before the clock runs out. Buy commodities cheap at the stations that produce them and sell them dear at the stations that need them — but the market shifts, events intervene, and any debt you carry compounds every single day.</p>
+      <p>If this is your first run, the Tutorial is strongly recommended. It gives you double the time, a larger cargo hold, zero interest on loans, and a reduced event table — enough breathing room to learn the trade routes, understand how price trends work, and find your rhythm before the clock starts eating your margin. Players who skip straight to Intermediate often find their first run ends in early bankruptcy, having learned an expensive lesson about compounding interest on bad cargo. The Tutorial exists so that your second run is the one where you actually play to win.</p>
+      <p>Beginner scales things back to a comfortable challenge for traders who have seen the Tutorial once. Intermediate is the intended full experience — real deadlines, real interest pressure, and the full event table in play. Advanced is for veterans who want consequences: you start in debt, the clock is tight, the goal is high, and the market is in full chaos. Choose your difficulty. The trade lanes are open.</p>
+    </div>
+
+    <div class="ms-grid">
+      <button class="ms-btn" data-mode="tutorial">
+        <span class="ms-mode-name">Tutorial</span>
+        <span class="ms-mode-sub">Learn the trade lanes — no pressure</span>
+        <ul class="ms-mode-stats">
+          <li>90 days · 15,000 ¢ start</li>
+          <li>Hold: 80t · Goal: 50,000 ¢</li>
+          <li>No interest · Light events</li>
+        </ul>
+      </button>
+      <button class="ms-btn" data-mode="beginner">
+        <span class="ms-mode-name">Beginner</span>
+        <span class="ms-mode-sub">A fair fight with room to breathe</span>
+        <ul class="ms-mode-stats">
+          <li>75 days · 10,000 ¢ start</li>
+          <li>Hold: 70t · Goal: 100,000 ¢</li>
+          <li>5% interest · Moderate events</li>
+        </ul>
+      </button>
+      <button class="ms-btn" data-mode="intermediate">
+        <span class="ms-mode-name">Intermediate</span>
+        <span class="ms-mode-sub">The intended experience</span>
+        <ul class="ms-mode-stats">
+          <li>60 days · 5,000 ¢ start</li>
+          <li>Hold: 60t · Goal: 150,000 ¢</li>
+          <li>8% interest · Full events</li>
+        </ul>
+      </button>
+      <button class="ms-btn" data-mode="advanced">
+        <span class="ms-mode-name">Advanced</span>
+        <span class="ms-mode-sub">Debt, chaos, and a brutal deadline</span>
+        <ul class="ms-mode-stats">
+          <li>45 days · 2,000 ¢ + 2,000 ¢ debt</li>
+          <li>Hold: 45t · Goal: 250,000 ¢</li>
+          <li>12% interest · High chaos</li>
+        </ul>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="ship-select" class="screen hidden">
+  <div class="ss-overlay"></div>
+  <div class="ss-content">
+    <div class="ss-header">
+      <h2 class="ss-heading">SELECT YOUR VESSEL</h2>
+      <p class="ss-subheading">Your starting capital is set by your chosen difficulty. Ship cost is deducted on purchase.</p>
+    </div>
+    <div class="ss-layout">
+      <div class="ss-grid" id="ship-grid"></div>
+      <aside class="ss-panel" id="ship-panel">
+        <div id="ss-empty" class="ss-empty">← Select a vessel to inspect it</div>
+        <div id="ss-detail" class="hidden">
+          <div class="ss-detail-top">
+            <div class="ss-sprite" id="ss-sprite"></div>
+            <div class="ss-detail-header">
+              <div class="ss-ship-name" id="ss-ship-name"></div>
+              <div class="ss-ship-flavor" id="ss-ship-flavor"></div>
+              <table class="ss-stats" id="ss-stats"></table>
+            </div>
+          </div>
+          <p class="ss-ship-desc" id="ss-ship-desc"></p>
+          <div class="ss-detail-actions">
+            <div class="ss-cost-line" id="ss-cost-line"></div>
+            <div class="ss-action-btns">
+              <button id="ss-btn-back">← Back</button>
+              <button id="ss-btn-buy">Purchase</button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div id="game" class="screen hidden">
+
+  <header id="hud">
+    <div class="hud-cell"><span class="hud-label">Day</span><span id="hud-day">1</span>/<span id="hud-max-days">60</span></div>
+    <div class="hud-cell"><span class="hud-label">Cash</span><span id="hud-cash">5,000</span> ¢</div>
+    <div class="hud-cell"><span class="hud-label">Debt</span><span id="hud-debt">0</span> ¢</div>
+    <div class="hud-cell"><span class="hud-label">Net</span><span id="hud-net">5,000</span> ¢</div>
+    <div class="hud-cell"><span class="hud-label">Hold</span><span id="hud-hold">0</span>/<span id="hud-cap">50</span></div>
+    <div class="hud-cell"><span class="hud-label">Location</span><span id="hud-location">—</span></div>
+    <div class="hud-cell hud-target"><span class="hud-label">Goal</span><span id="hud-goal">100,000</span> ¢</div>
+  </header>
+
+  <div id="ticker-wrap">
+    <span class="ticker-label">NEWS</span>
+    <div id="ticker"><div id="ticker-inner">Welcome to the Gazonionaire Trade Network.</div></div>
+  </div>
+
+  <main id="main-grid">
+
+    <section class="panel" id="market-panel">
+      <h2>Market <small id="market-loc"></small></h2>
+      <table id="market-table">
+        <thead>
+          <tr>
+            <th>Good</th>
+            <th class="num">Price</th>
+            <th class="num">Trend</th>
+            <th class="num">In Hold</th>
+            <th class="num">Avg Cost</th>
+            <th class="actions">Buy / Sell</th>
+          </tr>
+        </thead>
+        <tbody id="market-body"></tbody>
+      </table>
+    </section>
+
+    <aside class="panel" id="side-panel">
+      <section class="sub-panel">
+        <h3>Location</h3>
+        <div id="location-card"></div>
+      </section>
+      <section class="sub-panel">
+        <h3>Travel</h3>
+        <ul id="travel-list"></ul>
+      </section>
+      <section class="sub-panel">
+        <h3>Bank</h3>
+        <p class="bank-info">Interest: <span id="bank-rate">10</span>% / day · Max loan: <span id="bank-max">10,000</span> ¢</p>
+        <div class="bank-actions">
+          <input id="bank-amount" type="number" min="1" step="100" placeholder="amount" />
+          <button id="btn-borrow">Borrow</button>
+          <button id="btn-repay">Repay</button>
+        </div>
+      </section>
+      <section class="sub-panel">
+        <h3>Ship</h3>
+        <p>
+          Hold: <strong id="ship-hold">0</strong> / <strong id="ship-cap">50</strong> tons<br/>
+          Fuel reserve: <strong id="ship-fuel">100</strong> u
+        </p>
+        <button id="btn-end-day" title="Pass a day without traveling (interest still accrues)">Wait 1 Day</button>
+      </section>
+    </aside>
+
+  </main>
+
+  <div id="log-wrap" class="panel">
+    <h3>Log</h3>
+    <ul id="log"></ul>
+  </div>
+
+</div>
+
+<div id="modal" class="modal hidden" aria-hidden="true">
+  <div class="modal-card">
+    <img id="modal-img" src="" alt="" onerror="this.style.display='none'"/>
+    <h2 id="modal-title">Event</h2>
+    <p id="modal-body"></p>
+    <div id="modal-actions"></div>
+  </div>
+</div>
+
+<audio id="sfx-ship"   src="assets/sounds/ship.wav"   preload="auto"></audio>
+<audio id="sfx-buy"     src="assets/sounds/buy.wav"     preload="auto"></audio>
+<audio id="sfx-sell"    src="assets/sounds/sell.wav"    preload="auto"></audio>
+<audio id="sfx-travel"  src="assets/sounds/travel.wav"  preload="auto"></audio>
+<audio id="sfx-event"   src="assets/sounds/event.wav"   preload="auto"></audio>
+<audio id="sfx-bad"     src="assets/sounds/bad.wav"     preload="auto"></audio>
+<audio id="sfx-good"    src="assets/sounds/good.wav"    preload="auto"></audio>
+<audio id="sfx-click"   src="assets/sounds/click.wav"   preload="auto"></audio>
+
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
