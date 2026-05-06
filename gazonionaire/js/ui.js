@@ -3,8 +3,31 @@
  * ===================================================================== */
 
 (() => {
-  const { GOODS, LOCATIONS, fmt, travelCost, travelDays, locById } = GAME_DATA;
+  const {
+    GOODS, LOCATIONS, fmt, travelDays, travelFuel, fuelBasePrice, locById,
+    SHIP_SPRITES,
+  } = GAME_DATA;
   const $ = sel => document.querySelector(sel);
+
+  // ---------- sprite atlas helper ----------
+  // pick the sheet, scale the sprite to fit the box uniformly, center it.
+  function spriteStyle(sheetKey, spriteKey, boxW, boxH) {
+    const sheet = SHIP_SPRITES[sheetKey];
+    const f = sheet && sheet.frames[spriteKey];
+    if (!f) return `width:${boxW}px;height:${boxH}px;background:#000;`;
+    const scale = Math.min(boxW / f.w, boxH / f.h);
+    const sw = sheet.sheetW * scale;
+    const sh = sheet.sheetH * scale;
+    const offX = -f.x * scale + (boxW - f.w * scale) / 2;
+    const offY = -f.y * scale + (boxH - f.h * scale) / 2;
+    return `
+      width:${boxW}px; height:${boxH}px;
+      background-image:url('${sheet.src}');
+      background-size:${sw}px ${sh}px;
+      background-position:${offX}px ${offY}px;
+      background-repeat:no-repeat;
+    `;
+  }
 
   // ---------- audio ----------
   function sfx(id) {
@@ -14,8 +37,11 @@
   }
 
   // ---------- splash ----------
+  let pendingCompany = "ACME TRADING CO.";
   $("#btn-new").addEventListener("click", () => {
     sfx("click");
+    const inputEl = $("#company-name");
+    pendingCompany = (inputEl.value || "").trim() || "ACME TRADING CO.";
     $("#splash").classList.add("hidden");
     $("#mode-select").classList.remove("hidden");
   });
@@ -41,7 +67,7 @@
   }
 
   function buildShipGrid() {
-    const { SHIPS, SHIP_SHEET } = GAME_DATA;
+    const { SHIPS } = GAME_DATA;
     const grid = $("#ship-grid");
     grid.innerHTML = "";
     selectedShip = null;
@@ -49,8 +75,7 @@
     $("#ss-detail").classList.add("hidden");
 
     const budget = modeCash();
-    const tw = SHIP_SHEET.tileW, th = SHIP_SHEET.tileH;
-    const sheetW = SHIP_SHEET.cols * tw;
+    const THUMB = 80;
 
     SHIPS.forEach(ship => {
       const affordable = ship.cost <= budget;
@@ -61,12 +86,7 @@
 
       const thumb = document.createElement("div");
       thumb.className = "ss-thumb";
-      thumb.style.cssText = `
-        background-image:url('${SHIP_SHEET.src}');
-        background-size:${sheetW}px auto;
-        background-position:${-ship.col * tw}px ${-ship.row * th}px;
-        background-repeat:no-repeat;
-      `;
+      thumb.style.cssText = spriteStyle(ship.sheet, ship.sprite, THUMB, THUMB);
 
       const label = document.createElement("div");
       label.className = "ss-card-name";
@@ -93,23 +113,12 @@
   }
 
   function showShipDetail(ship) {
-    const { SHIP_SHEET } = GAME_DATA;
     const budget = modeCash();
 
-    // sprite — 2× size for preview
-    const tw = SHIP_SHEET.tileW * 2, th = SHIP_SHEET.tileH * 2;
+    // detail sprite — large preview pane (square crop, multiple-angle popup TBD)
+    const PREVIEW = 192;
     const sprite = $("#ss-sprite");
-    sprite.style.cssText = `
-      width:${tw}px; height:${th}px;
-      background-image:url('${SHIP_SHEET.src}');
-      background-size:${SHIP_SHEET.cols * tw}px auto;
-      background-position:${-ship.col * tw}px ${-ship.row * th}px;
-      background-repeat:no-repeat;
-      image-rendering:pixelated;
-      background-color:var(--panel-2);
-      border:1px solid var(--border);
-      flex-shrink:0;
-    `;
+    sprite.style.cssText = spriteStyle(ship.sheet, ship.sprite, PREVIEW, PREVIEW);
 
     $("#ss-ship-name").textContent  = ship.name;
     $("#ss-ship-flavor").textContent = "“" + ship.flavor + "”";
@@ -119,10 +128,11 @@
     const fuelPct  = Math.round(Math.abs(1 - ship.fuelMod)  * 100);
     const rows = [
       ["Cargo hold",   ship.cap + " tons"],
+      ["Fuel tank",    (ship.fuelCap || 100) + " u"],
       ["Travel speed", ship.speedMod < 1 ? speedPct + "% faster"
                      : ship.speedMod > 1 ? speedPct + "% slower" : "Standard"],
-      ["Fuel cost",    ship.fuelMod  < 1 ? fuelPct  + "% cheaper"
-                     : ship.fuelMod  > 1 ? fuelPct  + "% more"   : "Standard"],
+      ["Fuel use",     ship.fuelMod  < 1 ? fuelPct  + "% lower"
+                     : ship.fuelMod  > 1 ? fuelPct  + "% higher" : "Standard"],
       ...(ship.interestMod    ? [["Interest",  "−" + Math.round((1 - ship.interestMod) * 100) + "%"]] : []),
       ...(ship.contrabandShield ? [["Special", "Customs shielding"]]          : []),
       ...(ship.betterEvents    ? [["Special", "Favorable event bias"]]        : []),
@@ -163,7 +173,7 @@
   $("#ss-btn-buy").addEventListener("click", () => {
     if (!selectedShip) return;
     sfx("click");
-    Game.newGame(pendingMode, selectedShip.id);
+    Game.newGame(pendingMode, selectedShip.id, pendingCompany);
     $("#ship-select").classList.add("hidden");
     $("#game").classList.remove("hidden");
     renderAll();
@@ -176,6 +186,8 @@
     renderMarket();
     renderTravel();
     renderShipPanel();
+    renderFuelPanel();
+    renderLeaderboard();
     renderLog();
     renderTicker();
   }
@@ -202,15 +214,29 @@
 
   function renderHud() {
     const s = Game.state;
-    $("#hud-day").textContent = s.day;
+    $("#hud-company").textContent  = s.company || "ACME TRADING CO.";
+    $("#hud-day").textContent      = s.day;
     $("#hud-max-days").textContent = s.maxDays;
-    $("#hud-cash").textContent = fmt(s.cash);
-    $("#hud-debt").textContent = fmt(s.debt);
-    $("#hud-net").textContent  = fmt(Game.netWorth());
-    $("#hud-hold").textContent = Game.holdUsed();
-    $("#hud-cap").textContent  = s.cap;
+    $("#hud-cash").textContent     = fmt(s.cash);
+    $("#hud-debt").textContent     = fmt(s.debt);
+    $("#hud-net").textContent      = fmt(Game.netWorth());
+    $("#hud-hold").textContent     = Game.holdUsed();
+    $("#hud-cap").textContent      = s.cap;
+    $("#hud-fuel").textContent     = s.fuel;
+    $("#hud-fuelcap").textContent  = s.fuelCap;
     $("#hud-location").textContent = locById(s.location).name;
-    $("#hud-goal").textContent = fmt(s.goal);
+    $("#hud-goal").textContent     = fmt(s.goal);
+
+    setFuelFill($("#hud-fuel-fill"), s.fuel, s.fuelCap);
+  }
+
+  function setFuelFill(el, fuel, cap) {
+    if (!el) return;
+    const pct = Math.max(0, Math.min(100, Math.round((fuel / cap) * 100)));
+    el.style.width = pct + "%";
+    el.classList.remove("fuel-low", "fuel-crit");
+    if (pct < 15) el.classList.add("fuel-crit");
+    else if (pct < 35) el.classList.add("fuel-low");
   }
 
   function trendArrow(goodId, locId) {
@@ -273,8 +299,9 @@
     ul.innerHTML = "";
     LOCATIONS.forEach(loc => {
       const here = loc.id === s.location;
-      const cost = here ? 0 : Math.round(travelCost(s.location, loc.id) * Game.CONFIG.shipFuelMod);
+      const fuel = here ? 0 : travelFuel(s.location, loc.id, Game.CONFIG.shipFuelMod);
       const days = here ? 0 : Math.max(1, Math.round(travelDays(s.location, loc.id) * Game.CONFIG.shipSpeedMod));
+      const lowFuel = !here && fuel > s.fuel;
       const li = document.createElement("li");
       if (here) li.classList.add("current");
       li.innerHTML = `
@@ -287,8 +314,9 @@
           here
             ? '<span style="color:var(--ink-dim)">— here —</span>'
             : `<span>
-                 <span style="color:var(--ink-dim);margin-right:8px">${days}d / ${fmt(cost)}¢</span>
-                 <button data-go="${loc.id}">Go</button>
+                 <span style="color:${lowFuel ? "var(--pink)" : "var(--ink-dim)"};margin-right:8px"
+                       title="${days}d at ${fuel}u fuel">${days}d / ${fuel}u</span>
+                 <button class="win95-btn" data-go="${loc.id}">Go</button>
                </span>`
         }
       `;
@@ -341,9 +369,36 @@
     const s = Game.state;
     $("#ship-hold").textContent = Game.holdUsed();
     $("#ship-cap").textContent  = s.cap;
-    $("#ship-fuel").textContent = s.fuel;
     $("#bank-rate").textContent = Math.round(Game.CONFIG.interestRate * 100);
     $("#bank-max").textContent  = fmt(Game.CONFIG.maxLoan);
+  }
+
+  function renderFuelPanel() {
+    const s = Game.state;
+    $("#ship-fuel").textContent    = s.fuel;
+    $("#ship-fuelcap").textContent = s.fuelCap;
+    $("#fuel-price").textContent   = Game.fuelPriceHere();
+    setFuelFill($("#ship-fuel-fill"), s.fuel, s.fuelCap);
+  }
+
+  function renderLeaderboard() {
+    const s = Game.state;
+    if (!s.competitors) return;
+    const ol = $("#leaderboard");
+    if (!ol) return;
+    const me = { id: "__self", name: s.company || "YOU", netWorth: Game.netWorth(), self: true };
+    const ranked = [...s.competitors, me].sort((a, b) => b.netWorth - a.netWorth);
+    ol.innerHTML = "";
+    ranked.forEach((c, i) => {
+      const li = document.createElement("li");
+      if (c.self) li.classList.add("lb-self");
+      li.innerHTML = `
+        <span class="lb-rank">${i + 1}.</span>
+        <span class="lb-name" title="${c.motto || ""}">${c.name}</span>
+        <span class="lb-net">${fmt(c.netWorth)} ¢</span>
+      `;
+      ol.appendChild(li);
+    });
   }
 
   function renderLog() {
@@ -378,6 +433,24 @@
   $("#btn-repay").addEventListener("click", () => {
     const amt = parseInt($("#bank-amount").value, 10) || 0;
     const r = Game.repay(amt);
+    if (!r.ok) flash(r.msg); else sfx("good");
+    renderAll();
+  });
+
+  // ---------- fuel ----------
+  $("#btn-fuel-buy").addEventListener("click", () => {
+    const amt = parseInt($("#fuel-amount").value, 10) || 0;
+    const r = Game.buyFuel(amt);
+    if (!r.ok) flash(r.msg); else sfx("good");
+    renderAll();
+  });
+  $("#btn-fuel-fill").addEventListener("click", () => {
+    const room = Game.fuelMaxBuy();
+    if (room <= 0) { flash("Tank is full."); return; }
+    const price = Game.fuelPriceHere();
+    const affordable = Math.min(room, Math.floor(Game.state.cash / price));
+    if (affordable <= 0) { flash("Not enough cash for any fuel."); return; }
+    const r = Game.buyFuel(affordable);
     if (!r.ok) flash(r.msg); else sfx("good");
     renderAll();
   });

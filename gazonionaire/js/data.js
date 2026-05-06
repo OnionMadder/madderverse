@@ -571,115 +571,188 @@ const GAME_DATA = (() => {
   LOCATIONS.forEach(loc => { loc.localEvents = LOCAL_EVENTS[loc.id] || []; });
 
   // =====================================================================
-  // ship sprite sheet config — update tileW/tileH to match your asset
+  // ship sprite sheet config — two sheets, atlas-style frame coords
+  //   sheet keys ('one'/'two') match the per-ship `sheet` field below.
+  //   frame coords mirror the JSON atlases in /assets/sprites/.
   // =====================================================================
-  const SHIP_SHEET = {
-    src:   'assets/images/ships.png',
-    tileW: 64,
-    tileH: 64,
-    cols:  4,
+  const SHIP_SPRITES = {
+    one: {
+      src:    'assets/sprites/ships-one.png',
+      sheetW: 1799, sheetH: 895,
+      frames: {
+        squid:     { x:    2, y:   2, w: 664, h: 376 },
+        submarine: { x:  668, y:   2, w: 518, h: 318 },
+        whale:     { x: 1204, y:   2, w: 593, h: 421 },
+        worm:      { x:    2, y: 425, w: 663, h: 377 },
+        cube:      { x:  668, y: 425, w: 534, h: 468 },
+        bottle:    { x: 1204, y: 425, w: 584, h: 427 },
+      },
+    },
+    two: {
+      src:    'assets/sprites/ships-two.png',
+      sheetW: 1557, sheetH: 1006,
+      frames: {
+        bee:     { x:    2, y:   2, w: 500, h: 500 },
+        brain:   { x:  504, y:   2, w: 469, h: 353 },
+        cyber:   { x: 1017, y:   2, w: 500, h: 500 },
+        eyeball: { x:    2, y: 504, w: 500, h: 500 },
+        skull:   { x:  504, y: 504, w: 511, h: 488 },
+        spider:  { x: 1017, y: 504, w: 538, h: 420 },
+      },
+    },
   };
 
   // =====================================================================
-  // 12 ships — arranged 4 cols × 3 rows on the sprite sheet
-  //   col/row   : 0-based position in the sheet
+  // 12 ships — sprites split across two sheets
+  //   sheet     : 'one' | 'two' — which sprite atlas
+  //   sprite    : frame key inside that atlas
   //   cost      : credits deducted from starting cash on purchase
   //   cap       : cargo hold in tons (overrides mode default)
-  //   fuelMod   : multiplier on travel fuel cost  (<1 = cheaper)
+  //   fuelCap   : maximum ship fuel reservoir (units)
+  //   fuelMod   : multiplier on travel fuel use   (<1 = cheaper)
   //   speedMod  : multiplier on travel days       (<1 = faster)
   // =====================================================================
   const SHIPS = [
-    // ── row 0: basic to mid ──────────────────────────────────────────
+    // ── starter / mid ────────────────────────────────────────────────
     {
-      id: 'shuttle', col: 0, row: 0,
+      id: 'shuttle', sheet: 'one', sprite: 'bottle',
       name: 'Deckard-Class Shuttle',
-      cost: 0, cap: 40, fuelMod: 1.0, speedMod: 1.0,
+      cost: 0, cap: 40, fuelCap: 80, fuelMod: 1.0, speedMod: 1.0,
       flavor: 'No shame in starting small.',
       desc: 'A battered personal shuttle retrofitted with a cargo bay. Free, reliable, and embarrassing to park next to anyone with money. Gets the job done if you know what you\'re doing.',
     },
     {
-      id: 'hauler', col: 1, row: 0,
+      id: 'hauler', sheet: 'one', sprite: 'cube',
       name: 'Kallis Standard Hauler',
-      cost: 500, cap: 65, fuelMod: 1.0, speedMod: 1.0,
+      cost: 500, cap: 65, fuelCap: 120, fuelMod: 1.0, speedMod: 1.0,
       flavor: 'Built in the belt, built to last.',
       desc: 'The workhorse of the trade lanes. Ample cargo space, reasonable fuel, no surprises. What most traders settle on — and what most start with.',
     },
     {
-      id: 'clipper', col: 2, row: 0,
+      id: 'clipper', sheet: 'two', sprite: 'bee',
       name: 'Zephyr Clipper',
-      cost: 1500, cap: 45, fuelMod: 0.88, speedMod: 0.78,
+      cost: 1500, cap: 45, fuelCap: 100, fuelMod: 0.88, speedMod: 0.78,
       flavor: 'Light load, fast lanes.',
       desc: 'A slender fast-courier hull optimized for speed over volume. The Clipper completes two runs where a hauler completes one. Time is money, and this ship prints time.',
     },
     {
-      id: 'runner', col: 3, row: 0,
+      id: 'runner', sheet: 'one', sprite: 'worm',
       name: 'Verra Rim Runner',
-      cost: 2000, cap: 58, fuelMod: 0.80, speedMod: 0.85,
+      cost: 2000, cap: 58, fuelCap: 110, fuelMod: 0.80, speedMod: 0.85,
       flavor: 'What scanner? That\'s just a shadow.',
       desc: 'A hull that grew up dodging customs on the Verra outskirts. Fast, fuel-lean, and fitted with baffled compartments that make inspectors uncomfortable. Discretion is built in.',
     },
-    // ── row 1: mid to advanced ────────────────────────────────────────
+    // ── advanced ─────────────────────────────────────────────────────
     {
-      id: 'courier', col: 0, row: 1,
+      id: 'courier', sheet: 'two', sprite: 'spider',
       name: 'Obsidian Courier',
-      cost: 4000, cap: 52, fuelMod: 0.82, speedMod: 0.70,
+      cost: 4000, cap: 52, fuelCap: 100, fuelMod: 0.82, speedMod: 0.70,
       flavor: 'Speed is its own kind of diplomacy.',
       desc: 'Built in the black-glass yards of Obsidian Reach for aristocratic dispatch work. The fastest hull money buys at this price point — style that makes docking officers wave you through.',
     },
     {
-      id: 'salvager', col: 1, row: 1,
+      id: 'salvager', sheet: 'one', sprite: 'submarine',
       name: 'Halcyon Salvager',
-      cost: 1200, cap: 85, fuelMod: 1.12, speedMod: 1.22,
+      cost: 1200, cap: 85, fuelCap: 140, fuelMod: 1.12, speedMod: 1.22,
       flavor: 'She\'ll get there. Eventually.',
       desc: 'Assembled from three derelict hulls at the Halcyon Drift yards. The expanded hold is genuinely impressive. Its engines, however, are a patchwork of compromises that adds up to slow.',
     },
     {
-      id: 'forge_hauler', col: 2, row: 1,
+      id: 'forge_hauler', sheet: 'one', sprite: 'whale',
       name: 'Caldera Forge-Hauler',
-      cost: 3000, cap: 110, fuelMod: 1.30, speedMod: 1.45,
+      cost: 3000, cap: 110, fuelCap: 200, fuelMod: 1.30, speedMod: 1.45,
       flavor: 'Slow money is still money.',
       desc: 'An industrial bulk freighter from the Caldera-9 foundry line. The hold is enormous, the engines are enormous, and the fuel bills are enormous. When margin lives in volume, nothing else competes.',
     },
     {
-      id: 'drifter', col: 3, row: 1,
+      id: 'drifter', sheet: 'one', sprite: 'squid',
       name: 'Erebus Drifter',
-      cost: 1800, cap: 68, fuelMod: 0.90, speedMod: 0.95,
+      cost: 1800, cap: 68, fuelCap: 130, fuelMod: 0.90, speedMod: 0.95,
       flavor: 'Uncommonly reliable.',
       desc: 'A reef-adapted patrol hull from New Erebus, modified for open-lane trade. Good hold, decent speed, solid fuel economy. The choice of the cautious professional who wants no weak points.',
     },
-    // ── row 2: specialty ─────────────────────────────────────────────
+    // ── specialty ────────────────────────────────────────────────────
     {
-      id: 'skimmer', col: 0, row: 2,
+      id: 'skimmer', sheet: 'two', sprite: 'cyber',
       name: 'Pavonis Skimmer',
-      cost: 2500, cap: 58, fuelMod: 0.58, speedMod: 0.90,
+      cost: 2500, cap: 58, fuelCap: 160, fuelMod: 0.58, speedMod: 0.90,
       flavor: 'The routes pay. The fuel doesn\'t.',
       desc: 'Engineered at Pavonis Prime gas rigs to minimize fuel draw. In open space the savings are extraordinary — every jump costs dramatically less, and that compounds across an entire run.',
     },
     {
-      id: 'pilgrim', col: 1, row: 2,
+      id: 'pilgrim', sheet: 'two', sprite: 'brain',
       name: 'Solenne Pilgrim Vessel',
-      cost: 2200, cap: 62, fuelMod: 0.88, speedMod: 1.0,
+      cost: 2200, cap: 62, fuelCap: 120, fuelMod: 0.88, speedMod: 1.0,
       interestMod: 0.75,
       flavor: 'The Order\'s mark opens doors.',
       desc: 'A consecrated trading vessel blessed by the Order of Solenne. Superstitious bankers charge 25% less interest to its registered captain. Customs tends toward leniency. Hard to explain, easy to profit from.',
     },
     {
-      id: 'ghost', col: 2, row: 2,
+      id: 'ghost', sheet: 'two', sprite: 'skull',
       name: 'Threnody Ghost',
-      cost: 3500, cap: 58, fuelMod: 0.88, speedMod: 0.85,
+      cost: 3500, cap: 58, fuelCap: 130, fuelMod: 0.88, speedMod: 0.85,
       contrabandShield: true,
       flavor: 'What ship? Exactly.',
       desc: 'Built in the vertical slums of Threnody-7 for clients whose cargo prefers not to be noticed. Scans clean on any frequency that matters. Customs inspection events have a heavily reduced effect on this vessel.',
     },
     {
-      id: 'explorer', col: 3, row: 2,
+      id: 'explorer', sheet: 'two', sprite: 'eyeball',
       name: 'Yoxai Deep Explorer',
-      cost: 5000, cap: 72, fuelMod: 0.85, speedMod: 0.90,
+      cost: 5000, cap: 72, fuelCap: 180, fuelMod: 0.85, speedMod: 0.90,
       betterEvents: true,
       flavor: 'The ruins taught it patience.',
       desc: 'A long-range survey vessel retrofitted for trade after the Yoxai dig grants dried up. Enhanced sensor arrays give the captain advance reads on market conditions — bad random events occur less frequently.',
     },
   ];
+
+  // =====================================================================
+  // competitor companies — six rivals jockeying for trade-network rank
+  //   style controls how their net worth drifts each day:
+  //     'steady'     low volatility, slow positive bias
+  //     'aggressive' higher upside but higher swings
+  //     'volatile'   wild swings, can crash or skyrocket
+  // =====================================================================
+  const COMPETITORS = [
+    { id: 'onix',    name: 'Onix Freight Guild',     style: 'steady',
+      motto: 'Bonded. Insured. On schedule.' },
+    { id: 'kallisco',name: 'Kallis Heavy Metals',    style: 'aggressive',
+      motto: 'We move what cannot be moved.' },
+    { id: 'pavonis', name: 'Pavonis Skyhook Cartel', style: 'volatile',
+      motto: 'Above the clouds, above the law.' },
+    { id: 'zephyr',  name: 'Zephyr Free Traders',    style: 'aggressive',
+      motto: 'No flag, no fear, no fees.' },
+    { id: 'threnco', name: 'Threnody Undermarket',   style: 'volatile',
+      motto: 'Quiet ships. Loud profits.' },
+    { id: 'solenne', name: 'Solenne Blessed Cargo',  style: 'steady',
+      motto: 'Cargo blessed. Routes prayed.' },
+  ];
+
+  // =====================================================================
+  // ship fuel — per-location base price and travel-cost helpers
+  //   travelFuel returns units consumed per jump (after shipFuelMod);
+  //   fuelBasePrice gives the location's posted price per unit.
+  // =====================================================================
+  const FUEL_PRICES = {
+    pavon:  6,   // gas-giant rigs — the cheapest cell on the lane
+    halc:   8,   // salvage town drips fuel from stripped hulls
+    kallis: 10,
+    terra:  11,
+    obsid:  12,
+    zeph:   12,
+    erebus: 12,
+    calder: 13,
+    yoxai:  13,
+    solen:  14,
+    verra:  14,
+    thren:  15,  // black-market markup
+  };
+
+  function travelFuel(a, b, fuelMod = 1.0) {
+    return Math.max(4, Math.round(distance(a, b) / 9 * fuelMod));
+  }
+  function fuelBasePrice(locId) {
+    return FUEL_PRICES[locId] || 12;
+  }
 
   // =====================================================================
   // helpers
@@ -699,7 +772,9 @@ const GAME_DATA = (() => {
   }
 
   return {
-    GOODS, LOCATIONS, EVENTS, TICKER_SEEDS, SHIPS, SHIP_SHEET,
-    goodName, locById, fmt, distance, travelCost, travelDays,
+    GOODS, LOCATIONS, EVENTS, TICKER_SEEDS,
+    SHIPS, SHIP_SPRITES, COMPETITORS, FUEL_PRICES,
+    goodName, locById, fmt, distance,
+    travelCost, travelDays, travelFuel, fuelBasePrice,
   };
 })();

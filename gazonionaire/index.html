@@ -7,16 +7,17 @@
     <link rel="canonical" href="https://madderverse.org/gazonionaire/" />
     <meta property="og:url" content="https://madderverse.org/gazonionaire/" />
     <meta name="twitter:url" content="https://madderverse.org/gazonionaire/" />
-    <meta name="title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
-    <meta name="description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
-    <meta name="keywords" content="FYMZ, Find Your Madder Zone, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
+    <meta name="title" content="Discover the Madderverse - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="description" content="Safe, free, and ad-free games for curious kids." />
+    <meta name="keywords" content="The Madderverse, Onion Madder, Mad Sundar LLC, indie kids games, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
     <meta name="author" content="Onion Madder" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
-    <meta property="og:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
-    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" /> <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
-    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta property="og:title" content="Discover the Madderverse - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta property="og:description" content="Safe, free, and ad-free games for curious kids." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" /> 
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Discover the Madderverse - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
@@ -24,9 +25,9 @@
     <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
     <meta name="theme-color" content="#00ffcc" /> 
-    <meta name="apple-mobile-web-app-title" content="FYMZ" />
-    <meta name="application-name" content="FYMZ" />
-    <link rel="stylesheet" href="https://madderverse.org/gazonionaire/css/style.css" />
+    <meta name="apple-mobile-web-app-title" content="The Madderverse" />
+    <meta name="application-name" content="The Madderverse" />
+    <link rel="stylesheet" href="css/style.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 
@@ -36,15 +37,28 @@
   <img class="logo" src="assets/images/logo.png" alt="logo" onerror="this.style.visibility='hidden'"/>
   <h1>GAZONIONAIRE</h1>
   <p class="tagline">Buy low. Sell high. Get out before the law catches up.</p>
+  <div class="splash-company win95-field">
+    <label for="company-name">REGISTERED COMPANY NAME</label>
+    <input id="company-name" class="win95-input" type="text" maxlength="32"
+           placeholder="ACME TRADING CO." value="ACME TRADING CO." spellcheck="false" />
+  </div>
   <div class="splash-actions">
-    <button id="btn-new">New Game</button>
+    <button id="btn-new" class="win95-btn">New Game</button>
   </div>
   <p class="hint">A trading game in the spirit of Gazillionaire (1994).</p>
 </div>
 
 <div id="mode-select" class="screen hidden">
   <div class="ms-overlay"></div>
-  <div class="ms-content">
+  <div class="ms-content win95-window">
+    <div class="win95-titlebar">
+      <span class="win95-titlebar-text">Difficulty Configuration</span>
+      <span class="win95-titlebar-tools">
+        <span class="win95-tbtn">_</span>
+        <span class="win95-tbtn">▢</span>
+        <span class="win95-tbtn win95-tbtn-x">×</span>
+      </span>
+    </div>
     <h2 class="ms-heading">SELECT YOUR RUN</h2>
 
     <div class="ms-intro">
@@ -96,46 +110,70 @@
 
 <div id="ship-select" class="screen hidden">
   <div class="ss-overlay"></div>
-  <div class="ss-content">
-    <div class="ss-header">
-      <h2 class="ss-heading">SELECT YOUR VESSEL</h2>
-      <p class="ss-subheading">Your starting capital is set by your chosen difficulty. Ship cost is deducted on purchase.</p>
+  <div class="ss-content win95-window">
+    <div class="win95-titlebar">
+      <span class="win95-titlebar-text">Vessel Acquisition Terminal</span>
+      <span class="win95-titlebar-tools">
+        <span class="win95-tbtn">_</span>
+        <span class="win95-tbtn">▢</span>
+        <span class="win95-tbtn win95-tbtn-x">×</span>
+      </span>
     </div>
-    <div class="ss-layout">
-      <div class="ss-grid" id="ship-grid"></div>
-      <aside class="ss-panel" id="ship-panel">
-        <div id="ss-empty" class="ss-empty">← Select a vessel to inspect it</div>
-        <div id="ss-detail" class="hidden">
-          <div class="ss-detail-top">
-            <div class="ss-sprite" id="ss-sprite"></div>
-            <div class="ss-detail-header">
-              <div class="ss-ship-name" id="ss-ship-name"></div>
-              <div class="ss-ship-flavor" id="ss-ship-flavor"></div>
-              <table class="ss-stats" id="ss-stats"></table>
+    <div class="win95-window-body">
+      <div class="ss-header">
+        <h2 class="ss-heading">SELECT YOUR VESSEL</h2>
+        <p class="ss-subheading">Your starting capital is set by your chosen difficulty. Ship cost is deducted on purchase.</p>
+      </div>
+      <div class="ss-layout">
+        <div class="ss-grid win95-sunken" id="ship-grid"></div>
+        <aside class="ss-panel win95-raised" id="ship-panel">
+          <div id="ss-empty" class="ss-empty">← Select a vessel to inspect it</div>
+          <div id="ss-detail" class="hidden">
+            <div class="ss-detail-top">
+              <div class="ss-sprite win95-sunken" id="ss-sprite"></div>
+              <div class="ss-detail-header">
+                <div class="ss-ship-name" id="ss-ship-name"></div>
+                <div class="ss-ship-flavor" id="ss-ship-flavor"></div>
+                <table class="ss-stats" id="ss-stats"></table>
+              </div>
+            </div>
+            <p class="ss-ship-desc" id="ss-ship-desc"></p>
+            <div class="ss-detail-actions">
+              <div class="ss-cost-line" id="ss-cost-line"></div>
+              <div class="ss-action-btns">
+                <button id="ss-btn-back" class="win95-btn">← Back</button>
+                <button id="ss-btn-buy" class="win95-btn ss-btn-buy">Purchase</button>
+              </div>
             </div>
           </div>
-          <p class="ss-ship-desc" id="ss-ship-desc"></p>
-          <div class="ss-detail-actions">
-            <div class="ss-cost-line" id="ss-cost-line"></div>
-            <div class="ss-action-btns">
-              <button id="ss-btn-back">← Back</button>
-              <button id="ss-btn-buy">Purchase</button>
-            </div>
-          </div>
-        </div>
-      </aside>
+        </aside>
+      </div>
     </div>
   </div>
 </div>
 
 <div id="game" class="screen hidden">
 
-  <header id="hud">
+  <div id="hud-titlebar" class="win95-titlebar">
+    <span class="win95-titlebar-text"><span id="hud-company">ACME TRADING CO.</span> — Trade Network Console</span>
+    <span class="win95-titlebar-tools">
+      <span class="win95-tbtn">_</span>
+      <span class="win95-tbtn">▢</span>
+      <span class="win95-tbtn win95-tbtn-x">×</span>
+    </span>
+  </div>
+
+  <header id="hud" class="win95-sunken">
     <div class="hud-cell"><span class="hud-label">Day</span><span id="hud-day">1</span>/<span id="hud-max-days">60</span></div>
     <div class="hud-cell"><span class="hud-label">Cash</span><span id="hud-cash">5,000</span> ¢</div>
     <div class="hud-cell"><span class="hud-label">Debt</span><span id="hud-debt">0</span> ¢</div>
     <div class="hud-cell"><span class="hud-label">Net</span><span id="hud-net">5,000</span> ¢</div>
     <div class="hud-cell"><span class="hud-label">Hold</span><span id="hud-hold">0</span>/<span id="hud-cap">50</span></div>
+    <div class="hud-cell hud-fuel-cell">
+      <span class="hud-label">Fuel</span>
+      <span class="hud-fuel-text"><span id="hud-fuel">100</span>/<span id="hud-fuelcap">100</span></span>
+      <div class="fuel-gauge win95-sunken-thin"><div id="hud-fuel-fill" class="fuel-gauge-fill"></div></div>
+    </div>
     <div class="hud-cell"><span class="hud-label">Location</span><span id="hud-location">—</span></div>
     <div class="hud-cell hud-target"><span class="hud-label">Goal</span><span id="hud-goal">100,000</span> ¢</div>
   </header>
@@ -177,18 +215,34 @@
         <h3>Bank</h3>
         <p class="bank-info">Interest: <span id="bank-rate">10</span>% / day · Max loan: <span id="bank-max">10,000</span> ¢</p>
         <div class="bank-actions">
-          <input id="bank-amount" type="number" min="1" step="100" placeholder="amount" />
-          <button id="btn-borrow">Borrow</button>
-          <button id="btn-repay">Repay</button>
+          <input id="bank-amount" type="number" min="1" step="100" placeholder="amount" class="win95-input" />
+          <button id="btn-borrow" class="win95-btn">Borrow</button>
+          <button id="btn-repay" class="win95-btn">Repay</button>
+        </div>
+      </section>
+      <section class="sub-panel">
+        <h3>Fuel Depot</h3>
+        <p class="fuel-info">
+          Tank: <strong><span id="ship-fuel">100</span> / <span id="ship-fuelcap">100</span></strong> u<br/>
+          Local price: <strong><span id="fuel-price">12</span> ¢</strong> / unit
+        </p>
+        <div class="fuel-gauge win95-sunken-thin"><div id="ship-fuel-fill" class="fuel-gauge-fill"></div></div>
+        <div class="fuel-actions">
+          <input id="fuel-amount" type="number" min="1" step="1" placeholder="units" class="win95-input" />
+          <button id="btn-fuel-buy" class="win95-btn">Buy</button>
+          <button id="btn-fuel-fill" class="win95-btn">Fill</button>
         </div>
       </section>
       <section class="sub-panel">
         <h3>Ship</h3>
         <p>
-          Hold: <strong id="ship-hold">0</strong> / <strong id="ship-cap">50</strong> tons<br/>
-          Fuel reserve: <strong id="ship-fuel">100</strong> u
+          Hold: <strong id="ship-hold">0</strong> / <strong id="ship-cap">50</strong> tons
         </p>
-        <button id="btn-end-day" title="Pass a day without traveling (interest still accrues)">Wait 1 Day</button>
+        <button id="btn-end-day" class="win95-btn" title="Pass a day without traveling (interest still accrues)">Wait 1 Day</button>
+      </section>
+      <section class="sub-panel" id="leaderboard-panel">
+        <h3>Trade Network Leaderboard</h3>
+        <ol id="leaderboard"></ol>
       </section>
     </aside>
 

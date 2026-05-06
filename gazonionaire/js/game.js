@@ -5,7 +5,10 @@
 
 const Game = (() => {
 
-  const { GOODS, LOCATIONS, EVENTS, TICKER_SEEDS, fmt, travelCost, travelDays } = GAME_DATA;
+  const {
+    GOODS, LOCATIONS, EVENTS, TICKER_SEEDS, COMPETITORS,
+    fmt, travelDays, travelFuel, fuelBasePrice,
+  } = GAME_DATA;
 
   const BASE_CONFIG = {
     startCash:        5000,
@@ -62,7 +65,7 @@ const Game = (() => {
   let state = null;
 
   // ---------- lifecycle ----------
-  function newGame(modeName = "intermediate", shipId = "hauler") {
+  function newGame(modeName = "intermediate", shipId = "hauler", companyName = "ACME TRADING CO.") {
     Object.assign(CONFIG, BASE_CONFIG, MODES[modeName] || {});
 
     const ship = GAME_DATA.SHIPS.find(s => s.id === shipId) || GAME_DATA.SHIPS[0];
@@ -72,16 +75,31 @@ const Game = (() => {
     if (ship.interestMod) CONFIG.interestRate = +(CONFIG.interestRate * ship.interestMod).toFixed(4);
 
     const startCash = Math.max(0, CONFIG.startCash - ship.cost);
+    const fuelCap   = ship.fuelCap || 100;
+
+    // procedurally seed each rival with a starting net worth that hovers
+    // around the player's starting cash, then drifts each day
+    const seededRivals = COMPETITORS.map(c => ({
+      id: c.id,
+      name: c.name,
+      style: c.style,
+      motto: c.motto,
+      netWorth: Math.max(800, Math.round(startCash * (0.65 + Math.random() * 0.9))),
+    }));
 
     state = {
       day: 1,
       maxDays: CONFIG.maxDays,
       goal:    CONFIG.goal,
 
+      company: (companyName || "").trim() || "ACME TRADING CO.",
+
       cash:  startCash,
       debt:  CONFIG.startDebt,
       cap:   CONFIG.startCap,
-      fuel:  CONFIG.startFuel,
+
+      fuel:    fuelCap,            // tank starts full
+      fuelCap: fuelCap,
 
       shipId:           ship.id,
       contrabandShield: ship.contrabandShield || false,
@@ -102,6 +120,9 @@ const Game = (() => {
       // current market: location_id -> { good_id: price }
       market: {},
 
+      // rival trading houses competing for the leaderboard
+      competitors: seededRivals,
+
       tickerQueue: [...TICKER_SEEDS],
       log: [],
       gameOver: false,
@@ -109,7 +130,7 @@ const Game = (() => {
     };
 
     rollAllMarkets();
-    log("Trade run started. Goal: " + fmt(state.goal) + " ¢ in " + state.maxDays + " days.", "warn");
+    log(`${state.company}: trade run started. Goal: ${fmt(state.goal)} ¢ in ${state.maxDays} days.`, "warn");
     return state;
   }
 
@@ -233,6 +254,28 @@ const Game = (() => {
     return { ok: true };
   }
 
+  // ---------- fuel ----------
+  function fuelPriceHere() {
+    return fuelBasePrice(state.location);
+  }
+  function fuelMaxBuy() {
+    return state.fuelCap - state.fuel;
+  }
+  function buyFuel(qty) {
+    qty = Math.max(0, Math.floor(qty));
+    if (!qty) return { ok: false, msg: "Quantity must be > 0." };
+    const room = fuelMaxBuy();
+    if (room <= 0) return { ok: false, msg: "Tank is full." };
+    if (qty > room) qty = room;
+    const price = fuelPriceHere();
+    const cost  = price * qty;
+    if (cost > state.cash) return { ok: false, msg: "Not enough cash for that fuel." };
+    state.cash -= cost;
+    state.fuel += qty;
+    log(`Refueled ${qty} u @ ${price} ¢/u = ${fmt(cost)} ¢.`, "good");
+    return { ok: true };
+  }
+
   // ---------- travel & turn ----------
   // returns { ok, msg, event? }
   function travel(destId) {
@@ -240,18 +283,20 @@ const Game = (() => {
     const dest = LOCATIONS.find(l => l.id === destId);
     if (!dest) return { ok: false, msg: "Unknown destination." };
 
-    const cost = Math.round(travelCost(state.location, destId) * CONFIG.shipFuelMod);
-    const days = Math.max(1, Math.round(travelDays(state.location, destId) * CONFIG.shipSpeedMod));
+    const fuelNeed = travelFuel(state.location, destId, CONFIG.shipFuelMod);
+    const days     = Math.max(1, Math.round(travelDays(state.location, destId) * CONFIG.shipSpeedMod));
 
-    if (cost > state.cash) return { ok: false, msg: "Not enough cash for fuel." };
+    if (fuelNeed > state.fuel) {
+      return { ok: false, msg: `Need ${fuelNeed} fuel — tank has ${state.fuel}. Refuel first.` };
+    }
 
-    state.cash -= cost;
+    state.fuel -= fuelNeed;
     state.location = destId;
 
     const firstVisit = !state.visited[destId];
     state.visited[destId] = true;
 
-    log(`Traveled to ${dest.name} (${days}d, ${fmt(cost)} ¢ fuel).`);
+    log(`Traveled to ${dest.name} (${days}d, ${fuelNeed} fuel burned).`);
 
     // advance days; interest accrues each
     let event = null;
@@ -291,10 +336,28 @@ const Game = (() => {
     }
     // expire price events
     expirePriceMods();
+    // rivals jockey for the leaderboard each day
+    driftCompetitors();
     // market drift mid-trip is hidden until arrival; ui will reroll once
     if (!skipMarketReroll) {
       // no-op — caller decides when to rollAllMarkets()
     }
+  }
+
+  function driftCompetitors() {
+    if (!state.competitors) return;
+    state.competitors.forEach(c => {
+      // each style picks a different daily volatility & drift bias
+      const vol  = c.style === 'volatile'   ? 0.18
+                : c.style === 'aggressive' ? 0.10
+                                            : 0.05;
+      const bias = c.style === 'volatile'   ? 0.005
+                : c.style === 'aggressive' ? 0.012
+                                            : 0.008;
+      const swing = (Math.random() * 2 - 1) * vol;
+      const next  = c.netWorth * (1 + swing + bias);
+      c.netWorth  = Math.max(200, Math.round(next));
+    });
   }
 
   // ---------- events ----------
@@ -353,6 +416,7 @@ const Game = (() => {
     newGame,
     priceOf, holdUsed, holdFree, netWorth,
     buy, sell, borrow, repay,
+    buyFuel, fuelPriceHere, fuelMaxBuy,
     travel, waitOneDay,
   };
 })();
