@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="80%">
+      <stop offset="0%" stop-color="#26200a"/>
+      <stop offset="55%" stop-color="#15110a"/>
+      <stop offset="100%" stop-color="#04000d"/>
+    </radialGradient>
+    <pattern id="grid" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0 L0 0 0 48" fill="none" stroke="#ffea00" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+    <pattern id="dots" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+      <circle cx="24" cy="24" r="1.4" fill="#ffea00" opacity="0.18"/>
+    </pattern>
+  </defs>
+  <rect width="1024" height="768" fill="url(#bg)"/>
+  <rect width="1024" height="768" fill="url(#grid)"/>
+  <rect width="1024" height="768" fill="url(#dots)"/>
+  <g opacity="0.13" transform="translate(512 384)">
+    <g fill="none" stroke="#ffea00" stroke-width="2">
+      <path d="M0 0 L240 -240 L240 0 Z"/>
+      <path d="M0 0 L240 240 L0 240 Z"/>
+      <path d="M0 0 L-240 240 L-240 0 Z"/>
+      <path d="M0 0 L-240 -240 L0 -240 Z"/>
+    </g>
+  </g>
+  <text x="512" y="370" font-family="monospace" font-size="115" font-weight="900"
+        fill="#ffea00" text-anchor="middle" opacity="0.2" letter-spacing="18">PINWHEEL</text>
+  <text x="512" y="432" font-family="monospace" font-size="20"
+        fill="#00f0ff" text-anchor="middle" opacity="0.4" letter-spacing="10">// BG PLACEHOLDER</text>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 768" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="80%">
+      <stop offset="0%" stop-color="#26000d"/>
+      <stop offset="55%" stop-color="#150010"/>
+      <stop offset="100%" stop-color="#04000d"/>
+    </radialGradient>
+    <pattern id="grid" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0 L0 0 0 48" fill="none" stroke="#ff3060" stroke-opacity="0.08" stroke-width="1"/>
+    </pattern>
+    <pattern id="dots" x="0" y="0" width="48" height="48" patternUnits="userSpaceOnUse">
+      <circle cx="24" cy="24" r="1.4" fill="#ff3060" opacity="0.18"/>
+    </pattern>
+  </defs>
+  <rect width="1024" height="768" fill="url(#bg)"/>
+  <rect width="1024" height="768" fill="url(#grid)"/>
+  <rect width="1024" height="768" fill="url(#dots)"/>
+  <g opacity="0.14" fill="none" stroke="#ff3060" stroke-width="2">
+    <path d="M192 80 H368 V336 H656 V80 H832 V688 H656 V432 H368 V688 H192 Z"/>
+  </g>
+  <text x="512" y="380" font-family="monospace" font-size="180" font-weight="900"
+        fill="#ff3060" text-anchor="middle" opacity="0.2" letter-spacing="32">H</text>
+  <text x="512" y="442" font-family="monospace" font-size="20"
+        fill="#00f0ff" text-anchor="middle" opacity="0.4" letter-spacing="10">// BG PLACEHOLDER</text>
+</svg>
