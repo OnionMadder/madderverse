@@ -62,9 +62,9 @@
     <h2 class="ms-heading">SELECT YOUR RUN</h2>
 
     <div class="ms-intro">
-      <p>Gazonionaire drops you into an open galaxy with a ship, a credit balance, and a deadline. Your objective is simple: reach a target net worth before the clock runs out. Buy commodities cheap at the stations that produce them and sell them dear at the stations that need them — but the market shifts, events intervene, and any debt you carry compounds every single day.</p>
-      <p>If this is your first run, the Tutorial is strongly recommended. It gives you double the time, a larger cargo hold, zero interest on loans, and a reduced event table — enough breathing room to learn the trade routes, understand how price trends work, and find your rhythm before the clock starts eating your margin. Players who skip straight to Intermediate often find their first run ends in early bankruptcy, having learned an expensive lesson about compounding interest on bad cargo. The Tutorial exists so that your second run is the one where you actually play to win.</p>
-      <p>Beginner scales things back to a comfortable challenge for traders who have seen the Tutorial once. Intermediate is the intended full experience — real deadlines, real interest pressure, and the full event table in play. Advanced is for veterans who want consequences: you start in debt, the clock is tight, the goal is high, and the market is in full chaos. Choose your difficulty. The trade lanes are open.</p>
+      <p>Gazonionaire drops you into an open galaxy with a ship, a credit balance, and a deadline. Your objective is simple: reach a target net worth before the clock runs out.</p>
+      <p>If this is your first run, the Tutorial is strongly recommended. It gives you double the time, a larger cargo hold, zero interest on loans, and a reduced event table — enough breathing room to learn the trade routes, understand how price trends work, and find your rhythm before the clock starts eating your margin.</p>
+      <p>Advanced is for veterans who want consequences: you start in debt, the clock is tight, the goal is high, and the market is in full chaos. Choose your difficulty. The trade lanes are open.</p>
     </div>
 
     <div class="ms-grid">
@@ -272,6 +272,25 @@
 <audio id="sfx-bad"     src="assets/sounds/bad.mp3"     preload="auto"></audio>
 <audio id="sfx-good"    src="assets/sounds/good.mp3"    preload="auto"></audio>
 <audio id="sfx-click"   src="assets/sounds/click.mp3"   preload="auto"></audio>
+
+<!--
+  Per-ship ambient audio. Plays on loop while a ship card is selected in the
+  ship picker. Element id must be `sfx-ship-<ship.id>`. Missing files fail
+  silently per the convention in assets/sounds/README.txt — drop a matching
+  <id>-ambient.mp3 into assets/sounds/ to wire each one up.
+-->
+<audio id="sfx-ship-shuttle"      src="assets/sounds/shuttle-ambient.mp3"      preload="none" loop></audio>
+<audio id="sfx-ship-hauler"       src="assets/sounds/hauler-ambient.mp3"       preload="none" loop></audio>
+<audio id="sfx-ship-clipper"      src="assets/sounds/bee-ambient.mp3"          preload="auto" loop></audio>
+<audio id="sfx-ship-runner"       src="assets/sounds/runner-ambient.mp3"       preload="none" loop></audio>
+<audio id="sfx-ship-courier"      src="assets/sounds/courier-ambient.mp3"      preload="none" loop></audio>
+<audio id="sfx-ship-salvager"     src="assets/sounds/salvager-ambient.mp3"     preload="none" loop></audio>
+<audio id="sfx-ship-forge_hauler" src="assets/sounds/forge_hauler-ambient.mp3" preload="none" loop></audio>
+<audio id="sfx-ship-drifter"      src="assets/sounds/drifter-ambient.mp3"      preload="none" loop></audio>
+<audio id="sfx-ship-skimmer"      src="assets/sounds/skimmer-ambient.mp3"      preload="none" loop></audio>
+<audio id="sfx-ship-pilgrim"      src="assets/sounds/pilgrim-ambient.mp3"      preload="none" loop></audio>
+<audio id="sfx-ship-ghost"        src="assets/sounds/ghost-ambient.mp3"        preload="none" loop></audio>
+<audio id="sfx-ship-explorer"     src="assets/sounds/explorer-ambient.mp3"     preload="none" loop></audio>
 
 <script src="js/data.js"></script>
 <script src="js/game.js"></script>

@@ -10,21 +10,32 @@
   const $ = sel => document.querySelector(sel);
 
   // ---------- sprite atlas helper ----------
-  // pick the sheet, scale the sprite to fit the box uniformly, center it.
-  function spriteStyle(sheetKey, spriteKey, boxW, boxH) {
-    const sheet = SHIP_SPRITES[sheetKey];
-    const f = sheet && sheet.frames[spriteKey];
-    if (!f) return `width:${boxW}px;height:${boxH}px;background:#000;`;
+  // size the box, then render the sprite into an inner div sized to the
+  // scaled-frame dimensions exactly. centering the inner div in the box
+  // means adjacent frames in the sheet can't bleed into the empty padding.
+  function applySprite(boxEl, spriteKey, boxW, boxH) {
+    boxEl.style.cssText = `width:${boxW}px;height:${boxH}px;display:flex;align-items:center;justify-content:center;`;
+    let inner = boxEl.querySelector(':scope > .sprite-frame');
+    if (!inner) {
+      inner = document.createElement('div');
+      inner.className = 'sprite-frame';
+      boxEl.appendChild(inner);
+    }
+    const f = SHIP_SPRITES.frames[spriteKey];
+    if (!f) {
+      inner.style.cssText = `width:${boxW}px;height:${boxH}px;background:#000;`;
+      return;
+    }
     const scale = Math.min(boxW / f.w, boxH / f.h);
-    const sw = sheet.sheetW * scale;
-    const sh = sheet.sheetH * scale;
-    const offX = -f.x * scale + (boxW - f.w * scale) / 2;
-    const offY = -f.y * scale + (boxH - f.h * scale) / 2;
-    return `
-      width:${boxW}px; height:${boxH}px;
-      background-image:url('${sheet.src}');
+    const dw = f.w * scale;
+    const dh = f.h * scale;
+    const sw = SHIP_SPRITES.sheetW * scale;
+    const sh = SHIP_SPRITES.sheetH * scale;
+    inner.style.cssText = `
+      width:${dw}px; height:${dh}px;
+      background-image:url('${SHIP_SPRITES.src}');
       background-size:${sw}px ${sh}px;
-      background-position:${offX}px ${offY}px;
+      background-position:${-f.x * scale}px ${-f.y * scale}px;
       background-repeat:no-repeat;
     `;
   }
@@ -34,6 +45,22 @@
     const el = document.getElementById("sfx-" + id);
     if (!el) return;
     try { el.currentTime = 0; el.play().catch(()=>{}); } catch(_){}
+  }
+
+  // ship-ambient: per-ship audio that loops while a card is selected.
+  // Plays the audio with id `sfx-ship-<id>`. Missing files fail silently.
+  let activeShipAmbient = null;
+  function stopShipAmbient() {
+    if (activeShipAmbient) {
+      try { activeShipAmbient.pause(); activeShipAmbient.currentTime = 0; } catch(_){}
+      activeShipAmbient = null;
+    }
+  }
+  function playShipAmbient(shipId) {
+    stopShipAmbient();
+    const el = document.getElementById("sfx-ship-" + shipId);
+    if (!el) return;
+    try { el.currentTime = 0; el.loop = true; el.play().catch(()=>{}); activeShipAmbient = el; } catch(_){}
   }
 
   // ---------- splash ----------
@@ -86,7 +113,7 @@
 
       const thumb = document.createElement("div");
       thumb.className = "ss-thumb";
-      thumb.style.cssText = spriteStyle(ship.sheet, ship.sprite, THUMB, THUMB);
+      applySprite(thumb, ship.sprite, THUMB, THUMB);
 
       const label = document.createElement("div");
       label.className = "ss-card-name";
@@ -105,6 +132,7 @@
           card.classList.add("ss-selected");
           selectedShip = ship;
           showShipDetail(ship);
+          playShipAmbient(ship.id);
         });
       }
 
@@ -118,7 +146,7 @@
     // detail sprite — large preview pane (square crop, multiple-angle popup TBD)
     const PREVIEW = 192;
     const sprite = $("#ss-sprite");
-    sprite.style.cssText = spriteStyle(ship.sheet, ship.sprite, PREVIEW, PREVIEW);
+    applySprite(sprite, ship.sprite, PREVIEW, PREVIEW);
 
     $("#ss-ship-name").textContent  = ship.name;
     $("#ss-ship-flavor").textContent = "“" + ship.flavor + "”";
@@ -165,6 +193,7 @@
 
   $("#ss-btn-back").addEventListener("click", () => {
     sfx("click");
+    stopShipAmbient();
     selectedShip = null;
     $("#ship-select").classList.add("hidden");
     $("#mode-select").classList.remove("hidden");
@@ -173,6 +202,7 @@
   $("#ss-btn-buy").addEventListener("click", () => {
     if (!selectedShip) return;
     sfx("click");
+    stopShipAmbient();
     Game.newGame(pendingMode, selectedShip.id, pendingCompany);
     $("#ship-select").classList.add("hidden");
     $("#game").classList.remove("hidden");
