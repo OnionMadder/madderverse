@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GazOnionaire</title>
+    <link rel="canonical" href="https://madderverse.org/georges-jump/" />
+    <meta property="og:url" content="https://madderverse.org/georges-jump/" />
+    <meta name="twitter:url" content="https://madderverse.org/georges-jump/" />
+    <meta name="title" content="Discover the Madderverse - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="description" content="Safe, free, and ad-free games for curious kids." />
+    <meta name="keywords" content="The Madderverse, Onion Madder, Mad Sundar LLC, indie kids games, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Discover the Madderverse - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta property="og:description" content="Safe, free, and ad-free games for curious kids." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" /> 
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Discover the Madderverse - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" /> 
+    <meta name="apple-mobile-web-app-title" content="The Madderverse" />
+    <meta name="application-name" content="The Madderverse" />
+    <link rel="stylesheet" href="https://madderverse.org/georges-jump/style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+
+<div class="wrap">
+<header>
+<div class="title-block">
+<h1>Bagawk!</h1>
+<h2>George's Jump</h2>
+<div class="meta" id="taskDesc">Eat as much as you can!</div>
+</div>
+<div class="hud">
+<span class="badge mascot-badge" id="mascotBadge" hidden><canvas id="mascotHudCanvas" width="28" height="28" aria-label="Equipped mascot"></canvas></span>
+<span class="badge level-badge">Lv <strong id="level">1</strong> · <span id="difficulty" class="diff diff-easy">EASY</span></span>
+<span class="badge">Score: <strong id="score">0</strong></span>
+<span class="badge coin-badge" id="coinBadge" title="Coins (spend on mascots)">&#127942; <strong id="coins">0</strong></span>
+<span class="badge eaten-badge" id="eatenBadge">Eaten: <strong id="fullness">0/0</strong></span>
+<span class="badge combo-badge" id="comboBadge" hidden>Combo: <strong id="combo">x1</strong></span>
+<span class="badge timer-badge">Time: <strong id="timer">120</strong>s</span>
+<span class="badge">Best: <strong id="best">0</strong></span>
+<button id="scoresBtn" class="btn btn-icon" type="button" title="High scores">&#9733;</button>
+<button id="mascotBtn" class="btn btn-icon" type="button" title="Mascot shop (C)">&#127917;</button>
+<button id="skinBtn" class="btn btn-icon" type="button" title="Choose George">&#128020;</button>
+<button id="mute" class="btn btn-icon" type="button" title="Mute music (M)" aria-pressed="false">&#9834;</button>
+<button id="restart" class="btn" type="button" title="Restart (R)">Restart</button>
+</div>
+</header>
+
+<div class="stage">
+    <canvas id="game" width="320" height="180" aria-label="Bagawk game canvas"></canvas>
+    <div id="endScreen" class="end-screen" hidden>
+        <div class="end-card">
+            <h2 id="endTitle">Time's up!</h2>
+            <p id="endMsg"></p>
+            <div class="end-stats">
+                <span>Score <strong id="endScore">0</strong></span>
+                <span>Eaten <strong id="endEaten">0</strong></span>
+                <span>Best Combo <strong id="endCombo">x1</strong></span>
+            </div>
+            <div id="endNew" class="end-new" hidden>NEW LEVEL BEST!</div>
+            <div id="endUnlock" class="end-unlock" hidden></div>
+            <button id="playAgain" class="btn" type="button">Play Again</button>
+        </div>
+    </div>
+
+    <div id="skinModal" class="modal" hidden>
+        <div class="modal-card">
+            <h2>Choose George</h2>
+            <div id="skinGrid" class="skin-grid"></div>
+            <button class="btn modal-close" data-close="skinModal" type="button">Close</button>
+        </div>
+    </div>
+
+    <div id="scoresModal" class="modal" hidden>
+        <div class="modal-card">
+            <h2>High Scores</h2>
+            <div id="scoresOverall" class="scores-overall"></div>
+            <div id="scoresList" class="scores-list"></div>
+            <button class="btn modal-close" data-close="scoresModal" type="button">Close</button>
+        </div>
+    </div>
+
+    <div id="mascotModal" class="modal" hidden>
+        <div class="modal-card">
+            <h2>Mascot Shop</h2>
+            <div class="mascot-balance">Coins: <strong id="mascotCoins">0</strong></div>
+            <div id="mascotGrid" class="mascot-grid"></div>
+            <button class="btn modal-close" data-close="mascotModal" type="button">Close</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<script type="module" src="game.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,255 @@
+{
+  "frames": {
+    "coffee": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1391
+      }
+    },
+    "eggs-toast": {
+      "frame": {
+        "x": 1082,
+        "y": 1,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 339,
+        "h": 339
+      }
+    },
+    "french-toast": {
+      "frame": {
+        "x": 2163,
+        "y": 1,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 339,
+        "h": 338
+      }
+    },
+    "fruit-bowl": {
+      "frame": {
+        "x": 3244,
+        "y": 1,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 289,
+        "h": 289
+      }
+    },
+    "full-breakfast-one": {
+      "frame": {
+        "x": 1,
+        "y": 1393,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 333,
+        "h": 333
+      }
+    },
+    "full-breakfast-three": {
+      "frame": {
+        "x": 1082,
+        "y": 1393,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 332,
+        "h": 332
+      }
+    },
+    "full-breakfast-two": {
+      "frame": {
+        "x": 2163,
+        "y": 1393,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 330,
+        "h": 329
+      }
+    },
+    "bacon": {
+      "frame": {
+        "x": 3244,
+        "y": 1393,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 319,
+        "h": 319
+      }
+    },
+    "bacon-eggs": {
+      "frame": {
+        "x": 1,
+        "y": 2785,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 326,
+        "h": 326
+      }
+    },
+    "breakfast-bowl": {
+      "frame": {
+        "x": 1082,
+        "y": 2785,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 291,
+        "h": 291
+      }
+    },
+    "butter": {
+      "frame": {
+        "x": 2163,
+        "y": 2785,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 266,
+        "h": 266
+      }
+    },
+    "cereal": {
+      "frame": {
+        "x": 3244,
+        "y": 2785,
+        "w": 1080,
+        "h": 1391
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1391
+      },
+      "sourceSize": {
+        "w": 317,
+        "h": 317
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 4325,
+      "h": 4177
+    },
+    "scale": "1"
+  }
+}

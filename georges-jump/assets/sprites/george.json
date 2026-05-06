@@ -1,0 +1,18 @@
+{
+  "_comment": "Placeholder layout. Adjust x/y/w/h to match your george.png. 32x32 movement frames in row 0, 64x48 sit frames in row 1, 64x32 nap in row 2.",
+  "frames": {
+    "idle":         { "frame": { "x": 0,   "y": 0,  "w": 32, "h": 32 } },
+    "walk-1":       { "frame": { "x": 32,  "y": 0,  "w": 32, "h": 32 } },
+    "walk-2":       { "frame": { "x": 64,  "y": 0,  "w": 32, "h": 32 } },
+    "jump-start":   { "frame": { "x": 96,  "y": 0,  "w": 32, "h": 32 } },
+    "jump-ascent":  { "frame": { "x": 128, "y": 0,  "w": 32, "h": 32 } },
+    "jump-peak":    { "frame": { "x": 160, "y": 0,  "w": 32, "h": 32 } },
+    "jump-descent": { "frame": { "x": 192, "y": 0,  "w": 32, "h": 32 } },
+    "landing":      { "frame": { "x": 224, "y": 0,  "w": 32, "h": 32 } },
+    "sit-empty":    { "frame": { "x": 0,   "y": 32, "w": 64, "h": 48 } },
+    "sit-feast-1":  { "frame": { "x": 64,  "y": 32, "w": 64, "h": 48 } },
+    "sit-feast-2":  { "frame": { "x": 128, "y": 32, "w": 64, "h": 48 } },
+    "sit-gorged":   { "frame": { "x": 192, "y": 32, "w": 64, "h": 48 } },
+    "nap":          { "frame": { "x": 0,   "y": 80, "w": 64, "h": 32 } }
+  }
+}
