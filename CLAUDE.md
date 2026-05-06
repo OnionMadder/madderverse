@@ -36,7 +36,9 @@ Other top-level entries:
 
 ## Conventions worth knowing
 
-**Asset URL style is inconsistent across games and that is intentional-looking** — leave it alone unless asked. Some games reference stylesheets/scripts via absolute `https://madderverse.org/...` URLs, some via relative paths, and `friend-picker/` still points at the legacy `https://fymz.lol/friend-picker/...` host. When editing a game, follow the URL style already used in that game's `index.html`.
+**Game stylesheets and scripts load via relative paths from the game's own directory** (`href="style.css"`, `src="game.js"`, or `css/style.css` + `js/*.js` for `gazonionaire/`). Do not introduce absolute `https://madderverse.org/...` URLs for in-game CSS/JS — they break local dev by silently loading production assets. SEO meta tags (`canonical`, `og:url`, `og:image`, `twitter:*`) and the favicon set are intentionally kept as absolute production URLs because they're consumed by external scrapers and PWA installers.
+
+**Known stale references in `friend-picker/`:** the OG/Twitter image URLs, favicon links, manifest, canonical, and the GoatCounter beacon all still point at the legacy `https://fymz.lol/...` domain. The CSS/JS load was fixed; the rest is unresolved.
 
 **Sprite sheets are addressed by hand-coded pixel coordinates.** See `cookie-cache/game.js` (`SHEETS`/`FRAMES`/`applySprite`) for the canonical pattern: a sheet's full pixel `w`/`h` plus per-frame `x,y,w,h`, scaled to display size in `applySprite`. If you change a sprite sheet image, the coordinate tables in the matching `game.js` must be updated to match.
 
