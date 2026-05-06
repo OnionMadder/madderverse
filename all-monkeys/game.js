@@ -90,6 +90,153 @@
         return c;
     }
 
+    // ---------- CHARACTER SVG ART (placeholder Sprunkis) ----------
+    // viewBox 100x140 — swap any of these out for an <img src="..."> tag when real art arrives.
+    const CHARACTER_SVG = {
+        monkey: `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="50" cy="105" rx="26" ry="28" fill="#8b5a2b" stroke="#3d220e" stroke-width="3"/>
+            <ellipse cx="50" cy="108" rx="15" ry="18" fill="#d4a574"/>
+            <ellipse cx="22" cy="92" rx="9" ry="14" fill="#8b5a2b" stroke="#3d220e" stroke-width="3" transform="rotate(-15 22 92)"/>
+            <ellipse cx="78" cy="92" rx="9" ry="14" fill="#8b5a2b" stroke="#3d220e" stroke-width="3" transform="rotate(15 78 92)"/>
+            <ellipse cx="38" cy="135" rx="8" ry="4" fill="#3d220e"/>
+            <ellipse cx="62" cy="135" rx="8" ry="4" fill="#3d220e"/>
+            <circle cx="20" cy="42" r="13" fill="#6b4423" stroke="#3d220e" stroke-width="3"/>
+            <circle cx="20" cy="42" r="7" fill="#d4a574"/>
+            <circle cx="80" cy="42" r="13" fill="#6b4423" stroke="#3d220e" stroke-width="3"/>
+            <circle cx="80" cy="42" r="7" fill="#d4a574"/>
+            <circle cx="50" cy="42" r="28" fill="#8b5a2b" stroke="#3d220e" stroke-width="3"/>
+            <ellipse cx="50" cy="50" rx="20" ry="16" fill="#d4a574"/>
+            <circle cx="42" cy="42" r="3.5" fill="#000"/>
+            <circle cx="58" cy="42" r="3.5" fill="#000"/>
+            <circle cx="43" cy="41" r="1.2" fill="#fff"/>
+            <circle cx="59" cy="41" r="1.2" fill="#fff"/>
+            <ellipse cx="46" cy="52" rx="1.2" ry="2" fill="#000"/>
+            <ellipse cx="54" cy="52" rx="1.2" ry="2" fill="#000"/>
+            <path d="M 42 60 Q 50 66 58 60" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>`,
+
+        nugget: `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 25 50 Q 14 38 28 25 Q 50 14 72 27 Q 88 40 80 60 Q 92 88 70 108 Q 50 124 28 110 Q 8 95 18 75 Q 12 60 25 50 Z" fill="#f4c465" stroke="#a06b1f" stroke-width="3" stroke-linejoin="round"/>
+            <circle cx="32" cy="48" r="2" fill="#a06b1f"/>
+            <circle cx="60" cy="40" r="2.5" fill="#a06b1f"/>
+            <circle cx="75" cy="65" r="2" fill="#a06b1f"/>
+            <circle cx="40" cy="80" r="2.5" fill="#a06b1f"/>
+            <circle cx="65" cy="92" r="2" fill="#a06b1f"/>
+            <circle cx="25" cy="85" r="2" fill="#a06b1f"/>
+            <circle cx="50" cy="62" r="2" fill="#a06b1f"/>
+            <circle cx="55" cy="105" r="2" fill="#a06b1f"/>
+            <path d="M 36 55 Q 42 49 48 55" fill="none" stroke="#3d220e" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 56 55 Q 62 49 68 55" fill="none" stroke="#3d220e" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 36 75 Q 50 92 64 75 Q 60 80 50 80 Q 40 80 36 75 Z" fill="#5d3a18" stroke="#3d220e" stroke-width="2.5" stroke-linejoin="round"/>
+        </svg>`,
+
+        choochoo: `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+            <rect x="42" y="12" width="16" height="22" fill="#1a1a1a" stroke="#000" stroke-width="2"/>
+            <rect x="38" y="10" width="24" height="6" fill="#1a1a1a" stroke="#000" stroke-width="2"/>
+            <circle cx="50" cy="6" r="5" fill="#666" opacity="0.6"/>
+            <circle cx="60" cy="3" r="4" fill="#666" opacity="0.5"/>
+            <circle cx="40" cy="2" r="3" fill="#666" opacity="0.4"/>
+            <path d="M 15 45 L 85 45 L 85 100 L 80 100 L 80 110 L 20 110 L 20 100 L 15 100 Z" fill="#2a2a2a" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+            <ellipse cx="50" cy="65" rx="32" ry="18" fill="#3a3a3a" stroke="#000" stroke-width="3"/>
+            <circle cx="38" cy="62" r="6" fill="#ff0000"/>
+            <circle cx="62" cy="62" r="6" fill="#ff0000"/>
+            <circle cx="38" cy="62" r="3" fill="#ffff66"/>
+            <circle cx="62" cy="62" r="3" fill="#ffff66"/>
+            <rect x="28" y="80" width="44" height="14" fill="#0a0a0a" stroke="#000" stroke-width="2"/>
+            <line x1="34" y1="80" x2="34" y2="94" stroke="#999" stroke-width="2"/>
+            <line x1="42" y1="80" x2="42" y2="94" stroke="#999" stroke-width="2"/>
+            <line x1="50" y1="80" x2="50" y2="94" stroke="#999" stroke-width="2"/>
+            <line x1="58" y1="80" x2="58" y2="94" stroke="#999" stroke-width="2"/>
+            <line x1="66" y1="80" x2="66" y2="94" stroke="#999" stroke-width="2"/>
+            <circle cx="28" cy="118" r="14" fill="#1a1a1a" stroke="#000" stroke-width="3"/>
+            <circle cx="28" cy="118" r="5" fill="#666"/>
+            <circle cx="72" cy="118" r="14" fill="#1a1a1a" stroke="#000" stroke-width="3"/>
+            <circle cx="72" cy="118" r="5" fill="#666"/>
+        </svg>`,
+
+        truck: `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+            <rect x="22" y="32" width="56" height="14" rx="4" fill="#5a7aaa" stroke="#1a2a4a" stroke-width="3"/>
+            <rect x="15" y="42" width="70" height="55" rx="6" fill="#3a5a8a" stroke="#1a2a4a" stroke-width="3"/>
+            <circle cx="30" cy="62" r="9" fill="#ffeb3b" stroke="#000" stroke-width="2.5"/>
+            <circle cx="70" cy="62" r="9" fill="#ffeb3b" stroke="#000" stroke-width="2.5"/>
+            <circle cx="30" cy="62" r="3" fill="#000"/>
+            <circle cx="70" cy="62" r="3" fill="#000"/>
+            <rect x="30" y="78" width="40" height="14" rx="2" fill="#222" stroke="#000" stroke-width="2"/>
+            <line x1="36" y1="78" x2="36" y2="92" stroke="#aaa" stroke-width="2"/>
+            <line x1="44" y1="78" x2="44" y2="92" stroke="#aaa" stroke-width="2"/>
+            <line x1="50" y1="78" x2="50" y2="92" stroke="#aaa" stroke-width="2"/>
+            <line x1="56" y1="78" x2="56" y2="92" stroke="#aaa" stroke-width="2"/>
+            <line x1="64" y1="78" x2="64" y2="92" stroke="#aaa" stroke-width="2"/>
+            <circle cx="22" cy="115" r="20" fill="#1a1a1a" stroke="#000" stroke-width="3"/>
+            <circle cx="22" cy="115" r="9" fill="#555"/>
+            <circle cx="22" cy="115" r="3" fill="#888"/>
+            <circle cx="78" cy="115" r="20" fill="#1a1a1a" stroke="#000" stroke-width="3"/>
+            <circle cx="78" cy="115" r="9" fill="#555"/>
+            <circle cx="78" cy="115" r="3" fill="#888"/>
+            <circle cx="42" cy="105" r="2" fill="#5a3a1a"/>
+            <circle cx="58" cy="103" r="2" fill="#5a3a1a"/>
+        </svg>`,
+
+        cocoa: `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+            <line x1="42" y1="100" x2="38" y2="130" stroke="#a06000" stroke-width="3" stroke-linecap="round"/>
+            <line x1="58" y1="100" x2="62" y2="130" stroke="#a06000" stroke-width="3" stroke-linecap="round"/>
+            <path d="M 33 132 L 38 130 L 35 134 M 38 130 L 41 134" stroke="#a06000" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <path d="M 67 132 L 62 130 L 65 134 M 62 130 L 59 134" stroke="#a06000" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+            <circle cx="50" cy="65" r="38" fill="#ffa500" stroke="#a06000" stroke-width="3"/>
+            <ellipse cx="50" cy="80" rx="20" ry="22" fill="#fdd835"/>
+            <path d="M 45 27 L 50 14 L 55 27 Z" fill="#ffa500" stroke="#a06000" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M 36 30 L 40 17 L 47 28 Z" fill="#ffa500" stroke="#a06000" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M 53 28 L 60 17 L 64 30 Z" fill="#ffa500" stroke="#a06000" stroke-width="2.5" stroke-linejoin="round"/>
+            <circle cx="38" cy="55" r="13" fill="#fff" stroke="#000" stroke-width="2.5"/>
+            <circle cx="62" cy="55" r="13" fill="#fff" stroke="#000" stroke-width="2.5"/>
+            <circle cx="42" cy="58" r="4" fill="#000"/>
+            <circle cx="58" cy="52" r="4" fill="#000"/>
+            <circle cx="43" cy="57" r="1.5" fill="#fff"/>
+            <circle cx="59" cy="51" r="1.5" fill="#fff"/>
+            <path d="M 38 78 L 50 96 L 62 78 L 60 76 L 50 90 L 40 76 Z" fill="#ff6b1c" stroke="#5a2a0a" stroke-width="2.5" stroke-linejoin="round"/>
+            <path d="M 42 80 L 50 90 L 58 80 Z" fill="#5a2a0a"/>
+            <ellipse cx="50" cy="86" rx="3" ry="2" fill="#ff3d6b"/>
+        </svg>`,
+
+        tamil: `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="50" cy="118" rx="32" ry="8" fill="#5a3a1a" stroke="#3d220e" stroke-width="2"/>
+            <rect x="18" y="42" width="64" height="76" fill="#a0522d" stroke="#3d220e" stroke-width="3"/>
+            <ellipse cx="50" cy="42" rx="32" ry="10" fill="#f5deb3" stroke="#3d220e" stroke-width="3"/>
+            <rect x="18" y="50" width="64" height="4" fill="#d4af37"/>
+            <rect x="18" y="100" width="64" height="4" fill="#d4af37"/>
+            <line x1="22" y1="54" x2="26" y2="100" stroke="#3d220e" stroke-width="2"/>
+            <line x1="32" y1="54" x2="36" y2="100" stroke="#3d220e" stroke-width="2"/>
+            <line x1="42" y1="54" x2="44" y2="100" stroke="#3d220e" stroke-width="2"/>
+            <line x1="56" y1="54" x2="56" y2="100" stroke="#3d220e" stroke-width="2"/>
+            <line x1="68" y1="54" x2="64" y2="100" stroke="#3d220e" stroke-width="2"/>
+            <line x1="78" y1="54" x2="74" y2="100" stroke="#3d220e" stroke-width="2"/>
+            <circle cx="50" cy="42" r="6" fill="#3d220e"/>
+            <circle cx="40" cy="75" r="3" fill="#3d220e"/>
+            <circle cx="60" cy="75" r="3" fill="#3d220e"/>
+            <path d="M 38 85 Q 50 95 62 85" fill="none" stroke="#3d220e" stroke-width="3" stroke-linecap="round"/>
+        </svg>`,
+
+        troll: `<svg viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 18 50 Q 14 30 30 25 Q 50 16 70 26 Q 88 32 84 50 Q 92 70 86 90 Q 88 110 70 118 Q 50 124 30 118 Q 12 112 14 92 Q 8 70 18 50 Z" fill="#a8b88a" stroke="#3a4a2a" stroke-width="3" stroke-linejoin="round"/>
+            <rect x="14" y="55" width="6" height="3" fill="#db2777" opacity="0.7"/>
+            <rect x="80" y="72" width="8" height="2" fill="#fbbf24" opacity="0.7"/>
+            <rect x="58" y="105" width="5" height="3" fill="#2dd4bf" opacity="0.7"/>
+            <rect x="22" y="100" width="4" height="2" fill="#db2777" opacity="0.7"/>
+            <ellipse cx="36" cy="55" rx="9" ry="6" fill="#fff" stroke="#000" stroke-width="2.5"/>
+            <ellipse cx="64" cy="55" rx="9" ry="6" fill="#fff" stroke="#000" stroke-width="2.5"/>
+            <circle cx="36" cy="56" r="3.5" fill="#000"/>
+            <circle cx="64" cy="56" r="3.5" fill="#000"/>
+            <path d="M 26 44 L 44 50" stroke="#3a4a2a" stroke-width="4" stroke-linecap="round"/>
+            <path d="M 56 50 L 74 44" stroke="#3a4a2a" stroke-width="4" stroke-linecap="round"/>
+            <path d="M 22 78 Q 50 105 78 78 Q 70 100 50 100 Q 30 100 22 78 Z" fill="#3d220e" stroke="#000" stroke-width="3" stroke-linejoin="round"/>
+            <path d="M 28 82 L 32 92 L 36 82 Z" fill="#fff" stroke="#000" stroke-width="1"/>
+            <path d="M 38 84 L 42 95 L 46 84 Z" fill="#fff" stroke="#000" stroke-width="1"/>
+            <path d="M 48 86 L 50 96 L 52 86 Z" fill="#fff" stroke="#000" stroke-width="1"/>
+            <path d="M 54 86 L 58 95 L 60 84 Z" fill="#fff" stroke="#000" stroke-width="1"/>
+            <path d="M 64 84 L 68 92 L 72 82 Z" fill="#fff" stroke="#000" stroke-width="1"/>
+        </svg>`
+    };
+
     // ---------- CHARACTERS ----------
     const CHARACTERS = {
         monkey: {
@@ -322,7 +469,7 @@
             el.className = 'tray-chip';
             el.dataset.char = id;
             el.innerHTML = `
-                <div class="chip-icon">${ch.emoji}</div>
+                <div class="chip-icon">${CHARACTER_SVG[id]}</div>
                 <div class="chip-label">${ch.label}</div>
             `;
             tray.appendChild(el);
@@ -339,7 +486,7 @@
             slot.classList.remove('empty');
             slot.dataset.char = id;
             slot.innerHTML = `
-                <div class="slot-icon">${ch.emoji}</div>
+                <div class="slot-icon">${CHARACTER_SVG[id]}</div>
                 <div class="slot-label">${ch.label}</div>
             `;
         } else {
@@ -347,7 +494,7 @@
             slot.classList.add('empty');
             delete slot.dataset.char;
             slot.innerHTML = `
-                <div class="slot-icon">🐒</div>
+                <div class="slot-icon">${CHARACTER_SVG.monkey}</div>
                 <div class="slot-label">EMPTY</div>
             `;
         }
@@ -370,7 +517,7 @@
         const charId = chip.dataset.char;
         const ghost = document.createElement('div');
         ghost.id = 'drag-ghost';
-        ghost.textContent = CHARACTERS[charId].emoji;
+        ghost.innerHTML = CHARACTER_SVG[charId];
         ghost.style.left = x + 'px';
         ghost.style.top = y + 'px';
         document.body.appendChild(ghost);

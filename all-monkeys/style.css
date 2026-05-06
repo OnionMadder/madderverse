@@ -196,10 +196,20 @@ main {
 }
 
 .slot-icon {
-    font-size: 76px;
-    line-height: 1;
+    width: 95px;
+    height: 133px;
     transition: transform 0.1s;
     filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.18));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.slot-icon svg, .chip-icon svg, #drag-ghost svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: visible;
 }
 
 @keyframes beat-pulse {
@@ -281,8 +291,11 @@ main {
 }
 
 .chip-icon {
-    font-size: 50px;
-    line-height: 1;
+    width: 56px;
+    height: 78px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .chip-label {
@@ -299,8 +312,8 @@ main {
     position: fixed;
     pointer-events: none;
     z-index: 9999;
-    font-size: 78px;
-    line-height: 1;
+    width: 100px;
+    height: 140px;
     filter: drop-shadow(0 0 18px rgba(251, 191, 36, 0.9));
     transform: translate(-50%, -50%);
 }
@@ -318,10 +331,10 @@ main {
         height: 140px;
         border-radius: 14px;
     }
-    .slot-icon { font-size: 56px; }
+    .slot-icon { width: 70px; height: 98px; }
     .slot-label { font-size: 10px; letter-spacing: 0.12em; margin-top: 8px; }
     .tray-chip { width: 86px; height: 104px; }
-    .chip-icon { font-size: 40px; }
+    .chip-icon { width: 48px; height: 68px; }
     .chip-label { font-size: 10px; }
     .btn-remix { font-size: 14px; padding: 8px 16px; }
     .icon-btn { width: 40px; height: 40px; font-size: 18px; }
@@ -330,6 +343,6 @@ main {
 @media (max-width: 420px) {
     .tray { gap: 8px; justify-content: flex-start; }
     .tray-chip { width: 76px; height: 92px; }
-    .chip-icon { font-size: 34px; }
+    .chip-icon { width: 42px; height: 58px; }
     .chip-label { font-size: 9px; }
 }
