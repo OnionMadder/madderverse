@@ -153,7 +153,7 @@ h2 { margin: 0; font-size: 0.9rem; opacity: 0.7; }
 .stage {
     position: absolute;
     inset: 0;
-    background: #000;
+    background: #000 url('assets/bg-img.png') center center / cover no-repeat;
     border: none;
     box-shadow: none;
     line-height: 0;
