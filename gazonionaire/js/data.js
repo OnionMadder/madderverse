@@ -59,6 +59,8 @@ const GAME_DATA = (() => {
   //   demands  : scarce goods   (price ~ 1.20–1.60 of base)  — sell here
   //   x,y      : map coords (drives fuel cost & travel days)
   //   lawful   : 0..1, higher = stricter customs (more contraband busts)
+  //   canLoan  : (optional) marks the sector's banking hub — wire game logic
+  //              to gate borrow/repay UI on this flag if/when desired.
   //   tagline  : one-line subtitle shown in the location card
   //   lore     : flavor blurb shown on first arrival (modal)
   // =====================================================================
@@ -258,20 +260,20 @@ const LOCATIONS = [
   // =====================================================================
   // starting headlines for the news ticker
   // =====================================================================
-const TICKER_SEEDS = [
-  "JACKHOLE MEGACORP: Our orbital sensors have detected you are thinking about a snack. Please purchase a snack.",
-  "REMINDER: Bankruptcy is a breach of your ‘Life-Usage Agreement’. Defaulters will be converted into Caldera-9 lubricants.",
-  "TERRA PRIME: Water prices dropped! Buy now before we remember to charge you for the bottle.",
-  "THE BUREAU: We have updated your file. We know what you did at the Halcyon Junk-Heap. It was hilarious.",
-  "KALLIS BELT: Strike ended after Megacorp successfully replaced all 5,000 miners with slightly cheaper rocks.",
-  "THE LEDGER HUB: Your loan interest just went up 2% because you’re breathing too fast. Calm down and save money.",
-  "MARKET ALERT: High-grade Organs are trending! Remember: You have two kidneys, but you only NEED one ship.",
-  "ATTENTION: A 500-credit 'Viewing Fee' has been deducted from your account for reading this ticker. You're welcome.",
-  "SOLENNE VERGE: Monks claim salt-hoarding is 'divine.' Jackhole Megacorp claims it’s 'market manipulation.' Fight! Fight!",
-  "URGENT: Smuggling is strictly prohibited unless you use the official Jackhole Megacorp 'Discretion Surcharge' app.",
-  "YOXAI JUNGLE: Ancient alien ruins discovered! Megacorp lawyers are currently suing the ruins for copyright infringement.",
-  "EREBUS BUBBLES: Record Algae harvest! It’s green, it’s slimy, and it’s legally classified as 'food-adjacent'!",
-];
+  const TICKER_SEEDS = [
+    "JACKHOLE MEGACORP: Our orbital sensors have detected you are thinking about a snack. Please purchase a snack.",
+    "REMINDER: Bankruptcy is a breach of your 'Life-Usage Agreement'. Defaulters will be converted into Caldera-9 lubricants.",
+    "TERRA PRIME: Water prices dropped! Buy now before we remember to charge you for the bottle.",
+    "THE BUREAU: We have updated your file. We know what you did at the Halcyon Junk-Heap. It was hilarious.",
+    "KALLIS BELT: Strike ended after Megacorp successfully replaced all 5,000 miners with slightly cheaper rocks.",
+    "THE LEDGER HUB: Your loan interest just went up 2% because you're breathing too fast. Calm down and save money.",
+    "MARKET ALERT: High-grade Organs are trending! Remember: You have two kidneys, but you only NEED one ship.",
+    "ATTENTION: A 500-credit 'Viewing Fee' has been deducted from your account for reading this ticker. You're welcome.",
+    "SOLENNE VERGE: Monks claim salt-hoarding is 'divine.' Jackhole Megacorp claims it's 'market manipulation.' Fight! Fight!",
+    "URGENT: Smuggling is strictly prohibited unless you use the official Jackhole Megacorp 'Discretion Surcharge' app.",
+    "YOXAI JUNGLE: Ancient alien ruins discovered! Megacorp lawyers are currently suing the ruins for copyright infringement.",
+    "EREBUS BUBBLES: Record Algae harvest! It's green, it's slimy, and it's legally classified as 'food-adjacent'!",
+  ];
 
   // =====================================================================
   // shared helpers used by local-event apply functions
@@ -503,7 +505,7 @@ const TICKER_SEEDS = [
         } },
     ],
 
-    thren: [
+    goog: [
       { id:"black_clinic", weight:35, type:"good", title:"Black Clinic",
         img:"evt_clinic.png",
         body:"A backstreet clinic sells implants below the listed price.",
@@ -552,46 +554,41 @@ const TICKER_SEEDS = [
   LOCATIONS.forEach(loc => { loc.localEvents = LOCAL_EVENTS[loc.id] || []; });
 
   // =====================================================================
-  // ship sprite sheet config — two sheets, atlas-style frame coords
-  //   sheet keys ('one'/'two') match the per-ship `sheet` field below.
-  //   frame coords mirror the JSON atlases in /assets/sprites/.
+  // ship sprite sheet config — single consolidated atlas
+  //   frame coords mirror /assets/sprites/ships.json
   // =====================================================================
   const SHIP_SPRITES = {
-    one: {
-      src:    'assets/sprites/ships-one.png',
-      sheetW: 1799, sheetH: 895,
-      frames: {
-        squid:     { x:    2, y:   2, w: 664, h: 376 },
-        submarine: { x:  668, y:   2, w: 518, h: 318 },
-        whale:     { x: 1204, y:   2, w: 593, h: 421 },
-        worm:      { x:    2, y: 425, w: 663, h: 377 },
-        cube:      { x:  668, y: 425, w: 534, h: 468 },
-        bottle:    { x: 1204, y: 425, w: 584, h: 427 },
-      },
-    },
-    two: {
-      src:    'assets/sprites/ships-two.png',
-      sheetW: 1557, sheetH: 1006,
-      frames: {
-        bee:     { x:    2, y:   2, w: 500, h: 500 },
-        brain:   { x:  504, y:   2, w: 469, h: 353 },
-        cyber:   { x: 1017, y:   2, w: 500, h: 500 },
-        eyeball: { x:    2, y: 504, w: 500, h: 500 },
-        skull:   { x:  504, y: 504, w: 511, h: 488 },
-        spider:  { x: 1017, y: 504, w: 538, h: 420 },
-      },
+    src:    'assets/sprites/ships.png',
+    sheetW: 2514, sheetH: 1508,
+    frames: {
+      eyeball:   { x:    2, y:    2, w: 500, h: 500 },
+      skull:     { x:  588, y:    2, w: 511, h: 488 },
+      spider:    { x: 1183, y:    2, w: 538, h: 420 },
+      squid:     { x: 1848, y:    2, w: 664, h: 376 },
+      submarine: { x:    2, y:  504, w: 518, h: 318 },
+      whale:     { x:  588, y:  504, w: 593, h: 421 },
+      worm:      { x: 1183, y:  504, w: 663, h: 377 },
+      bee:       { x: 1848, y:  504, w: 500, h: 500 },
+      bottle:    { x:    2, y: 1006, w: 584, h: 427 },
+      brain:     { x:  588, y: 1006, w: 469, h: 353 },
+      cube:      { x: 1183, y: 1006, w: 534, h: 468 },
+      cyber:     { x: 1848, y: 1006, w: 500, h: 500 },
     },
   };
 
   // =====================================================================
-  // 12 ships — sprites split across two sheets
-  //   sheet     : 'one' | 'two' — which sprite atlas
-  //   sprite    : frame key inside that atlas
-  //   cost      : credits deducted from starting cash on purchase
-  //   cap       : cargo hold in tons (overrides mode default)
-  //   fuelCap   : maximum ship fuel reservoir (units)
-  //   fuelMod   : multiplier on travel fuel use   (<1 = cheaper)
-  //   speedMod  : multiplier on travel days       (<1 = faster)
+  // 12 ships
+  //   sprite           : frame key inside SHIP_SPRITES.frames
+  //   cost             : credits deducted from starting cash on purchase
+  //   cap              : cargo hold in tons (overrides mode default)
+  //   passCap          : passenger berths (data only — no game logic yet)
+  //   fuelCap          : maximum ship fuel reservoir (units)
+  //   fuelMod          : multiplier on travel fuel use   (<1 = cheaper)
+  //   speedMod         : multiplier on travel days       (<1 = faster)
+  //   maint            : daily maintenance cost (data only — no game logic yet)
+  //   interestMod      : multiplier on loan interest rate
+  //   contrabandShield : true → customs inspections often find nothing
+  //   betterEvents     : true → bad random events fire less often
   // =====================================================================
 const SHIPS = [
   // ── STARTER / MID ────────────────────────────────────────────────
@@ -735,7 +732,7 @@ const COMPETITORS = [
     yoxai:  13,
     solen:  14,
     verra:  14,
-    thren:  15,  // black-market markup
+    goog:   15,  // black-market markup
   };
 
   function travelFuel(a, b, fuelMod = 1.0) {
