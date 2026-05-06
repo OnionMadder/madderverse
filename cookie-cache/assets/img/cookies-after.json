@@ -1,0 +1,255 @@
+{
+  "frames": {
+    "eaten-one": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 911
+      }
+    },
+    "eaten-two": {
+      "frame": {
+        "x": 1082,
+        "y": 1,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 897
+      }
+    },
+    "eaten-three": {
+      "frame": {
+        "x": 2163,
+        "y": 1,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 788
+      }
+    },
+    "eaten-four": {
+      "frame": {
+        "x": 3244,
+        "y": 1,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 968
+      }
+    },
+    "eaten-five": {
+      "frame": {
+        "x": 1,
+        "y": 970,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 953
+      }
+    },
+    "eaten-six": {
+      "frame": {
+        "x": 1082,
+        "y": 970,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 940
+      }
+    },
+    "eaten-seven": {
+      "frame": {
+        "x": 2163,
+        "y": 970,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 906
+      }
+    },
+    "eaten-eight": {
+      "frame": {
+        "x": 3244,
+        "y": 970,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 786
+      }
+    },
+    "eaten-nine": {
+      "frame": {
+        "x": 1,
+        "y": 1939,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 798
+      }
+    },
+    "eaten-ten": {
+      "frame": {
+        "x": 1082,
+        "y": 1939,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 803
+      }
+    },
+    "eaten-eleven": {
+      "frame": {
+        "x": 2163,
+        "y": 1939,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 813
+      }
+    },
+    "eaten-twelve": {
+      "frame": {
+        "x": 3244,
+        "y": 1939,
+        "w": 1080,
+        "h": 968
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 968
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 817
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 4325,
+      "h": 2908
+    },
+    "scale": "1"
+  }
+}

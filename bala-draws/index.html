@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Explore the Madderverse</title>
+    <link rel="canonical" href="https://madderverse.org/bala-draws/" />
+    <meta property="og:url" content="https://madderverse.org/bala-draws/" />
+    <meta name="twitter:url" content="https://madderverse.org/bala-draws/" />
+    <meta name="title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="keywords" content="FYMZ, Find Your Madder Zone, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta property="og:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" /> <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" /> 
+    <meta name="apple-mobile-web-app-title" content="FYMZ" />
+    <meta name="application-name" content="FYMZ" />
+    <link rel="stylesheet" href="https://madderverse.org/bala-draws/style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+
+<header class="top">
+    <a href="../" class="back">&larr; FYMZ</a>
+    <h1>Bala Draws</h1>
+    <button class="rotate-btn" id="rotate" aria-label="Rotate canvas"><span class="ico">⟲</span></button>
+</header>
+
+<div class="stage">
+    <div class="paper-frame frame-none" id="paper-frame">
+        <div class="paper landscape" id="paper">
+            <svg id="template-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet"></svg>
+            <canvas id="canvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="toolbar">
+    <div class="panel-area">
+        <div class="panel panel-tools active" data-panel="tools">
+            <div class="palette" id="palette"></div>
+            <div class="row">
+                <div class="sizes" id="brush-sizes">
+                    <button class="size-btn" data-size="4" aria-label="Small brush"><span class="dot"></span></button>
+                    <button class="size-btn active" data-size="14" aria-label="Medium brush"><span class="dot"></span></button>
+                    <button class="size-btn" data-size="30" aria-label="Big brush"><span class="dot"></span></button>
+                </div>
+                <button class="tool-btn" id="eraser" aria-label="Eraser"><span class="ico">🧽</span><span class="lbl">Erase</span></button>
+                <button class="tool-btn" id="clear" aria-label="Clear"><span class="ico">🗑️</span><span class="lbl">Clear</span></button>
+            </div>
+        </div>
+        <div class="panel panel-pages" data-panel="pages">
+            <div class="thumbs" id="page-thumbs"></div>
+        </div>
+        <div class="panel panel-frames" data-panel="frames">
+            <div class="thumbs" id="frame-thumbs"></div>
+        </div>
+    </div>
+    <div class="tabs-row">
+        <button class="tab-btn active" data-tab="tools" aria-label="Drawing tools"><span class="ico">🎨</span><span class="lbl">Tools</span></button>
+        <button class="tab-btn" data-tab="pages" aria-label="Pages"><span class="ico">📄</span><span class="lbl">Pages</span></button>
+        <button class="tab-btn" data-tab="frames" aria-label="Frames"><span class="ico">🖼️</span><span class="lbl">Frames</span></button>
+        <button class="tool-btn newpage" id="new-page" aria-label="New page"><span class="ico">✨</span><span class="lbl">New</span></button>
+        <button class="tool-btn primary" id="save" aria-label="Save"><span class="ico">💾</span><span class="lbl">Save</span></button>
+    </div>
+</div>
+
+<script src="game.js"></script>
+
+</body>
+</html>
