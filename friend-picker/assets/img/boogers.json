@@ -1,0 +1,95 @@
+{
+  "frames": {
+    "dingus-mctweet": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 403,
+        "h": 403
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 403,
+        "h": 403
+      },
+      "sourceSize": {
+        "w": 403,
+        "h": 403
+      }
+    },
+    "fifi-mcfluff": {
+      "frame": {
+        "x": 405,
+        "y": 1,
+        "w": 384,
+        "h": 384
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 384,
+        "h": 384
+      },
+      "sourceSize": {
+        "w": 384,
+        "h": 384
+      }
+    },
+    "mister-dandy": {
+      "frame": {
+        "x": 1,
+        "y": 405,
+        "w": 364,
+        "h": 364
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 364,
+        "h": 364
+      },
+      "sourceSize": {
+        "w": 364,
+        "h": 364
+      }
+    },
+    "greasy-gary": {
+      "frame": {
+        "x": 405,
+        "y": 405,
+        "w": 358,
+        "h": 358
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 358,
+        "h": 358
+      },
+      "sourceSize": {
+        "w": 358,
+        "h": 358
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 790,
+      "h": 770
+    },
+    "scale": "1"
+  }
+}

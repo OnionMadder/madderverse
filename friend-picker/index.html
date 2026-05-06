@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Friend Picker | FYMZ</title>
+    <link rel="canonical" href="https://fymz.lol/friend-picker/" />
+    <meta property="og:url" content="https://fymz.lol/friend-picker/" />
+    <meta name="twitter:url" content="https://fymz.lol/friend-picker/" />
+    <meta name="title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="keywords" content="FYMZ, Find Your Madder Zone, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta property="og:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta property="og:image" content="https://fymz.lol/assets/img/logo.jpg" /> <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="twitter:image" content="https://fymz.lol/assets/img/logo.jpg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://fymz.lol/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://fymz.lol/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://fymz.lol/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://fymz.lol/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://fymz.lol/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" /> <meta name="apple-mobile-web-app-title" content="FYMZ" />
+    <meta name="application-name" content="FYMZ" />
+    <link rel="stylesheet" href="https://fymz.lol/friend-picker/style.css" />
+    <script data-goatcounter="https://fymz.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body class="scanlines">
+
+<main id="friend-picker-app">
+<h1>Friend Picker</h1>
+
+  <div id="ui-layer">
+    <span id="timer-wrap">TIME: <span id="timer">0:30</span></span>
+    <span id="score-wrap">BOOGERS: <span id="score">0</span> / <span id="score-goal">30</span></span>
+    <button id="end-btn">END GAME</button>
+    <button id="reset-btn">RESET</button>
+    <button id="mute-btn" aria-label="Toggle sound">SOUND: ON</button>
+  </div>
+
+  <div id="game-container">
+    <button id="start-btn">START PICKING</button>
+
+    <aside id="friends-collected" aria-label="Special booger friends collected">
+      <div class="friends-collected-title">FRIENDS</div>
+      <div id="friends-collected-list"></div>
+    </aside>
+
+    <div id="reticle" class="game-element" aria-hidden="true">
+      <span class="reticle-ring"></span>
+      <span class="reticle-cross"></span>
+    </div>
+    <div id="hand" class="game-element" aria-hidden="true" hidden></div>
+
+    <div id="reveal-overlay" hidden>
+      <div class="reveal-card">
+        <h2 id="reveal-title">ROUND COMPLETE</h2>
+        <p id="reveal-stats"></p>
+        <div id="reveal-friends-grid"></div>
+        <div class="reveal-actions">
+          <button id="play-again">PLAY AGAIN</button>
+          <button id="reveal-back">END GAME</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script src="https://fymz.lol/friend-picker/game.js"></script>
+
+
+</body>
+</html>
