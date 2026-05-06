@@ -498,7 +498,7 @@
     showModal({
       title: s.win ? "You Win!" : "Game Over",
       body: s.win
-        ? `Net worth: ${fmt(Game.netWorth())} ¢ in ${s.day - 1} days. You're a Gazonionaire.`
+        ? `Net worth: ${fmt(Game.netWorth())} ¢ in ${s.day - 1} days. You're a GazOnionaire!`
         : `Net worth: ${fmt(Game.netWorth())} ¢. The void claims another trader.`,
       img: "assets/images/" + (s.win ? "win.png" : "lose.png"),
       actions: [{

@@ -62,128 +62,105 @@ const GAME_DATA = (() => {
   //   tagline  : one-line subtitle shown in the location card
   //   lore     : flavor blurb shown on first arrival (modal)
   // =====================================================================
-  const LOCATIONS = [
-    {
-      id: "terra", name: "Terra Prime", x:    0, y:    0,
-      lawful: 0.8, icon: "loc_terra.png",
-      produces: ["water", "grain"],
-      demands:  ["robots", "qchip"],
-      tagline: "Capital of the Pact. Clean streets, dirty politics.",
-      lore: "Once Earth, now a sanitized capital under the Pact's grey rule. " +
-            "Surface farms feed a hundred worlds; ask no questions about the under-cities. " +
-            "Customs is sharp here — leave the contraband in orbit."
-    },
-    {
-      id: "kallis", name: "Kallis Belt", x:   60, y:   25,
-      lawful: 0.3, icon: "loc_kallis.png",
-      produces: ["ore", "solar"],
-      demands:  ["water", "medicine"],
-      tagline: "Asteroid mining swarm. Company town, no exit.",
-      lore: "A debt-ridden mining swarm hammered into hollowed asteroids. " +
-            "Ore flows out, bills come due, the company always wins. " +
-            "Bring water and meds — they'll trade the shirts off their backs."
-    },
-    {
-      id: "zeph", name: "Zephyr Hub", x:   45, y:   80,
-      lawful: 0.5, icon: "loc_zeph.png",
-      produces: ["tech", "qchip"],
-      demands:  ["art", "antim"],
-      tagline: "Free port and tax haven. Anything's for sale.",
-      lore: "Free port and tax haven, glittering above Pavonis. " +
-            "If it can be invented, fenced, or licensed, you'll find it on the Hub's bazaar tier. " +
-            "The wealthy pay obscene prices for art and antimatter."
-    },
-    {
-      id: "verra", name: "Verra Outpost", x:  -95, y:   55,
-      lawful: 0.1, icon: "loc_verra.png",
-      produces: ["spice", "weapons"],
-      demands:  ["fuel", "solar"],
-      tagline: "Lawless rim. Smugglers welcome, governors don't last.",
-      lore: "The customs officers stopped showing up after the third governor disappeared. " +
-            "Spice runs hot from the back rooms; arms dealers haggle in the open. " +
-            "The frontier is hungry for fuel and power."
-    },
-    {
-      id: "obsid", name: "Obsidian Reach", x:  -35, y:  -65,
-      lawful: 0.6, icon: "loc_obsid.png",
-      produces: ["glass", "art"],
-      demands:  ["spice", "weapons"],
-      tagline: "Black-glass spires. Old aristocracy with new vices.",
-      lore: "Black glass spires raised by an old aristocracy that paints with starlight " +
-            "and pays in old grudges. Don't insult the host. " +
-            "Their parties run on spice and their bodyguards run on bullets."
-    },
-    {
-      id: "halc", name: "Halcyon Drift", x:   95, y:  -25,
-      lawful: 0.3, icon: "loc_halc.png",
-      produces: ["fuel", "plastics"],
-      demands:  ["grain", "holo"],
-      tagline: "A graveyard of warships turned salvage town.",
-      lore: "Half its citizens are stowaways, the other half are looking for them. " +
-            "Salvage rigs strip dead capital ships for fuel cells and polyplastics. " +
-            "The drifters trade everything for grain and contraband holos."
-    },
-    {
-      id: "calder", name: "Caldera-9", x:  -70, y:  -10,
-      lawful: 0.5, icon: "loc_calder.png",
-      produces: ["robots", "cyber"],
-      demands:  ["hydrogen", "organs"],
-      tagline: "Volcanic forge-world. Robots build robots build robots.",
-      lore: "A volcanic foundry-world where forges never cool and the workers " +
-            "are mostly metal themselves. The smelters are ravenous for hydrogen, " +
-            "and a working pair of lungs is worth its weight in robots."
-    },
-    {
-      id: "erebus", name: "New Erebus", x:   50, y:  -85,
-      lawful: 0.4, icon: "loc_erebus.png",
-      produces: ["algae", "salt"],
-      demands:  ["tech", "cyber"],
-      tagline: "Drowned ocean planet. Cities float, the deep listens.",
-      lore: "Cities cling to floating reefs of luminous algae. " +
-            "The deep things below have started knocking back, and the surveyors stopped reporting. " +
-            "Every reef-station is desperate for tech parts and replacement limbs."
-    },
-    {
-      id: "pavon", name: "Pavonis Prime", x:   60, y:   95,
-      lawful: 0.7, icon: "loc_pavon.png",
-      produces: ["hydrogen", "antim"],
-      demands:  ["textiles", "lumber"],
-      tagline: "Gas-giant skyhooks. Helium barons, helium parties.",
-      lore: "Cloud-city skyhooks dangle into a gas-giant's storms. " +
-            "Helium barons throw parties you'll never be invited to — " +
-            "but they pay in solid currency for soft beds, real wood, and warm fabric."
-    },
-    {
-      id: "solen", name: "Solenne Verge", x: -105, y:  -85,
-      lawful: 0.6, icon: "loc_solen.png",
-      produces: ["medicine", "holo"],
-      demands:  ["salt", "plastics"],
-      tagline: "Walled monk-engineer sanctuary. They pray with lasers.",
-      lore: "Pilgrims come to be healed; sometimes they leave. " +
-            "The Order grows rare crystals in vaulted gardens and brews medicine in copper stills. " +
-            "Salt and plastics pour into the cloister at strange premiums."
-    },
-    {
-      id: "thren", name: "Threnody-7", x:   15, y: -100,
-      lawful: 0.2, icon: "loc_thren.png",
-      produces: ["organs", "lace"],
-      demands:  ["algae", "glass"],
-      tagline: "Vertical slum-stack. Your spine is software here.",
-      lore: "Down here, your spine is software and your lungs are a subscription. " +
-            "Backstreet clinics print organs and braid neural lace into anyone who can pay. " +
-            "The masses live on algae paste; the towers above devour glass."
-    },
-    {
-      id: "yoxai", name: "Yoxai Hollow", x:  -65, y:  100,
-      lawful: 0.3, icon: "loc_yoxai.png",
-      produces: ["textiles", "lumber"],
-      demands:  ["ore", "lace"],
-      tagline: "Overgrown alien dig-site. The ruins are still listening.",
-      lore: "An overgrown dig at the edge of charted space. " +
-            "The ruins predate the species who named them, and the ruins are still listening. " +
-            "Archaeologists trade strange wood and silken fibers for ore and neural lace."
-    },
-  ];
+const LOCATIONS = [
+  {
+    id: "terra", name: "Terra Prime", x: 0, y: 0,
+    lawful: 1.0, icon: "loc_terra.png",
+    produces: ["water", "grain"],
+    demands:  ["robots", "qchip"],
+    tagline: "The 'Totally Real' Home World. Sponsored by Jackhole Megacorp.",
+    lore: "Jackhole Megacorp bought the naming rights to this rock and calls it 'The Cradle of Humanity' to dodge taxes. It's basically one giant office park with a nice gift shop. Very safe, very boring, and if you spit on the sidewalk, they'll garnish your wages for life."
+  },
+  {
+    id: "zeph", name: "The Ledger Hub", x: 45, y: 80,
+    lawful: 0.7, icon: "loc_zeph.png",
+    produces: ["tech", "qchip"],
+    demands:  ["art", "antim"],
+    canLoan: true, // Unique mechanical flag for banking
+    tagline: "Silicon Valley in the Stars. Banking with a smile and a wiretap.",
+    lore: "The sector's premier offshore accounting moon. It’s where the tech-bros and the tax-dodgers hang out. You can get a massive loan here at 'competitive' rates, but read the fine print—they've been known to repo ships while they're still in mid-warp."
+  },
+  {
+    id: "kallis", name: "Kallis Rock-Candy", x: 60, y: 25,
+    lawful: 0.3, icon: "loc_kallis.png",
+    produces: ["ore", "solar"],
+    demands:  ["water", "medicine"],
+    tagline: "A hollowed-out asteroid full of shiny rocks and grumpy miners.",
+    lore: "It looks like a giant floating piece of coal, but the inside is a neon-lit maze of tunnels! The miners here use giant robot drills to find space-crystals. They’re super thirsty and have a lot of boo-boos, so bring water and bandages!"
+  },
+  {
+    id: "verra", name: "Verra Vroom-Outpost", x: -95, y: 55,
+    lawful: 0.1, icon: "loc_verra.png",
+    produces: ["spice", "weapons"],
+    demands:  ["fuel", "solar"],
+    tagline: "The edge of the map where the space-pirates play!",
+    lore: "A wild, wild west station with zero rules and lots of explosions! Smugglers race their ships through the rings for fun. If you want the spicy stuff or big laser guns, this is the place—just don't leave your keys in the ignition."
+  },
+  {
+    id: "obsid", name: "Obsidian Spire", x: -35, y: -65,
+    lawful: 0.6, icon: "loc_obsid.png",
+    produces: ["glass", "art"],
+    demands:  ["spice", "weapons"],
+    tagline: "Fancy glass towers for very grumpy space-royalty.",
+    lore: "The whole planet is made of shiny black glass! The kings and queens here wear capes made of starlight and spend all day painting pictures. They act very posh, but they secretly love spice and need big blasters to keep the space-monsters away."
+  },
+  {
+    id: "halc", name: "Halcyon Junk-Heap", x: 95, y: -25,
+    lawful: 0.3, icon: "loc_halc.png",
+    produces: ["fuel", "plastics"],
+    demands:  ["grain", "holo"],
+    tagline: "A giant playground made of broken spaceships!",
+    lore: "What do you do with a trillion tons of space-trash? You turn it into a city! The 'Junkers' climb through old engine rooms looking for fuel and plastic toys. They’re hungry for real food and love watching cartoon holos."
+  },
+  {
+    id: "calder", name: "Caldera-9", x: -70, y: -10,
+    lawful: 0.5, icon: "loc_calder.png",
+    produces: ["robots", "cyber"],
+    demands:  ["hydrogen", "organs"],
+    tagline: "The Robot Factory Planet! Beep boop!",
+    lore: "A giant volcano planet where robots build other robots who then build more robots! It's very hot and very loud. The machines need ice-cold hydrogen to keep from melting, and they’re always looking for 'spare organic parts' for their human pets."
+  },
+  {
+    id: "erebus", name: "Bubble-Erebus", x: 50, y: -85,
+    lawful: 0.4, icon: "loc_erebus.png",
+    produces: ["algae", "salt"],
+    demands:  ["tech", "cyber"],
+    tagline: "A giant water-balloon planet full of glowing squids!",
+    lore: "The cities here float in giant bubbles under the sea! You can see glowing algae and huge space-whales through the windows. Everything breaks because of the water, so they'll trade all their salt for new gadgets and robot legs!"
+  },
+  {
+    id: "pavon", name: "Pavonis Clouds", x: 60, y: 95,
+    lawful: 0.7, icon: "loc_pavon.png",
+    produces: ["hydrogen", "antim"],
+    demands:  ["textiles", "lumber"],
+    tagline: "Floating castles in the sky! Don't look down!",
+    lore: "The rich 'Cloud Barons' live in houses held up by giant balloons. They have lots of fancy fuel but they don't have any trees or blankets. They'll pay a bajillion credits for a wooden chair or a warm sweater!"
+  },
+  {
+    id: "solen", name: "Solenne Garden", x: -105, y: -85,
+    lawful: 0.6, icon: "loc_solen.png",
+    produces: ["medicine", "holo"],
+    demands:  ["salt", "plastics"],
+    tagline: "The Space-Monk Sanctuary. Shhh... they're praying.",
+    lore: "A very quiet planet full of gardens and copper towers. The space-monks use giant lasers to write poems on the moon. They make magic medicine and cool movies, but for some reason, they really, really love eating salt."
+  },
+  {
+    id: "goog", name: "The Threnody Stack", x: 15, y: -100,
+    lawful: 0.2, icon: "loc_thren.png",
+    produces: ["organs", "lace"],
+    demands:  ["algae", "glass"],
+    tagline: "The world's biggest skyscraper! It goes up forever!",
+    lore: "Imagine a building so tall it pokes out of the atmosphere! Millions of people live in tiny rooms stacked on top of each other. They make cool brain-chips and bionic hearts, but they have to eat slimy algae every single day. Gross!"
+  },
+  {
+    id: "yoxai", name: "Yoxai Jungle", x: -65, y: 100,
+    lawful: 0.3, icon: "loc_yoxai.png",
+    produces: ["textiles", "lumber"],
+    demands:  ["ore", "lace"],
+    tagline: "Alien ruins and giant plants. Watch out for the vines!",
+    lore: "A spooky, beautiful jungle full of broken alien statues that might be alive! Scientists come here to find magic wood and silk. They need heavy rocks to build their camps and brain-lace to talk to the statues!"
+  }
+];
 
   // =====================================================================
   // random events (post-travel)
@@ -281,16 +258,20 @@ const GAME_DATA = (() => {
   // =====================================================================
   // starting headlines for the news ticker
   // =====================================================================
-  const TICKER_SEEDS = [
-    "Welcome to the Gazonionaire Trade Network — buy low, sell high.",
-    "Galactic Bank reports record loan defaults.",
-    "Terra Prime exports water cheap this cycle.",
-    "Verra Outpost reportedly under-policed; smugglers rejoice.",
-    "Halcyon Drift fuel-cell glut depresses prices.",
-    "Kallis Belt miners strike again — water shortages worsen.",
-    "Solenne monks unveil new holo-crystal vintage.",
-    "Yoxai Hollow dig yields fresh artifacts; collectors circling.",
-  ];
+const TICKER_SEEDS = [
+  "JACKHOLE MEGACORP: Our orbital sensors have detected you are thinking about a snack. Please purchase a snack.",
+  "REMINDER: Bankruptcy is a breach of your ‘Life-Usage Agreement’. Defaulters will be converted into Caldera-9 lubricants.",
+  "TERRA PRIME: Water prices dropped! Buy now before we remember to charge you for the bottle.",
+  "THE BUREAU: We have updated your file. We know what you did at the Halcyon Junk-Heap. It was hilarious.",
+  "KALLIS BELT: Strike ended after Megacorp successfully replaced all 5,000 miners with slightly cheaper rocks.",
+  "THE LEDGER HUB: Your loan interest just went up 2% because you’re breathing too fast. Calm down and save money.",
+  "MARKET ALERT: High-grade Organs are trending! Remember: You have two kidneys, but you only NEED one ship.",
+  "ATTENTION: A 500-credit 'Viewing Fee' has been deducted from your account for reading this ticker. You're welcome.",
+  "SOLENNE VERGE: Monks claim salt-hoarding is 'divine.' Jackhole Megacorp claims it’s 'market manipulation.' Fight! Fight!",
+  "URGENT: Smuggling is strictly prohibited unless you use the official Jackhole Megacorp 'Discretion Surcharge' app.",
+  "YOXAI JUNGLE: Ancient alien ruins discovered! Megacorp lawyers are currently suing the ruins for copyright infringement.",
+  "EREBUS BUBBLES: Record Algae harvest! It’s green, it’s slimy, and it’s legally classified as 'food-adjacent'!",
+];
 
   // =====================================================================
   // shared helpers used by local-event apply functions
@@ -612,120 +593,130 @@ const GAME_DATA = (() => {
   //   fuelMod   : multiplier on travel fuel use   (<1 = cheaper)
   //   speedMod  : multiplier on travel days       (<1 = faster)
   // =====================================================================
-  const SHIPS = [
-    // ── starter / mid ────────────────────────────────────────────────
-    {
-      id: 'shuttle', sheet: 'one', sprite: 'bottle',
-      name: 'Deckard-Class Shuttle',
-      cost: 0, cap: 40, fuelCap: 80, fuelMod: 1.0, speedMod: 1.0,
-      flavor: 'No shame in starting small.',
-      desc: 'A battered personal shuttle retrofitted with a cargo bay. Free, reliable, and embarrassing to park next to anyone with money. Gets the job done if you know what you\'re doing.',
-    },
-    {
-      id: 'hauler', sheet: 'one', sprite: 'cube',
-      name: 'Kallis Standard Hauler',
-      cost: 500, cap: 65, fuelCap: 120, fuelMod: 1.0, speedMod: 1.0,
-      flavor: 'Built in the belt, built to last.',
-      desc: 'The workhorse of the trade lanes. Ample cargo space, reasonable fuel, no surprises. What most traders settle on — and what most start with.',
-    },
-    {
-      id: 'clipper', sheet: 'two', sprite: 'bee',
-      name: 'Zephyr Clipper',
-      cost: 1500, cap: 45, fuelCap: 100, fuelMod: 0.88, speedMod: 0.78,
-      flavor: 'Light load, fast lanes.',
-      desc: 'A slender fast-courier hull optimized for speed over volume. The Clipper completes two runs where a hauler completes one. Time is money, and this ship prints time.',
-    },
-    {
-      id: 'runner', sheet: 'one', sprite: 'worm',
-      name: 'Verra Rim Runner',
-      cost: 2000, cap: 58, fuelCap: 110, fuelMod: 0.80, speedMod: 0.85,
-      flavor: 'What scanner? That\'s just a shadow.',
-      desc: 'A hull that grew up dodging customs on the Verra outskirts. Fast, fuel-lean, and fitted with baffled compartments that make inspectors uncomfortable. Discretion is built in.',
-    },
-    // ── advanced ─────────────────────────────────────────────────────
-    {
-      id: 'courier', sheet: 'two', sprite: 'spider',
-      name: 'Obsidian Courier',
-      cost: 4000, cap: 52, fuelCap: 100, fuelMod: 0.82, speedMod: 0.70,
-      flavor: 'Speed is its own kind of diplomacy.',
-      desc: 'Built in the black-glass yards of Obsidian Reach for aristocratic dispatch work. The fastest hull money buys at this price point — style that makes docking officers wave you through.',
-    },
-    {
-      id: 'salvager', sheet: 'one', sprite: 'submarine',
-      name: 'Halcyon Salvager',
-      cost: 1200, cap: 85, fuelCap: 140, fuelMod: 1.12, speedMod: 1.22,
-      flavor: 'She\'ll get there. Eventually.',
-      desc: 'Assembled from three derelict hulls at the Halcyon Drift yards. The expanded hold is genuinely impressive. Its engines, however, are a patchwork of compromises that adds up to slow.',
-    },
-    {
-      id: 'forge_hauler', sheet: 'one', sprite: 'whale',
-      name: 'Caldera Forge-Hauler',
-      cost: 3000, cap: 110, fuelCap: 200, fuelMod: 1.30, speedMod: 1.45,
-      flavor: 'Slow money is still money.',
-      desc: 'An industrial bulk freighter from the Caldera-9 foundry line. The hold is enormous, the engines are enormous, and the fuel bills are enormous. When margin lives in volume, nothing else competes.',
-    },
-    {
-      id: 'drifter', sheet: 'one', sprite: 'squid',
-      name: 'Erebus Drifter',
-      cost: 1800, cap: 68, fuelCap: 130, fuelMod: 0.90, speedMod: 0.95,
-      flavor: 'Uncommonly reliable.',
-      desc: 'A reef-adapted patrol hull from New Erebus, modified for open-lane trade. Good hold, decent speed, solid fuel economy. The choice of the cautious professional who wants no weak points.',
-    },
-    // ── specialty ────────────────────────────────────────────────────
-    {
-      id: 'skimmer', sheet: 'two', sprite: 'cyber',
-      name: 'Pavonis Skimmer',
-      cost: 2500, cap: 58, fuelCap: 160, fuelMod: 0.58, speedMod: 0.90,
-      flavor: 'The routes pay. The fuel doesn\'t.',
-      desc: 'Engineered at Pavonis Prime gas rigs to minimize fuel draw. In open space the savings are extraordinary — every jump costs dramatically less, and that compounds across an entire run.',
-    },
-    {
-      id: 'pilgrim', sheet: 'two', sprite: 'brain',
-      name: 'Solenne Pilgrim Vessel',
-      cost: 2200, cap: 62, fuelCap: 120, fuelMod: 0.88, speedMod: 1.0,
-      interestMod: 0.75,
-      flavor: 'The Order\'s mark opens doors.',
-      desc: 'A consecrated trading vessel blessed by the Order of Solenne. Superstitious bankers charge 25% less interest to its registered captain. Customs tends toward leniency. Hard to explain, easy to profit from.',
-    },
-    {
-      id: 'ghost', sheet: 'two', sprite: 'skull',
-      name: 'Threnody Ghost',
-      cost: 3500, cap: 58, fuelCap: 130, fuelMod: 0.88, speedMod: 0.85,
-      contrabandShield: true,
-      flavor: 'What ship? Exactly.',
-      desc: 'Built in the vertical slums of Threnody-7 for clients whose cargo prefers not to be noticed. Scans clean on any frequency that matters. Customs inspection events have a heavily reduced effect on this vessel.',
-    },
-    {
-      id: 'explorer', sheet: 'two', sprite: 'eyeball',
-      name: 'Yoxai Deep Explorer',
-      cost: 5000, cap: 72, fuelCap: 180, fuelMod: 0.85, speedMod: 0.90,
-      betterEvents: true,
-      flavor: 'The ruins taught it patience.',
-      desc: 'A long-range survey vessel retrofitted for trade after the Yoxai dig grants dried up. Enhanced sensor arrays give the captain advance reads on market conditions — bad random events occur less frequently.',
-    },
-  ];
+const SHIPS = [
+  // ── STARTER / MID ────────────────────────────────────────────────
+  {
+    id: 'shuttle', sheet: 'one', sprite: 'bottle',
+    name: 'Deckard-Class Shuttle',
+    cost: 0, cap: 40, passCap: 2, fuelCap: 80, fuelMod: 1.0, speedMod: 1.0, maint: 10,
+    flavor: 'Is that... cola?',
+    desc: 'An old promotional soda transport retrofitted with life support. It’s sticky, the engine sounds like a burp, and it’s free. No shame in starting small, but plenty of shame in being seen in this.',
+  },
+  {
+    id: 'hauler', sheet: 'one', sprite: 'cube',
+    name: 'Kallis Standard Hauler',
+    cost: 500, cap: 75, passCap: 0, fuelCap: 120, fuelMod: 1.1, speedMod: 1.0, maint: 25,
+    flavor: 'Suspend your disbelief (and your cargo).',
+    desc: 'Literally a block of gelatinous suspension fluid held in a purple force-field. It doesn’t have hallways, just pockets of air. Great for bulk, terrible for anyone who hates being moist.',
+  },
+  {
+    id: 'clipper', sheet: 'two', sprite: 'bee',
+    name: 'Zephyr Clipper',
+    cost: 1500, cap: 45, passCap: 8, fuelCap: 100, fuelMod: 0.88, speedMod: 0.78, maint: 40,
+    flavor: 'Float like a butterfly, sting like a fuel bill.',
+    desc: 'An insectoid hull with vibrating wings that somehow provide thrust in a vacuum. It’s the fastest way to get eight passengers across the sector, provided they don’t mind the constant buzzing.',
+  },
+  {
+    id: 'runner', sheet: 'one', sprite: 'worm',
+    name: 'Verra Rim Runner',
+    cost: 2000, cap: 58, passCap: 4, fuelCap: 110, fuelMod: 0.80, speedMod: 0.85, maint: 50,
+    flavor: 'The segmented speedster.',
+    desc: 'Its bio-mechanical segments allow it to weave through asteroid belts that would shred a hauler. It’s slimy and the air filters smell like compost, but customs can never quite catch it.',
+  },
 
-  // =====================================================================
-  // competitor companies — six rivals jockeying for trade-network rank
-  //   style controls how their net worth drifts each day:
-  //     'steady'     low volatility, slow positive bias
-  //     'aggressive' higher upside but higher swings
-  //     'volatile'   wild swings, can crash or skyrocket
-  // =====================================================================
-  const COMPETITORS = [
-    { id: 'onix',    name: 'Onix Freight Guild',     style: 'steady',
-      motto: 'Bonded. Insured. On schedule.' },
-    { id: 'kallisco',name: 'Kallis Heavy Metals',    style: 'aggressive',
-      motto: 'We move what cannot be moved.' },
-    { id: 'pavonis', name: 'Pavonis Skyhook Cartel', style: 'volatile',
-      motto: 'Above the clouds, above the law.' },
-    { id: 'zephyr',  name: 'Zephyr Free Traders',    style: 'aggressive',
-      motto: 'No flag, no fear, no fees.' },
-    { id: 'threnco', name: 'Threnody Undermarket',   style: 'volatile',
-      motto: 'Quiet ships. Loud profits.' },
-    { id: 'solenne', name: 'Solenne Blessed Cargo',  style: 'steady',
-      motto: 'Cargo blessed. Routes prayed.' },
-  ];
+  // ── ADVANCED ─────────────────────────────────────────────────────
+  {
+    id: 'courier', sheet: 'two', sprite: 'spider',
+    name: 'Obsidian Courier',
+    cost: 4000, cap: 52, passCap: 12, fuelCap: 100, fuelMod: 0.82, speedMod: 0.70, maint: 85,
+    flavor: 'Eight legs, zero delays.',
+    desc: 'The ultimate in high-society dispatch. The Obsidian Courier crawls through the jump-gates with terrifying precision. Its pressurized cabin is a favorite for aristocrats who enjoy a gothic touch.',
+  },
+  {
+    id: 'salvager', sheet: 'one', sprite: 'submarine',
+    name: 'Halcyon Salvager',
+    cost: 1200, cap: 85, passCap: 3, fuelCap: 140, fuelMod: 1.12, speedMod: 1.22, maint: 30,
+    flavor: 'Pressure-tested for the deep black.',
+    desc: 'Looks like it belongs underwater, but it handles the vacuum just as well. It’s a rusted tank with a massive belly—clunky and slow, but it can carry a whole scrapyard in one go.',
+  },
+  {
+    id: 'forge_hauler', sheet: 'one', sprite: 'whale',
+    name: 'Caldera Forge-Hauler',
+    cost: 3000, cap: 130, passCap: 2, fuelCap: 220, fuelMod: 1.35, speedMod: 1.45, maint: 100,
+    flavor: 'Steam-powered profit.',
+    desc: 'A massive, brass-bound beast that exhales pink exhaust. It’s an industrial behemoth with enough cargo room to crash a local market single-handedly. If you can afford the fuel, you win.',
+  },
+  {
+    id: 'drifter', sheet: 'one', sprite: 'squid',
+    name: 'Erebus Drifter',
+    cost: 1800, cap: 68, passCap: 6, fuelCap: 130, fuelMod: 0.90, speedMod: 0.95, maint: 45,
+    flavor: 'Tentacles of trade.',
+    desc: 'The Drifter uses its glowing propulsion limbs to glide through the void. It’s an uncommonly reliable ship with a balanced stat spread, popular with traders who don’t want any surprises.',
+  },
+
+  // ── SPECIALTY ────────────────────────────────────────────────────
+  {
+    id: 'skimmer', sheet: 'two', sprite: 'cyber',
+    name: 'Pavonis Skimmer',
+    cost: 2500, cap: 60, passCap: 10, fuelCap: 160, fuelMod: 0.55, speedMod: 0.90, maint: 60,
+    flavor: 'Neon-infused efficiency.',
+    desc: 'A sharp, crystalline hull that literally eats light to power its engines. It has the lowest fuel draw in the sector. It looks like a high-tech diamond and moves like a laser beam.',
+  },
+  {
+    id: 'pilgrim', sheet: 'two', sprite: 'brain',
+    name: 'Solenne Pilgrim Vessel',
+    cost: 2200, cap: 62, passCap: 20, fuelCap: 120, fuelMod: 0.88, speedMod: 1.0, interestMod: 0.75, maint: 35,
+    flavor: 'Thought-controlled travel.',
+    desc: 'A giant, preserved brain encased in a golden dome. It’s a sacred vessel of the Order. Bankers find the ship so unsettling (or holy) that they offer significantly lower interest rates to its owners.',
+  },
+  {
+    id: 'ghost', sheet: 'two', sprite: 'skull',
+    name: 'Threnody Ghost',
+    cost: 3500, cap: 58, passCap: 4, fuelCap: 130, fuelMod: 0.88, speedMod: 0.85, contrabandShield: true, maint: 70,
+    flavor: 'Death at the wheel.',
+    desc: 'A menacing hull shaped like a titan’s skull on wheels. It uses "fear-tech" to scramble scanners. Most customs agents see this coming and decide they’re too busy to perform an inspection.',
+  },
+  {
+    id: 'explorer', sheet: 'two', sprite: 'eyeball',
+    name: 'Yoxai Deep Explorer',
+    cost: 5000, cap: 72, passCap: 12, fuelCap: 180, fuelMod: 0.85, speedMod: 0.90, betterEvents: true, maint: 110,
+    flavor: 'The eye that never blinks.',
+    desc: 'Equipped with a giant, organic optic sensor. It can see market fluctuations three systems away. It avoids negative random events by simply seeing them coming and steering the other way.',
+  },
+];
+
+const COMPETITORS = [
+  { 
+    id: 'onix', name: 'Onix Paper-Pushers', style: 'steady',
+    motto: 'We love forms. We live for files.',
+    flavor: 'A subsidiary so boring that even Jackhole Megacorp forgot they owned them. They specialize in shipping stationary and staplers. They never crash, but they never truly soar—they just... exist.'
+  },
+  { 
+    id: 'kallisco', name: 'Kallis Heavy Metalheads', style: 'aggressive',
+    motto: 'If it’s heavy, we’ll drop it!',
+    flavor: 'Ex-miners who spent too much time huffing asteroid dust. They fly massive, rusted bricks and don’t believe in brakes. They make big money or big craters. There is no middle ground.'
+  },
+  { 
+    id: 'pavonis', name: 'Pavonis Cloud-Clown Cartel', style: 'volatile',
+    motto: 'Keep your head in the clouds!',
+    flavor: 'High-altitude thrill-seekers who trade in helium and ego. Their net worth swings wildly based on how many 'Sky-Parties' they throw. One day they’re kings, the next they’re selling their shoes for fuel.'
+  },
+  { 
+    id: 'zephyr', name: 'Bala Bureau Free-Riders', style: 'aggressive',
+    motto: 'Catch us if you can (you can\'t)!',
+    flavor: 'A group of renegade accountants from the Ledger Hub who stole a fleet of ships and deleted their own debt files. They trade fast and dirty, always one step ahead of a Jackhole audit.'
+  },
+  { 
+    id: 'threnco', name: 'Threnody Spine-Snatchers', style: 'volatile',
+    motto: 'Your trash is our treasure (and also your organs).',
+    flavor: 'The ultimate bottom-feeders from the Slum-Stacks. They deal in black-market brain-lace and second-hand kidneys. Their stock price is as unstable as the illegal cybernetics they sell.'
+  },
+  { 
+    id: 'solenne', name: 'Solenne Salt-Saints', style: 'steady',
+    motto: 'Praise the Machine! Pass the Salt!',
+    flavor: 'Monks who believe that cargo is a form of prayer. They move slowly, chanting into their comm-links and hoarding industrial salt. Jackhole leaves them alone because their medicine is the only thing that cures corporate stress-headaches.'
+  },
+];
 
   // =====================================================================
   // ship fuel — per-location base price and travel-cost helpers

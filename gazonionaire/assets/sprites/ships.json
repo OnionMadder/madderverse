@@ -1,0 +1,255 @@
+{
+  "frames": {
+    "eyeball": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 500,
+        "h": 500
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 500,
+        "h": 500
+      },
+      "sourceSize": {
+        "w": 500,
+        "h": 500
+      }
+    },
+    "skull": {
+      "frame": {
+        "x": 588,
+        "y": 2,
+        "w": 511,
+        "h": 488
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 511,
+        "h": 488
+      },
+      "sourceSize": {
+        "w": 511,
+        "h": 488
+      }
+    },
+    "spider": {
+      "frame": {
+        "x": 1183,
+        "y": 2,
+        "w": 538,
+        "h": 420
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 538,
+        "h": 420
+      },
+      "sourceSize": {
+        "w": 538,
+        "h": 420
+      }
+    },
+    "squid": {
+      "frame": {
+        "x": 1848,
+        "y": 2,
+        "w": 664,
+        "h": 376
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 664,
+        "h": 376
+      },
+      "sourceSize": {
+        "w": 664,
+        "h": 376
+      }
+    },
+    "submarine": {
+      "frame": {
+        "x": 2,
+        "y": 504,
+        "w": 518,
+        "h": 318
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 518,
+        "h": 318
+      },
+      "sourceSize": {
+        "w": 518,
+        "h": 318
+      }
+    },
+    "whale": {
+      "frame": {
+        "x": 588,
+        "y": 504,
+        "w": 593,
+        "h": 421
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 593,
+        "h": 421
+      },
+      "sourceSize": {
+        "w": 593,
+        "h": 421
+      }
+    },
+    "worm": {
+      "frame": {
+        "x": 1183,
+        "y": 504,
+        "w": 663,
+        "h": 377
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 663,
+        "h": 377
+      },
+      "sourceSize": {
+        "w": 663,
+        "h": 377
+      }
+    },
+    "bee": {
+      "frame": {
+        "x": 1848,
+        "y": 504,
+        "w": 500,
+        "h": 500
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 500,
+        "h": 500
+      },
+      "sourceSize": {
+        "w": 500,
+        "h": 500
+      }
+    },
+    "bottle": {
+      "frame": {
+        "x": 2,
+        "y": 1006,
+        "w": 584,
+        "h": 427
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 584,
+        "h": 427
+      },
+      "sourceSize": {
+        "w": 584,
+        "h": 427
+      }
+    },
+    "brain": {
+      "frame": {
+        "x": 588,
+        "y": 1006,
+        "w": 469,
+        "h": 353
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 469,
+        "h": 353
+      },
+      "sourceSize": {
+        "w": 469,
+        "h": 353
+      }
+    },
+    "cube": {
+      "frame": {
+        "x": 1183,
+        "y": 1006,
+        "w": 534,
+        "h": 468
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 534,
+        "h": 468
+      },
+      "sourceSize": {
+        "w": 534,
+        "h": 468
+      }
+    },
+    "cyber": {
+      "frame": {
+        "x": 1848,
+        "y": 1006,
+        "w": 500,
+        "h": 500
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 500,
+        "h": 500
+      },
+      "sourceSize": {
+        "w": 500,
+        "h": 500
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2514,
+      "h": 1508
+    },
+    "scale": "1"
+  }
+}
