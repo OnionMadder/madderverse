@@ -13,12 +13,17 @@ body {
     font-family: 'Inter', -apple-system, monospace;
     margin: 0;
     min-height: 100vh;
+    min-height: 100dvh;
     overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .wrap {
     width: 100vw;
     height: 100vh;
+    width: 100dvw;
+    height: 100dvh;
     max-width: none;
     padding: 0;
     position: relative;
@@ -33,7 +38,7 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    padding: 0.75rem 1rem 1.5rem;
+    padding: max(0.75rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) 1.5rem max(1rem, env(safe-area-inset-left));
     background: linear-gradient(to bottom, rgba(0,0,0,0.75), rgba(0,0,0,0));
     pointer-events: none;
 }
@@ -42,7 +47,7 @@ header > .title-block, header .hud { pointer-events: auto; }
 .title-block { max-width: 50%; }
 
 h1 { margin: 0; color: var(--accent-cyan); font-size: 1.5rem; text-transform: uppercase; }
-h2 { margin: 0; font-size: 0.9rem; opacity: 0.7; }
+h2 { margin: 0; font-size: 0.9rem; opacity: 0.9; }
 .meta {
     font-size: 0.85rem;
     opacity: 0.95;
@@ -473,4 +478,158 @@ canvas {
     .mascot-badge canvas { width: 22px; height: 22px; }
     .modal-card { min-width: 260px; padding: 1rem; }
     .mascot-thumb { width: 64px; height: 64px; }
+}
+
+/* === Rotate-your-phone overlay (mobile portrait only) === */
+.rotate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 2rem;
+    background-image:
+        linear-gradient(rgba(0, 255, 204, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 204, 0.04) 1px, transparent 1px),
+        linear-gradient(135deg, #050505 0%, #0a1a2e 100%);
+    background-size: 40px 40px, 40px 40px, cover;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.rotate-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.6rem;
+    color: #fff;
+    font-family: 'Inter', -apple-system, sans-serif;
+    max-width: 90%;
+}
+
+.rotate-content h2 {
+    font-size: clamp(1.4rem, 6vw, 2rem);
+    margin: 0;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 14px rgba(0, 255, 204, 0.6), 3px 3px 0 var(--accent-pink);
+    font-weight: 900;
+}
+.rotate-content p {
+    font-size: clamp(0.9rem, 4vw, 1.1rem);
+    margin: 0;
+    opacity: 0.88;
+    font-family: monospace;
+    color: #ffd166;
+    letter-spacing: 0.04em;
+}
+
+.phone-icon {
+    width: 84px;
+    height: 144px;
+    position: relative;
+    transform-origin: center;
+    animation: rotate-phone 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+.phone-frame {
+    width: 100%;
+    height: 100%;
+    border: 4px solid var(--accent-cyan);
+    border-radius: 16px;
+    background:
+        linear-gradient(135deg, rgba(0, 255, 204, 0.12) 0%, rgba(255, 0, 255, 0.08) 100%),
+        rgba(255, 255, 255, 0.04);
+    box-shadow:
+        0 0 30px rgba(0, 255, 204, 0.55),
+        inset 0 0 18px rgba(0, 255, 204, 0.18);
+    position: relative;
+}
+.phone-frame::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 5px;
+    background: var(--accent-cyan);
+    border-radius: 3px;
+    box-shadow: 0 0 6px rgba(0, 255, 204, 0.7);
+}
+.phone-frame::after {
+    content: '';
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 22px;
+    border: 2.5px solid var(--accent-cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.7);
+}
+
+@keyframes rotate-phone {
+    0%   { transform: rotate(0deg); }
+    25%  { transform: rotate(0deg); }
+    55%  { transform: rotate(-90deg); }
+    80%  { transform: rotate(-90deg); }
+    100% { transform: rotate(0deg); }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+    .rotate-overlay { display: none; }
+    .wrap {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: 100vh;
+        height: 100vw;
+        width: 100dvh;
+        height: 100dvw;
+        transform: translate(-50%, -50%) rotate(90deg);
+        transform-origin: center center;
+    }
+}
+
+/* === Thumb-zone indicators (mobile landscape only, decorative — pointer-events: none, so existing tap-anywhere on canvas still works) === */
+.thumb-zone {
+    position: fixed;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    width: 64px;
+    height: 64px;
+    border: 3px solid rgba(0, 255, 204, 0.45);
+    border-radius: 50%;
+    background:
+        radial-gradient(circle, rgba(0, 255, 204, 0.18) 0%, rgba(0, 255, 204, 0.04) 70%, transparent 100%);
+    display: none;
+    pointer-events: none;
+    z-index: 8;
+    animation: thumb-fade 7s ease-out 1.5s forwards;
+}
+.thumb-zone::before {
+    content: '👆';
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    opacity: 0.85;
+}
+.thumb-zone.left  { left:  max(1rem, env(safe-area-inset-left)); }
+.thumb-zone.right { right: max(1rem, env(safe-area-inset-right)); }
+
+@keyframes thumb-fade {
+    0%, 80%  { opacity: 1; transform: scale(1); }
+    90%      { opacity: 0.5; transform: scale(0.95); }
+    100%     { opacity: 0; transform: scale(0.9); }
+}
+
+@media (max-width: 900px) and (orientation: landscape) {
+    .thumb-zone { display: block; }
 }
