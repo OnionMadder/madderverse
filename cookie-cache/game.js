@@ -54,10 +54,6 @@ function applySprite(el, sheetKey, frameKey, w, h) {
     el.style.backgroundPosition = `${-frame.x * sx}px ${-frame.y * sy}px`;
 }
 
-// Each cookie has a paired before/after sprite. `before` is shown while the
-// cookie is in the air; `after` (the eaten/crumb state) takes over the moment
-// the cookie is tapped, and is also what shows up in the in-game pile zone
-// and the end-game feast pile.
 const COOKIE_NAMES = [
     'one', 'two', 'three', 'four', 'five', 'six',
     'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
@@ -77,7 +73,6 @@ const VEGGIES = [
 ];
 
 const EATER_FRAMES = ['frame-one','frame-two','frame-three','frame-four','frame-five','frame-six'];
-// frame-four is the open-mouth chomp pose; the rest are walking poses
 const WALK_CYCLE = ['frame-one','frame-two','frame-three','frame-five','frame-six'];
 
 const CFG = {
@@ -95,7 +90,6 @@ const CFG = {
     veggieRatio:     0.18,     // ~18% of spawns are veggies
     vegPenalty:      20,       // points lost per veggie tap
     comboWindowMs:   700,      // max gap between catches that still extends a combo
-    // ordered high → low; first match wins. mult=1 is the implicit default.
     comboTiers: [
         { hits: 8, mult: 5, label: 'INSANE!' },
         { hits: 5, mult: 3, label: 'FIRE!'   },
