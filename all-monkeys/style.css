@@ -20,11 +20,13 @@ body {
     -webkit-user-select: none;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
 }
 
 /* ====== HEADER ====== */
 header {
-    padding: 20px 24px 16px;
+    padding: 18px 22px 14px;
     border-bottom: 1px solid rgba(45, 212, 191, 0.2);
     position: relative;
 }
@@ -36,7 +38,7 @@ header {
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: flex-end;
-    gap: 16px;
+    gap: 14px;
 }
 
 .status {
@@ -52,7 +54,7 @@ header {
 
 h1 {
     margin: 0;
-    font-size: clamp(28px, 5.5vw, 60px);
+    font-size: clamp(26px, 5.5vw, 60px);
     font-weight: 800;
     font-style: italic;
     letter-spacing: -0.03em;
@@ -76,25 +78,28 @@ h1 {
 
 .header-buttons {
     display: flex;
-    gap: 12px;
+    gap: 8px;
     align-items: center;
 }
 
-.btn-remix {
+.btn {
     font-family: 'Fredoka', sans-serif;
     font-weight: 700;
-    font-size: 18px;
+    font-size: 16px;
     letter-spacing: 0.12em;
-    padding: 10px 24px;
-    border: 2px solid #db2777;
-    background: transparent;
-    color: #db2777;
-    text-shadow: 0 0 8px rgba(219, 39, 119, 0.7);
+    padding: 10px 20px;
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s;
+    background: transparent;
+    min-height: 44px;
 }
 
+.btn-remix {
+    border: 2px solid #db2777;
+    color: #db2777;
+    text-shadow: 0 0 8px rgba(219, 39, 119, 0.7);
+}
 .btn-remix:hover, .btn-remix:active {
     background: #db2777;
     color: #000;
@@ -102,14 +107,24 @@ h1 {
     transform: scale(1.05);
 }
 
+.btn-clear {
+    border: 2px solid rgba(45, 212, 191, 0.55);
+    color: #2dd4bf;
+}
+.btn-clear:hover, .btn-clear:active {
+    background: rgba(45, 212, 191, 0.15);
+    color: #fff;
+    border-color: #2dd4bf;
+}
+
 .icon-btn {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border: 2px solid rgba(45, 212, 191, 0.6);
     border-radius: 8px;
     background: transparent;
     color: #2dd4bf;
-    font-size: 22px;
+    font-size: 20px;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -124,10 +139,10 @@ h1 {
 main {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 28px 24px 220px;
+    padding: 22px 18px 240px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
 }
 
 .stage-wrap {
@@ -137,7 +152,7 @@ main {
     border: 1px solid rgba(45, 212, 191, 0.25);
     box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
     border-radius: 18px;
-    padding: 32px 16px;
+    padding: 22px 14px;
     position: relative;
     overflow: hidden;
 }
@@ -148,37 +163,34 @@ main {
     inset: 0;
     background-image: radial-gradient(rgba(45, 212, 191, 0.18) 1px, transparent 1px);
     background-size: 30px 30px;
-    opacity: 0.35;
+    opacity: 0.32;
     pointer-events: none;
 }
 
 .stage {
-    display: flex;
-    gap: 18px;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
     position: relative;
     z-index: 1;
+    max-width: 760px;
+    margin: 0 auto;
 }
 
 .stage-slot {
-    width: 150px;
-    height: 180px;
+    aspect-ratio: 5 / 6;
     border: 2px dashed rgba(45, 212, 191, 0.35);
-    border-radius: 18px;
+    border-radius: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     transition: transform 0.15s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
     cursor: pointer;
     position: relative;
     background: rgba(0, 0, 0, 0.25);
-}
-
-.stage-slot.empty .slot-icon {
-    opacity: 0.18;
+    padding: 6px;
+    overflow: hidden;
 }
 
 .stage-slot.drop-hover {
@@ -193,44 +205,103 @@ main {
     border-color: rgba(45, 212, 191, 0.85);
     border-style: solid;
     box-shadow: inset 0 0 28px rgba(45, 212, 191, 0.18);
+    background: rgba(45, 212, 191, 0.05);
 }
 
 .slot-icon {
-    width: 95px;
-    height: 133px;
-    transition: transform 0.1s;
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.18));
+    flex: 1;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    min-height: 0;
+    pointer-events: none;
 }
 
-.slot-icon svg, .chip-icon svg, #drag-ghost svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: visible;
+.slot-icon.slot-empty {
+    align-items: center;
 }
 
-@keyframes beat-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.20); }
-    100% { transform: scale(1); }
-}
-
-.slot-icon.beat {
-    animation: beat-pulse 0.18s ease-out;
+.empty-plus {
+    font-size: 30px;
+    color: rgba(45, 212, 191, 0.32);
+    font-weight: 300;
+    line-height: 1;
 }
 
 .slot-label {
-    margin-top: 12px;
-    font-size: 11px;
+    margin-top: 4px;
+    font-size: 10px;
     font-family: 'JetBrains Mono', monospace;
     color: rgba(45, 212, 191, 0.75);
     text-transform: uppercase;
-    letter-spacing: 0.18em;
+    letter-spacing: 0.14em;
     font-weight: 700;
+    text-align: center;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
 }
+
+.stage-slot.empty .slot-label { color: rgba(45, 212, 191, 0.32); }
+
+/* ====== CHARACTER ART (body + head) ====== */
+/* Container is sized by the parent (.slot-icon / .chip-icon). The body and
+   head are absolutely positioned siblings so their bounce animations stay
+   independent — head bobs while body squashes/stretches. */
+.char-art {
+    position: relative;
+    height: 100%;
+    aspect-ratio: 5 / 7;
+    pointer-events: none;
+    transform-origin: 50% 100%;
+}
+
+.char-body {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 65%;
+    transform-origin: 50% 100%;
+}
+
+.char-head {
+    position: absolute;
+    top: 0;
+    left: 7%;
+    width: 86%;
+    height: 56%;
+    transform-origin: 50% 100%;
+    z-index: 2;
+}
+
+.char-body svg, .char-head svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+@keyframes char-body-bounce {
+    0%   { transform: scale(1, 1); }
+    18%  { transform: scale(1.10, 0.85); } /* squash on impact */
+    52%  { transform: scale(0.94, 1.08); } /* stretch upward */
+    100% { transform: scale(1, 1); }
+}
+
+@keyframes char-head-bob {
+    0%   { transform: translateY(0) rotate(0); }
+    18%  { transform: translateY(2%) rotate(-2deg); }
+    52%  { transform: translateY(-12%) rotate(2deg); }
+    100% { transform: translateY(0) rotate(0); }
+}
+
+.char-art.beat .char-body { animation: char-body-bounce 0.36s ease-out; }
+.char-art.beat .char-head { animation: char-head-bob 0.36s ease-out; }
 
 /* ====== TRAY (fixed at bottom) ====== */
 .tray-wrap {
@@ -238,7 +309,7 @@ main {
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 14px 16px 20px;
+    padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0));
     background: linear-gradient(to top, rgba(0,0,0,0.96) 60%, rgba(0,0,0,0.6));
     border-top: 1px solid rgba(45, 212, 191, 0.3);
     backdrop-filter: blur(12px);
@@ -246,16 +317,25 @@ main {
     z-index: 10;
 }
 
+.tray-hint {
+    text-align: center;
+    font-size: 10px;
+    color: rgba(45, 212, 191, 0.55);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding: 0 12px;
+}
+
 .tray {
-    max-width: 1200px;
-    margin: 0 auto;
     display: flex;
-    gap: 12px;
+    gap: 10px;
     overflow-x: auto;
-    justify-content: center;
-    padding: 4px 4px 8px;
+    overflow-y: hidden;
+    padding: 4px 14px 8px;
     scrollbar-width: thin;
     scrollbar-color: rgba(45, 212, 191, 0.4) transparent;
+    -webkit-overflow-scrolling: touch;
 }
 
 .tray::-webkit-scrollbar { height: 6px; }
@@ -263,19 +343,20 @@ main {
 
 .tray-chip {
     flex: 0 0 auto;
-    width: 100px;
-    height: 120px;
+    width: 92px;
+    height: 116px;
     border: 2px solid rgba(45, 212, 191, 0.5);
     border-radius: 14px;
     background: rgba(255, 255, 255, 0.04);
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
     cursor: grab;
     transition: transform 0.12s, box-shadow 0.2s, border-color 0.2s, opacity 0.15s;
     touch-action: none;
     user-select: none;
+    padding: 5px;
 }
 
 .tray-chip:hover {
@@ -286,63 +367,99 @@ main {
 
 .tray-chip:active, .tray-chip.dragging {
     cursor: grabbing;
-    opacity: 0.35;
+    opacity: 0.4;
     transform: scale(0.96);
 }
 
 .chip-icon {
-    width: 56px;
-    height: 78px;
+    flex: 1;
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+    min-height: 0;
+    pointer-events: none;
 }
 
 .chip-label {
     font-family: 'Fredoka', sans-serif;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: #fbbf24;
-    margin-top: 8px;
+    margin-top: 4px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    pointer-events: none;
+    white-space: nowrap;
 }
 
 #drag-ghost {
     position: fixed;
     pointer-events: none;
     z-index: 9999;
-    width: 100px;
-    height: 140px;
+    width: 96px;
+    height: 134px;
     filter: drop-shadow(0 0 18px rgba(251, 191, 36, 0.9));
     transform: translate(-50%, -50%);
 }
 
-/* ====== RESPONSIVE ====== */
-@media (max-width: 720px) {
-    header { padding: 14px 16px 12px; }
-    .header-inner { align-items: center; }
-    main { padding: 16px 12px 200px; gap: 16px; }
-    .stage-wrap { padding: 18px 8px; border-radius: 14px; }
-    .stage { gap: 10px; }
-    .stage-slot {
-        width: calc(50% - 6px);
-        max-width: 160px;
-        height: 140px;
-        border-radius: 14px;
+#drag-ghost .char-art {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+}
+
+/* ====== DESKTOP: wrap the 16 chips into 2 rows so nothing is hidden ====== */
+@media (min-width: 760px) {
+    .tray {
+        flex-wrap: wrap;
+        justify-content: center;
+        overflow-x: visible;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 4px 16px;
     }
-    .slot-icon { width: 70px; height: 98px; }
-    .slot-label { font-size: 10px; letter-spacing: 0.12em; margin-top: 8px; }
-    .tray-chip { width: 86px; height: 104px; }
-    .chip-icon { width: 48px; height: 68px; }
-    .chip-label { font-size: 10px; }
-    .btn-remix { font-size: 14px; padding: 8px 16px; }
+    main { padding-bottom: 290px; }
+}
+
+/* ====== MOBILE TUNING ====== */
+@media (max-width: 720px) {
+    header { padding: 14px 14px 10px; }
+    .title-block { flex: 1 1 auto; }
+    .header-inner { gap: 10px; align-items: center; }
+    .header-buttons { gap: 6px; }
+    .btn { font-size: 13px; padding: 8px 12px; letter-spacing: 0.08em; min-height: 40px; }
     .icon-btn { width: 40px; height: 40px; font-size: 18px; }
+    .subtitle { font-size: 10px; letter-spacing: 0.14em; }
+
+    main { padding: 14px 10px 220px; gap: 14px; }
+    .stage-wrap { padding: 14px 8px; border-radius: 14px; }
+    .stage { gap: 8px; }
+    .stage-slot { border-radius: 12px; padding: 4px; }
+    .slot-label { font-size: 9px; letter-spacing: 0.08em; margin-top: 2px; }
+    .empty-plus { font-size: 22px; }
+
+    .tray-chip { width: 76px; height: 100px; padding: 4px; }
+    .chip-label { font-size: 9px; }
+    .tray-hint { font-size: 9px; letter-spacing: 0.12em; }
+    #drag-ghost { width: 84px; height: 116px; }
 }
 
 @media (max-width: 420px) {
-    .tray { gap: 8px; justify-content: flex-start; }
-    .tray-chip { width: 76px; height: 92px; }
-    .chip-icon { width: 42px; height: 58px; }
-    .chip-label { font-size: 9px; }
+    h1 { font-size: 26px; }
+    .status { font-size: 9px; letter-spacing: 0.2em; }
+    .subtitle { font-size: 9px; }
+    main { padding: 12px 6px 210px; }
+    .stage-wrap { padding: 10px 4px; }
+    .stage { gap: 6px; }
+    .stage-slot { padding: 3px; border-radius: 10px; }
+    .slot-label { font-size: 8px; }
+    .tray-chip { width: 70px; height: 92px; }
+    .chip-label { font-size: 8px; }
+}
+
+/* ====== Tall narrow phones — give the tray a touch more breathing room ====== */
+@media (max-height: 700px) and (max-width: 720px) {
+    main { padding-bottom: 200px; }
 }

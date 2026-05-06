@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Bala's Adventures of All Monkeys</title>
     <link rel="canonical" href="https://madderverse.org/all-monkeys/" />
     <meta property="og:url" content="https://madderverse.org/all-monkeys/" />
@@ -41,7 +41,8 @@
                 <p class="subtitle">Module: All Monkeys // Sub-Routine: Nugget_Mod.exe</p>
             </div>
             <div class="header-buttons">
-                <button id="remixBtn" class="btn-remix" type="button">REMIX</button>
+                <button id="remixBtn" class="btn btn-remix" type="button">REMIX</button>
+                <button id="clearBtn" class="btn btn-clear" type="button">CLEAR</button>
                 <button id="muteBtn" class="icon-btn" type="button" aria-label="mute"><span id="muteIcon">🔊</span></button>
             </div>
         </div>
@@ -49,17 +50,13 @@
 
     <main>
         <div class="stage-wrap">
-            <div id="stage" class="stage">
-                <div class="stage-slot empty" data-index="0"></div>
-                <div class="stage-slot empty" data-index="1"></div>
-                <div class="stage-slot empty" data-index="2"></div>
-                <div class="stage-slot empty" data-index="3"></div>
-            </div>
+            <div id="stage" class="stage" aria-label="8 sprunki slots"></div>
         </div>
     </main>
 
     <div class="tray-wrap">
-        <div id="tray" class="tray"></div>
+        <div class="tray-hint">Drag a mod onto a slot · tap a slot to clear it</div>
+        <div id="tray" class="tray" aria-label="16 mods"></div>
     </div>
 
     <script src="game.js"></script>
