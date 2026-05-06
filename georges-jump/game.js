@@ -308,12 +308,6 @@ window.addEventListener('DOMContentLoaded', () => {
   };
   let foodCatalog = [];
 
-  const bgImg = new Image();
-  let bgReady = false;
-  bgImg.addEventListener('load',  () => { bgReady = true; }, { once: true });
-  bgImg.addEventListener('error', () => { bgReady = false; }, { once: true });
-  bgImg.src = 'assets/bg-img.png';
-
   function loadSheet(key) {
     const s = sheets[key];
     s.ready = false;
@@ -817,11 +811,6 @@ window.addEventListener('DOMContentLoaded', () => {
   // ============================================================
   function render() {
     ctx.clearRect(0, 0, W, H);
-
-    // Level background
-    if (bgReady) {
-      ctx.drawImage(bgImg, 0, 0, W, H);
-    }
 
     // Drift zones (behind food) — translucent cyan column with rising feathers + glowing edges
     for (const d of drifts) {
