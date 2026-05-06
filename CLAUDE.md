@@ -38,7 +38,7 @@ Other top-level entries:
 
 **Game stylesheets and scripts load via relative paths from the game's own directory** (`href="style.css"`, `src="game.js"`, or `css/style.css` + `js/*.js` for `gazonionaire/`). Do not introduce absolute `https://madderverse.org/...` URLs for in-game CSS/JS — they break local dev by silently loading production assets. SEO meta tags (`canonical`, `og:url`, `og:image`, `twitter:*`) and the favicon set are intentionally kept as absolute production URLs because they're consumed by external scrapers and PWA installers.
 
-**Known stale references in `friend-picker/`:** the OG/Twitter image URLs, favicon links, manifest, canonical, and the GoatCounter beacon all still point at the legacy `https://fymz.lol/...` domain. The CSS/JS load was fixed; the rest is unresolved.
+**FYMZ is legacy branding.** The site was previously hosted at `fymz.lol` ("Find Your Madder Zone"). New/updated pages should brand as "The Madderverse", point all absolute URLs at `madderverse.org`, and use the shared GoatCounter beacon `https://madderverse.goatcounter.com/count`. Several older game pages (e.g. `cookie-cache/`) still carry "FYMZ" / "Find Your Madder Zone" in their `<meta name="keywords">` and `<meta name="title">` — leave those alone unless explicitly asked to migrate.
 
 **Sprite sheets are addressed by hand-coded pixel coordinates.** See `cookie-cache/game.js` (`SHEETS`/`FRAMES`/`applySprite`) for the canonical pattern: a sheet's full pixel `w`/`h` plus per-frame `x,y,w,h`, scaled to display size in `applySprite`. If you change a sprite sheet image, the coordinate tables in the matching `game.js` must be updated to match.
 
