@@ -1,0 +1,255 @@
+{
+  "frames": {
+    "obsidian-spire": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 1080,
+        "h": 1074
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1074
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1074
+      }
+    },
+    "pavonis-clouds": {
+      "frame": {
+        "x": 1082,
+        "y": 1,
+        "w": 1080,
+        "h": 1031
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1031
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1031
+      }
+    },
+    "solenne-gardens": {
+      "frame": {
+        "x": 2163,
+        "y": 1,
+        "w": 1080,
+        "h": 1116
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1116
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1116
+      }
+    },
+    "terra-prime": {
+      "frame": {
+        "x": 3244,
+        "y": 1,
+        "w": 1080,
+        "h": 1061
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1061
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1061
+      }
+    },
+    "threnody-stack": {
+      "frame": {
+        "x": 1,
+        "y": 1118,
+        "w": 1080,
+        "h": 1146
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1146
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1146
+      }
+    },
+    "vroom-outpost": {
+      "frame": {
+        "x": 1082,
+        "y": 1118,
+        "w": 1080,
+        "h": 1059
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1059
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1059
+      }
+    },
+    "yoxai-jungle": {
+      "frame": {
+        "x": 2163,
+        "y": 1118,
+        "w": 1080,
+        "h": 1075
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1075
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1075
+      }
+    },
+    "bubble-erebus": {
+      "frame": {
+        "x": 3244,
+        "y": 1118,
+        "w": 1080,
+        "h": 994
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 994
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 994
+      }
+    },
+    "caldera-9": {
+      "frame": {
+        "x": 1,
+        "y": 2265,
+        "w": 1080,
+        "h": 1063
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1063
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1063
+      }
+    },
+    "halcyon-junk": {
+      "frame": {
+        "x": 1082,
+        "y": 2265,
+        "w": 1080,
+        "h": 1016
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1016
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1016
+      }
+    },
+    "kallis-rock": {
+      "frame": {
+        "x": 2163,
+        "y": 2265,
+        "w": 1080,
+        "h": 1046
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1046
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1046
+      }
+    },
+    "ledger-hub": {
+      "frame": {
+        "x": 3244,
+        "y": 2265,
+        "w": 1080,
+        "h": 1114
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1080,
+        "h": 1114
+      },
+      "sourceSize": {
+        "w": 1080,
+        "h": 1114
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 4325,
+      "h": 3380
+    },
+    "scale": "1"
+  }
+}
