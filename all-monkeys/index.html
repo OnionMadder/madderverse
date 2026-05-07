@@ -38,11 +38,13 @@
             <div class="title-block">
                 <div class="status">System Status: Operational</div>
                 <h1>Bala's <span class="neon-pink">Adventures</span></h1>
-                <p class="subtitle">Module: All Munkis // Sub-Routine: Nugget_Mod.exe</p>
+                <p class="subtitle">Module: All Munkis + Madballz Modz // Warning: Black &amp; Ice cause horror</p>
             </div>
             <div class="header-buttons">
                 <button id="remixBtn" class="btn btn-remix" type="button">REMIX</button>
                 <button id="clearBtn" class="btn btn-clear" type="button">CLEAR</button>
+                <button id="songBtn" class="btn btn-song" type="button" aria-pressed="true" title="Toggle level song">♪ SONG</button>
+                <button id="booBtn" class="btn btn-boo" type="button" title="Trigger jump scare">BOO!</button>
                 <button id="muteBtn" class="icon-btn" type="button" aria-label="mute"><span id="muteIcon">🔊</span></button>
             </div>
         </div>
@@ -55,9 +57,12 @@
     </main>
 
     <div class="tray-wrap">
-        <div class="tray-hint">Drag a mod onto a slot · tap a slot to clear it</div>
-        <div id="tray" class="tray" aria-label="16 mods"></div>
+        <div class="tray-hint">Drag a mod onto a slot · 16 Munkis + 6 Madballz · BLACK or ICE = horror</div>
+        <div id="tray" class="tray" aria-label="22 mods (16 Munkis + 6 Madballz)"></div>
     </div>
+
+    <!-- Full-screen "BOO!" text that flashes during a jump scare. -->
+    <div id="booOverlay" class="boo-overlay" aria-hidden="true">BOO!</div>
 
     <script src="game.js"></script>
 </body>

@@ -9,13 +9,17 @@
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
     const NUM_SLOTS = 8;
+    const BARS_PER_LOOP = 2;                 // BASE_SONG cycles every 2 bars
 
     // ---------- AUDIO ENGINE ----------
     let audioCtx = null;
     let masterGain = null;
     let isPlaying = false;
     let isMuted = false;
+    let isBaseSongOn = true;                 // background "level music" theme
+    let isJumpScareActive = false;           // debounce + visual gate for BOO
     let currentStep = 0;
+    let currentBar = 0;
     let nextStepTime = 0;
     let schedTimer = null;
 
@@ -39,6 +43,7 @@
         if (!isPlaying) {
             isPlaying = true;
             currentStep = 0;
+            currentBar = 0;
             nextStepTime = audioCtx.currentTime + 0.08;
             schedule();
         }
@@ -46,14 +51,21 @@
 
     function schedule() {
         while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD) {
-            scheduleStep(currentStep, nextStepTime);
+            scheduleStep(currentStep, currentBar, nextStepTime);
             nextStepTime += SECONDS_PER_STEP;
-            currentStep = (currentStep + 1) % STEPS_PER_BAR;
+            currentStep++;
+            if (currentStep >= STEPS_PER_BAR) {
+                currentStep = 0;
+                currentBar = (currentBar + 1) % BARS_PER_LOOP;
+            }
         }
         schedTimer = setTimeout(schedule, LOOKAHEAD_MS);
     }
 
-    function scheduleStep(step, when) {
+    function scheduleStep(step, bar, when) {
+        // Background level theme — runs underneath the user's mods.
+        if (isBaseSongOn) BASE_SONG.play(audioCtx, masterGain, when, step, bar);
+        // User-placed mods
         for (let i = 0; i < NUM_SLOTS; i++) {
             const id = slots[i];
             if (!id) continue;
@@ -94,6 +106,84 @@
         }
         return c;
     }
+
+    // ---------- BASE SONG ("Bala's Theme") ----------
+    // A 2-bar level-music loop that plays under whatever mods are on stage.
+    //
+    //   Bar 0: Cmaj  — bass C2, pad C-E-G held the whole bar
+    //   Bar 1: Am    — bass A1, pad A3-C4-E4 held the whole bar
+    //   Melody: bouncy square hook on quarter notes, descending across bar 0
+    //           and resolving back up across bar 1.
+    //
+    // Both chords sit inside C major so any combination of the 16 mods
+    // (which all stay in C) lays cleanly on top. Toggle the whole thing with
+    // the SONG button in the header (sets isBaseSongOn).
+    const BASE_SONG = {
+        play(ctx, out, when, step, bar) {
+            // Sustained bass + pad fire once at the top of each bar and ring
+            // out across the full 2.4s the bar takes to complete.
+            if (step === 0) {
+                const isC = bar === 0;
+                const root = isC ? 65.41 : 55.00;            // C2 / A1
+                const chord = isC
+                    ? [261.63, 329.63, 392.00]               // C E G
+                    : [220.00, 261.63, 329.63];              // A C E (Am)
+                const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR; // 2.4s
+
+                // Bass — triangle wave, gentle attack/sustain envelope
+                const b = ctx.createOscillator();
+                const bg = ctx.createGain();
+                b.type = 'triangle';
+                b.frequency.value = root;
+                bg.gain.setValueAtTime(0, when);
+                bg.gain.linearRampToValueAtTime(0.16, when + 0.07);
+                bg.gain.linearRampToValueAtTime(0.13, when + BAR_LEN * 0.7);
+                bg.gain.exponentialRampToValueAtTime(0.001, when + BAR_LEN);
+                b.connect(bg).connect(out);
+                b.start(when); b.stop(when + BAR_LEN + 0.05);
+
+                // Pad — chord triad, quieter on each higher voice so the
+                // root sits forward in the mix without muddying the leads.
+                chord.forEach((freq, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'triangle';
+                    o.frequency.value = freq;
+                    const peak = 0.045 - i * 0.005;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(peak, when + 0.22);
+                    g.gain.linearRampToValueAtTime(peak * 0.85, when + BAR_LEN * 0.7);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + BAR_LEN);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + BAR_LEN + 0.05);
+                });
+            }
+
+            // Melody hook on quarter notes — bouncy "bala-bala" phrase.
+            //   Bar 0 (Cmaj):  G5  E5  C5  E5
+            //   Bar 1 (Am):    A4  C5  E5  G4
+            const melodyBar0 = { 0: 783.99, 4: 659.25, 8: 523.25, 12: 659.25 };
+            const melodyBar1 = { 0: 440.00, 4: 523.25, 8: 659.25, 12: 392.00 };
+            const melody = bar === 0 ? melodyBar0 : melodyBar1;
+            const freq = melody[step];
+            if (freq !== undefined) {
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const f = ctx.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.value = 3000;
+                f.Q.value = 1;
+                o.type = 'square';
+                o.frequency.value = freq;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.075, when + 0.02);
+                g.gain.linearRampToValueAtTime(0.06, when + 0.18);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
+                o.connect(f).connect(g).connect(out);
+                o.start(when); o.stop(when + 0.36);
+            }
+        }
+    };
 
     // ---------- CHARACTERS ----------
     // 16 Munki mods. Each entry has:
@@ -164,9 +254,12 @@
             }
         },
 
-        choochoo: {
-            label: 'CHOO CHOO',
-            bodyColor: '#6a1b9a', bodyHi: '#ab47bc', bodyShade: '#38006b',
+        // BLACK is one of the two horror-trigger Munkis. Dropping it onto a
+        // slot fires the jumpscare automatically. Pitch-black body, the
+        // dizzy-eyed purple head sells "something is wrong here".
+        black: {
+            label: 'BLACK',
+            bodyColor: '#1a1a1a', bodyHi: '#3a3a3a', bodyShade: '#000',
             headFrame: 'purple (1)',
             // Shaker — chuffs on every 8th note. Quarter-note hits are a
             // touch louder than the off-beats so the groove still feels like
@@ -506,6 +599,8 @@
             }
         },
 
+        // ICE is the second horror-trigger Munki — sleepy blue head reads
+        // as "frozen / cursed" once dropped onto a slot. See HORROR_TRIGGER_MODS.
         ice: {
             label: 'ICE',
             bodyColor: '#4fc3f7', bodyHi: '#81d4fa', bodyShade: '#0277bd',
@@ -526,44 +621,209 @@
                 o.connect(g).connect(out);
                 o.start(when); o.stop(when + 0.2);
             }
+        },
+
+        // ===================== MADBALLZ MODZ ============================
+        // A gnarlier, horror-leaning set of 6 mods that drop weird, distorted
+        // textures over the top of the regular Munki band. Each one points at
+        // a frame inside the madballs-heads spritesheet (sheet: 'madballs').
+        // Sounds are intentionally rougher — wave-shapers, detune, chopper
+        // LFOs — so the player can hear immediately when they've added one.
+        // ================================================================
+
+        'mb-alien': {
+            label: 'MB ALIEN', sheet: 'madballs', headFrame: 'mb-alien',
+            bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
+            // Distorted sub-pluck — descending saw through a wave-shaper.
+            play(ctx, out, when, step) {
+                if (step !== 0 && step !== 8) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const dist = ctx.createWaveShaper();
+                dist.curve = distortionCurve(45);
+                const f = ctx.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.setValueAtTime(2000, when);
+                f.frequency.exponentialRampToValueAtTime(380, when + 0.4);
+                o.type = 'sawtooth';
+                o.frequency.setValueAtTime(220, when);
+                o.frequency.exponentialRampToValueAtTime(110, when + 0.4);
+                g.gain.setValueAtTime(0.16, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.42);
+                o.connect(dist).connect(f).connect(g).connect(out);
+                o.start(when); o.stop(when + 0.45);
+            }
+        },
+
+        'mb-cry': {
+            label: 'MB CRY', sheet: 'madballs', headFrame: 'mb-cry',
+            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Wailing minor melody on the offbeats — sliding triangle whine.
+            play(ctx, out, when, step) {
+                const seq = { 4: 415.30, 12: 392.00 }; // G#4 → G4 (chromatic dip)
+                const start = seq[step];
+                if (!start) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(start, when);
+                o.frequency.exponentialRampToValueAtTime(start * 0.92, when + 0.45);
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.13, when + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.55);
+            }
+        },
+
+        'mb-shroom': {
+            label: 'MB SHROOM', sheet: 'madballs', headFrame: 'mb-shroom',
+            bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
+            // Bubbly water arpeggio — short sine plinks in random octaves.
+            play(ctx, out, when, step) {
+                if (![1, 4, 7, 10, 13].includes(step)) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                const base = [523.25, 659.25, 783.99][step % 3];
+                const oct = Math.random() < 0.5 ? 1 : 2;
+                o.frequency.value = base * oct;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.08, when + 0.005);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.14);
+            }
+        },
+
+        'mb-brain': {
+            label: 'MB BRAIN', sheet: 'madballs', headFrame: 'mb-brain',
+            bodyColor: '#65a30d', bodyHi: '#84cc16', bodyShade: '#1a2e05',
+            // Pulsing distorted bass — chopper LFO on the gain for a glitchy
+            // brainwave feel. Plays on beat 1 and beat 3.
+            play(ctx, out, when, step) {
+                if (step !== 0 && step !== 8) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const dist = ctx.createWaveShaper();
+                dist.curve = distortionCurve(70);
+                const lfo = ctx.createOscillator();
+                const lfoG = ctx.createGain();
+                lfo.frequency.value = 24;
+                lfoG.gain.value = 0.45;
+                lfo.connect(lfoG).connect(g.gain);
+                o.type = 'sawtooth';
+                o.frequency.value = 82.41; // E2
+                g.gain.setValueAtTime(0.18, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.55);
+                o.connect(dist).connect(g).connect(out);
+                o.start(when); o.stop(when + 0.6);
+                lfo.start(when); lfo.stop(when + 0.6);
+            }
+        },
+
+        'mb-wires': {
+            label: 'MB WIRES', sheet: 'madballs', headFrame: 'mb-wires',
+            bodyColor: '#78350f', bodyHi: '#a16207', bodyShade: '#1c0701',
+            // Electric buzz — high-frequency square chops on every 8th.
+            play(ctx, out, when, step) {
+                if (step % 4 !== 2) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const f = ctx.createBiquadFilter();
+                f.type = 'highpass';
+                f.frequency.value = 1500;
+                o.type = 'square';
+                o.frequency.value = 880 + (step * 11);
+                g.gain.setValueAtTime(0.07, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+                o.connect(f).connect(g).connect(out);
+                o.start(when); o.stop(when + 0.07);
+            }
+        },
+
+        'mb-rocky': {
+            label: 'MB ROCKY', sheet: 'madballs', headFrame: 'mb-rocky',
+            bodyColor: '#57534e', bodyHi: '#78716c', bodyShade: '#1c1917',
+            // Tribal stone-thud — pitched-down noise hit on the syncopated
+            // beats, gives the loop a chunky, primitive backbone.
+            play(ctx, out, when, step) {
+                if (![2, 9, 14].includes(step)) return;
+                const n = noiseSource(ctx, 0.18);
+                const f = ctx.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.setValueAtTime(420, when);
+                f.frequency.exponentialRampToValueAtTime(120, when + 0.15);
+                f.Q.value = 4;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.32, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+                n.connect(f).connect(g).connect(out);
+                n.start(when); n.stop(when + 0.2);
+            }
         }
     };
 
+    // Stage order: 16 standard Munkis first, then the 6 Madballz Modz at
+    // the end of the tray so they read as the "advanced / horror" set.
     const ORDER = [
-        'munki', 'nugget', 'choochoo', 'truck',
+        'munki', 'nugget', 'black', 'truck',
         'cocoa', 'tamil', 'troll', 'banana',
         'coconut', 'drum', 'flute', 'star',
-        'cloud', 'moon', 'fire', 'ice'
+        'cloud', 'moon', 'fire', 'ice',
+        'mb-alien', 'mb-cry', 'mb-shroom',
+        'mb-brain', 'mb-wires', 'mb-rocky'
     ];
 
-    // ---------- HEAD SPRITESHEET ----------
-    // munki-heads.png is a 1608×1604 sheet of 16 round Munki heads. The frame
-    // coordinates are mirrored from munki-heads.json so the rest of the file
-    // can stay synchronous (no fetch on init). Update these alongside the JSON
-    // when new frames are added.
-    const HEAD_SHEET = {
-        src: 'munki-heads.png',
-        sheetW: 1608,
-        sheetH: 1604,
-        frames: {
-            'blue (1)':   { x: 2,    y: 2,    w: 389, h: 388 },
-            'blue (2)':   { x: 400,  y: 2,    w: 400, h: 400 },
-            'blue (3)':   { x: 802,  y: 2,    w: 402, h: 401 },
-            'green (1)':  { x: 1206, y: 2,    w: 392, h: 392 },
-            'green (2)':  { x: 2,    y: 405,  w: 396, h: 396 },
-            'green (3)':  { x: 400,  y: 405,  w: 396, h: 396 },
-            'green (4)':  { x: 802,  y: 405,  w: 401, h: 400 },
-            'green (5)':  { x: 1206, y: 405,  w: 399, h: 399 },
-            'orange (1)': { x: 2,    y: 807,  w: 392, h: 392 },
-            'orange (2)': { x: 400,  y: 807,  w: 399, h: 399 },
-            'orange (3)': { x: 802,  y: 807,  w: 393, h: 393 },
-            'purple (1)': { x: 1206, y: 807,  w: 400, h: 399 },
-            'purple (2)': { x: 2,    y: 1208, w: 394, h: 394 },
-            'purple (3)': { x: 400,  y: 1208, w: 389, h: 389 },
-            'purple (4)': { x: 802,  y: 1208, w: 394, h: 394 },
-            'purple (5)': { x: 1206, y: 1208, w: 389, h: 389 }
+    // ---------- HEAD SPRITESHEETS ----------
+    // Two sheets feed character art:
+    //   - munki:    16 round colored Munki heads (the standard mods)
+    //   - madballs:  6 gnarly creature heads (the "Madballz Modz" set, more
+    //                horror-leaning aesthetic). Mirrored from the JSON files
+    //                in assets/sprites/ so we stay synchronous (no fetch).
+    const SHEETS = {
+        munki: {
+            src: 'assets/sprites/munki-heads.png',
+            sheetW: 1608,
+            sheetH: 1604,
+            frames: {
+                'blue (1)':   { x: 2,    y: 2,    w: 389, h: 388 },
+                'blue (2)':   { x: 400,  y: 2,    w: 400, h: 400 },
+                'blue (3)':   { x: 802,  y: 2,    w: 402, h: 401 },
+                'green (1)':  { x: 1206, y: 2,    w: 392, h: 392 },
+                'green (2)':  { x: 2,    y: 405,  w: 396, h: 396 },
+                'green (3)':  { x: 400,  y: 405,  w: 396, h: 396 },
+                'green (4)':  { x: 802,  y: 405,  w: 401, h: 400 },
+                'green (5)':  { x: 1206, y: 405,  w: 399, h: 399 },
+                'orange (1)': { x: 2,    y: 807,  w: 392, h: 392 },
+                'orange (2)': { x: 400,  y: 807,  w: 399, h: 399 },
+                'orange (3)': { x: 802,  y: 807,  w: 393, h: 393 },
+                'purple (1)': { x: 1206, y: 807,  w: 400, h: 399 },
+                'purple (2)': { x: 2,    y: 1208, w: 394, h: 394 },
+                'purple (3)': { x: 400,  y: 1208, w: 389, h: 389 },
+                'purple (4)': { x: 802,  y: 1208, w: 394, h: 394 },
+                'purple (5)': { x: 1206, y: 1208, w: 389, h: 389 }
+            }
+        },
+        madballs: {
+            src: 'assets/sprites/madballs-heads.png',
+            sheetW: 3244,
+            sheetH: 2160,
+            frames: {
+                // names map to the visual identity of each frame
+                'mb-alien':  { x: 1,    y: 1,    w: 1080, h: 1068 }, // head-three
+                'mb-cry':    { x: 1082, y: 1,    w: 1080, h: 1107 }, // head-five
+                'mb-shroom': { x: 2163, y: 1,    w: 1080, h: 1074 }, // head-four
+                'mb-brain':  { x: 1,    y: 1109, w: 1080, h: 1042 }, // head-one
+                'mb-wires':  { x: 1082, y: 1109, w: 1080, h: 1022 }, // head-six
+                'mb-rocky':  { x: 2163, y: 1109, w: 1080, h: 1050 }  // head-two
+            }
         }
     };
+
+    // Mods which, when dropped onto a slot, trigger the horror jumpscare
+    // automatically (and would persist horror state if we add one later).
+    const HORROR_TRIGGER_MODS = new Set(['black', 'ice']);
 
     // ---------- ART (body + layered head) ----------
     // The head is composed of three sibling layers, all anchored to the same
@@ -613,15 +873,17 @@
             + `</svg>`;
     }
 
-    // Custom head sprite cropped from the spritesheet. The SVG viewBox crops
-    // to the named frame's pixel coordinates, while the inner <image> shows
+    // Custom head sprite cropped from one of the spritesheets. The SVG viewBox
+    // crops to the named frame's pixel coords, while the inner <image> shows
     // the full sheet — preserveAspectRatio scales the cropped frame into the
     // SVG's display box (which is 100% of .head-mod = the head circle area).
-    function headModArt(frameName) {
-        const f = HEAD_SHEET.frames[frameName];
+    // Defaults to the 'munki' sheet; pass 'madballs' for the Madballz Modz set.
+    function headModArt(frameName, sheetName) {
+        const sheet = SHEETS[sheetName || 'munki'];
+        const f = sheet && sheet.frames[frameName];
         if (!f) return headFaceArt(); // fall back to placeholder face
         return `<svg class="head-mod" viewBox="${f.x} ${f.y} ${f.w} ${f.h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            + `<image href="${HEAD_SHEET.src}" x="0" y="0" width="${HEAD_SHEET.sheetW}" height="${HEAD_SHEET.sheetH}"/>`
+            + `<image href="${sheet.src}" x="0" y="0" width="${sheet.sheetW}" height="${sheet.sheetH}"/>`
             + `</svg>`;
     }
 
@@ -651,7 +913,7 @@
     }
 
     function headArt(c) {
-        const inner = c.headFrame ? headModArt(c.headFrame) : headFaceArt();
+        const inner = c.headFrame ? headModArt(c.headFrame, c.sheet) : headFaceArt();
         return headShapeArt(c) + inner + headPhonesArt();
     }
 
@@ -723,8 +985,16 @@
     }
 
     function setSlot(index, charId) {
+        const wasHorror = HORROR_TRIGGER_MODS.has(slots[index]);
         slots[index] = charId;
         renderSlot(index);
+        // Lore: BLACK and ICE Munkis carry a curse — placing one onto a slot
+        // tears the level into horror mode for a moment. We fire the scare
+        // only on transition into a trigger, so swapping between two trigger
+        // mods doesn't double-fire.
+        if (charId && HORROR_TRIGGER_MODS.has(charId) && !wasHorror) {
+            triggerJumpScare();
+        }
     }
 
     // ---------- DRAG & DROP (pointer events: mouse + touch + pen) ----------
@@ -837,13 +1107,76 @@
         o.start(t); o.stop(t + 0.2);
     }
 
+    // ---------- JUMP SCARE ----------
+    // Sprunki-style horror moment, kid-controlled via the BOO button. Plays a
+    // distorted descending shriek + sub thud while the page shakes, flashes
+    // red, and the active Munkis glitch out. Returns to normal after 1.5s.
+    // Debounced so spamming the button doesn't stack scares.
+    function triggerJumpScare() {
+        if (isJumpScareActive) return;
+        isJumpScareActive = true;
+
+        // Make sure the audio engine is alive before we try to play anything;
+        // also lets the kid trigger a scare as their very first interaction.
+        ensureAudio();
+        playJumpScareSound();
+
+        document.body.classList.add('jumpscare');
+        setTimeout(() => {
+            document.body.classList.remove('jumpscare');
+            isJumpScareActive = false;
+        }, 1500);
+    }
+
+    function playJumpScareSound() {
+        if (!audioCtx || isMuted) return;
+        const t = audioCtx.currentTime;
+
+        // Distorted descending shriek — sawtooth + square through a wave
+        // shaper. Sweeps from a piercing high down to a sub growl over ~1s.
+        const dist = audioCtx.createWaveShaper();
+        dist.curve = distortionCurve(100);
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.45, t + 0.02);
+        g.gain.linearRampToValueAtTime(0.35, t + 0.7);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+        dist.connect(g).connect(masterGain);
+
+        const o1 = audioCtx.createOscillator();
+        o1.type = 'sawtooth';
+        o1.frequency.setValueAtTime(1200, t);
+        o1.frequency.exponentialRampToValueAtTime(60, t + 1.0);
+        o1.connect(dist);
+        o1.start(t); o1.stop(t + 1.4);
+
+        const o2 = audioCtx.createOscillator();
+        o2.type = 'square';
+        o2.frequency.setValueAtTime(800, t);
+        o2.frequency.exponentialRampToValueAtTime(45, t + 1.0);
+        o2.connect(dist);
+        o2.start(t); o2.stop(t + 1.4);
+
+        // Sub thud — gives the scare a chest-punch landing.
+        const k = audioCtx.createOscillator();
+        const kg = audioCtx.createGain();
+        k.type = 'sine';
+        k.frequency.setValueAtTime(80, t);
+        k.frequency.exponentialRampToValueAtTime(28, t + 0.5);
+        kg.gain.setValueAtTime(0.7, t);
+        kg.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+        k.connect(kg).connect(masterGain);
+        k.start(t); k.stop(t + 0.65);
+    }
+
     // ---------- HEADER BUTTONS ----------
     function attachHeaderHandlers() {
         document.getElementById('remixBtn').addEventListener('click', () => {
             ensureAudio();
+            // Route through setSlot so a remix that lands on BLACK or ICE
+            // fires the horror jumpscare just like a manual drop would.
             for (let i = 0; i < NUM_SLOTS; i++) {
-                slots[i] = ORDER[Math.floor(Math.random() * ORDER.length)];
-                renderSlot(i);
+                setSlot(i, ORDER[Math.floor(Math.random() * ORDER.length)]);
             }
             playDropSound();
         });
@@ -861,6 +1194,21 @@
                 }
                 if (cleared) playClearSound();
             });
+        }
+
+        const songBtn = document.getElementById('songBtn');
+        if (songBtn) {
+            songBtn.addEventListener('click', () => {
+                ensureAudio(); // start playback if user toggles song first
+                isBaseSongOn = !isBaseSongOn;
+                songBtn.classList.toggle('off', !isBaseSongOn);
+                songBtn.setAttribute('aria-pressed', String(isBaseSongOn));
+            });
+        }
+
+        const booBtn = document.getElementById('booBtn');
+        if (booBtn) {
+            booBtn.addEventListener('click', triggerJumpScare);
         }
 
         const muteBtn = document.getElementById('muteBtn');

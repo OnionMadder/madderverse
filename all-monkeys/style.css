@@ -117,6 +117,37 @@ h1 {
     border-color: #2dd4bf;
 }
 
+/* SONG toggle — glows amber when the base song is on, dims when off. */
+.btn-song {
+    border: 2px solid #fbbf24;
+    color: #fbbf24;
+    text-shadow: 0 0 6px rgba(251, 191, 36, 0.55);
+}
+.btn-song:hover, .btn-song:active {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fff;
+}
+.btn-song.off {
+    border-color: rgba(251, 191, 36, 0.35);
+    color: rgba(251, 191, 36, 0.5);
+    text-shadow: none;
+}
+
+/* BOO! — big ominous red button that triggers the jumpscare. */
+.btn-boo {
+    border: 2px solid #ef4444;
+    color: #ef4444;
+    text-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+    font-weight: 800;
+}
+.btn-boo:hover, .btn-boo:active {
+    background: #ef4444;
+    color: #000;
+    text-shadow: none;
+    transform: scale(1.06);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.6);
+}
+
 .icon-btn {
     width: 44px;
     height: 44px;
@@ -499,4 +530,110 @@ main {
 /* ====== Tall narrow phones — give the tray a touch more breathing room ====== */
 @media (max-height: 700px) and (max-width: 720px) {
     main { padding-bottom: 200px; }
+}
+
+/* ====== JUMP SCARE ======
+   When body.jumpscare is set, four things happen at once:
+     1. A red radial vignette flashes across the viewport (::after on body).
+     2. The stage section shakes hard.
+     3. Active Munki characters glitch — color shift + jitter.
+     4. A giant "BOO!" overlay punches in then fades.
+   Everything is keyframe-driven so it cleanly resets when the class is
+   removed after 1.5s. The fixed tray and header are intentionally NOT
+   shaken so the kid still has something stable to look at. */
+.boo-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 800;
+    font-style: italic;
+    font-size: clamp(80px, 25vw, 280px);
+    color: #fff;
+    letter-spacing: -0.04em;
+    text-shadow:
+        0 0 30px #ff0000,
+        0 0 60px #800000,
+        4px 4px 0 #000,
+        -4px -4px 0 #000;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    transform: scale(0.4);
+    -webkit-text-stroke: 3px #000;
+}
+
+body.jumpscare .boo-overlay {
+    animation: boo-show 1.4s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+body.jumpscare::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255, 0, 0, 0.5), rgba(120, 0, 0, 0.85));
+    pointer-events: none;
+    z-index: 9998;
+    animation: jumpscare-flash 1.5s ease-out forwards;
+}
+
+body.jumpscare main {
+    animation: jumpscare-shake 0.55s linear;
+}
+
+body.jumpscare .stage-slot.active .char-art {
+    animation: char-glitch 0.18s steps(2) infinite;
+}
+
+@keyframes jumpscare-flash {
+    0%   { opacity: 0; }
+    8%   { opacity: 1; }
+    20%  { opacity: 0.55; }
+    32%  { opacity: 0.95; }
+    50%  { opacity: 0.4; }
+    100% { opacity: 0; }
+}
+
+@keyframes jumpscare-shake {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    10% { transform: translate(-9px, 5px) rotate(-0.6deg); }
+    20% { transform: translate(8px, -4px) rotate(0.6deg); }
+    30% { transform: translate(-6px, 6px) rotate(-0.4deg); }
+    40% { transform: translate(7px, -5px) rotate(0.5deg); }
+    50% { transform: translate(-8px, 3px) rotate(-0.3deg); }
+    60% { transform: translate(5px, -6px) rotate(0.4deg); }
+    70% { transform: translate(-4px, 5px) rotate(-0.2deg); }
+    80% { transform: translate(6px, -3px) rotate(0.3deg); }
+    90% { transform: translate(-3px, 4px) rotate(-0.1deg); }
+}
+
+@keyframes char-glitch {
+    0%   { filter: hue-rotate(0deg) saturate(1) brightness(1); transform: translate(0, 0); }
+    33%  { filter: hue-rotate(180deg) saturate(3) contrast(2); transform: translate(-2px, 1px) scale(1.05); }
+    66%  { filter: invert(1) saturate(2.5) brightness(1.1); transform: translate(2px, -1px) scale(0.97); }
+    100% { filter: hue-rotate(0deg) saturate(1) brightness(1); transform: translate(0, 0); }
+}
+
+@keyframes boo-show {
+    0%  { opacity: 0; transform: scale(0.4) rotate(-8deg); }
+    12% { opacity: 1; transform: scale(1.25) rotate(3deg); }
+    20% { opacity: 1; transform: scale(1.0)  rotate(-2deg); }
+    35% { opacity: 1; transform: scale(1.08) rotate(1.5deg); }
+    55% { opacity: 1; transform: scale(1.0)  rotate(-1deg); }
+    100%{ opacity: 0; transform: scale(0.85) rotate(0); }
+}
+
+/* Honour reduced-motion preferences — keep the visual punch subtle. */
+@media (prefers-reduced-motion: reduce) {
+    body.jumpscare main { animation: none; }
+    body.jumpscare .stage-slot.active .char-art { animation: none; filter: hue-rotate(180deg); }
+    body.jumpscare .boo-overlay { animation: boo-show-reduced 1.2s ease-out forwards; }
+    @keyframes boo-show-reduced {
+        0%   { opacity: 0; transform: scale(0.9); }
+        20%  { opacity: 1; transform: scale(1); }
+        80%  { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1); }
+    }
 }
