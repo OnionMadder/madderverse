@@ -9,11 +9,7 @@
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
     const NUM_SLOTS = 8;
-    const BARS_PER_LOOP = 2;                 // BASE_SONG cycles every 2 bars
-    // Story progression: trip horror mode this many times (by dropping ICE
-    // MUNKI or MOON MUNKI onto the stage) and the "MEET THE MADBALLZ" button
-    // appears in the header. Persisted in localStorage so the kid keeps the
-    // unlock between visits.
+    const BARS_PER_LOOP = 2;                
     const MADBALLZ_UNLOCK_THRESHOLD = 3;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
@@ -44,8 +40,6 @@
             audioCtx = new Ctx();
             masterGain = audioCtx.createGain();
             masterGain.gain.value = isMuted ? 0 : 0.55;
-            // Bus compressor — glues 8 simultaneous voices together and stops
-            // peaks from clipping when the full 8-slot mix is running.
             const comp = audioCtx.createDynamicsCompressor();
             comp.threshold.value = -10;
             comp.knee.value = 8;
@@ -78,7 +72,6 @@
     }
 
     function scheduleStep(step, bar, when) {
-        // Background level theme — runs underneath the user's mods.
         if (isBaseSongOn) BASE_SONG.play(audioCtx, masterGain, when, step, bar);
         // User-placed mods
         for (let i = 0; i < NUM_SLOTS; i++) {
@@ -121,18 +114,6 @@
         }
         return c;
     }
-
-    // ---------- BASE SONG ("Bala's Theme") ----------
-    // A 2-bar level-music loop that plays under whatever mods are on stage.
-    //
-    //   Bar 0: Cmaj  — bass C2, pad C-E-G held the whole bar
-    //   Bar 1: Am    — bass A1, pad A3-C4-E4 held the whole bar
-    //   Melody: bouncy square hook on quarter notes, descending across bar 0
-    //           and resolving back up across bar 1.
-    //
-    // Both chords sit inside C major so any combination of the 16 mods
-    // (which all stay in C) lays cleanly on top. Toggle the whole thing with
-    // the SONG button in the header (sets isBaseSongOn).
     const BASE_SONG = {
         play(ctx, out, when, step, bar) {
             // Sustained bass + pad fire once at the top of each bar and ring
@@ -199,38 +180,11 @@
             }
         }
     };
-
-    // ---------- CHARACTERS ----------
-    // 16 standard mods + 6 Madballz. Each entry has:
-    //   - body palette (color + highlight + shade); the head circle behind a
-    //     mod sprite uses the same body color
-    //   - headFrame: name of the frame inside the matching head spritesheet
-    //     (sheet defaults to 'munki'; Madballz use sheet: 'madballs')
-    //   - label: the two-word display name (uppercased by CSS in chip/slot UI)
-    //   - play() scheduling its WebAudio events on a 0..15 step grid
-    //
-    // Render layers per character (bottom → top):
-    //   body → head-shape circle (body color) → head sprite OR generic face →
-    //   headphones overlay. All head layers share the same 100×100 viewBox so
-    //   the headphones stay visually anchored regardless of which sprite (or
-    //   the placeholder face) is showing underneath.
-    //
-    // Color groups (the 14 friends):
-    //   green  (5): munki, nugget, tamil, troll, coconut
-    //   orange (3): cocoa, banana, fire
-    //   purple (5): black, drum, flute, star, cloud
-    //   blue   (1): truck
-    // Antagonists (also blue, but the bad guys): ice, moon
-    // Madballz set (own sheet, only seen on the unlocked Madballz screen):
-    //   mb-alien, mb-cry, mb-shroom, mb-brain, mb-wires, mb-rocky
-    const CHARACTERS = {
-        munki: {
-            label: 'Reginald Cotswattle',
+const CHARACTERS = {
+        green: {
+            label: 'Green Gear',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (1)',
-            // Filtered saw lead — C major hook on the quarter notes.
-            // C5 E5 G5 E5 (steps 0, 4, 8, 12). Stacks tunefully with FLUTE,
-            // STAR and ICE, all of which stay in C major.
             play(ctx, out, when, step) {
                 const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
                 const freq = hook[step];
@@ -252,13 +206,10 @@
             }
         },
 
-        nugget: {
-            label: 'Bibsy McNibbles',
+        high: {
+            label: 'High-Z',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (2)',
-            // Closed hi-hat — short, tight noise burst on the offbeat 8ths
-            // (steps 2, 6, 10, 14). Pairs with TRUCK kick + DRUM snare for
-            // a full standard kit feel.
             play(ctx, out, when, step) {
                 if (![2, 6, 10, 14].includes(step)) return;
                 const n = noiseSource(ctx, 0.04);
@@ -273,17 +224,10 @@
             }
         },
 
-        // BLACK was originally a horror trigger; in the new lore the only
-        // antagonists are ICE and MOON, so BLACK is just a regular friend.
-        // Body colour is the shared purple — head sprite is in the purple
-        // group, so the body matches per the uniform-color rule.
-        black: {
-            label: 'Onyx Shimmygobs',
+        shadow: {
+            label: 'Shadow Pulse',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (1)',
-            // Shaker — chuffs on every 8th note. Quarter-note hits are a
-            // touch louder than the off-beats so the groove still feels like
-            // a steam rhythm rather than a flat tick.
             play(ctx, out, when, step) {
                 if (step % 2 !== 0) return;
                 const n = noiseSource(ctx, 0.05);
@@ -300,12 +244,10 @@
             }
         },
 
-        truck: {
-            label: 'Hubert Hubcap',
+        mega: {
+            label: 'Mega Thump',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
             headFrame: 'blue (1)',
-            // Kick drum — four on the floor. Sine sweep from 150Hz → 45Hz
-            // gives weight without muddying the bass voices (MOON/TROLL/BANANA).
             play(ctx, out, when, step) {
                 if (step % 4 !== 0) return;
                 const o = ctx.createOscillator();
@@ -317,7 +259,6 @@
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
                 o.connect(g).connect(out);
                 o.start(when); o.stop(when + 0.2);
-                // Click transient gives the kick a definable attack
                 const click = ctx.createOscillator();
                 const cg = ctx.createGain();
                 click.type = 'triangle';
@@ -329,15 +270,13 @@
             }
         },
 
-        cocoa: {
-            label: 'Marzipan Featherbottom',
+        amber: {
+            label: 'Amber Arp',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             headFrame: 'orange (1)',
-            // Bird-style arpeggio in C major — C-E-G-C climb on the "and"
-            // of beats 2 and 4, fills the space between the lead phrases.
             play(ctx, out, when, step) {
                 if (step !== 5 && step !== 13) return;
-                const notes = [659.25, 783.99, 987.77, 1318.51]; // E5 G5 B5 E6
+                const notes = [659.25, 783.99, 987.77, 1318.51];
                 notes.forEach((freq, i) => {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
@@ -353,13 +292,10 @@
             }
         },
 
-        tamil: {
-            label: 'Srivatsan Sivanesan',
+        srivi: {
+            label: 'Srivi-Bot',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (3)',
-            // Tabla — "thom" (low) on syncopated beats, "tha" (high) on the
-            // ands. Pitched into the C major root so it complements the bass
-            // voices instead of clashing with them.
             play(ctx, out, when, step) {
                 const lowSteps = [0, 6, 10];
                 const highSteps = [3, 8, 13];
@@ -367,7 +303,7 @@
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
                     o.type = 'sine';
-                    o.frequency.setValueAtTime(110, when); // ~A2 — neutral
+                    o.frequency.setValueAtTime(110, when);
                     o.frequency.exponentialRampToValueAtTime(75, when + 0.15);
                     g.gain.setValueAtTime(0.32, when);
                     g.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
@@ -378,7 +314,7 @@
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
                     o.type = 'triangle';
-                    o.frequency.setValueAtTime(880, when); // A5
+                    o.frequency.setValueAtTime(880, when);
                     o.frequency.exponentialRampToValueAtTime(523.25, when + 0.06);
                     g.gain.setValueAtTime(0.13, when);
                     g.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
@@ -388,15 +324,13 @@
             }
         },
 
-        troll: {
-            label: 'Glamburt Underbridge',
+        grumble: {
+            label: 'Grumble Bass',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (4)',
-            // Detuned saw bass stab on beat 1 and beat 3 — moves between C2
-            // and G2 to give the loop a I → V root motion under the leads.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
-                const root = step === 0 ? 65.41 : 98.00; // C2, G2
+                const root = step === 0 ? 65.41 : 98.00;
                 const o1 = ctx.createOscillator();
                 const o2 = ctx.createOscillator();
                 const f = ctx.createBiquadFilter();
@@ -406,7 +340,7 @@
                 f.frequency.exponentialRampToValueAtTime(300, when + 0.35);
                 f.Q.value = 5;
                 o1.type = 'sawtooth'; o1.frequency.value = root;
-                o2.type = 'sawtooth'; o2.frequency.value = root * 1.005; // detune
+                o2.type = 'sawtooth'; o2.frequency.value = root * 1.005;
                 g.gain.setValueAtTime(0, when);
                 g.gain.linearRampToValueAtTime(0.18, when + 0.01);
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
@@ -417,13 +351,10 @@
             }
         },
 
-        banana: {
-            label: 'Flavio Splitsville',
+        sine: {
+            label: 'Sine Wave',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             headFrame: 'orange (2)',
-            // Bouncy sine bassline — C3 E3 G3 E3 walking through C major.
-            // Sits in the middle bass register so it stays out of MOON's
-            // sub-bass and TROLL's mid-bass lanes.
             play(ctx, out, when, step) {
                 const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
                 const f = seq[step];
@@ -440,12 +371,10 @@
             }
         },
 
-        coconut: {
-            label: 'Plopplop Tropicalo',
+        hiss: {
+            label: 'Hiss Shell',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (5)',
-            // Open hi-hat — long, splashy noise on the backbeat (steps 4, 12).
-            // Mixes well with NUGGET's closed hat for a varied groove.
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.18);
@@ -460,12 +389,10 @@
             }
         },
 
-        drum: {
-            label: 'Snerrick Backbeatington',
+        snare: {
+            label: 'Snare-Bot',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (2)',
-            // Snare drum on the backbeat (steps 4, 12). Bandpassed noise +
-            // pitched body — sits naturally with TRUCK kick and the hats.
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.13);
@@ -491,11 +418,9 @@
         },
 
         flute: {
-            label: 'JerryBerry Jamband',
+            label: 'Vibe Berry',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (3)',
-            // Flute line in C major — sits on the offbeats so it weaves
-            // between MUNKI's quarter-note hook. G5 A5 G5 E5.
             play(ctx, out, when, step) {
                 const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
                 const freq = melody[step];
@@ -520,14 +445,12 @@
         },
 
         star: {
-            label: 'Twinkle Tessellate',
+            label: 'Star Ping',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (4)',
-            // Bell / glockenspiel arpeggio — C major triad in the high
-            // register. Plays once per bar on beat 1, long ringing tail.
             play(ctx, out, when, step) {
                 if (step !== 0) return;
-                const notes = [1046.5, 1318.51, 1567.98]; // C6 E6 G6
+                const notes = [1046.5, 1318.51, 1567.98];
                 notes.forEach((freq, i) => {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
@@ -543,16 +466,13 @@
             }
         },
 
-        cloud: {
-            label: 'Nimbus Dreamslippers',
+        fog: {
+            label: 'Fog Chord',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (5)',
-            // Pad — C major triad held across the whole bar (~2.4s) with a
-            // soft attack and slow release. Provides the harmonic bed
-            // everything else rides on top of.
             play(ctx, out, when, step) {
                 if (step !== 0) return;
-                const chord = [261.63, 329.63, 392.00]; // C4 E4 G4
+                const chord = [261.63, 329.63, 392.00];
                 chord.forEach((freq, i) => {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
@@ -568,33 +488,26 @@
             }
         },
 
-        // MOON MUNKI — the second antagonist. He "dims the lights". Dropping
-        // him on a slot trips horror mode automatically. See HORROR_TRIGGER_MODS.
-        // Shares the uniform blue body palette with truck + ice; the dark
-        // moon head sprite carries his identity.
         moon: {
             label: 'Moon Munki',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
             headFrame: 'blue (2)',
-            // Sub-bass drone — C2 sustained for the full bar with a tiny
-            // C3 octave on top for body. Pure foundation under the kit.
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 o.type = 'sine';
-                o.frequency.value = 65.41; // C2
+                o.frequency.value = 65.41;
                 g.gain.setValueAtTime(0, when);
                 g.gain.linearRampToValueAtTime(0.32, when + 0.06);
                 g.gain.linearRampToValueAtTime(0.26, when + 1.6);
                 g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
                 o.connect(g).connect(out);
                 o.start(when); o.stop(when + 2.45);
-                // Octave for harmonic warmth
                 const o2 = ctx.createOscillator();
                 const g2 = ctx.createGain();
                 o2.type = 'sine';
-                o2.frequency.value = 130.81; // C3
+                o2.frequency.value = 130.81;
                 g2.gain.setValueAtTime(0, when);
                 g2.gain.linearRampToValueAtTime(0.06, when + 0.1);
                 g2.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
@@ -603,12 +516,10 @@
             }
         },
 
-        fire: {
-            label: 'Cinder Sparkletoot',
+        spark: {
+            label: 'Spark Snap',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             headFrame: 'orange (3)',
-            // Tambourine-style 16th tick on every "and" — fills the gaps
-            // between the 8th-note shaker and gives the loop forward drive.
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
                 const n = noiseSource(ctx, 0.025);
@@ -623,18 +534,10 @@
             }
         },
 
-        // ICE MUNKI — one of the two antagonists in the lore. She "freezes
-        // the song". Dropping her on a slot trips horror mode automatically.
-        // See HORROR_TRIGGER_MODS. Body uses the shared blue palette so the
-        // antagonists are color-uniform with the rest of the blue group; her
-        // identity reads through the icy blue head sprite + the red chip
-        // accent (.chip-bad), not the body color.
         ice: {
             label: 'Ice Munki',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
             headFrame: 'blue (3)',
-            // Twinkle — high C major scale steps on the 16th-note ands.
-            // Walks C6 D6 E6 G6 around the bar for a sparkly counter-line.
             play(ctx, out, when, step) {
                 const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
                 const freq = seq[step];
@@ -651,18 +554,9 @@
             }
         },
 
-        // ===================== MADBALLZ MODZ ============================
-        // A gnarlier, horror-leaning set of 6 mods that drop weird, distorted
-        // textures over the top of the regular Munki band. Each one points at
-        // a frame inside the madballs-heads spritesheet (sheet: 'madballs').
-        // Sounds are intentionally rougher — wave-shapers, detune, chopper
-        // LFOs — so the player can hear immediately when they've added one.
-        // ================================================================
-
-        'mb-alien': {
-            label: 'Zorbax Beanbean', sheet: 'madballs', headFrame: 'mb-alien',
+        'mb-zorb': {
+            label: 'Zorb Drive', sheet: 'madballs', headFrame: 'mb-alien',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
-            // Distorted sub-pluck — descending saw through a wave-shaper.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -683,12 +577,11 @@
             }
         },
 
-        'mb-cry': {
-            label: 'Drippy Frowndorf', sheet: 'madballs', headFrame: 'mb-cry',
+        'mb-drip': {
+            label: 'Drip Drop', sheet: 'madballs', headFrame: 'mb-cry',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
-            // Wailing minor melody on the offbeats — sliding triangle whine.
             play(ctx, out, when, step) {
-                const seq = { 4: 415.30, 12: 392.00 }; // G#4 → G4 (chromatic dip)
+                const seq = { 4: 415.30, 12: 392.00 };
                 const start = seq[step];
                 if (!start) return;
                 const o = ctx.createOscillator();
@@ -704,10 +597,9 @@
             }
         },
 
-        'mb-shroom': {
-            label: 'Sporeazo Toadcap', sheet: 'madballs', headFrame: 'mb-shroom',
+        'mb-random': {
+            label: 'Random Root', sheet: 'madballs', headFrame: 'mb-shroom',
             bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
-            // Bubbly water arpeggio — short sine plinks in random octaves.
             play(ctx, out, when, step) {
                 if (![1, 4, 7, 10, 13].includes(step)) return;
                 const o = ctx.createOscillator();
@@ -724,11 +616,9 @@
             }
         },
 
-        'mb-brain': {
-            label: 'Cerebellio Wibbletons', sheet: 'madballs', headFrame: 'mb-brain',
+        'mb-thrum': {
+            label: 'Thrum Brain', sheet: 'madballs', headFrame: 'mb-brain',
             bodyColor: '#65a30d', bodyHi: '#84cc16', bodyShade: '#1a2e05',
-            // Pulsing distorted bass — chopper LFO on the gain for a glitchy
-            // brainwave feel. Plays on beat 1 and beat 3.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -741,7 +631,7 @@
                 lfoG.gain.value = 0.45;
                 lfo.connect(lfoG).connect(g.gain);
                 o.type = 'sawtooth';
-                o.frequency.value = 82.41; // E2
+                o.frequency.value = 82.41;
                 g.gain.setValueAtTime(0.18, when);
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.55);
                 o.connect(dist).connect(g).connect(out);
@@ -750,10 +640,9 @@
             }
         },
 
-        'mb-wires': {
-            label: 'Volty Twistplug', sheet: 'madballs', headFrame: 'mb-wires',
+        'mb-volt': {
+            label: 'Volt Twist', sheet: 'madballs', headFrame: 'mb-wires',
             bodyColor: '#78350f', bodyHi: '#a16207', bodyShade: '#1c0701',
-            // Electric buzz — high-frequency square chops on every 8th.
             play(ctx, out, when, step) {
                 if (step % 4 !== 2) return;
                 const o = ctx.createOscillator();
@@ -770,11 +659,9 @@
             }
         },
 
-        'mb-rocky': {
-            label: 'Rumblestone Cragglethorpe', sheet: 'madballs', headFrame: 'mb-rocky',
+        'mb-rock': {
+            label: 'Rock Slide', sheet: 'madballs', headFrame: 'mb-rocky',
             bodyColor: '#57534e', bodyHi: '#78716c', bodyShade: '#1c1917',
-            // Tribal stone-thud — pitched-down noise hit on the syncopated
-            // beats, gives the loop a chunky, primitive backbone.
             play(ctx, out, when, step) {
                 if (![2, 9, 14].includes(step)) return;
                 const n = noiseSource(ctx, 0.18);
@@ -792,42 +679,22 @@
         }
     };
 
-    // Tray orders for the two screens.
-    //
-    // STANDARD_ORDER (default screen): the 14 colored "friends" arranged by
-    // body palette, then the two antagonists (Ice Munki + Moon Munki) at the
-    // end. Madballz never appear here — they live in their own screen.
-    //   green  (5): munki, nugget, tamil, troll, coconut
-    //   orange (3): cocoa, banana, fire
-    //   purple (5): black, drum, flute, star, cloud
-    //   blue   (1): truck
-    //   antagonists: ice, moon
-    //
-    // MADBALLZ_ORDER: only revealed after the kid has triggered horror mode
-    // enough times to "find" the dark crew. Lore-wise the Madballz are friends
-    // with Ice Munki and Moon Munki, so the antagonists travel here too.
     const STANDARD_ORDER = [
-        'munki', 'nugget', 'tamil', 'troll', 'coconut',
-        'cocoa', 'banana', 'fire',
-        'black', 'drum', 'flute', 'star', 'cloud',
-        'truck',
+        'green', 'high', 'srivi', 'grumble', 'hiss',
+        'amber', 'sine', 'spark',
+        'shadow', 'snare', 'flute', 'star', 'fog',
+        'mega',
         'ice', 'moon'
     ];
+
     const MADBALLZ_ORDER = [
         'ice', 'moon',
-        'mb-alien', 'mb-cry', 'mb-shroom',
-        'mb-brain', 'mb-wires', 'mb-rocky'
+        'mb-zorb', 'mb-drip', 'mb-random',
+        'mb-thrum', 'mb-volt', 'mb-rock'
     ];
-
-    // ---------- HEAD SPRITESHEETS ----------
-    // Two sheets feed character art:
-    //   - munki:    16 round colored Munki heads (the standard mods)
-    //   - madballs:  6 gnarly creature heads (the "Madballz Modz" set, more
-    //                horror-leaning aesthetic). Mirrored from the JSON files
-    //                in assets/sprites/ so we stay synchronous (no fetch).
     const SHEETS = {
         munki: {
-            src: 'assets/sprites/munki-heads.png',
+            src: 'assets/sprites/default-heads.png',
             sheetW: 1608,
             sheetH: 1604,
             frames: {
@@ -869,21 +736,6 @@
     // is dropped onto a slot, the jumpscare fires automatically AND counts
     // toward unlocking the Madballz screen (see MADBALLZ_UNLOCK_THRESHOLD).
     const HORROR_TRIGGER_MODS = new Set(['ice', 'moon']);
-
-    // ---------- ART (body + layered head) ----------
-    // The head is composed of three sibling layers, all anchored to the same
-    // 100×100 footprint so the headphones overlay always lands in the same
-    // visual spot regardless of which face/sprite is showing:
-    //
-    //   1. .head-shape   — colored circle (matches body color)
-    //   2. .head-face OR .head-mod — generic SVG eyes/mouth, OR custom head img
-    //   3. .head-phones  — headphones drawn on top
-    //
-    // The custom head sprite is rendered as an SVG <image> with a viewBox that
-    // crops to the relevant frame inside munki-heads.png, scaled with
-    // preserveAspectRatio="xMidYMid meet" so it fills the head circle without
-    // distortion. Drop in new mod heads by adding `headFrame: '<frame name>'`
-    // to a CHARACTERS entry (and the matching frame to HEAD_SHEET).
     function bodyArt(c) {
         return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
             + `<ellipse cx="22" cy="48" rx="9" ry="14" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3" transform="rotate(-15 22 48)"/>`

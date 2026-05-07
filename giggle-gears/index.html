@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Giggle Gears</title>
+    <link rel="canonical" href="https://madderverse.org/giggle-gears/" />
+    <meta property="og:url" content="https://madderverse.org/giggle-gears/" />
+    <meta name="twitter:url" content="https://madderverse.org/giggle-gears/" />
+    <meta name="title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="keywords" content="FYMZ, Find Your Madder Zone, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta property="og:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" /> <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
+    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" /> <meta name="apple-mobile-web-app-title" content="FYMZ" />
+    <meta name="application-name" content="FYMZ" />
+    <link rel="stylesheet" href="https://madderverse.org/giggle-gears/assets/css/sprites.css" />
+    <link rel="stylesheet" href="https://madderverse.org/giggle-gears/assets/css/style.css" />
+    <script data-goatcounter="https://fymz.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+
+<!-- ════════════════════════════════════════════════════════════════
+     MENU
+     ════════════════════════════════════════════════════════════════ -->
+<div id="screen-menu" class="screen active">
+    <button class="btn btn-xl btn-yellow">
+        START GAME
+    </button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PICK YOUR DRIVER
+     ════════════════════════════════════════════════════════════════ -->
+<div id="screen-driver" class="screen">
+    <div class="screen-title">Pick Your Driver</div>
+    <div id="driver-grid">
+        <!-- Built by JS -->
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     BUILD YOUR CAR (Customizer)
+     ════════════════════════════════════════════════════════════════ -->
+<div id="screen-custom" class="screen">
+    <div id="car-preview-container">
+        <div id="anchor-spoiler" class="anchor slot-roof-rear"></div>
+        <div id="anchor-dome"    class="anchor slot-roof-front"></div>
+        <div id="car-body-wrapper">
+            <span id="car-png" class="sprite" role="img" aria-label="Car"><img class="sprite-img" src="https://madderverse.org/giggle-gears/assets/sprite-sheets/car-bodies.png" alt="" draggable="false"></span>
+            <div id="driver-slot"></div>
+            <div id="headlight-slot" class="anchor slot-front">
+                <div class="headlight-beam"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <div class="control-label">Choose a Car</div>
+            <div id="body-bank" class="bank-grid"></div>
+        </div>
+        <div class="control-group">
+            <div class="control-label">Underglow</div>
+            <div id="color-bank" class="bank-grid"></div>
+        </div>
+        <div class="control-group">
+            <div class="control-label">Add-Ons</div>
+            <div id="extra-bank" class="bank-grid"></div>
+            <div class="tool-row">
+                <button class="bank-btn" id="light-toggle-btn">Headlights OFF</button>
+                <button class="bank-btn" id="reset-car-btn" style="background:var(--red);box-shadow:0 5px 0 var(--red-dark);color:white;">Reset Car</button>
+            </div>
+        </div>
+    </div>
+
+    <button class="btn btn-lg btn-green">
+        Drive!
+    </button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     PICK A TRACK
+     ════════════════════════════════════════════════════════════════ -->
+<div id="screen-tracks" class="screen">
+    <div class="screen-title">Pick a Track</div>
+    <div class="track-grid">
+        <div class="track-card" data-track="city">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/city-bg.jpg" alt="Neon City">
+            <div class="track-name">Neon City</div>
+        </div>
+        <div class="track-card" data-track="desert">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/desert-bg.jpg" alt="Giggle Gulch">
+            <div class="track-name">Giggle Gulch</div>
+        </div>
+        <div class="track-card" data-track="space">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/space-bg.jpg" alt="Galactic Post">
+            <div class="track-name">Galactic Post</div>
+        </div>
+        <div class="track-card" data-track="icy">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/icy-bg.jpg" alt="Icy Divide">
+            <div class="track-name">Icy Divide</div>
+        </div>
+        <div class="track-card" data-track="rainforest">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/rainforest-bg.jpg" alt="Tiki Dome">
+            <div class="track-name">Tiki Dome</div>
+        </div>
+        <div class="track-card" data-track="tamil">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/tamil-bg.jpg" alt="Tamil Nadu">
+            <div class="track-name">Tamil Nadu</div>
+        </div>
+        <div class="track-card" data-track="block">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/block-bg.jpg" alt="Blockville">
+            <div class="track-name">Blockville</div>
+        </div>
+        <div class="track-card" data-track="candy">
+            <img src="https://madderverse.org/giggle-gears/assets/img/bg-img/candy-bg.jpg" alt="Candy Kingdom">
+            <div class="track-name">Candy Kingdom</div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     LOADING (between track select and race start)
+     ════════════════════════════════════════════════════════════════ -->
+<div id="screen-loading" class="screen">
+    <div class="loading-card">
+        <div class="loading-title">Starting Engines!</div>
+        <div class="loading-spinner"></div>
+        <div class="loading-tip">Drivers warming up&hellip;</div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     RACE
+     ════════════════════════════════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+    <div id="hud">
+        <div id="score-display">⭐ <span id="score-val">0</span></div>
+        <div id="time-display">⏱ <span id="time-val">1:30</span></div>
+        <div id="speed-indicator">Cruising</div>
+        <button id="exit-btn">Exit</button>
+    </div>
+    <div id="trick-toast"></div>
+    <div id="race-track">
+        <div id="skybox-layer"></div>
+        <div id="scenery-layer"></div>
+        <div id="road-strip">
+            <div class="road-tile" id="road-a"></div>
+            <div class="road-tile" id="road-b"></div>
+        </div>
+        <div id="racing-car-wrapper"></div>
+        <div id="npc-layer"></div>
+    </div>
+    <div id="mobile-controls">
+        <button id="mobile-boost-btn">BalaBoost</button>
+        <button id="mobile-jump-btn">Jump</button>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     RACE OVER
+     ════════════════════════════════════════════════════════════════ -->
+<div id="screen-end" class="screen">
+    <div id="end-card">
+        <h2 id="end-title">Sick!</h2>
+        <p  id="end-summary"></p>
+        <div class="end-buttons">
+            <button class="btn btn-md btn-yellow" id="end-replay-btn">Replay Race</button>
+            <button class="btn-new-track"  id="end-new-track-btn"><span class="sprite sprite-new-track" role="img" aria-label="New Track"><img class="sprite-img" src="https://madderverse.org/giggle-gears/assets/sprite-sheets/button-icons.png" alt="" draggable="false"></span></button>
+            <button class="btn-new-driver" id="end-new-driver-btn"><span class="sprite sprite-new-driver" role="img" aria-label="New Driver"><img class="sprite-img" src="https://madderverse.org/giggle-gears/assets/sprite-sheets/button-icons.png" alt="" draggable="false"></span></button>
+            <button class="btn-new-car"    id="end-new-car-btn"><span class="sprite sprite-new-car" role="img" aria-label="New Car"><img class="sprite-img" src="https://madderverse.org/giggle-gears/assets/sprite-sheets/button-icons.png" alt="" draggable="false"></span></button>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="https://madderverse.org/giggle-gears/assets/js/main.js"></script>
+
+</body>
+</html>

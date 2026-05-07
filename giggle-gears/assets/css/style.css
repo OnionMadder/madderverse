@@ -1,0 +1,1168 @@
+/* ─── Fonts ─────────────────────────────────────────────────────── */
+@font-face {
+    font-family: 'WalterTurncoat';
+    src: url('https://fymz.lol/giggle-gears/assets/WalterTurncoat-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* ─── Tokens ────────────────────────────────────────────────────── */
+:root {
+    --accent:      #fdcb6e;
+    --accent-dark: #e17055;
+    --green:       #2ed573;
+    --green-dark:  #27ae60;
+    --red:         #ff6b6b;
+    --red-dark:    #c0392b;
+    --blue:        #74b9ff;
+    --purple:      #a29bfe;
+    --glass:       rgba(0,0,0,0.45);
+    --radius:      18px;
+    --tint-color:  transparent;
+}
+
+/* ─── Reset ─────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; height: 100%; }
+
+body {
+    font-family: 'WalterTurncoat', 'Comic Sans MS', cursive, sans-serif;
+    background:
+        linear-gradient(rgba(0,0,0,0.30), rgba(0,0,0,0.30)),
+        url('https://fymz.lol/giggle-gears/cover.jpg')
+        no-repeat center center / cover fixed;
+    height: 100%;
+    min-height: 100dvh;
+    overflow: hidden;
+    color: white;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCREENS
+   ═══════════════════════════════════════════════════════════════════ */
+.screen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100dvh;
+    position: absolute;
+    top: 0; left: 0;
+    overflow: hidden;
+    animation: fadeIn 0.35s ease;
+}
+.screen.active { display: flex !important; z-index: 10; }
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(1.03); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SHARED: SCREEN TITLE
+   ═══════════════════════════════════════════════════════════════════ */
+.screen-title {
+    font-size: clamp(1.7rem, 5vw, 2.8rem);
+    background: rgba(0,0,0,0.55);
+    padding: 10px 30px;
+    border-radius: 50px;
+    text-align: center;
+    letter-spacing: 1px;
+    flex-shrink: 0;
+    margin-top: clamp(12px, 2.5dvh, 22px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BIG BUTTONS — every tappable thing uses these
+   ═══════════════════════════════════════════════════════════════════ */
+.btn {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius);
+    font-family: 'WalterTurncoat', cursive;
+    color: #1a1a1a;
+    text-align: center;
+    line-height: 1.15;
+    transition: transform 0.1s, box-shadow 0.1s;
+    min-height: 52px;
+    min-width: 60px;
+}
+.btn:active { transform: translateY(4px) !important; }
+.btn:disabled { opacity: 0.44; cursor: not-allowed; filter: grayscale(0.6); }
+
+.btn-xl { font-size: clamp(1.9rem, 5.5vw, 2.8rem); padding: clamp(16px,3dvh,24px) clamp(48px,11vw,76px); }
+.btn-lg { font-size: clamp(1.4rem, 4vw,   2.0rem);  padding: clamp(14px,2.5dvh,19px) clamp(34px,7.5vw,54px); }
+.btn-md { font-size: clamp(1.1rem, 3vw,   1.5rem);  padding: clamp(10px,2dvh,14px) clamp(20px,5vw,32px); }
+.btn-sm { font-size: clamp(0.9rem, 2.5vw, 1.2rem);  padding: clamp(8px,1.5dvh,11px) clamp(14px,3.5vw,22px); }
+
+.btn-yellow { background: var(--accent);  box-shadow: 0 7px 0 var(--accent-dark); }
+.btn-yellow:active { box-shadow: 0 3px 0 var(--accent-dark) !important; }
+.btn-green  { background: var(--green);   box-shadow: 0 7px 0 var(--green-dark);  color: white; }
+.btn-green:active  { box-shadow: 0 3px 0 var(--green-dark) !important; }
+.btn-red    { background: var(--red);     box-shadow: 0 7px 0 var(--red-dark);    color: white; }
+.btn-red:active    { box-shadow: 0 3px 0 var(--red-dark) !important; }
+.btn-blue   { background: var(--blue);    box-shadow: 0 7px 0 #2980b9; }
+.btn-purple { background: var(--purple);  box-shadow: 0 7px 0 #5649c0; color: white; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MENU SCREEN
+   ═══════════════════════════════════════════════════════════════════ */
+#screen-menu { justify-content: center; gap: clamp(20px,5dvh,40px); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DRIVER SELECT
+   ═══════════════════════════════════════════════════════════════════ */
+#screen-driver {
+    justify-content: flex-start;
+    gap: clamp(10px, 2dvh, 18px);
+}
+
+#driver-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: clamp(10px, 2.5vw, 18px);
+    padding: 6px 14px 16px;
+    overflow-y: auto;
+    max-height: 74dvh;
+    width: 100%;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+#driver-grid::-webkit-scrollbar { display: none; }
+
+.driver-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    border-radius: var(--radius);
+    padding: clamp(8px,2vw,12px);
+    background: rgba(0,0,0,0.45);
+    border: 3px solid transparent;
+    transition: transform 0.14s, border-color 0.14s;
+    width: clamp(96px, 22vw, 136px);
+    min-height: 44px;
+}
+.driver-card:active { transform: scale(0.94); }
+.driver-card.selected {
+    border-color: var(--green);
+    background: rgba(46,213,115,0.22);
+    box-shadow: 0 0 0 3px rgba(46,213,115,0.35);
+}
+.driver-card .sprite {
+    width: 100%;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    margin: 0 auto;
+    pointer-events: none;
+}
+.driver-name {
+    font-size: clamp(0.75rem, 2vw, 1rem);
+    color: white;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   CUSTOMIZER
+   ═══════════════════════════════════════════════════════════════════ */
+#screen-custom {
+    justify-content: flex-start;
+    padding: clamp(10px,2dvh,16px) 10px;
+    gap: clamp(8px,1.5dvh,13px);
+    overflow-y: auto;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+#screen-custom::-webkit-scrollbar { display: none; }
+
+/* ── CAR PREVIEW STAGE ──────────────────────────────────────────
+   Layout:
+     - Stage is taller than the car body alone so accessories/driver fit
+     - Car body occupies the BOTTOM 58% of the stage
+     - Driver icon sits just above the car body, centred horizontally
+     - The driver bottom edge lands ~35% from the bottom of stage
+       (which is ~inside the top portion of the car body = "seated" look)
+   ──────────────────────────────────────────────────────────────── */
+#car-preview-container {
+    position: relative;
+    width:  clamp(240px, 70vw, 340px);
+    height: clamp(170px, 38vw, 240px);
+    flex-shrink: 0;
+}
+
+/* Car body: fixed-height band at the bottom of the stage */
+#car-body-wrapper,
+.race-body-wrapper {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%;
+    /* Exactly 58% of stage height — driver has 42% above to fit in */
+    height: 58%;
+    z-index: 2;
+}
+
+/* Sprite-backed car body: drive sizing from height so the sprite's
+   aspect-ratio resolves correctly. Without this, max-height clamping
+   breaks the aspect-ratio invariant and the inner sheet img ends up
+   mis-positioned (frame visibly cropped/wrapped). */
+#car-png,
+.race-car-img {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    z-index: 2;
+    filter: drop-shadow(0 4px 10px rgba(0,0,0,0.35));
+}
+
+/* ── DRIVER SLOT ────────────────────────────────────────────────
+   bottom: 38%  → sits in the top ~20% of the car body area,
+   i.e. the driver torso/head rises up from the car's cockpit.
+   This ensures no clipping regardless of stage size.
+   ──────────────────────────────────────────────────────────────── */
+#driver-slot,
+.race-driver-slot {
+    position: absolute;
+    bottom: 38%;          /* land on the car platform */
+    left: 50%;
+    transform: translateX(-50%);
+    /* Width is ~26% of stage width — feels proportional */
+    width:  clamp(48px, 13vw, 72px);
+    height: clamp(48px, 13vw, 72px);
+    z-index: 8;
+    pointer-events: none;
+    display: flex;
+    align-items: flex-end;   /* anchor to bottom so feet sit on car */
+    justify-content: center;
+}
+#driver-slot .sprite,
+.race-driver-slot .sprite {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+}
+
+/* Accessory anchors */
+.anchor            { position: absolute; font-size: clamp(1.3rem,3.5vw,1.9rem); z-index: 10; pointer-events: none; }
+.slot-roof-rear    { top: 4px;  left: 18%; }
+.slot-roof-front   { top: 2px;  left: 50%; }
+.slot-front        { right: 6px; bottom: 39%; }
+
+/* ── CONTROL PANELS ──────────────────────────────────────────────
+   Single column, each group is a dark card with big word-only buttons
+   ──────────────────────────────────────────────────────────────── */
+.controls {
+    width: 96%;
+    max-height: 44dvh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(6px,1dvh,10px);
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.controls::-webkit-scrollbar { display: none; }
+
+.control-group {
+    background: rgba(0,0,0,0.50);
+    border: 2px solid rgba(255,255,255,0.14);
+    border-radius: var(--radius);
+    padding: clamp(10px,2vw,16px);
+}
+
+.control-label {
+    font-size: clamp(1.05rem, 3vw, 1.5rem);
+    color: var(--accent);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Bank of word-only buttons */
+.bank-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(6px, 1.5vw, 10px);
+}
+
+.bank-btn {
+    all: unset;
+    cursor: pointer;
+    font-family: 'WalterTurncoat', cursive;
+    font-size: clamp(0.88rem, 2.4vw, 1.15rem);
+    color: #1a1a1a;
+    background: var(--accent);
+    box-shadow: 0 5px 0 var(--accent-dark);
+    border-radius: 13px;
+    padding: clamp(7px,1.5vw,10px) clamp(10px,2.5vw,15px);
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    transition: transform 0.1s, box-shadow 0.1s;
+    text-align: center;
+    line-height: 1.2;
+    font-weight: 700;
+}
+.bank-btn:active   { transform: translateY(3px); box-shadow: 0 2px 0 var(--accent-dark); }
+.bank-btn:disabled { opacity: 0.44; cursor: not-allowed; filter: grayscale(0.6); }
+.bank-btn.selected {
+    background: var(--green);
+    box-shadow: 0 5px 0 var(--green-dark);
+    color: white;
+    outline: 3px solid white;
+}
+.bank-btn .lock-label { font-size: clamp(0.62rem, 1.5vw, 0.8rem); color: #555; }
+.bank-btn .buy-label  { font-size: clamp(0.62rem, 1.5vw, 0.8rem); color: #1a6e1a; font-weight: 800; }
+
+/* Buyable state — green tint with a pulsing outline to draw attention */
+.bank-btn.buyable {
+    background: #b8f5c8;
+    box-shadow: 0 5px 0 #27ae60;
+    outline: 2px solid var(--green);
+    animation: buyable-ping 1.2s ease-in-out infinite alternate;
+}
+@keyframes buyable-ping {
+    from { outline-color: var(--green); }
+    to   { outline-color: transparent; }
+}
+
+/* Car thumbnail buttons */
+.car-bank-btn {
+    width:  clamp(70px, 17vw, 94px);
+    height: clamp(60px, 14vw, 78px);
+    padding: 4px 5px;
+}
+.car-bank-btn .sprite {
+    height: clamp(32px, 8vw, 44px);
+    width: auto;
+    max-width: 100%;
+    margin: 0 auto;
+}
+.car-bank-btn .car-name {
+    font-size: clamp(0.52rem, 1.3vw, 0.68rem);
+    color: #1a1a1a;
+    text-align: center;
+    line-height: 1.1;
+    font-weight: 700;
+}
+
+/* Underglow swatches — taller than the old paint buttons to fit the cost label */
+.color-btn {
+    width:  clamp(58px, 14vw, 76px);
+    height: clamp(72px, 17vw, 92px);
+    padding: 5px 4px;
+    flex-direction: column;
+    gap: 3px;
+}
+.color-swatch {
+    width:  clamp(26px, 6.5vw, 34px);
+    height: clamp(26px, 6.5vw, 34px);
+    border-radius: 50%;          /* circles look more like neon lights */
+    border: 3px solid rgba(0,0,0,0.2);
+    display: block;
+    flex-shrink: 0;
+}
+.color-label {
+    font-size: clamp(0.5rem, 1.3vw, 0.65rem);
+    color: #1a1a1a;
+    text-align: center;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
+.tool-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TRACK SELECT
+   ═══════════════════════════════════════════════════════════════════ */
+#screen-tracks {
+    justify-content: flex-start;
+    gap: clamp(12px,2dvh,20px);
+    transition: background 0.5s ease;
+}
+
+.track-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: clamp(10px,2.5vw,16px);
+    padding: 4px 14px;
+    overflow-y: auto;
+    max-height: 72dvh;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.track-grid::-webkit-scrollbar { display: none; }
+
+.track-card {
+    cursor: pointer;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.28);
+    position: relative;
+    width:  clamp(130px, 28vw, 195px);
+    height: clamp(98px,  21vw, 148px);
+    transition: transform 0.14s, border-color 0.14s;
+}
+.track-card:active { transform: scale(0.94); }
+.track-card img {
+    width: 100%; height: 72%;
+    object-fit: cover; display: block;
+}
+.track-name {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.70);
+    font-size: clamp(0.8rem, 2.4vw, 1.1rem);
+    color: white; text-align: center;
+    padding: 5px 4px;
+    text-transform: uppercase; letter-spacing: 1px;
+}
+
+#screen-tracks:has(.track-card[data-track="city"]:hover)       { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/city-bg.jpg') no-repeat center/cover; }
+#screen-tracks:has(.track-card[data-track="desert"]:hover)     { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/desert-bg.jpg') no-repeat center/cover; }
+#screen-tracks:has(.track-card[data-track="space"]:hover)      { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/space-bg.jpg') no-repeat center/cover; }
+#screen-tracks:has(.track-card[data-track="icy"]:hover)        { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/icy-bg.jpg') no-repeat center/cover; }
+#screen-tracks:has(.track-card[data-track="rainforest"]:hover) { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/rainforest-bg.jpg') no-repeat center/cover; }
+#screen-tracks:has(.track-card[data-track="tamil"]:hover)      { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/tamil-bg.jpg') no-repeat center/cover; }
+#screen-tracks:has(.track-card[data-track="block"]:hover)      { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/block-bg.jpg') no-repeat center/cover; }
+#screen-tracks:has(.track-card[data-track="candy"]:hover)      { background: linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.5)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/candy-bg.jpg') no-repeat center/cover; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOADING SCREEN
+   ═══════════════════════════════════════════════════════════════════ */
+#screen-loading {
+    background: radial-gradient(ellipse at center, rgba(20,20,40,0.95), rgba(0,0,0,0.98));
+    justify-content: center;
+}
+.loading-card {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 18px;
+    padding: 28px 36px;
+}
+.loading-title {
+    font-size: clamp(1.3rem, 4.5vw, 2.2rem);
+    color: var(--yellow, #ffe34a);
+    text-shadow: 0 3px 0 rgba(0,0,0,0.5);
+    letter-spacing: 2px; text-transform: uppercase;
+}
+.loading-spinner {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    border: 6px solid rgba(255,255,255,0.18);
+    border-top-color: var(--yellow, #ffe34a);
+    animation: loading-spin 0.85s linear infinite;
+}
+.loading-tip {
+    font-size: clamp(0.9rem, 2.6vw, 1.1rem);
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 1px;
+}
+@keyframes loading-spin { to { transform: rotate(360deg); } }
+
+#screen-loading[data-track="city"]       { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/city-bg.jpg')       no-repeat center/cover; }
+#screen-loading[data-track="desert"]     { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/desert-bg.jpg')     no-repeat center/cover; }
+#screen-loading[data-track="space"]      { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/space-bg.jpg')      no-repeat center/cover; }
+#screen-loading[data-track="icy"]        { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/icy-bg.jpg')        no-repeat center/cover; }
+#screen-loading[data-track="rainforest"] { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/rainforest-bg.jpg') no-repeat center/cover; }
+#screen-loading[data-track="tamil"]      { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/tamil-bg.jpg')      no-repeat center/cover; }
+#screen-loading[data-track="block"]      { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/block-bg.jpg')      no-repeat center/cover; }
+#screen-loading[data-track="candy"]      { background: linear-gradient(rgba(0,0,0,.55),rgba(0,0,0,.55)), url('https://fymz.lol/giggle-gears/assets/img/bg-img/candy-bg.jpg')      no-repeat center/cover; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   RACE SCREEN
+   ═══════════════════════════════════════════════════════════════════ */
+#screen-game {
+    background: #000 !important;
+    position: relative; overflow: hidden; padding: 0;
+}
+#screen-game.active { display: block !important; z-index: 10; }
+#screen-end { background: rgba(0,0,0,0.3); justify-content: center; }
+
+#race-track {
+    position: absolute; inset: 0;
+    background-size: cover;
+    background-position: center bottom;
+    overflow: hidden;
+}
+.track-city       { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/city-bg.jpg')        no-repeat center bottom/cover; }
+.track-desert     { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/desert-bg.jpg')      no-repeat center bottom/cover; }
+.track-space      { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/space-bg.jpg')       no-repeat center bottom/cover; }
+.track-icy        { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/icy-bg.jpg')         no-repeat center bottom/cover; }
+.track-rainforest { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/rainforest-bg.jpg')  no-repeat center bottom/cover; }
+.track-tamil      { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/tamil-bg.jpg')       no-repeat center bottom/cover; }
+.track-block      { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/block-bg.jpg')       no-repeat center bottom/cover; }
+.track-candy      { background: url('https://fymz.lol/giggle-gears/assets/img/bg-img/candy-bg.jpg')       no-repeat center bottom/cover; }
+
+#road-strip {
+    position: absolute; bottom: 0; left: 0;
+    width: 200vw; height: 18vh;
+    display: flex; will-change: transform; z-index: 2;
+}
+.road-tile {
+    width: 100vw; height: 18vh; flex-shrink: 0;
+    background-repeat: repeat-x; background-size: auto 100%;
+}
+.road-city       { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #555; }
+.road-desert     { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #c4a265; }
+.road-space      { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #1a0a3a; }
+.road-icy        { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #b0d8e8; }
+.road-rainforest { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #5a7a40; }
+.road-tamil      { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #1a0a3a; }
+.road-block      { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #1a0a3a; }
+.road-candy      { background-image: url('https://fymz.lol/giggle-gears/assets/img/bg-img/road.jpg'); background-color: #1a0a3a; }
+
+#race-track.crash-flash { animation: crash 0.4s ease; }
+@keyframes crash {
+    0%,100% { filter: none; }
+    25%,75%  { filter: brightness(2.2) saturate(0); }
+    50%      { filter: brightness(1.8) saturate(3) hue-rotate(340deg); }
+}
+
+/* ── Player car ─────────────────────────────────────────────────── */
+#racing-car-wrapper {
+    position: absolute;
+    left: clamp(28px, 5.5vw, 65px);
+    bottom: 10vh;    /* JS overrides for jump */
+    width:  clamp(130px, 26vw, 210px);
+    height: clamp(95px,  19vw, 153px);
+    z-index: 20;
+}
+.racing-car-inner { position: relative; width: 100%; height: 100%; }
+
+/* Race body mirrors preview proportions */
+.race-body-wrapper {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 58%;
+    z-index: 2;
+}
+
+/* Race driver — same bottom:38% logic as preview */
+.race-driver-slot {
+    position: absolute;
+    bottom: 38%; left: 50%;
+    transform: translateX(-50%);
+    width:  clamp(36px, 9vw, 54px);
+    height: clamp(36px, 9vw, 54px);
+    z-index: 8;
+    pointer-events: none;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+}
+.race-driver-slot img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    object-position: bottom center;
+}
+
+.car-boosting .racing-car-inner { animation: boost-shake 0.12s linear infinite; }
+@keyframes boost-shake {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(2px)  translateY(-1px); }
+    75%  { transform: translateX(-2px) translateY(1px); }
+    100% { transform: translateX(0); }
+}
+
+.car-jumping .racing-car-inner { animation: jump-tilt 0.15s ease-out forwards; }
+@keyframes jump-tilt {
+    0%  { transform: rotate(0); }
+    40% { transform: rotate(-7deg); }
+    100%{ transform: rotate(0); }
+}
+#racing-car-wrapper::after {
+    content: '';
+    position: absolute;
+    bottom: -6px; left: 15%;
+    width: 70%; height: 10px;
+    background: rgba(0,0,0,0.22);
+    border-radius: 50%;
+    filter: blur(4px);
+    pointer-events: none; z-index: -1;
+    transform: scaleX(var(--shadow-scale, 1));
+    transition: transform 0.05s linear;
+}
+.car-jumping::after { opacity: 0.38; }
+
+.trick-animation .racing-car-inner { animation: trick-spin 0.8s ease; }
+@keyframes trick-spin {
+    0%   { transform: rotate(0)      translateY(0); }
+    30%  { transform: rotate(-18deg) translateY(-18px); }
+    70%  { transform: rotate(12deg)  translateY(-12px); }
+    100% { transform: rotate(0)      translateY(0); }
+}
+
+/* ── NPCs ───────────────────────────────────────────────────────── */
+#npc-layer { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+.npc-car {
+    position: absolute;
+    width:  clamp(100px, 22vw, 175px);
+    height: clamp(73px,  16vw, 128px);
+    pointer-events: none;
+}
+.npc-car-img {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    filter: drop-shadow(0 3px 7px rgba(0,0,0,0.4));
+}
+
+/* ── CSS FX ─────────────────────────────────────────────────────── */
+
+/* Underglow is fully JS-driven via updateUnderglow() — no keyframe needed here.
+   The preview wrapper gets a static shadow via updatePreview() inline style. */
+
+.fx-hover { animation: hover-float 1.8s ease-in-out infinite; }
+@keyframes hover-float {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-12px); }
+}
+.fx-boostflame::before {
+    content: '🔥';
+    position: absolute;
+    left: -20px; top: 20%;
+    font-size: clamp(1.1rem, 3vw, 1.7rem);
+    animation: flame-flicker 0.15s ease infinite alternate;
+    z-index: 1;
+}
+@keyframes flame-flicker {
+    from { transform: scaleX(1)   rotate(-5deg); opacity: 1; }
+    to   { transform: scaleX(1.3) rotate(5deg);  opacity: 0.7; }
+}
+
+/* Deflect Shield — pulsing hamster-ball bubble around the car */
+.fx-shield { position: relative; }
+.fx-shield::after {
+    content: '';
+    position: absolute;
+    /* Wrap the car in a round bubble — width drives the circle, aspect-ratio keeps it perfectly round */
+    left: 50%;
+    top: 50%;
+    width: 130%;
+    aspect-ratio: 1 / 1;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 2px solid rgba(180, 240, 255, 0.85);
+    background:
+        /* top-left highlight: glossy sphere look */
+        radial-gradient(circle at 30% 28%, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0) 22%),
+        /* secondary highlight: smaller bright dot */
+        radial-gradient(circle at 68% 22%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 8%),
+        /* bubble body: inner clarity, outer cyan tint */
+        radial-gradient(circle at 50% 55%, rgba(140, 230, 255, 0.10) 0%, rgba(0, 180, 255, 0.18) 60%, rgba(0, 120, 220, 0.32) 100%);
+    box-shadow:
+        0 0 18px rgba(0, 220, 255, 0.55),
+        0 0 38px rgba(0, 130, 255, 0.45),
+        inset 0 0 22px rgba(180, 240, 255, 0.35),
+        inset 0 -16px 28px rgba(0, 70, 160, 0.30);
+    pointer-events: none;
+    z-index: 20;
+    animation: shield-bubble 1.6s ease-in-out infinite;
+}
+@keyframes shield-bubble {
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow:
+            0 0 14px rgba(0, 220, 255, 0.50),
+            0 0 30px rgba(0, 130, 255, 0.40),
+            inset 0 0 18px rgba(180, 240, 255, 0.30),
+            inset 0 -14px 24px rgba(0, 70, 160, 0.28);
+        border-color: rgba(180, 240, 255, 0.75);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.06);
+        box-shadow:
+            0 0 26px rgba(0, 240, 255, 0.75),
+            0 0 50px rgba(0, 160, 255, 0.60),
+            inset 0 0 28px rgba(200, 250, 255, 0.50),
+            inset 0 -18px 32px rgba(0, 90, 200, 0.36);
+        border-color: rgba(220, 250, 255, 1);
+    }
+}
+
+/* Fancy Lights */
+.fx-fancy-lights .headlight-beam {
+    display: block !important;
+    animation: light-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes light-pulse {
+    from { opacity: 0.8; } to { opacity: 1; filter: brightness(1.3); }
+}
+
+/* Standard lights-on: beam visible, JS fills the conic gradient */
+.lights-on .headlight-beam { display: block; }
+
+.headlight-beam {
+    display: none;
+    width:  clamp(55px, 14vw, 95px);
+    height: clamp(22px, 5.5vw, 42px);
+    position: absolute;
+    left: 26px; top: 0;
+    background: conic-gradient(
+        from -40deg at 0% 50%,
+        rgba(255,255,160,0.85) 0deg,
+        rgba(255,255,100,0.5)  30deg,
+        transparent 60deg
+    );
+    border-radius: 0 50% 50% 0;
+    pointer-events: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HUD
+   ═══════════════════════════════════════════════════════════════════ */
+#hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    padding: clamp(10px,2dvh,18px) clamp(12px,3vw,24px);
+    padding-top: calc(env(safe-area-inset-top, 0px) + clamp(10px,2dvh,18px));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 100;
+    pointer-events: none;
+}
+#hud > * { pointer-events: auto; }
+
+#score-display {
+    font-size: clamp(1.2rem, 4vw, 1.8rem);
+    background: var(--accent);
+    color: #1a1a1a;
+    padding: clamp(6px,1.5vw,10px) clamp(16px,4vw,24px);
+    border-radius: 50px;
+    box-shadow: 0 5px 0 var(--accent-dark);
+}
+#speed-indicator {
+    font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+    background: rgba(0,0,0,0.55);
+    color: white;
+    padding: clamp(6px,1.5vw,10px) clamp(12px,3vw,20px);
+    border-radius: 50px;
+    border: 2px solid rgba(255,255,255,0.25);
+}
+#time-display {
+    font-size: clamp(1rem, 3vw, 1.4rem);
+    background: rgba(0,0,0,0.55);
+    color: white;
+    padding: clamp(6px,1.5vw,10px) clamp(14px,3.5vw,22px);
+    border-radius: 50px;
+    border: 2px solid rgba(255,255,255,0.25);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 1px;
+}
+#time-display.low {
+    background: var(--red, #e63946);
+    border-color: rgba(255,255,255,0.55);
+    animation: time-pulse 0.5s ease-in-out infinite alternate;
+}
+@keyframes time-pulse { from { transform: scale(1); } to { transform: scale(1.08); } }
+#speed-indicator.boosting {
+    background: var(--accent); color: #1a1a1a;
+    animation: hud-pulse 0.4s ease infinite alternate;
+}
+@keyframes hud-pulse { from { transform: scale(1); } to { transform: scale(1.07); } }
+
+#exit-btn {
+    font-family: 'WalterTurncoat', cursive;
+    font-size: clamp(0.9rem, 2.5vw, 1.2rem);
+    background: var(--red); color: white;
+    box-shadow: 0 5px 0 var(--red-dark);
+    padding: clamp(7px,1.5vw,10px) clamp(14px,3vw,22px);
+    border-radius: 13px; border: none; cursor: pointer;
+}
+
+#trick-toast {
+    position: fixed;
+    top: clamp(65px, 13dvh, 92px);
+    left: 50%;
+    transform: translateX(-50%) translateY(-16px);
+    font-size: clamp(1.1rem, 4vw, 1.7rem);
+    font-family: 'WalterTurncoat', cursive;
+    padding: clamp(6px,1.5vw,10px) clamp(16px,4vw,26px);
+    border-radius: 50px;
+    pointer-events: none; z-index: 200;
+    opacity: 0; transition: opacity 0.22s, transform 0.22s;
+    white-space: nowrap;
+}
+#trick-toast.trick-toast-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#trick-toast.positive { background: var(--green); color: #fff; }
+#trick-toast.negative { background: var(--red);   color: #fff; }
+
+#mobile-controls {
+    position: fixed;
+    bottom: clamp(18px,4dvh,36px);
+    right: clamp(10px,2.5vw,20px);
+    display: none;
+    flex-direction: row;
+    gap: clamp(8px,2vw,14px);
+    z-index: 110;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+#mobile-boost-btn, #mobile-jump-btn {
+    font-family: 'WalterTurncoat', cursive;
+    font-size: clamp(1rem, 3.5vw, 1.4rem);
+    padding: clamp(14px,3.5vw,20px) clamp(22px,5vw,32px);
+    border-radius: 18px; border: none; cursor: pointer;
+    min-width: 80px; min-height: 56px;
+    font-weight: 700; color: white;
+}
+#mobile-boost-btn { background: var(--purple); box-shadow: 0 6px 0 #5649c0; }
+#mobile-jump-btn  { background: var(--green);  box-shadow: 0 6px 0 var(--green-dark); }
+@media (pointer: coarse), (max-width: 640px) { #mobile-controls { display: flex; } }
+
+/* ═══════════════════════════════════════════════════════════════════
+   END SCREEN
+   ═══════════════════════════════════════════════════════════════════ */
+#end-card {
+    background: rgba(0,0,0,0.68);
+    border: 3px solid rgba(255,255,255,0.22);
+    border-radius: clamp(22px,5vw,36px);
+    padding: clamp(24px,5dvh,44px) clamp(28px,6vw,52px);
+    text-align: center;
+    display: flex; flex-direction: column;
+    gap: clamp(14px,3dvh,22px);
+    max-width: min(480px, 92vw);
+}
+#end-card h2 { font-size: clamp(1.7rem, 5vw, 2.5rem); }
+#end-card p  { font-size: clamp(1.05rem, 3vw, 1.4rem); }
+.end-buttons { display: flex; gap: clamp(8px,2vw,12px); justify-content: center; flex-wrap: wrap; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════════════ */
+footer {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    text-align: center;
+    font-size: clamp(0.5rem,1.5vw,0.7rem);
+    opacity: 0.42; padding: 4px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    pointer-events: none; z-index: 5;
+}
+footer a { color: white; pointer-events: auto; }
+
+.btn-new-track {
+    cursor: pointer;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.28);
+    position: relative;
+    width:  clamp(130px, 28vw, 195px);
+    height: clamp(98px,  21vw, 148px);
+    transition: transform 0.14s, border-color 0.14s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    padding: 0;
+}
+.btn-new-track .sprite {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    margin: auto;
+}
+.btn-new-driver {
+    cursor: pointer;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.28);
+    position: relative;
+    width:  clamp(130px, 28vw, 195px);
+    height: clamp(98px,  21vw, 148px);
+    transition: transform 0.14s, border-color 0.14s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    padding: 0;
+}
+.btn-new-driver .sprite {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    margin: auto;
+}
+.btn-new-car {
+    cursor: pointer;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 3px solid rgba(255,255,255,0.28);
+    position: relative;
+    width:  clamp(130px, 28vw, 195px);
+    height: clamp(98px,  21vw, 148px);
+    transition: transform 0.14s, border-color 0.14s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    padding: 0;
+}
+.btn-new-car .sprite {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    margin: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ENVIRONMENT LAYERS
+   Three-tier: skybox (BG), scenery (midground), entities (road+NPCs+player)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Skybox static items ────────────────────────────────────────── */
+#skybox-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;           
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.sky-item {
+    position: absolute;
+    font-size: clamp(1.4rem, 4vw, 2.6rem);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+    user-select: none;
+    -webkit-user-select: none;
+}
+/* Sprite-backed sky items render at the source frame's natural size; the
+   fallback width keeps non-sprite specials (PNG <img>) at their intrinsic size. */
+.sky-item.sprite { width: var(--fw); }
+.sky-item.sky-visible { opacity: 1; }
+
+/* Player jumped up and touched it: jiggle, then pop and disappear. */
+@keyframes sky-pop-jiggle-kf {
+    0%   { transform: rotate(0deg) scale(1);     opacity: 1; filter: brightness(1.1); }
+    8%   { transform: rotate(-15deg) scale(1.22); }
+    18%  { transform: rotate(13deg) scale(0.92); }
+    28%  { transform: rotate(-9deg) scale(1.14); }
+    38%  { transform: rotate(6deg) scale(0.98); }
+    48%  { transform: rotate(0deg) scale(1.08);  opacity: 1; filter: brightness(1.4); }
+    100% { transform: rotate(0deg) scale(0.05);  opacity: 0; filter: brightness(2.2); }
+}
+.sky-item.sky-popping {
+    animation: sky-pop-jiggle-kf 0.6s ease-out forwards !important;
+    transform-origin: center center;
+}
+
+/* Angry chasers — red-hot glow, throbbing wobble. JS controls left/top so
+   the transform here is purely visual. */
+.sky-item.sky-angry {
+    z-index: 30;
+    filter:
+        hue-rotate(-25deg) saturate(1.7) brightness(1.15)
+        drop-shadow(0 0 14px rgba(255, 80, 50, 0.85))
+        drop-shadow(0 0 26px rgba(255, 30, 30, 0.55));
+    animation: sky-angry-throb 0.5s ease-in-out infinite alternate !important;
+    transform-origin: center center;
+}
+@keyframes sky-angry-throb {
+    from { transform: scale(1)    rotate(-3deg); }
+    to   { transform: scale(1.16) rotate(3deg); }
+}
+
+/* Full-screen "wiped out" overlay shown when an angry sky item kills the run. */
+#angry-ko-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px;
+    background: radial-gradient(ellipse at center, rgba(255, 60, 30, 0.55), rgba(0, 0, 0, 0.85));
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: opacity 0.18s ease-out, transform 0.18s ease-out;
+}
+#angry-ko-overlay.show {
+    opacity: 1;
+    transform: scale(1);
+    animation: ko-shake 0.45s cubic-bezier(.36,.07,.19,.97) 1;
+}
+#angry-ko-overlay .ko-icon {
+    font-size: clamp(4rem, 18vw, 10rem);
+    text-shadow: 0 0 30px #ff5533, 0 0 60px #ff2200;
+    animation: ko-pop 0.4s ease-out;
+}
+#angry-ko-overlay .ko-title {
+    font-family: 'WalterTurncoat', cursive;
+    font-size: clamp(2rem, 9vw, 5rem);
+    color: #fff;
+    letter-spacing: 3px;
+    text-shadow: 0 4px 0 #8b0000, 0 0 24px rgba(255, 80, 50, 0.9);
+}
+#angry-ko-overlay .ko-subtitle {
+    font-size: clamp(0.9rem, 3vw, 1.4rem);
+    color: rgba(255, 220, 200, 0.95);
+    letter-spacing: 1px;
+}
+@keyframes ko-pop {
+    0%   { transform: scale(0.2) rotate(-30deg); opacity: 0; }
+    60%  { transform: scale(1.4) rotate(8deg);   opacity: 1; }
+    100% { transform: scale(1)   rotate(0);      opacity: 1; }
+}
+@keyframes ko-shake {
+    10%, 90% { transform: translate3d(-2px, 0, 0); }
+    20%, 80% { transform: translate3d(4px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-8px, 0, 0); }
+    40%, 60% { transform: translate3d(8px, 0, 0); }
+}
+
+/* ── Midground scenery ──────────────────────────────────────────── */
+#scenery-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 8;           /* above road (2), below NPCs (15) */
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.scenery-item {
+    position: absolute;
+    font-size: clamp(2rem, 5.5vw, 3.8rem);
+    pointer-events: none;
+    bottom: 18vh;         /* sits just above road-strip */
+    will-change: transform;
+    user-select: none;
+    -webkit-user-select: none;
+    /* Depth hint: items that spawn at top of scenery band are "farther back" */
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+}
+
+/* Depth scale tiers — applied by JS based on y-band */
+.scenery-item.depth-far    { font-size: clamp(1.1rem, 2.8vw, 2rem);  opacity: 0.72; }
+.scenery-item.depth-mid    { font-size: clamp(1.6rem, 4.2vw, 3rem);  opacity: 0.88; }
+.scenery-item.depth-close  { font-size: clamp(2.2rem, 5.8vw, 4.2rem); opacity: 1;   }
+
+
+/* ── Scenery entry animation (cheap, CSS-only) ──────────────────── */
+@keyframes scenery-pop {
+    from { transform: translateX(0) scale(0.7); opacity: 0; }
+    to   { transform: translateX(0) scale(1);   opacity: 1; }
+}
+.scenery-item { animation: scenery-pop 0.22s ease-out both; }
+.scene-item   { animation: scenery-pop 0.22s ease-out both; }
+/* ═══════════════════════════════════════════════════════════════════
+   SKY LAYER — motion animation classes
+   sky items start off-screen right and drift/shoot left.
+   animationend fires self-removal (hooked in JS _emitSkyItem).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Slow drift — sun, moon, slow stars */
+@keyframes sky-drift-slow-kf {
+    from { transform: translateX(110vw); opacity: 0; }
+    5%   { opacity: 1; }
+    92%  { opacity: 1; }
+    to   { transform: translateX(-18vw); opacity: 0; }
+}
+.sky-drift-slow {
+    right: auto; left: 0;
+    animation: sky-drift-slow-kf 28s linear forwards;
+    width: clamp(38px, 9vw, 64px);
+    height: auto;
+}
+
+/* Mid drift — clouds, birds */
+@keyframes sky-drift-mid-kf {
+    from { transform: translateX(110vw); opacity: 0; }
+    6%   { opacity: 0.92; }
+    90%  { opacity: 0.92; }
+    to   { transform: translateX(-22vw); opacity: 0; }
+}
+.sky-drift-mid {
+    right: auto; left: 0;
+    animation: sky-drift-mid-kf 18s linear forwards;
+    width: clamp(60px, 14vw, 110px);
+    height: auto;
+}
+
+/* Fast drift — fast clouds, fast birds */
+@keyframes sky-drift-fast-kf {
+    from { transform: translateX(110vw); opacity: 0; }
+    8%   { opacity: 0.85; }
+    88%  { opacity: 0.85; }
+    to   { transform: translateX(-25vw); opacity: 0; }
+}
+.sky-drift-fast {
+    right: auto; left: 0;
+    animation: sky-drift-fast-kf 11s linear forwards;
+    width: clamp(50px, 12vw, 90px);
+    height: auto;
+}
+
+/* Shooting — comets, cross-sky objects */
+@keyframes sky-shoot-kf {
+    from { transform: translateX(110vw) rotate(-18deg); opacity: 0; }
+    4%   { opacity: 1; }
+    88%  { opacity: 1; }
+    to   { transform: translateX(-20vw) rotate(-18deg); opacity: 0; }
+}
+.sky-shoot {
+    right: auto; left: 0;
+    animation: sky-shoot-kf 6s linear forwards;
+    width: clamp(44px, 10vw, 72px);
+    height: auto;
+}
+
+/* Fast shoot — shooting stars */
+@keyframes sky-shoot-fast-kf {
+    from { transform: translateX(110vw) rotate(-22deg); opacity: 0; }
+    3%   { opacity: 1; }
+    85%  { opacity: 1; }
+    to   { transform: translateX(-20vw) rotate(-22deg); opacity: 0; }
+}
+.sky-shoot-fast {
+    right: auto; left: 0;
+    animation: sky-shoot-fast-kf 3.5s linear forwards;
+    width: clamp(36px, 8vw, 58px);
+    height: auto;
+}
+
+/* Special tag — no extra style, just a marker class */
+.sky-special { filter: drop-shadow(0 0 6px rgba(255,255,200,0.7)); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SCENE LAYER — anchored cameo fade in/out
+   ═══════════════════════════════════════════════════════════════════ */
+.scene-item {
+    position: absolute;
+    width:  clamp(52px, 12vw, 88px);
+    height: auto;
+    opacity: 0;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.45));
+    transition: opacity 0.45s ease;
+    /* anchor is bottom-left so bottom/left % in JS positions correctly */
+    transform: translateX(-50%);
+}
+.scene-item.scene-active  { opacity: 1; }
+.scene-item.scene-fadeout { opacity: 0; transition: opacity 0.55s ease; }
