@@ -1,0 +1,270 @@
+:root {
+    --bg-color: #050505;
+    --accent-cyan: #00ffcc;
+    --accent-pink: #ff00ff;
+    --accent-yellow: #f1c40f;
+    --glass-bg: rgba(255, 255, 255, 0.04);
+    --tool-bg: rgba(20, 20, 20, 0.94);
+    --border-thin: 1px solid rgba(255, 255, 255, 0.18);
+    --paper: #ffffff;
+    --ink: #1a1a1a;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+    margin: 0;
+    background-color: var(--bg-color);
+    background-image:
+        linear-gradient(rgba(0, 255, 204, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 204, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    color: #fff;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    overflow: hidden;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+.hidden { display: none !important; }
+
+/* ---------- header ---------- */
+header.top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-bottom: var(--border-thin);
+    flex-shrink: 0;
+    min-height: 44px;
+}
+
+header.top h1 {
+    font-size: clamp(1rem, 4vw, 1.4rem);
+    margin: 0;
+    font-weight: 900;
+    background: linear-gradient(to bottom, #fff 60%, var(--accent-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(2px 2px 0 var(--accent-pink));
+    letter-spacing: 1px;
+    white-space: nowrap;
+    text-align: center;
+    flex: 1;
+}
+
+.back {
+    color: var(--accent-cyan);
+    text-decoration: none;
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--accent-cyan);
+    border-radius: 8px;
+    white-space: nowrap;
+    min-height: 40px;
+    min-width: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    background: transparent;
+    cursor: pointer;
+    line-height: 1;
+}
+.back:active {
+    background: var(--accent-cyan);
+    color: #000;
+    box-shadow: 0 0 12px var(--accent-cyan);
+}
+
+.header-spacer { min-width: 40px; }
+
+/* ---------- stage / canvas ---------- */
+.stage {
+    position: relative;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#canvas {
+    background: var(--paper);
+    border-radius: 14px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 255, 204, 0.2);
+    touch-action: none;
+    cursor: crosshair;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.hint {
+    position: absolute;
+    bottom: 0.6rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    pointer-events: none;
+    transition: opacity 0.4s;
+    text-align: center;
+    max-width: 92%;
+}
+.hint.faded { opacity: 0; }
+.hint strong { color: var(--accent-cyan); }
+
+/* ---------- toolbar ---------- */
+.toolbar {
+    background: var(--tool-bg);
+    border-top: var(--border-thin);
+    padding: 0.5rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom)) 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ---------- color palette ---------- */
+.palette {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.12s, border-color 0.12s;
+    touch-action: manipulation;
+}
+.swatch.active {
+    border-color: #fff;
+    transform: scale(1.15);
+    box-shadow: 0 0 0 2px var(--accent-cyan);
+}
+
+/* ---------- brush sizes ---------- */
+.sizes {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+    background: var(--glass-bg);
+    padding: 0.25rem;
+    border-radius: 10px;
+    border: var(--border-thin);
+}
+
+.size-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+}
+.size-btn.active {
+    background: var(--accent-cyan);
+    color: #000;
+}
+.size-btn .dot {
+    background: currentColor;
+    border-radius: 50%;
+    display: inline-block;
+}
+.size-btn .dot-s { width: 5px; height: 5px; }
+.size-btn .dot-m { width: 12px; height: 12px; }
+.size-btn .dot-l { width: 22px; height: 22px; }
+
+/* ---------- tool buttons ---------- */
+.tool-btn {
+    background: var(--glass-bg);
+    border: var(--border-thin);
+    color: #fff;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    touch-action: manipulation;
+    line-height: 1;
+}
+.tool-btn .ico { font-size: 1.1rem; }
+.tool-btn:active {
+    background: rgba(0, 255, 204, 0.2);
+    border-color: var(--accent-cyan);
+}
+.tool-btn.primary {
+    background: var(--accent-cyan);
+    color: #000;
+    border-color: var(--accent-cyan);
+    font-weight: 800;
+}
+.tool-btn.primary:active {
+    box-shadow: 0 0 18px var(--accent-cyan);
+}
+
+/* ---------- BPM slider ---------- */
+.bpm-label {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.85);
+    font-family: monospace;
+    min-width: 130px;
+}
+.bpm-text strong { color: var(--accent-cyan); margin-left: 0.25rem; }
+#bpm {
+    width: 130px;
+    accent-color: var(--accent-cyan);
+}
+
+/* ---------- footer ---------- */
+footer {
+    text-align: center;
+    font-size: 0.65rem;
+    opacity: 0.4;
+    padding: 0.2rem;
+}
+footer a { color: #fff; }
