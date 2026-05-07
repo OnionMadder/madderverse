@@ -4,7 +4,7 @@ Sprunki-style drag-and-drop music game inside the Madderverse hub.
 **Read the repo root [`CLAUDE.md`](../CLAUDE.md) first** for project-wide rules
 (no build system, GitHub Pages deploy, "flat" game shape, GoatCounter beacon,
 ad-free / kid-friendly branding). This file captures only what's specific to
-`all-monkeys/`.
+`all-munkis/`.
 
 ## What it is
 
@@ -17,22 +17,38 @@ ad-free / kid-friendly branding). This file captures only what's specific to
     via the `SONG` button.
   - **Jumpscare** — manual via the `BOO!` button, **and** auto-fires when
     `MOON` or `ICE` lands in a slot (drag, drop, or REMIX). 1.5s, debounced.
+  - **Ice freeze** — additional layer on top of the jumpscare: when Ice
+    Munki is on the stage, every other active slot freezes to "DEATH"
+    (cyan tint, ❄ flake, 💀 RIP flag). Morbidly absurd, not gory. Thaws
+    automatically when no Ice Munki remains. See `updateIceFreeze()`.
+  - **Moon Rules** — while Moon Munki is on the stage, ANY click on the
+    page rolls a random chaos event (hue rotate, invert flash, slot
+    shuffle, 🌙 rain, subtitle glitch, page tilt, phantom Munki).
+    Cooldown 700ms. Wired in `attachMoonChaos()`.
 
 ## File layout
 
 ```
-all-monkeys/
+all-munkis/
   index.html            # static markup; header buttons + #stage + #tray + #booOverlay
   game.js               # everything below in one IIFE
   style.css             # @imports the bundled JetBrains Mono TTF
   assets/
     JetBrainsMono-VariableFont_wght.ttf
     sprites/
-      munki-heads.png    # 1608×1604, 16 frames in 4 colors (blue/green/orange/purple)
-      munki-heads.json   # frame coords (mirrored into SHEETS in game.js)
-      madballs-heads.png # 3244×2160, 6 gnarly creature heads
-      madballs-heads.json
-  .claude/launch.json    # `python -m http.server 8770` — used by preview tools
+      default-heads.png    # 4330×4381, 16 Munki heads named by id
+                           # (high, hiss, ice, mega, moon, shadow, sine,
+                           # snare, spark, srivi, star, amber, flute, fog,
+                           # green, grumble). Heads come in 4 colors:
+                           # PURPLE / GREEN / BLUE / ORANGE.
+      default-heads.json   # frame coords (mirrored into SHEETS.munki)
+      mb-heads.png         # 4330×2191, 8 Madballz heads named by id
+                           # (mb-skull, mb-sad, mb-zombie, mb-snooze,
+                           # mb-scared, mb-cool, mb-grump, mb-eye).
+                           # Heads come in 4 colors: PURPLE / ORANGE /
+                           # GREEN / TEAL.
+      mb-heads.json        # frame coords (mirrored into SHEETS.mb)
+  .claude/launch.json     # `python -m http.server 8770` — used by preview tools
 ```
 
 ## Architecture (game.js, top → bottom)
@@ -46,10 +62,12 @@ all-monkeys/
 | `scheduleStep(step, bar, when)` | Calls `BASE_SONG.play()` (if on) + every active slot's `ch.play()` + visual pulse on quarter notes |
 | **SYNTH HELPERS** | `noiseSource(ctx, dur)`, `distortionCurve(amount)` |
 | **BASE_SONG** | One object with `play(ctx, out, when, step, bar)`. Sustained bass + pad on step 0; melody hook on quarter notes. Cmaj on bar 0, Am on bar 1. |
-| **CHARACTERS** | The 22-mod dict. **See "Adding a mod" below.** |
-| **ORDER** | Array of character ids in tray render order. 16 Munkis then 6 Madballz. |
+| **CHARACTERS** | The 22-mod dict. **See "Adding a mod" below.** Body color must match the head sprite color — see comment above `SHEETS`. |
+| **STANDARD_ORDER / MADBALLZ_ORDER** | Tray order arrays. Munkis are grouped by HEAD COLOR (green → orange → purple → blue) and Ice Munki + Moon Munki are pinned to the very end on **every page**, including the Madballz tray. |
 | **HORROR_TRIGGER_MODS** | `Set(['moon', 'ice'])`. Auto-trigger jumpscare when one of these is placed (and wasn't already there). |
-| **SHEETS** | `{ munki: {src, sheetW, sheetH, frames}, madballs: {…} }`. Frame names map to coord rects mirrored from the JSON files. |
+| **SHEETS** | `{ munki: {src, sheetW, sheetH, frames}, madballs: {…} }`. Frame names map to coord rects mirrored from the JSON files. Munki frame names = character ids; the comment annotates each one's color. |
+| **isIceOnStage / updateIceFreeze** | Ice Munki freeze logic — toggles `.frozen-by-ice` on every other active slot when Ice is placed. |
+| **moonRules / attachMoonChaos** | Moon Munki click chaos — `attachMoonChaos()` adds a document-level click listener; `moonRules()` picks a random effect (hue, invert, shuffle, rain, glitch text, tilt, phantom). |
 | **ART** | `bodyArt(c)`, `headShapeArt(c)`, `headFaceArt()`, `headModArt(frameName, sheetName)`, `headPhonesArt()`, `hairArt(c)`, `headArt(c)`, `characterArt(id)`. All return SVG strings. |
 | **HAIR** | `HAIR_STYLES`, `HAIR_COLORS`, `hairSvg(style, color, dark)`, `assignRandomHair()` (picks ~55% of mods at init, skips horror-trigger ones). |
 | **STATE** | `slots = new Array(NUM_SLOTS).fill(null)` |
@@ -103,10 +121,14 @@ when a `.beat` class is added to `.char-art` on quarter notes.
 ## How to make common changes
 
 ### Add a new mod
-1. Add an entry to `CHARACTERS` (see shape above).
+1. Add an entry to `CHARACTERS` (see shape above). Body color **must** match
+   the head sprite color (purple body for purple head, etc.).
 2. If giving it a sprite head, add the frame name + coords to the matching
-   `SHEETS[sheet].frames` block (mirror from the JSON).
-3. Add the id to `ORDER` (controls tray position).
+   `SHEETS[sheet].frames` block (mirror from the JSON). For Munkis, frame
+   name = character id.
+3. Add the id to `STANDARD_ORDER` (or `MADBALLZ_ORDER`) at the right
+   position for its color group. **Ice + Moon must remain the last two
+   entries on every page.**
 4. To make it a horror trigger, add the id to `HORROR_TRIGGER_MODS`.
 
 ### Replace a character's head
@@ -130,8 +152,9 @@ will sound coherent together:
 - **Pad** cloud (Cmaj triad held)
 - **Leads / arps** munki (saw hook), flute (offbeat melody), cocoa (bird arp),
   star (bell triad), ice (high twinkle)
-- **Madballz textures** mb-alien (distorted pluck), mb-cry (wail), mb-shroom
-  (bubble arp), mb-brain (chopper-LFO bass), mb-wires (electric), mb-rocky (thud)
+- **Madballz textures** mb-zombie (distorted alien-pluck), mb-sad (triangle drip),
+  mb-cool (random sine arp), mb-grump (chopper-LFO bass), mb-eye (electric square),
+  mb-skull (low noise thud), mb-snooze (long yawn pad), mb-scared (high-pass shiver)
 
 When adding a new mod, pick a register/role that isn't crowded.
 
@@ -142,6 +165,17 @@ When adding a new mod, pick a register/role that isn't crowded.
   Add a separate counter, don't grow this one.
 - **`isJumpScareActive` debounces the scare** — REMIX over multiple horror
   mods only fires one scare. Intentional.
+- **Ice freeze re-fires on transition only** — `updateIceFreeze()` adds
+  `.frozen-by-ice` only when a slot moves from unfrozen → frozen so the
+  CSS RIP animation runs once per victim. Don't toggle the class on every
+  render or it will replay the death animation forever.
+- **Moon chaos has a 700ms cooldown** — `moonChaosCooldown` blocks rapid
+  spam. Don't shorten it without testing on a low-end phone; the
+  effects (page hue rotate, invert flash) get seizure-y if stacked.
+- **Body color must match head sprite color** — checked at PR time.
+  Purple head → purple body. The `default-heads.png` sheet is laid out as
+  4 rows × 4 columns; the comment beside each entry in `SHEETS.munki` is
+  the source of truth for which color each frame is.
 - **Headphones use `overflow="visible"`** so cups extend past the SVG box.
   Don't switch the SVG element to `overflow: hidden` or the chunky cartoon
   silhouette breaks.
@@ -179,5 +213,16 @@ The session that built the current shape did, in order:
 7. Restored CHOOCHOO, switched horror trigger to MOON/ICE, supersized
    headphones (~3× cups, +71% band stroke), added procedural hair to ~55%
    of non-horror mods
-
-PR branch: `claude/awesome-franklin-e665cb`.
+8. Renamed game directory `all-monkeys/` → `all-munkis/`. New
+   `default-heads.png` sheet (4330×4381) with frame names = ids.
+   Re-grouped tray by head color with Ice + Moon pinned last on every
+   page. Added Ice freeze ("DEATH" tint + 💀 RIP) and Moon Rules
+   (random click chaos: hue rotate, invert, shuffle, 🌙 rain, glitch
+   text, page tilt, phantom Munki).
+9. New Madballz sheet `mb-heads.png` (4330×2191), 8 frames named
+   `mb-skull`, `mb-sad`, `mb-zombie`, `mb-snooze`, `mb-scared`,
+   `mb-cool`, `mb-grump`, `mb-eye`. Replaced the 6 old `mb-zorb`,
+   `mb-drip`, `mb-random`, `mb-thrum`, `mb-volt`, `mb-rock` with 8 new
+   characters that match the new sprites; added two new audio profiles
+   (`mb-snooze` yawn pad, `mb-scared` shiver). Madballz tray now also
+   color-grouped (purple → orange → green → teal) with Ice + Moon last.

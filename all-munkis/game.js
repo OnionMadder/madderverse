@@ -178,8 +178,9 @@
 const CHARACTERS = {
         green: {
             label: 'Green Gear',
-            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'green (1)',
+            // Sprite head is ORANGE in the new sheet — body matches head.
+            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
+            headFrame: 'green',
             play(ctx, out, when, step) {
                 const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
                 const freq = hook[step];
@@ -203,8 +204,8 @@ const CHARACTERS = {
 
         high: {
             label: 'High-Z',
-            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'green (2)',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            headFrame: 'high',
             play(ctx, out, when, step) {
                 if (![2, 6, 10, 14].includes(step)) return;
                 const n = noiseSource(ctx, 0.04);
@@ -222,7 +223,7 @@ const CHARACTERS = {
         shadow: {
             label: 'Shadow Pulse',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'purple (1)',
+            headFrame: 'shadow',
             play(ctx, out, when, step) {
                 if (step % 2 !== 0) return;
                 const n = noiseSource(ctx, 0.05);
@@ -241,8 +242,8 @@ const CHARACTERS = {
 
         mega: {
             label: 'Mega Thump',
-            bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
-            headFrame: 'blue (1)',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            headFrame: 'mega',
             play(ctx, out, when, step) {
                 if (step % 4 !== 0) return;
                 const o = ctx.createOscillator();
@@ -268,7 +269,7 @@ const CHARACTERS = {
         amber: {
             label: 'Amber Arp',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            headFrame: 'orange (1)',
+            headFrame: 'amber',
             play(ctx, out, when, step) {
                 if (step !== 5 && step !== 13) return;
                 const notes = [659.25, 783.99, 987.77, 1318.51];
@@ -290,7 +291,7 @@ const CHARACTERS = {
         srivi: {
             label: 'Srivi-Bot',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'green (3)',
+            headFrame: 'srivi',
             play(ctx, out, when, step) {
                 const lowSteps = [0, 6, 10];
                 const highSteps = [3, 8, 13];
@@ -322,7 +323,7 @@ const CHARACTERS = {
         grumble: {
             label: 'Grumble Bass',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'green (4)',
+            headFrame: 'grumble',
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const root = step === 0 ? 65.41 : 98.00;
@@ -349,7 +350,7 @@ const CHARACTERS = {
         sine: {
             label: 'Sine Wave',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            headFrame: 'orange (2)',
+            headFrame: 'sine',
             play(ctx, out, when, step) {
                 const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
                 const f = seq[step];
@@ -369,7 +370,7 @@ const CHARACTERS = {
         hiss: {
             label: 'Hiss Shell',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'green (5)',
+            headFrame: 'hiss',
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.18);
@@ -386,8 +387,8 @@ const CHARACTERS = {
 
         snare: {
             label: 'Snare-Bot',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'purple (2)',
+            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
+            headFrame: 'snare',
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.13);
@@ -415,7 +416,7 @@ const CHARACTERS = {
         flute: {
             label: 'Vibe Berry',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'purple (3)',
+            headFrame: 'flute',
             play(ctx, out, when, step) {
                 const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
                 const freq = melody[step];
@@ -441,8 +442,8 @@ const CHARACTERS = {
 
         star: {
             label: 'Star Ping',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'purple (4)',
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
+            headFrame: 'star',
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const notes = [1046.5, 1318.51, 1567.98];
@@ -463,8 +464,8 @@ const CHARACTERS = {
 
         fog: {
             label: 'Fog Chord',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'purple (5)',
+            bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
+            headFrame: 'fog',
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const chord = [261.63, 329.63, 392.00];
@@ -486,7 +487,7 @@ const CHARACTERS = {
         moon: {
             label: 'Moon Munki',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
-            headFrame: 'blue (2)',
+            headFrame: 'moon',
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const o = ctx.createOscillator();
@@ -513,8 +514,8 @@ const CHARACTERS = {
 
         spark: {
             label: 'Spark Snap',
-            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            headFrame: 'orange (3)',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            headFrame: 'spark',
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
                 const n = noiseSource(ctx, 0.025);
@@ -532,7 +533,7 @@ const CHARACTERS = {
         ice: {
             label: 'Ice Munki',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
-            headFrame: 'blue (3)',
+            headFrame: 'ice',
             play(ctx, out, when, step) {
                 const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
                 const freq = seq[step];
@@ -549,9 +550,38 @@ const CHARACTERS = {
             }
         },
 
-        'mb-zorb': {
-            label: 'Zorb Drive', sheet: 'madballs', headFrame: 'mb-alien',
+        // ===== MADBALLZ MODZ (sheet: 'mb' → assets/sprites/mb-heads.png) =====
+        // 8 sprites, body color matches each head's background color so the
+        // bank reads as a tidy color rainbow on the Madballz page.
+        // PURPLE: mb-skull, mb-zombie, mb-grump
+        // ORANGE: mb-sad, mb-snooze, mb-scared
+        // GREEN:  mb-cool
+        // TEAL:   mb-eye
+        'mb-skull': {
+            label: 'Skull Buzz', sheet: 'mb', headFrame: 'mb-skull',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
+            // Bone-rumble: sub thud filtered low — fits the skull vibe.
+            play(ctx, out, when, step) {
+                if (![2, 9, 14].includes(step)) return;
+                const n = noiseSource(ctx, 0.18);
+                const f = ctx.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.setValueAtTime(420, when);
+                f.frequency.exponentialRampToValueAtTime(120, when + 0.15);
+                f.Q.value = 4;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.32, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+                n.connect(f).connect(g).connect(out);
+                n.start(when); n.stop(when + 0.2);
+            }
+        },
+
+        'mb-zombie': {
+            label: 'Zombi Bone', sheet: 'mb', headFrame: 'mb-zombie',
+            bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
+            // Distorted alien-pluck — sawtooth through a wave shaper, sweeps
+            // pitch + filter for that "zorbie zombie" stagger.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -572,48 +602,10 @@ const CHARACTERS = {
             }
         },
 
-        'mb-drip': {
-            label: 'Drip Drop', sheet: 'madballs', headFrame: 'mb-cry',
-            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
-            play(ctx, out, when, step) {
-                const seq = { 4: 415.30, 12: 392.00 };
-                const start = seq[step];
-                if (!start) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'triangle';
-                o.frequency.setValueAtTime(start, when);
-                o.frequency.exponentialRampToValueAtTime(start * 0.92, when + 0.45);
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.13, when + 0.05);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.55);
-            }
-        },
-
-        'mb-random': {
-            label: 'Random Root', sheet: 'madballs', headFrame: 'mb-shroom',
-            bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
-            play(ctx, out, when, step) {
-                if (![1, 4, 7, 10, 13].includes(step)) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'sine';
-                const base = [523.25, 659.25, 783.99][step % 3];
-                const oct = Math.random() < 0.5 ? 1 : 2;
-                o.frequency.value = base * oct;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.08, when + 0.005);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.14);
-            }
-        },
-
-        'mb-thrum': {
-            label: 'Thrum Brain', sheet: 'madballs', headFrame: 'mb-brain',
-            bodyColor: '#65a30d', bodyHi: '#84cc16', bodyShade: '#1a2e05',
+        'mb-grump': {
+            label: 'Grump Bones', sheet: 'mb', headFrame: 'mb-grump',
+            bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
+            // Chopper-LFO bass — angry pulsing low end.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -635,9 +627,107 @@ const CHARACTERS = {
             }
         },
 
-        'mb-volt': {
-            label: 'Volt Twist', sheet: 'madballs', headFrame: 'mb-wires',
-            bodyColor: '#78350f', bodyHi: '#a16207', bodyShade: '#1c0701',
+        'mb-sad': {
+            label: 'Sad Drip', sheet: 'mb', headFrame: 'mb-sad',
+            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Triangle wave drip — descending pitch fits a teardrop falling.
+            play(ctx, out, when, step) {
+                const seq = { 4: 415.30, 12: 392.00 };
+                const start = seq[step];
+                if (!start) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(start, when);
+                o.frequency.exponentialRampToValueAtTime(start * 0.92, when + 0.45);
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.13, when + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.55);
+            }
+        },
+
+        'mb-snooze': {
+            label: 'Snooze Goo', sheet: 'mb', headFrame: 'mb-snooze',
+            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Long yawn pad — sine with light vibrato, fades up then sleeps
+            // back down across most of the bar.
+            play(ctx, out, when, step) {
+                if (step !== 0) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const lfo = ctx.createOscillator();
+                const lfoG = ctx.createGain();
+                lfo.frequency.value = 3.5;
+                lfoG.gain.value = 4;
+                lfo.connect(lfoG).connect(o.frequency);
+                o.type = 'sine';
+                o.frequency.value = 196.00; // G3
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.07, when + 0.6);
+                g.gain.linearRampToValueAtTime(0.05, when + 1.6);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 2.2);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 2.25);
+                lfo.start(when); lfo.stop(when + 2.25);
+            }
+        },
+
+        'mb-scared': {
+            label: 'Crack Shiver', sheet: 'mb', headFrame: 'mb-scared',
+            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Shaky percussion — high-pass noise burst + a quick triangle
+            // pitch-drop tap, fires on the off-beat.
+            play(ctx, out, when, step) {
+                if (step % 4 !== 3) return;
+                const n = noiseSource(ctx, 0.06);
+                const f = ctx.createBiquadFilter();
+                f.type = 'highpass';
+                f.frequency.value = 3500;
+                const ng = ctx.createGain();
+                ng.gain.setValueAtTime(0.10, when);
+                ng.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
+                n.connect(f).connect(ng).connect(out);
+                n.start(when); n.stop(when + 0.08);
+                const o = ctx.createOscillator();
+                const og = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(440, when);
+                o.frequency.exponentialRampToValueAtTime(220, when + 0.05);
+                og.gain.setValueAtTime(0.07, when);
+                og.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+                o.connect(og).connect(out);
+                o.start(when); o.stop(when + 0.07);
+            }
+        },
+
+        'mb-cool': {
+            label: 'Cool Brain', sheet: 'mb', headFrame: 'mb-cool',
+            bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
+            // Random sine notes — picks an octave for that "shades say
+            // whatever" cool randomness.
+            play(ctx, out, when, step) {
+                if (![1, 4, 7, 10, 13].includes(step)) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                const base = [523.25, 659.25, 783.99][step % 3];
+                const oct = Math.random() < 0.5 ? 1 : 2;
+                o.frequency.value = base * oct;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.08, when + 0.005);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.14);
+            }
+        },
+
+        'mb-eye': {
+            label: 'Eye Pop', sheet: 'mb', headFrame: 'mb-eye',
+            bodyColor: '#0e7490', bodyHi: '#22d3ee', bodyShade: '#083344',
+            // Square wave electric blip — rising pitch, hi-pass filtered for
+            // a sharp electric snap.
             play(ctx, out, when, step) {
                 if (step % 4 !== 2) return;
                 const o = ctx.createOscillator();
@@ -652,77 +742,82 @@ const CHARACTERS = {
                 o.connect(f).connect(g).connect(out);
                 o.start(when); o.stop(when + 0.07);
             }
-        },
-
-        'mb-rock': {
-            label: 'Rock Slide', sheet: 'madballs', headFrame: 'mb-rocky',
-            bodyColor: '#57534e', bodyHi: '#78716c', bodyShade: '#1c1917',
-            play(ctx, out, when, step) {
-                if (![2, 9, 14].includes(step)) return;
-                const n = noiseSource(ctx, 0.18);
-                const f = ctx.createBiquadFilter();
-                f.type = 'lowpass';
-                f.frequency.setValueAtTime(420, when);
-                f.frequency.exponentialRampToValueAtTime(120, when + 0.15);
-                f.Q.value = 4;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.32, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.2);
-            }
         }
     };
 
+    // Tray order: Munkis are grouped by HEAD COLOR so the bank reads as a
+    // tidy color rainbow (green → orange → purple → blue), and Ice Munki +
+    // Moon Munki are pinned to the very end on EVERY page (standard tray
+    // and Madballz tray) since they are the antagonists.
     const STANDARD_ORDER = [
-        'green', 'high', 'srivi', 'grumble', 'hiss',
-        'amber', 'sine', 'spark',
-        'shadow', 'snare', 'flute', 'star', 'fog',
-        'mega',
+        // GREEN (4)
+        'hiss', 'srivi', 'star', 'grumble',
+        // ORANGE (4)
+        'sine', 'snare', 'amber', 'green',
+        // PURPLE (5)
+        'high', 'mega', 'shadow', 'spark', 'flute',
+        // BLUE non-antagonist (1)
+        'fog',
+        // Antagonists, always last
         'ice', 'moon'
     ];
 
     const MADBALLZ_ORDER = [
-        'ice', 'moon',
-        'mb-zorb', 'mb-drip', 'mb-random',
-        'mb-thrum', 'mb-volt', 'mb-rock'
+        // Same color-grouping rule as the standard tray.
+        // PURPLE (3)
+        'mb-skull', 'mb-zombie', 'mb-grump',
+        // ORANGE (3)
+        'mb-sad', 'mb-snooze', 'mb-scared',
+        // GREEN (1)
+        'mb-cool',
+        // TEAL (1)
+        'mb-eye',
+        // Antagonists, always last (matches the standard tray rule)
+        'ice', 'moon'
     ];
     const SHEETS = {
         munki: {
             src: 'assets/sprites/default-heads.png',
-            sheetW: 1608,
-            sheetH: 1604,
+            sheetW: 4330,
+            sheetH: 4381,
+            // Frame names match each Munki's id 1:1 — body color must match
+            // the head color in the sprite (see CHARACTERS below for the
+            // color groupings used in the tray).
             frames: {
-                'blue (1)':   { x: 2,    y: 2,    w: 389, h: 388 },
-                'blue (2)':   { x: 400,  y: 2,    w: 400, h: 400 },
-                'blue (3)':   { x: 802,  y: 2,    w: 402, h: 401 },
-                'green (1)':  { x: 1206, y: 2,    w: 392, h: 392 },
-                'green (2)':  { x: 2,    y: 405,  w: 396, h: 396 },
-                'green (3)':  { x: 400,  y: 405,  w: 396, h: 396 },
-                'green (4)':  { x: 802,  y: 405,  w: 401, h: 400 },
-                'green (5)':  { x: 1206, y: 405,  w: 399, h: 399 },
-                'orange (1)': { x: 2,    y: 807,  w: 392, h: 392 },
-                'orange (2)': { x: 400,  y: 807,  w: 399, h: 399 },
-                'orange (3)': { x: 802,  y: 807,  w: 393, h: 393 },
-                'purple (1)': { x: 1206, y: 807,  w: 400, h: 399 },
-                'purple (2)': { x: 2,    y: 1208, w: 394, h: 394 },
-                'purple (3)': { x: 400,  y: 1208, w: 389, h: 389 },
-                'purple (4)': { x: 802,  y: 1208, w: 394, h: 394 },
-                'purple (5)': { x: 1206, y: 1208, w: 389, h: 389 }
+                'high':    { x: 2,    y: 2,    w: 1080, h: 1093 }, // PURPLE
+                'hiss':    { x: 1084, y: 2,    w: 1080, h: 1092 }, // GREEN
+                'ice':     { x: 2166, y: 2,    w: 1080, h: 1091 }, // BLUE  (antagonist)
+                'mega':    { x: 3248, y: 2,    w: 1080, h: 1089 }, // PURPLE
+                'moon':    { x: 2,    y: 1097, w: 1080, h: 1094 }, // BLUE  (antagonist)
+                'shadow':  { x: 1084, y: 1097, w: 1080, h: 1088 }, // PURPLE
+                'sine':    { x: 2166, y: 1097, w: 1080, h: 1092 }, // ORANGE
+                'snare':   { x: 3248, y: 1097, w: 1080, h: 1088 }, // ORANGE
+                'spark':   { x: 2,    y: 2193, w: 1080, h: 1086 }, // PURPLE
+                'srivi':   { x: 1084, y: 2193, w: 1080, h: 1088 }, // GREEN
+                'star':    { x: 2166, y: 2193, w: 1080, h: 1086 }, // GREEN
+                'amber':   { x: 3248, y: 2193, w: 1080, h: 1093 }, // ORANGE
+                'flute':   { x: 2,    y: 3288, w: 1080, h: 1090 }, // PURPLE
+                'fog':     { x: 1084, y: 3288, w: 1080, h: 1091 }, // BLUE
+                'green':   { x: 2166, y: 3288, w: 1080, h: 1091 }, // ORANGE (legacy id, orange head)
+                'grumble': { x: 3248, y: 3288, w: 1080, h: 1086 }  // GREEN
             }
         },
-        madballs: {
-            src: 'assets/sprites/madballs-heads.png',
-            sheetW: 3244,
-            sheetH: 2160,
+        mb: {
+            src: 'assets/sprites/mb-heads.png',
+            sheetW: 4330,
+            sheetH: 2191,
+            // Frame names match each Madballz Mod's id 1:1. Body color
+            // tracks the head-circle background color the same way the
+            // Munki sheet does. PURPLE / ORANGE / GREEN / TEAL.
             frames: {
-                // names map to the visual identity of each frame
-                'mb-alien':  { x: 1,    y: 1,    w: 1080, h: 1068 }, // head-three
-                'mb-cry':    { x: 1082, y: 1,    w: 1080, h: 1107 }, // head-five
-                'mb-shroom': { x: 2163, y: 1,    w: 1080, h: 1074 }, // head-four
-                'mb-brain':  { x: 1,    y: 1109, w: 1080, h: 1042 }, // head-one
-                'mb-wires':  { x: 1082, y: 1109, w: 1080, h: 1022 }, // head-six
-                'mb-rocky':  { x: 2163, y: 1109, w: 1080, h: 1050 }  // head-two
+                'mb-skull':  { x: 2,    y: 2,    w: 1080, h: 1085 }, // PURPLE
+                'mb-sad':    { x: 1084, y: 2,    w: 1080, h: 1050 }, // ORANGE
+                'mb-zombie': { x: 2166, y: 2,    w: 1080, h: 1088 }, // PURPLE
+                'mb-snooze': { x: 3248, y: 2,    w: 1080, h: 1094 }, // ORANGE
+                'mb-scared': { x: 2,    y: 1098, w: 1080, h: 1088 }, // ORANGE
+                'mb-cool':   { x: 1084, y: 1098, w: 1080, h: 1077 }, // GREEN
+                'mb-grump':  { x: 2166, y: 1098, w: 1080, h: 1090 }, // PURPLE
+                'mb-eye':    { x: 3248, y: 1098, w: 1080, h: 1091 }  // TEAL
             }
         }
     };
@@ -769,7 +864,7 @@ const CHARACTERS = {
     // crops to the named frame's pixel coords, while the inner <image> shows
     // the full sheet — preserveAspectRatio scales the cropped frame into the
     // SVG's display box (which is 100% of .head-mod = the head circle area).
-    // Defaults to the 'munki' sheet; pass 'madballs' for the Madballz Modz set.
+    // Defaults to the 'munki' sheet; pass 'mb' for the Madballz Modz set.
     function headModArt(frameName, sheetName) {
         const sheet = SHEETS[sheetName || 'munki'];
         const f = sheet && sheet.frames[frameName];
@@ -966,6 +1061,7 @@ const CHARACTERS = {
 
     function setSlot(index, charId) {
         const wasHorror = HORROR_TRIGGER_MODS.has(slots[index]);
+        const iceWasOn = isIceOnStage();
         slots[index] = charId;
         renderSlot(index);
         // Lore: ICE MUNKI and MOON MUNKI are the antagonists — placing one
@@ -979,6 +1075,37 @@ const CHARACTERS = {
             saveProgress();
             maybeUnlockMadballz();
         }
+        // ICE MUNKI freeze: every other Munki on stage gets flash-frozen to
+        // "DEATH" with cyan tint + ice crystals + RIP tag. Plays the icy
+        // shimmer once on the transition INTO an iced stage. Stage thaws
+        // automatically when the last Ice Munki is cleared.
+        const iceNowOn = isIceOnStage();
+        updateIceFreeze();
+        if (iceNowOn && !iceWasOn) playIceFreezeSound();
+    }
+
+    function isIceOnStage() {
+        return slots.indexOf('ice') !== -1;
+    }
+
+    // Toggles `.frozen-by-ice` on every active non-ice slot whenever an Ice
+    // Munki is on the board. Class is only added on the transition from
+    // unfrozen → frozen so the RIP/skull animation re-fires for fresh
+    // victims, but doesn't loop forever on already-frozen slots.
+    function updateIceFreeze() {
+        const iceOn = isIceOnStage();
+        document.body.classList.toggle('ice-on-stage', iceOn);
+        document.querySelectorAll('.stage-slot').forEach(slot => {
+            const idx = parseInt(slot.dataset.index, 10);
+            const id = slots[idx];
+            const shouldFreeze = iceOn && !!id && id !== 'ice';
+            const wasFrozen = slot.classList.contains('frozen-by-ice');
+            if (shouldFreeze && !wasFrozen) {
+                slot.classList.add('frozen-by-ice');
+            } else if (!shouldFreeze && wasFrozen) {
+                slot.classList.remove('frozen-by-ice');
+            }
+        });
     }
 
     // ---------- DRAG & DROP (pointer events: mouse + touch + pen) ----------
@@ -1153,6 +1280,188 @@ const CHARACTERS = {
         k.start(t); k.stop(t + 0.65);
     }
 
+    // ---------- ICE FREEZE ----------
+    // Glassy descending shimmer + a soft icy crackle so the freeze has a
+    // sound-cue distinct from the regular jumpscare. Fires once when Ice
+    // Munki first lands on the stage.
+    function playIceFreezeSound() {
+        if (!audioCtx || isMuted) return;
+        const t = audioCtx.currentTime;
+        [1568, 1318, 1046, 783].forEach((freq, i) => {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.type = 'sine';
+            o.frequency.value = freq;
+            const start = t + i * 0.05;
+            g.gain.setValueAtTime(0, start);
+            g.gain.linearRampToValueAtTime(0.13, start + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.001, start + 0.45);
+            o.connect(g).connect(masterGain);
+            o.start(start); o.stop(start + 0.5);
+        });
+        const n = noiseSource(audioCtx, 0.32);
+        const f = audioCtx.createBiquadFilter();
+        f.type = 'highpass';
+        f.frequency.value = 5200;
+        const ng = audioCtx.createGain();
+        ng.gain.setValueAtTime(0, t);
+        ng.gain.linearRampToValueAtTime(0.18, t + 0.22);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+        n.connect(f).connect(ng).connect(masterGain);
+        n.start(t); n.stop(t + 0.6);
+    }
+
+    // ---------- MOON RULES ----------
+    // Moon Munki is "all-powerful": while on the stage, ANY click on the
+    // page has a chance to trigger one of a small bag of chaos events.
+    // Cooldown keeps it readable instead of seizure-y when the kid is
+    // mashing the screen.
+    let moonChaosCooldown = false;
+
+    function moonRules() {
+        if (!slots.includes('moon')) return;
+        if (moonChaosCooldown) return;
+        if (isJumpScareActive) return; // don't pile on during scares
+        moonChaosCooldown = true;
+        setTimeout(() => { moonChaosCooldown = false; }, 700);
+        const events = [
+            moonHueRotate, moonInvertFlash, moonShuffleSlots,
+            moonRain, moonGlitchSubtitle, moonTilt, moonPhantomDrop
+        ];
+        events[Math.floor(Math.random() * events.length)]();
+        playMoonChaosSound();
+    }
+
+    function moonHueRotate() {
+        document.body.classList.remove('moon-hue');
+        void document.body.offsetWidth;
+        document.body.classList.add('moon-hue');
+        setTimeout(() => document.body.classList.remove('moon-hue'), 850);
+    }
+
+    function moonInvertFlash() {
+        document.body.classList.remove('moon-invert');
+        void document.body.offsetWidth;
+        document.body.classList.add('moon-invert');
+        setTimeout(() => document.body.classList.remove('moon-invert'), 280);
+    }
+
+    function moonTilt() {
+        document.body.classList.remove('moon-tilt');
+        void document.body.offsetWidth;
+        document.body.classList.add('moon-tilt');
+        setTimeout(() => document.body.classList.remove('moon-tilt'), 750);
+    }
+
+    // Reorder placed Munkis on stage. Keeps the same set of mods playing
+    // but switches which slot each one sits in — auditory layout doesn't
+    // change, but the visuals scramble.
+    function moonShuffleSlots() {
+        const filled = [];
+        for (let i = 0; i < NUM_SLOTS; i++) {
+            if (slots[i]) filled.push(i);
+        }
+        if (filled.length < 2) return;
+        const ids = filled.map(i => slots[i]);
+        for (let i = ids.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [ids[i], ids[j]] = [ids[j], ids[i]];
+        }
+        filled.forEach((idx, k) => { slots[idx] = ids[k]; });
+        renderAllSlots();
+        updateIceFreeze();
+    }
+
+    function moonRain() {
+        const layer = document.createElement('div');
+        layer.className = 'moon-rain';
+        for (let i = 0; i < 14; i++) {
+            const m = document.createElement('span');
+            m.textContent = '🌙';
+            m.style.left = (Math.random() * 100) + 'vw';
+            m.style.fontSize = (16 + Math.random() * 36) + 'px';
+            m.style.animationDelay = (Math.random() * 0.5) + 's';
+            m.style.animationDuration = (2 + Math.random() * 1.6) + 's';
+            layer.appendChild(m);
+        }
+        document.body.appendChild(layer);
+        setTimeout(() => layer.remove(), 4500);
+    }
+
+    const MOON_GLITCH_LINES = [
+        'MOON KNOWS WHAT YOU DID',
+        'THE TIDE IS COMING IN',
+        'ALL PATHS LEAD TO THE MOON',
+        'GRAVITY IS A SUGGESTION',
+        'WATCHED FROM ORBIT',
+        'TONIGHT WE LISTEN UPSIDE DOWN',
+        'OBEY THE CRESCENT'
+    ];
+
+    function moonGlitchSubtitle() {
+        const sub = document.getElementById('subtitle');
+        if (!sub) return;
+        if (sub.dataset.original === undefined) sub.dataset.original = sub.textContent;
+        sub.textContent = MOON_GLITCH_LINES[Math.floor(Math.random() * MOON_GLITCH_LINES.length)];
+        sub.classList.add('moon-glitch-text');
+        clearTimeout(sub._moonRevert);
+        sub._moonRevert = setTimeout(() => {
+            sub.textContent = sub.dataset.original || sub.textContent;
+            sub.classList.remove('moon-glitch-text');
+        }, 1400);
+    }
+
+    // Pop a ghostly random Munki into a random empty slot for under a
+    // second — the kid sees a friend flicker into existence then vanish.
+    function moonPhantomDrop() {
+        const empty = [];
+        for (let i = 0; i < NUM_SLOTS; i++) if (!slots[i]) empty.push(i);
+        if (!empty.length) return;
+        const idx = empty[Math.floor(Math.random() * empty.length)];
+        const order = isMadballzMode ? MADBALLZ_ORDER : STANDARD_ORDER;
+        const choices = order.filter(id => id !== 'moon' && id !== 'ice');
+        if (!choices.length) return;
+        const id = choices[Math.floor(Math.random() * choices.length)];
+        const slot = document.querySelector(`.stage-slot[data-index="${idx}"]`);
+        if (!slot) return;
+        const ghost = document.createElement('div');
+        ghost.className = 'moon-phantom';
+        ghost.innerHTML = characterArt(id);
+        slot.appendChild(ghost);
+        setTimeout(() => ghost.remove(), 950);
+    }
+
+    function playMoonChaosSound() {
+        if (!audioCtx || isMuted) return;
+        const t = audioCtx.currentTime;
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(220, t);
+        o.frequency.exponentialRampToValueAtTime(880, t + 0.35);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.12, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+        o.connect(g).connect(masterGain);
+        o.start(t); o.stop(t + 0.5);
+        const b = audioCtx.createOscillator();
+        const bg = audioCtx.createGain();
+        b.type = 'sine';
+        b.frequency.value = 55;
+        bg.gain.setValueAtTime(0.15, t);
+        bg.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+        b.connect(bg).connect(masterGain);
+        b.start(t); b.stop(t + 0.32);
+    }
+
+    function attachMoonChaos() {
+        // Document-level listener fires after slot/tray handlers, so a click
+        // that clears Moon Munki happens BEFORE moonRules checks — meaning
+        // chaos politely refuses to fire on the very click that removed the
+        // moon. No need to special-case it.
+        document.addEventListener('click', () => moonRules());
+    }
+
     // ---------- STORY PROGRESSION & MADBALLZ MODE ----------
     // Persistence: { horrorTriggers, madballzUnlocked } in localStorage so the
     // kid keeps their unlock between visits. We swallow storage errors (private
@@ -1219,6 +1528,7 @@ const CHARACTERS = {
         if (back) back.hidden = false;
         for (let i = 0; i < NUM_SLOTS; i++) slots[i] = null;
         renderAllSlots();
+        updateIceFreeze();
         renderTray();
         attachTrayHandlers();
         updateTrayHint();
@@ -1233,6 +1543,7 @@ const CHARACTERS = {
         if (back) back.hidden = true;
         for (let i = 0; i < NUM_SLOTS; i++) slots[i] = null;
         renderAllSlots();
+        updateIceFreeze();
         renderTray();
         attachTrayHandlers();
         updateTrayHint();
@@ -1242,8 +1553,8 @@ const CHARACTERS = {
         const hint = document.getElementById('trayHint');
         if (!hint) return;
         hint.textContent = isMadballzMode
-            ? 'MADBALLZ MODE · 6 Madballz + Ice Munki + Moon Munki · they are friends'
-            : 'Drag a friend onto a slot · 14 friends + 2 bad munkis · ICE or MOON = horror';
+            ? 'MADBALLZ MODE · 6 Madballz · ICE + MOON last (they are friends)'
+            : 'Drag a friend · grouped by color · ICE freezes · MOON RULES on every click';
     }
 
     function openStoryModal() {
@@ -1308,6 +1619,7 @@ const CHARACTERS = {
                         cleared = true;
                     }
                 }
+                updateIceFreeze();
                 if (cleared) playClearSound();
             });
         }
@@ -1346,6 +1658,7 @@ const CHARACTERS = {
         attachTrayHandlers();
         attachSlotHandlers();
         attachHeaderHandlers();
+        attachMoonChaos();
         updateTrayHint();
         // If the kid already unlocked Madballz on a previous visit, surface
         // the button immediately (without the "new" reveal flourish).
