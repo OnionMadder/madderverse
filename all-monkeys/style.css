@@ -279,11 +279,48 @@ main {
     z-index: 2;
 }
 
-.char-body svg, .char-head svg {
+.char-body svg {
     width: 100%;
     height: 100%;
     display: block;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+/* The head is layered: colored circle (shape) → face/mod sprite → headphones
+   overlay. All four sibling layers share the same 100×100 footprint so the
+   headphones never shift when a custom head replaces the generic face. */
+.char-head .head-shape,
+.char-head .head-face,
+.char-head .head-mod,
+.char-head .head-phones {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+}
+
+.char-head .head-shape {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+    z-index: 1;
+}
+
+.char-head .head-face,
+.char-head .head-mod {
+    z-index: 2;
+}
+
+/* Pixel-art rendering hint so the spritesheet keeps its crisp edges when
+   scaled down to chip / slot size. */
+.char-head .head-mod image {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.char-head .head-phones {
+    z-index: 3;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
 
 @keyframes char-body-bounce {
