@@ -67,7 +67,7 @@ const GAME_DATA = (() => {
 const LOCATIONS = [
   {
     id: "terra", name: "Terra Prime", x: 0, y: 0,
-    lawful: 1.0, icon: "loc_terra.png",
+    lawful: 1.0, icon: "loc_terra.png", planetSprite: "terra-prime",
     produces: ["water", "grain"],
     demands:  ["robots", "qchip"],
     tagline: "The 'Totally Real' Home World. Sponsored by Jackhole Megacorp.",
@@ -75,7 +75,7 @@ const LOCATIONS = [
   },
   {
     id: "zeph", name: "The Ledger Hub", x: 45, y: 80,
-    lawful: 0.7, icon: "loc_zeph.png",
+    lawful: 0.7, icon: "loc_zeph.png", planetSprite: "ledger-hub",
     produces: ["tech", "qchip"],
     demands:  ["art", "antim"],
     canLoan: true, // Unique mechanical flag for banking
@@ -84,7 +84,7 @@ const LOCATIONS = [
   },
   {
     id: "kallis", name: "Kallis Rock-Candy", x: 60, y: 25,
-    lawful: 0.3, icon: "loc_kallis.png",
+    lawful: 0.3, icon: "loc_kallis.png", planetSprite: "kallis-rock",
     produces: ["ore", "solar"],
     demands:  ["water", "medicine"],
     tagline: "A hollowed-out asteroid full of shiny rocks and grumpy miners.",
@@ -92,7 +92,7 @@ const LOCATIONS = [
   },
   {
     id: "verra", name: "Verra Vroom-Outpost", x: -95, y: 55,
-    lawful: 0.1, icon: "loc_verra.png",
+    lawful: 0.1, icon: "loc_verra.png", planetSprite: "vroom-outpost",
     produces: ["spice", "weapons"],
     demands:  ["fuel", "solar"],
     tagline: "The edge of the map where the space-pirates play!",
@@ -100,7 +100,7 @@ const LOCATIONS = [
   },
   {
     id: "obsid", name: "Obsidian Spire", x: -35, y: -65,
-    lawful: 0.6, icon: "loc_obsid.png",
+    lawful: 0.6, icon: "loc_obsid.png", planetSprite: "obsidian-spire",
     produces: ["glass", "art"],
     demands:  ["spice", "weapons"],
     tagline: "Fancy glass towers for very grumpy space-royalty.",
@@ -108,7 +108,7 @@ const LOCATIONS = [
   },
   {
     id: "halc", name: "Halcyon Junk-Heap", x: 95, y: -25,
-    lawful: 0.3, icon: "loc_halc.png",
+    lawful: 0.3, icon: "loc_halc.png", planetSprite: "halcyon-junk",
     produces: ["fuel", "plastics"],
     demands:  ["grain", "holo"],
     tagline: "A giant playground made of broken spaceships!",
@@ -116,7 +116,7 @@ const LOCATIONS = [
   },
   {
     id: "calder", name: "Caldera-9", x: -70, y: -10,
-    lawful: 0.5, icon: "loc_calder.png",
+    lawful: 0.5, icon: "loc_calder.png", planetSprite: "caldera-9",
     produces: ["robots", "cyber"],
     demands:  ["hydrogen", "organs"],
     tagline: "The Robot Factory Planet! Beep boop!",
@@ -124,7 +124,7 @@ const LOCATIONS = [
   },
   {
     id: "erebus", name: "Bubble-Erebus", x: 50, y: -85,
-    lawful: 0.4, icon: "loc_erebus.png",
+    lawful: 0.4, icon: "loc_erebus.png", planetSprite: "bubble-erebus",
     produces: ["algae", "salt"],
     demands:  ["tech", "cyber"],
     tagline: "A giant water-balloon planet full of glowing squids!",
@@ -132,7 +132,7 @@ const LOCATIONS = [
   },
   {
     id: "pavon", name: "Pavonis Clouds", x: 60, y: 95,
-    lawful: 0.7, icon: "loc_pavon.png",
+    lawful: 0.7, icon: "loc_pavon.png", planetSprite: "pavonis-clouds",
     produces: ["hydrogen", "antim"],
     demands:  ["textiles", "lumber"],
     tagline: "Floating castles in the sky! Don't look down!",
@@ -140,7 +140,7 @@ const LOCATIONS = [
   },
   {
     id: "solen", name: "Solenne Garden", x: -105, y: -85,
-    lawful: 0.6, icon: "loc_solen.png",
+    lawful: 0.6, icon: "loc_solen.png", planetSprite: "solenne-gardens",
     produces: ["medicine", "holo"],
     demands:  ["salt", "plastics"],
     tagline: "The Space-Monk Sanctuary. Shhh... they're praying.",
@@ -148,7 +148,7 @@ const LOCATIONS = [
   },
   {
     id: "goog", name: "The Threnody Stack", x: 15, y: -100,
-    lawful: 0.2, icon: "loc_thren.png",
+    lawful: 0.2, icon: "loc_thren.png", planetSprite: "threnody-stack",
     produces: ["organs", "lace"],
     demands:  ["algae", "glass"],
     tagline: "The world's biggest skyscraper! It goes up forever!",
@@ -156,7 +156,7 @@ const LOCATIONS = [
   },
   {
     id: "yoxai", name: "Yoxai Jungle", x: -65, y: 100,
-    lawful: 0.3, icon: "loc_yoxai.png",
+    lawful: 0.3, icon: "loc_yoxai.png", planetSprite: "yoxai-jungle",
     produces: ["textiles", "lumber"],
     demands:  ["ore", "lace"],
     tagline: "Alien ruins and giant plants. Watch out for the vines!",
@@ -577,6 +577,30 @@ const LOCATIONS = [
   };
 
   // =====================================================================
+  // planet sprite sheet config — single consolidated atlas
+  //   frame coords mirror /assets/sprites/planets.json
+  //   keys are referenced by LOCATIONS[].planetSprite
+  // =====================================================================
+  const PLANET_SPRITES = {
+    src:    'assets/sprites/planets.png',
+    sheetW: 4325, sheetH: 3380,
+    frames: {
+      "obsidian-spire":  { x:    1, y:    1, w: 1080, h: 1074 },
+      "pavonis-clouds":  { x: 1082, y:    1, w: 1080, h: 1031 },
+      "solenne-gardens": { x: 2163, y:    1, w: 1080, h: 1116 },
+      "terra-prime":     { x: 3244, y:    1, w: 1080, h: 1061 },
+      "threnody-stack":  { x:    1, y: 1118, w: 1080, h: 1146 },
+      "vroom-outpost":   { x: 1082, y: 1118, w: 1080, h: 1059 },
+      "yoxai-jungle":    { x: 2163, y: 1118, w: 1080, h: 1075 },
+      "bubble-erebus":   { x: 3244, y: 1118, w: 1080,  h: 994 },
+      "caldera-9":       { x:    1, y: 2265, w: 1080, h: 1063 },
+      "halcyon-junk":    { x: 1082, y: 2265, w: 1080, h: 1016 },
+      "kallis-rock":     { x: 2163, y: 2265, w: 1080, h: 1046 },
+      "ledger-hub":      { x: 3244, y: 2265, w: 1080, h: 1114 },
+    },
+  };
+
+  // =====================================================================
   // 12 ships
   //   sprite           : frame key inside SHIP_SPRITES.frames
   //   cost             : credits deducted from starting cash on purchase
@@ -696,7 +720,7 @@ const COMPETITORS = [
   { 
     id: 'pavonis', name: 'Pavonis Cloud-Clown Cartel', style: 'volatile',
     motto: 'Keep your head in the clouds!',
-    flavor: 'High-altitude thrill-seekers who trade in helium and ego. Their net worth swings wildly based on how many 'Sky-Parties' they throw. One day they’re kings, the next they’re selling their shoes for fuel.'
+    flavor: 'High-altitude thrill-seekers who trade in helium and ego. Their net worth swings wildly based on how many ‘Sky-Parties’ they throw. One day they’re kings, the next they’re selling their shoes for fuel.'
   },
   { 
     id: 'zephyr', name: 'Bala Bureau Free-Riders', style: 'aggressive',
@@ -761,7 +785,7 @@ const COMPETITORS = [
 
   return {
     GOODS, LOCATIONS, EVENTS, TICKER_SEEDS,
-    SHIPS, SHIP_SPRITES, COMPETITORS, FUEL_PRICES,
+    SHIPS, SHIP_SPRITES, PLANET_SPRITES, COMPETITORS, FUEL_PRICES,
     goodName, locById, fmt, distance,
     travelCost, travelDays, travelFuel, fuelBasePrice,
   };
