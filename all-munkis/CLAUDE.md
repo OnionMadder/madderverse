@@ -41,9 +41,13 @@ all-munkis/
                            # snare, spark, srivi, star, amber, flute, fog,
                            # green, grumble). Heads come in 4 colors:
                            # PURPLE / GREEN / BLUE / ORANGE.
-      default-heads.json   # frame coords (mirrored into SHEETS in game.js)
-      madballs-heads.png   # 3244×2160, 6 gnarly creature heads
-      madballs-heads.json
+      default-heads.json   # frame coords (mirrored into SHEETS.munki)
+      mb-heads.png         # 4330×2191, 8 Madballz heads named by id
+                           # (mb-skull, mb-sad, mb-zombie, mb-snooze,
+                           # mb-scared, mb-cool, mb-grump, mb-eye).
+                           # Heads come in 4 colors: PURPLE / ORANGE /
+                           # GREEN / TEAL.
+      mb-heads.json        # frame coords (mirrored into SHEETS.mb)
   .claude/launch.json     # `python -m http.server 8770` — used by preview tools
 ```
 
@@ -148,8 +152,9 @@ will sound coherent together:
 - **Pad** cloud (Cmaj triad held)
 - **Leads / arps** munki (saw hook), flute (offbeat melody), cocoa (bird arp),
   star (bell triad), ice (high twinkle)
-- **Madballz textures** mb-alien (distorted pluck), mb-cry (wail), mb-shroom
-  (bubble arp), mb-brain (chopper-LFO bass), mb-wires (electric), mb-rocky (thud)
+- **Madballz textures** mb-zombie (distorted alien-pluck), mb-sad (triangle drip),
+  mb-cool (random sine arp), mb-grump (chopper-LFO bass), mb-eye (electric square),
+  mb-skull (low noise thud), mb-snooze (long yawn pad), mb-scared (high-pass shiver)
 
 When adding a new mod, pick a register/role that isn't crowded.
 
@@ -214,3 +219,10 @@ The session that built the current shape did, in order:
    page. Added Ice freeze ("DEATH" tint + 💀 RIP) and Moon Rules
    (random click chaos: hue rotate, invert, shuffle, 🌙 rain, glitch
    text, page tilt, phantom Munki).
+9. New Madballz sheet `mb-heads.png` (4330×2191), 8 frames named
+   `mb-skull`, `mb-sad`, `mb-zombie`, `mb-snooze`, `mb-scared`,
+   `mb-cool`, `mb-grump`, `mb-eye`. Replaced the 6 old `mb-zorb`,
+   `mb-drip`, `mb-random`, `mb-thrum`, `mb-volt`, `mb-rock` with 8 new
+   characters that match the new sprites; added two new audio profiles
+   (`mb-snooze` yawn pad, `mb-scared` shiver). Madballz tray now also
+   color-grouped (purple → orange → green → teal) with Ice + Moon last.

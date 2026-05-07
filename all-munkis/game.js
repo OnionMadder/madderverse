@@ -550,9 +550,38 @@ const CHARACTERS = {
             }
         },
 
-        'mb-zorb': {
-            label: 'Zorb Drive', sheet: 'madballs', headFrame: 'mb-alien',
+        // ===== MADBALLZ MODZ (sheet: 'mb' → assets/sprites/mb-heads.png) =====
+        // 8 sprites, body color matches each head's background color so the
+        // bank reads as a tidy color rainbow on the Madballz page.
+        // PURPLE: mb-skull, mb-zombie, mb-grump
+        // ORANGE: mb-sad, mb-snooze, mb-scared
+        // GREEN:  mb-cool
+        // TEAL:   mb-eye
+        'mb-skull': {
+            label: 'Skull Buzz', sheet: 'mb', headFrame: 'mb-skull',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
+            // Bone-rumble: sub thud filtered low — fits the skull vibe.
+            play(ctx, out, when, step) {
+                if (![2, 9, 14].includes(step)) return;
+                const n = noiseSource(ctx, 0.18);
+                const f = ctx.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.setValueAtTime(420, when);
+                f.frequency.exponentialRampToValueAtTime(120, when + 0.15);
+                f.Q.value = 4;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.32, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+                n.connect(f).connect(g).connect(out);
+                n.start(when); n.stop(when + 0.2);
+            }
+        },
+
+        'mb-zombie': {
+            label: 'Zombi Bone', sheet: 'mb', headFrame: 'mb-zombie',
+            bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
+            // Distorted alien-pluck — sawtooth through a wave shaper, sweeps
+            // pitch + filter for that "zorbie zombie" stagger.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -573,48 +602,10 @@ const CHARACTERS = {
             }
         },
 
-        'mb-drip': {
-            label: 'Drip Drop', sheet: 'madballs', headFrame: 'mb-cry',
-            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
-            play(ctx, out, when, step) {
-                const seq = { 4: 415.30, 12: 392.00 };
-                const start = seq[step];
-                if (!start) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'triangle';
-                o.frequency.setValueAtTime(start, when);
-                o.frequency.exponentialRampToValueAtTime(start * 0.92, when + 0.45);
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.13, when + 0.05);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.55);
-            }
-        },
-
-        'mb-random': {
-            label: 'Random Root', sheet: 'madballs', headFrame: 'mb-shroom',
-            bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
-            play(ctx, out, when, step) {
-                if (![1, 4, 7, 10, 13].includes(step)) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'sine';
-                const base = [523.25, 659.25, 783.99][step % 3];
-                const oct = Math.random() < 0.5 ? 1 : 2;
-                o.frequency.value = base * oct;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.08, when + 0.005);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.14);
-            }
-        },
-
-        'mb-thrum': {
-            label: 'Thrum Brain', sheet: 'madballs', headFrame: 'mb-brain',
-            bodyColor: '#65a30d', bodyHi: '#84cc16', bodyShade: '#1a2e05',
+        'mb-grump': {
+            label: 'Grump Bones', sheet: 'mb', headFrame: 'mb-grump',
+            bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
+            // Chopper-LFO bass — angry pulsing low end.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -636,9 +627,107 @@ const CHARACTERS = {
             }
         },
 
-        'mb-volt': {
-            label: 'Volt Twist', sheet: 'madballs', headFrame: 'mb-wires',
-            bodyColor: '#78350f', bodyHi: '#a16207', bodyShade: '#1c0701',
+        'mb-sad': {
+            label: 'Sad Drip', sheet: 'mb', headFrame: 'mb-sad',
+            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Triangle wave drip — descending pitch fits a teardrop falling.
+            play(ctx, out, when, step) {
+                const seq = { 4: 415.30, 12: 392.00 };
+                const start = seq[step];
+                if (!start) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(start, when);
+                o.frequency.exponentialRampToValueAtTime(start * 0.92, when + 0.45);
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.13, when + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.55);
+            }
+        },
+
+        'mb-snooze': {
+            label: 'Snooze Goo', sheet: 'mb', headFrame: 'mb-snooze',
+            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Long yawn pad — sine with light vibrato, fades up then sleeps
+            // back down across most of the bar.
+            play(ctx, out, when, step) {
+                if (step !== 0) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const lfo = ctx.createOscillator();
+                const lfoG = ctx.createGain();
+                lfo.frequency.value = 3.5;
+                lfoG.gain.value = 4;
+                lfo.connect(lfoG).connect(o.frequency);
+                o.type = 'sine';
+                o.frequency.value = 196.00; // G3
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.07, when + 0.6);
+                g.gain.linearRampToValueAtTime(0.05, when + 1.6);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 2.2);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 2.25);
+                lfo.start(when); lfo.stop(when + 2.25);
+            }
+        },
+
+        'mb-scared': {
+            label: 'Crack Shiver', sheet: 'mb', headFrame: 'mb-scared',
+            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Shaky percussion — high-pass noise burst + a quick triangle
+            // pitch-drop tap, fires on the off-beat.
+            play(ctx, out, when, step) {
+                if (step % 4 !== 3) return;
+                const n = noiseSource(ctx, 0.06);
+                const f = ctx.createBiquadFilter();
+                f.type = 'highpass';
+                f.frequency.value = 3500;
+                const ng = ctx.createGain();
+                ng.gain.setValueAtTime(0.10, when);
+                ng.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
+                n.connect(f).connect(ng).connect(out);
+                n.start(when); n.stop(when + 0.08);
+                const o = ctx.createOscillator();
+                const og = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(440, when);
+                o.frequency.exponentialRampToValueAtTime(220, when + 0.05);
+                og.gain.setValueAtTime(0.07, when);
+                og.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+                o.connect(og).connect(out);
+                o.start(when); o.stop(when + 0.07);
+            }
+        },
+
+        'mb-cool': {
+            label: 'Cool Brain', sheet: 'mb', headFrame: 'mb-cool',
+            bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
+            // Random sine notes — picks an octave for that "shades say
+            // whatever" cool randomness.
+            play(ctx, out, when, step) {
+                if (![1, 4, 7, 10, 13].includes(step)) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                const base = [523.25, 659.25, 783.99][step % 3];
+                const oct = Math.random() < 0.5 ? 1 : 2;
+                o.frequency.value = base * oct;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.08, when + 0.005);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.14);
+            }
+        },
+
+        'mb-eye': {
+            label: 'Eye Pop', sheet: 'mb', headFrame: 'mb-eye',
+            bodyColor: '#0e7490', bodyHi: '#22d3ee', bodyShade: '#083344',
+            // Square wave electric blip — rising pitch, hi-pass filtered for
+            // a sharp electric snap.
             play(ctx, out, when, step) {
                 if (step % 4 !== 2) return;
                 const o = ctx.createOscillator();
@@ -652,25 +741,6 @@ const CHARACTERS = {
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
                 o.connect(f).connect(g).connect(out);
                 o.start(when); o.stop(when + 0.07);
-            }
-        },
-
-        'mb-rock': {
-            label: 'Rock Slide', sheet: 'madballs', headFrame: 'mb-rocky',
-            bodyColor: '#57534e', bodyHi: '#78716c', bodyShade: '#1c1917',
-            play(ctx, out, when, step) {
-                if (![2, 9, 14].includes(step)) return;
-                const n = noiseSource(ctx, 0.18);
-                const f = ctx.createBiquadFilter();
-                f.type = 'lowpass';
-                f.frequency.setValueAtTime(420, when);
-                f.frequency.exponentialRampToValueAtTime(120, when + 0.15);
-                f.Q.value = 4;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.32, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.2);
             }
         }
     };
@@ -693,8 +763,15 @@ const CHARACTERS = {
     ];
 
     const MADBALLZ_ORDER = [
-        'mb-zorb', 'mb-drip', 'mb-random',
-        'mb-thrum', 'mb-volt', 'mb-rock',
+        // Same color-grouping rule as the standard tray.
+        // PURPLE (3)
+        'mb-skull', 'mb-zombie', 'mb-grump',
+        // ORANGE (3)
+        'mb-sad', 'mb-snooze', 'mb-scared',
+        // GREEN (1)
+        'mb-cool',
+        // TEAL (1)
+        'mb-eye',
         // Antagonists, always last (matches the standard tray rule)
         'ice', 'moon'
     ];
@@ -725,18 +802,22 @@ const CHARACTERS = {
                 'grumble': { x: 3248, y: 3288, w: 1080, h: 1086 }  // GREEN
             }
         },
-        madballs: {
-            src: 'assets/sprites/madballs-heads.png',
-            sheetW: 3244,
-            sheetH: 2160,
+        mb: {
+            src: 'assets/sprites/mb-heads.png',
+            sheetW: 4330,
+            sheetH: 2191,
+            // Frame names match each Madballz Mod's id 1:1. Body color
+            // tracks the head-circle background color the same way the
+            // Munki sheet does. PURPLE / ORANGE / GREEN / TEAL.
             frames: {
-                // names map to the visual identity of each frame
-                'mb-alien':  { x: 1,    y: 1,    w: 1080, h: 1068 }, // head-three
-                'mb-cry':    { x: 1082, y: 1,    w: 1080, h: 1107 }, // head-five
-                'mb-shroom': { x: 2163, y: 1,    w: 1080, h: 1074 }, // head-four
-                'mb-brain':  { x: 1,    y: 1109, w: 1080, h: 1042 }, // head-one
-                'mb-wires':  { x: 1082, y: 1109, w: 1080, h: 1022 }, // head-six
-                'mb-rocky':  { x: 2163, y: 1109, w: 1080, h: 1050 }  // head-two
+                'mb-skull':  { x: 2,    y: 2,    w: 1080, h: 1085 }, // PURPLE
+                'mb-sad':    { x: 1084, y: 2,    w: 1080, h: 1050 }, // ORANGE
+                'mb-zombie': { x: 2166, y: 2,    w: 1080, h: 1088 }, // PURPLE
+                'mb-snooze': { x: 3248, y: 2,    w: 1080, h: 1094 }, // ORANGE
+                'mb-scared': { x: 2,    y: 1098, w: 1080, h: 1088 }, // ORANGE
+                'mb-cool':   { x: 1084, y: 1098, w: 1080, h: 1077 }, // GREEN
+                'mb-grump':  { x: 2166, y: 1098, w: 1080, h: 1090 }, // PURPLE
+                'mb-eye':    { x: 3248, y: 1098, w: 1080, h: 1091 }  // TEAL
             }
         }
     };
@@ -783,7 +864,7 @@ const CHARACTERS = {
     // crops to the named frame's pixel coords, while the inner <image> shows
     // the full sheet — preserveAspectRatio scales the cropped frame into the
     // SVG's display box (which is 100% of .head-mod = the head circle area).
-    // Defaults to the 'munki' sheet; pass 'madballs' for the Madballz Modz set.
+    // Defaults to the 'munki' sheet; pass 'mb' for the Madballz Modz set.
     function headModArt(frameName, sheetName) {
         const sheet = SHEETS[sheetName || 'munki'];
         const f = sheet && sheet.frames[frameName];
