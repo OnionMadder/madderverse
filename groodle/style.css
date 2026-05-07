@@ -1,270 +1,456 @@
-:root {
-    --bg-color: #050505;
-    --accent-cyan: #00ffcc;
-    --accent-pink: #ff00ff;
-    --accent-yellow: #f1c40f;
-    --glass-bg: rgba(255, 255, 255, 0.04);
-    --tool-bg: rgba(20, 20, 20, 0.94);
-    --border-thin: 1px solid rgba(255, 255, 255, 0.18);
-    --paper: #ffffff;
-    --ink: #1a1a1a;
-}
-
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html, body {
     margin: 0;
-    background-color: var(--bg-color);
-    background-image:
-        linear-gradient(rgba(0, 255, 204, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 204, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
+    padding: 0;
+    font-family: 'Trebuchet MS', system-ui, sans-serif;
+    background:
+        radial-gradient(ellipse at top, #3b1f6b 0%, transparent 60%),
+        radial-gradient(ellipse at bottom right, #ff6ec7 0%, transparent 50%),
+        linear-gradient(180deg, #1a0f33 0%, #2b1454 100%);
+    background-attachment: fixed;
     color: #fff;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    overflow: hidden;
-    overscroll-behavior: none;
-    user-select: none;
-    -webkit-user-select: none;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
 }
 
-body {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
-    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
-}
+/* ============ HEADER ============ */
 
-.hidden { display: none !important; }
-
-/* ---------- header ---------- */
 header.top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.4rem;
-    padding: 0.35rem 0.7rem;
-    border-bottom: var(--border-thin);
-    flex-shrink: 0;
-    min-height: 44px;
-}
-
-header.top h1 {
-    font-size: clamp(1rem, 4vw, 1.4rem);
-    margin: 0;
-    font-weight: 900;
-    background: linear-gradient(to bottom, #fff 60%, var(--accent-cyan));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(2px 2px 0 var(--accent-pink));
-    letter-spacing: 1px;
-    white-space: nowrap;
     text-align: center;
-    flex: 1;
+    padding: 14px 16px 6px;
+    position: relative;
 }
 
 .back {
-    color: var(--accent-cyan);
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1.5px;
     text-decoration: none;
-    font-family: monospace;
-    font-size: 0.85rem;
-    padding: 0.4rem 0.65rem;
-    border: 1px solid var(--accent-cyan);
-    border-radius: 8px;
-    white-space: nowrap;
-    min-height: 40px;
-    min-width: 40px;
-    display: inline-flex;
+    color: #d6bdff;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    padding: 6px 10px;
+    border-radius: 10px;
+    transition: background 0.15s;
+    z-index: 10;
+}
+.back:hover { background: rgba(255, 255, 255, 0.16); }
+
+header.top h1 {
+    margin: 0;
+    font-size: 44px;
+    letter-spacing: 3px;
+    color: #00ffcc;
+    text-shadow: 0 0 18px rgba(0, 255, 204, 0.45), 0 2px 0 #1a0f33;
+}
+
+header.top h1 .neon-pink {
+    color: #ff6ec7;
+    text-shadow: 0 0 18px rgba(255, 110, 199, 0.55), 0 2px 0 #1a0f33;
+}
+
+/* ============ MAIN LAYOUT ============ */
+
+main {
+    display: flex;
+    flex-direction: column;
     align-items: center;
+    padding: 12px;
+    gap: 14px;
+}
+
+.stage-row {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+/* ============ HINT TAG ============ */
+
+.hint-tag {
+    display: inline-block;
+    background: linear-gradient(135deg, #ffe066 0%, #ffd23f 100%);
+    color: #1a0f33;
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    padding: 8px 14px;
+    border-radius: 14px;
+    transform: rotate(-3deg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 2px solid #1a0f33;
+    text-transform: uppercase;
+    transition: opacity 0.3s;
+}
+
+body.dancing .hint-tag {
+    opacity: 0;
+}
+
+/* ============ BACKGROUND PICKER ============ */
+
+.bg-picker {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
     justify-content: center;
-    touch-action: manipulation;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.bg-thumb {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
     background: transparent;
     cursor: pointer;
-    line-height: 1;
-}
-.back:active {
-    background: var(--accent-cyan);
-    color: #000;
-    box-shadow: 0 0 12px var(--accent-cyan);
-}
-
-.header-spacer { min-width: 40px; }
-
-/* ---------- stage / canvas ---------- */
-.stage {
-    position: relative;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.5rem;
-    min-height: 0;
+    padding: 3px;
+    transition: transform 0.1s, border-color 0.1s;
     overflow: hidden;
 }
 
-#canvas {
-    background: var(--paper);
-    border-radius: 14px;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 255, 204, 0.2);
+.bg-thumb:hover { transform: scale(1.05); }
+
+.bg-thumb.active {
+    border-color: #00ffcc;
+    box-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+}
+
+.bg-preview {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+}
+
+/* ============ STAGE & CREATURE ============ */
+
+.stage-wrap {
+    position: relative;
+    display: flex;
+    justify-content: center;
+}
+
+.stage {
+    position: relative;
+    width: min(94vw, 380px);
+    aspect-ratio: 2 / 3;
+    border-radius: 16px;
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 4px #fff,
+        inset 0 0 0 6px rgba(0, 255, 204, 0.4);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: box-shadow 0.3s;
+}
+
+body.dancing .stage {
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 4px #fff,
+        inset 0 0 0 6px #ff6ec7,
+        0 0 32px rgba(255, 110, 199, 0.3);
+}
+
+.bg-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    transition: background 0.3s;
+}
+
+/* ----- background variants (also reused for thumbnails) ----- */
+
+.bg-studio {
+    background:
+        radial-gradient(ellipse 70% 28% at 50% 92%, rgba(255, 110, 199, 0.22) 0%, transparent 70%),
+        linear-gradient(180deg, #fff8ec 0%, #fff0d6 70%, #ffd9a8 100%);
+}
+
+.bg-disco {
+    background:
+        radial-gradient(circle at 20% 20%, rgba(255, 220, 100, 0.5) 0%, transparent 30%),
+        radial-gradient(circle at 80% 30%, rgba(255, 110, 199, 0.55) 0%, transparent 30%),
+        radial-gradient(circle at 50% 80%, rgba(0, 200, 255, 0.4) 0%, transparent 35%),
+        linear-gradient(180deg, #2a0a4a 0%, #4d1c8a 100%);
+}
+
+.bg-outdoors {
+    background:
+        radial-gradient(circle at 80% 25%, #fff8c0 0%, transparent 12%),
+        linear-gradient(180deg, #87ceeb 0%, #b6e0f5 60%, #6fbf52 60%, #4a9b34 100%);
+}
+
+.bg-night {
+    background:
+        radial-gradient(circle at 20% 25%, #fff 0%, transparent 0.5%),
+        radial-gradient(circle at 78% 18%, #fff 0%, transparent 0.4%),
+        radial-gradient(circle at 35% 60%, #fff 0%, transparent 0.4%),
+        radial-gradient(circle at 65% 75%, #fff 0%, transparent 0.5%),
+        radial-gradient(circle at 88% 55%, #fff 0%, transparent 0.4%),
+        radial-gradient(circle at 50% 30%, rgba(255, 255, 200, 0.9) 0%, transparent 4%),
+        linear-gradient(180deg, #0a1838 0%, #1a2c5a 100%);
+}
+
+.creature {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    transform-origin: 50% 92%;
+    transition: transform 0.04s linear;
+    will-change: transform;
+}
+
+.silhouette {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* The pale wash inside the silhouette so the kid sees the body shape
+   even before any strokes. */
+.silhouette-fill > * {
+    fill: rgba(255, 255, 255, 0.92);
+}
+
+/* The outline filter spits out a dark ring around the union of the
+   body shapes. The fills below are only used as input to the filter
+   â€” they never render as fill themselves. */
+.silhouette-outline > * {
+    fill: #000;
+}
+
+.draw-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 3;
     touch-action: none;
     cursor: crosshair;
-    max-width: 100%;
-    max-height: 100%;
+    -webkit-clip-path: url(#bodyClip);
+    clip-path: url(#bodyClip);
 }
 
-.hint {
+body.dancing .draw-canvas {
+    cursor: default;
+    pointer-events: none;
+}
+
+.stage-floor {
     position: absolute;
-    bottom: 0.6rem;
+    bottom: 2.5%;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    font-size: 0.85rem;
-    padding: 0.35rem 0.75rem;
-    border-radius: 999px;
+    width: 65%;
+    height: 4%;
+    background: radial-gradient(ellipse, rgba(0, 0, 0, 0.45) 0%, transparent 75%);
+    border-radius: 50%;
+    transform-origin: center center;
     pointer-events: none;
-    transition: opacity 0.4s;
-    text-align: center;
-    max-width: 92%;
+    transition: opacity 0.05s linear;
+    z-index: 1;
 }
-.hint.faded { opacity: 0; }
-.hint strong { color: var(--accent-cyan); }
 
-/* ---------- toolbar ---------- */
-.toolbar {
-    background: var(--tool-bg);
-    border-top: var(--border-thin);
-    padding: 0.5rem 0.7rem calc(0.5rem + env(safe-area-inset-bottom)) 0.7rem;
+/* Beat bubble pulses on each kick. */
+.beat-bubble {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ff6ec7;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 0 12px #ff6ec7;
+    transition: opacity 0.06s linear, transform 0.06s linear;
+    z-index: 5;
+}
+
+/* ============ PANELS ============ */
+
+.panel {
+    width: min(94vw, 460px);
+    background: rgba(0, 0, 0, 0.45);
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
-    flex-shrink: 0;
+    gap: 10px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
 
-.row {
+.panel-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
     justify-content: center;
+    gap: 8px;
 }
 
-/* ---------- color palette ---------- */
 .palette {
-    display: flex;
-    gap: 0.35rem;
-    flex-wrap: wrap;
-    justify-content: center;
+    gap: 6px;
 }
 
 .swatch {
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.25);
     cursor: pointer;
     padding: 0;
-    transition: transform 0.12s, border-color 0.12s;
-    touch-action: manipulation;
+    transition: transform 0.1s, box-shadow 0.1s;
+    flex: 0 0 auto;
 }
+.swatch:hover { transform: scale(1.1); }
 .swatch.active {
-    border-color: #fff;
-    transform: scale(1.15);
-    box-shadow: 0 0 0 2px var(--accent-cyan);
+    border-color: #00ffcc;
+    box-shadow: 0 0 10px #00ffcc, inset 0 0 0 2px #1a0f33;
+    transform: scale(1.18);
 }
+.swatch[data-color="#ffffff"] { border-color: #999; }
 
-/* ---------- brush sizes ---------- */
 .sizes {
     display: flex;
-    gap: 0.3rem;
-    align-items: center;
-    background: var(--glass-bg);
-    padding: 0.25rem;
-    border-radius: 10px;
-    border: var(--border-thin);
+    gap: 6px;
 }
 
 .size-btn {
-    background: transparent;
-    border: none;
-    color: #fff;
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.2);
     cursor: pointer;
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
-    touch-action: manipulation;
+    padding: 0;
+    transition: background 0.1s, border-color 0.1s;
 }
 .size-btn.active {
-    background: var(--accent-cyan);
-    color: #000;
+    border-color: #00ffcc;
+    background: rgba(0, 255, 204, 0.18);
 }
 .size-btn .dot {
-    background: currentColor;
+    background: #fff;
     border-radius: 50%;
-    display: inline-block;
+    display: block;
 }
-.size-btn .dot-s { width: 5px; height: 5px; }
-.size-btn .dot-m { width: 12px; height: 12px; }
-.size-btn .dot-l { width: 22px; height: 22px; }
 
-/* ---------- tool buttons ---------- */
-.tool-btn {
-    background: var(--glass-bg);
-    border: var(--border-thin);
+.actions { gap: 8px; }
+
+/* ============ BUTTONS ============ */
+
+.btn {
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 2px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.08);
     color: #fff;
-    padding: 0.5rem 0.85rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-    border-radius: 10px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1.2px;
     cursor: pointer;
+    text-transform: uppercase;
     min-height: 44px;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
+    transition: background 0.12s, border-color 0.12s, transform 0.05s;
     touch-action: manipulation;
-    line-height: 1;
+    -webkit-tap-highlight-color: transparent;
 }
-.tool-btn .ico { font-size: 1.1rem; }
-.tool-btn:active {
-    background: rgba(0, 255, 204, 0.2);
-    border-color: var(--accent-cyan);
+.btn:hover { background: rgba(255, 255, 255, 0.16); }
+.btn:active { transform: translateY(1px); }
+.btn.small { padding: 8px 12px; font-size: 12px; min-height: 38px; }
+.btn.active {
+    background: rgba(255, 110, 199, 0.28);
+    border-color: #ff6ec7;
+    color: #fff;
 }
-.tool-btn.primary {
-    background: var(--accent-cyan);
-    color: #000;
-    border-color: var(--accent-cyan);
-    font-weight: 800;
+.btn.primary {
+    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
+    color: #1a0f33;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 14px rgba(255, 110, 199, 0.35);
 }
-.tool-btn.primary:active {
-    box-shadow: 0 0 18px var(--accent-cyan);
-}
-
-/* ---------- BPM slider ---------- */
-.bpm-label {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-    font-size: 0.78rem;
-    color: rgba(255, 255, 255, 0.85);
-    font-family: monospace;
-    min-width: 130px;
-}
-.bpm-text strong { color: var(--accent-cyan); margin-left: 0.25rem; }
-#bpm {
-    width: 130px;
-    accent-color: var(--accent-cyan);
+.btn.primary:hover {
+    filter: brightness(1.08);
+    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
 }
 
-/* ---------- footer ---------- */
-footer {
+/* ============ DANCE PANEL ============ */
+
+.dance-panel .now-playing {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 18px;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    color: #d6bdff;
+    text-transform: uppercase;
+}
+.dance-panel .now-playing strong {
+    color: #00ffcc;
+    margin-left: 6px;
+}
+
+/* ============ FOOTER ============ */
+
+.site-footer {
+    margin-top: 28px;
+    padding: 18px 12px 24px;
     text-align: center;
-    font-size: 0.65rem;
-    opacity: 0.4;
-    padding: 0.2rem;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
 }
-footer a { color: #fff; }
+.footer-nav {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 8px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+}
+.footer-nav a { color: #d6bdff; text-decoration: none; }
+.footer-nav a:hover { color: #00ffcc; }
+.footer-tagline { margin: 4px 0; letter-spacing: 1px; }
+.footer-copy { margin: 4px 0; }
+.footer-copy a { color: #ff6ec7; text-decoration: none; }
+
+/* ============ DESKTOP LAYOUT ============ */
+
+@media (min-width: 760px) {
+    main {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: center;
+        flex-wrap: wrap;
+        max-width: 1000px;
+        margin: 0 auto;
+        gap: 24px;
+    }
+    .stage-row { width: auto; flex: 0 0 auto; }
+    .stage { width: 380px; }
+    .panel { width: 320px; }
+}
