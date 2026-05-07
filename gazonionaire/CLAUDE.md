@@ -27,7 +27,7 @@ Two consolidated atlases, same pattern: one PNG, one JSON of per-frame coords, m
 
 **Don't revert `applySprite` to a single `<div>` with a centered `background-image`.** Frames are non-square, so the empty padding inside a square box used to leak neighboring sprites through (e.g. whale's bottom band exposed bottle directly below it on the sheet). The current code renders into an inner `.sprite-frame` div sized **exactly** to the scaled frame, centered with flex — that clips neighbors at the inner div's bounds. If you change the function, reverify in the ship picker AND the star map that adjacent frames don't bleed through.
 
-**To add a ship/planet**: extend the PNG, update the JSON, mirror the new frame in `SHIP_SPRITES.frames` / `PLANET_SPRITES.frames` in [js/data.js](js/data.js), then either append a `SHIPS` entry or set `planetSprite` on a `LOCATIONS` entry. There is **no** `sheet:` field on `SHIPS` anymore (consolidated single-sheet design). Legacy [ships-one.png](assets/sprites/ships-one.png) / [ships-two.png](assets/sprites/ships-two.png) are still on disk but unreferenced — safe to delete.
+**To add a ship/planet**: extend the PNG, update the JSON, mirror the new frame in `SHIP_SPRITES.frames` / `PLANET_SPRITES.frames` in [js/data.js](js/data.js), then either append a `SHIPS` entry or set `planetSprite` on a `LOCATIONS` entry. There is **no** `sheet:` field on `SHIPS` anymore (consolidated single-sheet design).
 
 ## Star map (Travel panel)
 
@@ -50,7 +50,7 @@ To **swap the placeholder starfield** for real art: replace the `.map-bg` CSS ru
 
 ## Ship audio (per-ship ambient)
 
-A ship card click plays an ambient loop tied to that ship via element id `sfx-ship-<ship.id>`. The `<audio>` elements live at the bottom of [index.html](index.html). `assets/sounds/bee-ambient.mp3` is the only one currently shipping; the rest are placeholder `<id>-ambient.mp3` filenames. Missing files fail silently per [assets/sounds/README.txt](assets/sounds/README.txt). To wire a new ambient, drop the file in `assets/sounds/` matching the audio element's `src`.
+A ship card click plays an ambient loop tied to that ship via element id `sfx-ship-<ship.id>`. The `<audio>` elements live at the bottom of [index.html](index.html). `assets/sounds/bee-ambient.mp3` is the only one currently shipping; the rest are placeholder `<id>-ambient.mp3` filenames. Missing files fail silently — `sfx()` and `playShipAmbient()` in [js/ui.js](js/ui.js) catch and ignore play errors. To wire a new ambient, drop the file in `assets/sounds/` matching the audio element's `src`.
 
 Game event audio uses a separate `sfx-<event>` id convention (`click`, `ship`, `buy`, `sell`, `travel`, `event`, `good`, `bad`). Same silent-fail rule.
 
@@ -110,3 +110,4 @@ Opening `index.html` via `file://` is **not** equivalent — relative `fetch()`-
 - **`planets.png` is 22 MB.** Browsers cache it after first load, but full-page screenshot capture (e.g. `preview_screenshot`) can time out while it decodes. DOM inspection via `preview_eval` is reliable for verifying map state. Be deliberate about expanding the atlas.
 - **Verify the map after editing `applySprite`.** Both the ship picker AND the star map use it. Adjacent-frame bleed regressions show up first on whatever atlas has the tightest packing — currently the ship sheet.
 - **Worktree ↔ main-repo asset drift.** Multiple worktrees live under `.claude/worktrees/`; new binary assets dropped into the *main* working tree (or a sibling worktree) won't be in yours. If `data.js` references a sprite key but the rendered output is solid black, check that the matching PNG/JSON actually exists at the expected path *in your worktree* before debugging the code.
+- **`assets/images/` does not exist.** [js/ui.js](js/ui.js) references it for location icons (`loc_<id>.png`), good icons (`<good>.png` per `GOODS[].icon`), the lore modal image, event modal images (`evt_*.png` per `EVENTS[].img` / `LOCAL_EVENTS[*].img`), and `win.png` / `lose.png`. All `<img>` tags use `onerror="this.style.visibility='hidden'"` (or `display='none'`) so missing files render blank instead of a broken-image icon — the game looks intentionally minimal as a result. The fix is to drop the image files in `assets/images/` matching the filenames already in the code, **not** to rename or remove the references. Same applies to `splash.png` (root referenced by [index.html](index.html); only `splash.jpg` actually exists today and the splash CSS at [css/style.css](css/style.css) uses the `.jpg`).
