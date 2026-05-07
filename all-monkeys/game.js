@@ -88,14 +88,29 @@
     }
 
     // ---------- CHARACTERS ----------
-    // 16 mods. Each entry: visual palette (body + head colors with the emoji as
-    // the placeholder face) plus a play() function scheduling its WebAudio
-    // events on a given step (0..15 sixteenth-note grid).
+    // 16 Munki mods. Each entry has:
+    //   - body palette (color + highlight + shade); the head circle behind a
+    //     mod sprite uses the same body color
+    //   - headFrame: name of the frame inside munki-heads.png (mapped via
+    //     munki-heads.json — see HEAD_SHEET below)
+    //   - play() scheduling its WebAudio events on a 0..15 step grid
+    //
+    // Render layers per Munki (bottom → top):
+    //   body → head-shape circle (body color) → head sprite OR generic face →
+    //   headphones overlay. All head layers share the same 100×100 viewBox so
+    //   the headphones stay visually anchored regardless of which sprite (or
+    //   the placeholder face) is showing underneath.
+    //
+    // Mods are grouped by head color to match the body palette:
+    //   blue (3): truck, ice, moon
+    //   green (5): troll, munki, nugget, tamil, coconut
+    //   orange (3): cocoa, fire, banana
+    //   purple (5): star, choochoo, drum, flute, cloud
     const CHARACTERS = {
-        monkey: {
-            label: 'MONKEY', emoji: '🐒',
-            bodyColor: '#8b5a2b', bodyHi: '#a86d3a', bodyShade: '#3d220e',
-            headColor: '#9c6633', headHi: '#d4a574', headShade: '#3d220e',
+        munki: {
+            label: 'MUNKI',
+            bodyColor: '#558b2f', bodyHi: '#7cb342', bodyShade: '#2a4a14',
+            headFrame: 'green (1)',
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const osc = ctx.createOscillator();
@@ -119,9 +134,9 @@
         },
 
         nugget: {
-            label: 'NUGGET', emoji: '🍗',
-            bodyColor: '#f4c465', bodyHi: '#fbdc92', bodyShade: '#a06b1f',
-            headColor: '#f4c465', headHi: '#fbdc92', headShade: '#a06b1f',
+            label: 'NUGGET',
+            bodyColor: '#7cb342', bodyHi: '#aed581', bodyShade: '#33691e',
+            headFrame: 'green (2)',
             play(ctx, out, when, step) {
                 if (![3, 7, 11, 15].includes(step)) return;
                 const osc = ctx.createOscillator();
@@ -146,9 +161,9 @@
         },
 
         choochoo: {
-            label: 'CHOO CHOO', emoji: '🚂',
-            bodyColor: '#2a2a2a', bodyHi: '#5a5a5a', bodyShade: '#000',
-            headColor: '#3a3a3a', headHi: '#7a7a7a', headShade: '#000',
+            label: 'CHOO CHOO',
+            bodyColor: '#6a1b9a', bodyHi: '#ab47bc', bodyShade: '#38006b',
+            headFrame: 'purple (1)',
             play(ctx, out, when, step) {
                 if (step % 2 === 0) {
                     const n = noiseSource(ctx, 0.12);
@@ -178,9 +193,9 @@
         },
 
         truck: {
-            label: 'TRUCK', emoji: '🚚',
+            label: 'TRUCK',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
-            headColor: '#5a7aaa', headHi: '#86a6cf', headShade: '#1a2a4a',
+            headFrame: 'blue (1)',
             play(ctx, out, when, step) {
                 if (step % 4 === 0) {
                     const k = ctx.createOscillator();
@@ -213,9 +228,9 @@
         },
 
         cocoa: {
-            label: 'COCOA', emoji: '🐦',
+            label: 'COCOA',
             bodyColor: '#ffa500', bodyHi: '#ffd089', bodyShade: '#a06000',
-            headColor: '#ffa500', headHi: '#fdd835', headShade: '#a06000',
+            headFrame: 'orange (1)',
             play(ctx, out, when, step) {
                 if (![1, 5, 9, 13].includes(step)) return;
                 const notes = [880, 1108, 1318]; // A5, C#6, E6
@@ -235,9 +250,9 @@
         },
 
         tamil: {
-            label: 'TAMIL', emoji: '🪘',
-            bodyColor: '#a0522d', bodyHi: '#c97b50', bodyShade: '#3d220e',
-            headColor: '#f5deb3', headHi: '#fff0c2', headShade: '#3d220e',
+            label: 'TAMIL',
+            bodyColor: '#33691e', bodyHi: '#558b2f', bodyShade: '#1b4408',
+            headFrame: 'green (3)',
             play(ctx, out, when, step) {
                 const lowSteps = [0, 6, 11];
                 const highSteps = [3, 8, 14];
@@ -277,9 +292,9 @@
         },
 
         troll: {
-            label: 'TROLL', emoji: '👹',
-            bodyColor: '#a8b88a', bodyHi: '#c5d6a5', bodyShade: '#3a4a2a',
-            headColor: '#a8b88a', headHi: '#c5d6a5', headShade: '#3a4a2a',
+            label: 'TROLL',
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
+            headFrame: 'green (4)',
             play(ctx, out, when, step) {
                 if (![2, 7, 13].includes(step)) return;
                 const pent = [261.63, 293.66, 329.63, 392.00, 440];
@@ -304,9 +319,9 @@
         },
 
         banana: {
-            label: 'BANANA', emoji: '🍌',
-            bodyColor: '#ffd54f', bodyHi: '#fff176', bodyShade: '#8b6914',
-            headColor: '#ffeb3b', headHi: '#fff59d', headShade: '#8b6914',
+            label: 'BANANA',
+            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
+            headFrame: 'orange (2)',
             play(ctx, out, when, step) {
                 if (step !== 2 && step !== 10) return;
                 const o = ctx.createOscillator();
@@ -326,9 +341,9 @@
         },
 
         coconut: {
-            label: 'COCONUT', emoji: '🥥',
-            bodyColor: '#6b4423', bodyHi: '#8b5a2b', bodyShade: '#2a1a0a',
-            headColor: '#8b5a2b', headHi: '#a86d3a', headShade: '#2a1a0a',
+            label: 'COCONUT',
+            bodyColor: '#1b5e20', bodyHi: '#388e3c', bodyShade: '#0d3a12',
+            headFrame: 'green (5)',
             play(ctx, out, when, step) {
                 if (![2, 6, 10, 14].includes(step)) return;
                 const o = ctx.createOscillator();
@@ -345,9 +360,9 @@
         },
 
         drum: {
-            label: 'DRUM', emoji: '🥁',
-            bodyColor: '#c62828', bodyHi: '#e57373', bodyShade: '#5a0000',
-            headColor: '#fafafa', headHi: '#fff', headShade: '#5a0000',
+            label: 'DRUM',
+            bodyColor: '#7b1fa2', bodyHi: '#ba68c8', bodyShade: '#4a0072',
+            headFrame: 'purple (2)',
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.13);
@@ -373,9 +388,9 @@
         },
 
         flute: {
-            label: 'FLUTE', emoji: '🎵',
-            bodyColor: '#bdbdbd', bodyHi: '#e0e0e0', bodyShade: '#424242',
-            headColor: '#9e9e9e', headHi: '#cfcfcf', headShade: '#424242',
+            label: 'FLUTE',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            headFrame: 'purple (3)',
             play(ctx, out, when, step) {
                 const melody = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 587.33 }; // C5 E5 G5 D5
                 const f = melody[step];
@@ -400,9 +415,9 @@
         },
 
         star: {
-            label: 'STAR', emoji: '⭐',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headColor: '#ffd700', headHi: '#ffeb91', headShade: '#a07000',
+            label: 'STAR',
+            bodyColor: '#aa00ff', bodyHi: '#d291ff', bodyShade: '#5e0099',
+            headFrame: 'purple (4)',
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 6) return;
                 const freqs = [1318.51, 1760.00, 2637.02]; // E6 A6 E7
@@ -421,9 +436,9 @@
         },
 
         cloud: {
-            label: 'CLOUD', emoji: '☁️',
-            bodyColor: '#e8f0f7', bodyHi: '#fff', bodyShade: '#7e92a8',
-            headColor: '#fff', headHi: '#fff', headShade: '#7e92a8',
+            label: 'CLOUD',
+            bodyColor: '#ce93d8', bodyHi: '#e1bee7', bodyShade: '#7b1fa2',
+            headFrame: 'purple (5)',
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const chord = [196.00, 261.63, 329.63]; // G3 C4 E4
@@ -443,9 +458,9 @@
         },
 
         moon: {
-            label: 'MOON', emoji: '🌙',
+            label: 'MOON',
             bodyColor: '#1e3a5f', bodyHi: '#3d6090', bodyShade: '#0a1828',
-            headColor: '#fff8c5', headHi: '#fffbe0', headShade: '#9c8a3a',
+            headFrame: 'blue (2)',
             play(ctx, out, when, step) {
                 if (step !== 2 && step !== 10) return;
                 const o = ctx.createOscillator();
@@ -470,9 +485,9 @@
         },
 
         fire: {
-            label: 'FIRE', emoji: '🔥',
+            label: 'FIRE',
             bodyColor: '#ff6f00', bodyHi: '#ffab40', bodyShade: '#7c2900',
-            headColor: '#ff3d00', headHi: '#ff8a65', headShade: '#7c2900',
+            headFrame: 'orange (3)',
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
                 const n = noiseSource(ctx, 0.04);
@@ -488,9 +503,9 @@
         },
 
         ice: {
-            label: 'ICE', emoji: '❄️',
+            label: 'ICE',
             bodyColor: '#4fc3f7', bodyHi: '#81d4fa', bodyShade: '#0277bd',
-            headColor: '#e1f5fe', headHi: '#fff', headShade: '#0277bd',
+            headFrame: 'blue (3)',
             play(ctx, out, when, step) {
                 if (![2, 5, 9, 13].includes(step)) return;
                 const o = ctx.createOscillator();
@@ -507,17 +522,55 @@
     };
 
     const ORDER = [
-        'monkey', 'nugget', 'choochoo', 'truck',
+        'munki', 'nugget', 'choochoo', 'truck',
         'cocoa', 'tamil', 'troll', 'banana',
         'coconut', 'drum', 'flute', 'star',
         'cloud', 'moon', 'fire', 'ice'
     ];
 
-    // ---------- PLACEHOLDER ART ----------
-    // Body and head are independent SVG layers so a real sprite-sheet drop-in
-    // can replace either side without disturbing the other. The emoji acts as
-    // the placeholder face — swap to <image href> or background-image once the
-    // real frames arrive.
+    // ---------- HEAD SPRITESHEET ----------
+    // munki-heads.png is a 1608×1604 sheet of 16 round Munki heads. The frame
+    // coordinates are mirrored from munki-heads.json so the rest of the file
+    // can stay synchronous (no fetch on init). Update these alongside the JSON
+    // when new frames are added.
+    const HEAD_SHEET = {
+        src: 'munki-heads.png',
+        sheetW: 1608,
+        sheetH: 1604,
+        frames: {
+            'blue (1)':   { x: 2,    y: 2,    w: 389, h: 388 },
+            'blue (2)':   { x: 400,  y: 2,    w: 400, h: 400 },
+            'blue (3)':   { x: 802,  y: 2,    w: 402, h: 401 },
+            'green (1)':  { x: 1206, y: 2,    w: 392, h: 392 },
+            'green (2)':  { x: 2,    y: 405,  w: 396, h: 396 },
+            'green (3)':  { x: 400,  y: 405,  w: 396, h: 396 },
+            'green (4)':  { x: 802,  y: 405,  w: 401, h: 400 },
+            'green (5)':  { x: 1206, y: 405,  w: 399, h: 399 },
+            'orange (1)': { x: 2,    y: 807,  w: 392, h: 392 },
+            'orange (2)': { x: 400,  y: 807,  w: 399, h: 399 },
+            'orange (3)': { x: 802,  y: 807,  w: 393, h: 393 },
+            'purple (1)': { x: 1206, y: 807,  w: 400, h: 399 },
+            'purple (2)': { x: 2,    y: 1208, w: 394, h: 394 },
+            'purple (3)': { x: 400,  y: 1208, w: 389, h: 389 },
+            'purple (4)': { x: 802,  y: 1208, w: 394, h: 394 },
+            'purple (5)': { x: 1206, y: 1208, w: 389, h: 389 }
+        }
+    };
+
+    // ---------- ART (body + layered head) ----------
+    // The head is composed of three sibling layers, all anchored to the same
+    // 100×100 footprint so the headphones overlay always lands in the same
+    // visual spot regardless of which face/sprite is showing:
+    //
+    //   1. .head-shape   — colored circle (matches body color)
+    //   2. .head-face OR .head-mod — generic SVG eyes/mouth, OR custom head img
+    //   3. .head-phones  — headphones drawn on top
+    //
+    // The custom head sprite is rendered as an SVG <image> with a viewBox that
+    // crops to the relevant frame inside munki-heads.png, scaled with
+    // preserveAspectRatio="xMidYMid meet" so it fills the head circle without
+    // distortion. Drop in new mod heads by adding `headFrame: '<frame name>'`
+    // to a CHARACTERS entry (and the matching frame to HEAD_SHEET).
     function bodyArt(c) {
         return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
             + `<ellipse cx="22" cy="48" rx="9" ry="14" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3" transform="rotate(-15 22 48)"/>`
@@ -529,12 +582,69 @@
             + `</svg>`;
     }
 
-    function headArt(c) {
-        return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            + `<circle cx="50" cy="50" r="42" fill="${c.headColor}" stroke="${c.headShade}" stroke-width="3"/>`
-            + `<ellipse cx="50" cy="58" rx="28" ry="22" fill="${c.headHi}" opacity="0.55"/>`
-            + `<text x="50" y="66" text-anchor="middle" font-size="44" font-family="'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif">${c.emoji}</text>`
+    // Colored head circle (matches body color). r=44 in the 100 viewBox; the
+    // .head-mod / .head-face siblings inset to match this radius so the sprite
+    // fills exactly the visible circle (no gaps under the headphones).
+    function headShapeArt(c) {
+        return `<svg class="head-shape" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+            + `<circle cx="50" cy="50" r="44" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3"/>`
+            + `<ellipse cx="50" cy="60" rx="30" ry="22" fill="${c.bodyHi}" opacity="0.32"/>`
             + `</svg>`;
+    }
+
+    // Generic Munki face — used as a fallback when no headFrame is set.
+    function headFaceArt() {
+        return `<svg class="head-face" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+            + `<circle cx="38" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>`
+            + `<circle cx="62" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>`
+            + `<circle cx="38" cy="51" r="3.5" fill="#000"/>`
+            + `<circle cx="62" cy="51" r="3.5" fill="#000"/>`
+            + `<circle cx="39" cy="50" r="1.4" fill="#fff"/>`
+            + `<circle cx="63" cy="50" r="1.4" fill="#fff"/>`
+            + `<path d="M 38 66 Q 50 76 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`
+            + `</svg>`;
+    }
+
+    // Custom head sprite cropped from the spritesheet. The SVG viewBox crops
+    // to the named frame's pixel coordinates, while the inner <image> shows
+    // the full sheet — preserveAspectRatio scales the cropped frame into the
+    // SVG's display box (which is 100% of .head-mod = the head circle area).
+    function headModArt(frameName) {
+        const f = HEAD_SHEET.frames[frameName];
+        if (!f) return headFaceArt(); // fall back to placeholder face
+        return `<svg class="head-mod" viewBox="${f.x} ${f.y} ${f.w} ${f.h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+            + `<image href="${HEAD_SHEET.src}" x="0" y="0" width="${HEAD_SHEET.sheetW}" height="${HEAD_SHEET.sheetH}"/>`
+            + `</svg>`;
+    }
+
+    // Headphones — band arching across the top, two earcups hugging the
+    // sides, mic boom on the right. Drawn in the same 100×100 viewBox so
+    // they keep their position whether a generic face or a mod sprite sits
+    // underneath them.
+    function headPhonesArt() {
+        return `<svg class="head-phones" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+            // band
+            + `<path d="M 11 50 Q 50 4 89 50" fill="none" stroke="#111" stroke-width="7" stroke-linecap="round"/>`
+            + `<path d="M 13 49 Q 50 9 87 49" fill="none" stroke="#3a3a3a" stroke-width="2.5" stroke-linecap="round"/>`
+            // left earcup
+            + `<ellipse cx="10" cy="55" rx="9" ry="13" fill="#111" stroke="#000" stroke-width="2"/>`
+            + `<ellipse cx="10" cy="55" rx="5.5" ry="8.5" fill="#444"/>`
+            + `<ellipse cx="8.5" cy="51" rx="1.6" ry="2.4" fill="#aaa" opacity="0.7"/>`
+            // right earcup
+            + `<ellipse cx="90" cy="55" rx="9" ry="13" fill="#111" stroke="#000" stroke-width="2"/>`
+            + `<ellipse cx="90" cy="55" rx="5.5" ry="8.5" fill="#444"/>`
+            + `<ellipse cx="88.5" cy="51" rx="1.6" ry="2.4" fill="#aaa" opacity="0.7"/>`
+            // mic boom (right)
+            + `<line x1="86" y1="62" x2="78" y2="73" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>`
+            + `<circle cx="76" cy="74" r="2.5" fill="#3a3a3a" stroke="#000" stroke-width="1"/>`
+            // tiny "live" LED on the left earcup
+            + `<circle cx="11" cy="60" r="1.4" fill="#2dd4bf"/>`
+            + `</svg>`;
+    }
+
+    function headArt(c) {
+        const inner = c.headFrame ? headModArt(c.headFrame) : headFaceArt();
+        return headShapeArt(c) + inner + headPhonesArt();
     }
 
     function characterArt(id) {
