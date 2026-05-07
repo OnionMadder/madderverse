@@ -254,12 +254,9 @@
             }
         },
 
-        // BLACK is one of the two horror-trigger Munkis. Dropping it onto a
-        // slot fires the jumpscare automatically. Pitch-black body, the
-        // dizzy-eyed purple head sells "something is wrong here".
-        black: {
-            label: 'BLACK',
-            bodyColor: '#1a1a1a', bodyHi: '#3a3a3a', bodyShade: '#000',
+        choochoo: {
+            label: 'CHOO CHOO',
+            bodyColor: '#6a1b9a', bodyHi: '#ab47bc', bodyShade: '#38006b',
             headFrame: 'purple (1)',
             // Shaker — chuffs on every 8th note. Quarter-note hits are a
             // touch louder than the off-beats so the groove still feels like
@@ -548,6 +545,9 @@
             }
         },
 
+        // MOON is one of the two horror-trigger Munkis (alongside ICE).
+        // Dropping it onto a slot fires the jumpscare automatically. The
+        // dark blue body + sad-eyed blue head reads as "lunar dread".
         moon: {
             label: 'MOON',
             bodyColor: '#1e3a5f', bodyHi: '#3d6090', bodyShade: '#0a1828',
@@ -767,7 +767,7 @@
     // Stage order: 16 standard Munkis first, then the 6 Madballz Modz at
     // the end of the tray so they read as the "advanced / horror" set.
     const ORDER = [
-        'munki', 'nugget', 'black', 'truck',
+        'munki', 'nugget', 'choochoo', 'truck',
         'cocoa', 'tamil', 'troll', 'banana',
         'coconut', 'drum', 'flute', 'star',
         'cloud', 'moon', 'fire', 'ice',
@@ -823,7 +823,8 @@
 
     // Mods which, when dropped onto a slot, trigger the horror jumpscare
     // automatically (and would persist horror state if we add one later).
-    const HORROR_TRIGGER_MODS = new Set(['black', 'ice']);
+    // Lore: MOON and ICE are the cursed Munkis — placing one tears reality.
+    const HORROR_TRIGGER_MODS = new Set(['moon', 'ice']);
 
     // ---------- ART (body + layered head) ----------
     // The head is composed of three sibling layers, all anchored to the same
@@ -887,34 +888,97 @@
             + `</svg>`;
     }
 
-    // Headphones — band arching across the top, two earcups hugging the
-    // sides, mic boom on the right. Drawn in the same 100×100 viewBox so
-    // they keep their position whether a generic face or a mod sprite sits
-    // underneath them.
+    // Headphones — supersized "studio cans" version. Earcups are ~3x the
+    // original size and visually dominate the sides of the head; the band
+    // is thicker (was stroke-width 7, now 12) and arcs lower so it sits
+    // across the top of the head sprite rather than floating above it.
+    // overflow="visible" lets the cups extend slightly past the SVG bounds
+    // for that "headphones bigger than the head" cartoon look.
     function headPhonesArt() {
-        return `<svg class="head-phones" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            // band
-            + `<path d="M 11 50 Q 50 4 89 50" fill="none" stroke="#111" stroke-width="7" stroke-linecap="round"/>`
-            + `<path d="M 13 49 Q 50 9 87 49" fill="none" stroke="#3a3a3a" stroke-width="2.5" stroke-linecap="round"/>`
-            // left earcup
-            + `<ellipse cx="10" cy="55" rx="9" ry="13" fill="#111" stroke="#000" stroke-width="2"/>`
-            + `<ellipse cx="10" cy="55" rx="5.5" ry="8.5" fill="#444"/>`
-            + `<ellipse cx="8.5" cy="51" rx="1.6" ry="2.4" fill="#aaa" opacity="0.7"/>`
-            // right earcup
-            + `<ellipse cx="90" cy="55" rx="9" ry="13" fill="#111" stroke="#000" stroke-width="2"/>`
-            + `<ellipse cx="90" cy="55" rx="5.5" ry="8.5" fill="#444"/>`
-            + `<ellipse cx="88.5" cy="51" rx="1.6" ry="2.4" fill="#aaa" opacity="0.7"/>`
-            // mic boom (right)
-            + `<line x1="86" y1="62" x2="78" y2="73" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>`
-            + `<circle cx="76" cy="74" r="2.5" fill="#3a3a3a" stroke="#000" stroke-width="1"/>`
-            // tiny "live" LED on the left earcup
-            + `<circle cx="11" cy="60" r="1.4" fill="#2dd4bf"/>`
+        return `<svg class="head-phones" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" overflow="visible">`
+            // band — thicker outer + inner highlight, peaks low so it covers
+            // the top of the head sprite like a real headband
+            + `<path d="M 6 24 Q 50 6 94 24" fill="none" stroke="#0a0a0a" stroke-width="12" stroke-linecap="round"/>`
+            + `<path d="M 9 22 Q 50 10 91 22" fill="none" stroke="#4a4a4a" stroke-width="3" stroke-linecap="round"/>`
+            // left earcup — outer shell, soft cushion ring, glossy highlight
+            + `<ellipse cx="12" cy="58" rx="26" ry="36" fill="#0a0a0a" stroke="#000" stroke-width="3"/>`
+            + `<ellipse cx="12" cy="58" rx="17" ry="26" fill="#3a3a3a"/>`
+            + `<ellipse cx="6" cy="48" rx="5" ry="9" fill="#aaa" opacity="0.55"/>`
+            // right earcup — mirror
+            + `<ellipse cx="88" cy="58" rx="26" ry="36" fill="#0a0a0a" stroke="#000" stroke-width="3"/>`
+            + `<ellipse cx="88" cy="58" rx="17" ry="26" fill="#3a3a3a"/>`
+            + `<ellipse cx="94" cy="48" rx="5" ry="9" fill="#aaa" opacity="0.55"/>`
+            // mic boom — bigger, hangs further off the right cup
+            + `<line x1="76" y1="86" x2="58" y2="104" stroke="#0a0a0a" stroke-width="3.5" stroke-linecap="round"/>`
+            + `<circle cx="56" cy="105" r="4.5" fill="#3a3a3a" stroke="#000" stroke-width="1.5"/>`
+            // live-audio LED on left cup, glow + core
+            + `<circle cx="16" cy="74" r="3" fill="#2dd4bf" opacity="0.9"/>`
+            + `<circle cx="16" cy="74" r="1.3" fill="#fff"/>`
             + `</svg>`;
+    }
+
+    // ---------- HAIR ----------
+    // Procedural hair: 5 silhouette styles, 5 colors. About half the Munkis
+    // get a random combo at load time (see assignRandomHair below) and keep
+    // it for the session — same id always renders the same hair.
+    //
+    // Hair sits BETWEEN the head sprite and the headphones in the z-stack:
+    //   shape (z 1) → mod/face (z 2) → hair (z 2.5) → phones (z 3)
+    // This means tufts and spikes peek above the face but are partly covered
+    // by the chunky band/earcups, which reads naturally for over-ear cans.
+    const HAIR_STYLES = ['spikes', 'mohawk', 'tuft', 'antennae', 'sidepuffs'];
+    const HAIR_COLORS = ['#1a1a1a', '#6b3410', '#fbbf24', '#e91e63', '#f5f5f5'];
+
+    function hairSvg(style, color, dark) {
+        const stroke = `stroke="${dark}" stroke-width="2" stroke-linejoin="round"`;
+        switch (style) {
+            case 'spikes':
+                return `<path d="M 22 16 L 28 -2 L 34 16 Z" fill="${color}" ${stroke}/>`
+                     + `<path d="M 38 14 L 46 -6 L 52 14 Z" fill="${color}" ${stroke}/>`
+                     + `<path d="M 56 14 L 64 -4 L 72 14 Z" fill="${color}" ${stroke}/>`;
+            case 'mohawk':
+                return `<path d="M 38 14 Q 40 -12 50 -10 Q 60 -12 62 14 Z" fill="${color}" ${stroke}/>`
+                     + `<line x1="50" y1="-8" x2="50" y2="14" stroke="${dark}" stroke-width="1" opacity="0.6"/>`;
+            case 'tuft':
+                return `<path d="M 38 16 Q 36 0 44 0 Q 50 -6 56 0 Q 64 0 62 16 Z" fill="${color}" ${stroke}/>`
+                     + `<circle cx="44" cy="6" r="3" fill="${color}"/>`
+                     + `<circle cx="56" cy="4" r="2.5" fill="${color}"/>`;
+            case 'antennae':
+                return `<line x1="40" y1="14" x2="30" y2="-8" stroke="${dark}" stroke-width="2.5" stroke-linecap="round"/>`
+                     + `<circle cx="30" cy="-8" r="3.5" fill="${color}" stroke="${dark}" stroke-width="1.5"/>`
+                     + `<line x1="60" y1="14" x2="70" y2="-6" stroke="${dark}" stroke-width="2.5" stroke-linecap="round"/>`
+                     + `<circle cx="70" cy="-6" r="3.5" fill="${color}" stroke="${dark}" stroke-width="1.5"/>`;
+            case 'sidepuffs':
+                return `<ellipse cx="8" cy="44" rx="7" ry="11" fill="${color}" ${stroke}/>`
+                     + `<ellipse cx="92" cy="44" rx="7" ry="11" fill="${color}" ${stroke}/>`;
+            default:
+                return '';
+        }
+    }
+
+    function hairArt(c) {
+        if (!c.hair) return '';
+        const dark = c.hair.outline || '#000';
+        return `<svg class="char-hair" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" overflow="visible">`
+            + hairSvg(c.hair.style, c.hair.color, dark)
+            + `</svg>`;
+    }
+
+    function assignRandomHair() {
+        // ~55% of mods get hair, randomly. Munkis with horror trigger flags
+        // (moon, ice) skip — bald horror reads better than wig horror.
+        ORDER.forEach(id => {
+            if (HORROR_TRIGGER_MODS.has(id)) return;
+            if (Math.random() > 0.55) return;
+            const style = HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)];
+            const color = HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
+            CHARACTERS[id].hair = { style, color, outline: '#000' };
+        });
     }
 
     function headArt(c) {
         const inner = c.headFrame ? headModArt(c.headFrame, c.sheet) : headFaceArt();
-        return headShapeArt(c) + inner + headPhonesArt();
+        return headShapeArt(c) + inner + hairArt(c) + headPhonesArt();
     }
 
     function characterArt(id) {
@@ -1223,6 +1287,7 @@
 
     // ---------- INIT ----------
     function init() {
+        assignRandomHair();
         buildStage();
         renderTray();
         renderAllSlots();

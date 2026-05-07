@@ -342,6 +342,22 @@ main {
     z-index: 2;
 }
 
+/* Hair sits between the head sprite and the headphones — peeks out around
+   the band/earcups for that "Munki had a wild hairdo BEFORE the headphones
+   went on" look. overflow: visible lets spikes / antennae / mohawks extend
+   past the SVG box without getting clipped. */
+.char-head .char-hair {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    z-index: 2;
+    overflow: visible;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
 /* Pixel-art rendering hint so the spritesheet keeps its crisp edges when
    scaled down to chip / slot size. */
 .char-head .head-mod image {
@@ -352,6 +368,7 @@ main {
 .char-head .head-phones {
     z-index: 3;
     filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+    overflow: visible;
 }
 
 @keyframes char-body-bounce {
