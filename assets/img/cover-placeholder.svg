@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Cover art coming soon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a1a"/>
+      <stop offset="60%" stop-color="#180033"/>
+      <stop offset="100%" stop-color="#260040"/>
+    </linearGradient>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#00ffcc" stroke-opacity="0.12" stroke-width="0.6"/>
+    </pattern>
+    <filter id="glowC" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowP" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="300" height="400" fill="url(#bg)"/>
+  <rect width="300" height="400" fill="url(#grid)"/>
+  <circle cx="150" cy="170" r="46" fill="none" stroke="#00ffcc" stroke-width="2" opacity="0.85" filter="url(#glowC)"/>
+  <circle cx="150" cy="170" r="62" fill="none" stroke="#ff00ff" stroke-width="1" opacity="0.5" filter="url(#glowP)"/>
+  <text x="150" y="178" text-anchor="middle" fill="#00ffcc" font-family="monospace" font-size="36" font-weight="bold" filter="url(#glowC)">?</text>
+  <text x="150" y="270" text-anchor="middle" fill="#ffffff" font-family="monospace" font-size="18" font-weight="bold" letter-spacing="2">MADDERVERSE</text>
+  <text x="150" y="295" text-anchor="middle" fill="#ff00ff" font-family="monospace" font-size="11" letter-spacing="1.5" filter="url(#glowP)">// COVER LOADING</text>
+  <text x="150" y="345" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="12" opacity="0.55">Cover art coming soon</text>
+</svg>

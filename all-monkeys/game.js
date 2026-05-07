@@ -25,6 +25,11 @@
     let nextStepTime = 0;
     let schedTimer = null;
 
+    // ---------- STORY PROGRESSION STATE ----------
+    // Counts horror triggers (Ice/Moon drops) toward the Madballz unlock.
+    // `madballzUnlocked` flips true the first time the threshold is hit and
+    // stays true forever after (persisted in localStorage). `isMadballzMode`
+    // is the live toggle for the "Meet the Madballz" screen.
     let horrorTriggers = 0;
     let madballzUnlocked = false;
     let isMadballzMode = false;

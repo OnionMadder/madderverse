@@ -5,7 +5,7 @@
 (() => {
   const {
     GOODS, LOCATIONS, fmt, travelDays, travelFuel, fuelBasePrice, locById,
-    SHIP_SPRITES,
+    SHIP_SPRITES, PLANET_SPRITES,
   } = GAME_DATA;
   const $ = sel => document.querySelector(sel);
 
@@ -13,7 +13,8 @@
   // size the box, then render the sprite into an inner div sized to the
   // scaled-frame dimensions exactly. centering the inner div in the box
   // means adjacent frames in the sheet can't bleed into the empty padding.
-  function applySprite(boxEl, spriteKey, boxW, boxH) {
+  function applySprite(boxEl, spriteKey, boxW, boxH, atlas) {
+    const sheet = atlas || SHIP_SPRITES;
     boxEl.style.cssText = `width:${boxW}px;height:${boxH}px;display:flex;align-items:center;justify-content:center;`;
     let inner = boxEl.querySelector(':scope > .sprite-frame');
     if (!inner) {
@@ -21,7 +22,7 @@
       inner.className = 'sprite-frame';
       boxEl.appendChild(inner);
     }
-    const f = SHIP_SPRITES.frames[spriteKey];
+    const f = sheet.frames[spriteKey];
     if (!f) {
       inner.style.cssText = `width:${boxW}px;height:${boxH}px;background:#000;`;
       return;
@@ -29,11 +30,11 @@
     const scale = Math.min(boxW / f.w, boxH / f.h);
     const dw = f.w * scale;
     const dh = f.h * scale;
-    const sw = SHIP_SPRITES.sheetW * scale;
-    const sh = SHIP_SPRITES.sheetH * scale;
+    const sw = sheet.sheetW * scale;
+    const sh = sheet.sheetH * scale;
     inner.style.cssText = `
       width:${dw}px; height:${dh}px;
-      background-image:url('${SHIP_SPRITES.src}');
+      background-image:url('${sheet.src}');
       background-size:${sw}px ${sh}px;
       background-position:${-f.x * scale}px ${-f.y * scale}px;
       background-repeat:no-repeat;
@@ -324,8 +325,111 @@
   }
 
   function renderTravel() {
+    renderTravelMap();
+    renderTravelList();
+  }
+
+  function attemptTravel(destId) {
+    const r = Game.travel(destId);
+    if (!r.ok) { flash(r.msg); return; }
+    sfx("travel");
+    renderAll();
+
+    // chain modals: lore (first visit) -> local event -> global event -> game-over
+    const queue = [];
+    if (r.firstVisit) queue.push(() => showLore(r.dest));
+    if (r.localEvent) queue.push(() => showEvent(r.localEvent));
+    if (r.event)      queue.push(() => showEvent(r.event));
+    runModalQueue(queue, () => { renderAll(); checkGameOver(); });
+  }
+
+  // visual planet picker: player at viewport center, all other planets
+  // positioned relative to current location. moves as the player travels.
+  // background is a CSS placeholder until a real starfield image lands.
+  function renderTravelMap() {
+    const s = Game.state;
+    const here = locById(s.location);
+    const viewport = $("#map-viewport");
+    const tip = $("#map-tip");
+    if (!viewport || !here) return;
+    viewport.innerHTML = "";
+
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    if (!vw || !vh) {
+      // viewport not measurable yet (panel not visible) — retry next frame
+      requestAnimationFrame(renderTravelMap);
+      return;
+    }
+    const cx = vw / 2;
+    const cy = vh / 2;
+
+    const SCALE = 0.62;       // 1 location-unit ≈ 0.62 px (planets span ±~110)
+    const PLANET_SIZE = 46;
+    const SHIP_SIZE   = 36;
+
+    LOCATIONS.forEach(loc => {
+      const dx = (loc.x - here.x) * SCALE;
+      const dy = (loc.y - here.y) * SCALE;
+      const px = cx + dx;
+      const py = cy + dy;
+      const isHere = loc.id === here.id;
+
+      const node = document.createElement("div");
+      node.className = "planet-node" + (isHere ? " current" : "");
+      node.style.left = (px - PLANET_SIZE / 2) + "px";
+      node.style.top  = (py - PLANET_SIZE / 2) + "px";
+      node.dataset.locId = loc.id;
+
+      const sprite = document.createElement("div");
+      sprite.className = "planet-sprite";
+      applySprite(sprite, loc.planetSprite, PLANET_SIZE, PLANET_SIZE, PLANET_SPRITES);
+      node.appendChild(sprite);
+
+      const label = document.createElement("div");
+      label.className = "planet-label";
+      label.textContent = loc.name;
+      node.appendChild(label);
+
+      if (!isHere) {
+        const fuel = travelFuel(s.location, loc.id, Game.CONFIG.shipFuelMod);
+        const days = Math.max(1, Math.round(travelDays(s.location, loc.id) * Game.CONFIG.shipSpeedMod));
+        const lowFuel = fuel > s.fuel;
+        node.title = `${loc.name} — ${days}d / ${fuel}u`;
+
+        const cost = document.createElement("div");
+        cost.className = "planet-cost" + (lowFuel ? " low-fuel" : "");
+        cost.textContent = `${days}d · ${fuel}u`;
+        node.appendChild(cost);
+
+        node.addEventListener("click", () => attemptTravel(loc.id));
+      } else {
+        node.title = `${loc.name} — you are here`;
+      }
+
+      viewport.appendChild(node);
+    });
+
+    // ship sprite hovers above the player's current planet
+    const shipDef = GAME_DATA.SHIPS.find(sh => sh.id === s.shipId);
+    if (shipDef) {
+      const ship = document.createElement("div");
+      ship.className = "ship-marker";
+      ship.style.left = (cx - SHIP_SIZE / 2) + "px";
+      ship.style.top  = (cy - SHIP_SIZE / 2 - PLANET_SIZE * 0.55) + "px";
+      const shipSprite = document.createElement("div");
+      applySprite(shipSprite, shipDef.sprite, SHIP_SIZE, SHIP_SIZE);
+      ship.appendChild(shipSprite);
+      viewport.appendChild(ship);
+    }
+
+    if (tip) tip.textContent = `Docked at ${here.name}. Click a planet to plot a course.`;
+  }
+
+  function renderTravelList() {
     const s = Game.state;
     const ul = $("#travel-list");
+    if (!ul) return;
     ul.innerHTML = "";
     LOCATIONS.forEach(loc => {
       const here = loc.id === s.location;
@@ -356,17 +460,7 @@
     ul.onclick = (e) => {
       const btn = e.target.closest("button[data-go]");
       if (!btn) return;
-      const r = Game.travel(btn.dataset.go);
-      if (!r.ok) { flash(r.msg); return; }
-      sfx("travel");
-      renderAll();
-
-      // chain modals: lore (first visit) -> local event -> global event -> game-over
-      const queue = [];
-      if (r.firstVisit) queue.push(() => showLore(r.dest));
-      if (r.localEvent) queue.push(() => showEvent(r.localEvent));
-      if (r.event)      queue.push(() => showEvent(r.event));
-      runModalQueue(queue, () => { renderAll(); checkGameOver(); });
+      attemptTravel(btn.dataset.go);
     };
   }
 

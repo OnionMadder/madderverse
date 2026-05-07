@@ -462,6 +462,100 @@ input[type="number"]:focus, input[type="text"]:focus, .win95-input:focus {
   font-size: 11px; margin-top: 0; color: var(--accent);
   border-bottom: 1px solid var(--border); padding-bottom: 4px;
 }
+/* ───────────── star map (planet picker) ───────────── */
+.travel-map {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  border: 2px solid;
+  border-color: var(--w95-shadow-2) var(--w95-light) var(--w95-light) var(--w95-shadow-2);
+  box-shadow:
+    inset  1px  1px 0 var(--w95-shadow),
+    inset -1px -1px 0 var(--w95-light-2);
+}
+/* placeholder starfield — swap for an <img> background later */
+.map-bg {
+  position: absolute; inset: 0;
+  background-color: #03060d;
+  background-image:
+    radial-gradient(1px 1px at 20% 30%,  #b8dff0 50%, transparent 51%),
+    radial-gradient(1px 1px at 70% 80%,  #8ecae6 50%, transparent 51%),
+    radial-gradient(1px 1px at 50% 10%,  #4fc3f7 50%, transparent 51%),
+    radial-gradient(1px 1px at 85% 40%,  #b8dff0 50%, transparent 51%),
+    radial-gradient(1px 1px at 30% 70%,  #8ecae6 50%, transparent 51%),
+    radial-gradient(2px 2px at 60% 55%,  #4fc3f7 50%, transparent 51%),
+    radial-gradient(1px 1px at 10% 85%,  #b8dff0 50%, transparent 51%),
+    radial-gradient(1px 1px at 90% 15%,  #8ecae6 50%, transparent 51%),
+    radial-gradient(ellipse at 50% 50%, #0a1a30 0%, #03060d 75%);
+  background-size: 240px 200px, 180px 160px, 320px 240px, 200px 180px,
+                   220px 220px, 260px 260px, 200px 200px, 280px 240px, auto;
+}
+.map-viewport {
+  position: absolute; inset: 0;
+  z-index: 1;
+}
+.map-tip {
+  position: absolute;
+  left: 6px; bottom: 4px; right: 6px;
+  font-size: 10px;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 0 #000a;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.planet-node {
+  position: absolute;
+  width: 46px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+  z-index: 2;
+}
+.planet-node:hover { transform: scale(1.12); z-index: 4; }
+.planet-node.current { cursor: default; }
+.planet-node.current:hover { transform: none; }
+.planet-sprite {
+  filter: drop-shadow(0 2px 3px #000a);
+}
+.planet-node.current .planet-sprite {
+  filter: drop-shadow(0 0 6px var(--accent)) drop-shadow(0 2px 3px #000a);
+}
+.planet-label {
+  margin-top: 2px;
+  font-size: 9px;
+  text-align: center;
+  color: var(--ink-bright);
+  text-shadow: 0 1px 2px #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70px;
+  margin-left: -12px;
+}
+.planet-node.current .planet-label { color: var(--accent); }
+.planet-cost {
+  font-size: 9px;
+  text-align: center;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 2px #000;
+}
+.planet-cost.low-fuel { color: var(--pink); }
+
+.ship-marker {
+  position: absolute;
+  width: 36px;
+  z-index: 5;
+  pointer-events: none;
+  animation: ship-bob 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px var(--teal)) drop-shadow(0 2px 2px #000a);
+}
+@keyframes ship-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
 #travel-list { list-style: none; padding: 0; margin: 0; }
 #travel-list li {
   display: flex; justify-content: space-between; align-items: center;
