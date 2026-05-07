@@ -1263,6 +1263,45 @@ const CHARACTERS = {
         if (!modal) return;
         modal.setAttribute('aria-hidden', 'true');
         modal.classList.remove('open');
+        stopReadAloud();
+    }
+
+    // Read the lore aloud via SpeechSynthesis. Toggle: click while speaking
+    // to stop. Auto-stops on modal close. Falls back silently if the browser
+    // lacks the API (very rare on modern mobile, but fail closed).
+    function toggleReadAloud() {
+        if (!('speechSynthesis' in window)) return;
+        if (window.speechSynthesis.speaking) {
+            stopReadAloud();
+            return;
+        }
+        const body = document.querySelector('.story-body');
+        if (!body) return;
+        const text = body.innerText.replace(/\s+/g, ' ').trim();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        u.pitch = 1.0;
+        u.onend    = updateReadButton;
+        u.onerror  = updateReadButton;
+        u.oncancel = updateReadButton;
+        window.speechSynthesis.speak(u);
+        updateReadButton();
+    }
+
+    function stopReadAloud() {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        updateReadButton();
+    }
+
+    function updateReadButton() {
+        const btn = document.getElementById('storyReadBtn');
+        if (!btn) return;
+        const speaking = ('speechSynthesis' in window) && window.speechSynthesis.speaking;
+        btn.classList.toggle('speaking', speaking);
+        const lbl = btn.querySelector('.story-read-lbl');
+        const ico = btn.querySelector('.story-read-ico');
+        if (lbl) lbl.textContent = speaking ? 'Stop' : 'Read';
+        if (ico) ico.textContent = speaking ? '⏹' : '🔊';
     }
 
     // ---------- HEADER BUTTONS ----------
@@ -1284,6 +1323,9 @@ const CHARACTERS = {
 
         const storyClose = document.getElementById('storyCloseBtn');
         if (storyClose) storyClose.addEventListener('click', closeStoryModal);
+
+        const storyRead = document.getElementById('storyReadBtn');
+        if (storyRead) storyRead.addEventListener('click', toggleReadAloud);
 
         const storyModal = document.getElementById('storyModal');
         if (storyModal) {

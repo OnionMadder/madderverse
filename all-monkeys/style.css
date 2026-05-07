@@ -845,9 +845,34 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     justify-content: center;
 }
 .story-close:hover { background: rgba(167, 139, 250, 0.2); color: #fff; }
+.story-read {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    background: transparent;
+    color: #a78bfa;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+.story-read:hover { background: rgba(167, 139, 250, 0.2); color: #fff; }
+.story-read.speaking {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: #fca5a5;
+    color: #fff;
+}
 .story-title {
     margin: 0 0 16px;
-    padding-right: 36px;
+    padding: 0 44px 0 96px;
     font-family: 'Fredoka', sans-serif;
     font-size: 24px;
     font-weight: 800;
