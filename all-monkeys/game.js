@@ -17,6 +17,7 @@
     let isPlaying = false;
     let isMuted = false;
     let isBaseSongOn = true;                 // background "level music" theme
+    let isJumpScareActive = false;           // debounce + visual gate for BOO
     let currentStep = 0;
     let currentBar = 0;
     let nextStepTime = 0;
@@ -926,6 +927,68 @@
         o.start(t); o.stop(t + 0.2);
     }
 
+    // ---------- JUMP SCARE ----------
+    // Sprunki-style horror moment, kid-controlled via the BOO button. Plays a
+    // distorted descending shriek + sub thud while the page shakes, flashes
+    // red, and the active Munkis glitch out. Returns to normal after 1.5s.
+    // Debounced so spamming the button doesn't stack scares.
+    function triggerJumpScare() {
+        if (isJumpScareActive) return;
+        isJumpScareActive = true;
+
+        // Make sure the audio engine is alive before we try to play anything;
+        // also lets the kid trigger a scare as their very first interaction.
+        ensureAudio();
+        playJumpScareSound();
+
+        document.body.classList.add('jumpscare');
+        setTimeout(() => {
+            document.body.classList.remove('jumpscare');
+            isJumpScareActive = false;
+        }, 1500);
+    }
+
+    function playJumpScareSound() {
+        if (!audioCtx || isMuted) return;
+        const t = audioCtx.currentTime;
+
+        // Distorted descending shriek — sawtooth + square through a wave
+        // shaper. Sweeps from a piercing high down to a sub growl over ~1s.
+        const dist = audioCtx.createWaveShaper();
+        dist.curve = distortionCurve(100);
+        const g = audioCtx.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.45, t + 0.02);
+        g.gain.linearRampToValueAtTime(0.35, t + 0.7);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+        dist.connect(g).connect(masterGain);
+
+        const o1 = audioCtx.createOscillator();
+        o1.type = 'sawtooth';
+        o1.frequency.setValueAtTime(1200, t);
+        o1.frequency.exponentialRampToValueAtTime(60, t + 1.0);
+        o1.connect(dist);
+        o1.start(t); o1.stop(t + 1.4);
+
+        const o2 = audioCtx.createOscillator();
+        o2.type = 'square';
+        o2.frequency.setValueAtTime(800, t);
+        o2.frequency.exponentialRampToValueAtTime(45, t + 1.0);
+        o2.connect(dist);
+        o2.start(t); o2.stop(t + 1.4);
+
+        // Sub thud — gives the scare a chest-punch landing.
+        const k = audioCtx.createOscillator();
+        const kg = audioCtx.createGain();
+        k.type = 'sine';
+        k.frequency.setValueAtTime(80, t);
+        k.frequency.exponentialRampToValueAtTime(28, t + 0.5);
+        kg.gain.setValueAtTime(0.7, t);
+        kg.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+        k.connect(kg).connect(masterGain);
+        k.start(t); k.stop(t + 0.65);
+    }
+
     // ---------- HEADER BUTTONS ----------
     function attachHeaderHandlers() {
         document.getElementById('remixBtn').addEventListener('click', () => {
@@ -960,6 +1023,11 @@
                 songBtn.classList.toggle('off', !isBaseSongOn);
                 songBtn.setAttribute('aria-pressed', String(isBaseSongOn));
             });
+        }
+
+        const booBtn = document.getElementById('booBtn');
+        if (booBtn) {
+            booBtn.addEventListener('click', triggerJumpScare);
         }
 
         const muteBtn = document.getElementById('muteBtn');
