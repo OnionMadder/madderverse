@@ -38,9 +38,15 @@
             <div class="title-block">
                 <div class="status">System Status: Operational</div>
                 <h1>Bala's <span class="neon-pink">Adventures</span></h1>
-                <p class="subtitle">Module: All Munkis + Madballz Modz // Warning: Black &amp; Ice cause horror</p>
+                <p class="subtitle" id="subtitle">Module: All Munkis // Warning: Ice &amp; Moon Munki cause horror</p>
             </div>
             <div class="header-buttons">
+                <button id="storyBtn" class="btn btn-story" type="button" title="Read the story">STORY</button>
+                <!-- Hidden until the kid trips horror mode 3 times. Lore: meet the
+                     friends Ice Munki and Moon Munki visit "across town". -->
+                <button id="madballzBtn" class="btn btn-madballz" type="button" title="Meet the Madballz" hidden>MEET THE MADBALLZ</button>
+                <!-- Only shown while we're inside the Madballz screen. -->
+                <button id="backBtn" class="btn btn-back" type="button" title="Back to the light" hidden>← BACK</button>
                 <button id="remixBtn" class="btn btn-remix" type="button">REMIX</button>
                 <button id="clearBtn" class="btn btn-clear" type="button">CLEAR</button>
                 <button id="songBtn" class="btn btn-song" type="button" aria-pressed="true" title="Toggle level song">♪ SONG</button>
@@ -57,12 +63,32 @@
     </main>
 
     <div class="tray-wrap">
-        <div class="tray-hint">Drag a mod onto a slot · 16 Munkis + 6 Madballz · BLACK or ICE = horror</div>
-        <div id="tray" class="tray" aria-label="22 mods (16 Munkis + 6 Madballz)"></div>
+        <div class="tray-hint" id="trayHint">Drag a friend onto a slot · 14 friends + 2 bad munkis · ICE or MOON = horror</div>
+        <div id="tray" class="tray" aria-label="character tray"></div>
     </div>
 
     <!-- Full-screen "BOO!" text that flashes during a jump scare. -->
     <div id="booOverlay" class="boo-overlay" aria-hidden="true">BOO!</div>
+
+    <!-- Story modal: opens when the player hits the STORY button. The lore
+         explains who the 14 friends are, who Ice Munki and Moon Munki are
+         (the antagonists), and that the Madballz are friends of theirs. -->
+    <div id="storyModal" class="story-modal" aria-hidden="true" role="dialog" aria-labelledby="storyTitle">
+        <div class="story-card">
+            <button id="storyCloseBtn" class="story-close" type="button" aria-label="Close story">&times;</button>
+            <h2 id="storyTitle" class="story-title">The Story of All Munkis</h2>
+            <div class="story-body">
+                <p>Once upon a beat, fourteen friends made a song.</p>
+                <p>Reginald Cotswattle. Srivatsan Sivanesan. JerryBerry Jamband. Twinkle Tessellate. Hubert Hubcap. Plopplop Tropicalo. The whole crew. They wore funny hats. They had giant headphones. They were great.</p>
+                <p>Then <strong class="lore-bad">Ice Munki</strong> showed up. She freezes the song.</p>
+                <p>Then <strong class="lore-bad">Moon Munki</strong> showed up. He dims the lights.</p>
+                <p>When they step onto the stage, the room goes <em>WRONG</em>. That is <strong>HORROR MODE</strong>.</p>
+                <p>Across town, in a place where the music sounds <em>different</em>, there lives a crew called <strong class="lore-mb">THE MADBALLZ</strong>.</p>
+                <p>Ice Munki and Moon Munki visit them all the time. They share snacks. They share secrets. They are <em>friends</em>.</p>
+                <p class="story-hint">If you've been WRONG enough times… you can meet them too.</p>
+            </div>
+        </div>
+    </div>
 
     <script src="game.js"></script>
 </body>

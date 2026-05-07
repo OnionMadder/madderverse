@@ -10,6 +10,12 @@
     const SCHEDULE_AHEAD = 0.1;
     const NUM_SLOTS = 8;
     const BARS_PER_LOOP = 2;                 // BASE_SONG cycles every 2 bars
+    // Story progression: trip horror mode this many times (by dropping ICE
+    // MUNKI or MOON MUNKI onto the stage) and the "MEET THE MADBALLZ" button
+    // appears in the header. Persisted in localStorage so the kid keeps the
+    // unlock between visits.
+    const MADBALLZ_UNLOCK_THRESHOLD = 3;
+    const STORAGE_KEY = 'all-munkis-progress-v1';
 
     // ---------- AUDIO ENGINE ----------
     let audioCtx = null;
@@ -22,6 +28,15 @@
     let currentBar = 0;
     let nextStepTime = 0;
     let schedTimer = null;
+
+    // ---------- STORY PROGRESSION STATE ----------
+    // Counts horror triggers (Ice/Moon drops) toward the Madballz unlock.
+    // `madballzUnlocked` flips true the first time the threshold is hit and
+    // stays true forever after (persisted in localStorage). `isMadballzMode`
+    // is the live toggle for the "Meet the Madballz" screen.
+    let horrorTriggers = 0;
+    let madballzUnlocked = false;
+    let isMadballzMode = false;
 
     function ensureAudio() {
         if (!audioCtx) {
@@ -186,28 +201,32 @@
     };
 
     // ---------- CHARACTERS ----------
-    // 16 Munki mods. Each entry has:
+    // 16 standard mods + 6 Madballz. Each entry has:
     //   - body palette (color + highlight + shade); the head circle behind a
     //     mod sprite uses the same body color
-    //   - headFrame: name of the frame inside munki-heads.png (mapped via
-    //     munki-heads.json — see HEAD_SHEET below)
+    //   - headFrame: name of the frame inside the matching head spritesheet
+    //     (sheet defaults to 'munki'; Madballz use sheet: 'madballs')
+    //   - label: the two-word display name (uppercased by CSS in chip/slot UI)
     //   - play() scheduling its WebAudio events on a 0..15 step grid
     //
-    // Render layers per Munki (bottom → top):
+    // Render layers per character (bottom → top):
     //   body → head-shape circle (body color) → head sprite OR generic face →
     //   headphones overlay. All head layers share the same 100×100 viewBox so
     //   the headphones stay visually anchored regardless of which sprite (or
     //   the placeholder face) is showing underneath.
     //
-    // Mods are grouped by head color to match the body palette:
-    //   blue (3): truck, ice, moon
-    //   green (5): troll, munki, nugget, tamil, coconut
-    //   orange (3): cocoa, fire, banana
-    //   purple (5): star, choochoo, drum, flute, cloud
+    // Color groups (the 14 friends):
+    //   green  (5): munki, nugget, tamil, troll, coconut
+    //   orange (3): cocoa, banana, fire
+    //   purple (5): black, drum, flute, star, cloud
+    //   blue   (1): truck
+    // Antagonists (also blue, but the bad guys): ice, moon
+    // Madballz set (own sheet, only seen on the unlocked Madballz screen):
+    //   mb-alien, mb-cry, mb-shroom, mb-brain, mb-wires, mb-rocky
     const CHARACTERS = {
         munki: {
-            label: 'MUNKI',
-            bodyColor: '#558b2f', bodyHi: '#7cb342', bodyShade: '#2a4a14',
+            label: 'Reginald Cotswattle',
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (1)',
             // Filtered saw lead — C major hook on the quarter notes.
             // C5 E5 G5 E5 (steps 0, 4, 8, 12). Stacks tunefully with FLUTE,
@@ -234,8 +253,8 @@
         },
 
         nugget: {
-            label: 'NUGGET',
-            bodyColor: '#7cb342', bodyHi: '#aed581', bodyShade: '#33691e',
+            label: 'Bibsy McNibbles',
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (2)',
             // Closed hi-hat — short, tight noise burst on the offbeat 8ths
             // (steps 2, 6, 10, 14). Pairs with TRUCK kick + DRUM snare for
@@ -254,12 +273,13 @@
             }
         },
 
-        // BLACK is one of the two horror-trigger Munkis. Dropping it onto a
-        // slot fires the jumpscare automatically. Pitch-black body, the
-        // dizzy-eyed purple head sells "something is wrong here".
+        // BLACK was originally a horror trigger; in the new lore the only
+        // antagonists are ICE and MOON, so BLACK is just a regular friend.
+        // Body colour is the shared purple — head sprite is in the purple
+        // group, so the body matches per the uniform-color rule.
         black: {
-            label: 'BLACK',
-            bodyColor: '#1a1a1a', bodyHi: '#3a3a3a', bodyShade: '#000',
+            label: 'Onyx Shimmygobs',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (1)',
             // Shaker — chuffs on every 8th note. Quarter-note hits are a
             // touch louder than the off-beats so the groove still feels like
@@ -281,7 +301,7 @@
         },
 
         truck: {
-            label: 'TRUCK',
+            label: 'Hubert Hubcap',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
             headFrame: 'blue (1)',
             // Kick drum — four on the floor. Sine sweep from 150Hz → 45Hz
@@ -310,8 +330,8 @@
         },
 
         cocoa: {
-            label: 'COCOA',
-            bodyColor: '#ffa500', bodyHi: '#ffd089', bodyShade: '#a06000',
+            label: 'Marzipan Featherbottom',
+            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             headFrame: 'orange (1)',
             // Bird-style arpeggio in C major — C-E-G-C climb on the "and"
             // of beats 2 and 4, fills the space between the lead phrases.
@@ -334,8 +354,8 @@
         },
 
         tamil: {
-            label: 'TAMIL',
-            bodyColor: '#33691e', bodyHi: '#558b2f', bodyShade: '#1b4408',
+            label: 'Srivatsan Sivanesan',
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (3)',
             // Tabla — "thom" (low) on syncopated beats, "tha" (high) on the
             // ands. Pitched into the C major root so it complements the bass
@@ -369,7 +389,7 @@
         },
 
         troll: {
-            label: 'TROLL',
+            label: 'Glamburt Underbridge',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (4)',
             // Detuned saw bass stab on beat 1 and beat 3 — moves between C2
@@ -398,7 +418,7 @@
         },
 
         banana: {
-            label: 'BANANA',
+            label: 'Flavio Splitsville',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             headFrame: 'orange (2)',
             // Bouncy sine bassline — C3 E3 G3 E3 walking through C major.
@@ -421,8 +441,8 @@
         },
 
         coconut: {
-            label: 'COCONUT',
-            bodyColor: '#1b5e20', bodyHi: '#388e3c', bodyShade: '#0d3a12',
+            label: 'Plopplop Tropicalo',
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (5)',
             // Open hi-hat — long, splashy noise on the backbeat (steps 4, 12).
             // Mixes well with NUGGET's closed hat for a varied groove.
@@ -441,8 +461,8 @@
         },
 
         drum: {
-            label: 'DRUM',
-            bodyColor: '#7b1fa2', bodyHi: '#ba68c8', bodyShade: '#4a0072',
+            label: 'Snerrick Backbeatington',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (2)',
             // Snare drum on the backbeat (steps 4, 12). Bandpassed noise +
             // pitched body — sits naturally with TRUCK kick and the hats.
@@ -471,7 +491,7 @@
         },
 
         flute: {
-            label: 'FLUTE',
+            label: 'JerryBerry Jamband',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (3)',
             // Flute line in C major — sits on the offbeats so it weaves
@@ -500,8 +520,8 @@
         },
 
         star: {
-            label: 'STAR',
-            bodyColor: '#aa00ff', bodyHi: '#d291ff', bodyShade: '#5e0099',
+            label: 'Twinkle Tessellate',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (4)',
             // Bell / glockenspiel arpeggio — C major triad in the high
             // register. Plays once per bar on beat 1, long ringing tail.
@@ -524,8 +544,8 @@
         },
 
         cloud: {
-            label: 'CLOUD',
-            bodyColor: '#ce93d8', bodyHi: '#e1bee7', bodyShade: '#7b1fa2',
+            label: 'Nimbus Dreamslippers',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (5)',
             // Pad — C major triad held across the whole bar (~2.4s) with a
             // soft attack and slow release. Provides the harmonic bed
@@ -548,9 +568,13 @@
             }
         },
 
+        // MOON MUNKI — the second antagonist. He "dims the lights". Dropping
+        // him on a slot trips horror mode automatically. See HORROR_TRIGGER_MODS.
+        // Shares the uniform blue body palette with truck + ice; the dark
+        // moon head sprite carries his identity.
         moon: {
-            label: 'MOON',
-            bodyColor: '#1e3a5f', bodyHi: '#3d6090', bodyShade: '#0a1828',
+            label: 'Moon Munki',
+            bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
             headFrame: 'blue (2)',
             // Sub-bass drone — C2 sustained for the full bar with a tiny
             // C3 octave on top for body. Pure foundation under the kit.
@@ -580,8 +604,8 @@
         },
 
         fire: {
-            label: 'FIRE',
-            bodyColor: '#ff6f00', bodyHi: '#ffab40', bodyShade: '#7c2900',
+            label: 'Cinder Sparkletoot',
+            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             headFrame: 'orange (3)',
             // Tambourine-style 16th tick on every "and" — fills the gaps
             // between the 8th-note shaker and gives the loop forward drive.
@@ -599,11 +623,15 @@
             }
         },
 
-        // ICE is the second horror-trigger Munki — sleepy blue head reads
-        // as "frozen / cursed" once dropped onto a slot. See HORROR_TRIGGER_MODS.
+        // ICE MUNKI — one of the two antagonists in the lore. She "freezes
+        // the song". Dropping her on a slot trips horror mode automatically.
+        // See HORROR_TRIGGER_MODS. Body uses the shared blue palette so the
+        // antagonists are color-uniform with the rest of the blue group; her
+        // identity reads through the icy blue head sprite + the red chip
+        // accent (.chip-bad), not the body color.
         ice: {
-            label: 'ICE',
-            bodyColor: '#4fc3f7', bodyHi: '#81d4fa', bodyShade: '#0277bd',
+            label: 'Ice Munki',
+            bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
             headFrame: 'blue (3)',
             // Twinkle — high C major scale steps on the 16th-note ands.
             // Walks C6 D6 E6 G6 around the bar for a sparkly counter-line.
@@ -632,7 +660,7 @@
         // ================================================================
 
         'mb-alien': {
-            label: 'MB ALIEN', sheet: 'madballs', headFrame: 'mb-alien',
+            label: 'Zorbax Beanbean', sheet: 'madballs', headFrame: 'mb-alien',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Distorted sub-pluck — descending saw through a wave-shaper.
             play(ctx, out, when, step) {
@@ -656,7 +684,7 @@
         },
 
         'mb-cry': {
-            label: 'MB CRY', sheet: 'madballs', headFrame: 'mb-cry',
+            label: 'Drippy Frowndorf', sheet: 'madballs', headFrame: 'mb-cry',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
             // Wailing minor melody on the offbeats — sliding triangle whine.
             play(ctx, out, when, step) {
@@ -677,7 +705,7 @@
         },
 
         'mb-shroom': {
-            label: 'MB SHROOM', sheet: 'madballs', headFrame: 'mb-shroom',
+            label: 'Sporeazo Toadcap', sheet: 'madballs', headFrame: 'mb-shroom',
             bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
             // Bubbly water arpeggio — short sine plinks in random octaves.
             play(ctx, out, when, step) {
@@ -697,7 +725,7 @@
         },
 
         'mb-brain': {
-            label: 'MB BRAIN', sheet: 'madballs', headFrame: 'mb-brain',
+            label: 'Cerebellio Wibbletons', sheet: 'madballs', headFrame: 'mb-brain',
             bodyColor: '#65a30d', bodyHi: '#84cc16', bodyShade: '#1a2e05',
             // Pulsing distorted bass — chopper LFO on the gain for a glitchy
             // brainwave feel. Plays on beat 1 and beat 3.
@@ -723,7 +751,7 @@
         },
 
         'mb-wires': {
-            label: 'MB WIRES', sheet: 'madballs', headFrame: 'mb-wires',
+            label: 'Volty Twistplug', sheet: 'madballs', headFrame: 'mb-wires',
             bodyColor: '#78350f', bodyHi: '#a16207', bodyShade: '#1c0701',
             // Electric buzz — high-frequency square chops on every 8th.
             play(ctx, out, when, step) {
@@ -743,7 +771,7 @@
         },
 
         'mb-rocky': {
-            label: 'MB ROCKY', sheet: 'madballs', headFrame: 'mb-rocky',
+            label: 'Rumblestone Cragglethorpe', sheet: 'madballs', headFrame: 'mb-rocky',
             bodyColor: '#57534e', bodyHi: '#78716c', bodyShade: '#1c1917',
             // Tribal stone-thud — pitched-down noise hit on the syncopated
             // beats, gives the loop a chunky, primitive backbone.
@@ -764,13 +792,29 @@
         }
     };
 
-    // Stage order: 16 standard Munkis first, then the 6 Madballz Modz at
-    // the end of the tray so they read as the "advanced / horror" set.
-    const ORDER = [
-        'munki', 'nugget', 'black', 'truck',
-        'cocoa', 'tamil', 'troll', 'banana',
-        'coconut', 'drum', 'flute', 'star',
-        'cloud', 'moon', 'fire', 'ice',
+    // Tray orders for the two screens.
+    //
+    // STANDARD_ORDER (default screen): the 14 colored "friends" arranged by
+    // body palette, then the two antagonists (Ice Munki + Moon Munki) at the
+    // end. Madballz never appear here — they live in their own screen.
+    //   green  (5): munki, nugget, tamil, troll, coconut
+    //   orange (3): cocoa, banana, fire
+    //   purple (5): black, drum, flute, star, cloud
+    //   blue   (1): truck
+    //   antagonists: ice, moon
+    //
+    // MADBALLZ_ORDER: only revealed after the kid has triggered horror mode
+    // enough times to "find" the dark crew. Lore-wise the Madballz are friends
+    // with Ice Munki and Moon Munki, so the antagonists travel here too.
+    const STANDARD_ORDER = [
+        'munki', 'nugget', 'tamil', 'troll', 'coconut',
+        'cocoa', 'banana', 'fire',
+        'black', 'drum', 'flute', 'star', 'cloud',
+        'truck',
+        'ice', 'moon'
+    ];
+    const MADBALLZ_ORDER = [
+        'ice', 'moon',
         'mb-alien', 'mb-cry', 'mb-shroom',
         'mb-brain', 'mb-wires', 'mb-rocky'
     ];
@@ -821,9 +865,10 @@
         }
     };
 
-    // Mods which, when dropped onto a slot, trigger the horror jumpscare
-    // automatically (and would persist horror state if we add one later).
-    const HORROR_TRIGGER_MODS = new Set(['black', 'ice']);
+    // The two antagonists in the lore. When either ICE MUNKI or MOON MUNKI
+    // is dropped onto a slot, the jumpscare fires automatically AND counts
+    // toward unlocking the Madballz screen (see MADBALLZ_UNLOCK_THRESHOLD).
+    const HORROR_TRIGGER_MODS = new Set(['ice', 'moon']);
 
     // ---------- ART (body + layered head) ----------
     // The head is composed of three sibling layers, all anchored to the same
@@ -887,28 +932,47 @@
             + `</svg>`;
     }
 
-    // Headphones — band arching across the top, two earcups hugging the
-    // sides, mic boom on the right. Drawn in the same 100×100 viewBox so
-    // they keep their position whether a generic face or a mod sprite sits
-    // underneath them.
+    // Headphones — big studio over-ear cans with a mic boom. Drawn in the
+    // same 100×100 viewBox as the head so the rig keeps its position whether
+    // a generic face or a mod sprite sits underneath.
+    //
+    // Geometry notes (head circle is r=44 at (50,50), so head crown sits at
+    // y=6, ear region around y=50–60):
+    //   - Headband is a true SEMICIRCLE arc: rx=ry=40, endpoints (10,42) and
+    //     (90,42), apex at (50, 2). Apex sits 4px above the head crown so the
+    //     band visibly wraps OVER the top of the head like real over-ear cans
+    //     instead of cutting across the face.
+    //   - Tiny crown cushion fills the gap between band apex and the head
+    //     dome so the touch point reads as soft contact.
+    //   - Earcups bumped from rx=9 ry=13 to rx=11 ry=14 (≈30% bigger area)
+    //     so they read as proper over-ear pads, anchored at the side of
+    //     the head.
+    //   - Mic boom is a stacked stroke (black + gray inner) for a chunkier
+    //     studio-boom feel, ending in a cardioid capsule on the right.
     function headPhonesArt() {
         return `<svg class="head-phones" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            // band
-            + `<path d="M 11 50 Q 50 4 89 50" fill="none" stroke="#111" stroke-width="7" stroke-linecap="round"/>`
-            + `<path d="M 13 49 Q 50 9 87 49" fill="none" stroke="#3a3a3a" stroke-width="2.5" stroke-linecap="round"/>`
-            // left earcup
-            + `<ellipse cx="10" cy="55" rx="9" ry="13" fill="#111" stroke="#000" stroke-width="2"/>`
-            + `<ellipse cx="10" cy="55" rx="5.5" ry="8.5" fill="#444"/>`
-            + `<ellipse cx="8.5" cy="51" rx="1.6" ry="2.4" fill="#aaa" opacity="0.7"/>`
+            // headband — true semicircle arc (rx=ry=40), outer thick black
+            // and inner metallic stripe sharing the same path data.
+            + `<path d="M 10 42 A 40 40 0 0 1 90 42" fill="none" stroke="#0a0a0a" stroke-width="8" stroke-linecap="round"/>`
+            + `<path d="M 10 42 A 40 40 0 0 1 90 42" fill="none" stroke="#3a3a3a" stroke-width="3" stroke-linecap="round"/>`
+            // crown cushion — soft pad nesting between the arc apex and head
+            + `<ellipse cx="50" cy="6.5" rx="14" ry="2.5" fill="#111" stroke="#000" stroke-width="1.2"/>`
+            + `<ellipse cx="50" cy="5.8" rx="11" ry="1.4" fill="#555" opacity="0.7"/>`
+            // left earcup — bigger, over-ear sized
+            + `<ellipse cx="11" cy="55" rx="11" ry="14" fill="#111" stroke="#000" stroke-width="2"/>`
+            + `<ellipse cx="11" cy="55" rx="6.5" ry="9.5" fill="#444"/>`
+            + `<ellipse cx="9" cy="50" rx="1.8" ry="2.8" fill="#aaa" opacity="0.7"/>`
             // right earcup
-            + `<ellipse cx="90" cy="55" rx="9" ry="13" fill="#111" stroke="#000" stroke-width="2"/>`
-            + `<ellipse cx="90" cy="55" rx="5.5" ry="8.5" fill="#444"/>`
-            + `<ellipse cx="88.5" cy="51" rx="1.6" ry="2.4" fill="#aaa" opacity="0.7"/>`
-            // mic boom (right)
-            + `<line x1="86" y1="62" x2="78" y2="73" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>`
-            + `<circle cx="76" cy="74" r="2.5" fill="#3a3a3a" stroke="#000" stroke-width="1"/>`
+            + `<ellipse cx="89" cy="55" rx="11" ry="14" fill="#111" stroke="#000" stroke-width="2"/>`
+            + `<ellipse cx="89" cy="55" rx="6.5" ry="9.5" fill="#444"/>`
+            + `<ellipse cx="87" cy="50" rx="1.8" ry="2.8" fill="#aaa" opacity="0.7"/>`
+            // mic boom — beefier studio boom + cardioid capsule on the right
+            + `<line x1="83" y1="65" x2="73" y2="78" stroke="#0a0a0a" stroke-width="3" stroke-linecap="round"/>`
+            + `<line x1="83" y1="65" x2="73.5" y2="77.5" stroke="#3a3a3a" stroke-width="1.2" stroke-linecap="round"/>`
+            + `<ellipse cx="71" cy="79" rx="3.6" ry="3" fill="#3a3a3a" stroke="#000" stroke-width="1.2"/>`
+            + `<ellipse cx="71" cy="78.5" rx="2.2" ry="1.6" fill="#666"/>`
             // tiny "live" LED on the left earcup
-            + `<circle cx="11" cy="60" r="1.4" fill="#2dd4bf"/>`
+            + `<circle cx="13" cy="62" r="1.6" fill="#2dd4bf"/>`
             + `</svg>`;
     }
 
@@ -943,11 +1007,17 @@
     function renderTray() {
         const tray = document.getElementById('tray');
         tray.innerHTML = '';
-        ORDER.forEach(id => {
+        const order = isMadballzMode ? MADBALLZ_ORDER : STANDARD_ORDER;
+        order.forEach(id => {
             const ch = CHARACTERS[id];
             const el = document.createElement('div');
             el.className = 'tray-chip';
             el.dataset.char = id;
+            // Tooltip carries the full name even when the chip label is
+            // truncated by the small chip width on mobile.
+            el.title = ch.label;
+            // Mark the antagonists so the chip can pulse / glow distinctly.
+            if (HORROR_TRIGGER_MODS.has(id)) el.classList.add('chip-bad');
             el.innerHTML = `
                 <div class="chip-icon">${characterArt(id)}</div>
                 <div class="chip-label">${ch.label}</div>
@@ -964,15 +1034,19 @@
             const ch = CHARACTERS[id];
             slot.classList.add('active');
             slot.classList.remove('empty');
+            slot.classList.toggle('slot-bad', HORROR_TRIGGER_MODS.has(id));
             slot.dataset.char = id;
+            slot.title = ch.label;
             slot.innerHTML = `
                 <div class="slot-icon">${characterArt(id)}</div>
                 <div class="slot-label">${ch.label}</div>
             `;
         } else {
             slot.classList.remove('active');
+            slot.classList.remove('slot-bad');
             slot.classList.add('empty');
             delete slot.dataset.char;
+            slot.removeAttribute('title');
             slot.innerHTML = `
                 <div class="slot-icon slot-empty"><span class="empty-plus">+</span></div>
                 <div class="slot-label">EMPTY</div>
@@ -988,12 +1062,16 @@
         const wasHorror = HORROR_TRIGGER_MODS.has(slots[index]);
         slots[index] = charId;
         renderSlot(index);
-        // Lore: BLACK and ICE Munkis carry a curse — placing one onto a slot
-        // tears the level into horror mode for a moment. We fire the scare
-        // only on transition into a trigger, so swapping between two trigger
-        // mods doesn't double-fire.
+        // Lore: ICE MUNKI and MOON MUNKI are the antagonists — placing one
+        // onto a slot tears the level into horror mode for a moment. Only
+        // fire on transition into a trigger so swapping between two trigger
+        // mods doesn't double-fire. Each transition also nudges the kid
+        // toward unlocking the Madballz screen.
         if (charId && HORROR_TRIGGER_MODS.has(charId) && !wasHorror) {
             triggerJumpScare();
+            horrorTriggers++;
+            saveProgress();
+            maybeUnlockMadballz();
         }
     }
 
@@ -1169,17 +1247,149 @@
         k.start(t); k.stop(t + 0.65);
     }
 
+    // ---------- STORY PROGRESSION & MADBALLZ MODE ----------
+    // Persistence: { horrorTriggers, madballzUnlocked } in localStorage so the
+    // kid keeps their unlock between visits. We swallow storage errors (private
+    // mode, quota) so a flaky client never breaks the game.
+    function loadProgress() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return;
+            const obj = JSON.parse(raw);
+            horrorTriggers = (obj.horrorTriggers | 0);
+            madballzUnlocked = !!obj.madballzUnlocked;
+        } catch (e) { /* ignore — start fresh */ }
+    }
+
+    function saveProgress() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                horrorTriggers,
+                madballzUnlocked
+            }));
+        } catch (e) { /* ignore */ }
+    }
+
+    // Called every time horrorTriggers ticks up. The first time we cross the
+    // threshold we flip the unlocked flag, persist it, and reveal the
+    // "MEET THE MADBALLZ" button so the kid spots the new path.
+    function maybeUnlockMadballz() {
+        if (madballzUnlocked) {
+            revealMadballzButton(false);
+            return;
+        }
+        if (horrorTriggers >= MADBALLZ_UNLOCK_THRESHOLD) {
+            madballzUnlocked = true;
+            saveProgress();
+            revealMadballzButton(true);
+        }
+    }
+
+    function revealMadballzButton(animate) {
+        const btn = document.getElementById('madballzBtn');
+        if (!btn) return;
+        btn.hidden = false;
+        if (animate) {
+            // Re-trigger the reveal animation on each fresh unlock so the kid
+            // sees a clear "NEW THING" beat instead of the button just popping
+            // in silently.
+            btn.classList.remove('reveal');
+            void btn.offsetWidth;
+            btn.classList.add('reveal');
+        }
+    }
+
+    // Switch to the Madballz screen — the antagonists Ice Munki + Moon Munki
+    // travel here too because (per lore) they are friends with the Madballz.
+    // Stage is cleared on entry so the kid starts the new screen with a blank
+    // canvas, and the tray + hint + body class swap to the darker palette.
+    function enterMadballzMode() {
+        ensureAudio();
+        isMadballzMode = true;
+        document.body.classList.add('madballz-mode');
+        const meet = document.getElementById('madballzBtn');
+        const back = document.getElementById('backBtn');
+        if (meet) meet.hidden = true;
+        if (back) back.hidden = false;
+        for (let i = 0; i < NUM_SLOTS; i++) slots[i] = null;
+        renderAllSlots();
+        renderTray();
+        attachTrayHandlers();
+        updateTrayHint();
+    }
+
+    function exitMadballzMode() {
+        isMadballzMode = false;
+        document.body.classList.remove('madballz-mode');
+        const meet = document.getElementById('madballzBtn');
+        const back = document.getElementById('backBtn');
+        if (meet) meet.hidden = !madballzUnlocked;
+        if (back) back.hidden = true;
+        for (let i = 0; i < NUM_SLOTS; i++) slots[i] = null;
+        renderAllSlots();
+        renderTray();
+        attachTrayHandlers();
+        updateTrayHint();
+    }
+
+    function updateTrayHint() {
+        const hint = document.getElementById('trayHint');
+        if (!hint) return;
+        hint.textContent = isMadballzMode
+            ? 'MADBALLZ MODE · 6 Madballz + Ice Munki + Moon Munki · they are friends'
+            : 'Drag a friend onto a slot · 14 friends + 2 bad munkis · ICE or MOON = horror';
+    }
+
+    function openStoryModal() {
+        const modal = document.getElementById('storyModal');
+        if (!modal) return;
+        modal.setAttribute('aria-hidden', 'false');
+        modal.classList.add('open');
+    }
+
+    function closeStoryModal() {
+        const modal = document.getElementById('storyModal');
+        if (!modal) return;
+        modal.setAttribute('aria-hidden', 'true');
+        modal.classList.remove('open');
+    }
+
     // ---------- HEADER BUTTONS ----------
     function attachHeaderHandlers() {
         document.getElementById('remixBtn').addEventListener('click', () => {
             ensureAudio();
-            // Route through setSlot so a remix that lands on BLACK or ICE
+            // Route through setSlot so a remix that lands on Ice or Moon
             // fires the horror jumpscare just like a manual drop would.
+            // Picks from the order matching the screen the kid is on.
+            const order = isMadballzMode ? MADBALLZ_ORDER : STANDARD_ORDER;
             for (let i = 0; i < NUM_SLOTS; i++) {
-                setSlot(i, ORDER[Math.floor(Math.random() * ORDER.length)]);
+                setSlot(i, order[Math.floor(Math.random() * order.length)]);
             }
             playDropSound();
         });
+
+        const storyBtn = document.getElementById('storyBtn');
+        if (storyBtn) storyBtn.addEventListener('click', openStoryModal);
+
+        const storyClose = document.getElementById('storyCloseBtn');
+        if (storyClose) storyClose.addEventListener('click', closeStoryModal);
+
+        const storyModal = document.getElementById('storyModal');
+        if (storyModal) {
+            // Click on the dim backdrop (not the card) closes the modal.
+            storyModal.addEventListener('click', e => {
+                if (e.target === storyModal) closeStoryModal();
+            });
+        }
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeStoryModal();
+        });
+
+        const madballzBtn = document.getElementById('madballzBtn');
+        if (madballzBtn) madballzBtn.addEventListener('click', enterMadballzMode);
+
+        const backBtn = document.getElementById('backBtn');
+        if (backBtn) backBtn.addEventListener('click', exitMadballzMode);
 
         const clearBtn = document.getElementById('clearBtn');
         if (clearBtn) {
@@ -1223,12 +1433,17 @@
 
     // ---------- INIT ----------
     function init() {
+        loadProgress();
         buildStage();
         renderTray();
         renderAllSlots();
         attachTrayHandlers();
         attachSlotHandlers();
         attachHeaderHandlers();
+        updateTrayHint();
+        // If the kid already unlocked Madballz on a previous visit, surface
+        // the button immediately (without the "new" reveal flourish).
+        if (madballzUnlocked) revealMadballzButton(false);
     }
 
     if (document.readyState === 'loading') {
