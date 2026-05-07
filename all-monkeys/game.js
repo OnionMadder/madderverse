@@ -24,8 +24,16 @@
             const Ctx = window.AudioContext || window.webkitAudioContext;
             audioCtx = new Ctx();
             masterGain = audioCtx.createGain();
-            masterGain.gain.value = isMuted ? 0 : 0.5;
-            masterGain.connect(audioCtx.destination);
+            masterGain.gain.value = isMuted ? 0 : 0.55;
+            // Bus compressor — glues 8 simultaneous voices together and stops
+            // peaks from clipping when the full 8-slot mix is running.
+            const comp = audioCtx.createDynamicsCompressor();
+            comp.threshold.value = -10;
+            comp.knee.value = 8;
+            comp.ratio.value = 6;
+            comp.attack.value = 0.004;
+            comp.release.value = 0.15;
+            masterGain.connect(comp).connect(audioCtx.destination);
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
         if (!isPlaying) {
@@ -111,25 +119,27 @@
             label: 'MUNKI',
             bodyColor: '#558b2f', bodyHi: '#7cb342', bodyShade: '#2a4a14',
             headFrame: 'green (1)',
+            // Filtered saw lead — C major hook on the quarter notes.
+            // C5 E5 G5 E5 (steps 0, 4, 8, 12). Stacks tunefully with FLUTE,
+            // STAR and ICE, all of which stay in C major.
             play(ctx, out, when, step) {
-                if (step !== 0 && step !== 8) return;
+                const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
+                const freq = hook[step];
+                if (!freq) return;
                 const osc = ctx.createOscillator();
                 const g = ctx.createGain();
                 const f = ctx.createBiquadFilter();
                 f.type = 'lowpass';
-                f.frequency.setValueAtTime(700, when);
-                f.frequency.linearRampToValueAtTime(1300, when + 0.1);
-                f.frequency.linearRampToValueAtTime(500, when + 0.35);
+                f.frequency.setValueAtTime(2200, when);
+                f.frequency.exponentialRampToValueAtTime(900, when + 0.3);
+                f.Q.value = 4;
                 osc.type = 'sawtooth';
-                const base = step === 0 ? 392 : 440; // G4, A4
-                osc.frequency.setValueAtTime(base, when);
-                osc.frequency.exponentialRampToValueAtTime(base * 1.25, when + 0.05);
-                osc.frequency.exponentialRampToValueAtTime(base * 0.92, when + 0.35);
+                osc.frequency.value = freq;
                 g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.26, when + 0.03);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.42);
+                g.gain.linearRampToValueAtTime(0.16, when + 0.015);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
                 osc.connect(f).connect(g).connect(out);
-                osc.start(when); osc.stop(when + 0.45);
+                osc.start(when); osc.stop(when + 0.35);
             }
         },
 
@@ -137,25 +147,19 @@
             label: 'NUGGET',
             bodyColor: '#7cb342', bodyHi: '#aed581', bodyShade: '#33691e',
             headFrame: 'green (2)',
+            // Closed hi-hat — short, tight noise burst on the offbeat 8ths
+            // (steps 2, 6, 10, 14). Pairs with TRUCK kick + DRUM snare for
+            // a full standard kit feel.
             play(ctx, out, when, step) {
-                if (![3, 7, 11, 15].includes(step)) return;
-                const osc = ctx.createOscillator();
-                const og = ctx.createGain();
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(360, when);
-                osc.frequency.exponentialRampToValueAtTime(180, when + 0.07);
-                og.gain.setValueAtTime(0.16, when);
-                og.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
-                osc.connect(og).connect(out);
-                osc.start(when); osc.stop(when + 0.08);
-                const n = noiseSource(ctx, 0.05);
-                const nf = ctx.createBiquadFilter();
-                nf.type = 'highpass';
-                nf.frequency.value = 2200;
-                const ng = ctx.createGain();
-                ng.gain.setValueAtTime(0.16, when);
-                ng.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
-                n.connect(nf).connect(ng).connect(out);
+                if (![2, 6, 10, 14].includes(step)) return;
+                const n = noiseSource(ctx, 0.04);
+                const f = ctx.createBiquadFilter();
+                f.type = 'highpass';
+                f.frequency.value = 7000;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.13, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.035);
+                n.connect(f).connect(g).connect(out);
                 n.start(when); n.stop(when + 0.05);
             }
         },
@@ -164,31 +168,22 @@
             label: 'CHOO CHOO',
             bodyColor: '#6a1b9a', bodyHi: '#ab47bc', bodyShade: '#38006b',
             headFrame: 'purple (1)',
+            // Shaker — chuffs on every 8th note. Quarter-note hits are a
+            // touch louder than the off-beats so the groove still feels like
+            // a steam rhythm rather than a flat tick.
             play(ctx, out, when, step) {
-                if (step % 2 === 0) {
-                    const n = noiseSource(ctx, 0.12);
-                    const f = ctx.createBiquadFilter();
-                    f.type = 'bandpass';
-                    f.frequency.value = step % 4 === 0 ? 650 : 420;
-                    f.Q.value = 4;
-                    const g = ctx.createGain();
-                    g.gain.setValueAtTime(0.2, when);
-                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
-                    n.connect(f).connect(g).connect(out);
-                    n.start(when); n.stop(when + 0.12);
-                }
-                if (step === 0) {
-                    const w = ctx.createOscillator();
-                    const wg = ctx.createGain();
-                    w.type = 'triangle';
-                    w.frequency.setValueAtTime(880, when);
-                    w.frequency.linearRampToValueAtTime(1100, when + 0.3);
-                    wg.gain.setValueAtTime(0, when);
-                    wg.gain.linearRampToValueAtTime(0.07, when + 0.05);
-                    wg.gain.linearRampToValueAtTime(0, when + 0.45);
-                    w.connect(wg).connect(out);
-                    w.start(when); w.stop(when + 0.5);
-                }
+                if (step % 2 !== 0) return;
+                const n = noiseSource(ctx, 0.05);
+                const f = ctx.createBiquadFilter();
+                f.type = 'bandpass';
+                f.frequency.value = 6000;
+                f.Q.value = 1.5;
+                const g = ctx.createGain();
+                const accent = step % 4 === 0 ? 0.10 : 0.06;
+                g.gain.setValueAtTime(accent, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
+                n.connect(f).connect(g).connect(out);
+                n.start(when); n.stop(when + 0.06);
             }
         },
 
@@ -196,34 +191,28 @@
             label: 'TRUCK',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
             headFrame: 'blue (1)',
+            // Kick drum — four on the floor. Sine sweep from 150Hz → 45Hz
+            // gives weight without muddying the bass voices (MOON/TROLL/BANANA).
             play(ctx, out, when, step) {
-                if (step % 4 === 0) {
-                    const k = ctx.createOscillator();
-                    const kg = ctx.createGain();
-                    k.type = 'sine';
-                    k.frequency.setValueAtTime(140, when);
-                    k.frequency.exponentialRampToValueAtTime(38, when + 0.18);
-                    kg.gain.setValueAtTime(0.5, when);
-                    kg.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
-                    k.connect(kg).connect(out);
-                    k.start(when); k.stop(when + 0.24);
-                }
-                if (step === 0 || step === 8) {
-                    const saw = ctx.createOscillator();
-                    const sg = ctx.createGain();
-                    const sf = ctx.createBiquadFilter();
-                    sf.type = 'lowpass';
-                    sf.frequency.setValueAtTime(220, when);
-                    sf.frequency.linearRampToValueAtTime(900, when + 0.25);
-                    saw.type = 'sawtooth';
-                    saw.frequency.setValueAtTime(60, when);
-                    saw.frequency.linearRampToValueAtTime(120, when + 0.25);
-                    sg.gain.setValueAtTime(0, when);
-                    sg.gain.linearRampToValueAtTime(0.16, when + 0.05);
-                    sg.gain.exponentialRampToValueAtTime(0.001, when + 0.35);
-                    saw.connect(sf).connect(sg).connect(out);
-                    saw.start(when); saw.stop(when + 0.36);
-                }
+                if (step % 4 !== 0) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'sine';
+                o.frequency.setValueAtTime(150, when);
+                o.frequency.exponentialRampToValueAtTime(45, when + 0.12);
+                g.gain.setValueAtTime(0.55, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.2);
+                // Click transient gives the kick a definable attack
+                const click = ctx.createOscillator();
+                const cg = ctx.createGain();
+                click.type = 'triangle';
+                click.frequency.value = 1800;
+                cg.gain.setValueAtTime(0.12, when);
+                cg.gain.exponentialRampToValueAtTime(0.001, when + 0.012);
+                click.connect(cg).connect(out);
+                click.start(when); click.stop(when + 0.015);
             }
         },
 
@@ -231,20 +220,22 @@
             label: 'COCOA',
             bodyColor: '#ffa500', bodyHi: '#ffd089', bodyShade: '#a06000',
             headFrame: 'orange (1)',
+            // Bird-style arpeggio in C major — C-E-G-C climb on the "and"
+            // of beats 2 and 4, fills the space between the lead phrases.
             play(ctx, out, when, step) {
-                if (![1, 5, 9, 13].includes(step)) return;
-                const notes = [880, 1108, 1318]; // A5, C#6, E6
+                if (step !== 5 && step !== 13) return;
+                const notes = [659.25, 783.99, 987.77, 1318.51]; // E5 G5 B5 E6
                 notes.forEach((freq, i) => {
-                    const osc = ctx.createOscillator();
+                    const o = ctx.createOscillator();
                     const g = ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.value = freq;
-                    const t = when + i * 0.045;
+                    o.type = 'triangle';
+                    o.frequency.value = freq;
+                    const t = when + i * 0.04;
                     g.gain.setValueAtTime(0, t);
-                    g.gain.linearRampToValueAtTime(0.14, t + 0.01);
-                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-                    osc.connect(g).connect(out);
-                    osc.start(t); osc.stop(t + 0.06);
+                    g.gain.linearRampToValueAtTime(0.11, t + 0.008);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+                    o.connect(g).connect(out);
+                    o.start(t); o.stop(t + 0.07);
                 });
             }
         },
@@ -253,39 +244,32 @@
             label: 'TAMIL',
             bodyColor: '#33691e', bodyHi: '#558b2f', bodyShade: '#1b4408',
             headFrame: 'green (3)',
+            // Tabla — "thom" (low) on syncopated beats, "tha" (high) on the
+            // ands. Pitched into the C major root so it complements the bass
+            // voices instead of clashing with them.
             play(ctx, out, when, step) {
-                const lowSteps = [0, 6, 11];
-                const highSteps = [3, 8, 14];
+                const lowSteps = [0, 6, 10];
+                const highSteps = [3, 8, 13];
                 if (lowSteps.includes(step)) {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
                     o.type = 'sine';
-                    o.frequency.setValueAtTime(115, when);
-                    o.frequency.exponentialRampToValueAtTime(70, when + 0.2);
-                    g.gain.setValueAtTime(0.4, when);
-                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.26);
+                    o.frequency.setValueAtTime(110, when); // ~A2 — neutral
+                    o.frequency.exponentialRampToValueAtTime(75, when + 0.15);
+                    g.gain.setValueAtTime(0.32, when);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
                     o.connect(g).connect(out);
-                    o.start(when); o.stop(when + 0.28);
+                    o.start(when); o.stop(when + 0.24);
                 }
                 if (highSteps.includes(step)) {
-                    const n = noiseSource(ctx, 0.06);
-                    const f = ctx.createBiquadFilter();
-                    f.type = 'bandpass';
-                    f.frequency.value = 1500;
-                    f.Q.value = 6;
-                    const g = ctx.createGain();
-                    g.gain.setValueAtTime(0.26, when);
-                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
-                    n.connect(f).connect(g).connect(out);
-                    n.start(when); n.stop(when + 0.07);
                     const o = ctx.createOscillator();
-                    const og = ctx.createGain();
+                    const g = ctx.createGain();
                     o.type = 'triangle';
-                    o.frequency.setValueAtTime(660, when);
-                    o.frequency.exponentialRampToValueAtTime(440, when + 0.08);
-                    og.gain.setValueAtTime(0.11, when);
-                    og.gain.exponentialRampToValueAtTime(0.001, when + 0.1);
-                    o.connect(og).connect(out);
+                    o.frequency.setValueAtTime(880, when); // A5
+                    o.frequency.exponentialRampToValueAtTime(523.25, when + 0.06);
+                    g.gain.setValueAtTime(0.13, when);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
+                    o.connect(g).connect(out);
                     o.start(when); o.stop(when + 0.1);
                 }
             }
@@ -295,26 +279,28 @@
             label: 'TROLL',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green (4)',
+            // Detuned saw bass stab on beat 1 and beat 3 — moves between C2
+            // and G2 to give the loop a I → V root motion under the leads.
             play(ctx, out, when, step) {
-                if (![2, 7, 13].includes(step)) return;
-                const pent = [261.63, 293.66, 329.63, 392.00, 440];
-                const freq = pent[Math.floor(Math.random() * pent.length)];
-                const osc = ctx.createOscillator();
+                if (step !== 0 && step !== 8) return;
+                const root = step === 0 ? 65.41 : 98.00; // C2, G2
+                const o1 = ctx.createOscillator();
+                const o2 = ctx.createOscillator();
+                const f = ctx.createBiquadFilter();
                 const g = ctx.createGain();
-                const dist = ctx.createWaveShaper();
-                dist.curve = distortionCurve(60);
-                osc.type = 'sawtooth';
-                osc.frequency.value = freq;
-                const lfo = ctx.createOscillator();
-                const lfoG = ctx.createGain();
-                lfo.frequency.value = 32;
-                lfoG.gain.value = 0.45;
-                lfo.connect(lfoG).connect(g.gain);
-                g.gain.setValueAtTime(0.16, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.16);
-                osc.connect(dist).connect(g).connect(out);
-                osc.start(when); osc.stop(when + 0.18);
-                lfo.start(when); lfo.stop(when + 0.18);
+                f.type = 'lowpass';
+                f.frequency.setValueAtTime(800, when);
+                f.frequency.exponentialRampToValueAtTime(300, when + 0.35);
+                f.Q.value = 5;
+                o1.type = 'sawtooth'; o1.frequency.value = root;
+                o2.type = 'sawtooth'; o2.frequency.value = root * 1.005; // detune
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.18, when + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
+                o1.connect(f); o2.connect(f);
+                f.connect(g).connect(out);
+                o1.start(when); o1.stop(when + 0.45);
+                o2.start(when); o2.stop(when + 0.45);
             }
         },
 
@@ -322,21 +308,22 @@
             label: 'BANANA',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             headFrame: 'orange (2)',
+            // Bouncy sine bassline — C3 E3 G3 E3 walking through C major.
+            // Sits in the middle bass register so it stays out of MOON's
+            // sub-bass and TROLL's mid-bass lanes.
             play(ctx, out, when, step) {
-                if (step !== 2 && step !== 10) return;
+                const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
+                const f = seq[step];
+                if (!f) return;
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
-                const f = ctx.createBiquadFilter();
-                f.type = 'lowpass';
-                f.frequency.setValueAtTime(900, when);
                 o.type = 'sine';
-                const root = step === 2 ? 196 : 220; // G3, A3
-                o.frequency.setValueAtTime(root * 1.5, when);
-                o.frequency.exponentialRampToValueAtTime(root, when + 0.18);
-                g.gain.setValueAtTime(0.3, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
-                o.connect(f).connect(g).connect(out);
-                o.start(when); o.stop(when + 0.24);
+                o.frequency.value = f;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.20, when + 0.012);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.16);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.18);
             }
         },
 
@@ -344,18 +331,19 @@
             label: 'COCONUT',
             bodyColor: '#1b5e20', bodyHi: '#388e3c', bodyShade: '#0d3a12',
             headFrame: 'green (5)',
+            // Open hi-hat — long, splashy noise on the backbeat (steps 4, 12).
+            // Mixes well with NUGGET's closed hat for a varied groove.
             play(ctx, out, when, step) {
-                if (![2, 6, 10, 14].includes(step)) return;
-                const o = ctx.createOscillator();
+                if (step !== 4 && step !== 12) return;
+                const n = noiseSource(ctx, 0.18);
+                const f = ctx.createBiquadFilter();
+                f.type = 'highpass';
+                f.frequency.value = 6500;
                 const g = ctx.createGain();
-                o.type = 'square';
-                const pitch = step % 4 === 2 ? 750 : 600;
-                o.frequency.setValueAtTime(pitch, when);
-                o.frequency.exponentialRampToValueAtTime(pitch * 0.6, when + 0.04);
-                g.gain.setValueAtTime(0.2, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.06);
+                g.gain.setValueAtTime(0.10, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+                n.connect(f).connect(g).connect(out);
+                n.start(when); n.stop(when + 0.2);
             }
         },
 
@@ -363,24 +351,26 @@
             label: 'DRUM',
             bodyColor: '#7b1fa2', bodyHi: '#ba68c8', bodyShade: '#4a0072',
             headFrame: 'purple (2)',
+            // Snare drum on the backbeat (steps 4, 12). Bandpassed noise +
+            // pitched body — sits naturally with TRUCK kick and the hats.
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.13);
                 const f = ctx.createBiquadFilter();
                 f.type = 'bandpass';
-                f.frequency.value = 2400;
-                f.Q.value = 1;
+                f.frequency.value = 2200;
+                f.Q.value = 1.2;
                 const g = ctx.createGain();
-                g.gain.setValueAtTime(0.36, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.13);
+                g.gain.setValueAtTime(0.32, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
                 n.connect(f).connect(g).connect(out);
                 n.start(when); n.stop(when + 0.14);
                 const o = ctx.createOscillator();
                 o.type = 'triangle';
-                o.frequency.setValueAtTime(220, when);
-                o.frequency.exponentialRampToValueAtTime(140, when + 0.06);
+                o.frequency.setValueAtTime(210, when);
+                o.frequency.exponentialRampToValueAtTime(135, when + 0.06);
                 const og = ctx.createGain();
-                og.gain.setValueAtTime(0.16, when);
+                og.gain.setValueAtTime(0.14, when);
                 og.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
                 o.connect(og).connect(out);
                 o.start(when); o.stop(when + 0.08);
@@ -391,26 +381,28 @@
             label: 'FLUTE',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             headFrame: 'purple (3)',
+            // Flute line in C major — sits on the offbeats so it weaves
+            // between MUNKI's quarter-note hook. G5 A5 G5 E5.
             play(ctx, out, when, step) {
-                const melody = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 587.33 }; // C5 E5 G5 D5
-                const f = melody[step];
-                if (!f) return;
+                const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
+                const freq = melody[step];
+                if (!freq) return;
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 const lfo = ctx.createOscillator();
                 const lfoG = ctx.createGain();
-                lfo.frequency.value = 5.5;
-                lfoG.gain.value = 6;
+                lfo.frequency.value = 5;
+                lfoG.gain.value = 4;
                 lfo.connect(lfoG).connect(o.frequency);
                 o.type = 'triangle';
-                o.frequency.value = f;
+                o.frequency.value = freq;
                 g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.14, when + 0.04);
-                g.gain.linearRampToValueAtTime(0.12, when + 0.28);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.42);
+                g.gain.linearRampToValueAtTime(0.13, when + 0.04);
+                g.gain.linearRampToValueAtTime(0.11, when + 0.2);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
                 o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.45);
-                lfo.start(when); lfo.stop(when + 0.45);
+                o.start(when); o.stop(when + 0.35);
+                lfo.start(when); lfo.stop(when + 0.35);
             }
         },
 
@@ -418,19 +410,22 @@
             label: 'STAR',
             bodyColor: '#aa00ff', bodyHi: '#d291ff', bodyShade: '#5e0099',
             headFrame: 'purple (4)',
+            // Bell / glockenspiel arpeggio — C major triad in the high
+            // register. Plays once per bar on beat 1, long ringing tail.
             play(ctx, out, when, step) {
-                if (step !== 0 && step !== 6) return;
-                const freqs = [1318.51, 1760.00, 2637.02]; // E6 A6 E7
-                freqs.forEach((freq, i) => {
+                if (step !== 0) return;
+                const notes = [1046.5, 1318.51, 1567.98]; // C6 E6 G6
+                notes.forEach((freq, i) => {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
                     o.type = 'sine';
                     o.frequency.value = freq;
-                    const t = when + i * 0.07;
-                    g.gain.setValueAtTime(0.11, t);
-                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+                    const t = when + i * 0.06;
+                    g.gain.setValueAtTime(0, t);
+                    g.gain.linearRampToValueAtTime(0.10, t + 0.005);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
                     o.connect(g).connect(out);
-                    o.start(t); o.stop(t + 0.6);
+                    o.start(t); o.stop(t + 0.65);
                 });
             }
         },
@@ -439,20 +434,23 @@
             label: 'CLOUD',
             bodyColor: '#ce93d8', bodyHi: '#e1bee7', bodyShade: '#7b1fa2',
             headFrame: 'purple (5)',
+            // Pad — C major triad held across the whole bar (~2.4s) with a
+            // soft attack and slow release. Provides the harmonic bed
+            // everything else rides on top of.
             play(ctx, out, when, step) {
-                if (step !== 0 && step !== 8) return;
-                const chord = [196.00, 261.63, 329.63]; // G3 C4 E4
-                chord.forEach(freq => {
+                if (step !== 0) return;
+                const chord = [261.63, 329.63, 392.00]; // C4 E4 G4
+                chord.forEach((freq, i) => {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
-                    o.type = 'sine';
+                    o.type = 'triangle';
                     o.frequency.value = freq;
                     g.gain.setValueAtTime(0, when);
-                    g.gain.linearRampToValueAtTime(0.045, when + 0.18);
-                    g.gain.linearRampToValueAtTime(0.035, when + 0.6);
-                    g.gain.exponentialRampToValueAtTime(0.001, when + 1.05);
+                    g.gain.linearRampToValueAtTime(0.05 - i * 0.01, when + 0.4);
+                    g.gain.linearRampToValueAtTime(0.04 - i * 0.008, when + 1.6);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
                     o.connect(g).connect(out);
-                    o.start(when); o.stop(when + 1.1);
+                    o.start(when); o.stop(when + 2.45);
                 });
             }
         },
@@ -461,26 +459,30 @@
             label: 'MOON',
             bodyColor: '#1e3a5f', bodyHi: '#3d6090', bodyShade: '#0a1828',
             headFrame: 'blue (2)',
+            // Sub-bass drone — C2 sustained for the full bar with a tiny
+            // C3 octave on top for body. Pure foundation under the kit.
             play(ctx, out, when, step) {
-                if (step !== 2 && step !== 10) return;
+                if (step !== 0) return;
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 o.type = 'sine';
-                o.frequency.setValueAtTime(55, when);
+                o.frequency.value = 65.41; // C2
                 g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.4, when + 0.05);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.55);
+                g.gain.linearRampToValueAtTime(0.32, when + 0.06);
+                g.gain.linearRampToValueAtTime(0.26, when + 1.6);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
                 o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.6);
+                o.start(when); o.stop(when + 2.45);
+                // Octave for harmonic warmth
                 const o2 = ctx.createOscillator();
                 const g2 = ctx.createGain();
                 o2.type = 'sine';
-                o2.frequency.setValueAtTime(110, when);
+                o2.frequency.value = 130.81; // C3
                 g2.gain.setValueAtTime(0, when);
-                g2.gain.linearRampToValueAtTime(0.1, when + 0.05);
-                g2.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
+                g2.gain.linearRampToValueAtTime(0.06, when + 0.1);
+                g2.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
                 o2.connect(g2).connect(out);
-                o2.start(when); o2.stop(when + 0.55);
+                o2.start(when); o2.stop(when + 2.45);
             }
         },
 
@@ -488,17 +490,19 @@
             label: 'FIRE',
             bodyColor: '#ff6f00', bodyHi: '#ffab40', bodyShade: '#7c2900',
             headFrame: 'orange (3)',
+            // Tambourine-style 16th tick on every "and" — fills the gaps
+            // between the 8th-note shaker and gives the loop forward drive.
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
-                const n = noiseSource(ctx, 0.04);
+                const n = noiseSource(ctx, 0.025);
                 const f = ctx.createBiquadFilter();
                 f.type = 'highpass';
-                f.frequency.value = 3500;
+                f.frequency.value = 8500;
                 const g = ctx.createGain();
-                g.gain.setValueAtTime(0.11, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
+                g.gain.setValueAtTime(0.06, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.025);
                 n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.04);
+                n.start(when); n.stop(when + 0.03);
             }
         },
 
@@ -506,14 +510,18 @@
             label: 'ICE',
             bodyColor: '#4fc3f7', bodyHi: '#81d4fa', bodyShade: '#0277bd',
             headFrame: 'blue (3)',
+            // Twinkle — high C major scale steps on the 16th-note ands.
+            // Walks C6 D6 E6 G6 around the bar for a sparkly counter-line.
             play(ctx, out, when, step) {
-                if (![2, 5, 9, 13].includes(step)) return;
+                const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
+                const freq = seq[step];
+                if (!freq) return;
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
                 o.type = 'triangle';
-                o.frequency.value = 1976 + Math.floor(Math.random() * 4) * 88;
+                o.frequency.value = freq;
                 g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.06, when + 0.02);
+                g.gain.linearRampToValueAtTime(0.07, when + 0.015);
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
                 o.connect(g).connect(out);
                 o.start(when); o.stop(when + 0.2);
@@ -859,7 +867,7 @@
         const muteIcon = document.getElementById('muteIcon');
         muteBtn.addEventListener('click', () => {
             isMuted = !isMuted;
-            if (masterGain) masterGain.gain.value = isMuted ? 0 : 0.5;
+            if (masterGain) masterGain.gain.value = isMuted ? 0 : 0.55;
             muteBtn.classList.toggle('muted', isMuted);
             muteIcon.textContent = isMuted ? '🔇' : '🔊';
         });
