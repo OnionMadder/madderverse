@@ -498,7 +498,7 @@
     showModal({
       title: evt.title,
       body:  evt.resolvedMsg || evt.body,
-      img:   "assets/images/" + (evt.img || ""),
+      img:   "assets/events/" + (evt.img || ""),
       actions: [{ label: "Continue", run: hideModal }],
     });
   }
