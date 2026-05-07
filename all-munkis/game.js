@@ -693,22 +693,22 @@ const CHARACTERS = {
             sheetW: 1608,
             sheetH: 1604,
             frames: {
-                'blue (1)':   { x: 2,    y: 2,    w: 389, h: 388 },
-                'blue (2)':   { x: 400,  y: 2,    w: 400, h: 400 },
-                'blue (3)':   { x: 802,  y: 2,    w: 402, h: 401 },
-                'green (1)':  { x: 1206, y: 2,    w: 392, h: 392 },
-                'green (2)':  { x: 2,    y: 405,  w: 396, h: 396 },
-                'green (3)':  { x: 400,  y: 405,  w: 396, h: 396 },
-                'green (4)':  { x: 802,  y: 405,  w: 401, h: 400 },
-                'green (5)':  { x: 1206, y: 405,  w: 399, h: 399 },
-                'orange (1)': { x: 2,    y: 807,  w: 392, h: 392 },
-                'orange (2)': { x: 400,  y: 807,  w: 399, h: 399 },
-                'orange (3)': { x: 802,  y: 807,  w: 393, h: 393 },
-                'purple (1)': { x: 1206, y: 807,  w: 400, h: 399 },
-                'purple (2)': { x: 2,    y: 1208, w: 394, h: 394 },
-                'purple (3)': { x: 400,  y: 1208, w: 389, h: 389 },
-                'purple (4)': { x: 802,  y: 1208, w: 394, h: 394 },
-                'purple (5)': { x: 1206, y: 1208, w: 389, h: 389 }
+                'high':   { x: 2,    y: 2,    w: 389, h: 388 },
+                'hiss':   { x: 400,  y: 2,    w: 400, h: 400 },
+                'ice':   { x: 802,  y: 2,    w: 402, h: 401 },
+                'mega':  { x: 1206, y: 2,    w: 392, h: 392 },
+                'moon':  { x: 2,    y: 405,  w: 396, h: 396 },
+                'shadow':  { x: 400,  y: 405,  w: 396, h: 396 },
+                'sine':  { x: 802,  y: 405,  w: 401, h: 400 },
+                'snare':  { x: 1206, y: 405,  w: 399, h: 399 },
+                'spark': { x: 2,    y: 807,  w: 392, h: 392 },
+                'srivi': { x: 400,  y: 807,  w: 399, h: 399 },
+                'star': { x: 802,  y: 807,  w: 393, h: 393 },
+                'amber': { x: 1206, y: 807,  w: 400, h: 399 },
+                'flute': { x: 2,    y: 1208, w: 394, h: 394 },
+                'fog': { x: 400,  y: 1208, w: 389, h: 389 },
+                'green': { x: 802,  y: 1208, w: 394, h: 394 },
+                'grumble': { x: 1206, y: 1208, w: 389, h: 389 }
             }
         },
         madballs: {
@@ -717,12 +717,14 @@ const CHARACTERS = {
             sheetH: 2160,
             frames: {
                 // names map to the visual identity of each frame
-                'mb-alien':  { x: 1,    y: 1,    w: 1080, h: 1068 }, // head-three
-                'mb-cry':    { x: 1082, y: 1,    w: 1080, h: 1107 }, // head-five
-                'mb-shroom': { x: 2163, y: 1,    w: 1080, h: 1074 }, // head-four
-                'mb-brain':  { x: 1,    y: 1109, w: 1080, h: 1042 }, // head-one
-                'mb-wires':  { x: 1082, y: 1109, w: 1080, h: 1022 }, // head-six
-                'mb-rocky':  { x: 2163, y: 1109, w: 1080, h: 1050 }  // head-two
+                'mb-skull':  { x: 1,    y: 1,    w: 1080, h: 1068 }, // head-three
+                'mb-sad':    { x: 1082, y: 1,    w: 1080, h: 1107 }, // head-five
+                'mb-zombie': { x: 2163, y: 1,    w: 1080, h: 1074 }, // head-four
+                'mb-snooze':  { x: 1,    y: 1109, w: 1080, h: 1042 }, // head-one
+                'mb-scared':  { x: 1082, y: 1109, w: 1080, h: 1022 }, // head-six
+                'mb-cool':  { x: 2163, y: 1109, w: 1080, h: 1050 },  // head-two
+                'mb-grump':  { x: 1082, y: 1109, w: 1080, h: 1022 },
+                'mb-eye':  { x: 1082, y: 1109, w: 1080, h: 1022 }
             }
         }
     };

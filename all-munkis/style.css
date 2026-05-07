@@ -1,4 +1,4 @@
-@import url('JetBrainsMono-VariableFont_wght.ttf');
+@import url('assets/JetBrainsMono-VariableFont_wght.ttf');
 
 * { box-sizing: border-box; }
 
@@ -487,8 +487,6 @@ main {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     pointer-events: none;
-    /* Two-line wrap with clamp — keeps the chip height predictable when a
-       name like "Reginald Cotswattle" is too wide to fit on one line. */
     text-align: center;
     line-height: 1.05;
     word-break: break-word;
@@ -569,15 +567,6 @@ main {
     main { padding-bottom: 200px; }
 }
 
-/* ====== JUMP SCARE ======
-   When body.jumpscare is set, four things happen at once:
-     1. A red radial vignette flashes across the viewport (::after on body).
-     2. The stage section shakes hard.
-     3. Active Munki characters glitch — color shift + jitter.
-     4. A giant "BOO!" overlay punches in then fades.
-   Everything is keyframe-driven so it cleanly resets when the class is
-   removed after 1.5s. The fixed tray and header are intentionally NOT
-   shaken so the kid still has something stable to look at. */
 .boo-overlay {
     position: fixed;
     inset: 0;
