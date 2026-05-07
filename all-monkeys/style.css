@@ -279,64 +279,11 @@ main {
     z-index: 2;
 }
 
-.char-body svg {
+.char-body svg, .char-head svg {
     width: 100%;
     height: 100%;
     display: block;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
-}
-
-/* The head is layered: colored circle (shape) → face or mod sprite →
-   headphones overlay. All three siblings share the same 100×100 footprint so
-   the headphones never shift when a custom head replaces the generic face. */
-.char-head .head-shape,
-.char-head .head-face,
-.char-head .head-phones {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    display: block;
-    pointer-events: none;
-}
-
-.char-head .head-shape {
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
-    z-index: 1;
-}
-
-/* Generic face sits inside the head-shape circle. It uses the same viewBox so
-   no inset is needed — the eyes/mouth land naturally inside the colored disc. */
-.char-head .head-face {
-    z-index: 2;
-}
-
-/* Custom mod head image. Inset to match head-shape's r=44 (visible diameter
-   ~88% of the box) so the sprite fills exactly the colored circle and the
-   headphones (on top, undisplaced) stay aligned. */
-.char-head .head-mod {
-    position: absolute;
-    inset: 6%;
-    border-radius: 50%;
-    overflow: hidden;
-    z-index: 2;
-    pointer-events: none;
-    /* Subtle ring matches the head-shape stroke for clean edge */
-    box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.35);
-}
-
-.char-head .head-mod img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    -webkit-user-drag: none;
-    user-select: none;
-}
-
-.char-head .head-phones {
-    z-index: 3;
-    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
 
 @keyframes char-body-bounce {
