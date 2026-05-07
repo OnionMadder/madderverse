@@ -976,9 +976,68 @@
             + `</svg>`;
     }
 
+    // ---------- HAIR ----------
+    // Procedural hair: 5 silhouette styles, 5 colors. About half the Munkis
+    // get a random combo at load time (see assignRandomHair below) and keep
+    // it for the session — same id always renders the same hair.
+    //
+    // Hair sits BETWEEN the head sprite and the headphones in the z-stack:
+    //   shape (z 1) → mod/face (z 2) → hair (z 2.5) → phones (z 3)
+    // This means tufts and spikes peek above the face but are partly covered
+    // by the chunky band/earcups, which reads naturally for over-ear cans.
+    const HAIR_STYLES = ['spikes', 'mohawk', 'tuft', 'antennae', 'sidepuffs'];
+    const HAIR_COLORS = ['#1a1a1a', '#6b3410', '#fbbf24', '#e91e63', '#f5f5f5'];
+
+    function hairSvg(style, color, dark) {
+        const stroke = `stroke="${dark}" stroke-width="2" stroke-linejoin="round"`;
+        switch (style) {
+            case 'spikes':
+                return `<path d="M 22 16 L 28 -2 L 34 16 Z" fill="${color}" ${stroke}/>`
+                     + `<path d="M 38 14 L 46 -6 L 52 14 Z" fill="${color}" ${stroke}/>`
+                     + `<path d="M 56 14 L 64 -4 L 72 14 Z" fill="${color}" ${stroke}/>`;
+            case 'mohawk':
+                return `<path d="M 38 14 Q 40 -12 50 -10 Q 60 -12 62 14 Z" fill="${color}" ${stroke}/>`
+                     + `<line x1="50" y1="-8" x2="50" y2="14" stroke="${dark}" stroke-width="1" opacity="0.6"/>`;
+            case 'tuft':
+                return `<path d="M 38 16 Q 36 0 44 0 Q 50 -6 56 0 Q 64 0 62 16 Z" fill="${color}" ${stroke}/>`
+                     + `<circle cx="44" cy="6" r="3" fill="${color}"/>`
+                     + `<circle cx="56" cy="4" r="2.5" fill="${color}"/>`;
+            case 'antennae':
+                return `<line x1="40" y1="14" x2="30" y2="-8" stroke="${dark}" stroke-width="2.5" stroke-linecap="round"/>`
+                     + `<circle cx="30" cy="-8" r="3.5" fill="${color}" stroke="${dark}" stroke-width="1.5"/>`
+                     + `<line x1="60" y1="14" x2="70" y2="-6" stroke="${dark}" stroke-width="2.5" stroke-linecap="round"/>`
+                     + `<circle cx="70" cy="-6" r="3.5" fill="${color}" stroke="${dark}" stroke-width="1.5"/>`;
+            case 'sidepuffs':
+                return `<ellipse cx="8" cy="44" rx="7" ry="11" fill="${color}" ${stroke}/>`
+                     + `<ellipse cx="92" cy="44" rx="7" ry="11" fill="${color}" ${stroke}/>`;
+            default:
+                return '';
+        }
+    }
+
+    function hairArt(c) {
+        if (!c.hair) return '';
+        const dark = c.hair.outline || '#000';
+        return `<svg class="char-hair" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" overflow="visible">`
+            + hairSvg(c.hair.style, c.hair.color, dark)
+            + `</svg>`;
+    }
+
+    function assignRandomHair() {
+        // ~55% of mods get hair, randomly. Munkis with horror trigger flags
+        // (moon, ice) skip — bald horror reads better than wig horror.
+        ORDER.forEach(id => {
+            if (HORROR_TRIGGER_MODS.has(id)) return;
+            if (Math.random() > 0.55) return;
+            const style = HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)];
+            const color = HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
+            CHARACTERS[id].hair = { style, color, outline: '#000' };
+        });
+    }
+
     function headArt(c) {
         const inner = c.headFrame ? headModArt(c.headFrame, c.sheet) : headFaceArt();
-        return headShapeArt(c) + inner + headPhonesArt();
+        return headShapeArt(c) + inner + hairArt(c) + headPhonesArt();
     }
 
     function characterArt(id) {
