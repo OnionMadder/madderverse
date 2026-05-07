@@ -77,8 +77,6 @@ const Game = (() => {
     const startCash = Math.max(0, CONFIG.startCash - ship.cost);
     const fuelCap   = ship.fuelCap || 100;
 
-    // procedurally seed each rival with a starting net worth that hovers
-    // around the player's starting cash, then drifts each day
     const seededRivals = COMPETITORS.map(c => ({
       id: c.id,
       name: c.name,
