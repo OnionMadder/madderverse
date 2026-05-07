@@ -1,0 +1,75 @@
+{
+  "frames": {
+    "new-car": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 778,
+        "h": 778
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 778,
+        "h": 778
+      },
+      "sourceSize": {
+        "w": 778,
+        "h": 778
+      }
+    },
+    "new-driver": {
+      "frame": {
+        "x": 782,
+        "y": 2,
+        "w": 778,
+        "h": 778
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 778,
+        "h": 778
+      },
+      "sourceSize": {
+        "w": 778,
+        "h": 778
+      }
+    },
+    "new-track": {
+      "frame": {
+        "x": 2,
+        "y": 782,
+        "w": 778,
+        "h": 778
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 778,
+        "h": 778
+      },
+      "sourceSize": {
+        "w": 584,
+        "h": 583
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1562,
+      "h": 1562
+    },
+    "scale": "1"
+  }
+}

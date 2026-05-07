@@ -1,0 +1,215 @@
+{
+  "frames": {
+    "driver-eight": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 310,
+        "h": 295
+      }
+    },
+    "driver-five": {
+      "frame": {
+        "x": 314,
+        "y": 2,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 140,
+        "h": 140
+      }
+    },
+    "driver-four": {
+      "frame": {
+        "x": 626,
+        "y": 2,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 140,
+        "h": 140
+      }
+    },
+    "driver-nine": {
+      "frame": {
+        "x": 938,
+        "y": 2,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 292,
+        "h": 320
+      }
+    },
+    "driver-one": {
+      "frame": {
+        "x": 2,
+        "y": 329,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 140,
+        "h": 140
+      }
+    },
+    "driver-seven": {
+      "frame": {
+        "x": 314,
+        "y": 329,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 274,
+        "h": 325
+      }
+    },
+    "driver-six": {
+      "frame": {
+        "x": 626,
+        "y": 329,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 267,
+        "h": 306
+      }
+    },
+    "driver-ten": {
+      "frame": {
+        "x": 938,
+        "y": 329,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 301,
+        "h": 308
+      }
+    },
+    "driver-three": {
+      "frame": {
+        "x": 2,
+        "y": 656,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 140,
+        "h": 140
+      }
+    },
+    "driver-two": {
+      "frame": {
+        "x": 314,
+        "y": 656,
+        "w": 310,
+        "h": 325
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 310,
+        "h": 325
+      },
+      "sourceSize": {
+        "w": 140,
+        "h": 140
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1250,
+      "h": 983
+    },
+    "scale": "1"
+  }
+}

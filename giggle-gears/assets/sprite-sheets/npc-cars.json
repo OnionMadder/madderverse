@@ -1,0 +1,215 @@
+{
+  "frames": {
+    "npc-eight": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 879,
+        "h": 822
+      }
+    },
+    "npc-five": {
+      "frame": {
+        "x": 1215,
+        "y": 2,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 799,
+        "h": 922
+      }
+    },
+    "npc-four": {
+      "frame": {
+        "x": 2428,
+        "y": 2,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 826,
+        "h": 1053
+      }
+    },
+    "npc-nine": {
+      "frame": {
+        "x": 3641,
+        "y": 2,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 937,
+        "h": 854
+      }
+    },
+    "npc-one": {
+      "frame": {
+        "x": 2,
+        "y": 1173,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 868,
+        "h": 1011
+      }
+    },
+    "npc-seven": {
+      "frame": {
+        "x": 1215,
+        "y": 1173,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 896,
+        "h": 826
+      }
+    },
+    "npc-six": {
+      "frame": {
+        "x": 2428,
+        "y": 1173,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 886,
+        "h": 772
+      }
+    },
+    "npc-ten": {
+      "frame": {
+        "x": 3641,
+        "y": 1173,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 1211,
+        "h": 1014
+      }
+    },
+    "npc-three": {
+      "frame": {
+        "x": 2,
+        "y": 2344,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 1040,
+        "h": 1169
+      }
+    },
+    "npc-two": {
+      "frame": {
+        "x": 1215,
+        "y": 2344,
+        "w": 1211,
+        "h": 1169
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1211,
+        "h": 1169
+      },
+      "sourceSize": {
+        "w": 857,
+        "h": 1065
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 4854,
+      "h": 3515
+    },
+    "scale": "1"
+  }
+}

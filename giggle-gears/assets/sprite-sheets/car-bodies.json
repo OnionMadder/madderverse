@@ -1,0 +1,315 @@
+{
+  "frames": {
+    "car-eight": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 365,
+        "h": 215
+      }
+    },
+    "car-eleven": {
+      "frame": {
+        "x": 1812,
+        "y": 2,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 834,
+        "h": 625
+      }
+    },
+    "car-fifteen": {
+      "frame": {
+        "x": 3622,
+        "y": 2,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 890,
+        "h": 731
+      }
+    },
+    "car-five": {
+      "frame": {
+        "x": 5432,
+        "y": 2,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 381,
+        "h": 303
+      }
+    },
+    "car-four": {
+      "frame": {
+        "x": 2,
+        "y": 1272,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 400,
+        "h": 231
+      }
+    },
+    "car-fourteen": {
+      "frame": {
+        "x": 1812,
+        "y": 1272,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 966,
+        "h": 724
+      }
+    },
+    "car-nine": {
+      "frame": {
+        "x": 3622,
+        "y": 1272,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 361,
+        "h": 303
+      }
+    },
+    "car-one": {
+      "frame": {
+        "x": 5432,
+        "y": 1272,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 396,
+        "h": 300
+      }
+    },
+    "car-seven": {
+      "frame": {
+        "x": 2,
+        "y": 2542,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 388,
+        "h": 218
+      }
+    },
+    "car-six": {
+      "frame": {
+        "x": 1812,
+        "y": 2542,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 357,
+        "h": 238
+      }
+    },
+    "car-ten": {
+      "frame": {
+        "x": 3622,
+        "y": 2542,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 374,
+        "h": 299
+      }
+    },
+    "car-thirteen": {
+      "frame": {
+        "x": 5432,
+        "y": 2542,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 776,
+        "h": 582
+      }
+    },
+    "car-three": {
+      "frame": {
+        "x": 2,
+        "y": 3812,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 1808,
+        "h": 1268
+      }
+    },
+    "car-twelve": {
+      "frame": {
+        "x": 1812,
+        "y": 3812,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 830,
+        "h": 622
+      }
+    },
+    "car-two": {
+      "frame": {
+        "x": 3622,
+        "y": 3812,
+        "w": 1808,
+        "h": 1268
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 1808,
+        "h": 1268
+      },
+      "sourceSize": {
+        "w": 1476,
+        "h": 904
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 7242,
+      "h": 5082
+    },
+    "scale": "1"
+  }
+}

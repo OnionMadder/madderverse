@@ -167,95 +167,96 @@ const LOCATIONS = [
   // =====================================================================
   // random events (post-travel)
   // =====================================================================
-  const EVENTS = [
-    {
-      id: "pirates", weight: 8, type: "bad", title: "Pirate Raid!",
-      img: "evt_pirates.png",
-      body: "Pirates board your ship in the lanes.",
-      apply(g){
-        const carried = Object.entries(g.cargo).filter(([,n])=>n>0);
-        if(!carried.length) return "Pirates found you broke. They left, disappointed.";
-        const [gid, n] = carried[Math.floor(Math.random()*carried.length)];
-        const stolen = Math.max(1, Math.floor(n * (0.2 + Math.random()*0.3)));
-        g.cargo[gid] -= stolen;
-        return `Pirates stole ${stolen} ${goodName(gid)}.`;
+ const EVENTS = [
+  {
+    id: "pirates", weight: 8, type: "bad", title: "Corporate Raiders!",
+    img: "/assets/events/evt_pirates.jpg",
+    body: "Aggressive 'Tax-Pirates' board your ship, claiming your cargo is a breach of the peace.",
+    apply(g){
+      const carried = Object.entries(g.cargo).filter(([,n])=>n>0);
+      if(!carried.length) return "The Raiders found you broke. They left a bill for the boarding fuel.";
+      const [gid, n] = carried[Math.floor(Math.random()*carried.length)];
+      const stolen = Math.max(1, Math.floor(n * (0.2 + Math.random()*0.3)));
+      g.cargo[gid] -= stolen;
+      return `Raiders 'legally repossessed' ${stolen} units of ${goodName(gid)}.`;
+    }
+  },
+  {
+    id: "customs", weight: 6, type: "bad", title: "Jackhole Audit",
+    img: "/assets/events/evt_customs.jpg",
+    body: "A Jackhole Auditor boards for a 'Surprise Lifestyle Compliance Review.'",
+    apply(g){
+      const loc = locById(g.location);
+      const contraband = GOODS.filter(x => !x.legal && (g.cargo[x.id]||0) > 0);
+      const checkMod = g.betterEvents ? 0.4 : 1.0;
+      if (!contraband.length || (Math.random() * checkMod) > loc.lawful) {
+        return "The Auditor got distracted by their own reflection. You passed.";
       }
-    },
-    {
-      id: "customs", weight: 6, type: "bad", title: "Customs Inspection",
-      img: "evt_customs.png",
-      body: "Customs scanner sweeps your hold.",
-      apply(g){
-        const loc = locById(g.location);
-        const contraband = GOODS.filter(x => !x.legal && (g.cargo[x.id]||0) > 0);
-        if (!contraband.length || Math.random() > loc.lawful) {
-          return "Customs waved you through. Lucky.";
-        }
-        if (g.contrabandShield && Math.random() < 0.72) {
-          return "Customs scanned deep. Came up clean. Strange.";
-        }
-        const c = contraband[0];
-        const lost = g.cargo[c.id];
-        g.cargo[c.id] = 0;
-        const fine = Math.floor(lost * c.basePrice * 0.5);
-        g.cash = Math.max(0, g.cash - fine);
-        return `Contraband seized: ${lost} ${c.name}. Fine: ${fmt(fine)} ¢.`;
+      if (g.contrabandShield && Math.random() < 0.75) {
+        return "The Auditor's scanner glitched. They blame the interns and leave.";
       }
-    },
-    {
-      id: "boom", weight: 5, type: "good", title: "Market Boom",
-      img: "evt_boom.png",
-      body: "A trade frenzy spikes prices on a hot commodity.",
-      apply(g){
-        const good = GOODS[Math.floor(Math.random()*GOODS.length)];
-        g.priceMods[good.id] = (g.priceMods[good.id] || 1) * 1.6;
-        g.priceModsExpire[good.id] = g.day + 3;
-        return `BOOM: ${good.name} prices surge for 3 days.`;
-      }
-    },
-    {
-      id: "bust", weight: 5, type: "bad", title: "Market Crash",
-      img: "evt_bust.png",
-      body: "Glut crashes a commodity's price.",
-      apply(g){
-        const good = GOODS[Math.floor(Math.random()*GOODS.length)];
-        g.priceMods[good.id] = (g.priceMods[good.id] || 1) * 0.5;
-        g.priceModsExpire[good.id] = g.day + 3;
-        return `CRASH: ${good.name} prices collapse for 3 days.`;
-      }
-    },
-    {
-      id: "find", weight: 3, type: "good", title: "Salvage!",
-      img: "evt_find.png",
-      body: "You find a derelict pod drifting in the lanes.",
-      apply(g){
-        const credits = 200 + Math.floor(Math.random()*1500);
-        g.cash += credits;
-        return `Salvage worth ${fmt(credits)} ¢ recovered.`;
-      }
-    },
-    {
-      id: "fueltax", weight: 4, type: "warn", title: "Fuel Surcharge",
-      img: "evt_fuel.png",
-      body: "Council levies an emergency fuel tax.",
-      apply(g){
-        const fee = 100 + Math.floor(Math.random()*400);
-        g.cash = Math.max(0, g.cash - fee);
-        return `Fuel surcharge cost you ${fmt(fee)} ¢.`;
-      }
-    },
-    {
-      id: "tip", weight: 4, type: "good", title: "Hot Tip",
-      img: "evt_tip.png",
-      body: "A trader leaks a tip about a future market move.",
-      apply(g){
-        const good = GOODS[Math.floor(Math.random()*GOODS.length)];
-        const upcoming = Math.random() < 0.5 ? "spike" : "crash";
-        g.tickerQueue.push(`RUMOR: ${good.name} prices may ${upcoming} soon.`);
-        return `Tip received about ${good.name}.`;
-      }
-    },
-  ];
+      const c = contraband[0];
+      const lost = g.cargo[c.id];
+      g.cargo[c.id] = 0;
+      const fine = Math.floor(lost * c.basePrice * 0.65);
+      g.cash = Math.max(0, g.cash - fine);
+      return `Auditor seized your ${lost} ${c.name}. Fine: ${fmt(fine)} ¢.`;
+    }
+  },
+  {
+    id: "boom", weight: 5, type: "good", title: "Hype Bubble!",
+    img: "/assets/events/evt_boom.jpg",
+    body: "Jackhole Marketing creates an artificial demand frenzy for a random shiny object.",
+    apply(g){
+      const good = GOODS[Math.floor(Math.random()*GOODS.length)];
+      g.priceMods[good.id] = (g.priceMods[good.id] || 1) * 1.8;
+      g.priceModsExpire[good.id] = g.day + 3;
+      return `HYPE: Everyone suddenly wants ${good.name}. Prices are astronomical!`;
+    }
+  },
+  {
+    id: "bust", weight: 5, type: "bad", title: "Market Correction",
+    img: "/assets/events/evt_bust.jpg",
+    body: "The Bala Files Bureau leaks a scandal, tanking a commodity's value.",
+    apply(g){
+      const good = GOODS[Math.floor(Math.random()*GOODS.length)];
+      g.priceMods[good.id] = (g.priceMods[good.id] || 1) * 0.4;
+      g.priceModsExpire[good.id] = g.day + 4;
+      return `SCANDAL: ${good.name} is 'canceled' by the Bureau. Prices cratered.`;
+    }
+  },
+  {
+    id: "find", weight: 3, type: "good", title: "Unclaimed Assets!",
+    img: "/assets/events/evt_find.jpg",
+    body: "You find a Jackhole supply crate that 'fell' off a transport ship.",
+    apply(g){
+      const credits = 300 + Math.floor(Math.random()*2000);
+      g.cash += credits;
+      return `Found ${fmt(credits)} ¢ in untraceable corporate slush funds. Score!`;
+    }
+  },
+  {
+    id: "oxygen", weight: 4, type: "warn", title: "Oxygen Subscription",
+    img: "/assets/events/evt_oxygen.jpg",
+    body: "Jackhole Megacorp reminds you that breathing is a premium service.",
+    apply(g){
+      const fee = 150 + Math.floor(Math.random()*500);
+      g.cash = Math.max(0, g.cash - fee);
+      return `Deducted ${fmt(fee)} ¢ for your 'Respiratory Maintenance Fee'.`;
+    }
+  },
+  {
+    id: "bala_leak", weight: 4, type: "good", title: "Bala Intel",
+    img: "/assets/events/evt_tip.jpg",
+    body: "A disgruntled clerk at the Bala Files Bureau faxes you a 'confidential' file.",
+    apply(g){
+      const good = GOODS[Math.floor(Math.random()*GOODS.length)];
+      const upcoming = Math.random() < 0.5 ? "skyrocket" : "implode";
+      g.tickerQueue.push(`BUREAU LEAK: Analysis suggests ${good.name} will ${upcoming}.`);
+      return `Intel secured. The Bureau knows all, and now so do you.`;
+    }
+  },
+];
 
   // =====================================================================
   // starting headlines for the news ticker

@@ -1,0 +1,355 @@
+{
+  "frames": {
+    "cloud-one": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 177,
+        "h": 108
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 177,
+        "h": 108
+      },
+      "sourceSize": {
+        "w": 177,
+        "h": 108
+      }
+    },
+    "cloud-three": {
+      "frame": {
+        "x": 340,
+        "y": 2,
+        "w": 117,
+        "h": 100
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 117,
+        "h": 100
+      },
+      "sourceSize": {
+        "w": 117,
+        "h": 100
+      }
+    },
+    "cloud-two": {
+      "frame": {
+        "x": 653,
+        "y": 2,
+        "w": 114,
+        "h": 86
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 114,
+        "h": 86
+      },
+      "sourceSize": {
+        "w": 114,
+        "h": 86
+      }
+    },
+    "comet-three": {
+      "frame": {
+        "x": 852,
+        "y": 2,
+        "w": 224,
+        "h": 136
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 224,
+        "h": 136
+      },
+      "sourceSize": {
+        "w": 224,
+        "h": 136
+      }
+    },
+    "comet-two": {
+      "frame": {
+        "x": 1078,
+        "y": 2,
+        "w": 161,
+        "h": 158
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 161,
+        "h": 158
+      },
+      "sourceSize": {
+        "w": 161,
+        "h": 158
+      }
+    },
+    "event-one": {
+      "frame": {
+        "x": 2,
+        "y": 162,
+        "w": 336,
+        "h": 190
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 336,
+        "h": 190
+      },
+      "sourceSize": {
+        "w": 336,
+        "h": 190
+      }
+    },
+    "event-two": {
+      "frame": {
+        "x": 340,
+        "y": 162,
+        "w": 311,
+        "h": 154
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 311,
+        "h": 154
+      },
+      "sourceSize": {
+        "w": 311,
+        "h": 154
+      }
+    },
+    "planet-one": {
+      "frame": {
+        "x": 653,
+        "y": 162,
+        "w": 197,
+        "h": 132
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 197,
+        "h": 132
+      },
+      "sourceSize": {
+        "w": 197,
+        "h": 132
+      }
+    },
+    "star-eight": {
+      "frame": {
+        "x": 852,
+        "y": 162,
+        "w": 67,
+        "h": 67
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 67,
+        "h": 67
+      },
+      "sourceSize": {
+        "w": 67,
+        "h": 67
+      }
+    },
+    "star-five": {
+      "frame": {
+        "x": 1078,
+        "y": 162,
+        "w": 74,
+        "h": 74
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 74,
+        "h": 74
+      },
+      "sourceSize": {
+        "w": 74,
+        "h": 74
+      }
+    },
+    "star-four": {
+      "frame": {
+        "x": 2,
+        "y": 354,
+        "w": 69,
+        "h": 69
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 69,
+        "h": 69
+      },
+      "sourceSize": {
+        "w": 69,
+        "h": 69
+      }
+    },
+    "star-one": {
+      "frame": {
+        "x": 340,
+        "y": 354,
+        "w": 71,
+        "h": 71
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 71,
+        "h": 71
+      },
+      "sourceSize": {
+        "w": 71,
+        "h": 71
+      }
+    },
+    "star-seven": {
+      "frame": {
+        "x": 653,
+        "y": 354,
+        "w": 65,
+        "h": 65
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 65,
+        "h": 65
+      },
+      "sourceSize": {
+        "w": 65,
+        "h": 65
+      }
+    },
+    "star-six": {
+      "frame": {
+        "x": 852,
+        "y": 354,
+        "w": 69,
+        "h": 69
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 69,
+        "h": 69
+      },
+      "sourceSize": {
+        "w": 69,
+        "h": 69
+      }
+    },
+    "star-three": {
+      "frame": {
+        "x": 1078,
+        "y": 354,
+        "w": 69,
+        "h": 69
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 69,
+        "h": 69
+      },
+      "sourceSize": {
+        "w": 69,
+        "h": 69
+      }
+    },
+    "star-two": {
+      "frame": {
+        "x": 2,
+        "y": 427,
+        "w": 67,
+        "h": 67
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 67,
+        "h": 67
+      },
+      "sourceSize": {
+        "w": 67,
+        "h": 67
+      }
+    },
+    "sun": {
+      "frame": {
+        "x": 340,
+        "y": 427,
+        "w": 205,
+        "h": 222
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 205,
+        "h": 222
+      },
+      "sourceSize": {
+        "w": 205,
+        "h": 222
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1241,
+      "h": 651
+    },
+    "scale": "1"
+  }
+}
