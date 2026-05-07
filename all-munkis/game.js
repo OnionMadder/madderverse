@@ -178,8 +178,10 @@
 const CHARACTERS = {
         green: {
             label: 'Green Gear',
-            // Sprite head is ORANGE in the new sheet — body matches head.
-            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
+            // Body intentionally green to match the name; the 'green' frame
+            // in the new sheet is actually an orange-colored head, so this
+            // breaks the body-matches-head rule. Acceptable per user request.
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green',
             play(ctx, out, when, step) {
                 const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
