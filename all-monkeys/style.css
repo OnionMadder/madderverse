@@ -117,6 +117,22 @@ h1 {
     border-color: #2dd4bf;
 }
 
+/* SONG toggle — glows amber when the base song is on, dims when off. */
+.btn-song {
+    border: 2px solid #fbbf24;
+    color: #fbbf24;
+    text-shadow: 0 0 6px rgba(251, 191, 36, 0.55);
+}
+.btn-song:hover, .btn-song:active {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fff;
+}
+.btn-song.off {
+    border-color: rgba(251, 191, 36, 0.35);
+    color: rgba(251, 191, 36, 0.5);
+    text-shadow: none;
+}
+
 .icon-btn {
     width: 44px;
     height: 44px;

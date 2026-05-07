@@ -9,13 +9,16 @@
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
     const NUM_SLOTS = 8;
+    const BARS_PER_LOOP = 2;                 // BASE_SONG cycles every 2 bars
 
     // ---------- AUDIO ENGINE ----------
     let audioCtx = null;
     let masterGain = null;
     let isPlaying = false;
     let isMuted = false;
+    let isBaseSongOn = true;                 // background "level music" theme
     let currentStep = 0;
+    let currentBar = 0;
     let nextStepTime = 0;
     let schedTimer = null;
 
@@ -39,6 +42,7 @@
         if (!isPlaying) {
             isPlaying = true;
             currentStep = 0;
+            currentBar = 0;
             nextStepTime = audioCtx.currentTime + 0.08;
             schedule();
         }
@@ -46,14 +50,21 @@
 
     function schedule() {
         while (nextStepTime < audioCtx.currentTime + SCHEDULE_AHEAD) {
-            scheduleStep(currentStep, nextStepTime);
+            scheduleStep(currentStep, currentBar, nextStepTime);
             nextStepTime += SECONDS_PER_STEP;
-            currentStep = (currentStep + 1) % STEPS_PER_BAR;
+            currentStep++;
+            if (currentStep >= STEPS_PER_BAR) {
+                currentStep = 0;
+                currentBar = (currentBar + 1) % BARS_PER_LOOP;
+            }
         }
         schedTimer = setTimeout(schedule, LOOKAHEAD_MS);
     }
 
-    function scheduleStep(step, when) {
+    function scheduleStep(step, bar, when) {
+        // Background level theme — runs underneath the user's mods.
+        if (isBaseSongOn) BASE_SONG.play(audioCtx, masterGain, when, step, bar);
+        // User-placed mods
         for (let i = 0; i < NUM_SLOTS; i++) {
             const id = slots[i];
             if (!id) continue;
@@ -94,6 +105,84 @@
         }
         return c;
     }
+
+    // ---------- BASE SONG ("Bala's Theme") ----------
+    // A 2-bar level-music loop that plays under whatever mods are on stage.
+    //
+    //   Bar 0: Cmaj  — bass C2, pad C-E-G held the whole bar
+    //   Bar 1: Am    — bass A1, pad A3-C4-E4 held the whole bar
+    //   Melody: bouncy square hook on quarter notes, descending across bar 0
+    //           and resolving back up across bar 1.
+    //
+    // Both chords sit inside C major so any combination of the 16 mods
+    // (which all stay in C) lays cleanly on top. Toggle the whole thing with
+    // the SONG button in the header (sets isBaseSongOn).
+    const BASE_SONG = {
+        play(ctx, out, when, step, bar) {
+            // Sustained bass + pad fire once at the top of each bar and ring
+            // out across the full 2.4s the bar takes to complete.
+            if (step === 0) {
+                const isC = bar === 0;
+                const root = isC ? 65.41 : 55.00;            // C2 / A1
+                const chord = isC
+                    ? [261.63, 329.63, 392.00]               // C E G
+                    : [220.00, 261.63, 329.63];              // A C E (Am)
+                const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR; // 2.4s
+
+                // Bass — triangle wave, gentle attack/sustain envelope
+                const b = ctx.createOscillator();
+                const bg = ctx.createGain();
+                b.type = 'triangle';
+                b.frequency.value = root;
+                bg.gain.setValueAtTime(0, when);
+                bg.gain.linearRampToValueAtTime(0.16, when + 0.07);
+                bg.gain.linearRampToValueAtTime(0.13, when + BAR_LEN * 0.7);
+                bg.gain.exponentialRampToValueAtTime(0.001, when + BAR_LEN);
+                b.connect(bg).connect(out);
+                b.start(when); b.stop(when + BAR_LEN + 0.05);
+
+                // Pad — chord triad, quieter on each higher voice so the
+                // root sits forward in the mix without muddying the leads.
+                chord.forEach((freq, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'triangle';
+                    o.frequency.value = freq;
+                    const peak = 0.045 - i * 0.005;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(peak, when + 0.22);
+                    g.gain.linearRampToValueAtTime(peak * 0.85, when + BAR_LEN * 0.7);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + BAR_LEN);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + BAR_LEN + 0.05);
+                });
+            }
+
+            // Melody hook on quarter notes — bouncy "bala-bala" phrase.
+            //   Bar 0 (Cmaj):  G5  E5  C5  E5
+            //   Bar 1 (Am):    A4  C5  E5  G4
+            const melodyBar0 = { 0: 783.99, 4: 659.25, 8: 523.25, 12: 659.25 };
+            const melodyBar1 = { 0: 440.00, 4: 523.25, 8: 659.25, 12: 392.00 };
+            const melody = bar === 0 ? melodyBar0 : melodyBar1;
+            const freq = melody[step];
+            if (freq !== undefined) {
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const f = ctx.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.value = 3000;
+                f.Q.value = 1;
+                o.type = 'square';
+                o.frequency.value = freq;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.075, when + 0.02);
+                g.gain.linearRampToValueAtTime(0.06, when + 0.18);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
+                o.connect(f).connect(g).connect(out);
+                o.start(when); o.stop(when + 0.36);
+            }
+        }
+    };
 
     // ---------- CHARACTERS ----------
     // 16 Munki mods. Each entry has:
@@ -860,6 +949,16 @@
                     }
                 }
                 if (cleared) playClearSound();
+            });
+        }
+
+        const songBtn = document.getElementById('songBtn');
+        if (songBtn) {
+            songBtn.addEventListener('click', () => {
+                ensureAudio(); // start playback if user toggles song first
+                isBaseSongOn = !isBaseSongOn;
+                songBtn.classList.toggle('off', !isBaseSongOn);
+                songBtn.setAttribute('aria-pressed', String(isBaseSongOn));
             });
         }
 
