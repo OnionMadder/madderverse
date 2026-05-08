@@ -115,7 +115,7 @@ body {
     margin: 12px auto;
     overflow: hidden;
     position: relative;
-    background: #00ffff url('https://fymz.lol/friend-picker/assets/img/stars.jpg');
+    background: #00ffff url('https://madderverse.org/friend-picker/assets/img/stars.jpg');
     background-size: cover;
     border: 6px ridge #ff00ff;
     z-index: 1;
@@ -190,7 +190,7 @@ body {
 #hand {
     z-index: 1100;
     pointer-events: none;
-    background-image: url('https://fymz.lol/friend-picker/assets/img/hands.png');
+    background-image: url('https://madderverse.org/friend-picker/assets/img/hands.png');
     background-repeat: no-repeat;
     transform: translate3d(-9999px, -9999px, 0);
     will-change: transform, opacity;

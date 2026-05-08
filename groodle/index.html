@@ -1,30 +1,31 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Groodle</title>
     <link rel="canonical" href="https://madderverse.org/groodle/" />
     <meta property="og:url" content="https://madderverse.org/groodle/" />
     <meta name="twitter:url" content="https://madderverse.org/groodle/" />
-    <meta name="title" content="Groodle - The Madderverse" />
-    <meta name="description" content="Draw a little doodle, then watch it dance to the beat. Free and ad-free for kids." />
-    <meta name="keywords" content="The Madderverse, Onion Madder, Mad Sundar LLC, indie kids games, free kids games, ad-free games, drawing, dance, doodle" />
+    <meta name="title" content="Groodle - Doodle a Dancer, Watch It Come Alive. From The Madderverse." />
+    <meta name="description" content="Scribble your own little character inside the silhouette and watch your doodle come alive and groove to the beat. Free, ad-free, kid-friendly." />
+    <meta name="keywords" content="groodle, drawing game, drawn to life, dance game, kids drawing, music game, doodle, groove, The Madderverse, Onion Madder, Mad Sundar LLC, indie kids games, free kids games, ad-free games" />
     <meta name="author" content="Onion Madder" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Groodle - Draw a doodle, watch it dance." />
-    <meta property="og:description" content="Free, ad-free drawing-and-dance toy for kids." />
-    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta property="og:title" content="Groodle - Doodle a Dancer, Watch It Come Alive" />
+    <meta property="og:description" content="Scribble your own little character inside the silhouette and watch your doodle come alive and groove to the beat. Free, ad-free, kid-friendly." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Groodle - Draw a doodle, watch it dance." />
-    <meta name="twitter:description" content="Free, ad-free drawing-and-dance toy for kids." />
-    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <meta name="twitter:title" content="Groodle - Doodle a Dancer, Watch It Come Alive" />
+    <meta name="twitter:description" content="Scribble your own little character inside the silhouette and watch your doodle come alive and groove to the beat." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
     <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
     <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
-    <meta name="theme-color" content="#00ffcc" />
+    <meta name="theme-color" content="#ff6ec7" />
     <meta name="apple-mobile-web-app-title" content="Groodle" />
     <meta name="application-name" content="Groodle" />
     <link rel="stylesheet" href="style.css" />
@@ -33,45 +34,122 @@
 <body>
 
 <header class="top">
-    <a href="../" class="back">&larr; Madderverse</a>
-    <h1>Groodle</h1>
-    <span class="header-spacer" aria-hidden="true"></span>
+    <a href="../" class="back" aria-label="Back to The Madderverse">&larr; MADDERVERSE</a>
+    <h1>Gr<span class="neon-pink">oo</span>dle</h1>
 </header>
 
-<div class="stage" id="stage">
-    <canvas id="canvas" aria-label="Drawing canvas"></canvas>
-    <div class="hint" id="hint">Draw a little figure, then tap <strong>Dance!</strong></div>
-</div>
-
-<div class="toolbar" id="draw-tools">
-    <div class="palette" id="palette" role="toolbar" aria-label="Color palette"></div>
-    <div class="row">
-        <div class="sizes" id="brush-sizes" role="toolbar" aria-label="Brush size">
-            <button class="size-btn" data-size="4" aria-label="Small brush"><span class="dot dot-s"></span></button>
-            <button class="size-btn active" data-size="14" aria-label="Medium brush"><span class="dot dot-m"></span></button>
-            <button class="size-btn" data-size="32" aria-label="Big brush"><span class="dot dot-l"></span></button>
+<main>
+    <div class="stage-row">
+        <div class="hint-tag" aria-hidden="true">
+            <span>STAY IN THE LINES TO GROOVE!</span>
         </div>
-        <button class="tool-btn" id="clear" aria-label="Clear drawing"><span class="ico">🗑️</span><span class="lbl">Clear</span></button>
-        <button class="tool-btn primary" id="dance" aria-label="Make it dance"><span class="ico">🎵</span><span class="lbl">Dance!</span></button>
-    </div>
-</div>
 
-<div class="toolbar hidden" id="dance-tools">
-    <div class="row">
-        <button class="tool-btn" id="back-to-draw" aria-label="Back to drawing"><span class="ico">✏️</span><span class="lbl">Edit</span></button>
-        <label class="bpm-label">
-            <span class="bpm-text">BPM <strong id="bpm-val">120</strong></span>
-            <input type="range" id="bpm" min="60" max="180" value="120" step="2" aria-label="Beats per minute" />
-        </label>
-        <button class="tool-btn primary" id="stop-dance" aria-label="Stop"><span class="ico">⏹</span><span class="lbl">Stop</span></button>
-    </div>
-</div>
+        <div class="stage-wrap">
+            <div class="stage" id="stage" aria-label="Drawing stage">
+                <div class="bg-layer bg-studio" id="bgLayer"></div>
 
-<footer>
-    <p>&copy; <span id="year"></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar</a></p>
+                <div class="creature" id="creature">
+                    <svg class="silhouette" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                        <defs>
+                            <filter id="outlineFilter" x="-10%" y="-10%" width="120%" height="120%">
+                                <feMorphology operator="dilate" radius="5" in="SourceAlpha" result="dilated"/>
+                                <feComposite operator="out" in="dilated" in2="SourceAlpha" result="outline"/>
+                                <feFlood flood-color="#1a0f33" result="ink"/>
+                                <feComposite operator="in" in="ink" in2="outline"/>
+                            </filter>
+                            <clipPath id="bodyClip">
+                                <circle cx="200" cy="100" r="58"/>
+                                <rect x="155" y="148" width="90" height="232" rx="42"/>
+                                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
+                                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
+                                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
+                                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
+                            </clipPath>
+                        </defs>
+
+                        <g class="silhouette-fill">
+                            <circle cx="200" cy="100" r="58"/>
+                            <rect x="155" y="148" width="90" height="232" rx="42"/>
+                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
+                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
+                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
+                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
+                        </g>
+
+                        <g class="silhouette-outline" filter="url(#outlineFilter)">
+                            <circle cx="200" cy="100" r="58"/>
+                            <rect x="155" y="148" width="90" height="232" rx="42"/>
+                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
+                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
+                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
+                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
+                        </g>
+                    </svg>
+
+                    <canvas class="draw-canvas" id="drawCanvas"></canvas>
+                </div>
+
+                <div class="stage-floor" id="stageFloor" aria-hidden="true"></div>
+            </div>
+            <div class="beat-bubble" id="beatBubble" aria-hidden="true"></div>
+        </div>
+
+        <div class="bg-picker" id="bgPicker" aria-label="Choose background">
+            <button class="bg-thumb active" type="button" data-bg="studio" aria-label="Studio background">
+                <span class="bg-preview bg-studio"></span>
+            </button>
+            <button class="bg-thumb" type="button" data-bg="disco" aria-label="Disco background">
+                <span class="bg-preview bg-disco"></span>
+            </button>
+            <button class="bg-thumb" type="button" data-bg="outdoors" aria-label="Outdoors background">
+                <span class="bg-preview bg-outdoors"></span>
+            </button>
+            <button class="bg-thumb" type="button" data-bg="night" aria-label="Night sky background">
+                <span class="bg-preview bg-night"></span>
+            </button>
+        </div>
+    </div>
+
+    <div class="panel" id="drawPanel">
+        <div class="panel-row palette" id="palette" aria-label="Color palette"></div>
+        <div class="panel-row sizes-row">
+            <div class="sizes" id="sizes" aria-label="Brush size"></div>
+            <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
+        </div>
+        <div class="panel-row actions">
+            <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
+            <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
+            <button id="playBtn" class="btn primary" type="button">▶ DANCE</button>
+        </div>
+    </div>
+
+    <div class="panel dance-panel" id="dancePanel" hidden>
+        <div class="now-playing">
+            <span class="np-row">MOVE: <strong id="moveLabel">BOUNCE</strong></span>
+            <span class="np-row">BEAT: <strong id="beatLabel">BOOM</strong></span>
+        </div>
+        <div class="panel-row actions">
+            <button id="moveBtn" class="btn" type="button">↻ MOVE</button>
+            <button id="beatBtn" class="btn" type="button">↻ BEAT</button>
+            <button id="stopBtn" class="btn primary" type="button">■ DRAW</button>
+        </div>
+    </div>
+</main>
+
+<footer class="site-footer">
+    <ul class="footer-nav">
+        <li><a href="../">Madderverse</a></li>
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../legal.html">Privacy &amp; Legal</a></li>
+    </ul>
+    <p class="footer-tagline">Free &middot; Ad-free &middot; Kid-friendly</p>
+    <p class="footer-copy">&copy; <span id="year"></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a>. All games made with care.</p>
 </footer>
 
+<script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+</script>
 <script src="game.js"></script>
-<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
+
 </body>
 </html>

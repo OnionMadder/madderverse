@@ -10,12 +10,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // ----- Friend sprite atlases (two sheets, 6 friends each = 12 total) -----
     const FRIEND_SHEETS = [
         {
-            sheetUrl: 'https://fymz.lol/friend-picker/assets/img/friends-one.png',
-            atlasUrl: 'https://fymz.lol/friend-picker/assets/img/friends-one.json'
+            sheetUrl: 'https://madderverse.org/friend-picker/assets/img/friends-one.png',
+            atlasUrl: 'https://madderverse.org/friend-picker/assets/img/friends-one.json'
         },
         {
-            sheetUrl: 'https://fymz.lol/friend-picker/assets/img/friends-two.png',
-            atlasUrl: 'https://fymz.lol/friend-picker/assets/img/friends-two.json'
+            sheetUrl: 'https://madderverse.org/friend-picker/assets/img/friends-two.png',
+            atlasUrl: 'https://madderverse.org/friend-picker/assets/img/friends-two.json'
         }
     ];
 
@@ -46,7 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ----- Hand sprite atlas (hardcoded — only 4 frames, no fetch needed) -----
-    const HANDS_SHEET_URL = 'https://fymz.lol/friend-picker/assets/img/hands.png';
+    const HANDS_SHEET_URL = 'https://madderverse.org/friend-picker/assets/img/hands.png';
     const HANDS_SHEET_W = 1003;
     const HANDS_SHEET_H = 753;
     // Frame definitions + fingertip anchor (% of the frame) for each hand pose.
@@ -86,8 +86,8 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     // Booger friends spritesheet — 4 unique friends.
-    const BOOGER_SHEET_URL  = 'https://fymz.lol/friend-picker/assets/img/boogers.png';
-    const BOOGER_ATLAS_URL  = 'https://fymz.lol/friend-picker/assets/img/boogers.json';
+    const BOOGER_SHEET_URL  = 'https://madderverse.org/friend-picker/assets/img/boogers.png';
+    const BOOGER_ATLAS_URL  = 'https://madderverse.org/friend-picker/assets/img/boogers.json';
     let BOOGER_FRAMES = null;       // populated by fetchBoogerAtlas()
     let BOOGER_SHEET_W = 790;
     let BOOGER_SHEET_H = 770;
@@ -182,7 +182,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ---------- Sound manager ----------
     // Each key maps to one or more files; playSound picks one at random per call.
     // Reaction sounds are split by gender — see FRIEND_GENDER below.
-    const SOUND_BASE = 'https://fymz.lol/friend-picker/assets/audio/';
+    const SOUND_BASE = 'https://madderverse.org/friend-picker/assets/audio/';
     const SOUND_BANK = {
         start:    ['start.mp3'],
         reset:    ['reset.mp3'],

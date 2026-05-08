@@ -178,8 +178,10 @@
 const CHARACTERS = {
         green: {
             label: 'Green Gear',
-            // Sprite head is ORANGE in the new sheet — body matches head.
-            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
+            // Body intentionally green to match the name; the 'green' frame
+            // in the new sheet is actually an orange-colored head, so this
+            // breaks the body-matches-head rule. Acceptable per user request.
+            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             headFrame: 'green',
             play(ctx, out, when, step) {
                 const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
@@ -1569,6 +1571,45 @@ const CHARACTERS = {
         if (!modal) return;
         modal.setAttribute('aria-hidden', 'true');
         modal.classList.remove('open');
+        stopReadAloud();
+    }
+
+    // Read the lore aloud via SpeechSynthesis. Toggle: click while speaking
+    // to stop. Auto-stops on modal close. Falls back silently if the browser
+    // lacks the API (very rare on modern mobile, but fail closed).
+    function toggleReadAloud() {
+        if (!('speechSynthesis' in window)) return;
+        if (window.speechSynthesis.speaking) {
+            stopReadAloud();
+            return;
+        }
+        const body = document.querySelector('.story-body');
+        if (!body) return;
+        const text = body.innerText.replace(/\s+/g, ' ').trim();
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        u.pitch = 1.0;
+        u.onend    = updateReadButton;
+        u.onerror  = updateReadButton;
+        u.oncancel = updateReadButton;
+        window.speechSynthesis.speak(u);
+        updateReadButton();
+    }
+
+    function stopReadAloud() {
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        updateReadButton();
+    }
+
+    function updateReadButton() {
+        const btn = document.getElementById('storyReadBtn');
+        if (!btn) return;
+        const speaking = ('speechSynthesis' in window) && window.speechSynthesis.speaking;
+        btn.classList.toggle('speaking', speaking);
+        const lbl = btn.querySelector('.story-read-lbl');
+        const ico = btn.querySelector('.story-read-ico');
+        if (lbl) lbl.textContent = speaking ? 'Stop' : 'Read';
+        if (ico) ico.textContent = speaking ? '⏹' : '🔊';
     }
 
     // ---------- HEADER BUTTONS ----------
@@ -1590,6 +1631,9 @@ const CHARACTERS = {
 
         const storyClose = document.getElementById('storyCloseBtn');
         if (storyClose) storyClose.addEventListener('click', closeStoryModal);
+
+        const storyRead = document.getElementById('storyReadBtn');
+        if (storyRead) storyRead.addEventListener('click', toggleReadAloud);
 
         const storyModal = document.getElementById('storyModal');
         if (storyModal) {
