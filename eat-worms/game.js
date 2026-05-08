@@ -387,7 +387,7 @@
         if (dist < PROXIMITY_PX) {
             if (mode === 'idle') {
                 mode = 'panic';
-                playPhase('panic', { fps: 14, loop: true });
+                playPhase('panic', { fps: 7, loop: true });
             }
             clearTimeout(proximityIdleTimer);
             proximityIdleTimer = null;
@@ -417,7 +417,7 @@
         // they actually start dragging.
         if (mode === 'idle') {
             mode = 'panic';
-            playPhase('panic', { fps: 14, loop: true });
+            playPhase('panic', { fps: 7, loop: true });
         }
 
         const sr = stageRect();
@@ -448,7 +448,7 @@
             const moved = Math.hypot(baitPos.x - pointerStart.x, baitPos.y - pointerStart.y);
             if (moved > CATCH_THRESHOLD) {
                 mode = 'pulling';
-                playPhase('catch', { fps: 12, loop: true });
+                playPhase('catch', { fps: 8, loop: true });
             }
         }
     }
@@ -507,7 +507,7 @@
     function flyWorm(startX, startY, vx, vy) {
         mode = 'flying';
         document.body.classList.add('flying');
-        playPhase('fling', { fps: 14, loop: true });
+        playPhase('fling', { fps: 10, loop: true });
         const t0 = performance.now();
         const gravity = 1900;
         const wobbleHz = 18;
@@ -552,7 +552,7 @@
             // wipe → underwater scene.
             bait.style.left = x + 'px';
             bait.style.top  = y + 'px';
-            playPhase('land', { fps: 10, loop: false, onEnd: () => {
+            playPhase('land', { fps: 6, loop: false, onEnd: () => {
                 setTimeout(() => sinkToUnderwater(x, y), 100);
             }});
         } else {

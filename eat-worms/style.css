@@ -330,15 +330,19 @@ header.top h1 {
     z-index: -1;
 }
 
+/* Pull / flight: the sprite sheets do the heavy lifting now (panic
+   poses + tumble frames). Keep the CSS keyframe rotation but at a
+   much calmer pace so it reads as a wobble layered on the sprite,
+   not a rotational blur fighting it. */
 .bait.pulling {
     top: 0;
     left: 0;
-    animation: worm-panic-wiggle 0.13s linear infinite;
+    animation: worm-panic-wiggle 0.45s linear infinite;
 }
 .bait.in-flight {
     top: 0;
     left: 0;
-    animation: worm-flight-wobble 0.18s linear infinite;
+    animation: worm-flight-wobble 0.55s linear infinite;
 }
 .bait.popping  {
     animation: worm-respawn-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) forwards;
