@@ -213,6 +213,85 @@ header.top h1 {
     pointer-events: none;
 }
 
+/* ---------- aim arc preview (step 2) ---------- */
+/* Full-stage SVG layer that shows a dotted parabolic preview of where the
+   bait will land. Hidden when not aiming; updated on every pointermove. */
+.arc-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    display: none;
+}
+.arc-layer.active { display: block; width: 100%; height: 100%; }
+.arc-path {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 4 9;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.45));
+}
+.arc-target {
+    fill: rgba(255, 255, 255, 0.8);
+    stroke: rgba(255, 255, 255, 0.95);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.6));
+}
+/* Red-tinted preview when the user is aiming somewhere we can't cast
+   (below the waterline). Tells them visually that release will cancel. */
+.arc-layer.invalid .arc-path   { stroke: rgba(255, 99, 99, 0.7); }
+.arc-layer.invalid .arc-target { fill: rgba(255, 99, 99, 0.7); stroke: rgba(255, 99, 99, 0.9); filter: none; }
+
+/* ---------- fishing line (step 2) ---------- */
+/* Single SVG line tracking the bait. Start point is fixed at the rod
+   anchor (top-center of the stage); end point follows the bait. */
+.line-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+}
+.fish-line {
+    stroke: rgba(255, 255, 255, 0.45);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+
+/* ---------- splash ring (step 2) ---------- */
+.splash {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.85);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: splash-expand 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+    z-index: 4;
+}
+@keyframes splash-expand {
+    0%   { width: 0;     height: 0;     opacity: 1;   border-width: 3px; }
+    70%  { width: 90px;  height: 50px;  opacity: 0.5; border-width: 2px; }
+    100% { width: 130px; height: 70px;  opacity: 0;   border-width: 1px; }
+}
+
+/* While aiming we shift the bait z-index above the dimmer + lock the
+   pointer to it. While in flight we make sure the bait can't be grabbed. */
+body.aiming .bait { z-index: 6; }
+body.flying .bait { pointer-events: none; }
+
+/* When the bait is in flight, JS sets top/left in pixel coords; clear
+   the rest-state bottom anchor so absolute positioning takes over. */
+.bait.in-flight {
+    bottom: auto;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
+}
+
 /* ---------- collection bar (placeholder for step 5) ---------- */
 .collection {
     position: absolute;
@@ -262,7 +341,20 @@ footer a { color: #fff; pointer-events: auto; }
         Caught <strong id="caughtCount">0</strong>
     </div>
 
-    <!-- Worm at rest on the shore. Step 2 will make this draggable. -->
+    <!-- Fishing line: from a virtual rod anchor (top of stage) to the bait.
+         Updated each frame as the bait moves. -->
+    <svg class="line-layer" id="lineLayer" aria-hidden="true">
+        <line id="fishLine" class="fish-line" x1="0" y1="0" x2="0" y2="0"/>
+    </svg>
+
+    <!-- Aim arc preview (dotted parabola). Hidden until the kid touches
+         the bait; shown while aiming. -->
+    <svg class="arc-layer" id="arcLayer" aria-hidden="true">
+        <path id="arcPath"   class="arc-path"   d=""/>
+        <circle id="arcTarget" class="arc-target" cx="-100" cy="-100" r="7"/>
+    </svg>
+
+    <!-- Worm at the shore. Touch-and-hold to aim, flick up to cast. -->
     <div class="bait" id="bait" aria-label="Worm bait">
         <svg viewBox="0 0 80 44" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
             <!-- segmented body: a wavy thick stroke -->
@@ -307,12 +399,15 @@ footer a { color: #fff; pointer-events: auto; }
     const bait       = document.getElementById('bait');
     const caughtEl   = document.getElementById('caughtCount');
     const yearEl     = document.getElementById('year');
+    const arcLayer   = document.getElementById('arcLayer');
+    const arcPath    = document.getElementById('arcPath');
+    const arcTarget  = document.getElementById('arcTarget');
+    const fishLine   = document.getElementById('fishLine');
 
     yearEl.textContent = new Date().getFullYear();
 
-    // ---------- state ----------
+    // ---------- collection state ----------
     // Persisted catch list lives in localStorage (step 5 wires this for real).
-    // Read it now so the count badge reflects past sessions.
     const STORAGE_KEY = 'go-eat-worms-collection';
     let collection = [];
     try {
@@ -321,35 +416,232 @@ footer a { color: #fff; pointer-events: auto; }
     } catch (e) { /* ignore */ }
     caughtEl.textContent = collection.length;
 
-    // ---------- orientation reflow ----------
-    // Reflow on orientation change without losing in-progress catches.
-    // For step 1 there's no in-flight state to preserve, but the listener
-    // is wired now so later steps can hook in.
+    // ---------- cast state machine ----------
+    // idle    — worm at rest on shore, waiting for touch
+    // aiming  — touch held; arc preview tracking finger
+    // flying  — bait launched, animating along parabola
+    // landed  — bait splashed, sitting in water (step 3 hooks fish in here)
+    let mode = 'idle';
+    let activePointerId = null;
+
+    // Resting position of the bait in stage coords. Computed lazily because
+    // CSS positions it via bottom/left percentages until JS takes over.
+    let baitRest = { x: 0, y: 0 };
+
+    // Anchor point for the fishing line — top of the stage at the bait's
+    // resting x. The line trails from here to wherever the bait is.
+    let lineAnchor = { x: 0, y: 0 };
+
+    // ---------- layout helpers ----------
+    function stageRect() { return stage.getBoundingClientRect(); }
+
+    function syncBaitRest() {
+        // Read the bait's current center in stage-local coords, while it's
+        // still in its CSS-positioned rest state.
+        const sr = stageRect();
+        const br = bait.getBoundingClientRect();
+        baitRest.x = (br.left + br.right) / 2 - sr.left;
+        baitRest.y = (br.top  + br.bottom) / 2 - sr.top;
+        lineAnchor.x = baitRest.x;
+        lineAnchor.y = 0;
+        fishLine.setAttribute('x1', lineAnchor.x);
+        fishLine.setAttribute('y1', lineAnchor.y);
+        updateLine(baitRest.x, baitRest.y);
+    }
+
+    function updateLine(x, y) {
+        fishLine.setAttribute('x2', x);
+        fishLine.setAttribute('y2', y);
+    }
+
+    function setBaitPx(x, y) {
+        bait.classList.add('in-flight');
+        bait.style.left = x + 'px';
+        bait.style.top  = y + 'px';
+        updateLine(x, y);
+    }
+
+    function returnBaitToRest() {
+        bait.classList.remove('in-flight');
+        bait.style.left = '';
+        bait.style.top  = '';
+        // syncBaitRest reads the post-CSS position so subsequent flights
+        // start from wherever CSS puts the bait now (handles orientation).
+        syncBaitRest();
+    }
+
+    // ---------- arc math ----------
+    // Quadratic Bezier from the rest position through an apex above the
+    // midpoint to the target. Apex height scales with throw distance so
+    // short flicks have a tighter arc than long ones.
+    function computeApex(startX, startY, endX, endY) {
+        const dist = Math.hypot(endX - startX, endY - startY);
+        const lift = Math.max(80, dist * 0.55);
+        return {
+            mx: (startX + endX) / 2,
+            my: Math.min(startY, endY) - lift
+        };
+    }
+
+    function bezier(t, p0x, p0y, p1x, p1y, p2x, p2y) {
+        const u = 1 - t;
+        return {
+            x: u * u * p0x + 2 * u * t * p1x + t * t * p2x,
+            y: u * u * p0y + 2 * u * t * p1y + t * t * p2y
+        };
+    }
+
+    // ---------- waterline test ----------
+    // The shore takes up the bottom 22% of the stage. Anywhere above that
+    // is "valid water" — releasing here casts. Below is "shore" — release
+    // here cancels the throw.
+    function isInWater(y) {
+        const sr = stageRect();
+        const waterlineY = sr.height * 0.78;
+        return y < waterlineY - 6; // small slop to disallow edge cases
+    }
+
+    // ---------- aim ----------
+    function showArc(targetX, targetY, valid) {
+        const { mx, my } = computeApex(baitRest.x, baitRest.y, targetX, targetY);
+        arcPath.setAttribute('d',
+            `M ${baitRest.x} ${baitRest.y} Q ${mx} ${my} ${targetX} ${targetY}`);
+        arcTarget.setAttribute('cx', targetX);
+        arcTarget.setAttribute('cy', targetY);
+        arcLayer.classList.toggle('invalid', !valid);
+        arcLayer.classList.add('active');
+    }
+
+    function hideArc() {
+        arcLayer.classList.remove('active', 'invalid');
+    }
+
+    // ---------- pointer handlers ----------
+    bait.addEventListener('pointerdown', e => {
+        if (mode !== 'idle') return;
+        e.preventDefault();
+        try { bait.setPointerCapture(e.pointerId); } catch (_) {}
+        activePointerId = e.pointerId;
+        mode = 'aiming';
+        document.body.classList.add('aiming');
+        syncBaitRest();
+        const sr = stageRect();
+        const fx = e.clientX - sr.left;
+        const fy = e.clientY - sr.top;
+        showArc(fx, fy, isInWater(fy));
+    });
+
+    function onMove(e) {
+        if (mode !== 'aiming' || e.pointerId !== activePointerId) return;
+        const sr = stageRect();
+        const fx = e.clientX - sr.left;
+        const fy = e.clientY - sr.top;
+        showArc(fx, fy, isInWater(fy));
+    }
+
+    function onUp(e) {
+        if (mode !== 'aiming' || e.pointerId !== activePointerId) return;
+        try { bait.releasePointerCapture(e.pointerId); } catch (_) {}
+        activePointerId = null;
+        document.body.classList.remove('aiming');
+
+        const sr = stageRect();
+        const fx = e.clientX - sr.left;
+        const fy = e.clientY - sr.top;
+
+        if (!isInWater(fy)) {
+            // Cancelled — release was on the shore. Reset to idle.
+            mode = 'idle';
+            hideArc();
+            return;
+        }
+
+        hideArc();
+        launchBait(fx, fy);
+    }
+
+    stage.addEventListener('pointermove',   onMove);
+    stage.addEventListener('pointerup',     onUp);
+    stage.addEventListener('pointercancel', onUp);
+
+    // ---------- launch ----------
+    // Animate the bait along the previewed Bezier. Keeps the fishing line
+    // attached so the cast looks continuous.
+    function launchBait(targetX, targetY) {
+        mode = 'flying';
+        document.body.classList.add('flying');
+        const { mx, my } = computeApex(baitRest.x, baitRest.y, targetX, targetY);
+
+        // Flight time scales with distance — feels more natural than a
+        // fixed duration.
+        const dist = Math.hypot(targetX - baitRest.x, targetY - baitRest.y);
+        const duration = Math.min(950, Math.max(450, dist * 1.6));
+        const start = performance.now();
+
+        function frame(now) {
+            const t = Math.min((now - start) / duration, 1);
+            const p = bezier(t,
+                baitRest.x, baitRest.y,
+                mx, my,
+                targetX, targetY);
+            setBaitPx(p.x, p.y);
+            if (t < 1) {
+                requestAnimationFrame(frame);
+            } else {
+                splashAt(targetX, targetY);
+                landed(targetX, targetY);
+            }
+        }
+        requestAnimationFrame(frame);
+    }
+
+    function splashAt(x, y) {
+        const ring = document.createElement('div');
+        ring.className = 'splash';
+        ring.style.left = x + 'px';
+        ring.style.top  = y + 'px';
+        stage.appendChild(ring);
+        setTimeout(() => ring.remove(), 700);
+        // Add a second smaller ring for layered effect.
+        setTimeout(() => {
+            const ring2 = document.createElement('div');
+            ring2.className = 'splash';
+            ring2.style.left = (x + (Math.random() - 0.5) * 18) + 'px';
+            ring2.style.top  = (y + (Math.random() - 0.5) * 12) + 'px';
+            ring2.style.opacity = 0.6;
+            stage.appendChild(ring2);
+            setTimeout(() => ring2.remove(), 700);
+        }, 90);
+    }
+
+    function landed(x, y) {
+        mode = 'landed';
+        // Step 3 hooks fish-attraction logic here. For step 2, sit in
+        // place a moment, then retrieve the bait.
+        setTimeout(() => {
+            mode = 'idle';
+            document.body.classList.remove('flying');
+            returnBaitToRest();
+        }, 1400);
+    }
+
+    // ---------- orientation / resize ----------
+    // Re-anchor the fishing line + bait reference if the viewport reshapes.
+    // If a cast is in flight we let it complete and re-sync on landing.
     function onResize() {
-        // future: reposition the bait, fish, and any in-flight cast
-        // relative to the new viewport.
+        if (mode === 'idle' || mode === 'aiming') {
+            syncBaitRest();
+        }
     }
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onResize);
 
-    // ---------- placeholder: tap the bait to bump the catch count ----------
-    // Wired now just so the kid (and the dev) can see something happens
-    // when they touch the worm. Step 2 replaces this with the real
-    // touch-and-flick mechanic.
-    bait.addEventListener('pointerdown', e => {
-        e.preventDefault();
-        bait.animate(
-            [
-                { transform: 'translateX(-50%) scale(1)' },
-                { transform: 'translateX(-50%) scale(1.18)' },
-                { transform: 'translateX(-50%) scale(1)' }
-            ],
-            { duration: 220, easing: 'ease-out' }
-        );
+    // ---------- init ----------
+    // Wait one frame so the .stage has its computed size before we read
+    // the bait's CSS-positioned rest coords.
+    requestAnimationFrame(() => {
+        syncBaitRest();
     });
-
-    // ---------- ready ----------
-    // Future steps populate window.GoEatWorms with debug hooks if useful.
 })();
 </script>
 
