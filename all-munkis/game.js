@@ -178,11 +178,8 @@
 const CHARACTERS = {
         green: {
             label: 'Green Gear',
-            // Body intentionally green to match the name; the 'green' frame
-            // in the new sheet is actually an orange-colored head, so this
-            // breaks the body-matches-head rule. Acceptable per user request.
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'green',
+            face: { eyes: 'gear', mouth: 'smirk', brow: 'sharp' },
             play(ctx, out, when, step) {
                 const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
                 const freq = hook[step];
@@ -207,7 +204,7 @@ const CHARACTERS = {
         high: {
             label: 'High-Z',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'high',
+            face: { eyes: 'button', mouth: 'o', brow: 'raised' },
             play(ctx, out, when, step) {
                 if (![2, 6, 10, 14].includes(step)) return;
                 const n = noiseSource(ctx, 0.04);
@@ -225,7 +222,7 @@ const CHARACTERS = {
         shadow: {
             label: 'Shadow Pulse',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'shadow',
+            face: { eyes: 'slant', mouth: 'smirk' },
             play(ctx, out, when, step) {
                 if (step % 2 !== 0) return;
                 const n = noiseSource(ctx, 0.05);
@@ -245,7 +242,7 @@ const CHARACTERS = {
         mega: {
             label: 'Mega Thump',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'mega',
+            face: { eyes: 'button', mouth: 'fanged', brow: 'sharp' },
             play(ctx, out, when, step) {
                 if (step % 4 !== 0) return;
                 const o = ctx.createOscillator();
@@ -271,7 +268,7 @@ const CHARACTERS = {
         amber: {
             label: 'Amber Arp',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            headFrame: 'amber',
+            face: { eyes: 'star', mouth: 'smile', extra: 'blush' },
             play(ctx, out, when, step) {
                 if (step !== 5 && step !== 13) return;
                 const notes = [659.25, 783.99, 987.77, 1318.51];
@@ -293,7 +290,7 @@ const CHARACTERS = {
         srivi: {
             label: 'Srivi-Bot',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'srivi',
+            face: { eyes: 'gear', mouth: 'straight' },
             play(ctx, out, when, step) {
                 const lowSteps = [0, 6, 10];
                 const highSteps = [3, 8, 13];
@@ -325,7 +322,7 @@ const CHARACTERS = {
         grumble: {
             label: 'Grumble Bass',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'grumble',
+            face: { eyes: 'slant', mouth: 'straight', brow: 'sharp' },
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const root = step === 0 ? 65.41 : 98.00;
@@ -352,7 +349,7 @@ const CHARACTERS = {
         sine: {
             label: 'Sine Wave',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            headFrame: 'sine',
+            face: { eyes: 'button', mouth: 'smile' },
             play(ctx, out, when, step) {
                 const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
                 const f = seq[step];
@@ -372,7 +369,7 @@ const CHARACTERS = {
         hiss: {
             label: 'Hiss Shell',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'hiss',
+            face: { eyes: 'slant', mouth: 'fanged' },
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.18);
@@ -390,7 +387,7 @@ const CHARACTERS = {
         snare: {
             label: 'Snare-Bot',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            headFrame: 'snare',
+            face: { eyes: 'dot', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.13);
@@ -418,7 +415,7 @@ const CHARACTERS = {
         flute: {
             label: 'Vibe Berry',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'flute',
+            face: { eyes: 'sleepy', mouth: 'smile', extra: 'blush' },
             play(ctx, out, when, step) {
                 const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
                 const freq = melody[step];
@@ -445,7 +442,7 @@ const CHARACTERS = {
         star: {
             label: 'Star Ping',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            headFrame: 'star',
+            face: { eyes: 'star', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const notes = [1046.5, 1318.51, 1567.98];
@@ -467,7 +464,7 @@ const CHARACTERS = {
         fog: {
             label: 'Fog Chord',
             bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
-            headFrame: 'fog',
+            face: { eyes: 'sleepy', mouth: 'smile' },
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const chord = [261.63, 329.63, 392.00];
@@ -488,8 +485,8 @@ const CHARACTERS = {
 
         moon: {
             label: 'Moon Munki',
-            bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
-            headFrame: 'moon',
+            bodyColor: '#f8fafc', bodyHi: '#ffffff', bodyShade: '#94a3b8',
+            face: { eyes: 'googly', mouth: 'o', brow: 'arched' },
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const o = ctx.createOscillator();
@@ -517,7 +514,7 @@ const CHARACTERS = {
         spark: {
             label: 'Spark Snap',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            headFrame: 'spark',
+            face: { eyes: 'asterisk', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
                 const n = noiseSource(ctx, 0.025);
@@ -534,8 +531,8 @@ const CHARACTERS = {
 
         ice: {
             label: 'Ice Munki',
-            bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
-            headFrame: 'ice',
+            bodyColor: '#f8fafc', bodyHi: '#ffffff', bodyShade: '#94a3b8',
+            face: { eyes: 'slant', mouth: 'fanged', brow: 'sharp' },
             play(ctx, out, when, step) {
                 const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
                 const freq = seq[step];
@@ -850,15 +847,124 @@ const CHARACTERS = {
     }
 
     // Generic Munki face — used as a fallback when no headFrame is set.
-    function headFaceArt() {
+    // ---------- FACE FEATURE POOL ----------
+    // Each renderer returns SVG fragments inside the standard 100×100 viewBox.
+    // Eyes sit around y=50, brow ~y=40, mouth ~y=66-76, cheeks ~y=58-66.
+    // Body color must match the head circle (always #f8fafc for evils, the
+    // character's bodyColor for regulars) — these features are color-agnostic
+    // overlays that read on any head circle.
+    const EYE_RENDERERS = {
+        dot:      () =>
+            `<circle cx="38" cy="52" r="3" fill="#000"/>` +
+            `<circle cx="62" cy="52" r="3" fill="#000"/>`,
+        button:   () =>
+            `<circle cx="38" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>` +
+            `<circle cx="62" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>` +
+            `<circle cx="38" cy="51" r="3.5" fill="#000"/>` +
+            `<circle cx="62" cy="51" r="3.5" fill="#000"/>` +
+            `<circle cx="39" cy="50" r="1.4" fill="#fff"/>` +
+            `<circle cx="63" cy="50" r="1.4" fill="#fff"/>`,
+        slant:    () =>
+            `<line x1="31" y1="48" x2="44" y2="55" stroke="#000" stroke-width="3.5" stroke-linecap="round"/>` +
+            `<line x1="69" y1="48" x2="56" y2="55" stroke="#000" stroke-width="3.5" stroke-linecap="round"/>`,
+        asterisk: () =>
+            `<g stroke="#000" stroke-width="2.5" stroke-linecap="round">` +
+            `<line x1="32" y1="50" x2="44" y2="50"/>` +
+            `<line x1="38" y1="44" x2="38" y2="56"/>` +
+            `<line x1="33" y1="45" x2="43" y2="55"/>` +
+            `<line x1="33" y1="55" x2="43" y2="45"/>` +
+            `<line x1="56" y1="50" x2="68" y2="50"/>` +
+            `<line x1="62" y1="44" x2="62" y2="56"/>` +
+            `<line x1="57" y1="45" x2="67" y2="55"/>` +
+            `<line x1="57" y1="55" x2="67" y2="45"/>` +
+            `</g>`,
+        googly:   () =>
+            `<circle cx="38" cy="50" r="9" fill="#fff" stroke="#000" stroke-width="2"/>` +
+            `<circle cx="62" cy="50" r="9" fill="#fff" stroke="#000" stroke-width="2"/>` +
+            `<circle cx="40" cy="52" r="4" fill="#000"/>` +
+            `<circle cx="60" cy="48" r="4" fill="#000"/>`,
+        gear:     () =>
+            `<g fill="#000">` +
+            `<polygon points="38,42 41,46 45,46 43,50 45,54 41,54 38,58 35,54 31,54 33,50 31,46 35,46"/>` +
+            `<polygon points="62,42 65,46 69,46 67,50 69,54 65,54 62,58 59,54 55,54 57,50 55,46 59,46"/>` +
+            `</g>` +
+            `<circle cx="38" cy="50" r="2" fill="#fff"/>` +
+            `<circle cx="62" cy="50" r="2" fill="#fff"/>`,
+        star:     () =>
+            `<g fill="#fff" stroke="#000" stroke-width="1.5">` +
+            `<polygon points="38,42 40.5,48 47,48 41.5,52 43.5,58 38,54.5 32.5,58 34.5,52 29,48 35.5,48"/>` +
+            `<polygon points="62,42 64.5,48 71,48 65.5,52 67.5,58 62,54.5 56.5,58 58.5,52 53,48 59.5,48"/>` +
+            `</g>`,
+        sleepy:   () =>
+            `<path d="M 30 52 Q 38 47 46 52" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
+            `<path d="M 54 52 Q 62 47 70 52" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`
+    };
+
+    const MOUTH_RENDERERS = {
+        smile:    () =>
+            `<path d="M 38 66 Q 50 76 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
+        smirk:    () =>
+            `<path d="M 38 70 Q 50 74 62 67" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
+        o:        () =>
+            `<ellipse cx="50" cy="71" rx="6" ry="7" fill="#000"/>` +
+            `<ellipse cx="50" cy="69" rx="3" ry="3" fill="#7f1d1d"/>`,
+        fanged:   () =>
+            `<path d="M 38 66 Q 50 72 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
+            `<polygon points="44,67 47,72 49,67" fill="#fff" stroke="#000" stroke-width="1"/>` +
+            `<polygon points="51,67 53,72 56,67" fill="#fff" stroke="#000" stroke-width="1"/>`,
+        straight: () =>
+            `<line x1="40" y1="70" x2="60" y2="70" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
+        tongue:   () =>
+            `<path d="M 38 66 Q 50 76 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
+            `<ellipse cx="50" cy="74" rx="5" ry="6" fill="#ec4899"/>`
+    };
+
+    const BROW_RENDERERS = {
+        arched: () =>
+            `<path d="M 30 40 Q 38 36 46 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
+            `<path d="M 54 40 Q 62 36 70 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
+        sharp:  () =>
+            `<line x1="30" y1="42" x2="46" y2="38" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
+            `<line x1="70" y1="42" x2="54" y2="38" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
+        flat:   () =>
+            `<line x1="30" y1="40" x2="46" y2="40" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
+            `<line x1="54" y1="40" x2="70" y2="40" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
+        raised: () =>
+            `<path d="M 30 40 Q 38 33 46 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
+            `<path d="M 54 40 Q 62 33 70 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`
+    };
+
+    const EXTRA_RENDERERS = {
+        blush:         () =>
+            `<ellipse cx="24" cy="62" rx="5" ry="3" fill="#ec4899" opacity="0.5"/>` +
+            `<ellipse cx="76" cy="62" rx="5" ry="3" fill="#ec4899" opacity="0.5"/>`,
+        freckles:      () =>
+            `<g fill="#92400e" opacity="0.7">` +
+            `<circle cx="34" cy="62" r="0.8"/>` +
+            `<circle cx="40" cy="63" r="0.8"/>` +
+            `<circle cx="36" cy="65" r="0.8"/>` +
+            `<circle cx="60" cy="62" r="0.8"/>` +
+            `<circle cx="66" cy="63" r="0.8"/>` +
+            `<circle cx="64" cy="65" r="0.8"/>` +
+            `</g>`,
+        'beauty-mark': () =>
+            `<circle cx="62" cy="76" r="1.2" fill="#1f2937"/>`,
+        scar:          () =>
+            `<path d="M 28 50 L 22 56 L 26 60 L 22 64" fill="none" stroke="#7f1d1d" stroke-width="1.5"/>`
+    };
+
+    // Compose a face from a {eyes, mouth, brow, extra} combo. Missing fields
+    // fall back to the friendly defaults (button eyes, smile mouth). The
+    // result is the inner-head SVG that sits between .head-shape (colored
+    // circle) and .head-phones in the layered head rig.
+    function headFaceArt(face) {
+        face = face || {};
+        const brow  = face.brow  ? (BROW_RENDERERS[face.brow]   || (() => ''))() : '';
+        const eyes  = (EYE_RENDERERS[face.eyes]   || EYE_RENDERERS.button)();
+        const mouth = (MOUTH_RENDERERS[face.mouth] || MOUTH_RENDERERS.smile)();
+        const extra = face.extra ? (EXTRA_RENDERERS[face.extra] || (() => ''))() : '';
         return `<svg class="head-face" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            + `<circle cx="38" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>`
-            + `<circle cx="62" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>`
-            + `<circle cx="38" cy="51" r="3.5" fill="#000"/>`
-            + `<circle cx="62" cy="51" r="3.5" fill="#000"/>`
-            + `<circle cx="39" cy="50" r="1.4" fill="#fff"/>`
-            + `<circle cx="63" cy="50" r="1.4" fill="#fff"/>`
-            + `<path d="M 38 66 Q 50 76 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`
+            + brow + eyes + mouth + extra
             + `</svg>`;
     }
 
@@ -980,7 +1086,7 @@ const CHARACTERS = {
     }
 
     function headArt(c) {
-        const inner = c.headFrame ? headModArt(c.headFrame, c.sheet) : headFaceArt();
+        const inner = c.headFrame ? headModArt(c.headFrame, c.sheet) : headFaceArt(c.face);
         return headShapeArt(c) + inner + hairArt(c) + headPhonesArt();
     }
 
