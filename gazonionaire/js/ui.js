@@ -229,8 +229,6 @@
     if (!el) return;
     el.innerHTML = `
       <div class="loc-card-head">
-        <img class="loc-card-icon" src="assets/images/${loc.icon}" alt=""
-             onerror="this.style.visibility='hidden'"/>
         <div>
           <div class="loc-card-name">${loc.name}</div>
           <div class="loc-card-tag">${loc.tagline || ""}</div>
@@ -294,8 +292,6 @@
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>
-          <img class="good-icon" src="assets/images/${good.icon}" alt=""
-               onerror="this.style.visibility='hidden'"/>
           ${good.name}${good.legal ? "" : ' <span class="trend-down" title="contraband">⚠</span>'}
         </td>
         <td class="num">${fmt(price)} ¢</td>
@@ -440,8 +436,6 @@
       if (here) li.classList.add("current");
       li.innerHTML = `
         <span class="travel-name">
-          <img class="loc-icon" src="assets/images/${loc.icon}" alt=""
-               onerror="this.style.visibility='hidden'"/>
           ${loc.name}
         </span>
         ${
@@ -484,7 +478,6 @@
     showModal({
       title: loc.name,
       body:  loc.lore || loc.tagline || "",
-      img:   "assets/images/" + (loc.icon || ""),
       actions: [{ label: "Dock", run: hideModal }],
     });
   }
@@ -624,7 +617,6 @@
       body: s.win
         ? `Net worth: ${fmt(Game.netWorth())} ¢ in ${s.day - 1} days. You're a GazOnionaire!`
         : `Net worth: ${fmt(Game.netWorth())} ¢. The void claims another trader.`,
-      img: "assets/images/" + (s.win ? "win.png" : "lose.png"),
       actions: [{
         label: "New Game",
         run: () => {
