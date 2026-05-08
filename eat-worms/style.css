@@ -8,7 +8,6 @@
     --shore-glow:   rgba(0, 255, 204, 0.18);
     --worm-pink:    #ec4899;
     --worm-deep:    #831843;
-    --line:         rgba(255, 255, 255, 0.6);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -88,6 +87,9 @@ header.top h1 {
 .header-spacer { min-width: 40px; }
 
 /* ---------- stage ---------- */
+/* All-water stage. Player POV is "looking down at the pond from a boat
+   or dock just below the bottom of the screen." The fishing line trails
+   from off-screen below the viewport up to the worm. */
 .stage {
     flex: 1;
     position: relative;
@@ -97,7 +99,7 @@ header.top h1 {
     background:
         linear-gradient(
             to bottom,
-            var(--water-top) 0%,
+            var(--water-top)  0%,
             var(--water-mid) 55%,
             var(--water-deep) 100%
         );
@@ -114,35 +116,19 @@ header.top h1 {
         );
     pointer-events: none;
 }
-
-.waterline {
+/* Soft vignette near the bottom edge to suggest the player's POV
+   "horizon" — the implied dock/boat shadow below the screen. */
+.stage::after {
+    content: '';
     position: absolute;
-    bottom: var(--shore-h, 22%);
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6), transparent);
-    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.35);
+    left: 0; right: 0; bottom: 0;
+    height: 25%;
+    background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 100%);
     pointer-events: none;
+    z-index: 1;
 }
 
-.shore {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: var(--shore-h, 22%);
-    background:
-        radial-gradient(ellipse at 50% 0%, var(--shore-glow), transparent 70%),
-        linear-gradient(to bottom, #14223a 0%, var(--shore) 100%);
-    border-top: 1px solid rgba(0, 255, 204, 0.25);
-    z-index: 2;
-}
-
-/* ---------- worm motion (giggly redesign) ---------- */
-/* Idle: gentle wiggle, like the worm's alive and bored. Pulling: panic
-   wiggle — fast, squirmy, stretching vertically as the kid yanks it
-   back. Flight: full tumble, end over end. */
+/* ---------- worm motion ---------- */
 @keyframes worm-idle-wiggle {
     0%, 100% { transform: translateX(-50%) rotate(-3deg); }
     50%      { transform: translateX(-50%) rotate( 3deg); }
@@ -164,13 +150,16 @@ header.top h1 {
     100% { transform: translateX(-50%) scale(1) rotate(0deg); }
 }
 
+/* Worm at rest dangles in the lower-middle of the stage so there's room
+   to PULL it down without going off-screen. The line trails out the
+   bottom from beneath it. */
 .bait {
     position: absolute;
-    bottom: calc(var(--shore-h, 22%) * 0.5 - 22px);
+    bottom: 18%;
     left: 50%;
     transform: translateX(-50%);
-    width: 80px;
-    height: 44px;
+    width: 92px;
+    height: 56px;
     z-index: 4;
     pointer-events: auto;
     touch-action: none;
@@ -180,9 +169,9 @@ header.top h1 {
     width: 100%;
     height: 100%;
     display: block;
+    overflow: visible;
     filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
 }
-/* Faint glow under the worm so kids see the touch target. */
 .bait::before {
     content: '';
     position: absolute;
@@ -192,54 +181,42 @@ header.top h1 {
     pointer-events: none;
 }
 
-/* During pull, the worm is JS-positioned via top/left and panic-wiggles. */
 .bait.pulling {
     bottom: auto;
     left: 0;
     top: 0;
-    animation: worm-panic-wiggle 0.16s linear infinite;
+    animation: worm-panic-wiggle 0.13s linear infinite;
 }
-/* During flight, JS positions and the tumble keyframe spins it. */
 .bait.in-flight {
     bottom: auto;
     left: 0;
     top: 0;
-    animation: worm-tumble 0.55s linear infinite;
+    animation: worm-tumble 0.45s linear infinite;
 }
-/* Pop animation when the worm respawns on shore. */
-.bait.popping { animation: worm-respawn-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) forwards; }
+.bait.popping  { animation: worm-respawn-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) forwards; }
+.bait.underwater {
+    /* While the worm bobs in the water waiting for a bite, eye+body get
+       a chill, slow sway. */
+    bottom: auto;
+    left: 0;
+    top: 0;
+    animation: worm-idle-wiggle 2s ease-in-out infinite;
+    opacity: 0.92;
+}
+
+/* ---------- worm face: panic eyes + open mouth on pull / flight ---------- */
+/* Normal: filled black pupil at r=2.8, tiny mouth. Panic: shrinks the
+   pupil so the white eye dominates ("OH NO" face); widens the mouth. */
+.worm-face .worm-pupil { transition: r 0.05s; }
+.worm-face .worm-mouth { transition: rx 0.08s, ry 0.08s; }
+.bait.pulling   .worm-pupil,
+.bait.in-flight .worm-pupil { r: 1.1; }
+.bait.pulling   .worm-mouth,
+.bait.in-flight .worm-mouth { rx: 4.5; ry: 5.5; }
 
 body.flying .bait { pointer-events: none; }
 
-/* ---------- rubber-band slingshot ---------- */
-/* Pink elastic line from the worm's shore anchor to the finger while
-   the kid is yanking. Replaces the dotted aim arc — this is a
-   slingshot, not an aiming reticle. */
-.band-layer {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    z-index: 5;
-    width: 100%;
-    height: 100%;
-    display: none;
-}
-.band-layer.active { display: block; }
-.rubber-band {
-    fill: none;
-    stroke: var(--worm-pink);
-    stroke-width: 7;
-    stroke-linecap: round;
-    filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.7));
-}
-.rubber-band-shadow {
-    fill: none;
-    stroke: rgba(0, 0, 0, 0.4);
-    stroke-width: 11;
-    stroke-linecap: round;
-}
-
-/* ---------- fishing line (kept, just thinner now) ---------- */
+/* ---------- fishing line (origin at off-screen bottom, tension shifts) ---------- */
 .line-layer {
     position: absolute;
     inset: 0;
@@ -247,16 +224,28 @@ body.flying .bait { pointer-events: none; }
     z-index: 3;
     width: 100%;
     height: 100%;
+    overflow: visible;
 }
 .fish-line {
-    stroke: rgba(255, 255, 255, 0.4);
-    stroke-width: 1.5;
+    stroke: rgba(255, 255, 255, 0.55);
+    stroke-width: 2;
     stroke-linecap: round;
+    transition: stroke 0.06s, stroke-width 0.06s, filter 0.06s;
+}
+/* Tension state — color shifts toward pink, line thickens, glow appears
+   as the kid stretches the slingshot. JS sets a tension level 0..1 via
+   the --tension CSS var to drive smooth interpolation. */
+.line-layer.taut .fish-line {
+    stroke: var(--worm-pink);
+    stroke-width: 3.5;
+    filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.85));
 }
 
+/* Legacy band-layer kept in DOM for compatibility but hidden — the
+   line-layer now does double duty as the slingshot. */
+.band-layer { display: none !important; }
+
 /* ---------- comedy text bursts ---------- */
-/* "WHEEE!", "SPLOOSH!", "BOING!" — bright, bold, jagged cartoon text
-   that pops in at key moments and floats up while fading. */
 .toon-text {
     position: absolute;
     transform: translate(-50%, -50%) rotate(var(--toon-rot, -8deg));
@@ -287,7 +276,7 @@ body.flying .bait { pointer-events: none; }
     100% { opacity: 0; transform: translate(-50%, calc(-50% - 60px)) rotate(var(--toon-rot, -8deg)) scale(0.85); }
 }
 
-/* ---------- splash + droplets (cranked up) ---------- */
+/* ---------- splash ---------- */
 .splash {
     position: absolute;
     width: 0;
@@ -319,6 +308,56 @@ body.flying .bait { pointer-events: none; }
 @keyframes droplet-fly {
     0%   { opacity: 1; transform: translate(-50%, -50%) translate(0, 0) scale(1); }
     100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--dx, 0), var(--dy, -90px)) scale(0.35); }
+}
+
+/* ---------- screen shake on water entry ---------- */
+@keyframes stage-shake {
+    0%, 100% { transform: translate(0, 0); }
+    20%      { transform: translate(-3px, 1px); }
+    40%      { transform: translate(2px, -2px); }
+    60%      { transform: translate(-2px, 2px); }
+    80%      { transform: translate(2px, 1px); }
+}
+.stage.shake { animation: stage-shake 0.32s ease-out; }
+
+/* ---------- chasing ripples (fish under-water trail) ---------- */
+/* Each ripple is one expanding ring. We spawn 3-4 of them at staggered
+   delays along a curve from the splash point toward the worm's resting
+   spot underwater, suggesting a hunting fish leaving a wake. */
+.ripple {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 4;
+    animation: ripple-grow 1.1s ease-out forwards;
+}
+@keyframes ripple-grow {
+    0%   { opacity: 0;   width: 14px; height: 14px; }
+    20%  { opacity: 0.85; }
+    100% { opacity: 0;   width: 70px; height: 36px; border-width: 1px; }
+}
+
+/* Tiny rising bubble for the glub-glub visual. */
+.bubble {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.18);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 4;
+    animation: bubble-rise 1.4s ease-out forwards;
+}
+@keyframes bubble-rise {
+    0%   { opacity: 0;    transform: translate(-50%, -50%) translate(0, 0) scale(0.6); }
+    25%  { opacity: 0.9;  }
+    100% { opacity: 0;    transform: translate(-50%, -50%) translate(var(--bx, 0), var(--by, -60px)) scale(1.1); }
 }
 
 /* ---------- collection bar ---------- */
