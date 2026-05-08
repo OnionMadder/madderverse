@@ -1,0 +1,135 @@
+{
+  "frames": {
+    "13": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 112,
+        "h": 112
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 112,
+        "h": 112
+      },
+      "sourceSize": {
+        "w": 112,
+        "h": 112
+      }
+    },
+    "14": {
+      "frame": {
+        "x": 125,
+        "y": 2,
+        "w": 101,
+        "h": 101
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 101,
+        "h": 101
+      },
+      "sourceSize": {
+        "w": 101,
+        "h": 101
+      }
+    },
+    "15": {
+      "frame": {
+        "x": 238,
+        "y": 2,
+        "w": 115,
+        "h": 115
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 115,
+        "h": 115
+      },
+      "sourceSize": {
+        "w": 115,
+        "h": 115
+      }
+    },
+    "16": {
+      "frame": {
+        "x": 2,
+        "y": 119,
+        "w": 121,
+        "h": 121
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 121,
+        "h": 121
+      },
+      "sourceSize": {
+        "w": 121,
+        "h": 121
+      }
+    },
+    "17": {
+      "frame": {
+        "x": 125,
+        "y": 119,
+        "w": 111,
+        "h": 111
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 111,
+        "h": 111
+      },
+      "sourceSize": {
+        "w": 111,
+        "h": 111
+      }
+    },
+    "20": {
+      "frame": {
+        "x": 238,
+        "y": 119,
+        "w": 121,
+        "h": 121
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 121,
+        "h": 121
+      },
+      "sourceSize": {
+        "w": 121,
+        "h": 121
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 361,
+      "h": 242
+    },
+    "scale": "1"
+  }
+}

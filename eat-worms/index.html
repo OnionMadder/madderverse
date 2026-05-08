@@ -64,11 +64,34 @@
         <path id="bandPath"   class="rubber-band"        d=""/>
     </svg>
 
-    <!-- Worm bait: sprite-sheet-driven. game.js swaps background-position
-         to advance frames as the state machine changes (idle / pull
-         tension / flight panic / splash). Source sheet:
-         sprites/worm-catch.png (1080x1335 per frame, 6 cols x 3 rows). -->
-    <div class="bait" id="bait" aria-label="Worm bait"></div>
+    <!-- Worm bait. .bait is a positioned wrapper; the inner .bait-sprite
+         div is the sprite renderer. game.js loads four phase sheets
+         (panic / catch / fling / land) and swaps the sprite's
+         background-image + background-position per frame as the state
+         machine progresses. -->
+    <div class="bait" id="bait" aria-label="Worm bait">
+        <div class="bait-sprite" id="baitSprite" aria-hidden="true"></div>
+    </div>
+
+    <!-- Black wipe overlay used for the cutaway moment between the
+         above-water shot and the side-view underwater scene. -->
+    <div class="wipe" id="wipe" aria-hidden="true"></div>
+
+    <!-- Underwater silhouette layer — only visible while .stage.underwater
+         is set. Worm + fish are placeholder shadow shapes until the real
+         side-view art lands. -->
+    <div class="underwater-layer" id="underwater" aria-hidden="true">
+        <svg class="under-shadow under-worm" viewBox="0 0 120 28" preserveAspectRatio="xMidYMid meet">
+            <path d="M 6 14 Q 18 4 30 14 T 54 14 T 78 14 T 102 14 T 116 14"
+                  stroke="#000" stroke-width="7" fill="none" stroke-linecap="round" opacity="0.85"/>
+        </svg>
+        <svg class="under-shadow under-fish" viewBox="0 0 140 60" preserveAspectRatio="xMidYMid meet">
+            <ellipse cx="70" cy="30" rx="48" ry="18" fill="#000" opacity="0.9"/>
+            <polygon points="22,30 0,12 0,48" fill="#000" opacity="0.9"/>
+            <circle cx="98" cy="24" r="3" fill="#fff"/>
+            <circle cx="98" cy="24" r="1.5" fill="#000"/>
+        </svg>
+    </div>
 
     <footer>
         &copy; <span id="year"></span>

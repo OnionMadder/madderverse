@@ -11,14 +11,6 @@
     --shore-glow:   rgba(0, 255, 204, 0.18);
     --worm-pink:    #ec4899;
     --worm-deep:    #831843;
-
-    /* Sprite sheet dimensions — must match sprites/worm-catch.json. */
-    --worm-w: 110px;
-    --worm-h: 136px;
-    /* (sheet_w / src_w) * worm_w  =  (6487 / 1080) * 110 ≈ 660.7
-       (sheet_h / src_h) * worm_h  =  (4009 / 1335) * 136 ≈ 408.4 */
-    --worm-sheet-w: 660.7px;
-    --worm-sheet-h: 408.4px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -199,6 +191,71 @@ header.top h1 {
     top: 0;
 }
 
+/* ---------- wipe overlay ----------
+   Solid black panel that slides up across the stage between the
+   above-water and underwater views. Briefly covers the screen so
+   the underwater silhouettes appear behind it as it clears. */
+.wipe {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    transform: translateY(100%);
+    pointer-events: none;
+    z-index: 9;
+}
+.wipe.go {
+    animation: wipe-up 0.6s cubic-bezier(0.4, 0, 0.6, 0.5);
+}
+@keyframes wipe-up {
+    0%   { transform: translateY(100%); }
+    50%  { transform: translateY(0); }
+    100% { transform: translateY(-100%); }
+}
+
+/* ---------- underwater silhouette layer ----------
+   Hidden until .stage.underwater is set. Worm + hungry fish appear
+   as black shadows; placeholders for the side-view chase art. */
+.underwater-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    display: none;
+}
+.stage.underwater .underwater-layer { display: block; }
+.under-shadow.under-worm {
+    position: absolute;
+    bottom: 38%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36%;
+    max-width: 200px;
+    height: auto;
+    animation: under-worm-sway 1.6s ease-in-out infinite;
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.6));
+}
+@keyframes under-worm-sway {
+    0%, 100% { transform: translateX(-50%) rotate(-4deg); }
+    50%      { transform: translateX(-50%) rotate(4deg); }
+}
+.under-shadow.under-fish {
+    position: absolute;
+    bottom: 22%;
+    left: -25%;
+    width: 28%;
+    max-width: 160px;
+    height: auto;
+    animation: under-fish-swim 6s linear infinite;
+    filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55));
+}
+@keyframes under-fish-swim {
+    0%   { left: -25%; transform: scaleX(1); }
+    45%  { left: 90%;  transform: scaleX(1); }
+    50%  { left: 90%;  transform: scaleX(-1); }
+    95%  { left: -25%; transform: scaleX(-1); }
+    100% { left: -25%; transform: scaleX(1); }
+}
+
 /* ---------- worm sprite ---------- */
 /* The worm is a single <div> backed by sprites/worm-catch.png. game.js
    swaps `background-position` to advance frames. Frame catalog and
@@ -232,27 +289,35 @@ header.top h1 {
 
 /* At rest: dangling above the lake at ~32% from the top, in the sky
    band. Centered both axes so cursor positioning during pull/flight
-   tracks the worm's middle. */
+   tracks the worm's middle. The .bait wrapper is a flex-centered box
+   sized generously enough to fit any phase frame; the inner
+   .bait-sprite div is the actual sprite renderer (game.js swaps its
+   background-image + position per frame). */
 .bait {
     position: absolute;
     top: 32%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: var(--worm-w);
-    height: var(--worm-h);
+    width: 130px;
+    height: 130px;
     z-index: 4;
     pointer-events: auto;
     touch-action: none;
-
-    background-image: url('sprites/worm-catch.png');
-    background-repeat: no-repeat;
-    background-size: var(--worm-sheet-w) var(--worm-sheet-h);
-    /* Initial position points at frame 1; game.js takes over via
-       setFrame() on first paint. */
-    background-position: 0 0;
-
+    display: flex;
+    align-items: center;
+    justify-content: center;
     filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.55));
     animation: worm-idle-wiggle 2.4s ease-in-out infinite;
+}
+/* Sprite renderer sized per-frame by game.js. image-rendering tweaks
+   keep edges crisp at non-1× scaling; remove if the sprites are
+   anti-aliased. */
+.bait-sprite {
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    width: 110px;
+    height: 110px;
 }
 /* Soft cyan halo around the worm at rest to show it's tappable. */
 .bait::before {
