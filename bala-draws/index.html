@@ -2,81 +2,76 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Explore the Madderverse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Bala Draws</title>
     <link rel="canonical" href="https://madderverse.org/bala-draws/" />
     <meta property="og:url" content="https://madderverse.org/bala-draws/" />
     <meta name="twitter:url" content="https://madderverse.org/bala-draws/" />
-    <meta name="title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
-    <meta name="description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
-    <meta name="keywords" content="FYMZ, Find Your Madder Zone, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, digital pets, safe gaming for kids" />
+    <meta name="title" content="Bala Draws - The Madderverse" />
+    <meta name="description" content="Doodle on a blank canvas, then watch it bounce to a beat with wild CSS effects. Free and ad-free for kids." />
+    <meta name="keywords" content="The Madderverse, Onion Madder, Mad Sundar LLC, indie kids games, free kids games, ad-free games, drawing, dance, doodle, beat" />
     <meta name="author" content="Onion Madder" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
-    <meta property="og:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
-    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" /> <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Find Your Madder Zone - Fun, Free Games for Kids. No Ads, Ever." />
-    <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids. Discover the Madderverse." />
+    <meta property="og:title" content="Bala Draws - Doodle, drum, dazzle." />
+    <meta property="og:description" content="Free, ad-free drawing toy that bounces your art to a beat." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bala Draws - Doodle, drum, dazzle." />
+    <meta name="twitter:description" content="Free, ad-free drawing toy that bounces your art to a beat." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
     <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
-    <meta name="theme-color" content="#00ffcc" /> 
-    <meta name="apple-mobile-web-app-title" content="FYMZ" />
-    <meta name="application-name" content="FYMZ" />
+    <meta name="theme-color" content="#00ffcc" />
+    <meta name="apple-mobile-web-app-title" content="Bala Draws" />
+    <meta name="application-name" content="Bala Draws" />
     <link rel="stylesheet" href="style.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
 <header class="top">
-    <a href="../" class="back">&larr; FYMZ</a>
+    <a href="../" class="back">&larr; Madderverse</a>
     <h1>Bala Draws</h1>
-    <button class="rotate-btn" id="rotate" aria-label="Rotate canvas"><span class="ico">⟲</span></button>
+    <span class="header-spacer" aria-hidden="true"></span>
 </header>
 
-<div class="stage">
-    <div class="paper-frame frame-none" id="paper-frame">
-        <div class="paper landscape" id="paper">
-            <svg id="template-svg" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet"></svg>
-            <canvas id="canvas"></canvas>
+<main class="stage" id="stage">
+    <div class="paper" id="paper">
+        <div class="fx-layer" id="fx-layer">
+            <canvas id="canvas" aria-label="Drawing canvas"></canvas>
         </div>
     </div>
-</div>
+</main>
 
 <div class="toolbar">
-    <div class="panel-area">
-        <div class="panel panel-tools active" data-panel="tools">
-            <div class="palette" id="palette"></div>
-            <div class="row">
-                <div class="sizes" id="brush-sizes">
-                    <button class="size-btn" data-size="4" aria-label="Small brush"><span class="dot"></span></button>
-                    <button class="size-btn active" data-size="14" aria-label="Medium brush"><span class="dot"></span></button>
-                    <button class="size-btn" data-size="30" aria-label="Big brush"><span class="dot"></span></button>
-                </div>
-                <button class="tool-btn" id="eraser" aria-label="Eraser"><span class="ico">🧽</span><span class="lbl">Erase</span></button>
-                <button class="tool-btn" id="clear" aria-label="Clear"><span class="ico">🗑️</span><span class="lbl">Clear</span></button>
-            </div>
+    <div class="palette" id="palette" role="toolbar" aria-label="Color palette"></div>
+
+    <div class="row">
+        <div class="sizes" id="brush-sizes" role="toolbar" aria-label="Brush size">
+            <button class="size-btn" data-size="3" aria-label="Thin pencil"><span class="dot dot-s"></span></button>
+            <button class="size-btn active" data-size="10" aria-label="Medium pencil"><span class="dot dot-m"></span></button>
+            <button class="size-btn" data-size="24" aria-label="Thick pencil"><span class="dot dot-l"></span></button>
         </div>
-        <div class="panel panel-pages" data-panel="pages">
-            <div class="thumbs" id="page-thumbs"></div>
-        </div>
-        <div class="panel panel-frames" data-panel="frames">
-            <div class="thumbs" id="frame-thumbs"></div>
-        </div>
+        <button class="tool-btn" id="eraser" aria-label="Eraser"><span class="ico">🧽</span><span class="lbl">Erase</span></button>
+        <button class="tool-btn" id="clear" aria-label="Clear drawing"><span class="ico">🗑️</span><span class="lbl">Clear</span></button>
     </div>
-    <div class="tabs-row">
-        <button class="tab-btn active" data-tab="tools" aria-label="Drawing tools"><span class="ico">🎨</span><span class="lbl">Tools</span></button>
-        <button class="tab-btn" data-tab="pages" aria-label="Pages"><span class="ico">📄</span><span class="lbl">Pages</span></button>
-        <button class="tab-btn" data-tab="frames" aria-label="Frames"><span class="ico">🖼️</span><span class="lbl">Frames</span></button>
-        <button class="tool-btn newpage" id="new-page" aria-label="New page"><span class="ico">✨</span><span class="lbl">New</span></button>
-        <button class="tool-btn primary" id="save" aria-label="Save"><span class="ico">💾</span><span class="lbl">Save</span></button>
+
+    <div class="row beat-row">
+        <button class="tool-btn primary" id="play" aria-label="Play beat"><span class="ico" id="play-ico">▶</span><span class="lbl" id="play-lbl">Play</span></button>
+        <button class="tool-btn cycle" id="cycle" aria-label="Next beat"><span class="ico">🔁</span><span class="lbl" id="beat-name">Boom Bap</span></button>
     </div>
+
+    <div class="row effects" id="effects" role="toolbar" aria-label="Effects"></div>
 </div>
 
-<script src="game.js"></script>
+<footer>
+    <p>&copy; <span id="year"></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar</a></p>
+</footer>
 
+<script src="game.js"></script>
+<script>document.getElementById("year").textContent = new Date().getFullYear();</script>
 </body>
 </html>
