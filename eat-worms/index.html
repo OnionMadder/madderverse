@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>Go Eat Worms</title>
+    <link rel="canonical" href="https://madderverse.org/eat-worms/" />
+    <meta property="og:url" content="https://madderverse.org/eat-worms/" />
+    <meta name="twitter:url" content="https://madderverse.org/eat-worms/" />
+    <meta name="title" content="Go Eat Worms - A No-Fail Fishing Toy from The Madderverse" />
+    <meta name="description" content="Flick the worm, splash into the water, catch fish (and weirder stuff). Free, ad-free, kid-friendly." />
+    <meta name="keywords" content="kids fishing game, flick to cast, no-fail fishing, ad-free games, The Madderverse, Onion Madder, Mad Sundar LLC, indie kids games" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Go Eat Worms - A No-Fail Fishing Toy from The Madderverse" />
+    <meta property="og:description" content="Flick the worm, splash into the water, catch fish (and weirder stuff)." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Go Eat Worms - A No-Fail Fishing Toy from The Madderverse" />
+    <meta name="twitter:description" content="Flick the worm, splash into the water, catch fish (and weirder stuff)." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" />
+    <meta name="apple-mobile-web-app-title" content="Go Eat Worms" />
+    <meta name="application-name" content="Go Eat Worms" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+
+<style>
+:root {
+    --accent-cyan: #00ffcc;
+    --accent-pink: #ff00ff;
+    --water-top:    #2dd4bf;
+    --water-mid:    #1d4ed8;
+    --water-deep:   #0c1f3a;
+    --shore:        #1a1a2e;
+    --shore-glow:   rgba(0, 255, 204, 0.18);
+    --worm-pink:    #ec4899;
+    --worm-deep:    #831843;
+    --line:         rgba(255, 255, 255, 0.6);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+    margin: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #fff;
+    background: var(--shore);
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+/* ---------- header ---------- */
+header.top {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    min-height: 44px;
+    z-index: 10;
+}
+
+header.top h1 {
+    font-size: clamp(1rem, 4vw, 1.4rem);
+    margin: 0;
+    font-weight: 900;
+    background: linear-gradient(to bottom, #fff 60%, var(--accent-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(2px 2px 0 var(--accent-pink));
+    letter-spacing: 1px;
+    white-space: nowrap;
+    text-align: center;
+    flex: 1;
+}
+
+.back {
+    color: var(--accent-cyan);
+    text-decoration: none;
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--accent-cyan);
+    border-radius: 8px;
+    white-space: nowrap;
+    min-height: 40px;
+    min-width: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    background: transparent;
+    cursor: pointer;
+    line-height: 1;
+}
+.back:active {
+    background: var(--accent-cyan);
+    color: #000;
+    box-shadow: 0 0 12px var(--accent-cyan);
+}
+
+.header-spacer { min-width: 40px; }
+
+/* ---------- stage ---------- */
+/* Stage takes the rest of the viewport. Water area on top, shore at bottom.
+   touch-action: none disables browser scroll/pinch so flick gestures land
+   cleanly on the bait instead of scrolling the page. */
+.stage {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    touch-action: none;
+    background:
+        linear-gradient(
+            to bottom,
+            var(--water-top) 0%,
+            var(--water-mid) 55%,
+            var(--water-deep) 100%
+        );
+}
+
+/* Subtle moving caustics-ish shimmer overlay on the water — pure CSS,
+   doesn't affect layout. */
+.stage::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            rgba(255, 255, 255, 0.03) 0 6px,
+            transparent 6px 18px
+        );
+    pointer-events: none;
+}
+
+/* Water-surface line near the top of the shore. Also acts as the splash
+   horizon for the flick mechanic (step 2). */
+.waterline {
+    position: absolute;
+    bottom: var(--shore-h, 22%);
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6), transparent);
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+}
+
+/* ---------- shore (bottom band where the worm lives at rest) ---------- */
+.shore {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--shore-h, 22%);
+    background:
+        radial-gradient(ellipse at 50% 0%, var(--shore-glow), transparent 70%),
+        linear-gradient(to bottom, #14223a 0%, var(--shore) 100%);
+    border-top: 1px solid rgba(0, 255, 204, 0.25);
+    z-index: 2;
+}
+
+/* ---------- bait / worm ---------- */
+/* Worm sits on the shore at bottom-center. In step 2 it becomes draggable
+   and gets a fishing-line tether. For now it's a static placeholder so
+   the layout reads correctly. */
+.bait {
+    position: absolute;
+    bottom: calc(var(--shore-h, 22%) * 0.5 - 22px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 44px;
+    z-index: 3;
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.bait svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+}
+
+/* Faint guide ring under the worm so the kid sees the touch target. */
+.bait::before {
+    content: '';
+    position: absolute;
+    inset: -16px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 255, 204, 0.18), transparent 70%);
+    pointer-events: none;
+}
+
+/* ---------- collection bar (placeholder for step 5) ---------- */
+.collection {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-family: monospace;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.85);
+    pointer-events: auto;
+}
+.collection strong { color: var(--accent-cyan); }
+
+/* ---------- footer ---------- */
+footer {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.62rem;
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 6;
+}
+footer a { color: #fff; pointer-events: auto; }
+</style>
+
+</head>
+<body>
+
+<header class="top">
+    <a href="../" class="back">&larr; Madderverse</a>
+    <h1>Go Eat Worms</h1>
+    <span class="header-spacer" aria-hidden="true"></span>
+</header>
+
+<div class="stage" id="stage" aria-label="Fishing area">
+    <div class="waterline" aria-hidden="true"></div>
+    <div class="shore" aria-hidden="true"></div>
+
+    <div class="collection" id="collection">
+        Caught <strong id="caughtCount">0</strong>
+    </div>
+
+    <!-- Worm at rest on the shore. Step 2 will make this draggable. -->
+    <div class="bait" id="bait" aria-label="Worm bait">
+        <svg viewBox="0 0 80 44" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+            <!-- segmented body: a wavy thick stroke -->
+            <path
+                d="M 8 28 Q 18 14 28 28 T 48 28 T 68 28"
+                fill="none"
+                stroke="var(--worm-deep)"
+                stroke-width="13"
+                stroke-linecap="round"/>
+            <path
+                d="M 8 28 Q 18 14 28 28 T 48 28 T 68 28"
+                fill="none"
+                stroke="var(--worm-pink)"
+                stroke-width="9"
+                stroke-linecap="round"/>
+            <!-- segment ribs -->
+            <g stroke="var(--worm-deep)" stroke-width="1.5" stroke-linecap="round" opacity="0.55">
+                <line x1="18" y1="22" x2="18" y2="32"/>
+                <line x1="28" y1="20" x2="28" y2="36"/>
+                <line x1="38" y1="22" x2="38" y2="34"/>
+                <line x1="48" y1="20" x2="48" y2="36"/>
+                <line x1="58" y1="22" x2="58" y2="34"/>
+            </g>
+            <!-- eye on the rightmost end (head) -->
+            <circle cx="70" cy="26" r="2.6" fill="#fff"/>
+            <circle cx="70.6" cy="26" r="1.4" fill="#1a1a1a"/>
+        </svg>
+    </div>
+
+    <footer>
+        &copy; <span id="year"></span>
+        <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar</a>
+    </footer>
+</div>
+
+<script>
+(() => {
+    'use strict';
+
+    // ---------- DOM ----------
+    const stage      = document.getElementById('stage');
+    const bait       = document.getElementById('bait');
+    const caughtEl   = document.getElementById('caughtCount');
+    const yearEl     = document.getElementById('year');
+
+    yearEl.textContent = new Date().getFullYear();
+
+    // ---------- state ----------
+    // Persisted catch list lives in localStorage (step 5 wires this for real).
+    // Read it now so the count badge reflects past sessions.
+    const STORAGE_KEY = 'go-eat-worms-collection';
+    let collection = [];
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) collection = JSON.parse(raw) || [];
+    } catch (e) { /* ignore */ }
+    caughtEl.textContent = collection.length;
+
+    // ---------- orientation reflow ----------
+    // Reflow on orientation change without losing in-progress catches.
+    // For step 1 there's no in-flight state to preserve, but the listener
+    // is wired now so later steps can hook in.
+    function onResize() {
+        // future: reposition the bait, fish, and any in-flight cast
+        // relative to the new viewport.
+    }
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+
+    // ---------- placeholder: tap the bait to bump the catch count ----------
+    // Wired now just so the kid (and the dev) can see something happens
+    // when they touch the worm. Step 2 replaces this with the real
+    // touch-and-flick mechanic.
+    bait.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        bait.animate(
+            [
+                { transform: 'translateX(-50%) scale(1)' },
+                { transform: 'translateX(-50%) scale(1.18)' },
+                { transform: 'translateX(-50%) scale(1)' }
+            ],
+            { duration: 220, easing: 'ease-out' }
+        );
+    });
+
+    // ---------- ready ----------
+    // Future steps populate window.GoEatWorms with debug hooks if useful.
+})();
+</script>
+
+</body>
+</html>
