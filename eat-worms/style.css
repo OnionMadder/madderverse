@@ -1,6 +1,9 @@
 :root {
     --accent-cyan: #00ffcc;
     --accent-pink: #ff00ff;
+    --sky-top:      #4dc1f5;
+    --sky-mid:      #9fdcf2;
+    --sky-haze:     #d8efff;
     --water-top:    #2dd4bf;
     --water-mid:    #1d4ed8;
     --water-deep:   #0c1f3a;
@@ -8,6 +11,14 @@
     --shore-glow:   rgba(0, 255, 204, 0.18);
     --worm-pink:    #ec4899;
     --worm-deep:    #831843;
+
+    /* Sprite sheet dimensions — must match sprites/worm-catch.json. */
+    --worm-w: 110px;
+    --worm-h: 136px;
+    /* (sheet_w / src_w) * worm_w  =  (6487 / 1080) * 110 ≈ 660.7
+       (sheet_h / src_h) * worm_h  =  (4009 / 1335) * 136 ≈ 408.4 */
+    --worm-sheet-w: 660.7px;
+    --worm-sheet-h: 408.4px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -86,92 +97,164 @@ header.top h1 {
 
 .header-spacer { min-width: 40px; }
 
-/* ---------- stage ---------- */
-/* All-water stage. Player POV is "looking down at the pond from a boat
-   or dock just below the bottom of the screen." The fishing line trails
-   from off-screen below the viewport up to the worm. */
+/* ---------- stage: horizontal fishing scene ---------- */
+/* Player POV: angler standing on a dock or in a boat just below the
+   bottom of the screen, looking out across a lake. Top half is sky,
+   bottom half is water, separated by the .horizon band. The fishing
+   line trails from off-screen below the viewport up to the worm
+   dangling above the water. */
 .stage {
     flex: 1;
     position: relative;
     width: 100%;
     overflow: hidden;
     touch-action: none;
-    background:
-        linear-gradient(
-            to bottom,
-            var(--water-top)  0%,
-            var(--water-mid) 55%,
-            var(--water-deep) 100%
-        );
+    background: linear-gradient(
+        to bottom,
+        var(--water-top)  0%,
+        var(--water-mid) 60%,
+        var(--water-deep) 100%
+    );
 }
+
+/* Sky overlay covers the top half of the stage — the lake gradient on
+   .stage shows through the bottom half. On splash we fade the sky out
+   so the whole stage reads as underwater. */
+.sky {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 50%;
+    background: linear-gradient(
+        to bottom,
+        var(--sky-top) 0%,
+        var(--sky-mid) 65%,
+        var(--sky-haze) 100%
+    );
+    pointer-events: none;
+    z-index: 1;
+    transition: opacity 0.55s ease-out, transform 0.55s ease-out;
+}
+
+/* Bright haze band right at the waterline so sky → water reads as a
+   horizon, not a hard color cut. Also fades on .underwater. */
+.horizon {
+    position: absolute;
+    left: 0; right: 0;
+    top: 50%;
+    height: 6%;
+    transform: translateY(-50%);
+    background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.55) 0%,
+        rgba(255, 255, 255, 0.0) 100%
+    );
+    pointer-events: none;
+    z-index: 2;
+    transition: opacity 0.45s ease-out;
+}
+
+/* Water shimmer overlay — same crosshatch as before, but only over the
+   water half. Top of crosshatch starts at the horizon. */
 .stage::before {
     content: '';
     position: absolute;
-    inset: 0;
+    left: 0; right: 0;
+    top: 50%;
+    bottom: 0;
     background:
         repeating-linear-gradient(
             45deg,
-            rgba(255, 255, 255, 0.03) 0 6px,
+            rgba(255, 255, 255, 0.04) 0 6px,
             transparent 6px 18px
         );
     pointer-events: none;
+    z-index: 2;
+    transition: top 0.55s ease-out;
 }
-/* Soft vignette near the bottom edge to suggest the player's POV
-   "horizon" — the implied dock/boat shadow below the screen. */
+
+/* Vignette near the bottom edge — implied dock/boat shadow under the
+   angler, off-screen below. */
 .stage::after {
     content: '';
     position: absolute;
     left: 0; right: 0; bottom: 0;
-    height: 25%;
+    height: 22%;
     background: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.45) 100%);
     pointer-events: none;
     z-index: 1;
 }
 
-/* ---------- worm motion ---------- */
-@keyframes worm-idle-wiggle {
-    0%, 100% { transform: translateX(-50%) rotate(-3deg); }
-    50%      { transform: translateX(-50%) rotate( 3deg); }
+/* Underwater scene: triggered on water entry. Sky slides up + fades
+   away, horizon glow disappears, and the water shimmer fills the whole
+   stage so the camera reads as fully submerged. The actual side-view
+   chase artwork ships in a follow-up step (sprites TBD). */
+.stage.underwater .sky {
+    opacity: 0;
+    transform: translateY(-100%);
 }
-@keyframes worm-panic-wiggle {
-    0%   { transform: translate(-50%, -50%) rotate(-15deg) scaleY(1.10); }
-    25%  { transform: translate(-50%, -50%) rotate(  9deg) scaleY(0.93); }
-    50%  { transform: translate(-50%, -50%) rotate(-12deg) scaleY(1.12); }
-    75%  { transform: translate(-50%, -50%) rotate( 13deg) scaleY(0.92); }
-    100% { transform: translate(-50%, -50%) rotate(-15deg) scaleY(1.10); }
+.stage.underwater .horizon {
+    opacity: 0;
 }
-@keyframes worm-tumble {
-    from { transform: translate(-50%, -50%) rotate(0deg); }
-    to   { transform: translate(-50%, -50%) rotate(720deg); }
-}
-@keyframes worm-respawn-pop {
-    0%   { transform: translateX(-50%) scale(0); }
-    60%  { transform: translateX(-50%) scale(1.4) rotate(8deg); }
-    100% { transform: translateX(-50%) scale(1) rotate(0deg); }
+.stage.underwater::before {
+    top: 0;
 }
 
-/* Worm at rest dangles in the lower-middle of the stage so there's room
-   to PULL it down without going off-screen. The line trails out the
-   bottom from beneath it. */
+/* ---------- worm sprite ---------- */
+/* The worm is a single <div> backed by sprites/worm-catch.png. game.js
+   swaps `background-position` to advance frames. Frame catalog and
+   per-state mappings live in game.js's SPRITE config block. */
+
+@keyframes worm-idle-wiggle {
+    0%, 100% { transform: translate(-50%, -50%) rotate(-3deg); }
+    50%      { transform: translate(-50%, -50%) rotate( 3deg); }
+}
+@keyframes worm-panic-wiggle {
+    0%   { transform: translate(-50%, -50%) rotate(-12deg); }
+    25%  { transform: translate(-50%, -50%) rotate(  9deg); }
+    50%  { transform: translate(-50%, -50%) rotate(-10deg); }
+    75%  { transform: translate(-50%, -50%) rotate( 11deg); }
+    100% { transform: translate(-50%, -50%) rotate(-12deg); }
+}
+@keyframes worm-flight-wobble {
+    0%   { transform: translate(-50%, -50%) rotate(-14deg); }
+    50%  { transform: translate(-50%, -50%) rotate( 14deg); }
+    100% { transform: translate(-50%, -50%) rotate(-14deg); }
+}
+@keyframes worm-respawn-pop {
+    0%   { transform: translate(-50%, -50%) scale(0); }
+    60%  { transform: translate(-50%, -50%) scale(1.4) rotate(8deg); }
+    100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+}
+@keyframes worm-underwater-bob {
+    0%, 100% { transform: translate(-50%, -50%) rotate(-4deg) translateY(-3px); }
+    50%      { transform: translate(-50%, -50%) rotate( 4deg) translateY( 3px); }
+}
+
+/* At rest: dangling above the lake at ~32% from the top, in the sky
+   band. Centered both axes so cursor positioning during pull/flight
+   tracks the worm's middle. */
 .bait {
     position: absolute;
-    bottom: 18%;
+    top: 32%;
     left: 50%;
-    transform: translateX(-50%);
-    width: 92px;
-    height: 56px;
+    transform: translate(-50%, -50%);
+    width: var(--worm-w);
+    height: var(--worm-h);
     z-index: 4;
     pointer-events: auto;
     touch-action: none;
+
+    background-image: url('sprites/worm-catch.png');
+    background-repeat: no-repeat;
+    background-size: var(--worm-sheet-w) var(--worm-sheet-h);
+    /* Initial position points at frame 1; game.js takes over via
+       setFrame() on first paint. */
+    background-position: 0 0;
+
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.55));
     animation: worm-idle-wiggle 2.4s ease-in-out infinite;
 }
-.bait svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-    overflow: visible;
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
-}
+/* Soft cyan halo around the worm at rest to show it's tappable. */
 .bait::before {
     content: '';
     position: absolute;
@@ -179,40 +262,29 @@ header.top h1 {
     border-radius: 50%;
     background: radial-gradient(circle, rgba(0, 255, 204, 0.18), transparent 70%);
     pointer-events: none;
+    z-index: -1;
 }
 
 .bait.pulling {
-    bottom: auto;
-    left: 0;
     top: 0;
+    left: 0;
     animation: worm-panic-wiggle 0.13s linear infinite;
 }
 .bait.in-flight {
-    bottom: auto;
-    left: 0;
     top: 0;
-    animation: worm-tumble 0.45s linear infinite;
+    left: 0;
+    animation: worm-flight-wobble 0.18s linear infinite;
 }
-.bait.popping  { animation: worm-respawn-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) forwards; }
+.bait.popping  {
+    animation: worm-respawn-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) forwards;
+}
 .bait.underwater {
-    /* While the worm bobs in the water waiting for a bite, eye+body get
-       a chill, slow sway. */
-    bottom: auto;
-    left: 0;
+    /* While the worm bobs in the water waiting for a bite, sway slowly. */
     top: 0;
-    animation: worm-idle-wiggle 2s ease-in-out infinite;
-    opacity: 0.92;
+    left: 0;
+    animation: worm-underwater-bob 2.4s ease-in-out infinite;
+    opacity: 0.95;
 }
-
-/* ---------- worm face: panic eyes + open mouth on pull / flight ---------- */
-/* Normal: filled black pupil at r=2.8, tiny mouth. Panic: shrinks the
-   pupil so the white eye dominates ("OH NO" face); widens the mouth. */
-.worm-face .worm-pupil { transition: r 0.05s; }
-.worm-face .worm-mouth { transition: rx 0.08s, ry 0.08s; }
-.bait.pulling   .worm-pupil,
-.bait.in-flight .worm-pupil { r: 1.1; }
-.bait.pulling   .worm-mouth,
-.bait.in-flight .worm-mouth { rx: 4.5; ry: 5.5; }
 
 body.flying .bait { pointer-events: none; }
 
@@ -227,10 +299,10 @@ body.flying .bait { pointer-events: none; }
     overflow: visible;
 }
 .fish-line {
-    stroke: rgba(255, 255, 255, 0.55);
+    stroke: rgba(255, 255, 255, 0.65);
     stroke-width: 2;
     stroke-linecap: round;
-    transition: stroke 0.06s, stroke-width 0.06s, filter 0.06s;
+    transition: stroke 0.06s, stroke-width 0.06s, filter 0.06s, opacity 0.4s;
 }
 /* Tension state — color shifts toward pink, line thickens, glow appears
    as the kid stretches the slingshot. JS sets a tension level 0..1 via
@@ -239,6 +311,11 @@ body.flying .bait { pointer-events: none; }
     stroke: var(--worm-pink);
     stroke-width: 3.5;
     filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.85));
+}
+/* Hide the line once the worm is underwater — the angler has "let it
+   bob" and the underwater camera reads as detached from the rod. */
+.stage.underwater .fish-line {
+    opacity: 0;
 }
 
 /* Legacy band-layer kept in DOM for compatibility but hidden — the

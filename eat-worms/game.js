@@ -10,6 +10,84 @@
 
     yearEl.textContent = new Date().getFullYear();
 
+    // ====================================================================
+    //                       SPRITE SHEET
+    // ====================================================================
+    // The worm character is a single <div id="bait"> backed by
+    // sprites/worm-catch.png. setFrame(N) swaps background-position to
+    // point at frame N. Frame coords come straight from
+    // sprites/worm-catch.json (Sprite Sheet Maker output).
+    //
+    // Frame map (1-indexed, matches the JSON):
+    //   row 1 (1-6):   calm → mildly worried (idle / early pull)
+    //   row 2 (7-12):  escalating panic; frame 9 is the long stretched
+    //                  "being yanked" pose
+    //   row 3 (13-18): peak screaming flight, frame 18 is splash entry
+    //
+    // SPRITE.states picks which frame appears for each game state. If a
+    // frame doesn't read the way you'd want, swap numbers in
+    // SPRITE.states without touching anything else.
+    const SPRITE = {
+        sheet: {
+            srcW:    1080,   // single frame source width
+            srcH:    1335,   // single frame source height
+            displayW: 110,   // on-screen size; matches --worm-w in style.css
+            displayH: 136,   // matches --worm-h in style.css
+        },
+        // Pixel coords (top-left) of each frame in the source sheet.
+        // Pulled directly from worm-catch.json.
+        frames: {
+            1:  { x: 1,    y: 1    },
+            2:  { x: 1082, y: 1    },
+            3:  { x: 2163, y: 1    },
+            4:  { x: 3244, y: 1    },
+            5:  { x: 4325, y: 1    },
+            6:  { x: 5406, y: 1    },
+            7:  { x: 1,    y: 1337 },
+            8:  { x: 1082, y: 1337 },
+            9:  { x: 2163, y: 1337 },
+            10: { x: 3244, y: 1337 },
+            11: { x: 4325, y: 1337 },
+            12: { x: 5406, y: 1337 },
+            13: { x: 1,    y: 2673 },
+            14: { x: 1082, y: 2673 },
+            15: { x: 2163, y: 2673 },
+            16: { x: 3244, y: 2673 },
+            17: { x: 4325, y: 2673 },
+            18: { x: 5406, y: 2673 },
+        },
+        // Per-state frame choices.
+        states: {
+            // Idle: dangling on the line, waiting to be poked.
+            idle:   1,
+            // Pull tension ramp: indexed by tension 0..1. Last entry is
+            // "fully yanked" — frame 9 is the long stretched body.
+            pull:   [1, 2, 4, 6, 9],
+            // Flight: cycled rapidly so the worm visibly flips between
+            // panic poses while screaming through the air.
+            fly:    [10, 11, 14, 15, 16, 17],
+            // Splash: the worm hitting water (frame 18 has its own
+            // splash effect baked in).
+            splash: 18,
+            // Underwater placeholder. The user will provide proper
+            // side-view chase frames in a follow-up step; until then
+            // the worm just bobs on a calm frame.
+            under:  1,
+        },
+    };
+
+    const SCALE_X = SPRITE.sheet.displayW / SPRITE.sheet.srcW;
+    const SCALE_Y = SPRITE.sheet.displayH / SPRITE.sheet.srcH;
+
+    /** Set the worm sprite to frame N (1-indexed). No-op for unknown N. */
+    function setFrame(n) {
+        const f = SPRITE.frames[n];
+        if (!f) return;
+        bait.style.backgroundPosition =
+            (-f.x * SCALE_X).toFixed(2) + 'px ' +
+            (-f.y * SCALE_Y).toFixed(2) + 'px';
+    }
+
     // ---------- collection state ----------
     const STORAGE_KEY = 'go-eat-worms-collection';
     let collection = [];
@@ -39,6 +117,11 @@
 
     const ROD_OFFSCREEN_OFFSET = 80;   // px below the bottom edge
     const MAX_PULL_DIST = 260;          // pixels of pull → 1.0 tension
+
+    // Where the water starts as a fraction of stage height. Matches the
+    // .horizon / .sky CSS — bait crossing this line during descent is a
+    // splash, not a near-miss in the air.
+    const HORIZON_FRAC = 0.50;
 
     // ---------- helpers ----------
     function stageRect() { return stage.getBoundingClientRect(); }
@@ -371,6 +454,9 @@
 
         bait.classList.remove('popping');
         bait.classList.add('pulling');
+        // Start the pull at the lowest tension frame; updateTension()
+        // ramps from there as the kid drags.
+        setFrame(SPRITE.states.pull[0]);
         setBaitPx(baitPos.x, baitPos.y);
         updateTension();
 
@@ -404,6 +490,13 @@
             delete layer.dataset.hapticFired;
         }
         layer.style.setProperty('--tension', tension.toFixed(3));
+
+        // Sprite frame ramps with tension. Map [0..1] across the
+        // SPRITE.states.pull array so the kid sees the worm get more
+        // distressed as they pull harder.
+        const ramp = SPRITE.states.pull;
+        const idx  = Math.min(ramp.length - 1, Math.floor(tension * ramp.length));
+        setFrame(ramp[idx]);
     }
 
     function onUp(e) {
@@ -444,9 +537,31 @@
     stage.addEventListener('pointercancel', onUp);
 
     // ---------- flight ----------
+    // The flight frame cycler flips between SPRITE.states.fly entries on
+    // an interval so the worm visibly riffles through panic poses while
+    // it arcs through the air. flightCycleId guards against leaking
+    // intervals if a flight ends abruptly.
+    let flightCycleId = null;
+    function startFlightCycle() {
+        const cycle = SPRITE.states.fly;
+        let i = 0;
+        setFrame(cycle[i]);
+        flightCycleId = setInterval(() => {
+            i = (i + 1) % cycle.length;
+            setFrame(cycle[i]);
+        }, 90);
+    }
+    function stopFlightCycle() {
+        if (flightCycleId) {
+            clearInterval(flightCycleId);
+            flightCycleId = null;
+        }
+    }
+
     function flyWorm(startX, startY, vx, vy) {
         mode = 'flying';
         document.body.classList.add('flying');
+        startFlightCycle();
         const t0 = performance.now();
         const gravity = 1900;
         const wobbleHz = 18;
@@ -461,15 +576,16 @@
             setBaitPx(x, y);
 
             const sr = stageRect();
+            const horizonY = sr.height * HORIZON_FRAC;
             const vyNow = vy + gravity * t;
 
+            // Off-screen below the angler — flop on shore.
             if (y > sr.height + 60) {
                 return endFlight(x, sr.height * 0.85, 'shore');
             }
-            // Worm enters water once it's descending inside the visible
-            // water area (which is most of the stage now). The "shore"
-            // band is gone — falling off the bottom is shore-style flop.
-            if (t > 0.12 && y > 0 && y < sr.height - 20 && vyNow > 0) {
+            // Worm is descending past the horizon line into the lake —
+            // splash. Sky/air half is anything above horizonY.
+            if (t > 0.12 && y > horizonY && y < sr.height - 20 && vyNow > 0) {
                 return endFlight(x, y, 'water');
             }
             if (x < -80 || x > sr.width + 80) {
@@ -485,33 +601,39 @@
     function endFlight(x, y, where) {
         mode = 'splashed';
         bait.classList.remove('in-flight');
+        stopFlightCycle();
 
         if (where === 'water') {
-            // SPLASH! The big sequence.
+            // SPLASH! Big sequence + camera transition to underwater.
             playSplash();
             bigSplash(x, y);
             spawnToon(pickRandom(WATER_WORDS), x, y - 60, 'white');
             stage.classList.add('shake');
             setTimeout(() => stage.classList.remove('shake'), 320);
 
-            // Then: glub-glub + ripple chase as a "fish hunts from below"
-            // sequence. The worm settles at (x, y) underwater while the
-            // ripples trail toward it.
+            // Hold the splash frame for the impact moment.
+            setFrame(SPRITE.states.splash);
+
+            // Glub-glub + ripple chase — fish hunting from below.
             playGlubGlub();
             spawnRippleChase(x, y, x, y + 0);
 
-            // Park the worm under water briefly so it visually bobs there.
+            // Camera cut: sky fades up + away (CSS), water fills the
+            // whole stage, worm settles and bobs at the splash point on
+            // the underwater placeholder frame. The proper side-view
+            // chase art ships in a follow-up step.
             setTimeout(() => {
+                stage.classList.add('underwater');
                 bait.classList.add('underwater');
                 bait.style.left = x + 'px';
                 bait.style.top  = y + 'px';
-                bait.style.opacity = '0.9';
+                bait.style.opacity = '0.95';
+                setFrame(SPRITE.states.under);
                 mode = 'submerged';
-            }, 60);
+            }, 220);
 
-            // For step 2, after a beat, retrieve the worm (step 4 will
-            // wire the bite + reel mini-game in here instead).
-            setTimeout(() => respawn(), 1700);
+            // Return to fishing view.
+            setTimeout(() => respawn(), 1900);
         } else {
             // Off-screen flop — no scream end, just a comedic *donk*.
             spawnToon(pickRandom(SHORE_WORDS), x, y - 50, 'pink');
@@ -528,6 +650,9 @@
         bait.style.top  = '';
         bait.classList.remove('in-flight', 'pulling', 'underwater');
         document.body.classList.remove('flying');
+        stage.classList.remove('underwater');
+        // Reset to the calm idle frame.
+        setFrame(SPRITE.states.idle);
         // Force reflow so the popping animation always restarts.
         // eslint-disable-next-line no-unused-expressions
         void bait.offsetWidth;
@@ -548,5 +673,6 @@
     window.addEventListener('orientationchange', onResize);
 
     // ---------- init ----------
+    setFrame(SPRITE.states.idle);
     requestAnimationFrame(() => syncRest());
 })();
