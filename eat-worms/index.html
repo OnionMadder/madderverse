@@ -38,58 +38,37 @@
     <span class="header-spacer" aria-hidden="true"></span>
 </header>
 
+<!-- Stage now reads as a horizontal "fishing-into-a-lake" view: sky on
+     top, horizon band, lake water on the bottom. After splash the stage
+     gets the .underwater class, which fades out the sky/horizon so the
+     scene becomes a fully submerged side-view (where step-N art for the
+     underwater chase will eventually live). -->
 <div class="stage" id="stage" aria-label="Fishing area">
-    <div class="waterline" aria-hidden="true"></div>
-    <div class="shore" aria-hidden="true"></div>
+    <div class="sky"     aria-hidden="true"></div>
+    <div class="horizon" aria-hidden="true"></div>
 
     <div class="collection" id="collection">
         Caught <strong id="caughtCount">0</strong>
     </div>
 
-    <!-- Fishing line: from a virtual rod anchor (top of stage) to the bait.
-         Updated each frame as the bait moves. -->
+    <!-- Fishing line: from a virtual rod anchor (bottom of stage,
+         off-screen below the player's hands) up to the bait. -->
     <svg class="line-layer" id="lineLayer" aria-hidden="true">
         <line id="fishLine" class="fish-line" x1="0" y1="0" x2="0" y2="0"/>
     </svg>
 
-    <!-- Stretchy slingshot rubber band. Pink elastic line from the worm's
-         shore anchor to the finger while the kid yanks the worm back.
-         Visible only during 'pulling' state. -->
+    <!-- Stretchy slingshot rubber band — legacy, kept hidden via CSS so
+         the line itself doubles as the elastic. -->
     <svg class="band-layer" id="bandLayer" aria-hidden="true">
         <path id="bandShadow" class="rubber-band-shadow" d=""/>
         <path id="bandPath"   class="rubber-band"        d=""/>
     </svg>
 
-    <!-- Worm dangling on the line. The face has wide cartoon eyes and a
-         tiny mouth that switch to a panic configuration when the kid
-         pulls back the slingshot or while the worm is in flight (handled
-         by .bait.pulling / .bait.in-flight rules in style.css). -->
-    <div class="bait" id="bait" aria-label="Worm bait">
-        <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-            <!-- Segmented body — head ends on the right. -->
-            <path d="M 8 36 Q 22 18 36 36 T 64 36 T 92 32"
-                  fill="none" stroke="var(--worm-deep)" stroke-width="17" stroke-linecap="round"/>
-            <path d="M 8 36 Q 22 18 36 36 T 64 36 T 92 32"
-                  fill="none" stroke="var(--worm-pink)" stroke-width="11" stroke-linecap="round"/>
-            <g stroke="var(--worm-deep)" stroke-width="2" stroke-linecap="round" opacity="0.5">
-                <line x1="22" y1="22" x2="22" y2="42"/>
-                <line x1="36" y1="20" x2="36" y2="48"/>
-                <line x1="50" y1="22" x2="50" y2="44"/>
-                <line x1="64" y1="20" x2="64" y2="48"/>
-                <line x1="78" y1="22" x2="78" y2="42"/>
-            </g>
-            <!-- Face: two cartoon eyes + mouth. CSS targets the
-                 .worm-pupil / .worm-mouth classes to switch between
-                 normal, panic, and "underwater chill" states. -->
-            <g class="worm-face">
-                <circle class="worm-sclera" cx="83" cy="26" r="6.5" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
-                <circle class="worm-sclera" cx="95" cy="26" r="6.5" fill="#fff" stroke="#1a1a1a" stroke-width="1.5"/>
-                <circle class="worm-pupil"  cx="84" cy="27" r="2.8" fill="#1a1a1a"/>
-                <circle class="worm-pupil"  cx="96" cy="27" r="2.8" fill="#1a1a1a"/>
-                <ellipse class="worm-mouth" cx="89" cy="40" rx="2" ry="1.5" fill="#1a1a1a"/>
-            </g>
-        </svg>
-    </div>
+    <!-- Worm bait: sprite-sheet-driven. game.js swaps background-position
+         to advance frames as the state machine changes (idle / pull
+         tension / flight panic / splash). Source sheet:
+         sprites/worm-catch.png (1080x1335 per frame, 6 cols x 3 rows). -->
+    <div class="bait" id="bait" aria-label="Worm bait"></div>
 
     <footer>
         &copy; <span id="year"></span>
