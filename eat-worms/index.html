@@ -52,14 +52,15 @@
         <line id="fishLine" class="fish-line" x1="0" y1="0" x2="0" y2="0"/>
     </svg>
 
-    <!-- Aim arc preview (dotted parabola). Hidden until the kid touches
-         the bait; shown while aiming. -->
-    <svg class="arc-layer" id="arcLayer" aria-hidden="true">
-        <path id="arcPath"   class="arc-path"   d=""/>
-        <circle id="arcTarget" class="arc-target" cx="-100" cy="-100" r="7"/>
+    <!-- Stretchy slingshot rubber band. Pink elastic line from the worm's
+         shore anchor to the finger while the kid yanks the worm back.
+         Visible only during 'pulling' state. -->
+    <svg class="band-layer" id="bandLayer" aria-hidden="true">
+        <path id="bandShadow" class="rubber-band-shadow" d=""/>
+        <path id="bandPath"   class="rubber-band"        d=""/>
     </svg>
 
-    <!-- Worm at the shore. Touch-and-hold to aim, flick up to cast. -->
+    <!-- Worm at the shore. Grab and YANK to slingshot it. -->
     <div class="bait" id="bait" aria-label="Worm bait">
         <svg viewBox="0 0 80 44" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
             <!-- segmented body: a wavy thick stroke -->

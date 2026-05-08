@@ -88,9 +88,6 @@ header.top h1 {
 .header-spacer { min-width: 40px; }
 
 /* ---------- stage ---------- */
-/* Stage takes the rest of the viewport. Water area on top, shore at bottom.
-   touch-action: none disables browser scroll/pinch so flick gestures land
-   cleanly on the bait instead of scrolling the page. */
 .stage {
     flex: 1;
     position: relative;
@@ -105,9 +102,6 @@ header.top h1 {
             var(--water-deep) 100%
         );
 }
-
-/* Subtle moving caustics-ish shimmer overlay on the water — pure CSS,
-   doesn't affect layout. */
 .stage::before {
     content: '';
     position: absolute;
@@ -121,8 +115,6 @@ header.top h1 {
     pointer-events: none;
 }
 
-/* Water-surface line near the top of the shore. Also acts as the splash
-   horizon for the flick mechanic (step 2). */
 .waterline {
     position: absolute;
     bottom: var(--shore-h, 22%);
@@ -134,7 +126,6 @@ header.top h1 {
     pointer-events: none;
 }
 
-/* ---------- shore (bottom band where the worm lives at rest) ---------- */
 .shore {
     position: absolute;
     bottom: 0;
@@ -148,10 +139,31 @@ header.top h1 {
     z-index: 2;
 }
 
-/* ---------- bait / worm ---------- */
-/* Worm sits on the shore at bottom-center. In step 2 it becomes draggable
-   and gets a fishing-line tether. For now it's a static placeholder so
-   the layout reads correctly. */
+/* ---------- worm motion (giggly redesign) ---------- */
+/* Idle: gentle wiggle, like the worm's alive and bored. Pulling: panic
+   wiggle — fast, squirmy, stretching vertically as the kid yanks it
+   back. Flight: full tumble, end over end. */
+@keyframes worm-idle-wiggle {
+    0%, 100% { transform: translateX(-50%) rotate(-3deg); }
+    50%      { transform: translateX(-50%) rotate( 3deg); }
+}
+@keyframes worm-panic-wiggle {
+    0%   { transform: translate(-50%, -50%) rotate(-15deg) scaleY(1.10); }
+    25%  { transform: translate(-50%, -50%) rotate(  9deg) scaleY(0.93); }
+    50%  { transform: translate(-50%, -50%) rotate(-12deg) scaleY(1.12); }
+    75%  { transform: translate(-50%, -50%) rotate( 13deg) scaleY(0.92); }
+    100% { transform: translate(-50%, -50%) rotate(-15deg) scaleY(1.10); }
+}
+@keyframes worm-tumble {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to   { transform: translate(-50%, -50%) rotate(720deg); }
+}
+@keyframes worm-respawn-pop {
+    0%   { transform: translateX(-50%) scale(0); }
+    60%  { transform: translateX(-50%) scale(1.4) rotate(8deg); }
+    100% { transform: translateX(-50%) scale(1) rotate(0deg); }
+}
+
 .bait {
     position: absolute;
     bottom: calc(var(--shore-h, 22%) * 0.5 - 22px);
@@ -159,19 +171,18 @@ header.top h1 {
     transform: translateX(-50%);
     width: 80px;
     height: 44px;
-    z-index: 3;
+    z-index: 4;
     pointer-events: auto;
     touch-action: none;
+    animation: worm-idle-wiggle 2.4s ease-in-out infinite;
 }
-
 .bait svg {
     width: 100%;
     height: 100%;
     display: block;
     filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
 }
-
-/* Faint guide ring under the worm so the kid sees the touch target. */
+/* Faint glow under the worm so kids see the touch target. */
 .bait::before {
     content: '';
     position: absolute;
@@ -181,39 +192,54 @@ header.top h1 {
     pointer-events: none;
 }
 
-/* ---------- aim arc preview (step 2) ---------- */
-/* Full-stage SVG layer that shows a dotted parabolic preview of where the
-   bait will land. Hidden when not aiming; updated on every pointermove. */
-.arc-layer {
+/* During pull, the worm is JS-positioned via top/left and panic-wiggles. */
+.bait.pulling {
+    bottom: auto;
+    left: 0;
+    top: 0;
+    animation: worm-panic-wiggle 0.16s linear infinite;
+}
+/* During flight, JS positions and the tumble keyframe spins it. */
+.bait.in-flight {
+    bottom: auto;
+    left: 0;
+    top: 0;
+    animation: worm-tumble 0.55s linear infinite;
+}
+/* Pop animation when the worm respawns on shore. */
+.bait.popping { animation: worm-respawn-pop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) forwards; }
+
+body.flying .bait { pointer-events: none; }
+
+/* ---------- rubber-band slingshot ---------- */
+/* Pink elastic line from the worm's shore anchor to the finger while
+   the kid is yanking. Replaces the dotted aim arc — this is a
+   slingshot, not an aiming reticle. */
+.band-layer {
     position: absolute;
     inset: 0;
     pointer-events: none;
     z-index: 5;
+    width: 100%;
+    height: 100%;
     display: none;
 }
-.arc-layer.active { display: block; width: 100%; height: 100%; }
-.arc-path {
+.band-layer.active { display: block; }
+.rubber-band {
     fill: none;
-    stroke: rgba(255, 255, 255, 0.85);
-    stroke-width: 3;
+    stroke: var(--worm-pink);
+    stroke-width: 7;
     stroke-linecap: round;
-    stroke-dasharray: 4 9;
-    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.45));
+    filter: drop-shadow(0 0 8px rgba(236, 72, 153, 0.7));
 }
-.arc-target {
-    fill: rgba(255, 255, 255, 0.8);
-    stroke: rgba(255, 255, 255, 0.95);
-    stroke-width: 1.5;
-    filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.6));
+.rubber-band-shadow {
+    fill: none;
+    stroke: rgba(0, 0, 0, 0.4);
+    stroke-width: 11;
+    stroke-linecap: round;
 }
-/* Red-tinted preview when the user is aiming somewhere we can't cast
-   (below the waterline). Tells them visually that release will cancel. */
-.arc-layer.invalid .arc-path   { stroke: rgba(255, 99, 99, 0.7); }
-.arc-layer.invalid .arc-target { fill: rgba(255, 99, 99, 0.7); stroke: rgba(255, 99, 99, 0.9); filter: none; }
 
-/* ---------- fishing line (step 2) ---------- */
-/* Single SVG line tracking the bait. Start point is fixed at the rod
-   anchor (top-center of the stage); end point follows the bait. */
+/* ---------- fishing line (kept, just thinner now) ---------- */
 .line-layer {
     position: absolute;
     inset: 0;
@@ -223,44 +249,79 @@ header.top h1 {
     height: 100%;
 }
 .fish-line {
-    stroke: rgba(255, 255, 255, 0.45);
+    stroke: rgba(255, 255, 255, 0.4);
     stroke-width: 1.5;
     stroke-linecap: round;
 }
 
-/* ---------- splash ring (step 2) ---------- */
+/* ---------- comedy text bursts ---------- */
+/* "WHEEE!", "SPLOOSH!", "BOING!" — bright, bold, jagged cartoon text
+   that pops in at key moments and floats up while fading. */
+.toon-text {
+    position: absolute;
+    transform: translate(-50%, -50%) rotate(var(--toon-rot, -8deg));
+    transform-origin: center;
+    font-family: 'Fredoka', 'Comic Sans MS', 'Trebuchet MS', system-ui, sans-serif;
+    font-weight: 900;
+    font-size: clamp(28px, 7vw, 46px);
+    color: #ffeb3b;
+    text-shadow:
+        -2px -2px 0 #1a0033,
+         2px -2px 0 #1a0033,
+        -2px  2px 0 #1a0033,
+         2px  2px 0 #1a0033,
+         0 0 14px rgba(255, 235, 59, 0.7);
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    z-index: 7;
+    white-space: nowrap;
+    animation: toon-pop 0.85s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+.toon-text.pink  { color: var(--worm-pink); text-shadow: -2px -2px 0 #1a0033, 2px -2px 0 #1a0033, -2px 2px 0 #1a0033, 2px 2px 0 #1a0033, 0 0 14px rgba(236, 72, 153, 0.7); }
+.toon-text.cyan  { color: var(--accent-cyan); text-shadow: -2px -2px 0 #1a0033, 2px -2px 0 #1a0033, -2px 2px 0 #1a0033, 2px 2px 0 #1a0033, 0 0 14px rgba(0, 255, 204, 0.7); }
+.toon-text.white { color: #ffffff; }
+@keyframes toon-pop {
+    0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--toon-rot, -8deg)) scale(0.3); }
+    35%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--toon-rot, -8deg)) scale(1.4); }
+    60%  { opacity: 1; transform: translate(-50%, -50%) rotate(var(--toon-rot, -8deg)) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, calc(-50% - 60px)) rotate(var(--toon-rot, -8deg)) scale(0.85); }
+}
+
+/* ---------- splash + droplets (cranked up) ---------- */
 .splash {
     position: absolute;
     width: 0;
     height: 0;
     border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.85);
+    border: 5px solid rgba(255, 255, 255, 0.95);
     transform: translate(-50%, -50%);
     pointer-events: none;
-    animation: splash-expand 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+    animation: splash-expand 0.95s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
     z-index: 4;
 }
 @keyframes splash-expand {
-    0%   { width: 0;     height: 0;     opacity: 1;   border-width: 3px; }
-    70%  { width: 90px;  height: 50px;  opacity: 0.5; border-width: 2px; }
-    100% { width: 130px; height: 70px;  opacity: 0;   border-width: 1px; }
+    0%   { width: 0;     height: 0;     opacity: 1;   border-width: 6px; }
+    50%  { width: 150px; height: 80px;  opacity: 0.7; border-width: 3px; }
+    100% { width: 240px; height: 130px; opacity: 0;   border-width: 1px; }
 }
-
-/* While aiming we shift the bait z-index above the dimmer + lock the
-   pointer to it. While in flight we make sure the bait can't be grabbed. */
-body.aiming .bait { z-index: 6; }
-body.flying .bait { pointer-events: none; }
-
-/* When the bait is in flight, JS sets top/left in pixel coords; clear
-   the rest-state bottom anchor so absolute positioning takes over. */
-.bait.in-flight {
-    bottom: auto;
-    left: 0;
-    top: 0;
+.splash-droplet {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.8), 0 0 14px rgba(0, 255, 204, 0.4);
     transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 5;
+    animation: droplet-fly 0.85s ease-out forwards;
+}
+@keyframes droplet-fly {
+    0%   { opacity: 1; transform: translate(-50%, -50%) translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) translate(var(--dx, 0), var(--dy, -90px)) scale(0.35); }
 }
 
-/* ---------- collection bar (placeholder for step 5) ---------- */
+/* ---------- collection bar ---------- */
 .collection {
     position: absolute;
     top: 8px;
