@@ -63,16 +63,16 @@
     </main>
 
     <div class="tray-wrap">
-        <div class="tray-hint" id="trayHint">Drag a friend · grouped by color · ICE freezes · MOON RULES on every click</div>
+        <div class="tray-hint" id="trayHint">Drag a friend · BLACK protects · WHITE corrupts · ICE freezes · MOON rules</div>
         <div id="tray" class="tray" aria-label="character tray"></div>
     </div>
 
     <!-- Full-screen "BOO!" text that flashes during a jump scare. -->
     <div id="booOverlay" class="boo-overlay" aria-hidden="true">BOO!</div>
 
-    <!-- Story modal: opens when the player hits the STORY button. The lore
-         explains who the 14 friends are, who Ice Munki and Moon Munki are
-         (the antagonists), and that the Madballz are friends of theirs. -->
+    <!-- Story modal: opens when the player hits the LORE button. The lore
+         explains the 7 crew colors, the BLACK Watchers (one per bank), the
+         4 WHITE evils (Ice, Moon, Void, Static), and the Madballz tie-in. -->
 <div id="storyModal" class="story-modal" aria-hidden="true" role="dialog" aria-labelledby="storyTitle">
         <div class="story-card">
             <button id="storyCloseBtn" class="story-close" type="button" aria-label="Close lore">&times;</button>
@@ -82,16 +82,18 @@
             </button>
             <h2 id="storyTitle" class="story-title">THE SYNTH-SQUAD CHRONICLES</h2>
             <div class="story-body">
-                <p>The beat was perfect. The Synth-Squad—<strong>Srivi-Bot</strong>, <strong>Green Gear</strong>, <strong>Mega Thump</strong>, and the rest of the crew—just wanted to vibe in the neon glow and keep the sequence rolling.</p>
-                
-                <p>But peace doesn't last long when the frequency drops. <strong>Ice Munki</strong> is always lurking, waiting to flash-freeze the rhythm into jagged, sharp chimes. Then there's <strong>Moon Munki</strong>, a deep-space disruptor who wants to pull every note into a silent, heavy void.</p>
-                
-                <p>When these two crash the party, the lights flicker, the code glitches, and the room goes <em>WRONG</em>. That is <strong>HORROR MODE</strong>.</p>
-                
+                <p>The Synth-Squad keeps the beat humming through the neon. <strong>Srivi-Bot</strong>, <strong>Green Gear</strong>, <strong>Amber Arp</strong>, and their friends each carry a sound that fits the loop. They glow in every color: <em>blue, green, orange, purple, red, yellow.</em></p>
+
+                <p>Every crew has a <strong class="lore-good">BLACK Watcher</strong> who anchors the rhythm and keeps the others safe. <strong>Shadow Pulse</strong> stands sentinel for the daytime crew. <strong>Mega Thump</strong> grounds the night crew. Two more Watchers wait somewhere deeper in the system — no one's met them yet.</p>
+
+                <p>And then there are the <strong class="lore-bad">WHITE Munkis</strong>. Four of them, one for each crew. <strong>Ice Munki</strong> flash-freezes the rhythm into sharp chimes. <strong>Moon Munki</strong> pulls every note into a silent void. <strong>Void Munki</strong> and <strong>Static Munki</strong> are still rumors — said to delete the music and tear the speakers — but no one knows where they hide.</p>
+
+                <p>When a White meets the loop, the lights flicker, the code glitches, and the room goes <em>WRONG</em>. That is <strong>HORROR MODE</strong>.</p>
+
                 <p>In the distorted shadows of the system, where the data is corrupted and the music sounds <em>different</em>, lives a crew of outcasts known as <strong class="lore-mb">THE MADBALLZ</strong>.</p>
-                
-                <p>Ice Munki and Moon Munki are their favorite guests. They don't want to chill; they want to break the speakers and rewire the world. They share secrets, they share static, and they are <em>always</em> looking for new friends.</p>
-                
+
+                <p>The Whites are their favorite guests. They don't want to chill; they want to break the speakers and rewire the world. They share secrets, they share static, and they are <em>always</em> looking for new friends.</p>
+
                 <p class="story-hint">If you've been WRONG enough times… you might just find the key to their lair.</p>
             </div>
         </div>

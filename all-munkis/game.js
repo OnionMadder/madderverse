@@ -203,7 +203,7 @@ const CHARACTERS = {
 
         high: {
             label: 'High-Z',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
             face: { eyes: 'button', mouth: 'o', brow: 'raised' },
             play(ctx, out, when, step) {
                 if (![2, 6, 10, 14].includes(step)) return;
@@ -221,7 +221,7 @@ const CHARACTERS = {
 
         shadow: {
             label: 'Shadow Pulse',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
             face: { eyes: 'slant', mouth: 'smirk' },
             play(ctx, out, when, step) {
                 if (step % 2 !== 0) return;
@@ -241,7 +241,7 @@ const CHARACTERS = {
 
         mega: {
             label: 'Mega Thump',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
             face: { eyes: 'button', mouth: 'fanged', brow: 'sharp' },
             play(ctx, out, when, step) {
                 if (step % 4 !== 0) return;
@@ -289,7 +289,7 @@ const CHARACTERS = {
 
         srivi: {
             label: 'Srivi-Bot',
-            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
+            bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
             face: { eyes: 'gear', mouth: 'straight' },
             play(ctx, out, when, step) {
                 const lowSteps = [0, 6, 10];
@@ -321,7 +321,7 @@ const CHARACTERS = {
 
         grumble: {
             label: 'Grumble Bass',
-            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
+            bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
             face: { eyes: 'slant', mouth: 'straight', brow: 'sharp' },
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
@@ -348,7 +348,7 @@ const CHARACTERS = {
 
         sine: {
             label: 'Sine Wave',
-            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
+            bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
             face: { eyes: 'button', mouth: 'smile' },
             play(ctx, out, when, step) {
                 const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
@@ -441,7 +441,7 @@ const CHARACTERS = {
 
         star: {
             label: 'Star Ping',
-            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
+            bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
             face: { eyes: 'star', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step !== 0) return;
@@ -463,7 +463,7 @@ const CHARACTERS = {
 
         fog: {
             label: 'Fog Chord',
-            bodyColor: '#3a5a8a', bodyHi: '#5a7aaa', bodyShade: '#1a2a4a',
+            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             face: { eyes: 'sleepy', mouth: 'smile' },
             play(ctx, out, when, step) {
                 if (step !== 0) return;
@@ -513,7 +513,7 @@ const CHARACTERS = {
 
         spark: {
             label: 'Spark Snap',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
+            bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
             face: { eyes: 'asterisk', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
@@ -776,29 +776,25 @@ const CHARACTERS = {
     ];
     const SHEETS = {
         munki: {
-            src: 'assets/sprites/default-heads.png',
+            src: 'assets/sprites/blank-heads.png',
             sheetW: 4330,
-            sheetH: 4381,
-            // Frame names match each Munki's id 1:1 — body color must match
-            // the head color in the sprite (see CHARACTERS below for the
-            // color groupings used in the tray).
+            sheetH: 2174,
+            // 8 color frames — frame names match the new body-color palette.
+            // Canon Munkis use procedural faces (headFaceArt) and don't read
+            // these frames; kept here for reference and future sheet-based
+            // head shapes if we ever want richer-than-CSS-circle rendering.
+            // BLACK = always good (one Watcher per bank).
+            // WHITE = always evil (Ice, Moon, Void, Static).
+            // The other 6 are regular crew colors (one per bank, per color).
             frames: {
-                'high':    { x: 2,    y: 2,    w: 1080, h: 1093 }, // PURPLE
-                'hiss':    { x: 1084, y: 2,    w: 1080, h: 1092 }, // GREEN
-                'ice':     { x: 2166, y: 2,    w: 1080, h: 1091 }, // BLUE  (antagonist)
-                'mega':    { x: 3248, y: 2,    w: 1080, h: 1089 }, // PURPLE
-                'moon':    { x: 2,    y: 1097, w: 1080, h: 1094 }, // BLUE  (antagonist)
-                'shadow':  { x: 1084, y: 1097, w: 1080, h: 1088 }, // PURPLE
-                'sine':    { x: 2166, y: 1097, w: 1080, h: 1092 }, // ORANGE
-                'snare':   { x: 3248, y: 1097, w: 1080, h: 1088 }, // ORANGE
-                'spark':   { x: 2,    y: 2193, w: 1080, h: 1086 }, // PURPLE
-                'srivi':   { x: 1084, y: 2193, w: 1080, h: 1088 }, // GREEN
-                'star':    { x: 2166, y: 2193, w: 1080, h: 1086 }, // GREEN
-                'amber':   { x: 3248, y: 2193, w: 1080, h: 1093 }, // ORANGE
-                'flute':   { x: 2,    y: 3288, w: 1080, h: 1090 }, // PURPLE
-                'fog':     { x: 1084, y: 3288, w: 1080, h: 1091 }, // BLUE
-                'green':   { x: 2166, y: 3288, w: 1080, h: 1091 }, // ORANGE (legacy id, orange head)
-                'grumble': { x: 3248, y: 3288, w: 1080, h: 1086 }  // GREEN
+                'black':  { x: 2,    y: 2,    w: 1080, h: 1076 },
+                'blue':   { x: 1084, y: 2,    w: 1080, h: 1075 },
+                'green':  { x: 2166, y: 2,    w: 1080, h: 1072 },
+                'orange': { x: 3248, y: 2,    w: 1080, h: 1080 },
+                'purple': { x: 2,    y: 1084, w: 1080, h: 1075 },
+                'red':    { x: 1084, y: 1084, w: 1080, h: 1076 },
+                'white':  { x: 2166, y: 1084, w: 1080, h: 1085 },
+                'yellow': { x: 3248, y: 1084, w: 1080, h: 1088 }
             }
         },
         mb: {
@@ -1662,7 +1658,7 @@ const CHARACTERS = {
         if (!hint) return;
         hint.textContent = isMadballzMode
             ? 'MADBALLZ MODE · 6 Madballz · ICE + MOON last (they are friends)'
-            : 'Drag a friend · grouped by color · ICE freezes · MOON RULES on every click';
+            : 'Drag a friend · BLACK protects · WHITE corrupts · ICE freezes · MOON rules';
     }
 
     function openStoryModal() {

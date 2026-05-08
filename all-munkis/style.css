@@ -889,8 +889,9 @@ body.madballz-mode .chip-label { color: #f0abfc; }
 }
 .story-body strong { color: #fff; }
 .story-body em { color: #fbbf24; font-style: italic; }
-.story-body .lore-bad { color: #fca5a5; text-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
-.story-body .lore-mb  { color: #d8b4fe; text-shadow: 0 0 8px rgba(168, 85, 247, 0.55); }
+.story-body .lore-bad  { color: #fca5a5; text-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+.story-body .lore-good { color: #fde68a; text-shadow: 0 0 8px rgba(0, 0, 0, 0.6), 0 0 8px rgba(167, 139, 250, 0.4); }
+.story-body .lore-mb   { color: #d8b4fe; text-shadow: 0 0 8px rgba(168, 85, 247, 0.55); }
 .story-body .story-hint {
     margin-top: 14px !important;
     padding-top: 12px;
