@@ -1,0 +1,292 @@
+:root {
+    --accent-cyan: #00ffcc;
+    --accent-pink: #ff00ff;
+    --water-top:    #2dd4bf;
+    --water-mid:    #1d4ed8;
+    --water-deep:   #0c1f3a;
+    --shore:        #1a1a2e;
+    --shore-glow:   rgba(0, 255, 204, 0.18);
+    --worm-pink:    #ec4899;
+    --worm-deep:    #831843;
+    --line:         rgba(255, 255, 255, 0.6);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+    margin: 0;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #fff;
+    background: var(--shore);
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+
+/* ---------- header ---------- */
+header.top {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+    min-height: 44px;
+    z-index: 10;
+}
+
+header.top h1 {
+    font-size: clamp(1rem, 4vw, 1.4rem);
+    margin: 0;
+    font-weight: 900;
+    background: linear-gradient(to bottom, #fff 60%, var(--accent-cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    filter: drop-shadow(2px 2px 0 var(--accent-pink));
+    letter-spacing: 1px;
+    white-space: nowrap;
+    text-align: center;
+    flex: 1;
+}
+
+.back {
+    color: var(--accent-cyan);
+    text-decoration: none;
+    font-family: monospace;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.65rem;
+    border: 1px solid var(--accent-cyan);
+    border-radius: 8px;
+    white-space: nowrap;
+    min-height: 40px;
+    min-width: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    touch-action: manipulation;
+    background: transparent;
+    cursor: pointer;
+    line-height: 1;
+}
+.back:active {
+    background: var(--accent-cyan);
+    color: #000;
+    box-shadow: 0 0 12px var(--accent-cyan);
+}
+
+.header-spacer { min-width: 40px; }
+
+/* ---------- stage ---------- */
+/* Stage takes the rest of the viewport. Water area on top, shore at bottom.
+   touch-action: none disables browser scroll/pinch so flick gestures land
+   cleanly on the bait instead of scrolling the page. */
+.stage {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    touch-action: none;
+    background:
+        linear-gradient(
+            to bottom,
+            var(--water-top) 0%,
+            var(--water-mid) 55%,
+            var(--water-deep) 100%
+        );
+}
+
+/* Subtle moving caustics-ish shimmer overlay on the water — pure CSS,
+   doesn't affect layout. */
+.stage::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        repeating-linear-gradient(
+            45deg,
+            rgba(255, 255, 255, 0.03) 0 6px,
+            transparent 6px 18px
+        );
+    pointer-events: none;
+}
+
+/* Water-surface line near the top of the shore. Also acts as the splash
+   horizon for the flick mechanic (step 2). */
+.waterline {
+    position: absolute;
+    bottom: var(--shore-h, 22%);
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6), transparent);
+    box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+}
+
+/* ---------- shore (bottom band where the worm lives at rest) ---------- */
+.shore {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: var(--shore-h, 22%);
+    background:
+        radial-gradient(ellipse at 50% 0%, var(--shore-glow), transparent 70%),
+        linear-gradient(to bottom, #14223a 0%, var(--shore) 100%);
+    border-top: 1px solid rgba(0, 255, 204, 0.25);
+    z-index: 2;
+}
+
+/* ---------- bait / worm ---------- */
+/* Worm sits on the shore at bottom-center. In step 2 it becomes draggable
+   and gets a fishing-line tether. For now it's a static placeholder so
+   the layout reads correctly. */
+.bait {
+    position: absolute;
+    bottom: calc(var(--shore-h, 22%) * 0.5 - 22px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80px;
+    height: 44px;
+    z-index: 3;
+    pointer-events: auto;
+    touch-action: none;
+}
+
+.bait svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.55));
+}
+
+/* Faint guide ring under the worm so the kid sees the touch target. */
+.bait::before {
+    content: '';
+    position: absolute;
+    inset: -16px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 255, 204, 0.18), transparent 70%);
+    pointer-events: none;
+}
+
+/* ---------- aim arc preview (step 2) ---------- */
+/* Full-stage SVG layer that shows a dotted parabolic preview of where the
+   bait will land. Hidden when not aiming; updated on every pointermove. */
+.arc-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    display: none;
+}
+.arc-layer.active { display: block; width: 100%; height: 100%; }
+.arc-path {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 4 9;
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.45));
+}
+.arc-target {
+    fill: rgba(255, 255, 255, 0.8);
+    stroke: rgba(255, 255, 255, 0.95);
+    stroke-width: 1.5;
+    filter: drop-shadow(0 0 6px rgba(0, 255, 204, 0.6));
+}
+/* Red-tinted preview when the user is aiming somewhere we can't cast
+   (below the waterline). Tells them visually that release will cancel. */
+.arc-layer.invalid .arc-path   { stroke: rgba(255, 99, 99, 0.7); }
+.arc-layer.invalid .arc-target { fill: rgba(255, 99, 99, 0.7); stroke: rgba(255, 99, 99, 0.9); filter: none; }
+
+/* ---------- fishing line (step 2) ---------- */
+/* Single SVG line tracking the bait. Start point is fixed at the rod
+   anchor (top-center of the stage); end point follows the bait. */
+.line-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+}
+.fish-line {
+    stroke: rgba(255, 255, 255, 0.45);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+
+/* ---------- splash ring (step 2) ---------- */
+.splash {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.85);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    animation: splash-expand 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+    z-index: 4;
+}
+@keyframes splash-expand {
+    0%   { width: 0;     height: 0;     opacity: 1;   border-width: 3px; }
+    70%  { width: 90px;  height: 50px;  opacity: 0.5; border-width: 2px; }
+    100% { width: 130px; height: 70px;  opacity: 0;   border-width: 1px; }
+}
+
+/* While aiming we shift the bait z-index above the dimmer + lock the
+   pointer to it. While in flight we make sure the bait can't be grabbed. */
+body.aiming .bait { z-index: 6; }
+body.flying .bait { pointer-events: none; }
+
+/* When the bait is in flight, JS sets top/left in pixel coords; clear
+   the rest-state bottom anchor so absolute positioning takes over. */
+.bait.in-flight {
+    bottom: auto;
+    left: 0;
+    top: 0;
+    transform: translate(-50%, -50%);
+}
+
+/* ---------- collection bar (placeholder for step 5) ---------- */
+.collection {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 5;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-family: monospace;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.85);
+    pointer-events: auto;
+}
+.collection strong { color: var(--accent-cyan); }
+
+/* ---------- footer ---------- */
+footer {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 0.62rem;
+    opacity: 0.5;
+    pointer-events: none;
+    z-index: 6;
+}
+footer a { color: #fff; pointer-events: auto; }
