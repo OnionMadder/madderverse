@@ -889,6 +889,41 @@ body.madballz-mode .chip-label { color: #f0abfc; }
 }
 .story-body strong { color: #fff; }
 .story-body em { color: #fbbf24; font-style: italic; }
+.bank-switcher {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 6px 0 4px;
+    font-family: 'Fredoka', sans-serif;
+}
+.bank-arrow {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.bank-arrow:hover { background: rgba(255, 255, 255, 0.16); }
+.bank-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+.bank-label {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #00ffcc;
+    text-shadow: 0 0 8px rgba(0, 255, 204, 0.45);
+    min-width: 88px;
+    text-align: center;
+}
+.bank-label.bank-locked { color: #94a3b8; text-shadow: none; }
+
 .story-body .lore-bad  { color: #fca5a5; text-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
 .story-body .lore-good { color: #fde68a; text-shadow: 0 0 8px rgba(0, 0, 0, 0.6), 0 0 8px rgba(167, 139, 250, 0.4); }
 .story-body .lore-mb   { color: #d8b4fe; text-shadow: 0 0 8px rgba(168, 85, 247, 0.55); }

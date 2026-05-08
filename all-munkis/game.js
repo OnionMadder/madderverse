@@ -26,6 +26,7 @@
     let schedTimer = null;
 
     let horrorTriggers = 0;
+    let activeBankIndex = 0;
     let madballzUnlocked = false;
     let isMadballzMode = false;
 
@@ -774,6 +775,50 @@ const CHARACTERS = {
         // Antagonists, always last (matches the standard tray rule)
         'ice', 'moon'
     ];
+
+    // 4 banks of 8 — banks 1 and 2 are populated by the canon 16 (one of
+    // each color per bank, evil pinned last). Banks 3 and 4 are reserved
+    // for the Void and Static crews (still to be designed) and unlock via
+    // secret events. Each bank is a "page" of the tray.
+    const BANKS = [
+        { id: 'bank-1', label: 'BANK 1', munkis: ['shadow', 'srivi', 'green', 'amber', 'flute', 'grumble', 'star',  'ice'],  unlocked: true  },
+        { id: 'bank-2', label: 'BANK 2', munkis: ['mega',   'sine',  'hiss',  'snare', 'fog',   'spark',   'high',  'moon'], unlocked: true  },
+        { id: 'bank-3', label: '???',    munkis: [],                                                                         unlocked: false },
+        { id: 'bank-4', label: '???',    munkis: [],                                                                         unlocked: false }
+    ];
+
+    function currentOrder() {
+        if (isMadballzMode) return MADBALLZ_ORDER;
+        return BANKS[activeBankIndex].munkis;
+    }
+
+    // Cycle to the next/previous unlocked bank, save, and re-render. No-op
+    // if there's only one unlocked bank.
+    function nudgeBank(direction) {
+        if (isMadballzMode) return;
+        const total = BANKS.length;
+        let i = activeBankIndex;
+        for (let step = 0; step < total; step++) {
+            i = (i + direction + total) % total;
+            if (BANKS[i].unlocked) break;
+        }
+        if (i === activeBankIndex || !BANKS[i].unlocked) return;
+        activeBankIndex = i;
+        saveProgress();
+        updateBankLabel();
+        renderTray();
+    }
+
+    function updateBankLabel() {
+        const lbl = document.getElementById('bankLabel');
+        const prev = document.getElementById('bankPrev');
+        const next = document.getElementById('bankNext');
+        if (lbl) lbl.textContent = BANKS[activeBankIndex].label;
+        const unlockedCount = BANKS.filter(b => b.unlocked).length;
+        if (prev) prev.disabled = unlockedCount < 2 || isMadballzMode;
+        if (next) next.disabled = unlockedCount < 2 || isMadballzMode;
+    }
+
     const SHEETS = {
         munki: {
             src: 'assets/sprites/blank-heads.png',
@@ -835,10 +880,28 @@ const CHARACTERS = {
     // Colored head circle (matches body color). r=44 in the 100 viewBox; the
     // .head-mod / .head-face siblings inset to match this radius so the sprite
     // fills exactly the visible circle (no gaps under the headphones).
+    // Maps body-color hex to the matching frame name in blank-heads.png so
+    // headShapeArt can crop the right colored circle for each character.
+    const COLOR_BY_BODY = {
+        '#1f2937': 'black',  '#1e88e5': 'blue',   '#43a047': 'green',  '#ff9800': 'orange',
+        '#9c27b0': 'purple', '#dc2626': 'red',    '#f8fafc': 'white',  '#fbbf24': 'yellow'
+    };
+
+    // Head circle = sprite frame from blank-heads.png matching the
+    // character's body color. SVG viewBox crops to the frame; the inner
+    // <image> shows the full sheet. Falls back to a flat colored circle if
+    // the body color isn't in the palette (custom-skin guard).
     function headShapeArt(c) {
-        return `<svg class="head-shape" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            + `<circle cx="50" cy="50" r="44" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3"/>`
-            + `<ellipse cx="50" cy="60" rx="30" ry="22" fill="${c.bodyHi}" opacity="0.32"/>`
+        const sheet = SHEETS.munki;
+        const colorName = COLOR_BY_BODY[c.bodyColor];
+        const f = colorName && sheet && sheet.frames[colorName];
+        if (!f) {
+            return `<svg class="head-shape" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+                + `<circle cx="50" cy="50" r="44" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3"/>`
+                + `</svg>`;
+        }
+        return `<svg class="head-shape" viewBox="${f.x} ${f.y} ${f.w} ${f.h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+            + `<image href="${sheet.src}" x="0" y="0" width="${sheet.sheetW}" height="${sheet.sheetH}"/>`
             + `</svg>`;
     }
 
@@ -1112,7 +1175,7 @@ const CHARACTERS = {
     function renderTray() {
         const tray = document.getElementById('tray');
         tray.innerHTML = '';
-        const order = isMadballzMode ? MADBALLZ_ORDER : STANDARD_ORDER;
+        const order = currentOrder();
         order.forEach(id => {
             const ch = CHARACTERS[id];
             const el = document.createElement('div');
@@ -1522,7 +1585,7 @@ const CHARACTERS = {
         for (let i = 0; i < NUM_SLOTS; i++) if (!slots[i]) empty.push(i);
         if (!empty.length) return;
         const idx = empty[Math.floor(Math.random() * empty.length)];
-        const order = isMadballzMode ? MADBALLZ_ORDER : STANDARD_ORDER;
+        const order = currentOrder();
         const choices = order.filter(id => id !== 'moon' && id !== 'ice');
         if (!choices.length) return;
         const id = choices[Math.floor(Math.random() * choices.length)];
@@ -1577,6 +1640,17 @@ const CHARACTERS = {
             const obj = JSON.parse(raw);
             horrorTriggers = (obj.horrorTriggers | 0);
             madballzUnlocked = !!obj.madballzUnlocked;
+            // Clamp activeBankIndex to a known + unlocked bank so a stale
+            // localStorage value can't push us into an empty bank.
+            const idx = (obj.activeBankIndex | 0);
+            if (idx >= 0 && idx < BANKS.length && BANKS[idx].unlocked) {
+                activeBankIndex = idx;
+            }
+            if (Array.isArray(obj.unlockedBanks)) {
+                obj.unlockedBanks.forEach((u, i) => {
+                    if (i < BANKS.length && u) BANKS[i].unlocked = true;
+                });
+            }
         } catch (e) { /* ignore — start fresh */ }
     }
 
@@ -1584,7 +1658,9 @@ const CHARACTERS = {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 horrorTriggers,
-                madballzUnlocked
+                madballzUnlocked,
+                activeBankIndex,
+                unlockedBanks: BANKS.map(b => b.unlocked)
             }));
         } catch (e) { /* ignore */ }
     }
@@ -1721,12 +1797,18 @@ const CHARACTERS = {
             // Route through setSlot so a remix that lands on Ice or Moon
             // fires the horror jumpscare just like a manual drop would.
             // Picks from the order matching the screen the kid is on.
-            const order = isMadballzMode ? MADBALLZ_ORDER : STANDARD_ORDER;
+            const order = currentOrder();
             for (let i = 0; i < NUM_SLOTS; i++) {
                 setSlot(i, order[Math.floor(Math.random() * order.length)]);
             }
             playDropSound();
         });
+
+        const bankPrev = document.getElementById('bankPrev');
+        const bankNext = document.getElementById('bankNext');
+        if (bankPrev) bankPrev.addEventListener('click', () => nudgeBank(-1));
+        if (bankNext) bankNext.addEventListener('click', () => nudgeBank(1));
+        updateBankLabel();
 
         const storyBtn = document.getElementById('storyBtn');
         if (storyBtn) storyBtn.addEventListener('click', openStoryModal);
