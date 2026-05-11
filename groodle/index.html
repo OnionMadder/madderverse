@@ -77,15 +77,27 @@
 
                     <canvas class="draw-canvas" id="drawCanvas"></canvas>
 
-                    <!-- Outline layer: same shapes as the clipPath, rendered
-                         as a stroked path that sits centered on the
-                         boundary. Placed AFTER the canvas in the DOM with a
-                         higher z-index so the dark edge stays visible over
-                         the kid's color right up to the silhouette boundary
-                         — drawable area and visible figure are now the same
-                         shape. -->
+                    <!-- Outline layer. Rather than stroking each of the 6
+                         body shapes individually (which would show inner
+                         joint lines where head meets torso, arms meet
+                         shoulders, etc.) we use an SVG filter to render a
+                         single unified ring sitting ENTIRELY INSIDE the
+                         union of all shapes. feMorphology erode shrinks
+                         the alpha union; composite-out subtracts the
+                         eroded mask from the original to leave just the
+                         ring. Outer edge of the ring == clipPath boundary
+                         == drawable area boundary. No outer "shadow frame",
+                         no inner joint lines, single coloring-book outline. -->
                     <svg class="silhouette-outline-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                        <g class="silhouette-outline">
+                        <defs>
+                            <filter id="innerOutlineFilter" x="-2%" y="-2%" width="104%" height="104%">
+                                <feMorphology operator="erode" radius="6" in="SourceAlpha" result="inner"/>
+                                <feComposite operator="out" in="SourceAlpha" in2="inner" result="ring"/>
+                                <feFlood flood-color="#1a0f33" result="ink"/>
+                                <feComposite operator="in" in="ink" in2="ring"/>
+                            </filter>
+                        </defs>
+                        <g class="silhouette-outline" filter="url(#innerOutlineFilter)">
                             <circle cx="200" cy="100" r="58"/>
                             <rect x="155" y="148" width="90" height="232" rx="42"/>
                             <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>

@@ -262,16 +262,14 @@ body.dancing .stage {
     fill: rgba(255, 255, 255, 0.94);
 }
 
-/* Outline = stroke centered on the same shape boundary as the clipPath.
-   Drawable area and visible figure edge are now the same line, so
-   colors no longer "snap" 5 px before the visible edge. The fill-layer
-   below provides the pale interior; this layer's stroke sits over the
-   kid's drawing to give the coloring-book "stay in the line" feel. */
+/* Outline shapes provide the SourceAlpha that the
+   #innerOutlineFilter operates on — the fill color is irrelevant
+   because the filter only reads the alpha channel. We give them a
+   visible fill anyway as a fallback in case the filter is unsupported
+   (very old browser); in that case the kid sees a solid body, not
+   an empty rectangle. */
 .silhouette-outline > * {
-    fill: none;
-    stroke: #1a0f33;
-    stroke-width: 7;
-    stroke-linejoin: round;
+    fill: #1a0f33;
 }
 
 .draw-canvas {
