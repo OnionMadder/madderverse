@@ -84,6 +84,7 @@ const Game = (() => {
       name: c.name,
       style: c.style,
       motto: c.motto,
+      flavor: c.flavor,
       netWorth: Math.max(800, Math.round(startCash * (0.65 + Math.random() * 0.9))),
     }));
 

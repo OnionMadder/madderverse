@@ -458,27 +458,29 @@
     };
   }
 
-  function runModalQueue(queue, done) {
-    if (!queue.length) { if (done) done(); return; }
-    const next = queue.shift();
-    next();
-    // patch the modal Continue button to advance the queue
-    const wrap = $("#modal-actions");
-    const btn = wrap.querySelector("button");
-    if (!btn) { runModalQueue(queue, done); return; }
-    const orig = btn.onclick;
-    btn.onclick = () => {
-      orig && orig();
-      runModalQueue(queue, done);
-    };
+  // Each step is a function returning a Promise that resolves when the user
+  // dismisses the modal it opened. Awaiting them in order chains lore →
+  // local event → global event without losing modals when an async image
+  // preload pushes showModal off the current tick.
+  async function runModalQueue(queue, done) {
+    for (const step of queue) {
+      try { await step(); } catch (_) { /* swallow & continue */ }
+    }
+    if (done) done();
   }
 
   function showLore(loc) {
     sfx("event");
-    showModal({
-      title: loc.name,
-      body:  loc.lore || loc.tagline || "",
-      actions: [{ label: "Dock", run: hideModal }],
+    return new Promise(resolve => {
+      showModal({
+        title:    loc.name,
+        titlebar: `Approach Vector — ${loc.name}`,
+        flavor:   loc.tagline || "",
+        result:   loc.lore || "",
+        sprite:   loc.planetSprite ? { key: loc.planetSprite, atlas: PLANET_SPRITES, size: 180 } : null,
+        eventType: "lore",
+        actions:  [{ label: "Dock", run: () => { hideModal(); resolve(); } }],
+      });
     });
   }
 
@@ -509,9 +511,13 @@
     ranked.forEach((c, i) => {
       const li = document.createElement("li");
       if (c.self) li.classList.add("lb-self");
+      const tipParts = [];
+      if (c.motto)  tipParts.push(`“${c.motto}”`);
+      if (c.flavor) tipParts.push(c.flavor);
+      const tip = tipParts.join("\n\n").replace(/"/g, "&quot;");
       li.innerHTML = `
         <span class="lb-rank">${i + 1}.</span>
-        <span class="lb-name" title="${c.motto || ""}">${c.name}</span>
+        <span class="lb-name" title="${tip}">${c.name}</span>
         <span class="lb-net">${fmt(c.netWorth)} ¢</span>
       `;
       ol.appendChild(li);
@@ -580,30 +586,95 @@
   });
 
   // ---------- modal ----------
+  // image preload cache: path -> "ok" | "fail" | "pending" promise
+  const imgStatus = Object.create(null);
+
+  function preloadEventImage(path) {
+    if (!path) return Promise.resolve(false);
+    const cached = imgStatus[path];
+    if (cached === "ok")   return Promise.resolve(true);
+    if (cached === "fail") return Promise.resolve(false);
+    if (cached && typeof cached.then === "function") return cached;
+    const p = new Promise(resolve => {
+      const im = new Image();
+      im.onload  = () => { imgStatus[path] = "ok";   resolve(true);  };
+      im.onerror = () => { imgStatus[path] = "fail"; resolve(false); };
+      im.src = path;
+    });
+    imgStatus[path] = p;
+    return p;
+  }
+
   function showEvent(evt) {
     sfx(evt.type === "good" ? "good" : (evt.type === "bad" ? "bad" : "event"));
-    showModal({
-      title: evt.title,
-      body:  evt.resolvedMsg || evt.body,
-      img:   "assets/events/" + (evt.img || ""),
-      actions: [{ label: "Continue", run: hideModal }],
+    const imgPath = evt.img ? "assets/events/" + evt.img : null;
+    return new Promise(resolve => {
+      const open = (validImg) => {
+        showModal({
+          title:    evt.title,
+          titlebar: `Trade Network Alert — ${evt.title}`,
+          flavor:   evt.body || "",
+          result:   evt.resolvedMsg || "",
+          img:      validImg,
+          eventType: evt.type || "",
+          actions:  [{ label: "Continue", run: () => { hideModal(); resolve(); } }],
+        });
+      };
+      if (imgPath) preloadEventImage(imgPath).then(ok => open(ok ? imgPath : null));
+      else open(null);
     });
   }
 
-  function showModal({ title, body, img, actions }) {
-    $("#modal-title").textContent = title;
-    $("#modal-body").textContent  = body;
-    const imgEl = $("#modal-img");
-    imgEl.src = img || "";
-    imgEl.style.display = img ? "" : "none";
+  function showModal({ title, flavor, result, body, img, sprite, titlebar, eventType, actions }) {
+    const card = document.querySelector(".modal-card");
+    if (card) card.dataset.eventType = eventType || "";
+
+    $("#modal-titlebar").textContent = titlebar || title || "Event";
+    $("#modal-title").textContent    = title || "";
+
+    // legacy callers may pass `body`; treat it as flavor when no flavor/result split is given
+    const flavorText = flavor != null ? flavor : (result == null ? (body || "") : "");
+    const resultText = result != null ? result : (flavor != null ? "" : (body || ""));
+    const flavorEl = $("#modal-flavor");
+    const resultEl = $("#modal-result");
+    flavorEl.textContent = flavorText;
+    resultEl.textContent = (flavorText && resultText) ? resultText : (flavorText ? "" : resultText);
+    // if there's no flavor, promote the result to the prominent slot for readability
+    if (!flavorText && resultText) {
+      flavorEl.textContent = "";
+      resultEl.textContent = resultText;
+    }
+
+    // rebuild image pane each time so previous content can't leak through
+    const imgWrap = $("#modal-image");
+    imgWrap.innerHTML = "";
+    imgWrap.classList.remove("modal-image-empty");
+
+    if (img) {
+      const im = document.createElement("img");
+      im.alt = "";
+      im.src = img;
+      // preload guarantees the bitmap is in cache, so this draws on first paint
+      imgWrap.appendChild(im);
+    } else if (sprite && sprite.key) {
+      const box = document.createElement("div");
+      const size = sprite.size || 180;
+      imgWrap.appendChild(box);
+      applySprite(box, sprite.key, size, size, sprite.atlas || SHIP_SPRITES);
+    } else {
+      imgWrap.classList.add("modal-image-empty");
+    }
+
     const wrap = $("#modal-actions");
     wrap.innerHTML = "";
     (actions || [{ label: "OK", run: hideModal }]).forEach(a => {
       const b = document.createElement("button");
+      b.className = "win95-btn";
       b.textContent = a.label;
       b.onclick = () => { a.run(); };
       wrap.appendChild(b);
     });
+
     $("#modal").classList.remove("hidden");
   }
   function hideModal() { $("#modal").classList.add("hidden"); }
@@ -613,10 +684,15 @@
     if (!Game.state.gameOver) return;
     const s = Game.state;
     showModal({
-      title: s.win ? "You Win!" : "Game Over",
-      body: s.win
+      title:    s.win ? "You Win!" : "Game Over",
+      titlebar: s.win ? "Trade Network — Solvency Confirmed" : "Trade Network — Liquidation Notice",
+      flavor:   s.win
+        ? "The Bureau stamps your file 'Profitable Citizen' and rescinds three pending audits."
+        : "Jackhole Megacorp expresses 'sincere disappointment' as the recovery droids board your hull.",
+      result:   s.win
         ? `Net worth: ${fmt(Game.netWorth())} ¢ in ${s.day - 1} days. You're a GazOnionaire!`
         : `Net worth: ${fmt(Game.netWorth())} ¢. The void claims another trader.`,
+      eventType: s.win ? "good" : "bad",
       actions: [{
         label: "New Game",
         run: () => {
