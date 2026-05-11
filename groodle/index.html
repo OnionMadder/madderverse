@@ -49,14 +49,12 @@
                 <div class="bg-layer bg-studio" id="bgLayer"></div>
 
                 <div class="creature" id="creature">
-                    <svg class="silhouette" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                    <!-- Fill layer: pale interior wash that becomes the
+                         "coloring page" surface. Sits UNDER the canvas
+                         (z-index 1). Also carries the clipPath def used
+                         by .draw-canvas. -->
+                    <svg class="silhouette-fill-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                         <defs>
-                            <filter id="outlineFilter" x="-10%" y="-10%" width="120%" height="120%">
-                                <feMorphology operator="dilate" radius="5" in="SourceAlpha" result="dilated"/>
-                                <feComposite operator="out" in="dilated" in2="SourceAlpha" result="outline"/>
-                                <feFlood flood-color="#1a0f33" result="ink"/>
-                                <feComposite operator="in" in="ink" in2="outline"/>
-                            </filter>
                             <clipPath id="bodyClip">
                                 <circle cx="200" cy="100" r="58"/>
                                 <rect x="155" y="148" width="90" height="232" rx="42"/>
@@ -75,8 +73,19 @@
                             <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
                             <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
                         </g>
+                    </svg>
 
-                        <g class="silhouette-outline" filter="url(#outlineFilter)">
+                    <canvas class="draw-canvas" id="drawCanvas"></canvas>
+
+                    <!-- Outline layer: same shapes as the clipPath, rendered
+                         as a stroked path that sits centered on the
+                         boundary. Placed AFTER the canvas in the DOM with a
+                         higher z-index so the dark edge stays visible over
+                         the kid's color right up to the silhouette boundary
+                         — drawable area and visible figure are now the same
+                         shape. -->
+                    <svg class="silhouette-outline-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                        <g class="silhouette-outline">
                             <circle cx="200" cy="100" r="58"/>
                             <rect x="155" y="148" width="90" height="232" rx="42"/>
                             <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
@@ -85,8 +94,6 @@
                             <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
                         </g>
                     </svg>
-
-                    <canvas class="draw-canvas" id="drawCanvas"></canvas>
                 </div>
 
                 <div class="stage-floor" id="stageFloor" aria-hidden="true"></div>
