@@ -261,11 +261,24 @@
 </div>
 
 <div id="modal" class="modal hidden" aria-hidden="true">
-  <div class="modal-card">
-    <img id="modal-img" src="" alt="" onerror="this.style.display='none'"/>
-    <h2 id="modal-title">Event</h2>
-    <p id="modal-body"></p>
-    <div id="modal-actions"></div>
+  <div class="modal-card win95-window" data-event-type="">
+    <div class="win95-titlebar">
+      <span class="win95-titlebar-text" id="modal-titlebar">Trade Network Alert</span>
+      <span class="win95-titlebar-tools">
+        <span class="win95-tbtn">_</span>
+        <span class="win95-tbtn">▢</span>
+        <span class="win95-tbtn win95-tbtn-x">×</span>
+      </span>
+    </div>
+    <div class="modal-body-wrap win95-window-body">
+      <div class="modal-image" id="modal-image"></div>
+      <div class="modal-content">
+        <h2 id="modal-title">Event</h2>
+        <p class="modal-flavor" id="modal-flavor"></p>
+        <p class="modal-result" id="modal-result"></p>
+        <div id="modal-actions"></div>
+      </div>
+    </div>
   </div>
 </div>
 

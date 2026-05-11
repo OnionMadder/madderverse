@@ -1,7 +1,7 @@
 ﻿/* =====================================================================
- * data.js â€” static game definitions
+ * data.js — static game definitions
  *   Customize / expand these tables to retheme the game.
- *   Prices are in credits (Â¢). Distances drive fuel/time costs.
+ *   Prices are in credits (¢). Distances drive fuel/time costs.
  *
  *   Trade-route design:
  *     - Each planet `produces` 2 goods (cheap, scarcity LOW there).
@@ -13,9 +13,9 @@ const GAME_DATA = (() => {
 
   // =====================================================================
   // 24 commodities
-  //   tier 1 basics (â‰¤ 100Â¢)  Â·  tier 2 industrial (100â€“400Â¢)
-  //   tier 3 advanced (400â€“1500Â¢)  Â·  tier 4 luxury (1500â€“5000Â¢)
-  //   contraband (legal:false) â€” risk customs seizure & fines
+  //   tier 1 basics (≤ 100¢)  ·  tier 2 industrial (100–400¢)
+  //   tier 3 advanced (400–1500¢)  ·  tier 4 luxury (1500–5000¢)
+  //   contraband (legal:false) — risk customs seizure & fines
   // =====================================================================
   const GOODS = [
     // --- tier 1: basics ---
@@ -55,11 +55,11 @@ const GAME_DATA = (() => {
 
   // =====================================================================
   // 12 locations
-  //   produces : abundant goods (price ~ 0.55â€“0.85 of base)  â€” buy here
-  //   demands  : scarce goods   (price ~ 1.20â€“1.60 of base)  â€” sell here
+  //   produces : abundant goods (price ~ 0.55–0.85 of base)  — buy here
+  //   demands  : scarce goods   (price ~ 1.20–1.60 of base)  — sell here
   //   x,y      : map coords (drives fuel cost & travel days)
   //   lawful   : 0..1, higher = stricter customs (more contraband busts)
-  //   canLoan  : (optional) marks the sector's banking hub â€” wire game logic
+  //   canLoan  : (optional) marks the sector's banking hub — wire game logic
   //              to gate borrow/repay UI on this flag if/when desired.
   //   tagline  : one-line subtitle shown in the location card
   //   lore     : flavor blurb shown on first arrival (modal)
@@ -80,7 +80,7 @@ const LOCATIONS = [
     demands:  ["art", "antim"],
     canLoan: true, // Unique mechanical flag for banking
     tagline: "Silicon Valley in the Stars. Banking with a smile and a wiretap.",
-    lore: "The sector's premier offshore accounting moon. Itâ€™s where the tech-bros and the tax-dodgers hang out. You can get a massive loan here at 'competitive' rates, but read the fine printâ€”they've been known to repo ships while they're still in mid-warp."
+    lore: "The sector's premier offshore accounting moon. It’s where the tech-bros and the tax-dodgers hang out. You can get a massive loan here at 'competitive' rates, but read the fine print—they've been known to repo ships while they're still in mid-warp."
   },
   {
     id: "kallis", name: "Kallis Rock-Candy", x: 60, y: 25,
@@ -88,7 +88,7 @@ const LOCATIONS = [
     produces: ["ore", "solar"],
     demands:  ["water", "medicine"],
     tagline: "A hollowed-out asteroid full of shiny rocks and grumpy miners.",
-    lore: "It looks like a giant floating piece of coal, but the inside is a neon-lit maze of tunnels! The miners here use giant robot drills to find space-crystals. Theyâ€™re super thirsty and have a lot of boo-boos, so bring water and bandages!"
+    lore: "It looks like a giant floating piece of coal, but the inside is a neon-lit maze of tunnels! The miners here use giant robot drills to find space-crystals. They’re super thirsty and have a lot of boo-boos, so bring water and bandages!"
   },
   {
     id: "verra", name: "Verra Vroom-Outpost", x: -95, y: 55,
@@ -96,7 +96,7 @@ const LOCATIONS = [
     produces: ["spice", "weapons"],
     demands:  ["fuel", "solar"],
     tagline: "The edge of the map where the space-pirates play!",
-    lore: "A wild, wild west station with zero rules and lots of explosions! Smugglers race their ships through the rings for fun. If you want the spicy stuff or big laser guns, this is the placeâ€”just don't leave your keys in the ignition."
+    lore: "A wild, wild west station with zero rules and lots of explosions! Smugglers race their ships through the rings for fun. If you want the spicy stuff or big laser guns, this is the place—just don't leave your keys in the ignition."
   },
   {
     id: "obsid", name: "Obsidian Spire", x: -35, y: -65,
@@ -112,7 +112,7 @@ const LOCATIONS = [
     produces: ["fuel", "plastics"],
     demands:  ["grain", "holo"],
     tagline: "A giant playground made of broken spaceships!",
-    lore: "What do you do with a trillion tons of space-trash? You turn it into a city! The 'Junkers' climb through old engine rooms looking for fuel and plastic toys. Theyâ€™re hungry for real food and love watching cartoon holos."
+    lore: "What do you do with a trillion tons of space-trash? You turn it into a city! The 'Junkers' climb through old engine rooms looking for fuel and plastic toys. They’re hungry for real food and love watching cartoon holos."
   },
   {
     id: "calder", name: "Caldera-9", x: -70, y: -10,
@@ -120,7 +120,7 @@ const LOCATIONS = [
     produces: ["robots", "cyber"],
     demands:  ["hydrogen", "organs"],
     tagline: "The Robot Factory Planet! Beep boop!",
-    lore: "A giant volcano planet where robots build other robots who then build more robots! It's very hot and very loud. The machines need ice-cold hydrogen to keep from melting, and theyâ€™re always looking for 'spare organic parts' for their human pets."
+    lore: "A giant volcano planet where robots build other robots who then build more robots! It's very hot and very loud. The machines need ice-cold hydrogen to keep from melting, and they’re always looking for 'spare organic parts' for their human pets."
   },
   {
     id: "erebus", name: "Bubble-Erebus", x: 50, y: -85,
@@ -200,7 +200,7 @@ const LOCATIONS = [
       g.cargo[c.id] = 0;
       const fine = Math.floor(lost * c.basePrice * 0.65);
       g.cash = Math.max(0, g.cash - fine);
-      return `Auditor seized your ${lost} ${c.name}. Fine: ${fmt(fine)} Â¢.`;
+      return `Auditor seized your ${lost} ${c.name}. Fine: ${fmt(fine)} ¢.`;
     }
   },
   {
@@ -232,7 +232,7 @@ const LOCATIONS = [
     apply(g){
       const credits = 300 + Math.floor(Math.random()*2000);
       g.cash += credits;
-      return `Found ${fmt(credits)} Â¢ in untraceable corporate slush funds. Score!`;
+      return `Found ${fmt(credits)} ¢ in untraceable corporate slush funds. Score!`;
     }
   },
   {
@@ -242,7 +242,7 @@ const LOCATIONS = [
     apply(g){
       const fee = 150 + Math.floor(Math.random()*500);
       g.cash = Math.max(0, g.cash - fee);
-      return `Deducted ${fmt(fee)} Â¢ for your 'Respiratory Maintenance Fee'.`;
+      return `Deducted ${fmt(fee)} ¢ for your 'Respiratory Maintenance Fee'.`;
     }
   },
   {
@@ -296,7 +296,7 @@ const LOCATIONS = [
   }
 
   // =====================================================================
-  // per-location flavor events â€” rolled on arrival in addition to global
+  // per-location flavor events — rolled on arrival in addition to global
   //   apply(g) returns a resolution string; may mutate g.market[g.location]
   //   to give one-visit price tweaks (rerolled when player leaves).
   // =====================================================================
@@ -305,12 +305,12 @@ const LOCATIONS = [
     terra: [
       { id:"permit_fee", weight:35, type:"warn", title:"Pact Permit Fee",
         img:"evt-permit.jpg",
-        body:"Pact bureaucrats process your docking papers â€” for a fee.",
-        apply(g){ return `Permit cost ${fmt(_pay(g, 100, 300))} Â¢.`; } },
+        body:"Pact bureaucrats process your docking papers — for a fee.",
+        apply(g){ return `Permit cost ${fmt(_pay(g, 100, 300))} ¢.`; } },
       { id:"pact_charter", weight:30, type:"good", title:"Diplomatic Charter",
         img:"evt-charter.jpg",
-        body:"A Pact attachÃ© slips you discreet courier work.",
-        apply(g){ return `Charter paid ${fmt(_earn(g, 600, 1500))} Â¢.`; } },
+        body:"A Pact attaché slips you discreet courier work.",
+        apply(g){ return `Charter paid ${fmt(_earn(g, 600, 1500))} ¢.`; } },
       { id:"undermarket", weight:35, type:"good", title:"Subway Contact",
         img:"evt-undermarket.jpg",
         body:"A contact in the under-city offers contraband at black-market rates.",
@@ -328,7 +328,7 @@ const LOCATIONS = [
         img:"evt-strike.jpg",
         body:"Striking miners pay anything for water and meds.",
         apply(g){ _disc(g, ["water","medicine"], 1.8);
-                  return "Water & meds sell at 1.8Ã— this visit."; } },
+                  return "Water & meds sell at 1.8× this visit."; } },
       { id:"asteroid", weight:30, type:"bad", title:"Asteroid Strike",
         img:"evt-asteroid.jpg",
         body:"A micro-impact ruptures cargo bay seals.",
@@ -351,7 +351,7 @@ const LOCATIONS = [
       { id:"fixer_fee", weight:30, type:"warn", title:"Fixer Fee",
         img:"evt-fixer.jpg",
         body:"A local fixer offers to 'expedite' your dock-side paperwork.",
-        apply(g){ return `Fixer took ${fmt(_pay(g, 200, 500))} Â¢.`; } },
+        apply(g){ return `Fixer took ${fmt(_pay(g, 200, 500))} ¢.`; } },
       { id:"insider", weight:30, type:"good", title:"Insider Whisper",
         img:"evt-insider.jpg",
         body:"A tipster slips you fresh trade rumors.",
@@ -373,12 +373,12 @@ const LOCATIONS = [
       { id:"cartel", weight:30, type:"bad", title:"Cartel Shakedown",
         img:"evt-cartel.jpg",
         body:"Cartel toughs want a 'docking tribute.'",
-        apply(g){ return `Tribute cost ${fmt(_pay(g, 200, 600))} Â¢.`; } },
+        apply(g){ return `Tribute cost ${fmt(_pay(g, 200, 600))} ¢.`; } },
       { id:"pirate_buyer", weight:35, type:"good", title:"Pirate Buyer",
         img:"evt-pirate-buy.jpg",
         body:"A pirate captain pays premium for fuel and solar arrays.",
         apply(g){ _disc(g, ["fuel","solar"], 1.7);
-                  return "Fuel & solar sell at 1.7Ã— this visit."; } },
+                  return "Fuel & solar sell at 1.7× this visit."; } },
     ],
 
     obsid: [
@@ -386,16 +386,16 @@ const LOCATIONS = [
         img:"evt-patron.jpg",
         body:"An old-house patron commissions exotica at any price.",
         apply(g){ _disc(g, ["art","holo"], 1.8);
-                  return "Art & holo-crystals 1.8Ã— this visit."; } },
+                  return "Art & holo-crystals 1.8× this visit."; } },
       { id:"duel", weight:30, type:"bad", title:"Duel Insult",
         img:"evt-duel.jpg",
         body:"You bumped the wrong shoulder. Honor demands payment.",
-        apply(g){ return `Honor settled with ${fmt(_pay(g, 200, 500))} Â¢.`; } },
+        apply(g){ return `Honor settled with ${fmt(_pay(g, 200, 500))} ¢.`; } },
       { id:"masquerade", weight:35, type:"good", title:"Masquerade Ball",
         img:"evt-masquerade.jpg",
         body:"The night's masquerade drives luxury prices skyward.",
         apply(g){ _disc(g, ["art","lace","holo"], 1.5);
-                  return "Luxury goods sell at 1.5Ã— this visit."; } },
+                  return "Luxury goods sell at 1.5× this visit."; } },
     ],
 
     halc: [
@@ -407,7 +407,7 @@ const LOCATIONS = [
       { id:"stowaway", weight:30, type:"warn", title:"Stowaway",
         img:"evt-stowaway.jpg",
         body:"A drifter is found in your cargo bay.",
-        apply(g){ return `Paid ${fmt(_pay(g, 100, 300))} Â¢ to dispatch them quietly.`; } },
+        apply(g){ return `Paid ${fmt(_pay(g, 100, 300))} ¢ to dispatch them quietly.`; } },
       { id:"lucky_salvage", weight:30, type:"good", title:"Lucky Salvage",
         img:"evt-salvage-local.jpg",
         body:"You find a working tech crate stamped 'unclaimed.'",
@@ -421,7 +421,7 @@ const LOCATIONS = [
             return `Free 1 ${good.name} added to your hold.`;
           } else {
             g.cash += good.basePrice;
-            return `No hold space â€” fenced the find for ${fmt(good.basePrice)} Â¢.`;
+            return `No hold space — fenced the find for ${fmt(good.basePrice)} ¢.`;
           }
         } },
     ],
@@ -435,12 +435,12 @@ const LOCATIONS = [
       { id:"heat_surcharge", weight:30, type:"warn", title:"Heat Surcharge",
         img:"evt-heat.jpg",
         body:"Cooling fees are levied on every visiting hull.",
-        apply(g){ return `Heat surcharge ${fmt(_pay(g, 150, 400))} Â¢.`; } },
+        apply(g){ return `Heat surcharge ${fmt(_pay(g, 150, 400))} ¢.`; } },
       { id:"worker_crisis", weight:35, type:"good", title:"Worker Crisis",
         img:"evt-workers.jpg",
         body:"A foundry accident has clinics scrambling for replacement organs.",
         apply(g){ _disc(g, ["organs"], 1.8);
-                  return "Bio-organs sell at 1.8Ã— this visit."; } },
+                  return "Bio-organs sell at 1.8× this visit."; } },
     ],
 
     erebus: [
@@ -452,7 +452,7 @@ const LOCATIONS = [
       { id:"reef_storm", weight:30, type:"warn", title:"Reef Storm",
         img:"evt-storm.jpg",
         body:"A storm forces docking surcharges across the floating quays.",
-        apply(g){ return `Storm fee ${fmt(_pay(g, 100, 300))} Â¢.`; } },
+        apply(g){ return `Storm fee ${fmt(_pay(g, 100, 300))} ¢.`; } },
       { id:"deep_find", weight:35, type:"good", title:"Deep Find",
         img:"evt-deepfind.jpg",
         body:"Fishermen hauled up something the deep didn't want kept.",
@@ -463,18 +463,18 @@ const LOCATIONS = [
     pavon: [
       { id:"baron_party", weight:35, type:"good", title:"Baron's Party",
         img:"evt-baron.jpg",
-        body:"A helium baron throws a soirÃ©e demanding fine wood and fabric.",
+        body:"A helium baron throws a soirée demanding fine wood and fabric.",
         apply(g){ _disc(g, ["textiles","lumber"], 1.7);
-                  return "Textiles & lumber sell at 1.7Ã— this visit."; } },
+                  return "Textiles & lumber sell at 1.7× this visit."; } },
       { id:"sky_casino", weight:30, type:"warn", title:"Sky-Casino",
         img:"evt-casino.jpg",
         body:"You can't help yourself at the cloud-deck tables.",
         apply(g){
           const win = Math.random() < 0.5;
           const amt = 300 + Math.floor(Math.random()*700);
-          if (win) { g.cash += amt; return `Won ${fmt(amt)} Â¢ at the tables.`; }
+          if (win) { g.cash += amt; return `Won ${fmt(amt)} ¢ at the tables.`; }
           g.cash = Math.max(0, g.cash - amt);
-          return `Lost ${fmt(amt)} Â¢ at the tables.`;
+          return `Lost ${fmt(amt)} ¢ at the tables.`;
         } },
       { id:"patron_commission", weight:35, type:"good", title:"Patron's Commission",
         img:"evt-commission.jpg",
@@ -487,7 +487,7 @@ const LOCATIONS = [
       { id:"blessing", weight:30, type:"good", title:"Pilgrim's Blessing",
         img:"evt-blessing.jpg",
         body:"A grateful pilgrim presses coin into your palm.",
-        apply(g){ return `Blessing brought ${fmt(_earn(g, 200, 500))} Â¢.`; } },
+        apply(g){ return `Blessing brought ${fmt(_earn(g, 200, 500))} ¢.`; } },
       { id:"forbidden_vault", weight:35, type:"good", title:"Forbidden Vault",
         img:"evt-vault.jpg",
         body:"A novitiate quietly opens the crystal vault for visitors.",
@@ -495,14 +495,14 @@ const LOCATIONS = [
                   return "Holo-crystals 40% off this visit."; } },
       { id:"confession", weight:35, type:"warn", title:"Confession Tithe",
         img:"evt-confession.jpg",
-        body:"The Order weighs your soul â€” and your cargo.",
+        body:"The Order weighs your soul — and your cargo.",
         apply(g){
           let val = 0;
           GOODS.forEach(x => { if (!x.legal) val += (g.cargo[x.id]||0) * x.basePrice; });
           if (val === 0) return "Your manifest is clean. The Order blesses you.";
           const tithe = Math.ceil(val * 0.10);
           g.cash = Math.max(0, g.cash - tithe);
-          return `Tithed ${fmt(tithe)} Â¢ for forbidden cargo.`;
+          return `Tithed ${fmt(tithe)} ¢ for forbidden cargo.`;
         } },
     ],
 
@@ -515,7 +515,7 @@ const LOCATIONS = [
       { id:"gang_toll", weight:35, type:"bad", title:"Gang Toll",
         img:"evt-gang.jpg",
         body:"A neon-painted gang demands a transit toll.",
-        apply(g){ return `Toll cost ${fmt(_pay(g, 200, 500))} Â¢.`; } },
+        apply(g){ return `Toll cost ${fmt(_pay(g, 200, 500))} ¢.`; } },
       { id:"data_broker", weight:30, type:"good", title:"Data Broker",
         img:"evt-broker.jpg",
         body:"A data broker pays for your trade logs and tips you to a rumor.",
@@ -523,7 +523,7 @@ const LOCATIONS = [
           const good = GOODS[Math.floor(Math.random()*GOODS.length)];
           g.tickerQueue.push(`RUMOR: ${good.name} demand shifting in next sector.`);
           const c = _earn(g, 100, 300);
-          return `Sold logs for ${fmt(c)} Â¢, picked up a rumor.`;
+          return `Sold logs for ${fmt(c)} ¢, picked up a rumor.`;
         } },
     ],
 
@@ -541,12 +541,12 @@ const LOCATIONS = [
           g.tickerQueue.push(`RUMOR: Yoxai harmonics correlate with ${good.name} markets.`);
           const c = 50 + Math.floor(Math.random()*200);
           g.cash += c;
-          return `Strange whisper. ${fmt(c)} Â¢ found in your pocket. New rumor recorded.`;
+          return `Strange whisper. ${fmt(c)} ¢ found in your pocket. New rumor recorded.`;
         } },
       { id:"archaeologist", weight:35, type:"good", title:"Archaeologist's Hire",
         img:"evt-archaeo.jpg",
         body:"An archaeologist needs samples ferried back to a research lab.",
-        apply(g){ return `Hired courier work paid ${fmt(_earn(g, 800, 2000))} Â¢.`; } },
+        apply(g){ return `Hired courier work paid ${fmt(_earn(g, 800, 2000))} ¢.`; } },
     ],
 
   };
@@ -555,7 +555,7 @@ const LOCATIONS = [
   LOCATIONS.forEach(loc => { loc.localEvents = LOCAL_EVENTS[loc.id] || []; });
 
   // =====================================================================
-  // ship sprite sheet config â€” single consolidated atlas
+  // ship sprite sheet config — single consolidated atlas
   //   frame coords mirror /assets/sprites/ships.json
   // =====================================================================
   const SHIP_SPRITES = {
@@ -606,47 +606,47 @@ const LOCATIONS = [
   //   sprite           : frame key inside SHIP_SPRITES.frames
   //   cost             : credits deducted from starting cash on purchase
   //   cap              : cargo hold in tons (overrides mode default)
-  //   passCap          : passenger berths (data only â€” no game logic yet)
+  //   passCap          : passenger berths (data only — no game logic yet)
   //   fuelCap          : maximum ship fuel reservoir (units)
   //   fuelMod          : multiplier on travel fuel use   (<1 = cheaper)
   //   speedMod         : multiplier on travel days       (<1 = faster)
-  //   maint            : daily maintenance cost (data only â€” no game logic yet)
+  //   maint            : daily maintenance cost (data only — no game logic yet)
   //   interestMod      : multiplier on loan interest rate
-  //   contrabandShield : true â†’ customs inspections often find nothing
-  //   betterEvents     : true â†’ bad random events fire less often
+  //   contrabandShield : true → customs inspections often find nothing
+  //   betterEvents     : true → bad random events fire less often
   // =====================================================================
 const SHIPS = [
-  // â”€â”€ STARTER / MID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── STARTER / MID ────────────────────────────────────────────────
   {
     id: 'shuttle', sheet: 'one', sprite: 'bottle',
     name: 'Deckard-Class Shuttle',
     cost: 0, cap: 40, passCap: 2, fuelCap: 80, fuelMod: 1.0, speedMod: 1.0, maint: 10,
     flavor: 'Is that... cola?',
-    desc: 'An old promotional soda transport retrofitted with life support. Itâ€™s sticky, the engine sounds like a burp, and itâ€™s free. No shame in starting small, but plenty of shame in being seen in this.',
+    desc: 'An old promotional soda transport retrofitted with life support. It’s sticky, the engine sounds like a burp, and it’s free. No shame in starting small, but plenty of shame in being seen in this.',
   },
   {
     id: 'hauler', sheet: 'one', sprite: 'cube',
     name: 'Kallis Standard Hauler',
     cost: 500, cap: 75, passCap: 0, fuelCap: 120, fuelMod: 1.1, speedMod: 1.0, maint: 25,
     flavor: 'Suspend your disbelief (and your cargo).',
-    desc: 'Literally a block of gelatinous suspension fluid held in a purple force-field. It doesnâ€™t have hallways, just pockets of air. Great for bulk, terrible for anyone who hates being moist.',
+    desc: 'Literally a block of gelatinous suspension fluid held in a purple force-field. It doesn’t have hallways, just pockets of air. Great for bulk, terrible for anyone who hates being moist.',
   },
   {
     id: 'clipper', sheet: 'two', sprite: 'bee',
     name: 'Zephyr Clipper',
     cost: 1500, cap: 45, passCap: 8, fuelCap: 100, fuelMod: 0.88, speedMod: 0.78, maint: 40,
     flavor: 'Float like a butterfly, sting like a fuel bill.',
-    desc: 'An insectoid hull with vibrating wings that somehow provide thrust in a vacuum. Itâ€™s the fastest way to get eight passengers across the sector, provided they donâ€™t mind the constant buzzing.',
+    desc: 'An insectoid hull with vibrating wings that somehow provide thrust in a vacuum. It’s the fastest way to get eight passengers across the sector, provided they don’t mind the constant buzzing.',
   },
   {
     id: 'runner', sheet: 'one', sprite: 'worm',
     name: 'Verra Rim Runner',
     cost: 2000, cap: 58, passCap: 4, fuelCap: 110, fuelMod: 0.80, speedMod: 0.85, maint: 50,
     flavor: 'The segmented speedster.',
-    desc: 'Its bio-mechanical segments allow it to weave through asteroid belts that would shred a hauler. Itâ€™s slimy and the air filters smell like compost, but customs can never quite catch it.',
+    desc: 'Its bio-mechanical segments allow it to weave through asteroid belts that would shred a hauler. It’s slimy and the air filters smell like compost, but customs can never quite catch it.',
   },
 
-  // â”€â”€ ADVANCED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── ADVANCED ─────────────────────────────────────────────────────
   {
     id: 'courier', sheet: 'two', sprite: 'spider',
     name: 'Obsidian Courier',
@@ -659,24 +659,24 @@ const SHIPS = [
     name: 'Halcyon Salvager',
     cost: 1200, cap: 85, passCap: 3, fuelCap: 140, fuelMod: 1.12, speedMod: 1.22, maint: 30,
     flavor: 'Pressure-tested for the deep black.',
-    desc: 'Looks like it belongs underwater, but it handles the vacuum just as well. Itâ€™s a rusted tank with a massive bellyâ€”clunky and slow, but it can carry a whole scrapyard in one go.',
+    desc: 'Looks like it belongs underwater, but it handles the vacuum just as well. It’s a rusted tank with a massive belly—clunky and slow, but it can carry a whole scrapyard in one go.',
   },
   {
     id: 'forge_hauler', sheet: 'one', sprite: 'whale',
     name: 'Caldera Forge-Hauler',
     cost: 3000, cap: 130, passCap: 2, fuelCap: 220, fuelMod: 1.35, speedMod: 1.45, maint: 100,
     flavor: 'Steam-powered profit.',
-    desc: 'A massive, brass-bound beast that exhales pink exhaust. Itâ€™s an industrial behemoth with enough cargo room to crash a local market single-handedly. If you can afford the fuel, you win.',
+    desc: 'A massive, brass-bound beast that exhales pink exhaust. It’s an industrial behemoth with enough cargo room to crash a local market single-handedly. If you can afford the fuel, you win.',
   },
   {
     id: 'drifter', sheet: 'one', sprite: 'squid',
     name: 'Erebus Drifter',
     cost: 1800, cap: 68, passCap: 6, fuelCap: 130, fuelMod: 0.90, speedMod: 0.95, maint: 45,
     flavor: 'Tentacles of trade.',
-    desc: 'The Drifter uses its glowing propulsion limbs to glide through the void. Itâ€™s an uncommonly reliable ship with a balanced stat spread, popular with traders who donâ€™t want any surprises.',
+    desc: 'The Drifter uses its glowing propulsion limbs to glide through the void. It’s an uncommonly reliable ship with a balanced stat spread, popular with traders who don’t want any surprises.',
   },
 
-  // â”€â”€ SPECIALTY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── SPECIALTY ────────────────────────────────────────────────────
   {
     id: 'skimmer', sheet: 'two', sprite: 'cyber',
     name: 'Pavonis Skimmer',
@@ -689,14 +689,14 @@ const SHIPS = [
     name: 'Solenne Pilgrim Vessel',
     cost: 2200, cap: 62, passCap: 20, fuelCap: 120, fuelMod: 0.88, speedMod: 1.0, interestMod: 0.75, maint: 35,
     flavor: 'Thought-controlled travel.',
-    desc: 'A giant, preserved brain encased in a golden dome. Itâ€™s a sacred vessel of the Order. Bankers find the ship so unsettling (or holy) that they offer significantly lower interest rates to its owners.',
+    desc: 'A giant, preserved brain encased in a golden dome. It’s a sacred vessel of the Order. Bankers find the ship so unsettling (or holy) that they offer significantly lower interest rates to its owners.',
   },
   {
     id: 'ghost', sheet: 'two', sprite: 'skull',
     name: 'Threnody Ghost',
     cost: 3500, cap: 58, passCap: 4, fuelCap: 130, fuelMod: 0.88, speedMod: 0.85, contrabandShield: true, maint: 70,
     flavor: 'Death at the wheel.',
-    desc: 'A menacing hull shaped like a titanâ€™s skull on wheels. It uses "fear-tech" to scramble scanners. Most customs agents see this coming and decide theyâ€™re too busy to perform an inspection.',
+    desc: 'A menacing hull shaped like a titan’s skull on wheels. It uses "fear-tech" to scramble scanners. Most customs agents see this coming and decide they’re too busy to perform an inspection.',
   },
   {
     id: 'explorer', sheet: 'two', sprite: 'eyeball',
@@ -711,12 +711,12 @@ const COMPETITORS = [
   { 
     id: 'onix', name: 'Onix Paper-Pushers', style: 'steady',
     motto: 'We love forms. We live for files.',
-    flavor: 'A subsidiary so boring that even Jackhole Megacorp forgot they owned them. They specialize in shipping stationary and staplers. They never crash, but they never truly soarâ€”they just... exist.'
+    flavor: 'A subsidiary so boring that even Jackhole Megacorp forgot they owned them. They specialize in shipping stationary and staplers. They never crash, but they never truly soar—they just... exist.'
   },
   { 
     id: 'kallisco', name: 'Kallis Heavy Metalheads', style: 'aggressive',
-    motto: 'If itâ€™s heavy, weâ€™ll drop it!',
-    flavor: 'Ex-miners who spent too much time huffing asteroid dust. They fly massive, rusted bricks and donâ€™t believe in brakes. They make big money or big craters. There is no middle ground.'
+    motto: 'If it’s heavy, we’ll drop it!',
+    flavor: 'Ex-miners who spent too much time huffing asteroid dust. They fly massive, rusted bricks and don’t believe in brakes. They make big money or big craters. There is no middle ground.'
   },
   { 
     id: 'pavonis', name: 'Pavonis Cloud-Clown Cartel', style: 'volatile',
@@ -741,12 +741,12 @@ const COMPETITORS = [
 ];
 
   // =====================================================================
-  // ship fuel â€” per-location base price and travel-cost helpers
+  // ship fuel — per-location base price and travel-cost helpers
   //   travelFuel returns units consumed per jump (after shipFuelMod);
   //   fuelBasePrice gives the location's posted price per unit.
   // =====================================================================
   const FUEL_PRICES = {
-    pavon:  6,   // gas-giant rigs â€” the cheapest cell on the lane
+    pavon:  6,   // gas-giant rigs — the cheapest cell on the lane
     halc:   8,   // salvage town drips fuel from stripped hulls
     kallis: 10,
     terra:  11,
