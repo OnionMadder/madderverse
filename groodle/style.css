@@ -280,8 +280,10 @@ body.dancing .stage {
     z-index: 2;
     touch-action: none;
     cursor: crosshair;
-    -webkit-clip-path: url(#bodyClip);
-    clip-path: url(#bodyClip);
+    /* Drawing is clipped to the silhouette inside game.js via ctx.clip()
+       on a Path2D built from BODY_SHAPES — see buildBodyPath() / buildCanvas.
+       That clip is the single source of truth for "the drawable area";
+       a CSS clip-path here would just duplicate the same mask. */
 }
 
 body.dancing .draw-canvas {

@@ -14,6 +14,20 @@
     ];
     const SIZES = [4, 12, 22];
 
+    /* The 6 shapes that form the silhouette. Must stay in sync with the
+       <clipPath id="bodyClip">, <g class="silhouette-fill">, and
+       <g class="silhouette-outline"> blocks in index.html — same numbers,
+       same transforms. Used by buildBodyPath() to clip the canvas so the
+       kid literally cannot paint outside the body. */
+    const BODY_SHAPES = [
+        { type: 'circle', cx: 200, cy: 100, r: 58 },
+        { type: 'rect',   x: 155,  y: 148,   w: 90, h: 232, r: 42 },
+        { type: 'rect',   x: -18,  y: -160,  w: 36, h: 172, r: 18, tx: 165, ty: 180, rot: -52 },
+        { type: 'rect',   x: -18,  y: -160,  w: 36, h: 172, r: 18, tx: 235, ty: 180, rot:  52 },
+        { type: 'rect',   x: -17,  y: 0,     w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
+        { type: 'rect',   x: -17,  y: 0,     w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
+    ];
+
     const TEMPO = 112;
     const STEPS_PER_BAR = 16;
     const BARS_PER_LOOP = 4;
@@ -223,6 +237,51 @@
 
     /* ============ CANVAS BUILD ============ */
 
+    /* Add a rounded rectangle subpath. Equivalent to SVG <rect rx="r"> and
+       to CanvasRenderingContext2D.roundRect, but hand-rolled so we don't
+       depend on roundRect (still missing in some older mobile Safaris). */
+    function addRoundRect(path, x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        path.moveTo(x + r, y);
+        path.lineTo(x + w - r, y);
+        path.arcTo(x + w, y, x + w, y + r, r);
+        path.lineTo(x + w, y + h - r);
+        path.arcTo(x + w, y + h, x + w - r, y + h, r);
+        path.lineTo(x + r, y + h);
+        path.arcTo(x, y + h, x, y + h - r, r);
+        path.lineTo(x, y + r);
+        path.arcTo(x, y, x + r, y, r);
+        path.closePath();
+    }
+
+    /* Build the union-of-shapes silhouette as one Path2D, in the canvas's
+       logical 400x600 coordinate system. Each shape's transform mirrors
+       the SVG: SVG "translate(tx ty) rotate(rot)" means rotate-about-origin
+       first, THEN translate — which is exactly the matrix you get by
+       calling translateSelf followed by rotateSelf on an identity DOMMatrix
+       (post-multiplication: M = T * R, applied as M*p = T*(R*p)). */
+    function buildBodyPath() {
+        const path = new Path2D();
+        for (let i = 0; i < BODY_SHAPES.length; i++) {
+            const s = BODY_SHAPES[i];
+            const sub = new Path2D();
+            if (s.type === 'circle') {
+                sub.arc(s.cx, s.cy, s.r, 0, Math.PI * 2);
+            } else if (s.type === 'rect') {
+                addRoundRect(sub, s.x, s.y, s.w, s.h, s.r || 0);
+            }
+            if (s.tx != null || s.ty != null || s.rot != null) {
+                const m = new DOMMatrix();
+                if (s.tx || s.ty) m.translateSelf(s.tx || 0, s.ty || 0);
+                if (s.rot) m.rotateSelf(s.rot);
+                path.addPath(sub, m);
+            } else {
+                path.addPath(sub);
+            }
+        }
+        return path;
+    }
+
     function buildCanvas() {
         canvas = document.getElementById('drawCanvas');
         creature = document.getElementById('creature');
@@ -235,6 +294,13 @@
         ctx.scale(dpr, dpr);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        // Hard-clip the drawing surface to the silhouette so strokes outside
+        // the body are never painted to the bitmap (not just visually masked
+        // by CSS clip-path). This is the source of truth for "the drawable
+        // area" — drawing a wide brush near the edge gets cleanly cropped,
+        // dragging outside the body simply paints nothing, and the eraser
+        // can only ever act on pixels that are actually visible.
+        ctx.clip(buildBodyPath());
         attachDrawing();
     }
 

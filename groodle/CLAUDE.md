@@ -10,8 +10,9 @@ to `groodle/`.
 ## What it is
 
 - One frontal humanoid silhouette on a stage. Kid colors inside it with a
-  palette + brush sizes; their strokes are clipped to the body shape via
-  SVG `<clipPath id="bodyClip">`.
+  palette + brush sizes; the canvas's 2D context is hard-clipped to the
+  body shape (via `ctx.clip(buildBodyPath())` in `buildCanvas`) so strokes
+  outside the silhouette are never painted to the bitmap at all.
 - DANCE button switches modes: drawing stops, the whole creature (silhouette
   + canvas as one unit) animates with translate / rotate / scale on every
   audio beat. Audio is procedural Web Audio — kick, snare, hat, bass, lead —
@@ -38,13 +39,13 @@ rest of the hub (relative for in-game assets, absolute for SEO / favicon).
 
 | Section | What lives there |
 |---|---|
-| **CONFIG** | `STAGE_W=400`, `STAGE_H=600`, `COLORS` (10), `SIZES` (4/12/22), `TEMPO=112`, `STEPS_PER_BAR=16`, `BARS_PER_LOOP=4`, `MOVES`, `BEATS` |
+| **CONFIG** | `STAGE_W=400`, `STAGE_H=600`, `COLORS` (10), `SIZES` (4/12/22), `BODY_SHAPES` (6 silhouette pieces — must match the SVG copies in `index.html`), `TEMPO=112`, `STEPS_PER_BAR=16`, `BARS_PER_LOOP=4`, `MOVES`, `BEATS` |
 | **STATE** | `currentColor`, `currentSize`, `isErasing`, `isDrawing`, `lastX/Y`, `isPlaying`, `currentMoveIdx`, `currentBeatIdx`, `danceStartTime` |
 | **AUDIO** | `audioCtx`, `masterGain` + `DynamicsCompressor`. `ensureAudio()` lazy-inits on first user click. `startAudio` / `stopAudio` drive the scheduler. |
 | `scheduler()` | Look-ahead scheduler — every 25 ms, schedule any beats due in the next 100 ms. Advances `currentStep` (0..15) then increments `currentBar` (0..3). |
 | `scheduleStep(step, bar, when)` | Per-beat dispatcher. Picks drum hits from the active `BEAT` pattern + bass / lead from the active `MOVE`. |
 | **SYNTH VOICES** | `kick`, `snare`, `hat`, `bass`, `lead`. All synthesized with oscillators + filters; no samples. |
-| **CANVAS** | `buildCanvas` sizes the canvas at `STAGE_W*dpr × STAGE_H*dpr` and scales the 2D context so coordinates are in logical 400×600 units. `getPos(e)` converts pointer coords to those logical units. `attachDrawing` wires the pointer events. |
+| **CANVAS** | `buildCanvas` sizes the canvas at `STAGE_W*dpr × STAGE_H*dpr`, scales the 2D context so coordinates are in logical 400×600 units, and calls `ctx.clip(buildBodyPath())` so the drawable area is the silhouette itself. `buildBodyPath` constructs a `Path2D` from `BODY_SHAPES` (using `addRoundRect` + a `DOMMatrix` for each transformed rect). `getPos(e)` converts pointer coords to logical units. `attachDrawing` wires the pointer events. |
 | **TOOLS UI** | `buildPalette`, `buildSizes`, `attachBgPicker` — generates the swatches / size pucks and the 4 background thumbnails. |
 | `drawSurprise()` | Goofy default character (skin fill, green shirt, blue pants, red star, eyes, smile, purple hair tufts) so kids can hit DANCE without drawing first. Relies on the clip to trim everything outside the silhouette. |
 | **DANCE** | `startDance` / `stopDance` toggles the panel + audio. `danceFrame` runs the RAF loop. `applyMove(move, beats)` computes the per-move transform. `scheduleBubblePulse` flashes the corner bubble on quarter notes. |
@@ -52,25 +53,41 @@ rest of the hub (relative for in-game assets, absolute for SEO / favicon).
 
 ## The silhouette + clip trick
 
-Three copies of the same 6 shapes (head circle + torso rect + 2 angled arms +
-2 angled legs) live in `index.html` inside one `<svg>`:
+The same 6 shapes (head circle + torso rect + 2 angled arms + 2 angled
+legs) live in **four** places that must stay in lockstep:
 
 ```
-.silhouette-fill        — pale white wash, visible to the kid as a guide
-.silhouette-outline     — passed through #outlineFilter (feMorphology
-                          dilate → composite out) to render a dark ring
-                          around the union of the body shapes
-<clipPath id="bodyClip"> — the SAME shapes again, used by CSS
-                          clip-path: url(#bodyClip) on the .draw-canvas
-                          so strokes are visually masked to the body
+.silhouette-fill            — pale white wash, the "coloring page" surface
+.silhouette-outline         — same shapes, fed through #innerOutlineFilter
+                              (feMorphology erode → composite out) to draw
+                              a dark ring sitting inside the body
+<clipPath id="bodyClip">    — defined in <defs>. No longer referenced by
+                              CSS — kept as a legacy / fallback hook in
+                              case future features (e.g. a "save your
+                              drawing as SVG" export) want it.
+BODY_SHAPES (game.js)       — the SAME shapes as a JS data array. Used by
+                              buildBodyPath() to build a Path2D, which
+                              buildCanvas() hands to ctx.clip(). This is
+                              the single source of truth for "the drawable
+                              area".
 ```
 
-**The canvas itself isn't trimmed — strokes outside the body still hit the
-backing bitmap, they're just hidden by the CSS clip.** That's important for
-the "snapping" TODO below: if the kid drags outside the silhouette, the
-stroke is invisible but technically painted, and the clip cleanly hides it.
-This is the source of both the "stay in the lines" magic AND the perception
-that the brush "snaps".
+**The canvas's 2D context is hard-clipped to the silhouette.** Strokes
+outside the body are never painted to the backing bitmap — not just
+visually hidden. Consequences:
+
+- Dragging the cursor outside the silhouette simply produces no marks
+  (no more "the brush snaps" illusion — there's nothing there to snap).
+- The eraser can only ever act on visible pixels.
+- A wide brush near the silhouette edge gets cleanly cropped at the
+  boundary, so strokes meet the inner outline ring perfectly.
+- `drawSurprise()` can still paint full-rect fills across `400×600` and
+  trust the clip to trim everything that isn't a body. The clip
+  intersects every draw call, so the rect-painting trick still works.
+
+If you change the silhouette, update BOTH the three SVG copies in
+`index.html` AND the `BODY_SHAPES` array in `game.js`, or the visible
+body and the clipped drawing area will drift apart.
 
 The creature `<div id="creature">` wraps both the silhouette and the draw
 canvas, so when `applyMove()` sets `creature.style.transform`, the silhouette
@@ -109,11 +126,14 @@ to the logical `400×600` space so JS only ever thinks in those units.
 
 ## Things that bite
 
-- **Strokes outside the silhouette aren't blocked, just masked.** See the
-  silhouette + clip section above. This means `drawSurprise()` can fill the
-  entire `400×600` rect with skin tone and trust the clip to make it a
-  body. Toggling the strict-drawing mode (TODO 2) is a JS change, not a
-  geometry change.
+- **The drawable area is defined by `BODY_SHAPES` in `game.js`, not by
+  the SVG.** The SVG copies (`.silhouette-fill`, `.silhouette-outline`,
+  `<clipPath id="bodyClip">`) only control what the kid SEES; the Canvas2D
+  `ctx.clip()` in `buildCanvas` decides what the kid can actually PAINT.
+  If the four copies drift out of sync, the visible silhouette and the
+  drawable area will mismatch. Pointer events still fire over the full
+  canvas rect — they just hit a clipped 2D context that paints nothing
+  outside the body.
 - **`audioCtx` needs a user gesture to start.** `ensureAudio` lazy-inits,
   and `startDance` calls `audioCtx.resume()` before its `begin()` callback
   — don't try to schedule audio from page load.
@@ -160,15 +180,17 @@ to the logical `400×600` space so JS only ever thinks in those units.
 3. Cycle buttons in `dancePanel` cycle through the arrays automatically.
 
 ### Swap or add a silhouette pose
-This is bigger — it touches three SVG groups in `index.html` that must
-stay in sync:
-- `.silhouette-fill > g` (the pale wash)
-- `.silhouette-outline > g` (input to the outline filter)
-- `<clipPath id="bodyClip">` (controls where strokes are visible)
+This is bigger — it touches **four** copies of the same shapes that must
+stay in lockstep:
+- `.silhouette-fill > g` in `index.html` (the pale wash)
+- `.silhouette-outline > g` in `index.html` (input to the outline filter)
+- `<clipPath id="bodyClip">` in `index.html` (legacy SVG clip-path)
+- `BODY_SHAPES` array in `game.js` (the canvas-level clip — this is the
+  one that actually decides where strokes can be drawn)
 
-All three must contain the **same shapes** or the clip won't match the
-visible body. There's no pose abstraction today — see TODO 1 below for
-what a real pose system would look like.
+All four must contain the **same shapes** or the visible body and the
+drawable area will disagree. There's no pose abstraction today — see
+TODO 1 below for what a real pose system would look like.
 
 ## Local dev
 
@@ -189,11 +211,15 @@ single focused session.
 
 **Poses (bigger work, ~1 session):**
 - Today there's exactly one silhouette: a front-facing humanoid (head + torso
-  + 2 arms + 2 legs). The shapes are duplicated three times in
-  `index.html` (fill / outline / clipPath).
-- To add more poses cleanly, extract a `POSES` data structure where each
-  entry is a list of `{ shape, attrs }` and have JS inject the same shapes
-  into all three SVG groups + the clip. Then add a pose-picker UI similar
+  + 2 arms + 2 legs). The shapes are duplicated four times: three SVG copies
+  in `index.html` (fill / outline / clipPath) plus the `BODY_SHAPES` array
+  in `game.js` that drives the canvas-level clip.
+- The `BODY_SHAPES` array is already in the right shape to be the basis of
+  a `POSES` data structure — each pose would be its own array of shape
+  records. To add more poses cleanly: lift `BODY_SHAPES` into a
+  `POSES[poseId]` map, have JS inject the same shapes into all three SVG
+  groups at init (so they're no longer hand-maintained in HTML), drive the
+  canvas clip off `POSES[currentPose]`, and add a pose-picker UI similar
   to the background picker.
 - Pose candidates to try: side profile (one-arm extended), arms-up
   ("yay!"), seated, animal (cat / dog), abstract blob (no-rules drawing).
@@ -206,29 +232,28 @@ single focused session.
 - Candidates: stadium / concert (spotlight beams), underwater, rainbow,
   forest at dawn, candy land.
 
-### 2. Fix figure "snapping" for coloring within the lines
+### 2. (DONE — kept here for context) Fix figure "snapping" for coloring within the lines
 
-The current behavior: strokes outside the silhouette are drawn to the
-canvas but visually masked by `clip-path: url(#bodyClip)`. To the kid this
-reads as "my brush snaps to the body" — strokes appear and disappear at
-the silhouette edge with no warning.
+**Resolved by hard-clipping the canvas 2D context to the silhouette** via
+`ctx.clip(buildBodyPath())` in `buildCanvas`. Strokes outside the body
+are no longer painted to the bitmap at all (previously they were drawn
+and only visually masked by a CSS `clip-path`, which made the brush
+appear to "snap" at the silhouette edge).
 
-Three approaches, ranked by effort:
-- **(a) Visual feedback (easy):** keep the current clip but render a faint
-  ghost stroke outside the silhouette so the kid sees their input is
-  registered. A duplicate canvas under the clip, slightly transparent.
-- **(b) Hard block (medium):** detect whether the pointer is inside the
-  silhouette in `getPos()` (point-in-path against the clip shapes) and
-  skip the stroke draw if outside. Pointer is still captured so a drag
-  that crosses back in continues correctly.
-- **(c) Stroke clamping (hardest):** when the pointer leaves the body,
-  draw the line up to the silhouette edge instead of past it. Needs a
-  line-segment / clip-shape intersection. Most satisfying feel but real
-  geometry work.
-
-Pick one based on how strict we want "stay in the lines" to feel. (a) +
-(b) together would probably give the best kid UX: the brush won't paint
-outside, but the kid sees their finger / cursor is still tracked.
+Open follow-ups that the original TODO floated but this change did NOT
+do, in case the kid UX still feels off:
+- **Visual feedback outside the body.** Today, dragging outside the
+  silhouette produces literally nothing — no shadow stroke, no cursor
+  hint, no "you're outside the body" affordance. If kids start to feel
+  the brush is "broken" outside the lines, render a faint ghost stroke
+  under the clip (a second canvas, low opacity, NOT clipped) so they
+  see their input is at least being tracked.
+- **Stroke clamping.** When the pointer crosses the silhouette boundary
+  mid-drag, the line currently jumps with no draw outside the body.
+  Pixel-accurate clamping (line-segment vs clip-path intersection so
+  the visible stroke ends exactly at the edge) would feel even crisper,
+  but it's real geometry work and the current behavior already looks
+  clean because the inner outline ring covers the boundary.
 
 ### 3. Improve layout
 
