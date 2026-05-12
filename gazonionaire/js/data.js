@@ -1,56 +1,40 @@
-﻿/* =====================================================================
- * data.js — static game definitions
- *   Customize / expand these tables to retheme the game.
- *   Prices are in credits (¢). Distances drive fuel/time costs.
- *
- *   Trade-route design:
- *     - Each planet `produces` 2 goods (cheap, scarcity LOW there).
- *     - Each planet `demands`  2 goods (premium prices, scarcity HIGH).
- *     - Every good has at least one producer and one demander somewhere.
- * ===================================================================== */
-
+﻿
 const GAME_DATA = (() => {
 
-  // =====================================================================
-  // 24 commodities
-  //   tier 1 basics (≤ 100¢)  ·  tier 2 industrial (100–400¢)
-  //   tier 3 advanced (400–1500¢)  ·  tier 4 luxury (1500–5000¢)
-  //   contraband (legal:false) — risk customs seizure & fines
-  // =====================================================================
-  const GOODS = [
-    // --- tier 1: basics ---
-    { id: "water",    name: "Water",            basePrice:    20, volatility: 0.10, bulk: 1, legal: true,  icon: "water.png"    },
-    { id: "grain",    name: "Grain",            basePrice:    45, volatility: 0.15, bulk: 1, legal: true,  icon: "grain.png"    },
-    { id: "algae",    name: "Algae Paste",      basePrice:    60, volatility: 0.15, bulk: 1, legal: true,  icon: "algae.png"    },
-    { id: "salt",     name: "Salt",             basePrice:    35, volatility: 0.12, bulk: 1, legal: true,  icon: "salt.png"     },
-    { id: "ore",      name: "Raw Ore",          basePrice:   110, volatility: 0.20, bulk: 2, legal: true,  icon: "ore.png"      },
-    { id: "hydrogen", name: "Hydrogen Slush",   basePrice:    90, volatility: 0.18, bulk: 1, legal: true,  icon: "hydrogen.png" },
+const GOODS = [
+    // --- tier 1: Mandatory Survival Assets ---
+    { id: "water",    name: "O2-Infused Hydrant", basePrice:    20, volatility: 0.10, bulk: 1, legal: true,  icon: "water.png"    },
+    { id: "grain",    name: "Nutri-Brick™",       basePrice:    45, volatility: 0.15, bulk: 1, legal: true,  icon: "grain.png"    },
+    { id: "algae",    name: "Wretched Algae",     basePrice:    60, volatility: 0.15, bulk: 1, legal: true,  icon: "algae.png"    },
+    { id: "salt",     name: "Industrial Salt",    basePrice:    35, volatility: 0.12, bulk: 1, legal: true,  icon: "salt.png"     },
+    { id: "ore",      name: "Raw Sludge",         basePrice:   110, volatility: 0.20, bulk: 2, legal: true,  icon: "ore.png"      },
+    { id: "hydrogen", name: "Coolant Slush",      basePrice:    90, volatility: 0.18, bulk: 1, legal: true,  icon: "hydrogen.png" },
 
-    // --- tier 2: industrial ---
-    { id: "fuel",     name: "Fuel Cells",       basePrice:   180, volatility: 0.18, bulk: 1, legal: true,  icon: "fuel.png"     },
-    { id: "plastics", name: "Polyplastics",     basePrice:   160, volatility: 0.18, bulk: 1, legal: true,  icon: "plastics.png" },
-    { id: "glass",    name: "Plate Glass",      basePrice:   140, volatility: 0.20, bulk: 2, legal: true,  icon: "glass.png"    },
-    { id: "textiles", name: "Smartfiber",       basePrice:   220, volatility: 0.20, bulk: 1, legal: true,  icon: "textiles.png" },
-    { id: "lumber",   name: "Yoxai Lumber",     basePrice:   280, volatility: 0.22, bulk: 2, legal: true,  icon: "lumber.png"   },
-    { id: "medicine", name: "Pharmaceuticals",  basePrice:   380, volatility: 0.22, bulk: 1, legal: true,  icon: "medicine.png" },
+    // --- tier 2: Bureaucracy & Infrastructure ---
+    { id: "fuel",     name: "Jackhole Fuel Cells",basePrice:   180, volatility: 0.18, bulk: 1, legal: true,  icon: "fuel.png"     },
+    { id: "plastics", name: "Recycled Gunk",      basePrice:   160, volatility: 0.18, bulk: 1, legal: true,  icon: "plastics.png" },
+    { id: "glass",    name: "Reinforced Glitch-Glass", basePrice: 140, volatility: 0.20, bulk: 2, legal: true,  icon: "glass.png" },
+    { id: "textiles", name: "Bureau Uniforms",    basePrice:   220, volatility: 0.20, bulk: 1, legal: true,  icon: "textiles.png" },
+    { id: "lumber",   name: "Yoxai Resin-Wood",   basePrice:   280, volatility: 0.22, bulk: 2, legal: true,  icon: "lumber.png"   },
+    { id: "medicine", name: "Morale Stabilizers", basePrice:   380, volatility: 0.22, bulk: 1, legal: true,  icon: "medicine.png" },
 
-    // --- tier 3: advanced ---
-    { id: "tech",     name: "Tech Parts",       basePrice:   420, volatility: 0.25, bulk: 1, legal: true,  icon: "tech.png"     },
-    { id: "solar",    name: "Solar Arrays",     basePrice:   520, volatility: 0.22, bulk: 2, legal: true,  icon: "solar.png"    },
-    { id: "organs",   name: "Bio-Print Organs", basePrice:  1100, volatility: 0.30, bulk: 1, legal: true,  icon: "organs.png"   },
-    { id: "robots",   name: "Service Robots",   basePrice:  1400, volatility: 0.28, bulk: 2, legal: true,  icon: "robots.png"   },
-    { id: "cyber",    name: "Cybernetic Limbs", basePrice:  1600, volatility: 0.30, bulk: 1, legal: true,  icon: "cyber.png"    },
+    // --- tier 3: Advanced Containment Tech ---
+    { id: "tech",     name: "Terminal Parts",     basePrice:   420, volatility: 0.25, bulk: 1, legal: true,  icon: "tech.png"     },
+    { id: "solar",    name: "Oversight Arrays",   basePrice:   520, volatility: 0.22, bulk: 2, legal: true,  icon: "solar.png"    },
+    { id: "organs",   name: "Bionic Gizzards",    basePrice:  1100, volatility: 0.30, bulk: 1, legal: true,  icon: "organs.png"   },
+    { id: "robots",   name: "Auditor Drones",     basePrice:  1400, volatility: 0.28, bulk: 2, legal: true,  icon: "robots.png"   },
+    { id: "cyber",    name: "Work-Ready Limbs",   basePrice:  1600, volatility: 0.30, bulk: 1, legal: true,  icon: "cyber.png"    },
 
-    // --- tier 4: luxury ---
-    { id: "qchip",    name: "Quantum Chips",    basePrice:  2200, volatility: 0.32, bulk: 1, legal: true,  icon: "qchip.png"    },
-    { id: "art",      name: "Alien Artifacts",  basePrice:  2800, volatility: 0.38, bulk: 1, legal: true,  icon: "art.png"      },
-    { id: "holo",     name: "Holo-Crystals",    basePrice:  3400, volatility: 0.35, bulk: 1, legal: true,  icon: "holo.png"     },
-    { id: "lace",     name: "Neural Lace",      basePrice:  3800, volatility: 0.38, bulk: 1, legal: true,  icon: "lace.png"     },
-    { id: "antim",    name: "Antimatter Vial",  basePrice:  4500, volatility: 0.40, bulk: 1, legal: true,  icon: "antim.png"    },
+    // --- tier 4: High-Level Corporate Luxury ---
+    { id: "qchip",    name: "Bala-Link Chips",    basePrice:  2200, volatility: 0.32, bulk: 1, legal: true,  icon: "qchip.png"    },
+    { id: "art",      name: "Redacted Files",     basePrice:  2800, volatility: 0.38, bulk: 1, legal: true,  icon: "art.png"      },
+    { id: "holo",     name: "Propaganda Cubes",   basePrice:  3400, volatility: 0.35, bulk: 1, legal: true,  icon: "holo.png"     },
+    { id: "lace",     name: "Neural Leash",       basePrice:  3800, volatility: 0.38, bulk: 1, legal: true,  icon: "lace.png"     },
+    { id: "antim",    name: "Reality Vials",      basePrice:  4500, volatility: 0.40, bulk: 1, legal: true,  icon: "antim.png"    },
 
-    // --- contraband (risky) ---
-    { id: "spice",    name: "Spice",            basePrice:  2200, volatility: 0.45, bulk: 1, legal: false, icon: "spice.png"    },
-    { id: "weapons",  name: "Black-Market Arms",basePrice:  3000, volatility: 0.40, bulk: 1, legal: false, icon: "weapons.png"  },
+    // --- Contraband: Anomaly-Adjacent Assets ---
+    { id: "spice",    name: "Unrefined Anomaly",  basePrice:  2200, volatility: 0.45, bulk: 1, legal: false, icon: "spice.png"    },
+    { id: "weapons",  name: "Infraction Tools",   basePrice:  3000, volatility: 0.40, bulk: 1, legal: false, icon: "weapons.png"  },
   ];
 
   // =====================================================================
@@ -71,189 +55,189 @@ const LOCATIONS = [
     produces: ["water", "grain"],
     demands:  ["robots", "qchip"],
     tagline: "The 'Totally Real' Home World. Sponsored by Jackhole Megacorp.",
-    lore: "Jackhole Megacorp bought the naming rights to this rock and calls it 'The Cradle of Humanity' to dodge taxes. It's basically one giant office park with a nice gift shop. Very safe, very boring, and if you spit on the sidewalk, they'll garnish your wages for life."
+    lore: "Jackhole Megacorp purchased the naming rights to the concept of 'Home' back in '24. This rock is a sanitized office-sprawl where the air is 40% advertising by weight. If you aren't actively producing value, you're trespassing on corporate reality. Remember: Breathing is a subscription service here, and the 'Free Trial' expired before you were born. Spitting on the sidewalk is considered an unauthorized biological leak and will result in life-long wage garnishment."
   },
   {
     id: "zeph", name: "The Ledger Hub", x: 45, y: 80,
     lawful: 0.7, icon: "loc_zeph.png", planetSprite: "ledger-hub",
     produces: ["tech", "qchip"],
     demands:  ["art", "antim"],
-    canLoan: true, // Unique mechanical flag for banking
-    tagline: "Silicon Valley in the Stars. Banking with a smile and a wiretap.",
-    lore: "The sector's premier offshore accounting moon. It’s where the tech-bros and the tax-dodgers hang out. You can get a massive loan here at 'competitive' rates, but read the fine print—they've been known to repo ships while they're still in mid-warp."
+    canLoan: true, 
+    tagline: "Silicon Valley in the Stars. Your soul is a rounding error.",
+    lore: "The central nervous system of the Jackhole accounting hive. It’s a moon-sized spreadsheet where the tech-bros and tax-dodgers hang out in high-contrast neon bunkers. They offer 'Citizen Lubricant' loans to bypass encryption gates, but the interest is paid in biological processing power. Don't bother reading the fine print; it's written in a frequency that induces permanent hair loss and erratic whimpering. They've been known to repo ships while they're still in mid-warp if your nostrils flare too much during an audit."
   },
   {
     id: "kallis", name: "Kallis Rock-Candy", x: 60, y: 25,
     lawful: 0.3, icon: "loc_kallis.png", planetSprite: "kallis-rock",
     produces: ["ore", "solar"],
     demands:  ["water", "medicine"],
-    tagline: "A hollowed-out asteroid full of shiny rocks and grumpy miners.",
-    lore: "It looks like a giant floating piece of coal, but the inside is a neon-lit maze of tunnels! The miners here use giant robot drills to find space-crystals. They’re super thirsty and have a lot of boo-boos, so bring water and bandages!"
+    tagline: "A hollowed-out asteroid. Labor-Units wanted. Do not report the smell.",
+    lore: "A jagged void-husk where 'Labor-Units' mine space-crystals until their structural integrity fails. Jackhole replaced the union with 'Organic Notifications'—if you stop swinging the pick, a Bala-entity manifests in your bunk to scream quarterly projections at you until you resume task-oriented behavior. The tunnels are neon-lit mazes of pustulent grime. The miners are chronically rash-covered and desperate for 'O2-Infused Hydrants' and 'Morale Stabilizers.' Bring bandages, but don't touch the vines."
   },
   {
     id: "verra", name: "Verra Vroom-Outpost", x: -95, y: 55,
     lawful: 0.1, icon: "loc_verra.png", planetSprite: "vroom-outpost",
     produces: ["spice", "weapons"],
     demands:  ["fuel", "solar"],
-    tagline: "The edge of the map where the space-pirates play!",
-    lore: "A wild, wild west station with zero rules and lots of explosions! Smugglers race their ships through the rings for fun. If you want the spicy stuff or big laser guns, this is the place—just don't leave your keys in the ignition."
+    tagline: "Unsanctioned kinetics and high-velocity infractions.",
+    lore: "The edge of the map where the Jackhole signal starts to glitch. It’s a high-octane wasteland where smugglers race ships through rings just to feel something other than corporate dread. There are zero rules here, but plenty of explosions—mostly from engines running on 'Unrefined Anomaly.' If you’re looking for 'Infraction Tools,' this is the locus. Just don't leave your keys in the ignition; the local 'Free-Riders' consider theft a form of rhythmic asset reallocation."
   },
   {
     id: "obsid", name: "Obsidian Spire", x: -35, y: -65,
     lawful: 0.6, icon: "loc_obsid.png", planetSprite: "obsidian-spire",
     produces: ["glass", "art"],
     demands:  ["spice", "weapons"],
-    tagline: "Fancy glass towers for very grumpy space-royalty.",
-    lore: "The whole planet is made of shiny black glass! The kings and queens here wear capes made of starlight and spend all day painting pictures. They act very posh, but they secretly love spice and need big blasters to keep the space-monsters away."
+    tagline: "Gothic asset-hoarding for the high-level audit-immune.",
+    lore: "The whole planet is a monolithic shard of 'Reinforced Glitch-Glass.' The Cloud Barons here wear capes made of literal starlight and spend their days archiving 'Redacted Files.' They act posh, but it’s a mask for the deep-seated fear of 'Perimeter Failure.' They secretly crave 'Unrefined Anomaly' to numb the boredom of immortality and need heavy-duty 'Infraction Tools' to keep the recursive space-monsters from nesting in their spires. Silence is the only currency they value more than credits."
   },
   {
     id: "halc", name: "Halcyon Junk-Heap", x: 95, y: -25,
     lawful: 0.3, icon: "loc_halc.png", planetSprite: "halcyon-junk",
     produces: ["fuel", "plastics"],
     demands:  ["grain", "holo"],
-    tagline: "A giant playground made of broken spaceships!",
-    lore: "What do you do with a trillion tons of space-trash? You turn it into a city! The 'Junkers' climb through old engine rooms looking for fuel and plastic toys. They’re hungry for real food and love watching cartoon holos."
+    tagline: "A trillion tons of Jackhole's discarded history.",
+    lore: "What do you do with a trillion tons of Jackhole industrial waste? You stack it until it develops its own gravity. The 'Junkers' are bottom-feeders who crawl through rusted engine rooms looking for 'Jackhole Fuel Cells' and 'Recycled Gunk.' They are perpetually starved for 'Nutri-Bricks™' and will trade their last scrap of dignity for a 'Propaganda Cube' to distract them from the smell of pork lard and college dorms that permeates the lower stacks. It's a playground, but the floor is made of logic-defying biological hazards."
   },
   {
     id: "calder", name: "Caldera-9", x: -70, y: -10,
     lawful: 0.5, icon: "loc_calder.png", planetSprite: "caldera-9",
     produces: ["robots", "cyber"],
     demands:  ["hydrogen", "organs"],
-    tagline: "The Robot Factory Planet! Beep boop!",
-    lore: "A giant volcano planet where robots build other robots who then build more robots! It's very hot and very loud. The machines need ice-cold hydrogen to keep from melting, and they’re always looking for 'spare organic parts' for their human pets."
+    tagline: "The Foundry Planet. Optimization through incineration.",
+    lore: "A giant volcano planet where 'Auditor Drones' build other drones in a recursive loop of unpaid labor. It's a high-decibel hellscape where the heat is leveraged to 'optimize' worker output. The machines require 'Coolant Slush' to prevent thermal logic-failure, and they are perpetually scanning for 'Bionic Gizzards' to integrate into their human pets. Jackhole calls the frequent foundry explosions 'spontaneous urban renewal.'"
   },
   {
     id: "erebus", name: "Bubble-Erebus", x: 50, y: -85,
     lawful: 0.4, icon: "loc_erebus.png", planetSprite: "bubble-erebus",
     produces: ["algae", "salt"],
     demands:  ["tech", "cyber"],
-    tagline: "A giant water-balloon planet full of glowing squids!",
-    lore: "The cities here float in giant bubbles under the sea! You can see glowing algae and huge space-whales through the windows. Everything breaks because of the water, so they'll trade all their salt for new gadgets and robot legs!"
+    tagline: "Sub-aquatic containment bubbles. Watch the whales, ignore the leaks.",
+    lore: "The cities here float in 'Reinforced Glitch-Glass' bubbles under a crushing methane sea. You can see 'Wretched Algae' blooms and huge, logic-defying space-whales through the windows. Everything breaks because of the caustic water, so the local Bureau agents will trade all their 'Industrial Salt' for 'Terminal Parts' and 'Work-Ready Limbs'. It’s the only place in the sector where 'unauthorized moistness' is an environmental hazard rather than just a personality flaw."
   },
   {
     id: "pavon", name: "Pavonis Clouds", x: 60, y: 95,
     lawful: 0.7, icon: "loc_pavon.png", planetSprite: "pavonis-clouds",
     produces: ["hydrogen", "antim"],
     demands:  ["textiles", "lumber"],
-    tagline: "Floating castles in the sky! Don't look down!",
-    lore: "The rich 'Cloud Barons' live in houses held up by giant balloons. They have lots of fancy fuel but they don't have any trees or blankets. They'll pay a bajillion credits for a wooden chair or a warm sweater!"
+    tagline: "Floating castles for the Cloud-Baron Cartel.",
+    lore: "The high-altitude 'Cloud Barons' live in houses held up by giant balloons, literally looking down on the rest of the revenue streams. They have a surplus of 'Reality Vials' and 'Coolant Slush' but zero access to organic comforts. They’ll pay a bajillion credits for 'Yoxai Resin-Wood' or a 'Bureau Uniform' just to feel something other than the thin, recycled air of their sky-casinos. Don't look down; the ground has been declassified for your protection."
   },
   {
     id: "solen", name: "Solenne Garden", x: -105, y: -85,
     lawful: 0.6, icon: "loc_solen.png", planetSprite: "solenne-gardens",
     produces: ["medicine", "holo"],
     demands:  ["salt", "plastics"],
-    tagline: "The Space-Monk Sanctuary. Shhh... they're praying.",
-    lore: "A very quiet planet full of gardens and copper towers. The space-monks use giant lasers to write poems on the moon. They make magic medicine and cool movies, but for some reason, they really, really love eating salt."
+    tagline: "The Space-Monk Sanctuary. Shhh... they're audit-syncing.",
+    lore: "A deceptively quiet planet full of copper towers and gardens that grow in logic-defying patterns. The space-monks are actually Bureau-assigned 'Biological Auditors' who use giant lasers to write encrypted poems on the moon. They manufacture 'Morale Stabilizers' and 'Propaganda Cubes,' but they have a ravenous, cult-like obsession with 'Industrial Salt.' Rumor has it the salt is the only thing keeping their structural integrity from collapsing into a Bala-state."
   },
   {
     id: "goog", name: "The Threnody Stack", x: 15, y: -100,
     lawful: 0.2, icon: "loc_thren.png", planetSprite: "threnody-stack",
     produces: ["organs", "lace"],
     demands:  ["algae", "glass"],
-    tagline: "The world's biggest skyscraper! It goes up forever!",
-    lore: "Imagine a building so tall it pokes out of the atmosphere! Millions of people live in tiny rooms stacked on top of each other. They make cool brain-chips and bionic hearts, but they have to eat slimy algae every single day. Gross!"
+    tagline: "The world's biggest skyscraper. Optimization through density.",
+    lore: "Imagine a building so tall it pokes out of the atmosphere and into a corrupted dimensional fault. Millions of 'Debt-Citizens' live in 2x2 pods stacked on top of each other in a permanent state of Rhythmic Asset Alignment. They manufacture 'Bionic Gizzards' and 'Neural Leashes,' but their only caloric intake is 'Wretched Algae' pumped through the walls. It is a vertical slum of high-contrast neon and 'unauthorized moistness' that the Bureau calls 'A Triumph of Efficiency.'"
   },
   {
     id: "yoxai", name: "Yoxai Jungle", x: -65, y: 100,
     lawful: 0.3, icon: "loc_yoxai.png", planetSprite: "yoxai-jungle",
     produces: ["textiles", "lumber"],
     demands:  ["ore", "lace"],
-    tagline: "Alien ruins and giant plants. Watch out for the vines!",
-    lore: "A spooky, beautiful jungle full of broken alien statues that might be alive! Scientists come here to find magic wood and silk. They need heavy rocks to build their camps and brain-lace to talk to the statues!"
+    tagline: "Recursive ruins and sentient vines. Watch your step.",
+    lore: "A spooky, beautiful jungle full of broken alien statues that Jackhole Megacorp is currently suing for copyright infringement. Scientists come here to harvest 'Yoxai Resin-Wood' and 'Bureau Uniform' fibers while dodging vines that vibrate at the frequency of a whining cryptid. They need 'Raw Sludge' to build containment camps and 'Neural Leashes' to attempt a conversation with the statues. If the ruins start singing quarterly projections, run for your ship."
   }
 ];
 
   // =====================================================================
   // random events (post-travel)
   // =====================================================================
- const EVENTS = [
+const EVENTS = [
   {
-    id: "pirates", weight: 8, type: "bad", title: "Corporate Raiders!",
+    id: "pirates", weight: 8, type: "bad", title: "Asset Recovery Specialists",
     img: "evt-pirates.jpg",
-    body: "Aggressive 'Tax-Pirates' board your ship, claiming your cargo is a breach of the peace.",
+    body: "Aggressive 'Tax-Pirates' from the Jackhole Repo-Division board your ship, claiming your very existence is a breach of the peace.",
     apply(g){
       const carried = Object.entries(g.cargo).filter(([,n])=>n>0);
-      if(!carried.length) return "The Raiders found you broke. They left a bill for the boarding fuel.";
+      if(!carried.length) return "The Specialists found you broke. They invoiced you 50¢ for the wear and tear on their boarding magnetic-boots.";
       const [gid, n] = carried[Math.floor(Math.random()*carried.length)];
       const stolen = Math.max(1, Math.floor(n * (0.2 + Math.random()*0.3)));
       g.cargo[gid] -= stolen;
-      return `Raiders 'legally repossessed' ${stolen} units of ${goodName(gid)}.`;
+      return `Specialists 'legally repossessed' ${stolen} units of ${goodName(gid)} to satisfy a clerical error.`;
     }
   },
   {
-    id: "customs", weight: 6, type: "bad", title: "Jackhole Audit",
+    id: "customs", weight: 6, type: "bad", title: "Moistness Inspection",
     img: "evt-customs.jpg",
-    body: "A Jackhole Auditor boards for a 'Surprise Lifestyle Compliance Review.'",
+    body: "A Jackhole Auditor boards for a 'Surprise Lifestyle Compliance Review' after detecting unauthorized whining in your sector.",
     apply(g){
       const loc = locById(g.location);
       const contraband = GOODS.filter(x => !x.legal && (g.cargo[x.id]||0) > 0);
       const checkMod = g.betterEvents ? 0.4 : 1.0;
       if (!contraband.length || (Math.random() * checkMod) > loc.lawful) {
-        return "The Auditor got distracted by their own reflection. You passed.";
+        return "The Auditor got distracted by a glitching advertisement in their own visor. You passed.";
       }
       if (g.contrabandShield && Math.random() < 0.75) {
-        return "The Auditor's scanner glitched. They blame the interns and leave.";
+        return "Your fear-tech scrambled the Auditor's scanner. They blamed an intern and left in a huff.";
       }
       const c = contraband[0];
       const lost = g.cargo[c.id];
       g.cargo[c.id] = 0;
       const fine = Math.floor(lost * c.basePrice * 0.65);
       g.cash = Math.max(0, g.cash - fine);
-      return `Auditor seized your ${lost} ${c.name}. Fine: ${fmt(fine)} ¢.`;
+      return `Auditor seized your ${lost} ${c.name}. Fine for 'Unauthorized Moistness': ${fmt(fine)} ¢.`;
     }
   },
   {
-    id: "boom", weight: 5, type: "good", title: "Hype Bubble!",
+    id: "boom", weight: 5, type: "good", title: "Marketing Frenzy!",
     img: "evt-boom.jpg",
-    body: "Jackhole Marketing creates an artificial demand frenzy for a random shiny object.",
+    body: "Jackhole Marketing triggers a mass-psychosis event, creating an artificial demand frenzy for a random shiny object.",
     apply(g){
       const good = GOODS[Math.floor(Math.random()*GOODS.length)];
       g.priceMods[good.id] = (g.priceMods[good.id] || 1) * 1.8;
       g.priceModsExpire[good.id] = g.day + 3;
-      return `HYPE: Everyone suddenly wants ${good.name}. Prices are astronomical!`;
+      return `HYPE: Jackhole declared ${good.name} 'Essential for Spiritual Growth.' Prices are astronomical!`;
     }
   },
   {
-    id: "bust", weight: 5, type: "bad", title: "Market Correction",
+    id: "bust", weight: 5, type: "bad", title: "Sudden Declassification",
     img: "evt-bust.jpg",
-    body: "The Bala Files Bureau leaks a scandal, tanking a commodity's value.",
+    body: "The Bala Files Bureau accidentally leaks a scandal, suggesting a commodity is actually made of 'class-IV digital remnants.'",
     apply(g){
       const good = GOODS[Math.floor(Math.random()*GOODS.length)];
       g.priceMods[good.id] = (g.priceMods[good.id] || 1) * 0.4;
       g.priceModsExpire[good.id] = g.day + 4;
-      return `SCANDAL: ${good.name} is 'canceled' by the Bureau. Prices cratered.`;
+      return `SCANDAL: ${good.name} is 'canceled' by the Bureau. Its value imploded into the Glitch Maw.`;
     }
   },
   {
-    id: "find", weight: 3, type: "good", title: "Unclaimed Assets!",
+    id: "find", weight: 3, type: "good", title: "Administrative Error!",
     img: "evt-find.jpg",
-    body: "You find a Jackhole supply crate that 'fell' off a transport ship.",
+    body: "You find a Jackhole supply crate that 'fell' off a transport ship. It was likely destined for a Slum-Stack, but now it's yours.",
     apply(g){
       const credits = 300 + Math.floor(Math.random()*2000);
       g.cash += credits;
-      return `Found ${fmt(credits)} ¢ in untraceable corporate slush funds. Score!`;
+      return `Found ${fmt(credits)} ¢ in untraceable corporate slush funds. Praise the Machine!`;
     }
   },
   {
-    id: "oxygen", weight: 4, type: "warn", title: "Oxygen Subscription",
+    id: "oxygen", weight: 4, type: "warn", title: "Respiratory Maintenance",
     img: "evt-oxygen.jpg",
-    body: "Jackhole Megacorp reminds you that breathing is a premium service.",
+    body: "Jackhole Megacorp reminds you that the 'Free Trial' for breathing expired when you left Terra Prime.",
     apply(g){
       const fee = 150 + Math.floor(Math.random()*500);
       g.cash = Math.max(0, g.cash - fee);
-      return `Deducted ${fmt(fee)} ¢ for your 'Respiratory Maintenance Fee'.`;
+      return `Deducted ${fmt(fee)} ¢ for your 'Voluntary Respiratory Subscription'. Silence is permission.`;
     }
   },
   {
-    id: "bala_leak", weight: 4, type: "good", title: "Bala Intel",
+    id: "bala_leak", weight: 4, type: "good", title: "Bureau Intel",
     img: "evt-tip.jpg",
-    body: "A disgruntled clerk at the Bala Files Bureau faxes you a 'confidential' file.",
+    body: "A disgruntled clerk at the Bala Files Bureau faxes you a file they found in the Meat Locker.",
     apply(g){
       const good = GOODS[Math.floor(Math.random()*GOODS.length)];
       const upcoming = Math.random() < 0.5 ? "skyrocket" : "implode";
-      g.tickerQueue.push(`BUREAU LEAK: Analysis suggests ${good.name} will ${upcoming}.`);
-      return `Intel secured. The Bureau knows all, and now so do you.`;
+      g.tickerQueue.push(`BUREAU LEAK: Data farming suggests ${good.name} will ${upcoming}.`);
+      return `Intel secured. The Bureau knows all, and now so do you, Citizen.`;
     }
   },
 ];
@@ -261,19 +245,21 @@ const LOCATIONS = [
   // =====================================================================
   // starting headlines for the news ticker
   // =====================================================================
-  const TICKER_SEEDS = [
-    "JACKHOLE MEGACORP: Our orbital sensors have detected you are thinking about a snack. Please purchase a snack.",
-    "REMINDER: Bankruptcy is a breach of your 'Life-Usage Agreement'. Defaulters will be converted into Caldera-9 lubricants.",
-    "TERRA PRIME: Water prices dropped! Buy now before we remember to charge you for the bottle.",
-    "THE BUREAU: We have updated your file. We know what you did at the Halcyon Junk-Heap. It was hilarious.",
-    "KALLIS BELT: Strike ended after Megacorp successfully replaced all 5,000 miners with slightly cheaper rocks.",
-    "THE LEDGER HUB: Your loan interest just went up 2% because you're breathing too fast. Calm down and save money.",
-    "MARKET ALERT: High-grade Organs are trending! Remember: You have two kidneys, but you only NEED one ship.",
-    "ATTENTION: A 500-credit 'Viewing Fee' has been deducted from your account for reading this ticker. You're welcome.",
-    "SOLENNE VERGE: Monks claim salt-hoarding is 'divine.' Jackhole Megacorp claims it's 'market manipulation.' Fight! Fight!",
-    "URGENT: Smuggling is strictly prohibited unless you use the official Jackhole Megacorp 'Discretion Surcharge' app.",
-    "YOXAI JUNGLE: Ancient alien ruins discovered! Megacorp lawyers are currently suing the ruins for copyright infringement.",
-    "EREBUS BUBBLES: Record Algae harvest! It's green, it's slimy, and it's legally classified as 'food-adjacent'!",
+const TICKER_SEEDS = [
+    "JACKHOLE MEGACORP: Our orbital sensors have detected you are thinking about a snack. Thinking is a premium service. Please purchase a snack and the associated thought-license.",
+    "REMINDER: Bankruptcy is a breach of your 'Civilian Contract'. Defaulters will be processed into 'Auditor Drone' lubricant on Caldera-9.",
+    "BUREAU NOTICE: If you see an entity that looks like a 1994 workstation, do not feed it your credits. It is a Bala-class anomaly and currently your problem.",
+    "THE BUREAU: We have updated your file. We know what you did at the Halcyon Junk-Heap. The 'unauthorized moistness' has been logged as a taxable event.",
+    "KALLIS BELT: Strike ended after Megacorp successfully replaced all 5,000 miners with slightly cheaper, more compliant rocks. Productivity has never been more mineral.",
+    "THE LEDGER HUB: Your loan interest just went up 3% because your heart rate suggests you're enjoying your free time. Calm down and return to a task-oriented state.",
+    "MARKET ALERT: High-grade Bionic Gizzards are trending! Remember: You have two kidneys, but you only NEED one Assigned Vessel.",
+    "ATTENTION: A 500-credit 'Holistic Accountability Fee' has been deducted from your account for reading this ticker. Silence is permission.",
+    "SOLENNE GARDEN: Biological Auditors claim salt-hoarding is 'divine.' Jackhole Megacorp claims it's 'market manipulation.' The Bureau is currently taking bets.",
+    "URGENT: Smuggling is strictly prohibited unless you use the official Jackhole Megacorp 'Discretion Surcharge' app to properly invoice your infractions.",
+    "YOXAI JUNGLE: Ancient alien ruins discovered! Megacorp lawyers are currently suing the ruins for copyright infringement of the Jackhole 'Gothic-Spire' aesthetic.",
+    "EREBUS BUBBLES: Record Wretched Algae harvest! It's green, it's slimy, and it's legally classified as 'food-adjacent' by the Department of Dirty Liars.",
+    "BUREAU WARNING: Do not interact with advertisement entities that appear to be whimpering. They are likely Pojo Kutty™ variants and highly pustulent.",
+    "OFFICIAL MEMO: Your structural integrity is a privilege, not a right. Maintain your quota to avoid 'Subject Integration' protocols."
   ];
 
   // =====================================================================
@@ -296,7 +282,7 @@ const LOCATIONS = [
   }
 
   // =====================================================================
-  // per-location flavor events — rolled on arrival in addition to global
+  // per-location flavor events rolled on arrival in addition to global
   //   apply(g) returns a resolution string; may mutate g.market[g.location]
   //   to give one-visit price tweaks (rerolled when player leaves).
   // =====================================================================
@@ -555,7 +541,7 @@ const LOCATIONS = [
   LOCATIONS.forEach(loc => { loc.localEvents = LOCAL_EVENTS[loc.id] || []; });
 
   // =====================================================================
-  // ship sprite sheet config — single consolidated atlas
+  // ship sprite sheet config single consolidated atlas
   //   frame coords mirror /assets/sprites/ships.json
   // =====================================================================
   const SHIP_SPRITES = {
@@ -616,7 +602,6 @@ const LOCATIONS = [
   //   betterEvents     : true → bad random events fire less often
   // =====================================================================
 const SHIPS = [
-  // ── STARTER / MID ────────────────────────────────────────────────
   {
     id: 'shuttle', sheet: 'one', sprite: 'bottle',
     name: 'Deckard-Class Shuttle',
@@ -645,8 +630,6 @@ const SHIPS = [
     flavor: 'The segmented speedster.',
     desc: 'Its bio-mechanical segments allow it to weave through asteroid belts that would shred a hauler. It’s slimy and the air filters smell like compost, but customs can never quite catch it.',
   },
-
-  // ── ADVANCED ─────────────────────────────────────────────────────
   {
     id: 'courier', sheet: 'two', sprite: 'spider',
     name: 'Obsidian Courier',
@@ -675,9 +658,7 @@ const SHIPS = [
     flavor: 'Tentacles of trade.',
     desc: 'The Drifter uses its glowing propulsion limbs to glide through the void. It’s an uncommonly reliable ship with a balanced stat spread, popular with traders who don’t want any surprises.',
   },
-
-  // ── SPECIALTY ────────────────────────────────────────────────────
-  {
+{
     id: 'skimmer', sheet: 'two', sprite: 'cyber',
     name: 'Pavonis Skimmer',
     cost: 2500, cap: 60, passCap: 10, fuelCap: 160, fuelMod: 0.55, speedMod: 0.90, maint: 60,
@@ -741,12 +722,12 @@ const COMPETITORS = [
 ];
 
   // =====================================================================
-  // ship fuel — per-location base price and travel-cost helpers
+  // ship fuel  per-location base price and travel-cost helpers
   //   travelFuel returns units consumed per jump (after shipFuelMod);
   //   fuelBasePrice gives the location's posted price per unit.
   // =====================================================================
   const FUEL_PRICES = {
-    pavon:  6,   // gas-giant rigs — the cheapest cell on the lane
+    pavon:  6,  
     halc:   8,   // salvage town drips fuel from stripped hulls
     kallis: 10,
     terra:  11,
