@@ -75,6 +75,15 @@ const VEGGIES = [
 const EATER_FRAMES = ['frame-one','frame-two','frame-three','frame-four','frame-five','frame-six'];
 const WALK_CYCLE = ['frame-one','frame-two','frame-three','frame-five','frame-six'];
 
+// ── Streak / speed tuning ─────────────────────────────────────────
+// Streak is persistent across cookie spawns. Each catch increments it.
+// It breaks only on miss (cookie flies offscreen) or veggie tap — empty
+// screens between spawns do NOT break it. Per-cookie speed scales as
+// STREAK_SPEED_BASE ** min(streak, STREAK_SPEED_CAP), so the streak
+// counter can keep climbing past 50 but the speed contribution is capped.
+const STREAK_SPEED_BASE = 1.04;   // each streak step multiplies cookie speed by this
+const STREAK_SPEED_CAP  = 50;     // streak count beyond which speed stops growing
+
 const CFG = {
     duration:        30,
     gravity:         900,
@@ -86,14 +95,15 @@ const CFG = {
     maxPeakRatio:    0.55,
     feastChompMs:    260,
     feastMinDelay:   60,
-    points:          10,       // base points per cookie catch (multiplied by combo tier)
+    points:          10,       // base points per cookie catch (multiplied by streak tier)
     veggieRatio:     0.18,     // ~18% of spawns are veggies
     vegPenalty:      20,       // points lost per veggie tap
-    comboWindowMs:   700,      // max gap between catches that still extends a combo
+    // Streak multiplier tiers — score earned per catch = points * mult.
+    // Capped at x5 so values stay readable; streak count itself keeps climbing.
     comboTiers: [
-        { hits: 8, mult: 5, label: 'INSANE!' },
-        { hits: 5, mult: 3, label: 'FIRE!'   },
-        { hits: 3, mult: 2, label: 'COMBO!'  },
+        { hits: 50, mult: 5, label: 'INSANE!' },
+        { hits: 25, mult: 3, label: 'FIRE!'   },
+        { hits: 10, mult: 2, label: 'COMBO!'  },
     ],
 };
 
@@ -102,6 +112,10 @@ function comboTier(streak) {
         if (streak >= t.hits) return t;
     }
     return { mult: 1, label: null };
+}
+
+function streakSpeedMult(streak) {
+    return Math.pow(STREAK_SPEED_BASE, Math.min(streak, STREAK_SPEED_CAP));
 }
 
 const SCREENS = {
@@ -121,6 +135,9 @@ const els = {
     hudScore:    document.getElementById('hud-score'),
     hudTime:     document.getElementById('hud-time'),
     hudPile:     document.getElementById('hud-pile'),
+    hudStreak:   document.getElementById('hud-streak'),
+    hudMult:     document.getElementById('hud-mult'),
+    hudStreakBlock: document.getElementById('hud-streak-block'),
     feastTub:    document.getElementById('feast-tub'),
     feastPile:   document.getElementById('feast-pile'),
     feastTitle:  document.getElementById('feast-title'),
@@ -212,6 +229,33 @@ function playBurpSfx() {
         SFX_BURP.currentTime = 0;
         SFX_BURP.volume = audio.burpVol;
         SFX_BURP.play().catch(() => {});
+    } catch (_) {}
+}
+
+// Synthesized "streak break" — quick descending sawtooth, ~300ms.
+// Uses a single shared AudioContext so we don't churn on every break.
+let _streakBreakCtx = null;
+function playStreakBreakSfx() {
+    if (audio.muted) return;
+    try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!_streakBreakCtx) _streakBreakCtx = new Ctor();
+        const ctx = _streakBreakCtx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const now = ctx.currentTime;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(520, now);
+        o.frequency.exponentialRampToValueAtTime(90, now + 0.28);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.22, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.30);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(now);
+        o.stop(now + 0.32);
     } catch (_) {}
 }
 
@@ -308,6 +352,10 @@ function spawnCookie() {
     el.style.top  = '0px';
     applySprite(el, sprite.sheet, sprite.frame, cookieD, cookieD);
 
+    // Lock in the speed multiplier at spawn time based on current streak,
+    // so cookies already in flight keep their pace even as the streak grows.
+    const timeMult = streakSpeedMult(state.streakHits);
+
     const cookie = {
         el,
         x:     startX,
@@ -323,6 +371,7 @@ function spawnCookie() {
         isVeggie,
         sprite,
         eatenSprite,
+        timeMult,
     };
 
     const onTap = (e) => {
@@ -353,6 +402,35 @@ const SCORE_LABELS  = ['YUM!', 'POP!', 'NOM!', 'CRUNCH!', 'TASTY!', 'CHOMP!', 'G
 state.streakHits = 0;
 state.lastHitAt  = 0;
 
+function updateStreakHud() {
+    if (!els.hudStreak) return;
+    els.hudStreak.textContent = String(state.streakHits);
+    const tier = comboTier(state.streakHits);
+    if (els.hudMult) {
+        els.hudMult.textContent = tier.mult > 1 ? ('×' + tier.mult) : '';
+    }
+    if (els.hudStreakBlock) {
+        els.hudStreakBlock.classList.toggle('dim', state.streakHits === 0);
+    }
+}
+
+// Drop the streak to zero and play the red-flash + descending sound.
+// No-ops if already zero, so multiple offscreen exits in one frame only
+// trigger the feedback once.
+function breakStreak() {
+    if (state.streakHits === 0) return;
+    state.streakHits = 0;
+    updateStreakHud();
+    playStreakBreakSfx();
+    const v = els.hudStreakBlock && els.hudStreakBlock.querySelector('.hud-streak-value');
+    if (v) {
+        v.classList.remove('streak-break');
+        void v.offsetWidth;
+        v.classList.add('streak-break');
+        setTimeout(() => v.classList.remove('streak-break'), 620);
+    }
+}
+
 function catchCookie(c) {
     c.popped = true;
     c.alive  = false; // freeze in place — punch then fly-to-tub takes over
@@ -363,12 +441,13 @@ function catchCookie(c) {
         applySprite(c.el, c.eatenSprite.sheet, c.eatenSprite.frame, c.w, c.h);
     }
 
-    const now = performance.now();
-    const isCombo = (now - state.lastHitAt) < CFG.comboWindowMs;
-    state.streakHits = isCombo ? state.streakHits + 1 : 1;
-    state.lastHitAt  = now;
+    // Streak persists across spawns — only misses or veggies break it. Empty
+    // screens between cookies do NOT reset.
+    state.streakHits += 1;
+    state.lastHitAt   = performance.now();
     const tier   = comboTier(state.streakHits);
     const earned = CFG.points * tier.mult;
+    updateStreakHud();
 
     state.score += earned;
     state.pile  += 1;
@@ -428,7 +507,7 @@ function hitVeggie(v) {
         els.hudScore.textContent = state.score;
         bumpHud(els.hudScore);
     }
-    state.streakHits = 0;
+    breakStreak();
 
     const pop = document.createElement('div');
     pop.className   = 'score-pop big';
@@ -677,18 +756,21 @@ function loop(ts) {
     const W = state.stageW, H = state.stageH;
     for (const c of state.cookies) {
         if (!c.alive) continue;
-        c.vy += CFG.gravity * dt;
-        c.x  += c.vx * dt;
-        c.y  += c.vy * dt;
-        c.rot += c.vrot * dt;
+        // Per-cookie time scaling: same parabolic arc, compressed in time.
+        // Streak-driven speedup is baked in at spawn via c.timeMult.
+        const cdt = dt * (c.timeMult || 1);
+        c.vy += CFG.gravity * cdt;
+        c.x  += c.vx * cdt;
+        c.y  += c.vy * cdt;
+        c.rot += c.vrot * cdt;
         placeCookieEl(c);
 
         if (c.y - c.h / 2 > H + 60 ||
             c.x < -c.w * 2 || c.x > W + c.w * 2) {
             // A real cookie that flew off uncaught is a "miss" — break the
-            // combo (no point loss; this is a kids' game). Veggies escaping
-            // is good news for the player, so leave the streak alone.
-            if (!c.popped && !c.isVeggie) state.streakHits = 0;
+            // streak (no point loss; this is a kids' game). Veggies escaping
+            // are good news for the player, so leave the streak alone.
+            if (!c.popped && !c.isVeggie) breakStreak();
             c.alive = false;
             c.el.remove();
         }
@@ -745,6 +827,7 @@ function resetState() {
     els.hudScore.textContent = '0';
     els.hudTime.textContent  = String(CFG.duration);
     els.hudPile.textContent  = '0';
+    updateStreakHud();
 }
 
 function startRound() {

@@ -217,6 +217,31 @@ body {
     text-shadow: 0 0 22px var(--accent-cyan), 0 0 38px rgba(0,255,204,0.6);
 }
 
+/* ── Streak / combo HUD block ────────────────────────────────── */
+.hud-streak-block { transition: opacity 0.2s ease; }
+.hud-streak-block.dim { opacity: 0.45; }
+.hud-streak-value {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.hud-mult {
+    font-size: 0.55em;
+    font-weight: 800;
+    color: var(--accent-pink);
+    text-shadow: 0 0 12px rgba(255,0,255,0.75), 0 2px 4px rgba(0,0,0,0.7);
+    letter-spacing: 1px;
+}
+.hud-mult:empty { display: none; }
+.hud-streak-value.streak-break {
+    animation: streak-break-flash 0.6s ease-out;
+}
+@keyframes streak-break-flash {
+    0%   { color: #ff3344; text-shadow: 0 0 26px #ff3344, 0 0 48px rgba(255,51,68,0.8); transform: scale(1.25); }
+    40%  { color: #ff3344; text-shadow: 0 0 26px #ff3344, 0 0 48px rgba(255,51,68,0.8); transform: scale(1.05); }
+    100% { color: var(--accent-cyan); text-shadow: 0 0 14px rgba(0,255,204,0.55), 0 2px 6px rgba(0,0,0,0.7); transform: scale(1); }
+}
+
 .game-stage {
     position: relative;
     width: 100%;
