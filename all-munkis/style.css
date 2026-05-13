@@ -323,11 +323,11 @@ main {
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
 }
 
-/* The head is layered: colored circle (shape) → face/mod sprite → headphones
-   overlay. All four sibling layers share the same 100×100 footprint so the
-   headphones never shift when a custom head replaces the generic face. */
+/* The head is layered: colored circle (shape) → head sprite → headphones
+   overlay. All three sibling layers share the same 100×100 footprint so the
+   headphones never shift when the sprite frame changes (e.g. when an
+   expression flip swaps the Munki's face). */
 .char-head .head-shape,
-.char-head .head-face,
 .char-head .head-mod,
 .char-head .head-phones {
     position: absolute;
@@ -343,7 +343,6 @@ main {
     z-index: 1;
 }
 
-.char-head .head-face,
 .char-head .head-mod {
     z-index: 2;
 }
