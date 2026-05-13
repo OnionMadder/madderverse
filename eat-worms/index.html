@@ -26,6 +26,7 @@
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
     <meta name="theme-color" content="#00ffcc" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <meta name="apple-mobile-web-app-title" content="Go Eat Worms" />
     <meta name="application-name" content="Go Eat Worms" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
@@ -93,13 +94,18 @@
         </svg>
     </div>
 
-    <footer>
-        &copy; <span id="year"></span>
-        <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar</a>
-    </footer>
 </div>
 
 <script src="game.js"></script>
+
+<footer class="site-footer-slim" aria-label="Site info">
+    <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../">The Madderverse</a>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../about.html">About</a>
+</footer>
+<script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 
 </body>
 </html>
