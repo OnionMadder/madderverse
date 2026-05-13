@@ -402,11 +402,13 @@ function requestGameFullscreen() {
     const req = el.requestFullscreen
              || el.webkitRequestFullscreen
              || el.msRequestFullscreen;
-    if (!req) return;
+    if (!req) return Promise.resolve();
     try {
         const p = req.call(el);
-        if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch (_) {}
+        return (p && typeof p.then === 'function') ? p : Promise.resolve();
+    } catch (_) {
+        return Promise.resolve();
+    }
 }
 
 function exitGameFullscreen() {
@@ -424,6 +426,23 @@ function exitGameFullscreen() {
     } catch (_) {}
 }
 
+// Lock orientation to landscape during play. Most browsers only honour
+// this while in fullscreen, so we chain off the fullscreen promise.
+// iOS Safari refuses unconditionally — the CSS rotate-prompt overlay
+// (gated on body.in-game + portrait + touch) handles that fallback.
+function tryLockLandscape() {
+    if (!screen.orientation || typeof screen.orientation.lock !== 'function') return;
+    try {
+        const p = screen.orientation.lock('landscape');
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+}
+
+function unlockOrientation() {
+    if (!screen.orientation || typeof screen.orientation.unlock !== 'function') return;
+    try { screen.orientation.unlock(); } catch (_) {}
+}
+
 // Tear down a round without playing the feast — used by Esc / fullscreen
 // exit mid-play. Mirrors endRound() but routes back to the menu and skips
 // the feast sequence.
@@ -437,6 +456,8 @@ function abortRound() {
     stopStartSfx();
     stopLevelMusic();
     stopGlitches();
+    document.body.classList.remove('in-game');
+    unlockOrientation();
     exitGameFullscreen();
     showScreen('menu');
 }
@@ -1097,7 +1118,13 @@ function resetState() {
 
 function startRound() {
     playStartSfx();
-    requestGameFullscreen();
+    document.body.classList.add('in-game');
+    // Chain orientation lock off the fullscreen promise — browsers only
+    // honour the lock while fullscreen is active. iOS rejects the lock;
+    // the rotate-prompt CSS handles that fallback automatically.
+    requestGameFullscreen()
+        .then(tryLockLandscape)
+        .catch(() => {});
     showScreen('game');
     requestAnimationFrame(() => {
         resetState();
@@ -1140,6 +1167,8 @@ function endRound() {
     stopStartSfx();
     stopLevelMusic();
     stopGlitches();
+    document.body.classList.remove('in-game');
+    unlockOrientation();
     // Note: fullscreen is kept through the feast screen so PLAY AGAIN
     // feels seamless. Esc or abortRound() exits fullscreen when needed.
     setTimeout(showFeast, 400);

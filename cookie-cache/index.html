@@ -123,12 +123,23 @@
         </div>
     </div>
 
-    <div id="game-stage" class="game-stage">
-        <div id="tub-butter" class="tub-butter"></div>
-        <div id="pile-zone" class="pile-zone"></div>
-        <div id="countdown" class="countdown"></div>
+    <div class="game-frame">
+        <div id="game-stage" class="game-stage">
+            <div id="tub-butter" class="tub-butter"></div>
+            <div id="pile-zone" class="pile-zone"></div>
+            <div id="countdown" class="countdown"></div>
+        </div>
     </div>
 
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ROTATE PROMPT — shown only on portrait phones during gameplay.
+     Driven purely by CSS media query; no JS toggle needed.
+     ════════════════════════════════════════════════════════════════ -->
+<div id="rotate-prompt" class="rotate-prompt" aria-hidden="true">
+    <div class="rotate-prompt-icon" aria-hidden="true">📱</div>
+    <p class="rotate-prompt-text">Turn your phone<br>sideways to play</p>
 </div>
 
 
