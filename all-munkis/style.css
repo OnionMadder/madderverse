@@ -327,42 +327,51 @@ body.react-mode-active .stage-wrap::after {
 .stage {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 12px;
+    gap: 4px;
     position: relative;
     z-index: 1;
     max-width: 960px;
     margin: 0 auto;
 }
 
+/* Slots are invisible grid placeholders — no border, no background, no
+   padding. The Munki standing inside is the entire visible element. Empty
+   slots reserve the grid column but render nothing so the dance row stays
+   balanced as Munkis fill in. */
 .stage-slot {
     aspect-ratio: 5 / 6;
-    border: 2px dashed rgba(45, 212, 191, 0.35);
-    border-radius: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    transition: transform 0.15s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    transition: transform 0.15s, filter 0.2s;
     cursor: pointer;
     position: relative;
-    background: rgba(0, 0, 0, 0.25);
-    padding: 6px;
-    overflow: hidden;
+    background: transparent;
+    border: none;
+    padding: 0;
+    overflow: visible;
 }
 
-.stage-slot.drop-hover {
-    border-color: #fbbf24;
-    background: rgba(251, 191, 36, 0.14);
-    transform: scale(1.06);
-    border-style: solid;
-    box-shadow: 0 0 32px rgba(251, 191, 36, 0.4);
+/* Active slot gets a soft footlight halo under the Munki to suggest a
+   spotlight on the dance floor — no border or filled box. */
+.stage-slot.active::before {
+    content: '';
+    position: absolute;
+    bottom: 4%;
+    left: 10%;
+    right: 10%;
+    height: 18%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(45, 212, 191, 0.35), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
 }
 
-.stage-slot.active {
-    border-color: rgba(45, 212, 191, 0.85);
-    border-style: solid;
-    box-shadow: inset 0 0 28px rgba(45, 212, 191, 0.18);
-    background: rgba(45, 212, 191, 0.05);
+/* Empty slots stay in the grid (so positions don't reshuffle) but render
+   nothing — no "+" placeholder, no label. */
+.stage-slot.empty .slot-icon,
+.stage-slot.empty .slot-label {
+    visibility: hidden;
 }
 
 .slot-icon {
@@ -667,10 +676,8 @@ body.react-mode-active .stage-wrap::after {
 
     main { padding: 14px 10px 220px; gap: 14px; }
     .stage-wrap { padding: 14px 8px; border-radius: 14px; }
-    .stage { gap: 8px; }
-    .stage-slot { border-radius: 12px; padding: 4px; }
+    .stage { gap: 4px; }
     .slot-label { font-size: 9px; letter-spacing: 0.08em; margin-top: 2px; }
-    .empty-plus { font-size: 22px; }
 
     .tray-chip { width: 76px; height: 100px; padding: 4px; }
     .chip-label { font-size: 9px; }
@@ -683,8 +690,7 @@ body.react-mode-active .stage-wrap::after {
     .subtitle { font-size: 9px; }
     main { padding: 12px 6px 210px; }
     .stage-wrap { padding: 10px 4px; }
-    .stage { gap: 6px; }
-    .stage-slot { padding: 3px; border-radius: 10px; }
+    .stage { gap: 3px; }
     .slot-label { font-size: 8px; }
     .tray-chip { width: 70px; height: 92px; }
     .chip-label { font-size: 8px; }
@@ -867,11 +873,11 @@ body.jumpscare .stage-slot.active .char-art {
 }
 .tray-chip.chip-bad .chip-label { color: #fca5a5; }
 
-/* Once placed on stage they keep the red accent so the slot reads as cursed. */
-.stage-slot.active.slot-bad {
-    border-color: rgba(239, 68, 68, 0.85);
-    box-shadow: inset 0 0 28px rgba(239, 68, 68, 0.18);
-    background: rgba(239, 68, 68, 0.05);
+/* Once placed on stage, antagonists keep the red accent — but on the
+   frame-less stage we express it as a red footlight under the Munki
+   (overriding the default cyan halo) plus the label color. */
+.stage-slot.active.slot-bad::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(239, 68, 68, 0.5), transparent 70%);
 }
 .stage-slot.active.slot-bad .slot-label { color: rgba(252, 165, 165, 0.85); }
 
@@ -897,13 +903,10 @@ body.madballz-mode .stage-wrap {
 body.madballz-mode .stage-wrap::before {
     background-image: radial-gradient(rgba(168, 85, 247, 0.2) 1px, transparent 1px);
 }
-body.madballz-mode .stage-slot {
-    border-color: rgba(168, 85, 247, 0.45);
-}
-body.madballz-mode .stage-slot.active {
-    border-color: rgba(168, 85, 247, 0.9);
-    box-shadow: inset 0 0 28px rgba(168, 85, 247, 0.22);
-    background: rgba(168, 85, 247, 0.08);
+/* Madballz dance floor — recolour the active slot footlight halo to the
+   purple palette so the spotlight reads against the red/violet BG. */
+body.madballz-mode .stage-slot.active::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(168, 85, 247, 0.45), transparent 70%);
 }
 body.madballz-mode .stage-slot .slot-label { color: rgba(240, 171, 252, 0.85); }
 body.madballz-mode .tray-wrap {
@@ -1086,12 +1089,13 @@ body.madballz-mode .chip-label { color: #f0abfc; }
    flag — never gore. The frozen Munki keeps its silhouette but reads as
    visibly Done. Class is toggled in updateIceFreeze() in game.js. */
 .stage-slot.frozen-by-ice {
-    border-color: #67e8f9 !important;
-    border-style: solid !important;
-    background: rgba(165, 243, 252, 0.10) !important;
-    box-shadow:
-        inset 0 0 30px rgba(165, 243, 252, 0.45),
-        0 0 28px rgba(103, 232, 249, 0.4) !important;
+    /* Slot itself has no frame on the frame-less stage; instead, replace
+       the active spotlight under the Munki with an icy cyan halo so the
+       footing reads cold. */
+    filter: drop-shadow(0 0 12px rgba(103, 232, 249, 0.55));
+}
+.stage-slot.frozen-by-ice::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(103, 232, 249, 0.55), transparent 70%) !important;
 }
 
 .stage-slot.frozen-by-ice .char-art {
@@ -1168,9 +1172,14 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     text-shadow: 0 0 6px rgba(103, 232, 249, 0.6);
 }
 
-/* Ice Munki itself wears the cold but isn't frozen — give the active ice
-   slot a subtle frost halo so the kid sees who's doing the freezing. */
+/* Ice Munki itself wears the cold but isn't frozen — give it a frost
+   halo footlight + bluish drop-shadow so the kid sees who's doing the
+   freezing on the frame-less stage. */
+body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"]::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(103, 232, 249, 0.6), transparent 70%);
+}
 body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"] {
+    filter: drop-shadow(0 0 14px rgba(103, 232, 249, 0.55));
     box-shadow:
         inset 0 0 30px rgba(103, 232, 249, 0.35),
         0 0 28px rgba(103, 232, 249, 0.45);
