@@ -12,8 +12,12 @@ ad-free / kid-friendly branding). This file captures only what's specific to
   the next empty stage slot. **Tap** a Munki on stage to cycle its head
   expression 1→2→3→4→5→1. **Drag** a Munki off the stage to clear it.
   If the stage is full, the tapped chip shakes to signal "no room."
-- Pure HTML/CSS/JS. No build step. **All audio is synthesized via WebAudio**
-  — there are no audio files anywhere.
+- Pure HTML/CSS/JS. No build step. **All audio is synthesized in-browser**
+  — there are no audio files anywhere. The 24 per-Munki voices use raw
+  WebAudio; on top of that, a self-hosted Tone.js (v14.8.49, MIT) drives
+  an ambient layer (PolySynth pad + FM bell + MetalSynth hat through a
+  shared reverb/delay bus). Both layers share the same `AudioContext`
+  so they stay phase-locked.
 - Ambient + horror layers that aren't user-controlled mods:
   - **`BASE_SONG`** — Cmaj→Am two-bar background loop ("Bala's Theme"). Toggle
     via the `SONG` button.
@@ -50,6 +54,13 @@ all-munkis/
                         # CSS variable at `url('assets/bg/<file>') center /
                         # cover` to replace the placeholder gradient.
     JetBrainsMono-VariableFont_wght.ttf
+    vendor/
+      tone.min.js          # Self-hosted Tone.js v14.8.49 (MIT). Loaded by
+                           # index.html BEFORE game.js. ~340 KB. The whole
+                           # ambient layer (PolySynth pad, FM bell, metal
+                           # hat, reverb + delay bus) is built from this.
+                           # Game stays playable if the file fails to load
+                           # — buildToneLayer just bails.
     sprites/
       default-heads.png    # 1602×1002, 40 Munki heads = 5 expression rows
                            # × 8 color columns. Frame names are
@@ -78,13 +89,15 @@ all-munkis/
 
 | Section | What lives there |
 |---|---|
-| **CONFIG** | `TEMPO=100`, `STEPS_PER_BAR=16`, `NUM_SLOTS=5`, `BARS_PER_LOOP=2`, `REACT_DWELL_BEATS=8`, `PLACED_SHOCK_MS=600`, `DRAG_THRESHOLD_PX=12` |
-| **AUDIO ENGINE** | `audioCtx`, `masterGain` + `DynamicsCompressor` bus, `isMuted`, `isBaseSongOn`, `isJumpScareActive`, `currentStep`, `currentBar` |
-| `ensureAudio()` | Lazily creates context + compressor on first user interaction |
-| `schedule()` | Look-ahead scheduler. Advances `currentStep` 0..15 then increments `currentBar` 0..1 |
-| `scheduleStep(step, bar, when)` | Calls `BASE_SONG.play()` (if on) + every active slot's `ch.play()` + visual pulse on quarter notes |
+| **CONFIG** | `TEMPO=100`, `STEPS_PER_BAR=16`, `NUM_SLOTS=5`, `BARS_PER_LOOP=4`, `REACT_DWELL_BEATS=8`, `PLACED_SHOCK_MS=600`, `DRAG_THRESHOLD_PX=12` |
+| **AUDIO ENGINE** | `audioCtx`, `masterGain` + `DynamicsCompressor` bus, `isMuted`, `isBaseSongOn`, `isJumpScareActive`, `currentStep`, `currentBar`, plus Tone.js handles: `toneReady`, `toneBus`, `tonePad`, `toneBell`, `toneHat`. |
+| `ensureAudio()` | Lazily creates the AudioContext + compressor on first user interaction, then calls `buildToneLayer()` to set up the Tone.js side. |
+| `buildToneLayer()` | Binds Tone.js to the existing `audioCtx`, builds a reverb + delay bus, and constructs the three ambient Tone instruments. Silently bails if Tone isn't loaded — the game stays playable without it. |
+| `schedule()` | Look-ahead scheduler. Advances `currentStep` 0..15 then increments `currentBar` 0..3 (`BARS_PER_LOOP`). |
+| `scheduleStep(step, bar, when)` | Calls `BASE_SONG.play()` + `TONE_LAYER.play()` (both gated on `isBaseSongOn`) + every active slot's `ch.play()` + visual pulse / `tickReactState` on quarter notes. |
 | **SYNTH HELPERS** | `noiseSource(ctx, dur)`, `distortionCurve(amount)` |
-| **BASE_SONG** | One object with `play(ctx, out, when, step, bar)`. Sustained bass + pad on step 0; melody hook on quarter notes. Cmaj on bar 0, Am on bar 1. |
+| **BASE_SONG** | Raw-WebAudio 4-bar I-vi-IV-V loop (Cmaj → Am → Fmaj → G). `chordsByBar` array carries `{ bass, triad, melody }` per bar. `play(ctx, out, when, step, bar)` fires bass + pad triad at `step === 0` and a square-wave melody hook on quarter notes. |
+| **TONE_LAYER** | Tone.js side of the loop. Same 4-bar progression in chord-name form. PolySynth pad sustains the bar's chord; MetalSynth hat ticks the off-eighth (steps 2 + 10); FMSynth bell sparkles on bar 2 step 0 and bar 3 step 12 for section turns. No-op when `toneReady === false`. |
 | **CHARACTERS** | The 22-mod dict. **See "Adding a mod" below.** Body color must match the head sprite color — see comment above `SHEETS`. |
 | **STANDARD_ORDER / MADBALLZ_ORDER** | Tray order arrays. Munkis are grouped by HEAD COLOR (green → orange → purple → blue) and Ice Munki + Moon Munki are pinned to the very end on **every page**, including the Madballz tray. |
 | **HORROR_TRIGGER_MODS** | `Set(['moon', 'ice'])`. Auto-trigger jumpscare when one of these is placed (and wasn't already there). |

@@ -9,7 +9,7 @@
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
     const NUM_SLOTS = 5;
-    const BARS_PER_LOOP = 2;                
+    const BARS_PER_LOOP = 4;                 // I-vi-IV-V progression (Cmaj, Am, Fmaj, G)
     const MADBALLZ_UNLOCK_THRESHOLD = 3;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
@@ -24,6 +24,15 @@
     let currentBar = 0;
     let nextStepTime = 0;
     let schedTimer = null;
+    // Tone.js layer — built once on first user interaction (inside ensureAudio).
+    // Adds a reverb/delay-driven pad, a sparkly FM bell, and a subtle hi-hat
+    // groove on top of the raw-WebAudio BASE_SONG. The 24 character voices
+    // continue to use raw WebAudio underneath. See buildToneLayer + TONE_LAYER.
+    let toneReady = false;
+    let toneBus = null;       // shared reverb/delay sink for melodic Tone voices
+    let tonePad = null;       // PolySynth — sustained chord per bar
+    let toneBell = null;      // FMSynth — section-transition sparkle
+    let toneHat = null;       // MetalSynth — off-beat hi-hat tick
 
     let horrorTriggers = 0;
     let activeBankIndex = 0;
@@ -43,6 +52,7 @@
             comp.attack.value = 0.004;
             comp.release.value = 0.15;
             masterGain.connect(comp).connect(audioCtx.destination);
+            buildToneLayer(); // no-op if Tone.js isn't loaded
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
         if (!isPlaying) {
@@ -52,6 +62,63 @@
             nextStepTime = audioCtx.currentTime + 0.08;
             schedule();
         }
+    }
+
+    // Binds Tone.js to our existing audioCtx so its scheduler shares the
+    // same clock as the raw-WebAudio scheduler, then builds three ambient
+    // instruments (pad / bell / hat) that TONE_LAYER drives every bar.
+    // Silently bails if Tone.js failed to load — the raw-WebAudio BASE_SONG
+    // is the source of truth and the game stays playable without it.
+    function buildToneLayer() {
+        if (typeof Tone === 'undefined' || toneReady) return;
+        try {
+            // Tone.setContext accepts a raw AudioContext in v14+. The new
+            // Tone.Context wrapper picks up our existing destination so
+            // every Tone.connect(node, masterGain) below routes correctly.
+            Tone.setContext(audioCtx);
+        } catch (e) {
+            try { Tone.setContext(new Tone.Context({ context: audioCtx })); }
+            catch (e2) { return; }
+        }
+        // Effects bus: PolySynth pad + FM bell go through reverb + delay so
+        // the ambient layer sits "behind" the chiptune voices in the mix.
+        const reverb = new Tone.Reverb({ decay: 3.4, preDelay: 0.04, wet: 0.35 });
+        const delay  = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.22, wet: 0.22 });
+        const busOut = new Tone.Gain(0.55);
+        reverb.connect(delay);
+        delay.connect(busOut);
+        Tone.connect(busOut, masterGain);
+        toneBus = reverb;
+
+        // PolySynth pad — fat, slow sine cluster that sustains the bar's
+        // chord. Quiet enough to sit under the leads without muddying.
+        tonePad = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'fatsine', count: 3, spread: 22 },
+            envelope: { attack: 0.45, decay: 0.35, sustain: 0.65, release: 1.4 },
+            volume: -22
+        });
+        tonePad.connect(toneBus);
+
+        // FMSynth bell — sparkles on section-change bars for ear candy.
+        toneBell = new Tone.FMSynth({
+            harmonicity: 2,
+            modulationIndex: 11,
+            envelope:           { attack: 0.002, decay: 0.5, sustain: 0, release: 0.7 },
+            modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.7 },
+            volume: -16
+        });
+        toneBell.connect(toneBus);
+
+        // MetalSynth hi-hat — direct to masterGain (no reverb wash) so the
+        // off-beat tick stays tight against the kid's drum-mods.
+        toneHat = new Tone.MetalSynth({
+            envelope: { attack: 0.001, decay: 0.05, release: 0.02 },
+            harmonicity: 5.1, modulationIndex: 32, resonance: 4200, octaves: 1.5,
+            volume: -32
+        });
+        Tone.connect(toneHat, masterGain);
+
+        toneReady = true;
     }
 
     function schedule() {
@@ -68,7 +135,10 @@
     }
 
     function scheduleStep(step, bar, when) {
-        if (isBaseSongOn) BASE_SONG.play(audioCtx, masterGain, when, step, bar);
+        if (isBaseSongOn) {
+            BASE_SONG.play(audioCtx, masterGain, when, step, bar);
+            TONE_LAYER.play(step, bar, when); // ambient pad + bell + hat
+        }
         // User-placed mods
         for (let i = 0; i < NUM_SLOTS; i++) {
             const id = slots[i];
@@ -110,23 +180,36 @@
         }
         return c;
     }
+    // ---------- BASE SONG ----------
+    // Bala's Theme — a 4-bar I-vi-IV-V loop (Cmaj → Am → Fmaj → G), the
+    // classic singable kid-pop progression. Each bar fires:
+    //   - one sustained triangle bass (the chord root, an octave low)
+    //   - a triangle triad pad ringing across the bar
+    //   - a square-wave melody hook on quarter notes (steps 0/4/8/12)
+    // The TONE_LAYER block below adds a thicker reverb-y pad + a bell + an
+    // off-beat hat on top — Tone.js sits on the same audioCtx so the two
+    // layers stay phase-locked.
     const BASE_SONG = {
+        chordsByBar: [
+            // bass = chord root in the low octave; triad = three voices
+            // a fourth/fifth above it for the sustained pad.
+            { bass: 65.41, triad: [261.63, 329.63, 392.00], melody: { 0: 783.99, 4: 659.25, 8: 523.25, 12: 659.25 } }, // Cmaj  (G E C E)
+            { bass: 55.00, triad: [220.00, 261.63, 329.63], melody: { 0: 440.00, 4: 523.25, 8: 659.25, 12: 392.00 } }, // Am    (A C E G)
+            { bass: 87.31, triad: [174.61, 220.00, 261.63], melody: { 0: 440.00, 4: 349.23, 8: 440.00, 12: 523.25 } }, // Fmaj  (A F A C)
+            { bass: 98.00, triad: [196.00, 246.94, 293.66], melody: { 0: 493.88, 4: 392.00, 8: 493.88, 12: 587.33 } }  // G     (B G B D)
+        ],
         play(ctx, out, when, step, bar) {
-            // Sustained bass + pad fire once at the top of each bar and ring
-            // out across the full 2.4s the bar takes to complete.
-            if (step === 0) {
-                const isC = bar === 0;
-                const root = isC ? 65.41 : 55.00;            // C2 / A1
-                const chord = isC
-                    ? [261.63, 329.63, 392.00]               // C E G
-                    : [220.00, 261.63, 329.63];              // A C E (Am)
-                const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR; // 2.4s
+            const cb = this.chordsByBar[bar];
+            if (!cb) return;
+            const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR; // 2.4 s
 
-                // Bass — triangle wave, gentle attack/sustain envelope
+            // Sustained bass + pad fire once at the top of each bar and ring
+            // out across the full bar length.
+            if (step === 0) {
                 const b = ctx.createOscillator();
                 const bg = ctx.createGain();
                 b.type = 'triangle';
-                b.frequency.value = root;
+                b.frequency.value = cb.bass;
                 bg.gain.setValueAtTime(0, when);
                 bg.gain.linearRampToValueAtTime(0.16, when + 0.07);
                 bg.gain.linearRampToValueAtTime(0.13, when + BAR_LEN * 0.7);
@@ -134,9 +217,7 @@
                 b.connect(bg).connect(out);
                 b.start(when); b.stop(when + BAR_LEN + 0.05);
 
-                // Pad — chord triad, quieter on each higher voice so the
-                // root sits forward in the mix without muddying the leads.
-                chord.forEach((freq, i) => {
+                cb.triad.forEach((freq, i) => {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
                     o.type = 'triangle';
@@ -151,13 +232,8 @@
                 });
             }
 
-            // Melody hook on quarter notes — bouncy "bala-bala" phrase.
-            //   Bar 0 (Cmaj):  G5  E5  C5  E5
-            //   Bar 1 (Am):    A4  C5  E5  G4
-            const melodyBar0 = { 0: 783.99, 4: 659.25, 8: 523.25, 12: 659.25 };
-            const melodyBar1 = { 0: 440.00, 4: 523.25, 8: 659.25, 12: 392.00 };
-            const melody = bar === 0 ? melodyBar0 : melodyBar1;
-            const freq = melody[step];
+            // Melody hook on quarter notes — square-wave through a soft lowpass.
+            const freq = cb.melody[step];
             if (freq !== undefined) {
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
@@ -173,6 +249,44 @@
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
                 o.connect(f).connect(g).connect(out);
                 o.start(when); o.stop(when + 0.36);
+            }
+        }
+    };
+
+    // ---------- TONE LAYER ----------
+    // Tone.js-driven ambient instruments triggered alongside BASE_SONG. Same
+    // 4-bar progression in chord-name form so Tone can do its own scheduling.
+    // No-op when buildToneLayer failed (no Tone.js, or browser blocks AC).
+    const TONE_LAYER = {
+        chordsByBar: [
+            ['C4', 'E4', 'G4'],   // Cmaj
+            ['A3', 'C4', 'E4'],   // Am
+            ['F3', 'A3', 'C4'],   // Fmaj
+            ['G3', 'B3', 'D4']    // G
+        ],
+        play(step, bar, when) {
+            if (!toneReady) return;
+            const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR;
+            // Sustained PolySynth pad — sits behind the triangle pad, adds
+            // body and reverb wash.
+            if (step === 0) {
+                const chord = this.chordsByBar[bar];
+                if (chord) tonePad.triggerAttackRelease(chord, BAR_LEN * 0.92, when);
+            }
+            // Hi-hat tick on the off-eighth (steps 2/10). Very quiet — just
+            // a glassy sparkle to give the groove some forward motion when
+            // the kid hasn't placed any drum mods.
+            if (step === 2 || step === 10) {
+                toneHat.triggerAttackRelease('C5', '32n', when);
+            }
+            // Bell sparkle marking the section turns: top of bar 2 (the
+            // "lift" into the IV chord) and the last beat of bar 3 (the
+            // turnaround back into Cmaj).
+            if (bar === 2 && step === 0) {
+                toneBell.triggerAttackRelease('C6', '2n', when + 0.04);
+            }
+            if (bar === 3 && step === 12) {
+                toneBell.triggerAttackRelease('E6', '4n', when);
             }
         }
     };
