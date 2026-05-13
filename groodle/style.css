@@ -278,17 +278,31 @@ body.dancing .stage {
     width: 100%;
     height: 100%;
     z-index: 2;
-    touch-action: none;
-    cursor: crosshair;
+    /* Default: allow the page to scroll/zoom right through the canvas so a
+       thumb swipe doesn't get hijacked. Drawing mode opts in below by
+       toggling .drawing-active on the element via game.js. */
+    touch-action: pan-y pinch-zoom;
+    cursor: default;
     /* Drawing is clipped to the silhouette inside game.js via ctx.clip()
        on a Path2D built from BODY_SHAPES — see buildBodyPath() / buildCanvas.
        That clip is the single source of truth for "the drawable area";
        a CSS clip-path here would just duplicate the same mask. */
 }
 
+/* Active drawing mode: single-finger touches are captured for strokes.
+   Two-finger gestures (pinch-zoom) are still allowed so kids/parents can
+   zoom in on the work without leaving draw mode. */
+.draw-canvas.drawing-active {
+    touch-action: pinch-zoom;
+    cursor: crosshair;
+}
+
 body.dancing .draw-canvas {
     cursor: default;
     pointer-events: none;
+    /* Belt-and-braces: even if drawing-active leaked in somehow, dance mode
+       must never capture page scroll. */
+    touch-action: pan-y pinch-zoom;
 }
 
 .stage-floor {
@@ -397,6 +411,25 @@ body.dancing .draw-canvas {
 }
 
 .actions { gap: 8px; }
+
+/* Small instructional line under the actions row. Shown only on touch
+   devices where the DRAW toggle has the most teaching value; on desktop
+   the pointer makes the mode self-evident. */
+.draw-hint {
+    margin: 4px 0 0;
+    font-family: var(--font-body);
+    font-size: 12px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.65);
+    line-height: 1.35;
+}
+.draw-hint strong {
+    color: #00ffcc;
+    font-weight: bold;
+}
+@media (hover: hover) and (pointer: fine) {
+    .draw-hint { display: none; }
+}
 
 /* ============ BUTTONS ============ */
 

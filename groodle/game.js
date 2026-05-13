@@ -42,6 +42,11 @@
     let currentSize = 12;
     let isErasing = false;
     let isDrawing = false;
+    /* When false the canvas behaves as a passive picture: single-finger
+       swipes pass through to the page so the kid (or parent thumb-scrolling
+       past) can scroll. The DRAW button toggles this on; finishing a
+       drawing session (DONE / DANCE) toggles it back off. */
+    let isDrawMode = false;
     let lastX = 0, lastY = 0;
 
     let canvas = null;
@@ -315,7 +320,12 @@
 
     function attachDrawing() {
         canvas.addEventListener('pointerdown', (e) => {
-            if (isPlaying) return;
+            /* Bail out unless the kid has explicitly entered draw mode.
+               Without this gate, a thumb-swipe through the silhouette while
+               the kid is just looking at their figure would get captured as
+               a stroke. With it, touches pass through to the page and the
+               browser uses the canvas's touch-action: pan-y to scroll. */
+            if (isPlaying || !isDrawMode) return;
             try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
             isDrawing = true;
             const p = getPos(e);
@@ -334,11 +344,15 @@
                 ctx.arc(p.x, p.y, currentSize / 2, 0, Math.PI * 2);
                 ctx.fill();
             }
+            /* Only preventDefault when we're actually capturing the stroke.
+               Calling it unconditionally on every touch would suppress the
+               browser's gesture inference (and isn't needed: touch-action
+               already gates scroll/zoom). */
             e.preventDefault();
         });
 
         canvas.addEventListener('pointermove', (e) => {
-            if (!isDrawing || isPlaying) return;
+            if (!isDrawing || isPlaying || !isDrawMode) return;
             const p = getPos(e);
             if (isErasing) {
                 ctx.save();
@@ -372,6 +386,27 @@
 
     function clearCanvas() {
         ctx.clearRect(0, 0, STAGE_W, STAGE_H);
+    }
+
+    /* ============ DRAW MODE ============ */
+
+    /* Default state is VIEW: the canvas is a passive picture, swipes scroll
+       the page. Entering DRAW mode flips touch-action via a CSS class and
+       lets pointerdown actually capture strokes. */
+    function setDrawMode(on) {
+        isDrawMode = !!on;
+        if (canvas) canvas.classList.toggle('drawing-active', isDrawMode);
+        const btn = document.getElementById('drawModeBtn');
+        if (btn) {
+            btn.classList.toggle('active', isDrawMode);
+            btn.setAttribute('aria-pressed', isDrawMode ? 'true' : 'false');
+            btn.textContent = isDrawMode ? '✓ DONE' : '✏️ DRAW';
+        }
+        if (!isDrawMode) {
+            /* Cancel any in-flight stroke so the next entry into draw mode
+               doesn't think we're mid-drag. */
+            isDrawing = false;
+        }
     }
 
     /* ============ TOOLS UI ============ */
@@ -496,6 +531,11 @@
 
     function startDance() {
         if (isPlaying) return;
+        /* Hard-exit draw mode on the way into dance — even though
+           pointer-events: none stops new strokes, leaving drawing-active
+           on the canvas would block page scroll over the figure while
+           it's animating. */
+        setDrawMode(false);
         ensureAudio();
         const begin = () => {
             isPlaying = true;
@@ -624,6 +664,10 @@
     function attachHandlers() {
         document.getElementById('clearBtn').addEventListener('click', clearCanvas);
         document.getElementById('randomBtn').addEventListener('click', drawSurprise);
+
+        document.getElementById('drawModeBtn').addEventListener('click', () => {
+            setDrawMode(!isDrawMode);
+        });
 
         document.getElementById('eraserBtn').addEventListener('click', () => {
             isErasing = !isErasing;
