@@ -141,51 +141,41 @@ function streakSpeedMult(streak) {
 // screen. Edit copy here; layout lives in style.css and the modal markup
 // lives in index.html. Apostrophes inside template literals are literal,
 // no escaping needed.
-const LORE_TUB_SVG = `
-<svg class="lore-tub-svg" viewBox="0 0 110 110" aria-hidden="true">
-  <ellipse cx="55" cy="62" rx="42" ry="36" fill="#f4881e"/>
-  <ellipse cx="55" cy="56" rx="40" ry="32" fill="#ffae3a"/>
-  <ellipse cx="40" cy="52" rx="6" ry="7" fill="#1a1208"/>
-  <ellipse cx="70" cy="52" rx="6" ry="7" fill="#1a1208"/>
-  <circle cx="38" cy="50" r="2" fill="#fff"/>
-  <circle cx="68" cy="50" r="2" fill="#fff"/>
-  <path d="M 38 72 Q 55 86 72 72" stroke="#1a1208" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-  <ellipse cx="28" cy="72" rx="6" ry="4" fill="#ff8c42" opacity="0.55"/>
-  <ellipse cx="82" cy="72" rx="6" ry="4" fill="#ff8c42" opacity="0.55"/>
-</svg>`;
+const LORE_TUB_IMG = `<div class="lore-tub-img" aria-hidden="true"></div>`;
 
 const LORE_PAGES = [
     {
-        title: 'Page 1 — Welcome to the Cache',
-        html: LORE_TUB_SVG +
-            `<p>Meet <strong>Tub Butter</strong>! Tub is a big, fuzzy, very orange monster who lives in a place called <em>The Cache</em>. The Cache is a cozy warehouse where the internet's most important snacks are kept: cookies. 🍪</p>
-             <p>But wait — these aren't the cookies in your kitchen. These are <strong>DATA cookies</strong>, and they're what Tub Butter runs on. No data cookies, no Tub.</p>`,
+        title: 'Page 1 — Meet Tub Butter',
+        html: LORE_TUB_IMG +
+            `<p>Meet <strong>Tub Butter</strong> — a fuzzy orange data-eater who lives inside your computer.</p>
+             <p>Tub's home is called <em>The Cache</em>. It's a cozy warehouse where bits of the internet pile up: logins, settings, save points, high scores. Tub calls them <strong>cookies</strong>. They're his favorite food.</p>
+             <p>But these aren't the kind you bake. These are <strong>DATA cookies</strong> — and without them, Tub starves.</p>`,
     },
     {
         title: 'Page 2 — What Even Is a Data Cookie?',
         html:
-            `<p>Every time you visit a website, that website might leave a little crumb behind. A note that says something like:</p>
+            `<p>Every time you visit a website, the site can drop a little crumb in Tub's Cache. A short note. Like:</p>
              <div class="lore-quotes">
                 <p>"This kid likes the dark theme."</p>
                 <p>"This kid is logged in."</p>
                 <p>"This kid was watching a video — show them where they left off."</p>
              </div>
-             <p>Those crumbs are cookies. Most of them are helpful! They make websites remember you so you don't have to start over every time.</p>`,
+             <p>Those notes are <strong>data cookies</strong>. Most are friendly. They're how websites remember you instead of asking who you are on every single visit.</p>`,
     },
     {
         title: 'Page 3 — Tub Butter\'s Job',
         html:
-            `<p>The Cache is where all those crumbs get stored. Tub Butter's job is to keep the Cache fresh — by <strong>eating</strong> the cookies that go there. 🍪</p>
-             <p>But Tub is picky! Some things that wind up in the Cache aren't really for him. Old veggies 🥦. Trackers from places he's never even been to. Random garbage. If Tub eats those, he goes <strong>"YUCK!"</strong> and the round ends in disgust.</p>
-             <p>Your job is to help Tub catch the right cookies before they fly out of the Cache. The faster he eats, the faster the Cache fills with fresh data. The more wrong stuff you let him catch, the worse he feels.</p>`,
+            `<p>Tub keeps his Cache tidy by eating cookies as they fly in. That's his whole job. 🍪</p>
+             <p>But Tub is <strong>PICKY</strong>. Sometimes random junk drifts into the Cache too — old veggies 🥦, trackers from sites he's never visited, leftover gunk. If Tub bites into one of those, he wails <strong>"YUCK!"</strong> and your streak crashes to the floor.</p>
+             <p>Help Tub grab the <em>right</em> cookies before they fly out the other side. Build a streak. Keep him happy. Keep the Cache fresh.</p>`,
     },
     {
         title: 'Page 4 — Why This Matters',
         html:
-            `<p>The real internet works a lot like the Cache. Websites leave cookies on your phone or computer so they can remember you. Most cookies are helpful — they remember your logins, your settings, your scores in games like this one.</p>
-             <p>Some cookies, though, are sneaky. They try to follow you around the whole internet, watching where you go. That's why grown-ups talk about <em>"cookies"</em> and <em>"privacy"</em> so much.</p>
-             <p>Tub Butter doesn't have to worry about that — he only eats the cookies that belong in his Cache. But now you know what cookies actually are. <strong>You're ahead of most adults.</strong></p>
-             <p class="lore-final">Press <strong>START</strong> when you're ready. Tub is HUNGRY.</p>`,
+            `<p>The real internet works almost exactly like Tub's Cache. Every time you tap or click around online, websites can drop their own data cookies onto your phone or computer — to remember your logins, your scores, your settings.</p>
+             <p>Most are friendly. A few are sneaky — they try to follow you from site to site, watching where you go. That's the kind grown-ups argue about when they say <em>"cookies"</em> and <em>"privacy."</em></p>
+             <p>Now you know what data cookies actually are. <strong>The grown-up internet doesn't have to be confusing.</strong></p>
+             <p class="lore-final">Tap <strong>START</strong>. Tub is HUNGRY.</p>`,
     },
 ];
 
@@ -368,6 +358,57 @@ function showScreen(name) {
     SCREENS[name].classList.add('active');
     // Return button visible on menu + feast; hidden during gameplay.
     if (els.btnReturn) els.btnReturn.classList.toggle('hidden', name === 'game');
+}
+
+// ── Fullscreen ────────────────────────────────────────────────────
+// On startRound the game requests fullscreen so desktop play fills the
+// whole viewport — much better hit-target real estate. iOS Safari quietly
+// refuses (no fullscreen API on iframes/sub-frames there); the game still
+// works fine in windowed mode. The browser's native Esc-to-exit-fullscreen
+// is what implements "Esc to exit" on desktop; a fullscreenchange listener
+// also aborts the round when the user bails out mid-play, so they return
+// to the menu instead of being stuck in a half-state.
+function requestGameFullscreen() {
+    const el = document.documentElement;
+    const req = el.requestFullscreen
+             || el.webkitRequestFullscreen
+             || el.msRequestFullscreen;
+    if (!req) return;
+    try {
+        const p = req.call(el);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+}
+
+function exitGameFullscreen() {
+    const fsEl = document.fullscreenElement
+              || document.webkitFullscreenElement
+              || document.msFullscreenElement;
+    if (!fsEl) return;
+    const exit = document.exitFullscreen
+              || document.webkitExitFullscreen
+              || document.msExitFullscreen;
+    if (!exit) return;
+    try {
+        const p = exit.call(document);
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+}
+
+// Tear down a round without playing the feast — used by Esc / fullscreen
+// exit mid-play. Mirrors endRound() but routes back to the menu and skips
+// the feast sequence.
+function abortRound() {
+    if (!state.running) return;
+    state.running = false;
+    if (state.rafId) cancelAnimationFrame(state.rafId);
+    state.rafId = null;
+    state.cookies.forEach(c => c.el && c.el.remove());
+    state.cookies = [];
+    stopStartSfx();
+    stopGlitches();
+    exitGameFullscreen();
+    showScreen('menu');
 }
 
 const rand   = (min, max) => min + Math.random() * (max - min);
@@ -1026,6 +1067,7 @@ function resetState() {
 
 function startRound() {
     playStartSfx();
+    requestGameFullscreen();
     showScreen('game');
     requestAnimationFrame(() => {
         resetState();
@@ -1063,6 +1105,8 @@ function endRound() {
     state.cookies = [];
     stopStartSfx();
     stopGlitches();
+    // Note: fullscreen is kept through the feast screen so PLAY AGAIN
+    // feels seamless. Esc or abortRound() exits fullscreen when needed.
     setTimeout(showFeast, 400);
 }
 
@@ -1267,6 +1311,29 @@ function init() {
 
     els.stage.addEventListener('contextmenu', e => e.preventDefault());
     els.stage.addEventListener('dragstart',   e => e.preventDefault());
+
+    // Esc during a round: abort + back to menu. The lore modal has its
+    // own Esc handler that's only attached while it's open, and lore can
+    // only open from the menu (where state.running is false), so the two
+    // handlers never both fire on the same Esc keypress.
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && state.running && !state.loreOpen) {
+            e.preventDefault();
+            abortRound();
+        }
+    });
+
+    // If the user exits fullscreen mid-play (Esc, F11, browser UI),
+    // abort the round so they're not stuck with the game still ticking
+    // behind a returned-to-windowed view.
+    const onFsChange = () => {
+        const fs = document.fullscreenElement
+                || document.webkitFullscreenElement
+                || document.msFullscreenElement;
+        if (!fs && state.running) abortRound();
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
 }
 
 document.addEventListener('DOMContentLoaded', init);
