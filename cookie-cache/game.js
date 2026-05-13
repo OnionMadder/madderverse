@@ -415,7 +415,8 @@ function placeCookieEl(c) {
 }
 
 // ── Catch ──────────────────────────────────────────────────────────
-const CRUMB_COLORS  = ['#e8b86d', '#c08a4a', '#fff3b0', '#a86a2c', '#d4a373'];
+// Cookie-dough golds and crumbs plus two darker chocolate-chip browns.
+const CRUMB_COLORS  = ['#e8b86d', '#c08a4a', '#fff3b0', '#a86a2c', '#d4a373', '#3b2410', '#5a3820'];
 const SPARK_COLORS  = ['#00ffcc', '#7dffe6', '#ffffff', '#ff00ff'];
 const CONFETTI_COLORS = ['#00ffcc', '#ff00ff', '#74b9ff', '#a29bfe', '#7dffe6', '#ffffff'];
 const SCORE_LABELS  = ['YUM!', 'POP!', 'NOM!', 'CRUNCH!', 'TASTY!', 'CHOMP!', 'GULP!'];
@@ -464,11 +465,20 @@ function catchCookie(c) {
 
     // Streak persists across spawns — only misses or veggies break it. Empty
     // screens between cookies do NOT reset.
+    const prevStreak = state.streakHits;
     state.streakHits += 1;
     state.lastHitAt   = performance.now();
     const tier   = comboTier(state.streakHits);
     const earned = CFG.points * tier.mult;
     updateStreakHud();
+
+    // Crossing a tier threshold (10, 25, 50) triggers a centered banner.
+    for (const t of CFG.comboTiers) {
+        if (prevStreak < t.hits && state.streakHits >= t.hits) {
+            flashMilestoneBanner('STREAK ×' + t.mult + '!');
+            break;
+        }
+    }
 
     state.score += earned;
     state.pile  += 1;
@@ -514,7 +524,7 @@ function catchCookie(c) {
 }
 
 const VEG_SPLATTER_COLORS = ['#ff6b6b', '#c0392b', '#2ed573', '#27ae60', '#a29bfe', '#74b9ff', '#ffaa00'];
-const VEG_LABELS = ['YUCK!', 'EW!', 'NOPE!', 'BLEH!', 'GROSS!'];
+const VEG_LABELS = ['YUCK!', 'EWWW!', 'GROSS!', 'BARF!', 'NOPE!'];
 
 function hitVeggie(v) {
     v.popped = true;
@@ -531,7 +541,7 @@ function hitVeggie(v) {
     breakStreak();
 
     const pop = document.createElement('div');
-    pop.className   = 'score-pop big';
+    pop.className   = 'score-pop big yuck-wobble';
     pop.textContent = `${choice(VEG_LABELS)} -${lost}`;
     pop.style.left  = v.x + 'px';
     pop.style.top   = v.y + 'px';
@@ -543,12 +553,53 @@ function hitVeggie(v) {
     spawnZapRing(v.x, v.y);
     spawnStageFlash(v.x, v.y, 'rgba(255,107,107,0.6)');
     spawnVegSplatter(v.x, v.y);
+    spawnVegVignette();
     playSfx('veg');
 
     els.stage.classList.add('veg-shake');
-    setTimeout(() => els.stage.classList.remove('veg-shake'), 460);
+    setTimeout(() => els.stage.classList.remove('veg-shake'), 380);
 
     setTimeout(() => v.el.remove(), 560);
+}
+
+function flashMilestoneBanner(text) {
+    const b = document.createElement('div');
+    b.className = 'milestone-banner';
+    b.textContent = text;
+    els.stage.appendChild(b);
+    b.addEventListener('animationend', () => b.remove(), { once: true });
+    setTimeout(() => { if (b.parentNode) b.remove(); }, 1200); // safety net
+}
+
+// Inset red glow flashing from the edges inward — only one at a time so
+// rapid veggie taps don't stack costly box-shadow layers.
+let _activeVegVignette = null;
+function spawnVegVignette() {
+    if (_activeVegVignette) return;
+    const v = document.createElement('div');
+    v.className = 'veg-vignette';
+    els.stage.appendChild(v);
+    _activeVegVignette = v;
+    const release = () => {
+        v.remove();
+        if (_activeVegVignette === v) _activeVegVignette = null;
+    };
+    v.addEventListener('animationend', release, { once: true });
+    setTimeout(release, 500); // safety net
+}
+
+// Faint red glow at the screen edge a cookie exited from.
+function spawnMissTrail(edge, along) {
+    const t = document.createElement('div');
+    t.className = 'miss-trail miss-trail-' + edge;
+    if (edge === 'bottom') {
+        t.style.left = Math.max(0, along - 60) + 'px';
+    } else {
+        t.style.top = Math.max(0, along - 60) + 'px';
+    }
+    els.stage.appendChild(t);
+    t.addEventListener('animationend', () => t.remove(), { once: true });
+    setTimeout(() => { if (t.parentNode) t.remove(); }, 1000);
 }
 
 function spawnZapRing(cx, cy) {
@@ -791,7 +842,14 @@ function loop(ts) {
             // A real cookie that flew off uncaught is a "miss" — break the
             // streak (no point loss; this is a kids' game). Veggies escaping
             // are good news for the player, so leave the streak alone.
-            if (!c.popped && !c.isVeggie) breakStreak();
+            if (!c.popped && !c.isVeggie) {
+                const edge = (c.y - c.h / 2 > H + 60) ? 'bottom'
+                           : (c.x < -c.w * 2)         ? 'left'
+                           :                            'right';
+                const along = edge === 'bottom' ? c.x : c.y;
+                spawnMissTrail(edge, along);
+                breakStreak();
+            }
             c.alive = false;
             c.el.remove();
         }

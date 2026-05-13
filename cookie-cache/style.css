@@ -365,14 +365,89 @@ body {
     100% { width: 320px; height: 320px; opacity: 0;   border-width: 1px;  }
 }
 
-.game-stage.veg-shake { animation: veg-shake 0.42s linear; }
+.game-stage.veg-shake { animation: veg-shake 0.35s linear; }
 @keyframes veg-shake {
     0%,100% { transform: translate(0,0); }
-    15%     { transform: translate(-9px, 3px);  }
-    30%     { transform: translate(8px, -4px);  }
-    45%     { transform: translate(-7px, 5px);  }
-    60%     { transform: translate(6px, -3px);  }
-    80%     { transform: translate(-3px, 2px);  }
+    10%     { transform: translate(-12px, 5px); }
+    25%     { transform: translate(11px, -6px); }
+    40%     { transform: translate(-10px, 7px); }
+    55%     { transform: translate(9px, -5px);  }
+    70%     { transform: translate(-7px, 4px);  }
+    85%     { transform: translate(4px, -2px);  }
+}
+
+/* Red vignette flashing inward from the edges on veggie hits. */
+.veg-vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 26;
+    box-shadow: inset 0 0 0 0 transparent;
+    animation: veg-vignette-kf 0.25s ease-out forwards;
+}
+@keyframes veg-vignette-kf {
+    0%   { box-shadow: inset 0 0 0 0 rgba(255,0,0,0); }
+    40%  { box-shadow: inset 0 0 120px 28px rgba(255,40,40,0.72); }
+    100% { box-shadow: inset 0 0 60px 8px rgba(255,40,40,0); }
+}
+
+/* Yuck wobble — overrides .score-pop's animation via later declaration. */
+.score-pop.yuck-wobble {
+    animation: yuck-wobble-kf 0.7s ease-out forwards;
+}
+@keyframes yuck-wobble-kf {
+    0%   { opacity: 0; transform: translate(-50%, -50%)  scale(0.6) rotate(0); }
+    15%  { opacity: 1; transform: translate(-50%, -90%)  scale(1.45) rotate(-9deg); }
+    30%  {              transform: translate(-50%, -85%)  scale(1.35) rotate(8deg);  }
+    45%  {              transform: translate(-50%, -95%)  scale(1.4)  rotate(-6deg); }
+    60%  {              transform: translate(-50%, -100%) scale(1.3)  rotate(5deg);  }
+    100% { opacity: 0; transform: translate(-50%, -170%) scale(1)    rotate(0);    }
+}
+
+/* Centered banner that flashes when the player crosses a streak tier. */
+.milestone-banner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    font-weight: 900;
+    font-size: clamp(2.2rem, 9vw, 4rem);
+    letter-spacing: 4px;
+    color: #fff;
+    text-shadow:
+        0 0 26px var(--accent-cyan),
+        0 0 50px rgba(0,255,204,0.7),
+        0 0 14px var(--accent-pink),
+        0 4px 0 var(--accent-pink);
+    z-index: 45;
+    animation: milestone-flash 0.7s ease-out forwards;
+    white-space: nowrap;
+}
+@keyframes milestone-flash {
+    0%   { opacity: 0; transform: scale(0.55); }
+    25%  { opacity: 1; transform: scale(1.25); }
+    65%  { opacity: 1; transform: scale(1);    }
+    100% { opacity: 0; transform: scale(1.4);  }
+}
+
+/* Faint red glow at the screen edge a cookie exited from. */
+.miss-trail {
+    position: absolute;
+    pointer-events: none;
+    z-index: 5;
+    background: radial-gradient(ellipse at center,
+                                rgba(255,80,80,0.75) 0%,
+                                rgba(255,80,80,0) 70%);
+    animation: miss-trail-kf 0.75s ease-out forwards;
+}
+.miss-trail-left   { left: 0;   width: 90px;  height: 120px; }
+.miss-trail-right  { right: 0;  width: 90px;  height: 120px; }
+.miss-trail-bottom { bottom: 0; width: 120px; height: 70px;  }
+@keyframes miss-trail-kf {
+    0%   { opacity: 1;   transform: scale(0.7); }
+    100% { opacity: 0;   transform: scale(1.4); }
 }
 
 /* ── Catch flash + score pop ─────────────────────────────────── */
