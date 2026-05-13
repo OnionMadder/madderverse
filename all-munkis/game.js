@@ -46,6 +46,24 @@
     let madballzUnlocked = false;
     let isMadballzMode = false;
 
+    // ---------- EASTER-EGG STATE ----------
+    // 5 hidden interactions the kid can find across the page. Each id is
+    // recorded once in munkiSightings (set, deduped). Hitting MOON_UNLOCK_
+    // THRESHOLD unique sightings flips moonUnlocked, plays the reveal
+    // animation, and appends Moon to the bank. Persists across sessions
+    // via the existing STORAGE_KEY payload (see loadProgress / saveProgress).
+    //
+    // Egg ids — see attachEggDetectors() for the gestures behind each:
+    //   titleClick    — tap the "MUNKIS" word 5× within 8s
+    //   corners       — tap all 4 viewport corners within 10s
+    //   rainbowOrder  — place all 6 rainbow Munkis in correct R-O-Y-G-B-P slots
+    //   chipSpam      — tap any single tray chip 7× without dragging
+    //   stageTriple   — triple-tap the empty stage area within 1s
+    const EGG_IDS = ['titleClick', 'corners', 'rainbowOrder', 'chipSpam', 'stageTriple'];
+    const MOON_UNLOCK_THRESHOLD = EGG_IDS.length;
+    const munkiSightings = new Set();
+    let moonUnlocked = false;
+
     function ensureAudio() {
         if (!audioCtx) {
             const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -1229,6 +1247,8 @@
         const iceNowOn = isIceOnStage();
         updateIceFreeze();
         if (iceNowOn && !iceWasOn) playIceFreezeSound();
+        // Easter egg: stage now matches the rainbow R-O-Y-G-B-P order?
+        checkRainbowEgg();
     }
 
     function isIceOnStage() {
@@ -1353,9 +1373,17 @@
                         playDropSound();
                     }
                     clearTrayGhost();
+                    // Any successful (or attempted) drag in the tray resets
+                    // the chipSpam egg counter — see attachEggDetectors().
+                    document.dispatchEvent(new CustomEvent('trayChipDrag'));
+                } else {
+                    // No-drag tap. tap-to-place is gone (Bala's feedback),
+                    // but tap is still meaningful for the chipSpam egg:
+                    // 7 taps without dragging triggers a hidden discovery.
+                    document.dispatchEvent(new CustomEvent('trayChipTap', {
+                        detail: { charId: state.charId }
+                    }));
                 }
-                // No-drag (tap) on a tray chip is intentionally a no-op —
-                // tap-to-place is gone; placing requires a drag.
             });
             chip.addEventListener('pointercancel', e => {
                 const state = trayDragState.get(e.pointerId);
@@ -1718,9 +1746,10 @@
     }
 
     // ---------- STORY PROGRESSION & MADBALLZ MODE ----------
-    // Persistence: { horrorTriggers, madballzUnlocked } in localStorage so the
-    // kid keeps their unlock between visits. We swallow storage errors (private
-    // mode, quota) so a flaky client never breaks the game.
+    // Persistence: { horrorTriggers, madballzUnlocked, munkiSightings,
+    //               moonUnlocked, activeBankIndex, unlockedBanks }
+    // We swallow storage errors (private mode, quota) so a flaky client
+    // never breaks the game.
     function loadProgress() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -1728,6 +1757,14 @@
             const obj = JSON.parse(raw);
             horrorTriggers = (obj.horrorTriggers | 0);
             madballzUnlocked = !!obj.madballzUnlocked;
+            // Easter-egg progress. munkiSightings persists which unique eggs
+            // the kid found; moonUnlocked is the once-flipped reward flag.
+            if (Array.isArray(obj.munkiSightings)) {
+                obj.munkiSightings.forEach(id => {
+                    if (EGG_IDS.includes(id)) munkiSightings.add(id);
+                });
+            }
+            moonUnlocked = !!obj.moonUnlocked;
             // Clamp activeBankIndex to a known + unlocked bank so a stale
             // localStorage value can't push us into an empty bank.
             const idx = (obj.activeBankIndex | 0);
@@ -1747,6 +1784,8 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 horrorTriggers,
                 madballzUnlocked,
+                munkiSightings: [...munkiSightings],
+                moonUnlocked,
                 activeBankIndex,
                 unlockedBanks: BANKS.map(b => b.unlocked)
             }));
@@ -1879,6 +1918,167 @@
         if (ico) ico.textContent = speaking ? '⏹' : '🔊';
     }
 
+    // ---------- EASTER-EGG DETECTORS ----------
+    // findEgg(id) is the single entry point — each detector below calls it
+    // when its gesture completes. Duplicate ids are deduped via the Set.
+    // First sighting reveals the counter chip; the threshold-th sighting
+    // flips moonUnlocked and plays the reveal.
+    function findEgg(id) {
+        if (!EGG_IDS.includes(id)) return;
+        if (munkiSightings.has(id)) return;
+        munkiSightings.add(id);
+        saveProgress();
+        showEggCounter();
+        bumpEggCounter();
+        if (munkiSightings.size >= MOON_UNLOCK_THRESHOLD && !moonUnlocked) {
+            unlockMoon();
+        }
+    }
+
+    function showEggCounter() {
+        const el = document.getElementById('eggCounter');
+        if (!el) return;
+        el.hidden = false;
+        // double-RAF so the .shown transition actually animates (browser
+        // needs a frame between hidden=false and the class flip).
+        requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('shown')));
+    }
+
+    function bumpEggCounter() {
+        const el = document.getElementById('eggCounter');
+        if (!el) return;
+        const text = el.querySelector('.egg-counter-text');
+        if (text) {
+            text.textContent = moonUnlocked
+                ? 'FOUND'
+                : `${munkiSightings.size}/${MOON_UNLOCK_THRESHOLD}`;
+        }
+        el.classList.toggle('found-all', moonUnlocked);
+        el.classList.remove('bump');
+        void el.offsetWidth;
+        el.classList.add('bump');
+    }
+
+    function unlockMoon() {
+        moonUnlocked = true;
+        saveProgress();
+        // Append Moon to the bank so the kid can use the new Munki right
+        // away. Chunk 4 will swap to a true 7-chip swappable layout; for
+        // now the bank just grows to 8 chips so the unlock is meaningful
+        // the moment it lands.
+        const bank = BANKS[0].munkis;
+        if (!bank.includes('moon')) bank.push('moon');
+        renderTray();
+        attachTrayHandlers();
+        bumpEggCounter(); // flip "5/5" → "FOUND"
+        showMoonReveal();
+    }
+
+    function showMoonReveal() {
+        const overlay = document.getElementById('moonReveal');
+        if (!overlay) return;
+        overlay.setAttribute('aria-hidden', 'false');
+        overlay.classList.add('open');
+        // Tap-to-dismiss + auto-close after 3.5s.
+        const dismiss = () => {
+            overlay.classList.remove('open');
+            overlay.setAttribute('aria-hidden', 'true');
+            overlay.removeEventListener('pointerdown', dismiss);
+            clearTimeout(autoClose);
+        };
+        overlay.addEventListener('pointerdown', dismiss);
+        const autoClose = setTimeout(dismiss, 3500);
+    }
+
+    // Wires the 5 hidden interactions. Idempotent — call once on init.
+    function attachEggDetectors() {
+        // ---- Egg 1: titleClick — tap the pink "Munkis" 5× in 8s ----
+        const titleSpan = document.querySelector('h1 .neon-pink');
+        if (titleSpan) {
+            const taps = [];
+            titleSpan.addEventListener('click', () => {
+                const now = performance.now();
+                taps.push(now);
+                while (taps.length && now - taps[0] > 8000) taps.shift();
+                if (taps.length >= 5) {
+                    taps.length = 0;
+                    findEgg('titleClick');
+                }
+            });
+            titleSpan.style.cursor = 'pointer';
+        }
+
+        // ---- Egg 2: corners — tap all 4 corner hotspots within 10s ----
+        const visited = new Set();
+        let firstCornerAt = 0;
+        ['cornerTL', 'cornerTR', 'cornerBR', 'cornerBL'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('pointerdown', e => {
+                e.preventDefault();
+                const now = performance.now();
+                if (visited.size === 0 || now - firstCornerAt > 10000) {
+                    visited.clear();
+                    firstCornerAt = now;
+                }
+                visited.add(id);
+                if (visited.size === 4) {
+                    visited.clear();
+                    findEgg('corners');
+                }
+            });
+        });
+
+        // ---- Egg 3: rainbowOrder — fired from setSlot via checkRainbow ----
+        // (handled in checkRainbowEgg(), called from setSlot)
+
+        // ---- Egg 4: chipSpam — 7 taps (no drag) on the same chip in 6s ----
+        const spamTaps = new Map(); // chipCharId → [timestamps]
+        document.addEventListener('trayChipTap', e => {
+            const charId = e.detail && e.detail.charId;
+            if (!charId) return;
+            const now = performance.now();
+            const arr = spamTaps.get(charId) || [];
+            arr.push(now);
+            while (arr.length && now - arr[0] > 6000) arr.shift();
+            spamTaps.set(charId, arr);
+            if (arr.length >= 7) {
+                spamTaps.clear();
+                findEgg('chipSpam');
+            }
+        });
+        // Any drag in the tray resets all spam counters — clearly the kid
+        // is using the chip, not stuck repeating taps on it.
+        document.addEventListener('trayChipDrag', () => spamTaps.clear());
+
+        // ---- Egg 5: stageTriple — triple-tap on the empty stage area ----
+        const stage = document.getElementById('stage');
+        if (stage) {
+            const tripleTaps = [];
+            stage.addEventListener('pointerdown', e => {
+                // Only count taps that hit the bare stage (not a slot).
+                if (e.target.closest('.stage-slot')) return;
+                const now = performance.now();
+                tripleTaps.push(now);
+                while (tripleTaps.length && now - tripleTaps[0] > 1000) tripleTaps.shift();
+                if (tripleTaps.length >= 3) {
+                    tripleTaps.length = 0;
+                    findEgg('stageTriple');
+                }
+            });
+        }
+    }
+
+    // Called from setSlot — checks if every slot now holds its rainbow color
+    // in the canonical R-O-Y-G-B-P order. Triggers the rainbowOrder egg.
+    const RAINBOW_ORDER = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+    function checkRainbowEgg() {
+        for (let i = 0; i < RAINBOW_ORDER.length; i++) {
+            if (slots[i] !== RAINBOW_ORDER[i]) return;
+        }
+        findEgg('rainbowOrder');
+    }
+
     // ---------- HEADER BUTTONS ----------
     function attachHeaderHandlers() {
         document.getElementById('remixBtn').addEventListener('click', () => {
@@ -1969,6 +2169,11 @@
     // ---------- INIT ----------
     function init() {
         loadProgress();
+        // Restore prior Moon unlock: append Moon to the bank before the
+        // first renderTray so the chip is visible from the first frame.
+        if (moonUnlocked && !BANKS[0].munkis.includes('moon')) {
+            BANKS[0].munkis.push('moon');
+        }
         buildStage();
         renderTray();
         renderAllSlots();
@@ -1976,7 +2181,14 @@
         attachSlotHandlers();
         attachHeaderHandlers();
         attachMoonChaos();
+        attachEggDetectors();
         updateTrayHint();
+        // If the kid found any eggs on a prior visit, restore the counter
+        // chip with the saved count (no animation — it's not "new").
+        if (munkiSightings.size > 0 || moonUnlocked) {
+            showEggCounter();
+            bumpEggCounter();
+        }
         // If the kid already unlocked Madballz on a previous visit, surface
         // the button immediately (without the "new" reveal flourish).
         if (madballzUnlocked) revealMadballzButton(false);
