@@ -11,6 +11,10 @@
     const NUM_SLOTS = 5;
     const BARS_PER_LOOP = 4;                 // I-vi-IV-V progression (Cmaj, Am, Fmaj, G)
     const MADBALLZ_UNLOCK_THRESHOLD = 3;
+    // Feature flag: Madballz mode is dormant in the 8-Munki redesign — code,
+    // sprites, audio profiles, and the mode toggle are all preserved, but the
+    // reveal button never appears. Flip to true to bring the bonus screen back.
+    const MADBALLZ_ENABLED = false;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
     // ---------- AUDIO ENGINE ----------
@@ -323,7 +327,92 @@
             }
         }
     };
-const CHARACTERS = {
+    // 8-Munki roster (post-redesign):
+    //   6 rainbow Munkis named for their color (red/orange/yellow/green/blue/purple)
+    //   Ice Munki (white sprite Z, freeze power) — default 7th in bank
+    //   Moon Munki (black sprite X, chaos power) — unlockable via Easter eggs;
+    //     swappable into the 7th bank slot in place of Ice.
+    // 8 Madballz mod entries are kept dormant (no button reveal) per design
+    // intent so the code/voices stay archived in-place rather than deleted.
+    const CHARACTERS = {
+        red: {
+            label: 'Red',
+            // Audio profile: saw bass stab (was "grumble"). Body color #dc2626
+            // → sprite letter R via COLOR_BY_BODY.
+            bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
+            play(ctx, out, when, step) {
+                if (step !== 0 && step !== 8) return;
+                const root = step === 0 ? 65.41 : 98.00;
+                const o1 = ctx.createOscillator();
+                const o2 = ctx.createOscillator();
+                const f = ctx.createBiquadFilter();
+                const g = ctx.createGain();
+                f.type = 'lowpass';
+                f.frequency.setValueAtTime(800, when);
+                f.frequency.exponentialRampToValueAtTime(300, when + 0.35);
+                f.Q.value = 5;
+                o1.type = 'sawtooth'; o1.frequency.value = root;
+                o2.type = 'sawtooth'; o2.frequency.value = root * 1.005;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.18, when + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
+                o1.connect(f); o2.connect(f);
+                f.connect(g).connect(out);
+                o1.start(when); o1.stop(when + 0.45);
+                o2.start(when); o2.stop(when + 0.45);
+            }
+        },
+
+        orange: {
+            label: 'Orange',
+            // Audio profile: snare drum (was "snare"). Body color #ff9800 → O.
+            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
+            play(ctx, out, when, step) {
+                if (step !== 4 && step !== 12) return;
+                const n = noiseSource(ctx, 0.13);
+                const f = ctx.createBiquadFilter();
+                f.type = 'bandpass';
+                f.frequency.value = 2200;
+                f.Q.value = 1.2;
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(0.32, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+                n.connect(f).connect(g).connect(out);
+                n.start(when); n.stop(when + 0.14);
+                const o = ctx.createOscillator();
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(210, when);
+                o.frequency.exponentialRampToValueAtTime(135, when + 0.06);
+                const og = ctx.createGain();
+                og.gain.setValueAtTime(0.14, when);
+                og.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
+                o.connect(og).connect(out);
+                o.start(when); o.stop(when + 0.08);
+            }
+        },
+
+        yellow: {
+            label: 'Yellow',
+            // Audio profile: bell triad on bar start (was "star"). Body #fbbf24 → Y.
+            bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
+            play(ctx, out, when, step) {
+                if (step !== 0) return;
+                const notes = [1046.5, 1318.51, 1567.98];
+                notes.forEach((freq, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.value = freq;
+                    const t = when + i * 0.06;
+                    g.gain.setValueAtTime(0, t);
+                    g.gain.linearRampToValueAtTime(0.10, t + 0.005);
+                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+                    o.connect(g).connect(out);
+                    o.start(t); o.stop(t + 0.65);
+                });
+            }
+        },
+
         green: {
             label: 'Green',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
@@ -348,90 +437,9 @@ const CHARACTERS = {
             }
         },
 
-        high: {
-            label: 'High-Z',
-            bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
-            play(ctx, out, when, step) {
-                if (![2, 6, 10, 14].includes(step)) return;
-                const n = noiseSource(ctx, 0.04);
-                const f = ctx.createBiquadFilter();
-                f.type = 'highpass';
-                f.frequency.value = 7000;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.13, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.035);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.05);
-            }
-        },
-
-        shadow: {
-            label: 'Shadow',
-            bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
-            play(ctx, out, when, step) {
-                if (step % 2 !== 0) return;
-                const n = noiseSource(ctx, 0.05);
-                const f = ctx.createBiquadFilter();
-                f.type = 'bandpass';
-                f.frequency.value = 6000;
-                f.Q.value = 1.5;
-                const g = ctx.createGain();
-                const accent = step % 4 === 0 ? 0.10 : 0.06;
-                g.gain.setValueAtTime(accent, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.05);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.06);
-            }
-        },
-
-        mega: {
-            label: 'Mega',
-            bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
-            play(ctx, out, when, step) {
-                if (step % 4 !== 0) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'sine';
-                o.frequency.setValueAtTime(150, when);
-                o.frequency.exponentialRampToValueAtTime(45, when + 0.12);
-                g.gain.setValueAtTime(0.55, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.2);
-                const click = ctx.createOscillator();
-                const cg = ctx.createGain();
-                click.type = 'triangle';
-                click.frequency.value = 1800;
-                cg.gain.setValueAtTime(0.12, when);
-                cg.gain.exponentialRampToValueAtTime(0.001, when + 0.012);
-                click.connect(cg).connect(out);
-                click.start(when); click.stop(when + 0.015);
-            }
-        },
-
-        amber: {
-            label: 'Amber',
-            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            play(ctx, out, when, step) {
-                if (step !== 5 && step !== 13) return;
-                const notes = [659.25, 783.99, 987.77, 1318.51];
-                notes.forEach((freq, i) => {
-                    const o = ctx.createOscillator();
-                    const g = ctx.createGain();
-                    o.type = 'triangle';
-                    o.frequency.value = freq;
-                    const t = when + i * 0.04;
-                    g.gain.setValueAtTime(0, t);
-                    g.gain.linearRampToValueAtTime(0.11, t + 0.008);
-                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-                    o.connect(g).connect(out);
-                    o.start(t); o.stop(t + 0.07);
-                });
-            }
-        },
-
-        srivi: {
-            label: 'Srivi-Bot',
+        blue: {
+            label: 'Blue',
+            // Audio profile: sub-bass + triangle blip (was "srivi"). Body #1e88e5 → B.
             bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
             play(ctx, out, when, step) {
                 const lowSteps = [0, 6, 10];
@@ -461,97 +469,9 @@ const CHARACTERS = {
             }
         },
 
-        grumble: {
-            label: 'Grumble',
-            bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
-            play(ctx, out, when, step) {
-                if (step !== 0 && step !== 8) return;
-                const root = step === 0 ? 65.41 : 98.00;
-                const o1 = ctx.createOscillator();
-                const o2 = ctx.createOscillator();
-                const f = ctx.createBiquadFilter();
-                const g = ctx.createGain();
-                f.type = 'lowpass';
-                f.frequency.setValueAtTime(800, when);
-                f.frequency.exponentialRampToValueAtTime(300, when + 0.35);
-                f.Q.value = 5;
-                o1.type = 'sawtooth'; o1.frequency.value = root;
-                o2.type = 'sawtooth'; o2.frequency.value = root * 1.005;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.18, when + 0.01);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
-                o1.connect(f); o2.connect(f);
-                f.connect(g).connect(out);
-                o1.start(when); o1.stop(when + 0.45);
-                o2.start(when); o2.stop(when + 0.45);
-            }
-        },
-
-        sine: {
-            label: 'Sine',
-            bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
-            play(ctx, out, when, step) {
-                const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
-                const f = seq[step];
-                if (!f) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'sine';
-                o.frequency.value = f;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.20, when + 0.012);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.16);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.18);
-            }
-        },
-
-        hiss: {
-            label: 'Hiss',
-            bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            play(ctx, out, when, step) {
-                if (step !== 4 && step !== 12) return;
-                const n = noiseSource(ctx, 0.18);
-                const f = ctx.createBiquadFilter();
-                f.type = 'highpass';
-                f.frequency.value = 6500;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.10, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.2);
-            }
-        },
-
-        snare: {
-            label: 'Snare-Bot',
-            bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            play(ctx, out, when, step) {
-                if (step !== 4 && step !== 12) return;
-                const n = noiseSource(ctx, 0.13);
-                const f = ctx.createBiquadFilter();
-                f.type = 'bandpass';
-                f.frequency.value = 2200;
-                f.Q.value = 1.2;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.32, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.14);
-                const o = ctx.createOscillator();
-                o.type = 'triangle';
-                o.frequency.setValueAtTime(210, when);
-                o.frequency.exponentialRampToValueAtTime(135, when + 0.06);
-                const og = ctx.createGain();
-                og.gain.setValueAtTime(0.14, when);
-                og.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
-                o.connect(og).connect(out);
-                o.start(when); o.stop(when + 0.08);
-            }
-        },
-
-        flute: {
-            label: 'Vibe',
+        purple: {
+            label: 'Purple',
+            // Audio profile: vibrato triangle melody (was "flute"/"Vibe"). Body #9c27b0 → P.
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             play(ctx, out, when, step) {
                 const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
@@ -573,48 +493,6 @@ const CHARACTERS = {
                 o.connect(g).connect(out);
                 o.start(when); o.stop(when + 0.35);
                 lfo.start(when); lfo.stop(when + 0.35);
-            }
-        },
-
-        star: {
-            label: 'Star',
-            bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
-            play(ctx, out, when, step) {
-                if (step !== 0) return;
-                const notes = [1046.5, 1318.51, 1567.98];
-                notes.forEach((freq, i) => {
-                    const o = ctx.createOscillator();
-                    const g = ctx.createGain();
-                    o.type = 'sine';
-                    o.frequency.value = freq;
-                    const t = when + i * 0.06;
-                    g.gain.setValueAtTime(0, t);
-                    g.gain.linearRampToValueAtTime(0.10, t + 0.005);
-                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
-                    o.connect(g).connect(out);
-                    o.start(t); o.stop(t + 0.65);
-                });
-            }
-        },
-
-        fog: {
-            label: 'Fog',
-            bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            play(ctx, out, when, step) {
-                if (step !== 0) return;
-                const chord = [261.63, 329.63, 392.00];
-                chord.forEach((freq, i) => {
-                    const o = ctx.createOscillator();
-                    const g = ctx.createGain();
-                    o.type = 'triangle';
-                    o.frequency.value = freq;
-                    g.gain.setValueAtTime(0, when);
-                    g.gain.linearRampToValueAtTime(0.05 - i * 0.01, when + 0.4);
-                    g.gain.linearRampToValueAtTime(0.04 - i * 0.008, when + 1.6);
-                    g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
-                    o.connect(g).connect(out);
-                    o.start(when); o.stop(when + 2.45);
-                });
             }
         },
 
@@ -642,23 +520,6 @@ const CHARACTERS = {
                 g2.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
                 o2.connect(g2).connect(out);
                 o2.start(when); o2.stop(when + 2.45);
-            }
-        },
-
-        spark: {
-            label: 'Spark',
-            bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
-            play(ctx, out, when, step) {
-                if (step % 2 !== 1) return;
-                const n = noiseSource(ctx, 0.025);
-                const f = ctx.createBiquadFilter();
-                f.type = 'highpass';
-                f.frequency.value = 8500;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.06, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.025);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.03);
             }
         },
 
@@ -876,46 +737,23 @@ const CHARACTERS = {
         }
     };
 
-    // Tray order: Munkis are grouped by HEAD COLOR so the bank reads as a
-    // tidy color rainbow (green → orange → purple → blue), and Ice Munki +
-    // Moon Munki are pinned to the very end on EVERY page (standard tray
-    // and Madballz tray) since they are the antagonists.
-    const STANDARD_ORDER = [
-        // GREEN (4)
-        'hiss', 'srivi', 'star', 'grumble',
-        // ORANGE (4)
-        'sine', 'snare', 'amber', 'green',
-        // PURPLE (5)
-        'high', 'mega', 'shadow', 'spark', 'flute',
-        // BLUE non-antagonist (1)
-        'fog',
-        // Antagonists, always last
-        'ice', 'moon'
-    ];
-
-    const MADBALLZ_ORDER = [
-        // Same color-grouping rule as the standard tray.
-        // PURPLE (3)
-        'mb-skull', 'mb-zombie', 'mb-grump',
-        // ORANGE (3)
-        'mb-sad', 'mb-snooze', 'mb-scared',
-        // GREEN (1)
-        'mb-cool',
-        // TEAL (1)
-        'mb-eye',
-        // Antagonists, always last (matches the standard tray rule)
-        'ice', 'moon'
-    ];
-
-    // 4 banks of 8 — banks 1 and 2 are populated by the canon 16 (one of
-    // each color per bank, evil pinned last). Banks 3 and 4 are reserved
-    // for the Void and Static crews (still to be designed) and unlock via
-    // secret events. Each bank is a "page" of the tray.
+    // Single bank of 7 chips: the 6 rainbow Munkis + the current 7th-wheel
+    // antagonist (Ice by default; swaps to Moon once the kid unlocks Moon
+    // via the hidden-Easter-egg system — see chunk 3+ work). Moon stays out
+    // of BANKS entirely until unlocked so it doesn't appear in the tray.
     const BANKS = [
-        { id: 'bank-1', label: 'BANK 1', munkis: ['shadow', 'srivi', 'green', 'amber', 'flute', 'grumble', 'star',  'ice'],  unlocked: true  },
-        { id: 'bank-2', label: 'BANK 2', munkis: ['mega',   'sine',  'hiss',  'snare', 'fog',   'spark',   'high',  'moon'], unlocked: true  },
-        { id: 'bank-3', label: '???',    munkis: [],                                                                         unlocked: false },
-        { id: 'bank-4', label: '???',    munkis: [],                                                                         unlocked: false }
+        { id: 'bank-1', label: 'BANK 1', munkis: ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'ice'], unlocked: true }
+    ];
+
+    // Madballz mode tray order — kept for the dormant Madballz screen (the
+    // reveal button is gated off, but the data + audio profiles stay in
+    // place so the work isn't lost).
+    const MADBALLZ_ORDER = [
+        'mb-skull', 'mb-zombie', 'mb-grump',
+        'mb-sad',   'mb-snooze', 'mb-scared',
+        'mb-cool',
+        'mb-eye',
+        'ice', 'moon'
     ];
 
     function currentOrder() {
@@ -949,6 +787,10 @@ const CHARACTERS = {
         const unlockedCount = BANKS.filter(b => b.unlocked).length;
         if (prev) prev.disabled = unlockedCount < 2 || isMadballzMode;
         if (next) next.disabled = unlockedCount < 2 || isMadballzMode;
+        // With only one bank, hide the whole switcher so the kid doesn't see
+        // a useless "BANK 1" label with dead arrows.
+        const switcher = document.querySelector('.bank-switcher');
+        if (switcher) switcher.hidden = unlockedCount < 2 || isMadballzMode;
     }
 
     const SHEETS = {
@@ -1147,9 +989,13 @@ const CHARACTERS = {
 
     function assignRandomHair() {
         // ~55% of mods get hair, randomly. Munkis with horror trigger flags
-        // (moon, ice) skip — bald horror reads better than wig horror.
-        ORDER.forEach(id => {
+        // (moon, ice) skip — bald horror reads better than wig horror. The
+        // Madballz mods (sheet: 'mb') also skip since their head sprites are
+        // already styled. Iterates every defined character so renames and
+        // dormant entries are both covered.
+        Object.keys(CHARACTERS).forEach(id => {
             if (HORROR_TRIGGER_MODS.has(id)) return;
+            if (CHARACTERS[id].sheet) return;
             if (Math.random() > 0.55) return;
             const style = HAIR_STYLES[Math.floor(Math.random() * HAIR_STYLES.length)];
             const color = HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
@@ -1832,6 +1678,7 @@ const CHARACTERS = {
     }
 
     function revealMadballzButton(animate) {
+        if (!MADBALLZ_ENABLED) return; // dormant under the 8-Munki redesign
         const btn = document.getElementById('madballzBtn');
         if (!btn) return;
         btn.hidden = false;
@@ -1870,7 +1717,7 @@ const CHARACTERS = {
         document.body.classList.remove('madballz-mode');
         const meet = document.getElementById('madballzBtn');
         const back = document.getElementById('backBtn');
-        if (meet) meet.hidden = !madballzUnlocked;
+        if (meet) meet.hidden = !MADBALLZ_ENABLED || !madballzUnlocked;
         if (back) back.hidden = true;
         for (let i = 0; i < NUM_SLOTS; i++) slots[i] = null;
         renderAllSlots();

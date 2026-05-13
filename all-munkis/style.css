@@ -1000,6 +1000,9 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     padding: 6px 0 4px;
     font-family: 'Fredoka', sans-serif;
 }
+/* The .bank-switcher rule above forces display:flex, beating the UA's
+   [hidden] { display:none } default, so we restore it explicitly. */
+.bank-switcher[hidden] { display: none; }
 .bank-arrow {
     width: 36px;
     height: 36px;
