@@ -84,11 +84,29 @@ const WALK_CYCLE = ['frame-one','frame-two','frame-three','frame-five','frame-si
 const STREAK_SPEED_BASE = 1.04;   // each streak step multiplies cookie speed by this
 const STREAK_SPEED_CAP  = 50;     // streak count beyond which speed stops growing
 
+// ── Round difficulty tuning ───────────────────────────────────────
+// Over the round, two curves stack on top of the streak multiplier:
+//   1. Spawn interval shrinks from SPAWN_INTERVAL_START ms → SPAWN_INTERVAL_END ms
+//   2. Base cookie speed grows from BASE_SPEED_START → BASE_SPEED_END
+// Both follow an ease-in curve (Math.pow(p, ROUND_DIFFICULTY_EXP)) so the
+// first ~third of the round is gentle and the last third gets brutal.
+// Raise the exponent for a flatter ramp; lower it to compress the difficulty.
+const SPAWN_INTERVAL_START = 800;  // ms between spawns at round start
+const SPAWN_INTERVAL_END   = 250;  // ms between spawns at round end
+const BASE_SPEED_START     = 1.0;  // baseline cookie-speed multiplier at start
+const BASE_SPEED_END       = 1.5;  // baseline cookie-speed multiplier at end
+const SPAWN_JITTER         = 0.25; // ± fraction applied to the mean spawn interval
+const ROUND_DIFFICULTY_EXP = 1.6;  // ease-in exponent (gentle start, steeper end)
+
+function roundEase(p) {
+    if (p <= 0) return 0;
+    if (p >= 1) return 1;
+    return Math.pow(p, ROUND_DIFFICULTY_EXP);
+}
+
 const CFG = {
-    duration:        30,
+    duration:        60,
     gravity:         900,
-    spawnEarly:      [650, 1100],
-    spawnLate:       [220, 520],
     minHorizSpeed:   180,
     maxHorizSpeed:   320,
     minPeakRatio:    0.10,
@@ -352,9 +370,12 @@ function spawnCookie() {
     el.style.top  = '0px';
     applySprite(el, sprite.sheet, sprite.frame, cookieD, cookieD);
 
-    // Lock in the speed multiplier at spawn time based on current streak,
-    // so cookies already in flight keep their pace even as the streak grows.
-    const timeMult = streakSpeedMult(state.streakHits);
+    // Lock in the speed multiplier at spawn time. Streak speedup AND the
+    // round's base-speed curve both multiply in — so cookies already in
+    // flight keep their pace even as the streak or round progress changes.
+    const progress    = 1 - (state.timeLeftMs / (CFG.duration * 1000));
+    const baseSpeed   = lerp(BASE_SPEED_START, BASE_SPEED_END, roundEase(progress));
+    const timeMult    = streakSpeedMult(state.streakHits) * baseSpeed;
 
     const cookie = {
         el,
@@ -784,12 +805,8 @@ function loop(ts) {
     if (state.spawnInMs <= 0) {
         spawnCookie();
         const progress = 1 - (state.timeLeftMs / (CFG.duration * 1000));
-        const min = lerp(CFG.spawnEarly[0], CFG.spawnLate[0], progress);
-        const max = lerp(CFG.spawnEarly[1], CFG.spawnLate[1], progress);
-        state.spawnInMs = rand(min, max);
-        if (progress > 0.5 && Math.random() < 0.15) {
-            setTimeout(spawnCookie, 60);
-        }
+        const mean = lerp(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, roundEase(progress));
+        state.spawnInMs = mean * (1 + rand(-SPAWN_JITTER, SPAWN_JITTER));
     }
 
     state.timeLeftMs -= dt * 1000;
@@ -812,7 +829,7 @@ function resetState() {
     state.score       = 0;
     state.pile        = 0;
     state.timeLeftMs  = CFG.duration * 1000;
-    state.spawnInMs   = rand(CFG.spawnEarly[0], CFG.spawnEarly[1]);
+    state.spawnInMs   = SPAWN_INTERVAL_START * (1 + rand(-SPAWN_JITTER, SPAWN_JITTER));
     state.lastTs      = 0;
     state.chompResetTo = 0;
     state.streakHits  = 0;
