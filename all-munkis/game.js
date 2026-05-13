@@ -8,7 +8,7 @@
     const SECONDS_PER_STEP = 60 / TEMPO / 4; // 0.15s
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
-    const NUM_SLOTS = 5;
+    const NUM_SLOTS = 6;
     const BARS_PER_LOOP = 4;                 // I-vi-IV-V progression (Cmaj, Am, Fmaj, G)
     const MADBALLZ_UNLOCK_THRESHOLD = 3;
     // Feature flag: Madballz mode is dormant in the 8-Munki redesign — code,
