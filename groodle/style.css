@@ -64,6 +64,57 @@ header.top {
     .back:hover { background: rgba(255, 255, 255, 0.16); }
 }
 
+/* Currency pill — mirror of .back, top-right. Yellow accent because
+   Doodles are a value/score (yellow is already the brand "kid-money"
+   tone used in the hint-tag and the DANCE gradient). Label collapses
+   on small phones so the pill stays compact next to the title. */
+.currency-pill {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(26, 15, 51, 0.55);
+    border: 1px solid rgba(255, 210, 63, 0.5);
+    color: #ffd23f;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    z-index: 10;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.4),
+        inset 0 0 8px rgba(255, 210, 63, 0.08);
+}
+.currency-icon { font-size: 16px; line-height: 1; }
+.currency-value { font-variant-numeric: tabular-nums; }
+.currency-label {
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    opacity: 0.85;
+}
+@media (max-width: 480px) {
+    /* Just "🪙 45" on phones — keeps the pill out of the title's way. */
+    .currency-label { display: none; }
+}
+
+/* Brief scale pulse when the value changes. Triggered via JS by adding
+   .bump to the pill — animation removes itself with animationend. */
+.currency-pill.bump {
+    animation: currencyBump 0.45s ease-out;
+}
+@keyframes currencyBump {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.18); }
+    100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .currency-pill.bump { animation: none; }
+}
+
 header.top h1 {
     margin: 0;
     /* Caveat is a handwritten cursive — visually denser per em than the

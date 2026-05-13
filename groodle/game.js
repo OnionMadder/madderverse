@@ -36,6 +36,183 @@
     const MOVES = ['BOUNCE', 'TWIST', 'DISCO', 'PARTY'];
     const BEATS = ['BOOM', 'FUNKY', 'SHUFFLE', 'WILD'];
 
+    /* ============ PERSISTENCE ============
+
+       Single versioned localStorage key holds the whole progression
+       snapshot: currency, counters, achievement unlocks, hat inventory.
+       Schema bumps go via a new STATE_KEY (groodle.state.v2 etc.) so old
+       saves never silently overwrite with the wrong shape; mergeDefaults
+       fills in any new top-level fields added between schema-compatible
+       v1 saves without nuking the user's accumulated state. */
+
+    const STATE_KEY = 'groodle.state.v1';
+
+    const DEFAULT_STATE = {
+        doodles: 0,
+        achievements: {},
+        counters: {
+            strokes: 0,
+            drawingsFinished: 0,
+            colorsUsedThisDrawing: [],
+            colorsUsedEver: [],
+            beatsExperienced: [],
+            hasUsedEraser: false,
+            hasUsedSurprise: false,
+            lastVisitDate: null,
+            longestDanceSec: 0
+        },
+        hats: {
+            owned: ['no-hat'],
+            equipped: 'no-hat'
+        }
+    };
+
+    let state = null;
+    let danceSessionStart = 0;
+
+    function clone(x) { return JSON.parse(JSON.stringify(x)); }
+
+    function mergeDefaults(saved, defaults) {
+        /* Recursive deep merge: pull missing keys from defaults so a new
+           field added in a later schema-compatible release shows up for
+           returning users; preserve any extra keys the user already has. */
+        if (defaults === null || typeof defaults !== 'object') return saved;
+        if (Array.isArray(defaults)) {
+            return Array.isArray(saved) ? saved : defaults.slice();
+        }
+        if (saved === null || typeof saved !== 'object' || Array.isArray(saved)) {
+            return clone(defaults);
+        }
+        const out = {};
+        for (const key in defaults) {
+            out[key] = (key in saved)
+                ? mergeDefaults(saved[key], defaults[key])
+                : clone(defaults[key]);
+        }
+        for (const key in saved) {
+            if (!(key in out)) out[key] = saved[key];
+        }
+        return out;
+    }
+
+    function loadState() {
+        try {
+            const raw = localStorage.getItem(STATE_KEY);
+            if (!raw) return clone(DEFAULT_STATE);
+            return mergeDefaults(JSON.parse(raw), DEFAULT_STATE);
+        } catch (e) {
+            /* localStorage disabled, full quota, or corrupt JSON — fall
+               back to defaults so the game still works (in-memory only). */
+            return clone(DEFAULT_STATE);
+        }
+    }
+
+    function saveState() {
+        try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
+        catch (e) { /* quota / private mode — fail silent, in-memory only */ }
+    }
+
+    function todayKey() {
+        const d = new Date();
+        return d.getFullYear()
+            + '-' + String(d.getMonth() + 1).padStart(2, '0')
+            + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    /* ============ COUNTERS ============
+
+       Thin wrappers around state.counters mutations. Each writes through
+       to localStorage immediately — saves are sub-millisecond on modern
+       devices and there's no realistic frequency at which a kid can
+       cause contention. Future commits add achievement-unlock checks
+       inside these functions; for now they only update the snapshot. */
+
+    function trackStroke() {
+        state.counters.strokes += 1;
+        saveState();
+    }
+    function trackColorUsed(color) {
+        const c = state.counters;
+        let dirty = false;
+        if (c.colorsUsedThisDrawing.indexOf(color) === -1) {
+            c.colorsUsedThisDrawing.push(color);
+            dirty = true;
+        }
+        if (c.colorsUsedEver.indexOf(color) === -1) {
+            c.colorsUsedEver.push(color);
+            dirty = true;
+        }
+        if (dirty) saveState();
+    }
+    function trackEraserUsed() {
+        if (state.counters.hasUsedEraser) return;
+        state.counters.hasUsedEraser = true;
+        saveState();
+    }
+    function trackSurpriseUsed() {
+        if (state.counters.hasUsedSurprise) return;
+        state.counters.hasUsedSurprise = true;
+        saveState();
+    }
+    function trackDrawingFinished() {
+        state.counters.drawingsFinished += 1;
+        state.counters.colorsUsedThisDrawing = [];
+        saveState();
+    }
+    function trackClearDrawing() {
+        state.counters.colorsUsedThisDrawing = [];
+        saveState();
+    }
+    function trackBeatExperienced(beat) {
+        if (state.counters.beatsExperienced.indexOf(beat) !== -1) return;
+        state.counters.beatsExperienced.push(beat);
+        saveState();
+    }
+    function trackDanceSession(seconds) {
+        if (seconds > state.counters.longestDanceSec) {
+            state.counters.longestDanceSec = seconds;
+            saveState();
+        }
+    }
+    function trackVisit() {
+        const today = todayKey();
+        const last = state.counters.lastVisitDate;
+        if (last !== today) {
+            state.counters.lastVisitDate = today;
+            saveState();
+        }
+        /* `last` (the previous date string) is returned so the achievement
+           engine in the next commit can unlock Bedhead when it's non-null
+           and different from today. */
+        return last;
+    }
+
+    /* ============ CURRENCY ============ */
+
+    let currencyValueEl = null;
+    let currencyPillEl = null;
+
+    function renderCurrency() {
+        if (currencyValueEl) currencyValueEl.textContent = String(state.doodles);
+    }
+
+    /* Used by the upcoming achievement-unlock path. Kept in the persistence
+       neighborhood now so it's a one-liner to import for callers. */
+    function addDoodles(n) {
+        if (!n) return;
+        state.doodles = Math.max(0, state.doodles + n);
+        saveState();
+        renderCurrency();
+        if (currencyPillEl && n > 0) {
+            currencyPillEl.classList.remove('bump');
+            /* force reflow so the animation restarts even if it fires
+               twice in quick succession (e.g. two achievements unlocking
+               back-to-back). */
+            void currencyPillEl.offsetWidth;
+            currencyPillEl.classList.add('bump');
+        }
+    }
+
     /* ============ STATE ============ */
 
     let currentColor = '#000000';
@@ -359,6 +536,11 @@
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, currentSize / 2, 0, Math.PI * 2);
                 ctx.fill();
+                /* Only the kid's actively-selected colors count toward
+                   Rainbow Day / Color Curator — SURPRISE-painted regions
+                   don't, which is why this lives on pointer events rather
+                   than at the fill site of drawSurprise. */
+                trackColorUsed(currentColor);
             }
             /* Only preventDefault when we're actually capturing the stroke.
                Calling it unconditionally on every touch would suppress the
@@ -392,6 +574,7 @@
         });
 
         const endStroke = (e) => {
+            if (isDrawing) trackStroke();
             isDrawing = false;
             cachedRect = null;
             try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
@@ -399,6 +582,7 @@
         canvas.addEventListener('pointerup', endStroke);
         canvas.addEventListener('pointercancel', endStroke);
         canvas.addEventListener('pointerleave', () => {
+            if (isDrawing) trackStroke();
             isDrawing = false;
             cachedRect = null;
         });
@@ -406,6 +590,10 @@
 
     function clearCanvas() {
         ctx.clearRect(0, 0, STAGE_W, STAGE_H);
+        /* Wipe the per-drawing color tally so Rainbow Day resets cleanly
+           when the kid starts over. trackClearDrawing is a no-op for
+           any other counters. */
+        if (state) trackClearDrawing();
     }
 
     /* ============ DRAW MODE ============ */
@@ -492,6 +680,7 @@
     /* A goofy default character so kids can press DANCE immediately. The
        silhouette clip-path takes care of trimming any overflow. */
     function drawSurprise() {
+        trackSurpriseUsed();
         clearCanvas();
 
         // Skin tone fill across the whole body silhouette
@@ -556,9 +745,16 @@
            on the canvas would block page scroll over the figure while
            it's animating. */
         setDrawMode(false);
+        /* Pressing DANCE finishes the current drawing (commits it as a
+           groodle). drawingsFinished and First/Five Groodle hinge on this
+           — it's the only moment in the game with a clear "I'm done"
+           signal from the kid. */
+        trackDrawingFinished();
+        trackBeatExperienced(BEATS[currentBeatIdx]);
         ensureAudio();
         const begin = () => {
             isPlaying = true;
+            danceSessionStart = Date.now();
             document.body.classList.add('dancing');
             document.getElementById('drawPanel').hidden = true;
             document.getElementById('dancePanel').hidden = false;
@@ -577,6 +773,10 @@
     function stopDance() {
         if (!isPlaying) return;
         isPlaying = false;
+        if (danceSessionStart) {
+            trackDanceSession((Date.now() - danceSessionStart) / 1000);
+            danceSessionStart = 0;
+        }
         stopAudio();
         document.body.classList.remove('dancing');
         document.getElementById('drawPanel').hidden = false;
@@ -689,6 +889,7 @@
             const btn = document.getElementById('eraserBtn');
             btn.classList.toggle('active', isErasing);
             if (isErasing) {
+                trackEraserUsed();
                 document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
             } else {
                 const sw = document.querySelector('.swatch[data-color="' + currentColor + '"]');
@@ -705,11 +906,22 @@
         });
         document.getElementById('beatBtn').addEventListener('click', () => {
             currentBeatIdx = (currentBeatIdx + 1) % BEATS.length;
+            trackBeatExperienced(BEATS[currentBeatIdx]);
             updateMoveBeatLabels();
         });
     }
 
     function init() {
+        /* Persistence first: every other init step may want to read or
+           write state (the palette wiring tracks color usage, etc.).
+           loadState falls back to defaults if storage is unavailable, so
+           this never throws. */
+        state = loadState();
+        currencyPillEl = document.getElementById('currencyPill');
+        currencyValueEl = document.getElementById('currencyValue');
+        renderCurrency();
+        trackVisit();
+
         buildCanvas();
         buildPalette();
         buildSizes();
