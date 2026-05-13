@@ -433,9 +433,12 @@ body {
     will-change: transform, left, top;
     z-index: 6;
     filter: drop-shadow(0 0 10px rgba(0,255,204,0.35)) drop-shadow(0 6px 10px rgba(0,0,0,0.55));
-    /* expanded touch target via padding (negated by margin so layout/position is unchanged) */
-    padding: 56px;
-    margin: -56px;
+    /* Expanded hit area via padding (negated by margin so layout is unchanged).
+       Bumped from 56 → 80 in chunk 9 — fast-moving cookies on desktop are
+       hard to click precisely, and the extra 24px on each side noticeably
+       improves catch rate without overlapping neighbours at normal density. */
+    padding: 80px;
+    margin: -80px;
     box-sizing: content-box;
     background-origin: content-box;
     background-clip: content-box;
@@ -1119,11 +1122,18 @@ footer a { color: var(--accent-cyan); pointer-events: auto; }
     letter-spacing: 0.5px;
 }
 
-.lore-tub-svg {
+/* Tub portrait on the lore booklet — same eater.png sprite-sheet crop as
+   the menu mascot (frame-one, idle pose). Hard offset shadow matches the
+   booklet's cartridge-frame aesthetic. */
+.lore-tub-img {
     display: block;
-    width: clamp(74px, 18vw, 110px);
-    height: auto;
-    margin: 0 auto 12px;
+    width:  clamp(100px, 24vw, 140px);
+    height: clamp(100px, 24vw, 140px);
+    margin: 0 auto 14px;
+    background-image: url('assets/img/eater.png');
+    background-repeat: no-repeat;
+    background-size: 300% 200%;
+    background-position: 100% 0%; /* frame-one (idle, closed mouth) */
     filter: drop-shadow(3px 3px 0 var(--booklet-stroke));
 }
 
