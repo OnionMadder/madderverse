@@ -39,6 +39,11 @@
 
 <header class="top">
     <a href="../" class="back" aria-label="Back to The Madderverse">&larr; MADDERVERSE</a>
+    <div class="currency-pill" id="currencyPill" aria-label="Your Doodles balance">
+        <span class="currency-icon" aria-hidden="true">🪙</span>
+        <span class="currency-value" id="currencyValue">0</span>
+        <span class="currency-label">Doodles</span>
+    </div>
     <h1>Gr<span class="neon-pink">oo</span>dle</h1>
     <p class="tagline">We Groove. We Doodle. We Groodle.</p>
 </header>
@@ -116,6 +121,18 @@
                             <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
                         </g>
                     </svg>
+
+                    <!-- Hat layer. Sits above the outline so hats land on
+                         top of the head ring (not under it). Same viewBox
+                         and aspect handling as the silhouette so hat
+                         coordinates live in the same 400×600 logical
+                         space; positions out-of-body (above head, beside
+                         head) are allowed since this SVG isn't clipped.
+                         renderEquippedHat() in game.js drops the equipped
+                         hat's SVG fragment into #hatLayerInner. -->
+                    <svg class="hat-layer" id="hatLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                        <g id="hatLayerInner"></g>
+                    </svg>
                 </div>
 
                 <div class="stage-floor" id="stageFloor" aria-hidden="true"></div>
@@ -135,6 +152,17 @@
             </button>
             <button class="bg-thumb" type="button" data-bg="night" aria-label="Night sky background">
                 <span class="bg-preview bg-night"></span>
+            </button>
+        </div>
+
+        <div class="shelf-row" id="shelfRow">
+            <button class="btn shelf-btn" id="openAchievementsBtn" type="button">
+                <span class="shelf-icon" aria-hidden="true">🏆</span>
+                <span class="shelf-label">Achievements</span>
+            </button>
+            <button class="btn shelf-btn" id="openHatShopBtn" type="button">
+                <span class="shelf-icon" aria-hidden="true">🎩</span>
+                <span class="shelf-label">Hat Shop</span>
             </button>
         </div>
     </div>
@@ -160,6 +188,32 @@
             </div>
         </section>
     </div>
+
+    <div class="modal" id="achievementsModal" hidden aria-hidden="true" role="dialog" aria-labelledby="achievementsModalTitle">
+        <div class="modal-backdrop" data-close="1"></div>
+        <div class="modal-sheet" role="document">
+            <header class="modal-header">
+                <h2 id="achievementsModalTitle"><span aria-hidden="true">🏆</span> Achievements</h2>
+                <button class="modal-close" type="button" data-close="1" aria-label="Close achievements">✕</button>
+            </header>
+            <div class="modal-stats" id="achievementStats" aria-live="polite"></div>
+            <div class="modal-body" id="achievementsList"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="hatShopModal" hidden aria-hidden="true" role="dialog" aria-labelledby="hatShopModalTitle">
+        <div class="modal-backdrop" data-close="1"></div>
+        <div class="modal-sheet" role="document">
+            <header class="modal-header">
+                <h2 id="hatShopModalTitle"><span aria-hidden="true">🎩</span> Hat Shop</h2>
+                <button class="modal-close" type="button" data-close="1" aria-label="Close hat shop">✕</button>
+            </header>
+            <div class="modal-stats">Balance: <span id="hatShopBalance">🪙 0</span></div>
+            <div class="modal-body hat-grid" id="hatShopGrid"></div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
     <div class="panel dance-panel" id="dancePanel" hidden>
         <div class="now-playing">

@@ -36,6 +36,593 @@
     const MOVES = ['BOUNCE', 'TWIST', 'DISCO', 'PARTY'];
     const BEATS = ['BOOM', 'FUNKY', 'SHUFFLE', 'WILD'];
 
+    /* ============ PERSISTENCE ============
+
+       Single versioned localStorage key holds the whole progression
+       snapshot: currency, counters, achievement unlocks, hat inventory.
+       Schema bumps go via a new STATE_KEY (groodle.state.v2 etc.) so old
+       saves never silently overwrite with the wrong shape; mergeDefaults
+       fills in any new top-level fields added between schema-compatible
+       v1 saves without nuking the user's accumulated state. */
+
+    const STATE_KEY = 'groodle.state.v1';
+
+    const DEFAULT_STATE = {
+        doodles: 0,
+        achievements: {},
+        counters: {
+            strokes: 0,
+            drawingsFinished: 0,
+            colorsUsedThisDrawing: [],
+            colorsUsedEver: [],
+            beatsExperienced: [],
+            hasUsedEraser: false,
+            hasUsedSurprise: false,
+            lastVisitDate: null,
+            longestDanceSec: 0
+        },
+        hats: {
+            owned: ['no-hat'],
+            equipped: 'no-hat'
+        }
+    };
+
+    let state = null;
+    let danceSessionStart = 0;
+    /* True for the current session only when trackVisit detected a real
+       calendar-day rollover (last visit non-null AND != today). The
+       Bedhead predicate reads this flag — it's deliberately not in
+       state.counters because the achievement should unlock for *this*
+       returning visit, not stay perpetually true. */
+    let bedheadEligible = false;
+
+    function clone(x) { return JSON.parse(JSON.stringify(x)); }
+
+    function mergeDefaults(saved, defaults) {
+        /* Recursive deep merge: pull missing keys from defaults so a new
+           field added in a later schema-compatible release shows up for
+           returning users; preserve any extra keys the user already has. */
+        if (defaults === null || typeof defaults !== 'object') return saved;
+        if (Array.isArray(defaults)) {
+            return Array.isArray(saved) ? saved : defaults.slice();
+        }
+        if (saved === null || typeof saved !== 'object' || Array.isArray(saved)) {
+            return clone(defaults);
+        }
+        const out = {};
+        for (const key in defaults) {
+            out[key] = (key in saved)
+                ? mergeDefaults(saved[key], defaults[key])
+                : clone(defaults[key]);
+        }
+        for (const key in saved) {
+            if (!(key in out)) out[key] = saved[key];
+        }
+        return out;
+    }
+
+    function loadState() {
+        try {
+            const raw = localStorage.getItem(STATE_KEY);
+            if (!raw) return clone(DEFAULT_STATE);
+            return mergeDefaults(JSON.parse(raw), DEFAULT_STATE);
+        } catch (e) {
+            /* localStorage disabled, full quota, or corrupt JSON — fall
+               back to defaults so the game still works (in-memory only). */
+            return clone(DEFAULT_STATE);
+        }
+    }
+
+    function saveState() {
+        try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
+        catch (e) { /* quota / private mode — fail silent, in-memory only */ }
+    }
+
+    function todayKey() {
+        const d = new Date();
+        return d.getFullYear()
+            + '-' + String(d.getMonth() + 1).padStart(2, '0')
+            + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    /* ============ COUNTERS ============
+
+       Thin wrappers around state.counters mutations. Each writes through
+       to localStorage immediately — saves are sub-millisecond on modern
+       devices and there's no realistic frequency at which a kid can
+       cause contention. Future commits add achievement-unlock checks
+       inside these functions; for now they only update the snapshot. */
+
+    function trackStroke() {
+        state.counters.strokes += 1;
+        saveState();
+        checkAchievements();
+    }
+    function trackColorUsed(color) {
+        const c = state.counters;
+        let dirty = false;
+        if (c.colorsUsedThisDrawing.indexOf(color) === -1) {
+            c.colorsUsedThisDrawing.push(color);
+            dirty = true;
+        }
+        if (c.colorsUsedEver.indexOf(color) === -1) {
+            c.colorsUsedEver.push(color);
+            dirty = true;
+        }
+        if (dirty) {
+            saveState();
+            checkAchievements();
+        }
+    }
+    function trackEraserUsed() {
+        if (state.counters.hasUsedEraser) return;
+        state.counters.hasUsedEraser = true;
+        saveState();
+        checkAchievements();
+    }
+    function trackSurpriseUsed() {
+        if (state.counters.hasUsedSurprise) return;
+        state.counters.hasUsedSurprise = true;
+        saveState();
+        checkAchievements();
+    }
+    function trackDrawingFinished() {
+        state.counters.drawingsFinished += 1;
+        state.counters.colorsUsedThisDrawing = [];
+        saveState();
+        checkAchievements();
+    }
+    function trackClearDrawing() {
+        state.counters.colorsUsedThisDrawing = [];
+        saveState();
+        /* No achievement check here — clearing only removes progress
+           toward Rainbow Day; it can't unlock anything. */
+    }
+    function trackBeatExperienced(beat) {
+        if (state.counters.beatsExperienced.indexOf(beat) !== -1) return;
+        state.counters.beatsExperienced.push(beat);
+        saveState();
+        checkAchievements();
+    }
+    function trackDanceSession(seconds) {
+        if (seconds > state.counters.longestDanceSec) {
+            state.counters.longestDanceSec = seconds;
+            saveState();
+            checkAchievements();
+        }
+    }
+    function trackVisit() {
+        const today = todayKey();
+        const last = state.counters.lastVisitDate;
+        if (last !== today) {
+            if (last !== null) bedheadEligible = true;
+            state.counters.lastVisitDate = today;
+            saveState();
+        }
+    }
+
+    /* ============ CURRENCY ============ */
+
+    let currencyValueEl = null;
+    let currencyPillEl = null;
+
+    function renderCurrency() {
+        if (currencyValueEl) currencyValueEl.textContent = String(state.doodles);
+    }
+
+    function addDoodles(n) {
+        if (!n) return;
+        state.doodles = Math.max(0, state.doodles + n);
+        saveState();
+        renderCurrency();
+        if (currencyPillEl && n > 0) {
+            currencyPillEl.classList.remove('bump');
+            /* force reflow so the animation restarts even if it fires
+               twice in quick succession (e.g. two achievements unlocking
+               back-to-back). */
+            void currencyPillEl.offsetWidth;
+            currencyPillEl.classList.add('bump');
+        }
+    }
+
+    /* ============ ACHIEVEMENTS ============
+
+       Static catalog: each entry has an id (used as the storage key
+       inside state.achievements), a display title + one-line desc, the
+       Doodles reward, an emoji icon, and a `check` predicate that's a
+       pure function of state + the bedheadEligible session flag.
+
+       The unlock engine just iterates the catalog after every counter
+       mutation; predicates that are already-unlocked are skipped, and
+       newly-true ones fire the toast + addDoodles. */
+
+    const FULL_LOOP_SEC = BARS_PER_LOOP * STEPS_PER_BAR * SECONDS_PER_STEP;
+
+    const ACHIEVEMENTS = [
+        { id: 'first-groodle',    title: 'First Groodle',    desc: 'Finish your first drawing.',         reward: 10, icon: '🎨',
+          check: () => state.counters.drawingsFinished >= 1 },
+        { id: 'five-groodles',    title: 'Five Groodles',    desc: 'Finish five drawings.',              reward: 25, icon: '🖼️',
+          check: () => state.counters.drawingsFinished >= 5 },
+        { id: 'rainbow-day',      title: 'Rainbow Day',      desc: 'Use every color in one drawing.',    reward: 30, icon: '🌈',
+          check: () => state.counters.colorsUsedThisDrawing.length >= COLORS.length },
+        { id: 'eraser-apprentice',title: 'Eraser Apprentice',desc: 'Use the eraser tool.',                reward:  5, icon: '🧽',
+          check: () => state.counters.hasUsedEraser },
+        { id: 'beat-boom',        title: 'Beat BOOM',        desc: 'Dance to the BOOM beat.',             reward: 10, icon: '🥁',
+          check: () => state.counters.beatsExperienced.indexOf('BOOM') !== -1 },
+        { id: 'beat-funky',       title: 'Beat FUNKY',       desc: 'Dance to the FUNKY beat.',            reward: 10, icon: '🎷',
+          check: () => state.counters.beatsExperienced.indexOf('FUNKY') !== -1 },
+        { id: 'beat-shuffle',     title: 'Beat SHUFFLE',     desc: 'Dance to the SHUFFLE beat.',          reward: 10, icon: '🪩',
+          check: () => state.counters.beatsExperienced.indexOf('SHUFFLE') !== -1 },
+        { id: 'beat-wild',        title: 'Beat WILD',        desc: 'Dance to the WILD beat.',             reward: 10, icon: '🎸',
+          check: () => state.counters.beatsExperienced.indexOf('WILD') !== -1 },
+        { id: 'all-beat-champion',title: 'All-Beat Champion',desc: 'Dance to all four beats.',            reward: 25, icon: '🏆',
+          check: () => state.counters.beatsExperienced.length >= BEATS.length },
+        { id: 'dance-floor',      title: 'Dance Floor',      desc: 'Dance for a full song without stopping.', reward: 20, icon: '🕺',
+          check: () => state.counters.longestDanceSec >= FULL_LOOP_SEC },
+        { id: 'bedhead',          title: 'Bedhead',          desc: 'Come back the next day.',             reward: 30, icon: '😴',
+          check: () => bedheadEligible },
+        { id: 'doodler',          title: 'Doodler',          desc: 'Make 100 brush strokes.',              reward: 25, icon: '✏️',
+          check: () => state.counters.strokes >= 100 },
+        { id: 'big-doodler',      title: 'Big Doodler',      desc: 'Make 500 brush strokes.',              reward: 50, icon: '🖌️',
+          check: () => state.counters.strokes >= 500 },
+        { id: 'color-curator',    title: 'Color Curator',    desc: 'Try 8 different colors across your drawings.', reward: 20, icon: '🎭',
+          check: () => state.counters.colorsUsedEver.length >= 8 },
+        { id: 'surprise-hat',     title: 'Surprise Hat',     desc: 'Discover the SURPRISE button.',        reward: 15, icon: '🎲',
+          check: () => state.counters.hasUsedSurprise }
+    ];
+
+    const ACHIEVEMENT_BY_ID = {};
+    ACHIEVEMENTS.forEach(a => { ACHIEVEMENT_BY_ID[a.id] = a; });
+
+    function isUnlocked(id) {
+        const rec = state.achievements[id];
+        return !!(rec && rec.unlocked);
+    }
+
+    function unlockAchievement(ach) {
+        if (isUnlocked(ach.id)) return;
+        state.achievements[ach.id] = { unlocked: true, ts: Date.now() };
+        saveState();
+        addDoodles(ach.reward);
+        showAchievementToast(ach);
+        /* If the board is currently open, refresh it so the user sees the
+           card flip from locked to unlocked while looking at it. */
+        if (achievementsModalEl && !achievementsModalEl.hidden) {
+            renderAchievementBoard();
+        }
+    }
+
+    function checkAchievements() {
+        if (!state) return;
+        for (let i = 0; i < ACHIEVEMENTS.length; i++) {
+            const a = ACHIEVEMENTS[i];
+            if (isUnlocked(a.id)) continue;
+            try {
+                if (a.check()) unlockAchievement(a);
+            } catch (e) { /* defensive: a malformed predicate can't take
+                             down the whole engine */ }
+        }
+    }
+
+    /* ============ TOAST ============
+
+       Single-file queue: only one toast on screen at a time so they
+       don't overlap visually. Subsequent unlocks wait their turn. */
+
+    let toastContainerEl = null;
+    const toastQueue = [];
+    let toastBusy = false;
+
+    function showAchievementToast(ach) {
+        toastQueue.push(ach);
+        if (!toastBusy) drainToastQueue();
+    }
+
+    function drainToastQueue() {
+        if (toastQueue.length === 0) { toastBusy = false; return; }
+        toastBusy = true;
+        const ach = toastQueue.shift();
+        const el = document.createElement('div');
+        el.className = 'achievement-toast';
+        el.setAttribute('role', 'status');
+        el.innerHTML =
+            '<div class="toast-icon" aria-hidden="true"></div>' +
+            '<div class="toast-body">' +
+                '<div class="toast-meta">Achievement unlocked</div>' +
+                '<div class="toast-title"></div>' +
+                '<div class="toast-reward"></div>' +
+            '</div>';
+        /* textContent assignment instead of building the string with the
+           ach values directly — keeps user-visible strings safe even if a
+           future achievement title contains characters HTML cares about. */
+        el.querySelector('.toast-icon').textContent = ach.icon;
+        el.querySelector('.toast-title').textContent = ach.title;
+        el.querySelector('.toast-reward').textContent = '+' + ach.reward + ' 🪙';
+        toastContainerEl.appendChild(el);
+        /* next frame: let the browser paint the start state then add
+           .show so the transition runs. */
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => el.classList.add('show'));
+        });
+        setTimeout(() => {
+            el.classList.remove('show');
+            el.classList.add('hide');
+            setTimeout(() => {
+                el.remove();
+                drainToastQueue();
+            }, 400);
+        }, 2800);
+    }
+
+    /* ============ MODAL ============
+
+       Generic open/close used by the achievements board and (next
+       commit) the hat shop. Click outside the sheet (anything tagged
+       data-close="1") dismisses. Escape closes. Body scroll is locked
+       while open. */
+
+    let openModalEl = null;
+
+    function openModal(el) {
+        if (!el || openModalEl === el) return;
+        if (openModalEl) closeModal();
+        openModalEl = el;
+        el.hidden = false;
+        el.setAttribute('aria-hidden', 'false');
+        document.documentElement.classList.add('modal-open');
+        /* Two RAFs so the browser commits hidden=false + initial
+           transforms before we trigger the .open transition. */
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => el.classList.add('open'));
+        });
+    }
+
+    function closeModal() {
+        if (!openModalEl) return;
+        const el = openModalEl;
+        el.classList.remove('open');
+        el.setAttribute('aria-hidden', 'true');
+        document.documentElement.classList.remove('modal-open');
+        openModalEl = null;
+        /* Wait out the slide-down transition before hiding so the sheet
+           animates away rather than snapping. Matches .modal-sheet's
+           transition duration with a small buffer. */
+        setTimeout(() => { if (!openModalEl) el.hidden = true; }, 360);
+    }
+
+    function attachModalDismissers(el) {
+        el.addEventListener('click', (e) => {
+            const t = e.target;
+            if (t && t.closest && t.closest('[data-close="1"]')) closeModal();
+        });
+    }
+
+    /* ============ ACHIEVEMENT BOARD ============ */
+
+    let achievementsModalEl = null;
+    let achievementsListEl = null;
+    let achievementsStatsEl = null;
+
+    function renderAchievementBoard() {
+        if (!achievementsListEl) return;
+        const unlockedCount = ACHIEVEMENTS.filter(a => isUnlocked(a.id)).length;
+        achievementsStatsEl.textContent =
+            unlockedCount + ' / ' + ACHIEVEMENTS.length + ' unlocked';
+        achievementsListEl.innerHTML = '';
+        /* Unlocked first, then locked in catalog order. Within unlocked,
+           sort by unlock timestamp descending so the most recent appears
+           at the top — kids like seeing what they just earned. */
+        const sorted = ACHIEVEMENTS.slice().sort((a, b) => {
+            const au = isUnlocked(a.id), bu = isUnlocked(b.id);
+            if (au !== bu) return au ? -1 : 1;
+            if (au && bu) {
+                return (state.achievements[b.id].ts || 0) - (state.achievements[a.id].ts || 0);
+            }
+            return ACHIEVEMENTS.indexOf(a) - ACHIEVEMENTS.indexOf(b);
+        });
+        for (let i = 0; i < sorted.length; i++) {
+            const a = sorted[i];
+            const unlocked = isUnlocked(a.id);
+            const card = document.createElement('div');
+            card.className = 'ach-card ' + (unlocked ? 'unlocked' : 'locked');
+            card.innerHTML =
+                '<div class="ach-icon" aria-hidden="true"></div>' +
+                '<div class="ach-body">' +
+                    '<div class="ach-title"></div>' +
+                    '<div class="ach-desc"></div>' +
+                '</div>' +
+                '<div class="ach-reward"></div>';
+            card.querySelector('.ach-icon').textContent = unlocked ? a.icon : '🔒';
+            card.querySelector('.ach-title').textContent = a.title;
+            card.querySelector('.ach-desc').textContent = a.desc;
+            card.querySelector('.ach-reward').textContent = '+' + a.reward + ' 🪙';
+            achievementsListEl.appendChild(card);
+        }
+    }
+
+    function openAchievements() {
+        renderAchievementBoard();
+        openModal(achievementsModalEl);
+    }
+
+    /* ============ HATS ============
+
+       Catalog of 15 purchasable hats + a free 'no-hat' default.
+
+       Each entry references a sprite file in assets/hats/ rather than
+       carrying inline SVG markup. The renderer drops an SVG <image>
+       into #hatLayerInner pointing at the sprite — works for both PNG
+       and SVG sources. See assets/hats/README.md for the sprite spec.
+
+       Positioning convention (renderEquippedHat applies it):
+         * Sprite's bottom-center is the anchor reference point.
+         * That point lands at the head crown (canvas 200, 42) shifted
+           by anchor.x / anchor.y.
+         * scale multiplies both natural dimensions.
+         * Sprite natural size is HAT_SPRITE_W × HAT_SPRITE_H below;
+           swapping in real art with the same dimensions keeps every
+           anchor / scale value still valid.
+
+       The hat-layer SVG isn't clipped, so hat content is allowed to
+       extend outside the body silhouette. Hats follow the dance
+       transforms because the SVG element is a child of .creature. */
+
+    const HAT_SPRITE_W = 200;
+    const HAT_SPRITE_H = 120;
+    const HEAD_CROWN_X = 200;
+    const HEAD_CROWN_Y = 42;
+
+    const HATS = [
+        { id: 'no-hat',       name: 'No Hat',        price:   0, sprite: null,                            anchor: { x: 0, y:   0 }, scale: 1.00 },
+        { id: 'beanie',       name: 'Beanie',        price:  20, sprite: 'assets/hats/beanie.svg',        anchor: { x: 0, y:  14 }, scale: 1.05 },
+        { id: 'baseball-cap', name: 'Baseball Cap',  price:  25, sprite: 'assets/hats/baseball-cap.svg',  anchor: { x: 0, y:  14 }, scale: 1.05 },
+        { id: 'beret',        name: 'Beret',         price:  30, sprite: 'assets/hats/beret.svg',         anchor: { x: 0, y:  10 }, scale: 0.95 },
+        { id: 'cowboy-hat',   name: 'Cowboy Hat',    price:  50, sprite: 'assets/hats/cowboy-hat.svg',    anchor: { x: 0, y:  18 }, scale: 1.20 },
+        { id: 'top-hat',      name: 'Top Hat',       price:  60, sprite: 'assets/hats/top-hat.svg',       anchor: { x: 0, y:  10 }, scale: 1.00 },
+        { id: 'sombrero',     name: 'Sombrero',      price:  65, sprite: 'assets/hats/sombrero.svg',      anchor: { x: 0, y:  16 }, scale: 1.40 },
+        { id: 'bunny-ears',   name: 'Bunny Ears',    price:  70, sprite: 'assets/hats/bunny-ears.svg',    anchor: { x: 0, y:  18 }, scale: 1.10 },
+        { id: 'wizard-hat',   name: 'Wizard Hat',    price:  75, sprite: 'assets/hats/wizard-hat.svg',    anchor: { x: 0, y:  10 }, scale: 1.15 },
+        { id: 'witch-hat',    name: 'Witch Hat',     price:  80, sprite: 'assets/hats/witch-hat.svg',     anchor: { x: 0, y:  10 }, scale: 1.15 },
+        { id: 'antlers',      name: 'Antlers',       price:  90, sprite: 'assets/hats/antlers.svg',       anchor: { x: 0, y:  18 }, scale: 1.20 },
+        { id: 'helmet',       name: 'Helmet',        price:  90, sprite: 'assets/hats/helmet.svg',        anchor: { x: 0, y:  22 }, scale: 1.05 },
+        { id: 'crown',        name: 'Crown',         price: 100, sprite: 'assets/hats/crown.svg',         anchor: { x: 0, y:  14 }, scale: 1.00 },
+        { id: 'tiara',        name: 'Tiara',         price: 100, sprite: 'assets/hats/tiara.svg',         anchor: { x: 0, y:  16 }, scale: 0.95 },
+        { id: 'snorkel-mask', name: 'Snorkel Mask',  price: 110, sprite: 'assets/hats/snorkel-mask.svg',  anchor: { x: 0, y: 110 }, scale: 1.00 },
+        { id: 'halo',         name: 'Halo',          price: 150, sprite: 'assets/hats/halo.svg',          anchor: { x: 0, y:  -8 }, scale: 1.00 }
+    ];
+
+    const HAT_BY_ID = {};
+    HATS.forEach(h => { HAT_BY_ID[h.id] = h; });
+
+    /* Build the SVG <image> markup that places a hat sprite at the
+       correct canvas-coordinate rect. Used for both the in-stage hat
+       layer and the hat-shop preview cards (which crop to a smaller
+       viewBox but share coordinate space). Returns '' for no-hat or
+       any hat missing a sprite reference so the caller can no-op. */
+    function hatImageMarkup(hat) {
+        if (!hat || !hat.sprite) return '';
+        const w = HAT_SPRITE_W * hat.scale;
+        const h = HAT_SPRITE_H * hat.scale;
+        const x = HEAD_CROWN_X + hat.anchor.x - w / 2;
+        const y = HEAD_CROWN_Y + hat.anchor.y - h;
+        return '<image href="' + hat.sprite + '"' +
+            ' x="' + x.toFixed(2) + '"' +
+            ' y="' + y.toFixed(2) + '"' +
+            ' width="' + w.toFixed(2) + '"' +
+            ' height="' + h.toFixed(2) + '"' +
+            ' preserveAspectRatio="xMidYMid meet"' +
+            '/>';
+    }
+
+    /* In-game (.creature) hat layer. Updated on equip / load / surprise.
+       Surprise repaints the canvas but never touches the hat layer, so
+       a kid's hat survives across SURPRISE / CLEAR / DANCE transitions. */
+    let hatLayerInnerEl = null;
+
+    function renderEquippedHat() {
+        if (!hatLayerInnerEl) return;
+        const hat = HAT_BY_ID[state.hats.equipped] || HAT_BY_ID['no-hat'];
+        hatLayerInnerEl.innerHTML = hatImageMarkup(hat);
+    }
+
+    function buyHat(id) {
+        const hat = HAT_BY_ID[id];
+        if (!hat) return;
+        const alreadyOwned = state.hats.owned.indexOf(id) !== -1;
+        if (alreadyOwned) { equipHat(id); return; }
+        if (hat.price > 0 && state.doodles < hat.price) return;
+        state.doodles -= hat.price;
+        state.hats.owned.push(id);
+        state.hats.equipped = id;
+        saveState();
+        renderCurrency();
+        renderEquippedHat();
+        buildHatShopGrid();
+    }
+
+    function equipHat(id) {
+        if (state.hats.owned.indexOf(id) === -1) return;
+        state.hats.equipped = id;
+        saveState();
+        renderEquippedHat();
+        buildHatShopGrid();
+    }
+
+    /* ============ HAT SHOP UI ============ */
+
+    let hatShopModalEl = null;
+    let hatShopGridEl = null;
+    let hatShopBalanceEl = null;
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function buildHatShopGrid() {
+        if (!hatShopGridEl) return;
+        if (hatShopBalanceEl) {
+            hatShopBalanceEl.textContent = '🪙 ' + state.doodles + ' Doodles';
+        }
+        hatShopGridEl.innerHTML = '';
+        for (let i = 0; i < HATS.length; i++) {
+            const hat = HATS[i];
+            const owned = state.hats.owned.indexOf(hat.id) !== -1;
+            const equipped = state.hats.equipped === hat.id;
+            const affordable = state.doodles >= hat.price;
+
+            const card = document.createElement('div');
+            card.className = 'hat-card';
+            if (equipped) card.classList.add('equipped');
+            else if (owned) card.classList.add('owned');
+            else if (!affordable && hat.price > 0) card.classList.add('locked');
+
+            /* The preview is a mini-Groodle: same wash circle for the
+               head as the in-stage figure, then the hat <image> sprite
+               on top. viewBox crops to the upper body so the hat
+               dominates the card. */
+            const previewSvg =
+                '<svg class="hat-preview" viewBox="60 -90 280 280" aria-hidden="true">' +
+                    '<circle cx="200" cy="100" r="58" fill="rgba(232, 232, 244, 0.94)" stroke="#1a0f33" stroke-width="3"/>' +
+                    hatImageMarkup(hat) +
+                '</svg>';
+
+            let actionHtml;
+            if (equipped) {
+                actionHtml = '<button class="hat-action equipped-tag" type="button" disabled>✓ Equipped</button>';
+            } else if (owned) {
+                actionHtml = '<button class="hat-action own" type="button" data-action="equip">Wear</button>';
+            } else if (hat.price === 0) {
+                /* No-Hat row when not currently equipped — treat as a
+                   free equip (price 0). */
+                actionHtml = '<button class="hat-action own" type="button" data-action="buy">Wear</button>';
+            } else if (affordable) {
+                actionHtml = '<button class="hat-action buy" type="button" data-action="buy">Buy &nbsp;' + hat.price + ' 🪙</button>';
+            } else {
+                actionHtml = '<button class="hat-action locked-tag" type="button" disabled>🔒 ' + hat.price + ' 🪙</button>';
+            }
+
+            card.innerHTML = previewSvg +
+                '<div class="hat-name">' + escapeHtml(hat.name) + '</div>' +
+                actionHtml;
+
+            const btn = card.querySelector('button[data-action]');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (btn.dataset.action === 'equip') equipHat(hat.id);
+                    else buyHat(hat.id);
+                });
+            }
+
+            hatShopGridEl.appendChild(card);
+        }
+    }
+
+    function openHatShop() {
+        buildHatShopGrid();
+        openModal(hatShopModalEl);
+    }
+
     /* ============ STATE ============ */
 
     let currentColor = '#000000';
@@ -359,6 +946,11 @@
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, currentSize / 2, 0, Math.PI * 2);
                 ctx.fill();
+                /* Only the kid's actively-selected colors count toward
+                   Rainbow Day / Color Curator — SURPRISE-painted regions
+                   don't, which is why this lives on pointer events rather
+                   than at the fill site of drawSurprise. */
+                trackColorUsed(currentColor);
             }
             /* Only preventDefault when we're actually capturing the stroke.
                Calling it unconditionally on every touch would suppress the
@@ -392,6 +984,7 @@
         });
 
         const endStroke = (e) => {
+            if (isDrawing) trackStroke();
             isDrawing = false;
             cachedRect = null;
             try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
@@ -399,6 +992,7 @@
         canvas.addEventListener('pointerup', endStroke);
         canvas.addEventListener('pointercancel', endStroke);
         canvas.addEventListener('pointerleave', () => {
+            if (isDrawing) trackStroke();
             isDrawing = false;
             cachedRect = null;
         });
@@ -406,6 +1000,10 @@
 
     function clearCanvas() {
         ctx.clearRect(0, 0, STAGE_W, STAGE_H);
+        /* Wipe the per-drawing color tally so Rainbow Day resets cleanly
+           when the kid starts over. trackClearDrawing is a no-op for
+           any other counters. */
+        if (state) trackClearDrawing();
     }
 
     /* ============ DRAW MODE ============ */
@@ -492,6 +1090,7 @@
     /* A goofy default character so kids can press DANCE immediately. The
        silhouette clip-path takes care of trimming any overflow. */
     function drawSurprise() {
+        trackSurpriseUsed();
         clearCanvas();
 
         // Skin tone fill across the whole body silhouette
@@ -556,9 +1155,16 @@
            on the canvas would block page scroll over the figure while
            it's animating. */
         setDrawMode(false);
+        /* Pressing DANCE finishes the current drawing (commits it as a
+           groodle). drawingsFinished and First/Five Groodle hinge on this
+           — it's the only moment in the game with a clear "I'm done"
+           signal from the kid. */
+        trackDrawingFinished();
+        trackBeatExperienced(BEATS[currentBeatIdx]);
         ensureAudio();
         const begin = () => {
             isPlaying = true;
+            danceSessionStart = Date.now();
             document.body.classList.add('dancing');
             document.getElementById('drawPanel').hidden = true;
             document.getElementById('dancePanel').hidden = false;
@@ -577,6 +1183,10 @@
     function stopDance() {
         if (!isPlaying) return;
         isPlaying = false;
+        if (danceSessionStart) {
+            trackDanceSession((Date.now() - danceSessionStart) / 1000);
+            danceSessionStart = 0;
+        }
         stopAudio();
         document.body.classList.remove('dancing');
         document.getElementById('drawPanel').hidden = false;
@@ -684,11 +1294,15 @@
             setDrawMode(!isDrawMode);
         });
 
+        document.getElementById('openAchievementsBtn').addEventListener('click', openAchievements);
+        document.getElementById('openHatShopBtn').addEventListener('click', openHatShop);
+
         document.getElementById('eraserBtn').addEventListener('click', () => {
             isErasing = !isErasing;
             const btn = document.getElementById('eraserBtn');
             btn.classList.toggle('active', isErasing);
             if (isErasing) {
+                trackEraserUsed();
                 document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
             } else {
                 const sw = document.querySelector('.swatch[data-color="' + currentColor + '"]');
@@ -705,11 +1319,33 @@
         });
         document.getElementById('beatBtn').addEventListener('click', () => {
             currentBeatIdx = (currentBeatIdx + 1) % BEATS.length;
+            trackBeatExperienced(BEATS[currentBeatIdx]);
             updateMoveBeatLabels();
         });
     }
 
     function init() {
+        /* Persistence first: every other init step may want to read or
+           write state (the palette wiring tracks color usage, etc.).
+           loadState falls back to defaults if storage is unavailable, so
+           this never throws. */
+        state = loadState();
+        currencyPillEl = document.getElementById('currencyPill');
+        currencyValueEl = document.getElementById('currencyValue');
+        toastContainerEl = document.getElementById('toastContainer');
+        achievementsModalEl = document.getElementById('achievementsModal');
+        achievementsListEl = document.getElementById('achievementsList');
+        achievementsStatsEl = document.getElementById('achievementStats');
+        hatShopModalEl = document.getElementById('hatShopModal');
+        hatShopGridEl = document.getElementById('hatShopGrid');
+        hatShopBalanceEl = document.getElementById('hatShopBalance');
+        hatLayerInnerEl = document.getElementById('hatLayerInner');
+        if (achievementsModalEl) attachModalDismissers(achievementsModalEl);
+        if (hatShopModalEl) attachModalDismissers(hatShopModalEl);
+        renderCurrency();
+        renderEquippedHat();
+        trackVisit();
+
         buildCanvas();
         buildPalette();
         buildSizes();
@@ -718,6 +1354,17 @@
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');
         bubbleEl = document.getElementById('beatBubble');
+
+        /* Defensive: if a returning user is on a release where the
+           achievement catalog grew, retroactively unlock anything their
+           historic counters already satisfy. Also fires Bedhead when
+           bedheadEligible is true from the trackVisit above. */
+        checkAchievements();
+
+        /* Global Escape closes whatever modal is open. */
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && openModalEl) closeModal();
+        });
 
         /* Stop the dance when the tab/app goes to the background. RAF
            naturally pauses on hidden tabs, but the audio scheduler's

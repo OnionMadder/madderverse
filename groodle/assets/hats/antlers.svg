@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120">
+    <text x="4" y="14" font-family="monospace" font-size="9" fill="#1a0f33" opacity="0.55">PLACEHOLDER</text>
+    <g stroke="#6f4e37" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M68,108 Q42,68 28,18"/>
+        <path d="M50,52 L20,38"/>
+        <path d="M42,28 L18,12"/>
+        <path d="M132,108 Q158,68 172,18"/>
+        <path d="M150,52 L180,38"/>
+        <path d="M158,28 L182,12"/>
+    </g>
+    <g stroke="#1a0f33" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.45">
+        <path d="M68,108 Q42,68 28,18"/>
+        <path d="M132,108 Q158,68 172,18"/>
+    </g>
+</svg>

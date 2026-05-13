@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120">
+    <text x="4" y="14" font-family="monospace" font-size="9" fill="#1a0f33" opacity="0.55">PLACEHOLDER</text>
+    <g stroke="#1a0f33" stroke-width="4" stroke-linejoin="round">
+        <ellipse cx="64" cy="58" rx="18" ry="52" fill="#ffffff" transform="rotate(-12 64 58)"/>
+        <ellipse cx="64" cy="64" rx="9" ry="36" fill="#ff6ec7" transform="rotate(-12 64 64)"/>
+        <ellipse cx="136" cy="58" rx="18" ry="52" fill="#ffffff" transform="rotate(12 136 58)"/>
+        <ellipse cx="136" cy="64" rx="9" ry="36" fill="#ff6ec7" transform="rotate(12 136 64)"/>
+    </g>
+</svg>
