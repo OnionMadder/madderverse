@@ -55,7 +55,9 @@ header.top {
     transition: background 0.15s;
     z-index: 10;
 }
-.back:hover { background: rgba(255, 255, 255, 0.16); }
+@media (hover: hover) {
+    .back:hover { background: rgba(255, 255, 255, 0.16); }
+}
 
 header.top h1 {
     margin: 0;
@@ -150,7 +152,9 @@ body.dancing .hint-tag {
     overflow: hidden;
 }
 
-.bg-thumb:hover { transform: scale(1.05); }
+@media (hover: hover) {
+    .bg-thumb:hover { transform: scale(1.05); }
+}
 
 .bg-thumb.active {
     border-color: #00ffcc;
@@ -370,8 +374,10 @@ body.dancing .draw-canvas {
 }
 
 .swatch {
-    width: 40px;
-    height: 40px;
+    /* 44px to meet the iOS / WCAG minimum tap target on phones; kid
+       fingers especially aren't precise. */
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     border: 3px solid rgba(255, 255, 255, 0.3);
     cursor: pointer;
@@ -380,7 +386,9 @@ body.dancing .draw-canvas {
     flex: 0 0 auto;
     box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
 }
-.swatch:hover { transform: scale(1.1); }
+@media (hover: hover) {
+    .swatch:hover { transform: scale(1.1); }
+}
 .swatch.active {
     border-color: #00ffcc;
     box-shadow: 0 0 14px #00ffcc, inset 0 0 0 2px #1a0f33, 0 3px 0 rgba(0, 0, 0, 0.3);
@@ -457,12 +465,16 @@ body.dancing .draw-canvas {
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
 }
-.btn:hover { background: rgba(255, 255, 255, 0.16); }
+@media (hover: hover) {
+    .btn:hover { background: rgba(255, 255, 255, 0.16); }
+}
 .btn:active {
     transform: translateY(2px);
     box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
 }
-.btn.small { padding: 8px 12px; font-size: 12px; min-height: 38px; }
+/* min-height keeps the small variant above the 44px touch floor even
+   though it visually reads smaller (less padding, smaller font). */
+.btn.small { padding: 8px 12px; font-size: 12px; min-height: 44px; }
 .btn.active {
     background: rgba(255, 110, 199, 0.28);
     border-color: #ff6ec7;
@@ -474,9 +486,11 @@ body.dancing .draw-canvas {
     border: 2px solid rgba(255, 255, 255, 0.4);
     box-shadow: 0 4px 14px rgba(255, 110, 199, 0.35);
 }
-.btn.primary:hover {
-    filter: brightness(1.08);
-    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
+@media (hover: hover) {
+    .btn.primary:hover {
+        filter: brightness(1.08);
+        background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
+    }
 }
 
 /* ============ DANCE PANEL ============ */
@@ -515,7 +529,9 @@ body.dancing .draw-canvas {
     gap: 14px;
 }
 .footer-nav a { color: #d6bdff; text-decoration: none; }
-.footer-nav a:hover { color: #00ffcc; }
+@media (hover: hover) {
+    .footer-nav a:hover { color: #00ffcc; }
+}
 .footer-tagline { margin: 4px 0; letter-spacing: 1px; }
 .footer-copy { margin: 4px 0; }
 .footer-copy a { color: #ff6ec7; text-decoration: none; }
