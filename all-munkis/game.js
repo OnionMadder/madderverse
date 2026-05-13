@@ -64,6 +64,12 @@
     const munkiSightings = new Set();
     let moonUnlocked = false;
 
+    // Which evil rides the 7th-wheel slot in the bank. Pre-Moon-unlock this
+    // is always 'ice'. Post-unlock the kid can drag-swap (see the altar
+    // logic in renderMunkiAltar). Persisted across sessions.
+    let seventhWheel = 'ice';
+    function altWheel() { return seventhWheel === 'ice' ? 'moon' : 'ice'; }
+
     function ensureAudio() {
         if (!audioCtx) {
             const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -1765,6 +1771,9 @@
                 });
             }
             moonUnlocked = !!obj.moonUnlocked;
+            if (obj.seventhWheel === 'moon' || obj.seventhWheel === 'ice') {
+                seventhWheel = obj.seventhWheel;
+            }
             // Clamp activeBankIndex to a known + unlocked bank so a stale
             // localStorage value can't push us into an empty bank.
             const idx = (obj.activeBankIndex | 0);
@@ -1786,10 +1795,21 @@
                 madballzUnlocked,
                 munkiSightings: [...munkiSightings],
                 moonUnlocked,
+                seventhWheel,
                 activeBankIndex,
                 unlockedBanks: BANKS.map(b => b.unlocked)
             }));
         } catch (e) { /* ignore */ }
+    }
+
+    // Keeps BANKS[0]'s 7th chip in sync with the current seventhWheel value.
+    // Idempotent — call after any swap, on init, after loadProgress.
+    function syncBankWithSeventhWheel() {
+        const bank = BANKS[0].munkis;
+        // Strip both evils, then append the current 7th wheel.
+        const cleaned = bank.filter(id => id !== 'ice' && id !== 'moon');
+        cleaned.push(seventhWheel);
+        BANKS[0].munkis = cleaned;
     }
 
     // Called every time horrorTriggers ticks up. The first time we cross the
@@ -1962,14 +1982,12 @@
     function unlockMoon() {
         moonUnlocked = true;
         saveProgress();
-        // Append Moon to the bank so the kid can use the new Munki right
-        // away. Chunk 4 will swap to a true 7-chip swappable layout; for
-        // now the bank just grows to 8 chips so the unlock is meaningful
-        // the moment it lands.
-        const bank = BANKS[0].munkis;
-        if (!bank.includes('moon')) bank.push('moon');
-        renderTray();
-        attachTrayHandlers();
+        // Show the swap altar — the kid can now drag Moon's alternate chip
+        // onto Ice in the bank (or vice-versa) to swap which evil rides
+        // the 7th-wheel slot. Bank itself stays at 7 chips. seventhWheel
+        // defaults to 'ice' so the existing bank layout is unchanged on
+        // first unlock; the kid earns Moon's presence by swapping.
+        renderMunkiAltar();
         bumpEggCounter(); // flip "5/5" → "FOUND"
         showMoonReveal();
     }
@@ -2079,6 +2097,116 @@
         findEgg('rainbowOrder');
     }
 
+    // ---------- MUNKI ALTAR (Ice ↔ Moon swap, post-unlock) ----------
+    // After Moon unlocks, the alt-evil sits in a small "altar" chip next to
+    // the tray. The kid drags it onto the active 7th-wheel chip in the bank
+    // to swap which evil rides that slot. Drop anywhere else snaps back.
+    // The bank itself stays at 7 chips, preserving the rainbow-with-one-evil
+    // visual the redesign asked for.
+    function renderMunkiAltar() {
+        const altar = document.getElementById('munkiAltar');
+        if (!altar) return;
+        if (!moonUnlocked) {
+            altar.hidden = true;
+            altar.innerHTML = '';
+            return;
+        }
+        altar.hidden = false;
+        const altId = altWheel();
+        const ch = CHARACTERS[altId];
+        // Mirror the regular tray-chip markup so the visual stays consistent.
+        altar.innerHTML = `
+            <div class="altar-chip tray-chip altar-chip-alt" data-char="${altId}" title="${ch.label}">
+                <div class="chip-icon">${characterArt(altId)}</div>
+                <div class="chip-label">${ch.label}</div>
+            </div>
+            <div class="altar-hint">drag to swap</div>
+        `;
+        attachAltarHandlers();
+    }
+
+    function attachAltarHandlers() {
+        const chip = document.querySelector('.altar-chip');
+        if (!chip) return;
+        chip.addEventListener('pointerdown', e => {
+            if (e.button !== undefined && e.button !== 0) return;
+            e.preventDefault();
+            ensureAudio();
+            try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+            chip.classList.add('grabbing');
+            trayDragState.set(e.pointerId, {
+                chip,
+                charId: chip.dataset.char,
+                startX: e.clientX, startY: e.clientY,
+                dragging: false,
+                isAltar: true
+            });
+        });
+        chip.addEventListener('pointermove', e => {
+            const state = trayDragState.get(e.pointerId);
+            if (!state) return;
+            const dx = e.clientX - state.startX;
+            const dy = e.clientY - state.startY;
+            if (!state.dragging && (dx * dx + dy * dy) > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+                state.dragging = true;
+                startTrayGhost(state.chip, e.clientX, e.clientY);
+                // Highlight the active 7th-wheel chip in the bank as the
+                // only valid drop target for an altar drag.
+                const active = document.querySelector(`.tray-chip[data-char="${seventhWheel}"]`);
+                if (active) active.classList.add('swap-target');
+            }
+            if (state.dragging) {
+                moveTrayGhost(e.clientX, e.clientY);
+            }
+        });
+        chip.addEventListener('pointerup', e => {
+            const state = trayDragState.get(e.pointerId);
+            if (!state) return;
+            trayDragState.delete(e.pointerId);
+            try {
+                if (state.chip.hasPointerCapture(e.pointerId)) {
+                    state.chip.releasePointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+            state.chip.classList.remove('grabbing');
+            document.querySelectorAll('.tray-chip.swap-target').forEach(c => c.classList.remove('swap-target'));
+            if (state.dragging) {
+                // Drop on the active 7th-wheel chip → swap.
+                const els = document.elementsFromPoint(e.clientX, e.clientY);
+                const dropTarget = els.find(el => el.classList && el.classList.contains('tray-chip') && el.dataset.char === seventhWheel);
+                if (dropTarget) {
+                    swapSeventhWheel();
+                }
+                clearTrayGhost();
+            }
+        });
+        chip.addEventListener('pointercancel', e => {
+            const state = trayDragState.get(e.pointerId);
+            if (!state) return;
+            trayDragState.delete(e.pointerId);
+            state.chip.classList.remove('grabbing');
+            document.querySelectorAll('.tray-chip.swap-target').forEach(c => c.classList.remove('swap-target'));
+            clearTrayGhost();
+        });
+    }
+
+    function swapSeventhWheel() {
+        const incoming = altWheel();
+        // If the outgoing evil is on the stage, clear it (its chip won't
+        // exist after the swap, so leaving the stage occupant orphaned
+        // would be a confusing state).
+        for (let i = 0; i < NUM_SLOTS; i++) {
+            if (slots[i] === seventhWheel) setSlot(i, null);
+        }
+        seventhWheel = incoming;
+        syncBankWithSeventhWheel();
+        saveProgress();
+        renderTray();
+        attachTrayHandlers();
+        renderMunkiAltar();
+        playDropSound();
+    }
+
     // ---------- HEADER BUTTONS ----------
     function attachHeaderHandlers() {
         document.getElementById('remixBtn').addEventListener('click', () => {
@@ -2169,11 +2297,9 @@
     // ---------- INIT ----------
     function init() {
         loadProgress();
-        // Restore prior Moon unlock: append Moon to the bank before the
-        // first renderTray so the chip is visible from the first frame.
-        if (moonUnlocked && !BANKS[0].munkis.includes('moon')) {
-            BANKS[0].munkis.push('moon');
-        }
+        // Make sure the 7th slot reflects the persisted seventhWheel (ice
+        // by default, moon if the kid swapped) before the first renderTray.
+        syncBankWithSeventhWheel();
         buildStage();
         renderTray();
         renderAllSlots();
@@ -2183,6 +2309,8 @@
         attachMoonChaos();
         attachEggDetectors();
         updateTrayHint();
+        // If Moon is unlocked, surface the altar chip so the kid can swap.
+        renderMunkiAltar();
         // If the kid found any eggs on a prior visit, restore the counter
         // chip with the saved count (no animation — it's not "new").
         if (munkiSightings.size > 0 || moonUnlocked) {

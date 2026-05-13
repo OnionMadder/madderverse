@@ -1187,6 +1187,49 @@ body.moon-invert {
     50%      { filter: invert(1) hue-rotate(180deg); }
 }
 
+/* ====== MUNKI ALTAR (Ice ↔ Moon swap chip) ======
+   Lives below the regular tray. The chip is a scaled-down clone of a
+   regular tray-chip so all the existing styling applies. Drag onto the
+   active 7th-wheel chip in the bank to swap; bank stays at 7 chips. */
+.munki-altar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0 0;
+    margin: 0 auto;
+}
+.munki-altar[hidden] { display: none; }
+.munki-altar .altar-chip {
+    transform: scale(0.78);
+    transform-origin: top center;
+    margin: -6px 0;
+    border-color: rgba(167, 139, 250, 0.6);
+    box-shadow: 0 0 14px rgba(167, 139, 250, 0.35);
+}
+.munki-altar .altar-hint {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(196, 181, 253, 0.7);
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+    margin-top: 2px;
+}
+
+/* Highlight the bank chip that's a valid swap drop target during an
+   altar drag — mirrors the .drop-target glow on stage slots. */
+.tray-chip.swap-target {
+    border-color: #c4b5fd;
+    box-shadow: 0 0 22px rgba(167, 139, 250, 0.7);
+    animation: swap-target-pulse 0.9s ease-in-out infinite;
+}
+@keyframes swap-target-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.06); }
+}
+
 /* ====== EASTER-EGG COUNTER + MOON REVEAL ======
    The counter chip lives top-right of the viewport. It stays hidden until
    the kid finds their first egg, then fades in and animates each bump.
