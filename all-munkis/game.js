@@ -178,7 +178,7 @@
     };
 const CHARACTERS = {
         green: {
-            label: 'Green Gear',
+            label: 'Green',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             play(ctx, out, when, step) {
                 const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
@@ -219,7 +219,7 @@ const CHARACTERS = {
         },
 
         shadow: {
-            label: 'Shadow Pulse',
+            label: 'Shadow',
             bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
             play(ctx, out, when, step) {
                 if (step % 2 !== 0) return;
@@ -238,7 +238,7 @@ const CHARACTERS = {
         },
 
         mega: {
-            label: 'Mega Thump',
+            label: 'Mega',
             bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
             play(ctx, out, when, step) {
                 if (step % 4 !== 0) return;
@@ -263,7 +263,7 @@ const CHARACTERS = {
         },
 
         amber: {
-            label: 'Amber Arp',
+            label: 'Amber',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
             play(ctx, out, when, step) {
                 if (step !== 5 && step !== 13) return;
@@ -315,7 +315,7 @@ const CHARACTERS = {
         },
 
         grumble: {
-            label: 'Grumble Bass',
+            label: 'Grumble',
             bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
@@ -341,7 +341,7 @@ const CHARACTERS = {
         },
 
         sine: {
-            label: 'Sine Wave',
+            label: 'Sine',
             bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
             play(ctx, out, when, step) {
                 const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
@@ -360,7 +360,7 @@ const CHARACTERS = {
         },
 
         hiss: {
-            label: 'Hiss Shell',
+            label: 'Hiss',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
@@ -404,7 +404,7 @@ const CHARACTERS = {
         },
 
         flute: {
-            label: 'Vibe Berry',
+            label: 'Vibe',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             play(ctx, out, when, step) {
                 const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
@@ -430,7 +430,7 @@ const CHARACTERS = {
         },
 
         star: {
-            label: 'Star Ping',
+            label: 'Star',
             bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
             play(ctx, out, when, step) {
                 if (step !== 0) return;
@@ -451,7 +451,7 @@ const CHARACTERS = {
         },
 
         fog: {
-            label: 'Fog Chord',
+            label: 'Fog',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
             play(ctx, out, when, step) {
                 if (step !== 0) return;
@@ -472,7 +472,7 @@ const CHARACTERS = {
         },
 
         moon: {
-            label: 'Moon Munki',
+            label: 'Moon',
             bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
             play(ctx, out, when, step) {
                 if (step !== 0) return;
@@ -499,7 +499,7 @@ const CHARACTERS = {
         },
 
         spark: {
-            label: 'Spark Snap',
+            label: 'Spark',
             bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
@@ -516,7 +516,7 @@ const CHARACTERS = {
         },
 
         ice: {
-            label: 'Ice Munki',
+            label: 'Ice',
             bodyColor: '#f8fafc', bodyHi: '#ffffff', bodyShade: '#94a3b8',
             play(ctx, out, when, step) {
                 const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
@@ -542,7 +542,7 @@ const CHARACTERS = {
         // GREEN:  mb-cool
         // TEAL:   mb-eye
         'mb-skull': {
-            label: 'Skull Buzz', sheet: 'mb', headFrame: 'mb-skull',
+            label: 'Skull', sheet: 'mb', headFrame: 'mb-skull',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Bone-rumble: sub thud filtered low — fits the skull vibe.
             play(ctx, out, when, step) {
@@ -562,7 +562,7 @@ const CHARACTERS = {
         },
 
         'mb-zombie': {
-            label: 'Zombi Bone', sheet: 'mb', headFrame: 'mb-zombie',
+            label: 'Zombi', sheet: 'mb', headFrame: 'mb-zombie',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Distorted alien-pluck — sawtooth through a wave shaper, sweeps
             // pitch + filter for that "zorbie zombie" stagger.
@@ -587,7 +587,7 @@ const CHARACTERS = {
         },
 
         'mb-grump': {
-            label: 'Grump Bones', sheet: 'mb', headFrame: 'mb-grump',
+            label: 'Grump', sheet: 'mb', headFrame: 'mb-grump',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Chopper-LFO bass — angry pulsing low end.
             play(ctx, out, when, step) {
@@ -612,7 +612,7 @@ const CHARACTERS = {
         },
 
         'mb-sad': {
-            label: 'Sad Drip', sheet: 'mb', headFrame: 'mb-sad',
+            label: 'Sad', sheet: 'mb', headFrame: 'mb-sad',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
             // Triangle wave drip — descending pitch fits a teardrop falling.
             play(ctx, out, when, step) {
@@ -633,7 +633,7 @@ const CHARACTERS = {
         },
 
         'mb-snooze': {
-            label: 'Snooze Goo', sheet: 'mb', headFrame: 'mb-snooze',
+            label: 'Snooze', sheet: 'mb', headFrame: 'mb-snooze',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
             // Long yawn pad — sine with light vibrato, fades up then sleeps
             // back down across most of the bar.
@@ -659,7 +659,7 @@ const CHARACTERS = {
         },
 
         'mb-scared': {
-            label: 'Crack Shiver', sheet: 'mb', headFrame: 'mb-scared',
+            label: 'Shiver', sheet: 'mb', headFrame: 'mb-scared',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
             // Shaky percussion — high-pass noise burst + a quick triangle
             // pitch-drop tap, fires on the off-beat.
@@ -687,7 +687,7 @@ const CHARACTERS = {
         },
 
         'mb-cool': {
-            label: 'Cool Brain', sheet: 'mb', headFrame: 'mb-cool',
+            label: 'Cool', sheet: 'mb', headFrame: 'mb-cool',
             bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
             // Random sine notes — picks an octave for that "shades say
             // whatever" cool randomness.
@@ -708,7 +708,7 @@ const CHARACTERS = {
         },
 
         'mb-eye': {
-            label: 'Eye Pop', sheet: 'mb', headFrame: 'mb-eye',
+            label: 'Eye', sheet: 'mb', headFrame: 'mb-eye',
             bodyColor: '#0e7490', bodyHi: '#22d3ee', bodyShade: '#083344',
             // Square wave electric blip — rising pitch, hi-pass filtered for
             // a sharp electric snap.
