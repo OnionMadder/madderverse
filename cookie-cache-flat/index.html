@@ -58,7 +58,10 @@
     <div class="menu-card">
         <h1 class="menu-title">TUB'S COOKIE CACHE</h1>
         <p class="menu-subtitle">Stack the data. Purge the cache.</p>
-        <div class="menu-mascot"></div>
+        <button id="menu-mascot" class="menu-mascot" type="button"
+                aria-label="Read the story booklet — what's a data cookie?"
+                aria-haspopup="dialog"></button>
+        <p class="menu-mascot-hint" aria-hidden="true">▸ TAP TUB FOR THE STORY ◂</p>
 
     <div style="background: #000000; 
     border: 1px solid #333; 
@@ -156,6 +159,24 @@
         <button class="btn btn-xl btn-yellow" id="btn-replay" type="button">
             PLAY AGAIN
         </button>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     LORE BOOKLET (90s game manual styling)
+     Opened by tapping #menu-mascot on the start screen. Self-contained
+     modal; safe to open before any round has started.
+     ════════════════════════════════════════════════════════════════ -->
+<div id="lore-modal" class="lore-modal" aria-hidden="true">
+    <div class="lore-backdrop" id="lore-backdrop"></div>
+    <div class="lore-booklet" role="dialog" aria-modal="true" aria-labelledby="lore-page-title">
+        <button class="lore-close" id="lore-close" type="button" aria-label="Close booklet">✕</button>
+        <article class="lore-page" id="lore-page-content"></article>
+        <div class="lore-page-nav">
+            <button class="lore-nav-btn lore-prev" id="lore-prev" type="button" aria-label="Previous page">‹</button>
+            <span class="lore-page-num" id="lore-page-num">1 / 4</span>
+            <button class="lore-nav-btn lore-next" id="lore-next" type="button" aria-label="Next page">›</button>
+        </div>
     </div>
 </div>
 

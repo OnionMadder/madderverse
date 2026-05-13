@@ -136,6 +136,59 @@ function streakSpeedMult(streak) {
     return Math.pow(STREAK_SPEED_BASE, Math.min(streak, STREAK_SPEED_CAP));
 }
 
+// ── Lore booklet content ──────────────────────────────────────────
+// Each entry is one page in the 90s-manual modal opened from the start
+// screen. Edit copy here; layout lives in style.css and the modal markup
+// lives in index.html. Apostrophes inside template literals are literal,
+// no escaping needed.
+const LORE_TUB_SVG = `
+<svg class="lore-tub-svg" viewBox="0 0 110 110" aria-hidden="true">
+  <ellipse cx="55" cy="62" rx="42" ry="36" fill="#f4881e"/>
+  <ellipse cx="55" cy="56" rx="40" ry="32" fill="#ffae3a"/>
+  <ellipse cx="40" cy="52" rx="6" ry="7" fill="#1a1208"/>
+  <ellipse cx="70" cy="52" rx="6" ry="7" fill="#1a1208"/>
+  <circle cx="38" cy="50" r="2" fill="#fff"/>
+  <circle cx="68" cy="50" r="2" fill="#fff"/>
+  <path d="M 38 72 Q 55 86 72 72" stroke="#1a1208" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <ellipse cx="28" cy="72" rx="6" ry="4" fill="#ff8c42" opacity="0.55"/>
+  <ellipse cx="82" cy="72" rx="6" ry="4" fill="#ff8c42" opacity="0.55"/>
+</svg>`;
+
+const LORE_PAGES = [
+    {
+        title: 'Page 1 — Welcome to the Cache',
+        html: LORE_TUB_SVG +
+            `<p>Meet <strong>Tub Butter</strong>! Tub is a big, fuzzy, very orange monster who lives in a place called <em>The Cache</em>. The Cache is a cozy warehouse where the internet's most important snacks are kept: cookies. 🍪</p>
+             <p>But wait — these aren't the cookies in your kitchen. These are <strong>DATA cookies</strong>, and they're what Tub Butter runs on. No data cookies, no Tub.</p>`,
+    },
+    {
+        title: 'Page 2 — What Even Is a Data Cookie?',
+        html:
+            `<p>Every time you visit a website, that website might leave a little crumb behind. A note that says something like:</p>
+             <div class="lore-quotes">
+                <p>"This kid likes the dark theme."</p>
+                <p>"This kid is logged in."</p>
+                <p>"This kid was watching a video — show them where they left off."</p>
+             </div>
+             <p>Those crumbs are cookies. Most of them are helpful! They make websites remember you so you don't have to start over every time.</p>`,
+    },
+    {
+        title: 'Page 3 — Tub Butter\'s Job',
+        html:
+            `<p>The Cache is where all those crumbs get stored. Tub Butter's job is to keep the Cache fresh — by <strong>eating</strong> the cookies that go there. 🍪</p>
+             <p>But Tub is picky! Some things that wind up in the Cache aren't really for him. Old veggies 🥦. Trackers from places he's never even been to. Random garbage. If Tub eats those, he goes <strong>"YUCK!"</strong> and the round ends in disgust.</p>
+             <p>Your job is to help Tub catch the right cookies before they fly out of the Cache. The faster he eats, the faster the Cache fills with fresh data. The more wrong stuff you let him catch, the worse he feels.</p>`,
+    },
+    {
+        title: 'Page 4 — Why This Matters',
+        html:
+            `<p>The real internet works a lot like the Cache. Websites leave cookies on your phone or computer so they can remember you. Most cookies are helpful — they remember your logins, your settings, your scores in games like this one.</p>
+             <p>Some cookies, though, are sneaky. They try to follow you around the whole internet, watching where you go. That's why grown-ups talk about <em>"cookies"</em> and <em>"privacy"</em> so much.</p>
+             <p>Tub Butter doesn't have to worry about that — he only eats the cookies that belong in his Cache. But now you know what cookies actually are. <strong>You're ahead of most adults.</strong></p>
+             <p class="lore-final">Press <strong>START</strong> when you're ready. Tub is HUNGRY.</p>`,
+    },
+];
+
 const SCREENS = {
     menu:  document.getElementById('screen-menu'),
     game:  document.getElementById('screen-game'),
@@ -147,6 +200,14 @@ const els = {
     btnReplay:   document.getElementById('btn-replay'),
     btnMute:     document.getElementById('btn-mute'),
     btnReturn:   document.getElementById('btn-return'),
+    menuMascot:  document.getElementById('menu-mascot'),
+    loreModal:   document.getElementById('lore-modal'),
+    loreBackdrop:document.getElementById('lore-backdrop'),
+    loreClose:   document.getElementById('lore-close'),
+    loreContent: document.getElementById('lore-page-content'),
+    lorePrev:    document.getElementById('lore-prev'),
+    loreNext:    document.getElementById('lore-next'),
+    lorePageNum: document.getElementById('lore-page-num'),
     stage:       document.getElementById('game-stage'),
     tub:         document.getElementById('tub-butter'),
     pileZone:    document.getElementById('pile-zone'),
@@ -1123,6 +1184,69 @@ function chompPile(imgs) {
     }, inDelay);
 }
 
+// ── Lore booklet modal ────────────────────────────────────────────
+state.lorePage = 0;
+state.loreOpen = false;
+
+function loreRender() {
+    const idx  = state.lorePage;
+    const page = LORE_PAGES[idx];
+    if (!els.loreContent) return;
+    els.loreContent.innerHTML =
+        `<h2 id="lore-page-title">${page.title}</h2>${page.html}`;
+    els.loreContent.scrollTop = 0;
+    els.lorePageNum.textContent = (idx + 1) + ' / ' + LORE_PAGES.length;
+    els.lorePrev.disabled = idx === 0;
+    els.loreNext.disabled = idx === LORE_PAGES.length - 1;
+}
+
+function loreSetPage(idx) {
+    state.lorePage = Math.max(0, Math.min(LORE_PAGES.length - 1, idx));
+    loreRender();
+}
+
+function loreOpen() {
+    if (state.loreOpen) return;
+    state.loreOpen = true;
+    state.lorePage = 0;
+    loreRender();
+    els.loreModal.classList.add('open');
+    els.loreModal.setAttribute('aria-hidden', 'false');
+    document.addEventListener('keydown', loreKeyHandler);
+    // Tab-focuses the close button per spec.
+    setTimeout(() => els.loreClose && els.loreClose.focus(), 60);
+}
+
+function loreCloseModal() {
+    if (!state.loreOpen) return;
+    state.loreOpen = false;
+    els.loreModal.classList.remove('open');
+    els.loreModal.setAttribute('aria-hidden', 'true');
+    document.removeEventListener('keydown', loreKeyHandler);
+    // Return focus to the trigger so keyboard users don't lose their place.
+    if (els.menuMascot) els.menuMascot.focus();
+}
+
+function loreKeyHandler(e) {
+    if (!state.loreOpen) return;
+    switch (e.key) {
+        case 'Escape':
+            e.preventDefault();
+            loreCloseModal();
+            break;
+        case 'ArrowRight':
+        case 'PageDown':
+            e.preventDefault();
+            loreSetPage(state.lorePage + 1);
+            break;
+        case 'ArrowLeft':
+        case 'PageUp':
+            e.preventDefault();
+            loreSetPage(state.lorePage - 1);
+            break;
+    }
+}
+
 function init() {
     preload();
     loadSfxPools();
@@ -1130,6 +1254,12 @@ function init() {
     els.btnStart.addEventListener('click',  startRound);
     els.btnReplay.addEventListener('click', startRound);
     if (els.btnMute) els.btnMute.addEventListener('click', toggleMute);
+
+    if (els.menuMascot)   els.menuMascot.addEventListener('click', loreOpen);
+    if (els.loreClose)    els.loreClose.addEventListener('click', loreCloseModal);
+    if (els.loreBackdrop) els.loreBackdrop.addEventListener('click', loreCloseModal);
+    if (els.lorePrev)     els.lorePrev.addEventListener('click', () => loreSetPage(state.lorePage - 1));
+    if (els.loreNext)     els.loreNext.addEventListener('click', () => loreSetPage(state.lorePage + 1));
 
     window.addEventListener('resize', () => {
         if (state.running) measureStage();

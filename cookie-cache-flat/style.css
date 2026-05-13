@@ -140,6 +140,15 @@ body {
     opacity: 0.9;
 }
 .menu-mascot {
+    /* button-reset (was a div before chunk 7) */
+    border: none;
+    padding: 0;
+    background-color: transparent;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    -webkit-tap-highlight-color: transparent;
+    /* original visuals */
     width: clamp(120px, 35vw, 200px);
     height: clamp(120px, 35vw, 200px);
     background-image: url('assets/img/eater.png');
@@ -148,10 +157,41 @@ body {
     background-position: 100% 0%; /* frame-one */
     filter: drop-shadow(0 0 18px rgba(0,255,204,0.45)) drop-shadow(0 8px 14px rgba(0,0,0,0.55));
     animation: menu-bob 2.4s ease-in-out infinite;
+    transition: filter 0.15s ease;
+}
+@media (hover: hover) {
+    .menu-mascot:hover {
+        filter: drop-shadow(0 0 26px rgba(0,255,204,0.75)) drop-shadow(0 8px 14px rgba(0,0,0,0.55));
+    }
+}
+.menu-mascot:active {
+    /* override the bob animation briefly on press */
+    animation: none;
+    transform: scale(0.94);
+}
+.menu-mascot:focus-visible {
+    outline: 2px solid var(--accent-cyan);
+    outline-offset: 6px;
+    border-radius: 12px;
 }
 @keyframes menu-bob {
     0%,100% { transform: translateY(0)    rotate(-2deg); }
     50%     { transform: translateY(-8px) rotate(2deg);  }
+}
+.menu-mascot-hint {
+    margin-top: -6px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: clamp(0.62rem, 1.7vw, 0.78rem);
+    color: rgba(0,255,204,0.85);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 8px rgba(0,255,204,0.5);
+    animation: hint-blink 1.8s ease-in-out infinite;
+    pointer-events: none;
+}
+@keyframes hint-blink {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 1;    }
 }
 .menu-blurb {
     font-size: clamp(0.9rem, 2.6vw, 1.05rem);
@@ -923,3 +963,208 @@ footer {
     pointer-events: none; z-index: 5;
 }
 footer a { color: var(--accent-cyan); pointer-events: auto; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   LORE BOOKLET — 90s NES/SNES game-manual styling
+   Cream paper, serif body, chunky double-stroked border, red cartridge-
+   tab close button. Independent of the game-stage; usable from the
+   start screen before any round begins.
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+    --booklet-paper:  #f4e8d0;
+    --booklet-ink:    #2a1c0a;
+    --booklet-stroke: #1a1208;
+    --booklet-red:    #c8242a;
+    --booklet-blue:   #1d4e8c;
+}
+
+.lore-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    /* same safe-area handling as the screens */
+    padding-top:    calc(20px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.lore-modal.open { display: flex; animation: lore-fade 0.18s ease-out; }
+
+@keyframes lore-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.lore-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.72);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    cursor: pointer;
+}
+
+.lore-booklet {
+    position: relative;
+    z-index: 1;
+    width: min(94vw, 580px);
+    max-height: calc(100dvh - 80px);
+    background-color: var(--booklet-paper);
+    color: var(--booklet-ink);
+    font-family: Georgia, 'Times New Roman', 'Cambria', serif;
+    border: 4px solid var(--booklet-stroke);
+    /* Pixel-art chunky inset frame: paper > dark stroke > paper > dark
+       stroke, then a hard offset drop-shadow for the cartridge feel. */
+    box-shadow:
+        0 0 0 2px var(--booklet-paper),
+        0 0 0 6px var(--booklet-stroke),
+        8px 10px 0 6px rgba(0,0,0,0.55);
+    background-image:
+        radial-gradient(circle at 30% 20%, rgba(180,130,60,0.06) 0%, transparent 50%),
+        radial-gradient(circle at 70% 80%, rgba(120,80,30,0.05) 0%, transparent 50%);
+    display: flex;
+    flex-direction: column;
+    animation: lore-pop 0.22s cubic-bezier(.2,.7,.4,1.2);
+}
+@keyframes lore-pop {
+    from { transform: scale(0.85); opacity: 0; }
+    to   { transform: scale(1);    opacity: 1; }
+}
+
+/* Cartridge label-tab close button: chunky red square with hard offset
+   shadow, hangs slightly outside the booklet's top-right corner. */
+.lore-close {
+    position: absolute;
+    top: -16px;
+    right: -16px;
+    width: 44px;
+    height: 44px;
+    background: var(--booklet-red);
+    color: #fff;
+    border: 4px solid var(--booklet-stroke);
+    border-radius: 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 1.1rem;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 2;
+    box-shadow: 4px 4px 0 var(--booklet-stroke);
+    transition: transform 0.06s ease, background 0.15s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) {
+    .lore-close:hover { background: #e63a40; }
+}
+.lore-close:active,
+.lore-close:focus-visible {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 var(--booklet-stroke);
+    outline: none;
+}
+
+.lore-page {
+    padding: 28px 26px 14px;
+    overflow-y: auto;
+    flex: 1 1 auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.lore-page h2 {
+    font-family: 'Impact', 'Arial Black', 'Helvetica Neue', sans-serif;
+    font-size: clamp(1.25rem, 4.6vw, 1.7rem);
+    color: var(--booklet-red);
+    letter-spacing: 1.5px;
+    margin-bottom: 16px;
+    padding-bottom: 6px;
+    border-bottom: 3px solid var(--booklet-stroke);
+    text-transform: uppercase;
+    line-height: 1.15;
+}
+
+.lore-page p {
+    font-size: clamp(0.96rem, 2.7vw, 1.05rem);
+    line-height: 1.55;
+    margin-bottom: 12px;
+}
+.lore-page p:last-child { margin-bottom: 0; }
+
+.lore-page strong { color: var(--booklet-stroke); font-weight: 700; }
+.lore-page em     { color: var(--booklet-blue); font-style: italic; }
+
+.lore-page .lore-quotes {
+    padding: 10px 16px;
+    margin: 14px 4px 16px;
+    border-left: 5px solid var(--booklet-stroke);
+    background: rgba(180,130,60,0.16);
+    font-style: italic;
+    color: #4a3018;
+}
+.lore-page .lore-quotes p {
+    margin: 4px 0;
+    font-size: 0.96em;
+}
+
+.lore-page .lore-final {
+    margin-top: 18px;
+    padding: 10px 14px;
+    text-align: center;
+    background: rgba(200,36,42,0.1);
+    border: 2px solid var(--booklet-red);
+    color: var(--booklet-stroke);
+    font-size: 1.02em;
+    letter-spacing: 0.5px;
+}
+
+.lore-tub-svg {
+    display: block;
+    width: clamp(74px, 18vw, 110px);
+    height: auto;
+    margin: 0 auto 12px;
+    filter: drop-shadow(3px 3px 0 var(--booklet-stroke));
+}
+
+.lore-page-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    border-top: 3px solid var(--booklet-stroke);
+    background: rgba(180,130,60,0.14);
+    flex-shrink: 0;
+    gap: 12px;
+}
+.lore-nav-btn {
+    width: 48px;
+    height: 44px;
+    background: var(--booklet-stroke);
+    color: var(--booklet-paper);
+    border: none;
+    border-radius: 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 1.5rem;
+    font-weight: 900;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, transform 0.06s ease;
+}
+@media (hover: hover) {
+    .lore-nav-btn:hover:not(:disabled) { background: #4a3018; }
+}
+.lore-nav-btn:active:not(:disabled) { transform: translateY(1px); }
+.lore-nav-btn:disabled {
+    opacity: 0.28;
+    cursor: not-allowed;
+}
+
+.lore-page-num {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 700;
+    color: var(--booklet-stroke);
+    font-size: clamp(0.85rem, 2.3vw, 0.95rem);
+    letter-spacing: 1.5px;
+}
