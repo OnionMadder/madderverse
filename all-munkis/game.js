@@ -1255,24 +1255,115 @@
         });
     }
 
-    // ---------- TRAY: tap-to-place ----------
-    // A tap on a tray chip teleports its Munki onto the next empty stage
-    // slot. If the stage is already full, the chip shakes briefly to signal
-    // "no room" — clear someone first.
+    // ---------- TRAY: drag-to-place ----------
+    // Pointer-event drag. pointerdown on a chip starts tracking; once the
+    // pointer moves past DRAG_THRESHOLD_PX, a ghost element follows the
+    // cursor/finger and the slot under it lights up as a drop target.
+    // pointerup over a stage slot drops the Munki there (replacing any
+    // existing occupant). Release elsewhere just discards the ghost.
+    //
+    // touch-action: none on .tray-chip lets the browser hand the whole
+    // gesture to JS instead of stealing it for scrolling — important now
+    // that the tray wraps onto two rows instead of horizontally scrolling.
+    const trayDragState = new Map();
+    let trayDragGhost = null;
+
+    function startTrayGhost(chip, x, y) {
+        if (trayDragGhost) trayDragGhost.remove();
+        const ghost = chip.cloneNode(true);
+        ghost.classList.add('drag-ghost');
+        ghost.style.position = 'fixed';
+        ghost.style.left = '0';
+        ghost.style.top = '0';
+        ghost.style.pointerEvents = 'none';
+        ghost.style.zIndex = '1000';
+        document.body.appendChild(ghost);
+        trayDragGhost = ghost;
+        moveTrayGhost(x, y);
+    }
+
+    function moveTrayGhost(x, y) {
+        if (!trayDragGhost) return;
+        const w = trayDragGhost.offsetWidth;
+        const h = trayDragGhost.offsetHeight;
+        trayDragGhost.style.transform = `translate(${x - w / 2}px, ${y - h / 2}px) scale(1.08)`;
+    }
+
+    function clearTrayGhost() {
+        if (trayDragGhost) {
+            trayDragGhost.remove();
+            trayDragGhost = null;
+        }
+    }
+
+    function highlightSlotUnder(x, y) {
+        const slot = findSlotAt(x, y);
+        document.querySelectorAll('.stage-slot.drop-target').forEach(s => {
+            if (s !== slot) s.classList.remove('drop-target');
+        });
+        if (slot) slot.classList.add('drop-target');
+        return slot;
+    }
+
     function attachTrayHandlers() {
         document.querySelectorAll('.tray-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
+            chip.addEventListener('pointerdown', e => {
+                if (e.button !== undefined && e.button !== 0) return; // left/touch only
+                e.preventDefault();
                 ensureAudio();
-                const charId = chip.dataset.char;
-                const emptyIdx = slots.indexOf(null);
-                if (emptyIdx === -1) {
-                    chip.classList.remove('shake');
-                    void chip.offsetWidth; // restart the keyframes
-                    chip.classList.add('shake');
-                    return;
+                try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+                chip.classList.add('grabbing');
+                trayDragState.set(e.pointerId, {
+                    chip,
+                    charId: chip.dataset.char,
+                    startX: e.clientX, startY: e.clientY,
+                    dragging: false
+                });
+            });
+            chip.addEventListener('pointermove', e => {
+                const state = trayDragState.get(e.pointerId);
+                if (!state) return;
+                const dx = e.clientX - state.startX;
+                const dy = e.clientY - state.startY;
+                if (!state.dragging && (dx * dx + dy * dy) > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+                    state.dragging = true;
+                    startTrayGhost(state.chip, e.clientX, e.clientY);
                 }
-                setSlot(emptyIdx, charId);
-                playDropSound();
+                if (state.dragging) {
+                    moveTrayGhost(e.clientX, e.clientY);
+                    highlightSlotUnder(e.clientX, e.clientY);
+                }
+            });
+            chip.addEventListener('pointerup', e => {
+                const state = trayDragState.get(e.pointerId);
+                if (!state) return;
+                trayDragState.delete(e.pointerId);
+                try {
+                    if (state.chip.hasPointerCapture(e.pointerId)) {
+                        state.chip.releasePointerCapture(e.pointerId);
+                    }
+                } catch (_) {}
+                state.chip.classList.remove('grabbing');
+                document.querySelectorAll('.stage-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
+                if (state.dragging) {
+                    const slot = findSlotAt(e.clientX, e.clientY);
+                    if (slot) {
+                        const idx = parseInt(slot.dataset.index, 10);
+                        setSlot(idx, state.charId);
+                        playDropSound();
+                    }
+                    clearTrayGhost();
+                }
+                // No-drag (tap) on a tray chip is intentionally a no-op —
+                // tap-to-place is gone; placing requires a drag.
+            });
+            chip.addEventListener('pointercancel', e => {
+                const state = trayDragState.get(e.pointerId);
+                if (!state) return;
+                trayDragState.delete(e.pointerId);
+                state.chip.classList.remove('grabbing');
+                document.querySelectorAll('.stage-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
+                clearTrayGhost();
             });
         });
     }
@@ -1731,8 +1822,8 @@
         const hint = document.getElementById('trayHint');
         if (!hint) return;
         hint.textContent = isMadballzMode
-            ? 'MADBALLZ MODE · Tap to add · Tap on stage to change face · Drag off to clear'
-            : 'Tap to add · Tap on stage to change face · Drag off stage to clear';
+            ? 'MADBALLZ MODE · Drag a Munki onto the stage · Tap on stage to react · Drag off to remove'
+            : 'Drag a Munki onto the stage · Tap on stage to react · Drag off stage to remove';
     }
 
     function openStoryModal() {

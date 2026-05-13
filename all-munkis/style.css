@@ -530,19 +530,18 @@ main {
     padding: 0 12px;
 }
 
+/* Two-row wrap layout. Drag-to-place needs touch-action:none on each chip,
+   which kills browser scrolling — so the tray must fit every chip without
+   scrolling. 7 chips wrap to ~4+3 on phones, 7-in-a-row on tablets+. */
 .tray {
     display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding: 4px 14px 8px;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(45, 212, 191, 0.4) transparent;
-    -webkit-overflow-scrolling: touch;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 10px 8px;
+    max-width: 1100px;
+    margin: 0 auto;
 }
-
-.tray::-webkit-scrollbar { height: 6px; }
-.tray::-webkit-scrollbar-thumb { background: rgba(45, 212, 191, 0.4); border-radius: 3px; }
 
 .tray-chip {
     flex: 0 0 auto;
@@ -568,22 +567,32 @@ main {
     box-shadow: 0 0 22px rgba(45, 212, 191, 0.45);
 }
 
-.tray-chip:active {
+.tray-chip:active,
+.tray-chip.grabbing {
     transform: scale(0.94);
     transition: transform 0.05s;
+    cursor: grabbing;
+    opacity: 0.55;
 }
 
-/* Brief shake when the kid taps a tray chip but the stage is already full
-   (5 munkis on stage). Visual "no room" cue — clear someone first. */
-@keyframes chip-shake {
-    0%, 100% { transform: translateX(0); }
-    20%      { transform: translateX(-5px) rotate(-2deg); }
-    40%      { transform: translateX(5px)  rotate(2deg);  }
-    60%      { transform: translateX(-4px) rotate(-1.5deg); }
-    80%      { transform: translateX(4px)  rotate(1.5deg); }
+/* Floating chip clone that follows the cursor/finger during a drag from
+   the tray to the stage. Created in startTrayGhost() and removed on drop
+   or cancel. transform handles both translation and the scale-up cue. */
+.tray-chip.drag-ghost {
+    opacity: 0.92;
+    transition: none;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6),
+                0 0 24px rgba(45, 212, 191, 0.55);
+    border-color: #2dd4bf;
+    pointer-events: none;
 }
-.tray-chip.shake {
-    animation: chip-shake 0.34s ease-in-out;
+
+/* Drop-target glow on the stage slot under the dragging pointer. */
+.stage-slot.drop-target {
+    outline: 2px dashed #2dd4bf;
+    outline-offset: -4px;
+    background: rgba(45, 212, 191, 0.18);
+    box-shadow: 0 0 24px rgba(45, 212, 191, 0.55) inset;
 }
 
 /* Lift the Munki visually while it's being dragged off the stage. If the
@@ -625,16 +634,8 @@ main {
     width: 100%;
 }
 
-/* ====== DESKTOP: wrap the chips into 2 rows so nothing is hidden ====== */
+/* ====== DESKTOP: roomier bottom padding so the wrapped tray clears ====== */
 @media (min-width: 760px) {
-    .tray {
-        flex-wrap: wrap;
-        justify-content: center;
-        overflow-x: visible;
-        max-width: 1100px;
-        margin: 0 auto;
-        padding: 4px 16px;
-    }
     main { padding-bottom: 290px; }
 }
 
