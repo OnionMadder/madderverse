@@ -27,6 +27,7 @@
     <meta name="application-name" content="FYMZ" />
     <link rel="stylesheet" href="https://madderverse.org/giggle-gears/assets/css/sprites.css" />
     <link rel="stylesheet" href="https://madderverse.org/giggle-gears/assets/css/style.css" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <script data-goatcounter="https://fymz.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 
@@ -187,6 +188,15 @@
 </div>
 
 <script type="module" src="https://madderverse.org/giggle-gears/assets/js/main.js"></script>
+
+<footer class="site-footer-slim" aria-label="Site info">
+    <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../">The Madderverse</a>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../about.html">About</a>
+</footer>
+<script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 
 </body>
 </html>

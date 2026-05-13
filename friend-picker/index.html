@@ -26,6 +26,7 @@
     <meta name="theme-color" content="#00ffcc" /> <meta name="apple-mobile-web-app-title" content="The Madderverse" />
     <meta name="application-name" content="The Madderverse" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 
@@ -73,6 +74,14 @@
 
 <script src="game.js"></script>
 
+<footer class="site-footer-slim" aria-label="Site info">
+    <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../">The Madderverse</a>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../about.html">About</a>
+</footer>
+<script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 
 </body>
 </html>

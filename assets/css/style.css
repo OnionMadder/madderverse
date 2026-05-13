@@ -79,84 +79,109 @@ body.kids-hub {
     .container { padding: 0 1.5rem 4rem; }
 }
 
-/* Game grid: responsive columns, never single-stack */
+/* Game grid: landscape monitor-style cards. 1-up on phones (the
+   landscape covers want room to breathe), 2-up around tablet,
+   3-up on desktop. .site-footer rules live in assets/css/site-footer.css. */
 .game-grid {
     display: grid;
     gap: 1rem;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
 }
-@media (min-width: 500px) {
-    .game-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (min-width: 760px) {
+@media (min-width: 600px) {
     .game-grid {
         gap: 1.25rem;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 @media (min-width: 1000px) {
     .game-grid {
         gap: 1.5rem;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
-/* Cards */
+/* Each card looks like a small flat-panel monitor. The card itself
+   is the bezel; .cover is the recessed screen; ::after is the LED. */
 .game-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: var(--border-thin);
-    border-radius: 12px;
-    padding: 0.75rem;
-    text-align: center;
+    position: relative;
+    background: linear-gradient(180deg, #1a1a1f 0%, #08080b 100%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    padding: 10px 12px 16px;
+    text-align: left;
     transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
                 border-color 0.2s, box-shadow 0.2s;
     display: flex;
     flex-direction: column;
-    align-items: center;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.04) inset,
+        0 6px 24px rgba(0, 0, 0, 0.45);
 }
 
 @media (min-width: 600px) {
-    .game-card { padding: 1.25rem; }
+    .game-card { padding: 12px 14px 18px; }
 }
 
-/* Cover image (replaces emoji icons for game cards) */
+/* The "screen" — landscape 16:9. Inner ring + inner shadow read as
+   a recessed panel without going full retro CRT. */
 .game-card .cover {
     display: block;
     width: 100%;
-    aspect-ratio: 3 / 4;
+    aspect-ratio: 16 / 9;
     object-fit: cover;
-    border-radius: 8px;
-    margin-bottom: 0.75rem;
-    border: 1px solid rgba(0, 255, 204, 0.18);
+    border-radius: 6px;
+    margin: 0 0 12px;
+    border: 1px solid rgba(0, 0, 0, 0.7);
     background: linear-gradient(135deg, rgba(0, 255, 204, 0.08), rgba(255, 0, 255, 0.08));
+    box-shadow:
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 0 30px rgba(0, 255, 204, 0.04) inset,
+        0 2px 6px rgba(0, 0, 0, 0.6);
+    transition: box-shadow 0.25s;
 }
 
-/* Emoji icon (used by .coming-soon variant) */
+/* Emoji-icon variant (.coming-soon). Matches screen aspect so the
+   grid stays even when the slot has no signal. */
 .game-card .icon {
     width: 100%;
-    aspect-ratio: 3 / 4;
-    margin: 0 0 0.75rem;
-    font-size: clamp(3rem, 8vw, 5rem);
+    aspect-ratio: 16 / 9;
+    margin: 0 0 12px;
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px dashed rgba(255, 255, 255, 0.12);
     background: linear-gradient(135deg, rgba(0, 255, 204, 0.05), rgba(255, 0, 255, 0.05));
     filter: drop-shadow(0 0 10px rgba(255,255,255,0.2));
 }
 
+/* Power LED on the chin */
+.game-card::after {
+    content: '';
+    position: absolute;
+    right: 18px;
+    bottom: 8px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow:
+        0 0 6px var(--accent-cyan),
+        0 0 1px rgba(255, 255, 255, 0.9) inset;
+    opacity: 0.85;
+    pointer-events: none;
+}
+
 .game-card h2 {
-    margin: 0.25rem 0 0.4rem;
-    font-size: clamp(0.95rem, 2.5vw, 1.25rem);
+    margin: 0.15rem 0 0.35rem;
+    font-size: clamp(1rem, 2.4vw, 1.25rem);
     color: var(--accent-cyan);
     line-height: 1.2;
 }
 
 .game-card p {
-    font-size: clamp(0.75rem, 1.8vw, 0.9rem);
+    font-size: clamp(0.78rem, 1.7vw, 0.92rem);
     opacity: 0.8;
     line-height: 1.4;
     margin: 0 0 0.9rem;
@@ -164,91 +189,56 @@ body.kids-hub {
 }
 
 .play-btn {
+    display: block;
     width: 100%;
-    max-width: 220px;
-    padding: 0.6rem 0.5rem;
+    padding: 0.65rem 1rem;
     background: transparent;
     border: 2px solid var(--accent-cyan);
     color: var(--accent-cyan);
     text-decoration: none;
+    text-align: center;
     text-transform: uppercase;
     font-weight: bold;
     letter-spacing: 1px;
     border-radius: 8px;
     transition: all 0.2s;
-    font-size: clamp(0.75rem, 1.8vw, 0.95rem);
+    font-size: clamp(0.78rem, 1.6vw, 0.92rem);
     box-sizing: border-box;
 }
 
 @media (min-width: 600px) {
-    .play-btn { padding: 0.85rem 1rem; }
+    .play-btn { padding: 0.8rem 1.25rem; }
 }
 
-.game-card.coming-soon { opacity: 0.65; }
+.game-card.coming-soon { opacity: 0.6; }
+.game-card.coming-soon::after { opacity: 0.25; } /* LED dim — no signal */
 
-/* Hover + active */
+/* Hover/active: subtle "screen wakes up" — cyan tint on the bezel
+   and stronger cyan glow on the recessed screen. */
 @media (hover: hover) {
     .game-card:hover {
-        transform: scale(1.03);
-        border-color: var(--accent-cyan);
-        box-shadow: var(--onion-glow);
+        transform: translateY(-2px);
+        border-color: rgba(0, 255, 204, 0.45);
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.06) inset,
+            0 8px 28px rgba(0, 0, 0, 0.55),
+            var(--onion-glow);
+    }
+    .game-card:hover .cover {
+        box-shadow:
+            0 0 0 1px rgba(0, 255, 204, 0.18) inset,
+            0 0 35px rgba(0, 255, 204, 0.12) inset,
+            0 2px 8px rgba(0, 0, 0, 0.6);
     }
 }
 
-.game-card:active { transform: scale(0.98); }
+.game-card:active { transform: translateY(0) scale(0.99); }
 
 .play-btn:active, .play-btn:hover {
     background: var(--accent-cyan);
     color: #000;
     box-shadow: 0 0 25px var(--accent-cyan);
 }
-
-/* Site footer (flow, not fixed) */
-.site-footer {
-    margin-top: auto;
-    padding: 2rem 1rem 1.5rem;
-    border-top: 1px solid rgba(0, 255, 204, 0.15);
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    text-align: center;
-}
-
-.site-footer .footer-nav {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.5rem 1.5rem;
-    margin: 0 0 0.75rem;
-    padding: 0;
-    list-style: none;
-    font-size: 0.95rem;
-}
-.site-footer .footer-nav a {
-    color: var(--accent-cyan);
-    text-decoration: none;
-    transition: color 0.2s, text-shadow 0.2s;
-}
-.site-footer .footer-nav a:hover {
-    color: var(--accent-pink);
-    text-shadow: 0 0 10px var(--accent-pink);
-}
-
-.site-footer .footer-tagline {
-    font-family: monospace;
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 0.72rem;
-    letter-spacing: 1.5px;
-    margin: 0.4rem 0;
-    text-transform: uppercase;
-}
-
-.site-footer .footer-copy {
-    opacity: 0.55;
-    font-size: 0.78rem;
-    margin: 0.5rem 0 0;
-}
-.site-footer .footer-copy a { color: white; }
 
 /* Article pages (about, legal) */
 .article {

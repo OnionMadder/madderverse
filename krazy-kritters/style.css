@@ -46,7 +46,7 @@ body {
   display: grid;
   grid-template-rows: auto 1fr auto;
   grid-template-areas: "header" "stage" "footer";
-  height: 100vh;
+  height: calc(100vh - var(--mv-slim-h, 22px));
   width: 100vw;
   padding: 8px 14px;
   gap: 6px;

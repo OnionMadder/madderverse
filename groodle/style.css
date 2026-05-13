@@ -761,30 +761,8 @@ body.dancing .draw-mode-row {
 }
 
 /* ============ FOOTER ============ */
-
-.site-footer {
-    margin-top: 28px;
-    padding: 18px 12px 24px;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.55);
-    font-size: 12px;
-}
-.footer-nav {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 8px;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 14px;
-}
-.footer-nav a { color: #d6bdff; text-decoration: none; }
-@media (hover: hover) {
-    .footer-nav a:hover { color: #00ffcc; }
-}
-.footer-tagline { margin: 4px 0; letter-spacing: 1px; }
-.footer-copy { margin: 4px 0; }
-.footer-copy a { color: #ff6ec7; text-decoration: none; }
+/* Footer styles live in /assets/css/site-footer.css (.site-footer)
+   so the look is uniform across the Madderverse. */
 
 /* ============ DESKTOP LAYOUT ============ */
 
