@@ -47,17 +47,26 @@ const FRAMES = {
 function applySprite(el, sheetKey, frameKey, w, h) {
     const sheet = SHEETS[sheetKey];
     const frame = FRAMES[sheetKey][frameKey];
-    // Uniform scale so non-square sprite cells (cookie cells are 4:3
-    // = 1080×810) don't get squished into a square display element.
-    // The sheet is scaled by min(w/frame.w, h/frame.h) and the cell is
-    // centered within the element's box — preserves the cookie's
-    // intended round shape on mobile/desktop alike.
-    const s = Math.min(w / frame.w, h / frame.h);
-    const offsetX = (w - frame.w * s) / 2;
-    const offsetY = (h - frame.h * s) / 2;
+    // Two-pixel inset into the cell so anti-aliased scaling doesn't
+    // sample the 1-pixel separator between sheet cells (and the next
+    // cell's content beyond it, which was bleeding through as "chunks
+    // of the neighbour cookie" at small display sizes).
+    const INSET = 2;
+    const fx = frame.x + INSET;
+    const fy = frame.y + INSET;
+    const fw = frame.w - 2 * INSET;
+    const fh = frame.h - 2 * INSET;
+    // Element aspect matches cell aspect (see spawnCookie / .flying-*
+    // CSS) so this min collapses to a single scale and offsetX/Y are
+    // both zero in the common case. The centering branch is kept as a
+    // safety net for the brief .after sprite swap on catch (eaten cells
+    // are ~1.115:1, not exactly 4:3).
+    const s = Math.min(w / fw, h / fh);
+    const offsetX = (w - fw * s) / 2;
+    const offsetY = (h - fh * s) / 2;
     el.style.backgroundImage    = `url('${sheet.url}')`;
     el.style.backgroundSize     = `${sheet.w * s}px ${sheet.h * s}px`;
-    el.style.backgroundPosition = `${-frame.x * s + offsetX}px ${-frame.y * s + offsetY}px`;
+    el.style.backgroundPosition = `${-fx * s + offsetX}px ${-fy * s + offsetY}px`;
 }
 
 const COOKIE_NAMES = [
@@ -564,18 +573,23 @@ function spawnCookie() {
     if (W < 50 || H < 50) return;
 
     const fromLeft = Math.random() < 0.5;
-    const size     = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const cookieD  = Math.min(Math.max(W * 0.18, 72), 120);
-    const startX = fromLeft ? -cookieD : W + cookieD;
+    const isVeggie = Math.random() < CFG.veggieRatio;
+    // Element aspect tracks sheet-cell aspect: cookies are 4:3, veggies
+    // are 1:1. This is what kills the "neighbour cookie chunks" bleed —
+    // when the element matches the cell exactly, the scaled sheet image
+    // has no empty space inside the element to leak adjacent cells.
+    const cookieW = Math.min(Math.max(W * 0.18, 72), 120);
+    const cookieH = isVeggie ? cookieW : Math.round(cookieW * 0.75);
+
+    const startX = fromLeft ? -cookieW : W + cookieW;
     const startY = rand(H * 0.55, H * 0.85);
-    const flightTime = rand(1.6, 2.4); 
-    const targetX    = fromLeft ? W + cookieD : -cookieD;
+    const flightTime = rand(1.6, 2.4);
+    const targetX    = fromLeft ? W + cookieW : -cookieW;
     const vx = (targetX - startX) / flightTime;
     const peakY = rand(H * CFG.minPeakRatio, H * CFG.maxPeakRatio);
     const dy = Math.max(20, startY - peakY);
     const vy = -Math.sqrt(2 * CFG.gravity * dy);
 
-    const isVeggie = Math.random() < CFG.veggieRatio;
     const entry    = choice(isVeggie ? VEGGIES : COOKIES);
     // Veggies have a single sprite; cookies have a before/after pair.
     const sprite      = isVeggie ? entry : entry.before;
@@ -585,7 +599,7 @@ function spawnCookie() {
     el.className = isVeggie ? 'flying-veggie' : 'flying-cookie';
     el.style.left = '0px';
     el.style.top  = '0px';
-    applySprite(el, sprite.sheet, sprite.frame, cookieD, cookieD);
+    applySprite(el, sprite.sheet, sprite.frame, cookieW, cookieH);
 
     // Lock in the speed multiplier at spawn time. Streak speedup AND the
     // round's base-speed curve both multiply in — so cookies already in
@@ -602,8 +616,8 @@ function spawnCookie() {
         vy,
         rot:   rand(0, 360),
         vrot:  rand(-220, 220),
-        w:     cookieD,
-        h:     cookieD,
+        w:     cookieW,
+        h:     cookieH,
         alive: true,
         popped: false,
         isVeggie,
@@ -1020,11 +1034,14 @@ function addPileThumb(sprite) {
     el.className = 'pile-cookie';
     const zoneR = els.pileZone.getBoundingClientRect();
     const thumbW = Math.min(Math.max(zoneR.width * 0.45, 28), 44);
-    applySprite(el, sprite.sheet, sprite.frame, thumbW, thumbW);
+    // Match the .after cell aspect (1080×968 ≈ 1.115:1) so the scaled
+    // sheet has no empty space to bleed adjacent cells into.
+    const thumbH = Math.round(thumbW * 968 / 1080);
+    applySprite(el, sprite.sheet, sprite.frame, thumbW, thumbH);
     el.style.width = thumbW + 'px';
-    el.style.height = thumbW + 'px';
+    el.style.height = thumbH + 'px';
     const x = rand(0, Math.max(0, zoneR.width  - thumbW));
-    const y = rand(0, Math.max(0, zoneR.height - thumbW));
+    const y = rand(0, Math.max(0, zoneR.height - thumbH));
     el.style.left = x + 'px';
     el.style.bottom = y + 'px';
     el.style.transform = `rotate(${rand(-25, 25)}deg)`;
@@ -1212,7 +1229,10 @@ function buildFeastPile(stageR) {
     const pileR = els.feastPile.getBoundingClientRect();
     const pileW = pileR.width;
     const pileH = pileR.height;
-    const cookieD = Math.min(Math.max(pileW * 0.22, 38), 70);
+    const cookieW = Math.min(Math.max(pileW * 0.22, 38), 70);
+    // Match the .after cell aspect (1080×968) so no sheet bleed in
+    // the feast pile (same trick as the in-flight cookies + pile thumbs).
+    const cookieH = Math.round(cookieW * 968 / 1080);
 
     const imgs = [];
     for (let i = 0; i < count; i++) {
@@ -1220,16 +1240,16 @@ function buildFeastPile(stageR) {
         const sprite = COOKIES[i % COOKIES.length].after;
         const el = document.createElement('div');
         el.className = 'feast-cookie';
-        applySprite(el, sprite.sheet, sprite.frame, cookieD, cookieD);
-        el.style.width  = cookieD + 'px';
-        el.style.height = cookieD + 'px';
+        applySprite(el, sprite.sheet, sprite.frame, cookieW, cookieH);
+        el.style.width  = cookieW + 'px';
+        el.style.height = cookieH + 'px';
 
         const rowSize = Math.ceil(Math.sqrt(count) * 1.4);
         const row     = Math.floor(i / rowSize);
         const col     = i % rowSize;
-        const rowOffset = row * cookieD * 0.55;
+        const rowOffset = row * cookieH * 0.55;
 
-        const x = pileW - cookieD * (rowSize + 1) * 0.45 + col * cookieD * 0.6 + rand(-4, 4);
+        const x = pileW - cookieW * (rowSize + 1) * 0.45 + col * cookieW * 0.6 + rand(-4, 4);
         const y = rowOffset + rand(-3, 3);
 
         el.style.right  = (x) + 'px';

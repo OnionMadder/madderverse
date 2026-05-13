@@ -490,12 +490,6 @@ body {
 .flying-cookie,
 .flying-veggie {
     position: absolute;
-    /* Bumped 33% (was clamp(54, 14vw, 90)) to compensate for uniform
-       sprite scaling — cookie cells are 4:3, so they now display at 75%
-       of element height. Larger element keeps the cookies' visual
-       presence on screen while letting them render at correct aspect. */
-    width: clamp(72px, 18vw, 120px);
-    height: clamp(72px, 18vw, 120px);
     background-repeat: no-repeat;
     pointer-events: auto;
     cursor: pointer;
@@ -503,9 +497,8 @@ body {
     z-index: 6;
     filter: drop-shadow(0 0 10px rgba(0,255,204,0.35)) drop-shadow(0 6px 10px rgba(0,0,0,0.55));
     /* Expanded hit area via padding (negated by margin so layout is unchanged).
-       Bumped from 56 → 80 in chunk 9 — fast-moving cookies on desktop are
-       hard to click precisely, and the extra 24px on each side noticeably
-       improves catch rate without overlapping neighbours at normal density. */
+       Fast-moving cookies on desktop are hard to click precisely; the 80px
+       inset gives generous tap targets without overlapping neighbours. */
     padding: 80px;
     margin: -80px;
     box-sizing: content-box;
@@ -513,7 +506,17 @@ body {
     background-clip: content-box;
     -webkit-touch-callout: none;
 }
+/* Element aspect now matches each sheet cell's aspect so the sprite
+   fills the element exactly with no empty space — kills the "chunks
+   of neighbour cookie" bleed that the previous square element caused
+   when 4:3 cookie cells were uniform-scaled into it. */
+.flying-cookie {
+    width:  clamp(72px, 18vw, 120px);          /* 4:3 — matches cookie cells (1080×810) */
+    height: clamp(54px, 13.5vw, 90px);
+}
 .flying-veggie {
+    width:  clamp(72px, 18vw, 120px);          /* 1:1 — matches veg cells (438×438) */
+    height: clamp(72px, 18vw, 120px);
     filter: drop-shadow(0 0 10px rgba(255,0,255,0.4)) drop-shadow(0 6px 10px rgba(0,0,0,0.55));
 }
 .flying-cookie.popped,
