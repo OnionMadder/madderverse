@@ -8,8 +8,8 @@
     const SECONDS_PER_STEP = 60 / TEMPO / 4; // 0.15s
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
-    const NUM_SLOTS = 8;
-    const BARS_PER_LOOP = 2;                
+    const NUM_SLOTS = 5;
+    const BARS_PER_LOOP = 4;                 // I-vi-IV-V progression (Cmaj, Am, Fmaj, G)
     const MADBALLZ_UNLOCK_THRESHOLD = 3;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
@@ -24,6 +24,18 @@
     let currentBar = 0;
     let nextStepTime = 0;
     let schedTimer = null;
+    // Tone.js layer — built once on first user interaction (inside ensureAudio).
+    // Adds a reverb/delay-driven pad, a sparkly FM bell, and a subtle hi-hat
+    // groove on top of the raw-WebAudio BASE_SONG. The 24 character voices
+    // continue to use raw WebAudio underneath. See buildToneLayer + TONE_LAYER.
+    let toneReady = false;
+    let toneBus = null;       // shared reverb/delay sink for melodic Tone voices
+    let tonePad = null;       // PolySynth — sustained chord per bar
+    let toneBell = null;      // FMSynth — section-transition sparkle
+    let toneHat = null;       // MetalSynth — off-beat hi-hat tick
+    let toneDrone = null;     // Oscillator — low rumble that swells during react mode
+    let toneDroneGain = null; // Drone's gain envelope (ramps on react in/out)
+    let anyWasReacting = false; // edge-detect react mode transitions for the drone
 
     let horrorTriggers = 0;
     let activeBankIndex = 0;
@@ -43,6 +55,7 @@
             comp.attack.value = 0.004;
             comp.release.value = 0.15;
             masterGain.connect(comp).connect(audioCtx.destination);
+            buildToneLayer(); // no-op if Tone.js isn't loaded
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
         if (!isPlaying) {
@@ -52,6 +65,93 @@
             nextStepTime = audioCtx.currentTime + 0.08;
             schedule();
         }
+    }
+
+    // Binds Tone.js to our existing audioCtx so its scheduler shares the
+    // same clock as the raw-WebAudio scheduler, then builds three ambient
+    // instruments (pad / bell / hat) that TONE_LAYER drives every bar.
+    // Silently bails if Tone.js failed to load — the raw-WebAudio BASE_SONG
+    // is the source of truth and the game stays playable without it.
+    function buildToneLayer() {
+        if (typeof Tone === 'undefined' || toneReady) return;
+        try {
+            // Tone.setContext accepts a raw AudioContext in v14+. The new
+            // Tone.Context wrapper picks up our existing destination so
+            // every Tone.connect(node, masterGain) below routes correctly.
+            Tone.setContext(audioCtx);
+        } catch (e) {
+            try { Tone.setContext(new Tone.Context({ context: audioCtx })); }
+            catch (e2) { return; }
+        }
+        // Effects bus: PolySynth pad + FM bell go through reverb + delay so
+        // the ambient layer sits "behind" the chiptune voices in the mix.
+        const reverb = new Tone.Reverb({ decay: 3.4, preDelay: 0.04, wet: 0.35 });
+        const delay  = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.22, wet: 0.22 });
+        const busOut = new Tone.Gain(0.55);
+        reverb.connect(delay);
+        delay.connect(busOut);
+        Tone.connect(busOut, masterGain);
+        toneBus = reverb;
+
+        // PolySynth pad — fat, slow sine cluster that sustains the bar's
+        // chord. Quiet enough to sit under the leads without muddying.
+        tonePad = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'fatsine', count: 3, spread: 22 },
+            envelope: { attack: 0.45, decay: 0.35, sustain: 0.65, release: 1.4 },
+            volume: -22
+        });
+        tonePad.connect(toneBus);
+
+        // FMSynth bell — sparkles on section-change bars for ear candy.
+        toneBell = new Tone.FMSynth({
+            harmonicity: 2,
+            modulationIndex: 11,
+            envelope:           { attack: 0.002, decay: 0.5, sustain: 0, release: 0.7 },
+            modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.7 },
+            volume: -16
+        });
+        toneBell.connect(toneBus);
+
+        // MetalSynth hi-hat — direct to masterGain (no reverb wash) so the
+        // off-beat tick stays tight against the kid's drum-mods.
+        toneHat = new Tone.MetalSynth({
+            envelope: { attack: 0.001, decay: 0.05, release: 0.02 },
+            harmonicity: 5.1, modulationIndex: 32, resonance: 4200, octaves: 1.5,
+            volume: -32
+        });
+        Tone.connect(toneHat, masterGain);
+
+        // Sub-bass drone for react mode. A pair of slightly detuned low
+        // sawtooths through a heavy lowpass — when any Munki tips into
+        // react mode, the drone swells up over ~4 s and just sits there
+        // ominously until react ends. It's silent the rest of the time
+        // (start gain at zero, ramp on transitions in tickReactState).
+        const droneOsc1 = new Tone.Oscillator({ frequency: 55, type: 'sawtooth' });
+        const droneOsc2 = new Tone.Oscillator({ frequency: 55.5, type: 'sawtooth' });
+        const droneFilter = new Tone.Filter({ type: 'lowpass', frequency: 240, Q: 4 });
+        const droneShape = new Tone.Distortion(0.35);
+        toneDroneGain = new Tone.Gain(0);
+        droneOsc1.connect(droneFilter);
+        droneOsc2.connect(droneFilter);
+        droneFilter.connect(droneShape);
+        droneShape.connect(toneDroneGain);
+        Tone.connect(toneDroneGain, masterGain);
+        droneOsc1.start();
+        droneOsc2.start();
+        toneDrone = { osc1: droneOsc1, osc2: droneOsc2, filter: droneFilter };
+
+        toneReady = true;
+    }
+
+    // Ramp the sub-bass drone up or down depending on whether react mode
+    // is active. Long 4-s envelope so the menace sneaks in rather than
+    // popping. Called from tickReactState only on a transition.
+    function setReactDrone(on) {
+        if (!toneReady || !toneDroneGain) return;
+        const now = Tone.now();
+        toneDroneGain.gain.cancelScheduledValues(now);
+        toneDroneGain.gain.setValueAtTime(toneDroneGain.gain.value, now);
+        toneDroneGain.gain.linearRampToValueAtTime(on ? 0.32 : 0, now + 4);
     }
 
     function schedule() {
@@ -68,7 +168,10 @@
     }
 
     function scheduleStep(step, bar, when) {
-        if (isBaseSongOn) BASE_SONG.play(audioCtx, masterGain, when, step, bar);
+        if (isBaseSongOn) {
+            BASE_SONG.play(audioCtx, masterGain, when, step, bar);
+            TONE_LAYER.play(step, bar, when); // ambient pad + bell + hat
+        }
         // User-placed mods
         for (let i = 0; i < NUM_SLOTS; i++) {
             const id = slots[i];
@@ -78,7 +181,7 @@
         }
         if (step % 4 === 0) {
             const delayMs = Math.max(0, (when - audioCtx.currentTime) * 1000);
-            setTimeout(pulseActiveIcons, delayMs);
+            setTimeout(() => { pulseActiveIcons(); tickReactState(); }, delayMs);
         }
     }
 
@@ -110,23 +213,36 @@
         }
         return c;
     }
+    // ---------- BASE SONG ----------
+    // Bala's Theme — a 4-bar I-vi-IV-V loop (Cmaj → Am → Fmaj → G), the
+    // classic singable kid-pop progression. Each bar fires:
+    //   - one sustained triangle bass (the chord root, an octave low)
+    //   - a triangle triad pad ringing across the bar
+    //   - a square-wave melody hook on quarter notes (steps 0/4/8/12)
+    // The TONE_LAYER block below adds a thicker reverb-y pad + a bell + an
+    // off-beat hat on top — Tone.js sits on the same audioCtx so the two
+    // layers stay phase-locked.
     const BASE_SONG = {
+        chordsByBar: [
+            // bass = chord root in the low octave; triad = three voices
+            // a fourth/fifth above it for the sustained pad.
+            { bass: 65.41, triad: [261.63, 329.63, 392.00], melody: { 0: 783.99, 4: 659.25, 8: 523.25, 12: 659.25 } }, // Cmaj  (G E C E)
+            { bass: 55.00, triad: [220.00, 261.63, 329.63], melody: { 0: 440.00, 4: 523.25, 8: 659.25, 12: 392.00 } }, // Am    (A C E G)
+            { bass: 87.31, triad: [174.61, 220.00, 261.63], melody: { 0: 440.00, 4: 349.23, 8: 440.00, 12: 523.25 } }, // Fmaj  (A F A C)
+            { bass: 98.00, triad: [196.00, 246.94, 293.66], melody: { 0: 493.88, 4: 392.00, 8: 493.88, 12: 587.33 } }  // G     (B G B D)
+        ],
         play(ctx, out, when, step, bar) {
-            // Sustained bass + pad fire once at the top of each bar and ring
-            // out across the full 2.4s the bar takes to complete.
-            if (step === 0) {
-                const isC = bar === 0;
-                const root = isC ? 65.41 : 55.00;            // C2 / A1
-                const chord = isC
-                    ? [261.63, 329.63, 392.00]               // C E G
-                    : [220.00, 261.63, 329.63];              // A C E (Am)
-                const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR; // 2.4s
+            const cb = this.chordsByBar[bar];
+            if (!cb) return;
+            const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR; // 2.4 s
 
-                // Bass — triangle wave, gentle attack/sustain envelope
+            // Sustained bass + pad fire once at the top of each bar and ring
+            // out across the full bar length.
+            if (step === 0) {
                 const b = ctx.createOscillator();
                 const bg = ctx.createGain();
                 b.type = 'triangle';
-                b.frequency.value = root;
+                b.frequency.value = cb.bass;
                 bg.gain.setValueAtTime(0, when);
                 bg.gain.linearRampToValueAtTime(0.16, when + 0.07);
                 bg.gain.linearRampToValueAtTime(0.13, when + BAR_LEN * 0.7);
@@ -134,9 +250,7 @@
                 b.connect(bg).connect(out);
                 b.start(when); b.stop(when + BAR_LEN + 0.05);
 
-                // Pad — chord triad, quieter on each higher voice so the
-                // root sits forward in the mix without muddying the leads.
-                chord.forEach((freq, i) => {
+                cb.triad.forEach((freq, i) => {
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
                     o.type = 'triangle';
@@ -151,13 +265,8 @@
                 });
             }
 
-            // Melody hook on quarter notes — bouncy "bala-bala" phrase.
-            //   Bar 0 (Cmaj):  G5  E5  C5  E5
-            //   Bar 1 (Am):    A4  C5  E5  G4
-            const melodyBar0 = { 0: 783.99, 4: 659.25, 8: 523.25, 12: 659.25 };
-            const melodyBar1 = { 0: 440.00, 4: 523.25, 8: 659.25, 12: 392.00 };
-            const melody = bar === 0 ? melodyBar0 : melodyBar1;
-            const freq = melody[step];
+            // Melody hook on quarter notes — square-wave through a soft lowpass.
+            const freq = cb.melody[step];
             if (freq !== undefined) {
                 const o = ctx.createOscillator();
                 const g = ctx.createGain();
@@ -173,6 +282,44 @@
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
                 o.connect(f).connect(g).connect(out);
                 o.start(when); o.stop(when + 0.36);
+            }
+        }
+    };
+
+    // ---------- TONE LAYER ----------
+    // Tone.js-driven ambient instruments triggered alongside BASE_SONG. Same
+    // 4-bar progression in chord-name form so Tone can do its own scheduling.
+    // No-op when buildToneLayer failed (no Tone.js, or browser blocks AC).
+    const TONE_LAYER = {
+        chordsByBar: [
+            ['C4', 'E4', 'G4'],   // Cmaj
+            ['A3', 'C4', 'E4'],   // Am
+            ['F3', 'A3', 'C4'],   // Fmaj
+            ['G3', 'B3', 'D4']    // G
+        ],
+        play(step, bar, when) {
+            if (!toneReady) return;
+            const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR;
+            // Sustained PolySynth pad — sits behind the triangle pad, adds
+            // body and reverb wash.
+            if (step === 0) {
+                const chord = this.chordsByBar[bar];
+                if (chord) tonePad.triggerAttackRelease(chord, BAR_LEN * 0.92, when);
+            }
+            // Hi-hat tick on the off-eighth (steps 2/10). Very quiet — just
+            // a glassy sparkle to give the groove some forward motion when
+            // the kid hasn't placed any drum mods.
+            if (step === 2 || step === 10) {
+                toneHat.triggerAttackRelease('C5', '32n', when);
+            }
+            // Bell sparkle marking the section turns: top of bar 2 (the
+            // "lift" into the IV chord) and the last beat of bar 3 (the
+            // turnaround back into Cmaj).
+            if (bar === 2 && step === 0) {
+                toneBell.triggerAttackRelease('C6', '2n', when + 0.04);
+            }
+            if (bar === 3 && step === 12) {
+                toneBell.triggerAttackRelease('E6', '4n', when);
             }
         }
     };
@@ -791,6 +938,7 @@ const CHARACTERS = {
         saveProgress();
         updateBankLabel();
         renderTray();
+        attachTrayHandlers();
     }
 
     function updateBankLabel() {
@@ -1010,28 +1158,96 @@ const CHARACTERS = {
     }
 
     // ---------- EXPRESSION (state → 1..5 row of default-heads) ----------
-    // Each Munki picks a row of default-heads based on game state at render
+    // Each slot picks a row of default-heads based on game state at render
     // time. Madballz mods have a static `headFrame` and ignore this.
-    //   1  default / silly        (tray chips + idle on stage)
-    //   2  shocked                (just placed, ~600 ms, OR during a jumpscare)
-    //   3  sad                    (Ice on stage; this slot isn't ice/moon)
-    //   5  angry                  (Moon on stage; this slot isn't ice/moon)
-    // Ice and Moon themselves stay on row 1 (their X/Z glitch-grey row 1 is
-    // already creepy enough — locking them keeps the menace constant).
+    // Priority (highest first):
+    //   jumpscare    →  2 (shocked, briefest gate)
+    //   react mode   →  cycles 1→2→3→4→5→1 on every quarter note (auto-fired
+    //                   after dwelling adjacent to Ice or Moon for
+    //                   REACT_DWELL_BEATS beats — see tickReactState)
+    //   just placed  →  2 (shocked, ~600 ms after a fresh drop)
+    //   manual tap   →  whichever expression the kid last tapped to
+    //   default      →  1 (silly / idle)
     const PLACED_SHOCK_MS = 600;
-    const placedAt = new Map();
+    const placedAt = new Map();         // slotIndex → performance.now()
+    const manualExpression = new Map();  // slotIndex → 1..5 (set by tap-cycle)
+    const dwellBeats = new Map();        // slotIndex → consecutive beats adjacent to a trigger
+    const reactStartBeat = new Map();    // slotIndex → beatCounter when react fired
+    const REACT_DWELL_BEATS = 8;         // ~4.8 s at 100 BPM
+    let beatCounter = 0;                 // monotonically ticks on every quarter note
 
     function expressionForSlot(slotIndex) {
         if (slotIndex == null) return 1;
         if (isJumpScareActive) return 2;
         const id = slots[slotIndex];
         if (!id) return 1;
+        const r = reactStartBeat.get(slotIndex);
+        if (r !== undefined) return ((beatCounter - r) % 5) + 1;
         const t = placedAt.get(slotIndex);
         if (t !== undefined && (performance.now() - t) < PLACED_SHOCK_MS) return 2;
-        if (id === 'ice' || id === 'moon') return 1;
-        if (slots.indexOf('moon') !== -1) return 5;
-        if (slots.indexOf('ice')  !== -1) return 3;
+        const m = manualExpression.get(slotIndex);
+        if (m !== undefined) return m;
         return 1;
+    }
+
+    // Tap on a stage slot cycles its expression 1 → 2 → 3 → 4 → 5 → 1.
+    // The result is read by expressionForSlot until a higher-priority state
+    // (jumpscare, react mode, fresh placement) overrides it.
+    function cycleManualExpression(slotIndex) {
+        const cur = manualExpression.get(slotIndex) || 1;
+        manualExpression.set(slotIndex, (cur % 5) + 1);
+    }
+
+    // True if either immediate neighbour in the linear 5-slot row holds an
+    // antagonist (Ice or Moon). Used by the react-mode dwell ticker.
+    function isTriggerAdjacent(idx) {
+        const left  = idx > 0             ? slots[idx - 1] : null;
+        const right = idx < NUM_SLOTS - 1 ? slots[idx + 1] : null;
+        const evil = id => id === 'ice' || id === 'moon';
+        return evil(left) || evil(right);
+    }
+
+    // Beat-quantised state machine. Fires once per quarter note (from
+    // scheduleStep). Increments dwell for every regular Munki next to an
+    // antagonist; trips that Munki into react mode when dwell crosses
+    // REACT_DWELL_BEATS. Resets dwell when the kid moves things around so
+    // the kid can rescue a Munki by sliding it away in time.
+    function tickReactState() {
+        beatCounter++;
+        let anyReacting = false;
+        const toRender = new Set();
+        for (let i = 0; i < NUM_SLOTS; i++) {
+            const id = slots[i];
+            // Empty slots and the antagonists themselves never react.
+            if (!id || id === 'ice' || id === 'moon') {
+                if (dwellBeats.delete(i))     toRender.add(i);
+                if (reactStartBeat.delete(i)) toRender.add(i);
+                continue;
+            }
+            if (isTriggerAdjacent(i)) {
+                const next = (dwellBeats.get(i) || 0) + 1;
+                dwellBeats.set(i, next);
+                if (next >= REACT_DWELL_BEATS && !reactStartBeat.has(i)) {
+                    reactStartBeat.set(i, beatCounter);
+                    manualExpression.delete(i); // react overrides any prior tap
+                    toRender.add(i);
+                }
+            } else {
+                if (dwellBeats.delete(i))     toRender.add(i);
+                if (reactStartBeat.delete(i)) toRender.add(i);
+            }
+            if (reactStartBeat.has(i)) {
+                anyReacting = true;
+                toRender.add(i); // expression cycles every beat
+            }
+        }
+        document.body.classList.toggle('react-mode-active', anyReacting);
+        // Drone fires the sub-bass swell on transitions in/out of react mode.
+        if (anyReacting !== anyWasReacting) {
+            setReactDrone(anyReacting);
+            anyWasReacting = anyReacting;
+        }
+        toRender.forEach(i => renderSlot(i));
     }
 
     // headArt composes the head layers (shape circle → sprite → hair → cans).
@@ -1130,14 +1346,17 @@ const CHARACTERS = {
     function setSlot(index, charId) {
         const wasHorror = HORROR_TRIGGER_MODS.has(slots[index]);
         const iceWasOn = isIceOnStage();
-        const moonWasOn = slots.indexOf('moon') !== -1;
         slots[index] = charId;
-        // Track placement time so expressionForSlot can show the "shocked"
-        // row for ~600ms after a fresh drop. Re-render once that window
-        // closes so the face settles back to row 1 (or 3/5 if Ice/Moon is
-        // still on stage). Cleared on remove so empty slots don't shock
-        // again next time something lands here.
+        // Replacing or clearing a slot resets every per-slot state map so
+        // the new occupant starts from a clean default. dwell + react are
+        // cheap to rebuild via the beat tick if conditions re-apply.
+        manualExpression.delete(index);
+        dwellBeats.delete(index);
+        reactStartBeat.delete(index);
         if (charId) {
+            // Track placement time so expressionForSlot shows the "shocked"
+            // row for ~600 ms after a fresh drop. Schedule a re-render
+            // once that window closes so the face settles back to row 1.
             placedAt.set(index, performance.now());
             setTimeout(() => {
                 if (slots[index] === charId) renderSlot(index);
@@ -1162,18 +1381,8 @@ const CHARACTERS = {
         // shimmer once on the transition INTO an iced stage. Stage thaws
         // automatically when the last Ice Munki is cleared.
         const iceNowOn = isIceOnStage();
-        const moonNowOn = slots.indexOf('moon') !== -1;
         updateIceFreeze();
         if (iceNowOn && !iceWasOn) playIceFreezeSound();
-        // When ice or moon presence flips, every other slot's expression
-        // changes (sad/angry/default). Re-render the others so their face
-        // sprite picks up the new state. The slot we just touched was
-        // already rendered above with the fresh placedAt.
-        if (iceNowOn !== iceWasOn || moonNowOn !== moonWasOn) {
-            for (let i = 0; i < NUM_SLOTS; i++) {
-                if (i !== index) renderSlot(i);
-            }
-        }
     }
 
     function isIceOnStage() {
@@ -1200,84 +1409,97 @@ const CHARACTERS = {
         });
     }
 
-    // ---------- DRAG & DROP (pointer events: mouse + touch + pen) ----------
-    let drag = null;
-
-    function startDrag(chip, pointerId, x, y) {
-        ensureAudio();
-        const charId = chip.dataset.char;
-        const ghost = document.createElement('div');
-        ghost.id = 'drag-ghost';
-        ghost.innerHTML = characterArt(charId);
-        ghost.style.left = x + 'px';
-        ghost.style.top = y + 'px';
-        document.body.appendChild(ghost);
-        chip.classList.add('dragging');
-        drag = { charId, ghost, chip, pointerId };
+    // ---------- TRAY: tap-to-place ----------
+    // A tap on a tray chip teleports its Munki onto the next empty stage
+    // slot. If the stage is already full, the chip shakes briefly to signal
+    // "no room" — clear someone first.
+    function attachTrayHandlers() {
+        document.querySelectorAll('.tray-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                ensureAudio();
+                const charId = chip.dataset.char;
+                const emptyIdx = slots.indexOf(null);
+                if (emptyIdx === -1) {
+                    chip.classList.remove('shake');
+                    void chip.offsetWidth; // restart the keyframes
+                    chip.classList.add('shake');
+                    return;
+                }
+                setSlot(emptyIdx, charId);
+                playDropSound();
+            });
+        });
     }
 
-    function moveDrag(x, y) {
-        if (!drag) return;
-        drag.ghost.style.left = x + 'px';
-        drag.ghost.style.top = y + 'px';
-        document.querySelectorAll('.stage-slot').forEach(s => s.classList.remove('drop-hover'));
-        const target = findSlotAt(x, y);
-        if (target) target.classList.add('drop-hover');
-    }
-
-    function endDrag(x, y) {
-        if (!drag) return;
-        const target = findSlotAt(x, y);
-        if (target) {
-            const idx = parseInt(target.dataset.index, 10);
-            setSlot(idx, drag.charId);
-            playDropSound();
-        }
-        document.querySelectorAll('.stage-slot').forEach(s => s.classList.remove('drop-hover'));
-        drag.chip.classList.remove('dragging');
-        drag.ghost.remove();
-        drag = null;
-    }
+    // ---------- STAGE: tap-to-cycle + drag-off-to-clear ----------
+    // pointerdown on a filled slot starts tracking. If the pointer moves
+    // past DRAG_THRESHOLD_PX, treat it as a drag — release outside any
+    // stage slot clears the Munki. Release without moving (a tap) cycles
+    // the head expression 1 → 2 → 3 → 4 → 5 → 1 instead.
+    const DRAG_THRESHOLD_PX = 12;
+    const slotDragState = new Map();
 
     function findSlotAt(x, y) {
         const els = document.elementsFromPoint(x, y);
         return els.find(el => el.classList && el.classList.contains('stage-slot'));
     }
 
-    function attachTrayHandlers() {
-        document.querySelectorAll('.tray-chip').forEach(chip => {
-            chip.addEventListener('pointerdown', e => {
-                e.preventDefault();
-                chip.setPointerCapture(e.pointerId);
-                startDrag(chip, e.pointerId, e.clientX, e.clientY);
-            });
-            chip.addEventListener('pointermove', e => {
-                if (drag && drag.pointerId === e.pointerId) moveDrag(e.clientX, e.clientY);
-            });
-            chip.addEventListener('pointerup', e => {
-                if (drag && drag.pointerId === e.pointerId) {
-                    endDrag(e.clientX, e.clientY);
-                    if (chip.hasPointerCapture(e.pointerId)) chip.releasePointerCapture(e.pointerId);
-                }
-            });
-            chip.addEventListener('pointercancel', e => {
-                if (drag && drag.pointerId === e.pointerId) endDrag(e.clientX, e.clientY);
-            });
-        });
-    }
-
     function attachSlotHandlers() {
-        // Single delegated listener on the stage so we don't need to rewire on
-        // every slot re-render.
-        document.getElementById('stage').addEventListener('click', e => {
-            if (drag) return;
+        const stage = document.getElementById('stage');
+        stage.addEventListener('pointerdown', e => {
             const slot = e.target.closest('.stage-slot');
             if (!slot) return;
             const idx = parseInt(slot.dataset.index, 10);
-            if (slots[idx]) {
-                setSlot(idx, null);
-                playClearSound();
+            if (!slots[idx]) return; // empty slot — nothing to grab or tap
+            e.preventDefault();
+            ensureAudio(); // unlock audio on first interaction
+            // setPointerCapture can throw InvalidPointerId for synthetic
+            // events (testing) — guard so the handler still records state.
+            try { slot.setPointerCapture(e.pointerId); } catch (_) {}
+            slotDragState.set(e.pointerId, {
+                slot, idx,
+                startX: e.clientX, startY: e.clientY,
+                dragging: false
+            });
+        });
+        stage.addEventListener('pointermove', e => {
+            const state = slotDragState.get(e.pointerId);
+            if (!state) return;
+            const dx = e.clientX - state.startX;
+            const dy = e.clientY - state.startY;
+            if (!state.dragging && (dx * dx + dy * dy) > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+                state.dragging = true;
+                state.slot.classList.add('dragging-off');
             }
+        });
+        stage.addEventListener('pointerup', e => {
+            const state = slotDragState.get(e.pointerId);
+            if (!state) return;
+            slotDragState.delete(e.pointerId);
+            try {
+                if (state.slot.hasPointerCapture(e.pointerId)) {
+                    state.slot.releasePointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+            state.slot.classList.remove('dragging-off');
+            if (state.dragging) {
+                // Drag — clear if the kid let go outside the stage area.
+                const overSlot = findSlotAt(e.clientX, e.clientY);
+                if (!overSlot) {
+                    setSlot(state.idx, null);
+                    playClearSound();
+                }
+            } else {
+                // Tap — cycle the expression and re-render just this slot.
+                cycleManualExpression(state.idx);
+                renderSlot(state.idx);
+            }
+        });
+        stage.addEventListener('pointercancel', e => {
+            const state = slotDragState.get(e.pointerId);
+            if (!state) return;
+            slotDragState.delete(e.pointerId);
+            state.slot.classList.remove('dragging-off');
         });
     }
 
@@ -1662,8 +1884,8 @@ const CHARACTERS = {
         const hint = document.getElementById('trayHint');
         if (!hint) return;
         hint.textContent = isMadballzMode
-            ? 'MADBALLZ MODE · 6 Madballz · ICE + MOON last (they are friends)'
-            : 'Drag a friend · BLACK protects · WHITE corrupts · ICE freezes · MOON rules';
+            ? 'MADBALLZ MODE · Tap to add · Tap on stage to change face · Drag off to clear'
+            : 'Tap to add · Tap on stage to change face · Drag off stage to clear';
     }
 
     function openStoryModal() {

@@ -8,11 +8,18 @@ html, body {
     min-height: 100%;
 }
 
+/* ====== STAGE BACKGROUND ======
+   One shared stage photo behind every screen (Bank 1 / Bank 2 / Madballz).
+   Drop a replacement at assets/bg-img/stage.jpg and the whole game retints.
+   When body.react-mode-active is set, the BG is darkened + desaturated to
+   sell the "something is wrong" mood, and the horror-munki corner sprites
+   defined further down slowly creep into view. */
 body {
     background-color: #000;
-    background-image:
-        radial-gradient(ellipse at 20% 0%, rgba(45, 212, 191, 0.10), transparent 55%),
-        radial-gradient(ellipse at 80% 100%, rgba(219, 39, 119, 0.12), transparent 55%);
+    background-image: url('assets/bg-img/stage.jpg');
+    background-attachment: fixed;
+    background-size: cover;
+    background-position: center 30%;
     color: #2dd4bf;
     font-family: 'JetBrains Mono', monospace;
     overflow-x: hidden;
@@ -22,6 +29,94 @@ body {
     touch-action: manipulation;
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);
+    position: relative;
+    /* Slow filter transition gives the horror buildup time to settle in
+       rather than snapping; the 4 s ease matches the corner-Munki creep. */
+    transition: filter 4s ease-in-out;
+}
+
+/* React mode darkens and desaturates the whole stage photo — the world
+   slowly going wrong while the corner Munkis approach. */
+body.react-mode-active {
+    filter: brightness(0.55) saturate(0.45) contrast(1.12);
+}
+
+/* Soft dark vignette over the BG photo so the UI chrome reads against any
+   stage art the user drops in. Always present, not tied to react mode. */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(0, 0, 0, 0.55) 100%);
+    z-index: 0;
+}
+
+/* Keep content above the fixed BG ::before vignette. */
+body > * { position: relative; z-index: 1; }
+
+/* ====== HORROR-MODE CORNER MUNKIS ======
+   Moon Munki creeps in from the lower-left, Ice Munki from the lower-right.
+   They're invisible by default and slide + fade into view over ~4 s when
+   body.react-mode-active is set. The slow approach is the new "scary":
+   the kid sees them before they realise they're being watched. Frames are
+   cropped via the SVG viewBox from assets/bg-img/bg-munkis.png. */
+.horror-munki {
+    position: fixed;
+    bottom: -2vh;
+    height: 86vh;
+    width: auto;
+    aspect-ratio: 432 / 988;
+    pointer-events: none;
+    z-index: 40;          /* over the stage, under modals/jumpscare/tray */
+    opacity: 0;
+    /* The Munki starts pushed off-screen by 25% of its width plus a slight
+       droop, so the slow ease feels like they're rising from the wings. */
+    filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.7));
+    transition:
+        opacity   4.5s ease-in,
+        transform 5s   ease-in-out,
+        filter    4.5s ease-in;
+}
+.horror-munki--moon {
+    left:  -8vw;
+    transform: translate(-25%, 22%) scale(0.92);
+}
+.horror-munki--ice {
+    right: -8vw;
+    transform: translate( 25%, 22%) scale(0.92);
+}
+
+body.react-mode-active .horror-munki {
+    opacity: 0.95;
+    /* Subtle blood-red glow once visible. */
+    filter: drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
+            drop-shadow(0 0 40px rgba(255, 40, 40, 0.25));
+}
+body.react-mode-active .horror-munki--moon {
+    transform: translate(0, 0) scale(1);
+}
+body.react-mode-active .horror-munki--ice {
+    transform: translate(0, 0) scale(1);
+}
+
+/* Slow ominous breathing — barely-perceptible scale pulse while visible.
+   Kicks in AFTER the entry transform finishes (~5 s) so it doesn't fight
+   the creep-in. */
+@keyframes horror-munki-breathe {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(0, -0.6%) scale(1.015); }
+}
+body.react-mode-active .horror-munki--moon { animation: horror-munki-breathe 5.2s ease-in-out 5s infinite; }
+body.react-mode-active .horror-munki--ice  { animation: horror-munki-breathe 5.6s ease-in-out 5s infinite; }
+
+/* Reduced-motion: no creep, no breathing — a quick low-opacity flash so the
+   kid is still aware something's happening without motion sickness. */
+@media (prefers-reduced-motion: reduce) {
+    .horror-munki { transition: opacity 0.6s ease-in; transform: none !important; }
+    .horror-munki--moon, .horror-munki--ice { animation: none !important; }
+    body.react-mode-active .horror-munki { opacity: 0.7; }
 }
 
 /* ====== HEADER ====== */
@@ -198,45 +293,59 @@ main {
     pointer-events: none;
 }
 
+/* (Earlier versions painted a CSS-built dance floor here. Now the
+   stage.jpg BG photo is the floor itself, so this block is intentionally
+   empty — the .stage-wrap dot pattern and the per-slot footlight halos
+   below provide enough on-stage texture.) */
+
 .stage {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
     position: relative;
     z-index: 1;
-    max-width: 760px;
+    max-width: 960px;
     margin: 0 auto;
 }
 
+/* Slots are invisible grid placeholders — no border, no background, no
+   padding. The Munki standing inside is the entire visible element. Empty
+   slots reserve the grid column but render nothing so the dance row stays
+   balanced as Munkis fill in. */
 .stage-slot {
     aspect-ratio: 5 / 6;
-    border: 2px dashed rgba(45, 212, 191, 0.35);
-    border-radius: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-end;
-    transition: transform 0.15s, border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    transition: transform 0.15s, filter 0.2s;
     cursor: pointer;
     position: relative;
-    background: rgba(0, 0, 0, 0.25);
-    padding: 6px;
-    overflow: hidden;
+    background: transparent;
+    border: none;
+    padding: 0;
+    overflow: visible;
 }
 
-.stage-slot.drop-hover {
-    border-color: #fbbf24;
-    background: rgba(251, 191, 36, 0.14);
-    transform: scale(1.06);
-    border-style: solid;
-    box-shadow: 0 0 32px rgba(251, 191, 36, 0.4);
+/* Active slot gets a soft footlight halo under the Munki to suggest a
+   spotlight on the dance floor — no border or filled box. */
+.stage-slot.active::before {
+    content: '';
+    position: absolute;
+    bottom: 4%;
+    left: 10%;
+    right: 10%;
+    height: 18%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(45, 212, 191, 0.35), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
 }
 
-.stage-slot.active {
-    border-color: rgba(45, 212, 191, 0.85);
-    border-style: solid;
-    box-shadow: inset 0 0 28px rgba(45, 212, 191, 0.18);
-    background: rgba(45, 212, 191, 0.05);
+/* Empty slots stay in the grid (so positions don't reshuffle) but render
+   nothing — no "+" placeholder, no label. */
+.stage-slot.empty .slot-icon,
+.stage-slot.empty .slot-label {
+    visibility: hidden;
 }
 
 .slot-icon {
@@ -403,7 +512,7 @@ main {
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0));
+    padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0) + var(--mv-slim-h, 22px));
     background: linear-gradient(to top, rgba(0,0,0,0.96) 60%, rgba(0,0,0,0.6));
     border-top: 1px solid rgba(45, 212, 191, 0.3);
     backdrop-filter: blur(12px);
@@ -459,10 +568,30 @@ main {
     box-shadow: 0 0 22px rgba(45, 212, 191, 0.45);
 }
 
-.tray-chip:active, .tray-chip.dragging {
-    cursor: grabbing;
-    opacity: 0.4;
-    transform: scale(0.96);
+.tray-chip:active {
+    transform: scale(0.94);
+    transition: transform 0.05s;
+}
+
+/* Brief shake when the kid taps a tray chip but the stage is already full
+   (5 munkis on stage). Visual "no room" cue — clear someone first. */
+@keyframes chip-shake {
+    0%, 100% { transform: translateX(0); }
+    20%      { transform: translateX(-5px) rotate(-2deg); }
+    40%      { transform: translateX(5px)  rotate(2deg);  }
+    60%      { transform: translateX(-4px) rotate(-1.5deg); }
+    80%      { transform: translateX(4px)  rotate(1.5deg); }
+}
+.tray-chip.shake {
+    animation: chip-shake 0.34s ease-in-out;
+}
+
+/* Lift the Munki visually while it's being dragged off the stage. If the
+   kid releases inside the stage, the class clears and it snaps back. */
+.stage-slot.dragging-off .char-art {
+    opacity: 0.55;
+    transform: translateY(-10%) scale(0.92);
+    transition: transform 0.1s, opacity 0.1s;
 }
 
 .chip-icon {
@@ -496,23 +625,7 @@ main {
     width: 100%;
 }
 
-#drag-ghost {
-    position: fixed;
-    pointer-events: none;
-    z-index: 9999;
-    width: 96px;
-    height: 134px;
-    filter: drop-shadow(0 0 18px rgba(251, 191, 36, 0.9));
-    transform: translate(-50%, -50%);
-}
-
-#drag-ghost .char-art {
-    width: 100%;
-    height: 100%;
-    aspect-ratio: auto;
-}
-
-/* ====== DESKTOP: wrap the 16 chips into 2 rows so nothing is hidden ====== */
+/* ====== DESKTOP: wrap the chips into 2 rows so nothing is hidden ====== */
 @media (min-width: 760px) {
     .tray {
         flex-wrap: wrap;
@@ -537,15 +650,12 @@ main {
 
     main { padding: 14px 10px 220px; gap: 14px; }
     .stage-wrap { padding: 14px 8px; border-radius: 14px; }
-    .stage { gap: 8px; }
-    .stage-slot { border-radius: 12px; padding: 4px; }
+    .stage { gap: 4px; }
     .slot-label { font-size: 9px; letter-spacing: 0.08em; margin-top: 2px; }
-    .empty-plus { font-size: 22px; }
 
     .tray-chip { width: 76px; height: 100px; padding: 4px; }
     .chip-label { font-size: 9px; }
     .tray-hint { font-size: 9px; letter-spacing: 0.12em; }
-    #drag-ghost { width: 84px; height: 116px; }
 }
 
 @media (max-width: 420px) {
@@ -554,8 +664,7 @@ main {
     .subtitle { font-size: 9px; }
     main { padding: 12px 6px 210px; }
     .stage-wrap { padding: 10px 4px; }
-    .stage { gap: 6px; }
-    .stage-slot { padding: 3px; border-radius: 10px; }
+    .stage { gap: 3px; }
     .slot-label { font-size: 8px; }
     .tray-chip { width: 70px; height: 92px; }
     .chip-label { font-size: 8px; }
@@ -738,22 +847,22 @@ body.jumpscare .stage-slot.active .char-art {
 }
 .tray-chip.chip-bad .chip-label { color: #fca5a5; }
 
-/* Once placed on stage they keep the red accent so the slot reads as cursed. */
-.stage-slot.active.slot-bad {
-    border-color: rgba(239, 68, 68, 0.85);
-    box-shadow: inset 0 0 28px rgba(239, 68, 68, 0.18);
-    background: rgba(239, 68, 68, 0.05);
+/* Once placed on stage, antagonists keep the red accent — but on the
+   frame-less stage we express it as a red footlight under the Munki
+   (overriding the default cyan halo) plus the label color. */
+.stage-slot.active.slot-bad::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(239, 68, 68, 0.5), transparent 70%);
 }
 .stage-slot.active.slot-bad .slot-label { color: rgba(252, 165, 165, 0.85); }
 
 /* ====== MADBALLZ MODE (whole-screen palette swap) ====== */
 /* Activated by adding `body.madballz-mode` when the player taps "MEET THE
    MADBALLZ". Tints the whole screen red/violet to signal "you are in the
-   bad neighborhood now". The stage + tray + chips all retint together. */
+   bad neighborhood now". The stage + tray + chips all retint together.
+   The body background-image is owned by --bg-madballz-normal (see the
+   per-mode BG block at the top of this file); this rule only tweaks
+   chrome colors. */
 body.madballz-mode {
-    background-image:
-        radial-gradient(ellipse at 20% 0%, rgba(239, 68, 68, 0.18), transparent 55%),
-        radial-gradient(ellipse at 80% 100%, rgba(168, 85, 247, 0.22), transparent 55%);
     color: #f0abfc;
 }
 body.madballz-mode header {
@@ -768,13 +877,10 @@ body.madballz-mode .stage-wrap {
 body.madballz-mode .stage-wrap::before {
     background-image: radial-gradient(rgba(168, 85, 247, 0.2) 1px, transparent 1px);
 }
-body.madballz-mode .stage-slot {
-    border-color: rgba(168, 85, 247, 0.45);
-}
-body.madballz-mode .stage-slot.active {
-    border-color: rgba(168, 85, 247, 0.9);
-    box-shadow: inset 0 0 28px rgba(168, 85, 247, 0.22);
-    background: rgba(168, 85, 247, 0.08);
+/* Madballz dance floor — recolour the active slot footlight halo to the
+   purple palette so the spotlight reads against the red/violet BG. */
+body.madballz-mode .stage-slot.active::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(168, 85, 247, 0.45), transparent 70%);
 }
 body.madballz-mode .stage-slot .slot-label { color: rgba(240, 171, 252, 0.85); }
 body.madballz-mode .tray-wrap {
@@ -957,12 +1063,13 @@ body.madballz-mode .chip-label { color: #f0abfc; }
    flag — never gore. The frozen Munki keeps its silhouette but reads as
    visibly Done. Class is toggled in updateIceFreeze() in game.js. */
 .stage-slot.frozen-by-ice {
-    border-color: #67e8f9 !important;
-    border-style: solid !important;
-    background: rgba(165, 243, 252, 0.10) !important;
-    box-shadow:
-        inset 0 0 30px rgba(165, 243, 252, 0.45),
-        0 0 28px rgba(103, 232, 249, 0.4) !important;
+    /* Slot itself has no frame on the frame-less stage; instead, replace
+       the active spotlight under the Munki with an icy cyan halo so the
+       footing reads cold. */
+    filter: drop-shadow(0 0 12px rgba(103, 232, 249, 0.55));
+}
+.stage-slot.frozen-by-ice::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(103, 232, 249, 0.55), transparent 70%) !important;
 }
 
 .stage-slot.frozen-by-ice .char-art {
@@ -1039,9 +1146,14 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     text-shadow: 0 0 6px rgba(103, 232, 249, 0.6);
 }
 
-/* Ice Munki itself wears the cold but isn't frozen — give the active ice
-   slot a subtle frost halo so the kid sees who's doing the freezing. */
+/* Ice Munki itself wears the cold but isn't frozen — give it a frost
+   halo footlight + bluish drop-shadow so the kid sees who's doing the
+   freezing on the frame-less stage. */
+body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"]::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(103, 232, 249, 0.6), transparent 70%);
+}
 body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"] {
+    filter: drop-shadow(0 0 14px rgba(103, 232, 249, 0.55));
     box-shadow:
         inset 0 0 30px rgba(103, 232, 249, 0.35),
         0 0 28px rgba(103, 232, 249, 0.45);
