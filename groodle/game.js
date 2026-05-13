@@ -52,6 +52,16 @@
     let canvas = null;
     let ctx = null;
     let creature = null;
+    /* DOM elements touched on every dance frame are looked up once at init.
+       Repeating getElementById per RAF is two extra DOM tree walks per
+       frame and shows up under DevTools profiling on slower phones. */
+    let floorEl = null;
+    let bubbleEl = null;
+    /* Canvas bounding rect is cached for the duration of a stroke. Reading
+       getBoundingClientRect on every pointermove forces a layout pass; the
+       rect can only change on scroll/resize/zoom, and a pointer capture
+       guarantees those don't happen mid-stroke. */
+    let cachedRect = null;
 
     let isPlaying = false;
     let currentMoveIdx = 0;
@@ -309,9 +319,12 @@
         attachDrawing();
     }
 
-    /* Convert pointer event coords to logical canvas coords (0..400, 0..600). */
+    /* Convert pointer event coords to logical canvas coords (0..400, 0..600).
+       Uses cachedRect when available (during an active stroke) so
+       pointermove doesn't force a layout each event; falls back to a fresh
+       read for one-off uses. */
     function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
+        const rect = cachedRect || canvas.getBoundingClientRect();
         return {
             x: (e.clientX - rect.left) * (STAGE_W / rect.width),
             y: (e.clientY - rect.top) * (STAGE_H / rect.height)
@@ -327,6 +340,9 @@
                browser uses the canvas's touch-action: pan-y to scroll. */
             if (isPlaying || !isDrawMode) return;
             try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+            /* Cache the rect once per stroke so subsequent pointermove
+               events skip the getBoundingClientRect layout read. */
+            cachedRect = canvas.getBoundingClientRect();
             isDrawing = true;
             const p = getPos(e);
             lastX = p.x; lastY = p.y;
@@ -377,11 +393,15 @@
 
         const endStroke = (e) => {
             isDrawing = false;
+            cachedRect = null;
             try { canvas.releasePointerCapture(e.pointerId); } catch (err) {}
         };
         canvas.addEventListener('pointerup', endStroke);
         canvas.addEventListener('pointercancel', endStroke);
-        canvas.addEventListener('pointerleave', () => { isDrawing = false; });
+        canvas.addEventListener('pointerleave', () => {
+            isDrawing = false;
+            cachedRect = null;
+        });
     }
 
     function clearCanvas() {
@@ -562,16 +582,14 @@
         document.getElementById('drawPanel').hidden = false;
         document.getElementById('dancePanel').hidden = true;
         creature.style.transform = '';
-        const floor = document.getElementById('stageFloor');
-        if (floor) {
-            floor.style.transform = 'translateX(-50%)';
-            floor.style.opacity = '';
+        if (floorEl) {
+            floorEl.style.transform = 'translateX(-50%)';
+            floorEl.style.opacity = '';
         }
-        const bubble = document.getElementById('beatBubble');
-        if (bubble) {
-            bubble.style.opacity = '0';
-            bubble.style.transform = '';
-            bubble._pulseStart = null;
+        if (bubbleEl) {
+            bubbleEl.style.opacity = '0';
+            bubbleEl.style.transform = '';
+            bubbleEl._pulseStart = null;
         }
     }
 
@@ -625,30 +643,27 @@
         if (sx !== 1 || sy !== 1) parts.push('scale(' + sx.toFixed(3) + ', ' + sy.toFixed(3) + ')');
         creature.style.transform = parts.join(' ');
 
-        const floor = document.getElementById('stageFloor');
-        if (floor) {
+        if (floorEl) {
             const sc = 1 - bouncePulse * 0.18;
-            floor.style.transform = 'translateX(-50%) scaleX(' + sc + ')';
-            floor.style.opacity = String(0.55 + bouncePulse * 0.35);
+            floorEl.style.transform = 'translateX(-50%) scaleX(' + sc + ')';
+            floorEl.style.opacity = String(0.55 + bouncePulse * 0.35);
         }
 
-        const bubble = document.getElementById('beatBubble');
-        if (bubble && bubble._pulseStart != null) {
-            const elapsed = (audioCtx.currentTime - bubble._pulseStart);
+        if (bubbleEl && bubbleEl._pulseStart != null) {
+            const elapsed = (audioCtx.currentTime - bubbleEl._pulseStart);
             const k = Math.max(0, 1 - elapsed / 0.18);
-            bubble.style.opacity = String(k);
-            bubble.style.transform = 'scale(' + (1 + (1 - k) * 0.6) + ')';
+            bubbleEl.style.opacity = String(k);
+            bubbleEl.style.transform = 'scale(' + (1 + (1 - k) * 0.6) + ')';
         }
     }
 
     function scheduleBubblePulse(when) {
         const delay = Math.max(0, (when - audioCtx.currentTime) * 1000);
         setTimeout(() => {
-            const bubble = document.getElementById('beatBubble');
-            if (!bubble || !isPlaying) return;
-            bubble._pulseStart = audioCtx.currentTime;
-            bubble.style.opacity = '1';
-            bubble.style.transform = 'scale(1)';
+            if (!bubbleEl || !isPlaying) return;
+            bubbleEl._pulseStart = audioCtx.currentTime;
+            bubbleEl.style.opacity = '1';
+            bubbleEl.style.transform = 'scale(1)';
         }, delay);
     }
 
@@ -701,6 +716,19 @@
         attachBgPicker();
         attachHandlers();
         updateMoveBeatLabels();
+        floorEl = document.getElementById('stageFloor');
+        bubbleEl = document.getElementById('beatBubble');
+
+        /* Stop the dance when the tab/app goes to the background. RAF
+           naturally pauses on hidden tabs, but the audio scheduler's
+           setInterval continues to fire and the Web Audio context can keep
+           emitting whatever was already queued. Calling stopDance is the
+           predictable choice: when the kid comes back, they tap DANCE
+           again and the loop restarts at step 0 instead of resuming from
+           some indeterminate phase. */
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && isPlaying) stopDance();
+        });
     }
 
     if (document.readyState === 'loading') {

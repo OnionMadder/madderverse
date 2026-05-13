@@ -20,7 +20,13 @@ html, body {
         linear-gradient(180deg, #1a0f33 0%, #2b1454 100%);
     background-attachment: fixed;
     color: #fff;
+    /* 100vh on mobile Safari/Chrome includes the area behind the URL bar,
+       so the page is taller than the visible viewport on first paint and
+       can jump when the bar collapses. 100dvh is the dynamic viewport
+       height that accounts for retracting toolbars. The vh line is the
+       fallback for browsers without dvh support. */
     min-height: 100vh;
+    min-height: 100dvh;
     overflow-x: hidden;
     -webkit-tap-highlight-color: transparent;
 }
