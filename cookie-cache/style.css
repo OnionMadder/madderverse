@@ -257,6 +257,26 @@ body {
     text-shadow: 0 0 22px var(--accent-cyan), 0 0 38px rgba(0,255,204,0.6);
 }
 
+/* On narrow viewports the four HUD blocks were overflowing the right
+   edge (TIME/PILE getting pushed off-screen). Tighten everything so all
+   four fit cleanly on a 360px-wide phone in landscape and an even
+   narrower portrait window. */
+@media (max-width: 768px) {
+    .game-hud {
+        padding: 6px 10px;
+        gap: 4px;
+    }
+    .hud-block { min-width: 0; }
+    .hud-label {
+        font-size: 0.55rem;
+        letter-spacing: 1px;
+    }
+    .hud-value {
+        font-size: 1.05rem;
+    }
+    .hud-mult { font-size: 0.6em; }
+}
+
 /* ── Streak / combo HUD block ────────────────────────────────── */
 .hud-streak-block { transition: opacity 0.2s ease; }
 .hud-streak-block.dim { opacity: 0.45; }
@@ -470,8 +490,12 @@ body {
 .flying-cookie,
 .flying-veggie {
     position: absolute;
-    width: clamp(54px, 14vw, 90px);
-    height: clamp(54px, 14vw, 90px);
+    /* Bumped 33% (was clamp(54, 14vw, 90)) to compensate for uniform
+       sprite scaling — cookie cells are 4:3, so they now display at 75%
+       of element height. Larger element keeps the cookies' visual
+       presence on screen while letting them render at correct aspect. */
+    width: clamp(72px, 18vw, 120px);
+    height: clamp(72px, 18vw, 120px);
     background-repeat: no-repeat;
     pointer-events: auto;
     cursor: pointer;
@@ -1242,7 +1266,11 @@ footer a { color: var(--accent-cyan); pointer-events: auto; }
     margin: 0;
 }
 
-@media (orientation: portrait) and (max-width: 768px) and (hover: none) {
+/* Any narrow portrait viewport during gameplay — phone in portrait,
+   desktop browser sized narrow, mobile emulator. Dropped the previous
+   (hover: none) guard because some mobile browsers don't report it
+   reliably and the prompt should err on the side of "show". */
+@media (orientation: portrait) and (max-width: 900px) {
     body.in-game .rotate-prompt {
         display: flex;
     }
