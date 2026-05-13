@@ -47,11 +47,17 @@ const FRAMES = {
 function applySprite(el, sheetKey, frameKey, w, h) {
     const sheet = SHEETS[sheetKey];
     const frame = FRAMES[sheetKey][frameKey];
-    const sx = w / frame.w;
-    const sy = h / frame.h;
+    // Uniform scale so non-square sprite cells (cookie cells are 4:3
+    // = 1080×810) don't get squished into a square display element.
+    // The sheet is scaled by min(w/frame.w, h/frame.h) and the cell is
+    // centered within the element's box — preserves the cookie's
+    // intended round shape on mobile/desktop alike.
+    const s = Math.min(w / frame.w, h / frame.h);
+    const offsetX = (w - frame.w * s) / 2;
+    const offsetY = (h - frame.h * s) / 2;
     el.style.backgroundImage    = `url('${sheet.url}')`;
-    el.style.backgroundSize     = `${sheet.w * sx}px ${sheet.h * sy}px`;
-    el.style.backgroundPosition = `${-frame.x * sx}px ${-frame.y * sy}px`;
+    el.style.backgroundSize     = `${sheet.w * s}px ${sheet.h * s}px`;
+    el.style.backgroundPosition = `${-frame.x * s + offsetX}px ${-frame.y * s + offsetY}px`;
 }
 
 const COOKIE_NAMES = [
@@ -559,7 +565,7 @@ function spawnCookie() {
 
     const fromLeft = Math.random() < 0.5;
     const size     = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    const cookieD  = Math.min(Math.max(W * 0.14, 54), 90); 
+    const cookieD  = Math.min(Math.max(W * 0.18, 72), 120);
     const startX = fromLeft ? -cookieD : W + cookieD;
     const startY = rand(H * 0.55, H * 0.85);
     const flightTime = rand(1.6, 2.4); 
