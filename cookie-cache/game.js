@@ -689,8 +689,17 @@ function catchCookie(c) {
     c.alive  = false; // freeze in place — punch then fly-to-tub takes over
     c.el.classList.add('popped');
 
-    // Swap to the eaten/crumb sprite the moment the player taps.
+    // Swap to the eaten/crumb sprite the moment the player taps. The
+    // .after cells are 1080×968 (~1.115:1), not 4:3 like .before — so
+    // reshape the element to match before rendering. Otherwise the
+    // sheet's next eaten cell bleeds into the ~10px sliver of empty
+    // space on the right of the 4:3 box. Re-anchor on c.y so the
+    // cookie's visual center doesn't jump during the swap.
     if (c.eatenSprite) {
+        const eatenH = Math.round(c.w * 968 / 1080);
+        c.h = eatenH;
+        c.el.style.height = eatenH + 'px';
+        c.el.style.top = (c.y - eatenH / 2) + 'px';
         applySprite(c.el, c.eatenSprite.sheet, c.eatenSprite.frame, c.w, c.h);
     }
 
