@@ -288,16 +288,17 @@ function toggleMute() {
 
 const state = {
     running:      false,
-    cookies:      [],          
+    cookies:      [],
     score:        0,
-    pile:         0,          
+    pile:         0,
     timeLeftMs:   CFG.duration * 1000,
     spawnInMs:    600,
     rafId:        null,
     lastTs:       0,
     stageW:       0,
     stageH:       0,
-    chompResetTo: 0,           
+    chompResetTo: 0,
+    glitchTimer:  0,
 };
 
 function showScreen(name) {
@@ -339,6 +340,60 @@ function measureStage() {
     const r = els.stage.getBoundingClientRect();
     state.stageW = r.width;
     state.stageH = r.height;
+}
+
+// ── Hacker-terminal background layers ─────────────────────────────
+// CSS handles scanlines (::before) and the corner vignette (::after).
+// JS generates the code-rain columns once at init and schedules rare
+// glitch bars while a round is running.
+const CODE_RAIN_CHARS = '0123456789ABCDEFabcdef!@#$%^&*<>{}[]|/?:;~+=';
+
+function initCodeRain() {
+    if (!els.stage || els.stage.querySelector('.code-rain-layer')) return;
+    const layer = document.createElement('div');
+    layer.className = 'code-rain-layer';
+
+    const N = 26;
+    for (let i = 0; i < N; i++) {
+        const col = document.createElement('div');
+        col.className = 'code-rain-col';
+        let block = '';
+        for (let k = 0; k < 32; k++) {
+            block += CODE_RAIN_CHARS[Math.floor(Math.random() * CODE_RAIN_CHARS.length)] + '\n';
+        }
+        // Double the block so the linear translateY loop is seamless.
+        col.textContent = block + block;
+        col.style.left = ((i + 0.5) / N * 100) + '%';
+        const dur = rand(6, 16);
+        col.style.animationDuration = dur + 's';
+        col.style.animationDelay    = (-rand(0, dur)) + 's';
+        layer.appendChild(col);
+    }
+    els.stage.appendChild(layer);
+}
+
+function spawnGlitchBar() {
+    if (!state.running || state.stageH < 50) return;
+    const bar = document.createElement('div');
+    bar.className = 'code-glitch-bar';
+    bar.style.top = rand(20, state.stageH - 30) + 'px';
+    els.stage.appendChild(bar);
+    bar.addEventListener('animationend', () => bar.remove(), { once: true });
+    setTimeout(() => { if (bar.parentNode) bar.remove(); }, 600);
+}
+
+function scheduleNextGlitch() {
+    clearTimeout(state.glitchTimer);
+    state.glitchTimer = setTimeout(() => {
+        if (!state.running) return;
+        spawnGlitchBar();
+        scheduleNextGlitch();
+    }, rand(8000, 14000));
+}
+
+function stopGlitches() {
+    clearTimeout(state.glitchTimer);
+    state.glitchTimer = 0;
 }
 
 function spawnCookie() {
@@ -915,6 +970,7 @@ function startRound() {
             state.running = true;
             state.lastTs  = 0;
             state.rafId   = requestAnimationFrame(loop);
+            scheduleNextGlitch();
         });
     });
 }
@@ -942,6 +998,7 @@ function endRound() {
     state.cookies.forEach(c => c.el && c.el.remove());
     state.cookies = [];
     stopStartSfx();
+    stopGlitches();
     setTimeout(showFeast, 400);
 }
 
@@ -1066,6 +1123,7 @@ function chompPile(imgs) {
 function init() {
     preload();
     loadSfxPools();
+    initCodeRain();
     els.btnStart.addEventListener('click',  startRound);
     els.btnReplay.addEventListener('click', startRound);
     if (els.btnMute) els.btnMute.addEventListener('click', toggleMute);

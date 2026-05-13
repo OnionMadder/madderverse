@@ -248,10 +248,81 @@ body {
     flex: 1 1 auto;
     overflow: hidden;
     background:
-        radial-gradient(ellipse at 50% 0%, rgba(255,0,255,0.08) 0%, transparent 60%),
-        radial-gradient(ellipse at 50% 110%, rgba(0,255,204,0.14) 0%, transparent 70%),
-        linear-gradient(180deg, rgba(5,5,5,0.55) 0%, rgba(5,5,5,0.85) 100%);
+        radial-gradient(ellipse at 50% 110%, rgba(0,255,204,0.10) 0%, transparent 65%),
+        linear-gradient(180deg, #04060d 0%, #07101e 50%, #050a16 100%);
     cursor: crosshair;
+}
+
+/* ── Hacker-terminal background layers ──────────────────────────
+   ::before — CRT scanlines (z 1)
+   .code-rain-layer — falling chars (z 2, JS-generated)
+   ::after  — corner vignette (z 3)
+   Gameplay sits at z >= 4. */
+.game-stage::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background-image: repeating-linear-gradient(0deg,
+        transparent 0px, transparent 2px,
+        rgba(0,255,255,0.04) 2px, rgba(0,255,255,0.04) 3px);
+    mix-blend-mode: screen;
+}
+.game-stage::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 3;
+    background: radial-gradient(ellipse at center,
+        transparent 42%, rgba(0,0,0,0.65) 100%);
+}
+
+.code-rain-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    overflow: hidden;
+}
+.code-rain-col {
+    position: absolute;
+    top: 0;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.15;
+    color: rgba(0, 255, 204, 0.18);
+    text-shadow: 0 0 6px rgba(0,255,204,0.35);
+    white-space: pre;
+    pointer-events: none;
+    animation: code-rain-fall linear infinite;
+    will-change: transform;
+}
+@keyframes code-rain-fall {
+    0%   { transform: translateY(-50%); }
+    100% { transform: translateY(0%);   }
+}
+
+/* Rare horizontal glitch bar — spawned by JS every ~10s during play. */
+.code-glitch-bar {
+    position: absolute;
+    left: -10px;
+    right: -10px;
+    height: 5px;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(90deg,
+        rgba(255,0,255,0.8) 0%,
+        rgba(0,255,255,0.85) 50%,
+        rgba(255,0,255,0.8) 100%);
+    mix-blend-mode: screen;
+    animation: glitch-bar-kf 0.22s linear forwards;
+}
+@keyframes glitch-bar-kf {
+    0%   { opacity: 1; transform: translateX(-12px); }
+    50%  {              transform: translateX(10px); }
+    100% { opacity: 0; transform: translateX(-4px); }
 }
 
 /* ── Tub Butter sitting in the corner ─────────────────────────── */
