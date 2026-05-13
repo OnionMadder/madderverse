@@ -8,43 +8,18 @@ html, body {
     min-height: 100%;
 }
 
-/* ====== PER-MODE BACKGROUND IMAGES ======
-   Six placeholder gradients, one pair (normal / horror) per "mode" (Bank 1,
-   Bank 2, Madballz). When the real images land at
-   assets/bg/<mode>-{normal,horror}.<ext>, swap a single line per variable:
-       --bg-bank1-normal: url('assets/bg/bank1-normal.jpg') center / cover;
-   The horror variant fades in on top of the normal one whenever any Munki
-   on stage is in react mode (body.react-mode-active). Mode is set by
-   game.js via body.dataset.mode = "bank-1" | "bank-2" | "madballz". */
-:root {
-    --bg-bank1-normal:
-        radial-gradient(ellipse at 20% 0%,   rgba( 45,212,191,0.22), transparent 55%),
-        radial-gradient(ellipse at 80% 100%, rgba(219, 39,119,0.20), transparent 55%),
-        linear-gradient(180deg, #0a0a1a 0%, #14081a 100%);
-    --bg-bank1-horror:
-        radial-gradient(circle  at 50%  50%, rgba(239, 68, 68,0.45), transparent 65%),
-        linear-gradient(180deg, #2a0808 0%, #000 100%);
-    --bg-bank2-normal:
-        radial-gradient(ellipse at 20% 100%, rgba(251,191, 36,0.20), transparent 60%),
-        radial-gradient(ellipse at 80%   0%, rgba(167,139,250,0.25), transparent 60%),
-        linear-gradient(180deg, #0a0a2a 0%, #1f1426 100%);
-    --bg-bank2-horror:
-        radial-gradient(circle  at 50%  50%, rgba( 96,165,250,0.35), transparent 70%),
-        linear-gradient(180deg, #00161f 0%, #000 100%);
-    --bg-madballz-normal:
-        radial-gradient(ellipse at 20%   0%, rgba(168, 85,247,0.30), transparent 60%),
-        radial-gradient(ellipse at 80% 100%, rgba(239, 68, 68,0.22), transparent 60%),
-        linear-gradient(180deg, #14081a 0%, #0b0b18 100%);
-    --bg-madballz-horror:
-        radial-gradient(circle  at 50%  50%, rgba(239, 68, 68,0.55), transparent 60%),
-        linear-gradient(180deg, #1f0014 0%, #000 100%);
-}
-
+/* ====== STAGE BACKGROUND ======
+   One shared stage photo behind every screen (Bank 1 / Bank 2 / Madballz).
+   Drop a replacement at assets/bg-img/stage.jpg and the whole game retints.
+   When body.react-mode-active is set, the BG is darkened + desaturated to
+   sell the "something is wrong" mood, and the horror-munki corner sprites
+   defined further down slowly creep into view. */
 body {
     background-color: #000;
-    background-image: var(--bg-bank1-normal); /* updated by JS via dataset.mode */
+    background-image: url('assets/bg-img/stage.jpg');
     background-attachment: fixed;
     background-size: cover;
+    background-position: center 30%;
     color: #2dd4bf;
     font-family: 'JetBrains Mono', monospace;
     overflow-x: hidden;
@@ -55,33 +30,94 @@ body {
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);
     position: relative;
+    /* Slow filter transition gives the horror buildup time to settle in
+       rather than snapping; the 4 s ease matches the corner-Munki creep. */
+    transition: filter 4s ease-in-out;
 }
 
-/* Mode selectors live on body[data-mode=...]; horror variant fades in via
-   ::before whenever react-mode-active is set on body. */
-body[data-mode="bank-1"]   { background-image: var(--bg-bank1-normal); }
-body[data-mode="bank-2"]   { background-image: var(--bg-bank2-normal); }
-body[data-mode="madballz"] { background-image: var(--bg-madballz-normal); }
+/* React mode darkens and desaturates the whole stage photo — the world
+   slowly going wrong while the corner Munkis approach. */
+body.react-mode-active {
+    filter: brightness(0.55) saturate(0.45) contrast(1.12);
+}
 
+/* Soft dark vignette over the BG photo so the UI chrome reads against any
+   stage art the user drops in. Always present, not tied to react mode. */
 body::before {
     content: '';
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background-image: var(--bg-bank1-horror);
-    background-attachment: fixed;
-    background-size: cover;
-    opacity: 0;
-    transition: opacity 0.6s ease-in-out;
+    background:
+        radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(0, 0, 0, 0.55) 100%);
     z-index: 0;
 }
-body[data-mode="bank-1"]::before   { background-image: var(--bg-bank1-horror); }
-body[data-mode="bank-2"]::before   { background-image: var(--bg-bank2-horror); }
-body[data-mode="madballz"]::before { background-image: var(--bg-madballz-horror); }
-body.react-mode-active::before { opacity: 1; }
 
-/* Keep content above the fixed BG ::before overlay. */
+/* Keep content above the fixed BG ::before vignette. */
 body > * { position: relative; z-index: 1; }
+
+/* ====== HORROR-MODE CORNER MUNKIS ======
+   Moon Munki creeps in from the lower-left, Ice Munki from the lower-right.
+   They're invisible by default and slide + fade into view over ~4 s when
+   body.react-mode-active is set. The slow approach is the new "scary":
+   the kid sees them before they realise they're being watched. Frames are
+   cropped via the SVG viewBox from assets/bg-img/bg-munkis.png. */
+.horror-munki {
+    position: fixed;
+    bottom: -2vh;
+    height: 86vh;
+    width: auto;
+    aspect-ratio: 432 / 988;
+    pointer-events: none;
+    z-index: 40;          /* over the stage, under modals/jumpscare/tray */
+    opacity: 0;
+    /* The Munki starts pushed off-screen by 25% of its width plus a slight
+       droop, so the slow ease feels like they're rising from the wings. */
+    filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.7));
+    transition:
+        opacity   4.5s ease-in,
+        transform 5s   ease-in-out,
+        filter    4.5s ease-in;
+}
+.horror-munki--moon {
+    left:  -8vw;
+    transform: translate(-25%, 22%) scale(0.92);
+}
+.horror-munki--ice {
+    right: -8vw;
+    transform: translate( 25%, 22%) scale(0.92);
+}
+
+body.react-mode-active .horror-munki {
+    opacity: 0.95;
+    /* Subtle blood-red glow once visible. */
+    filter: drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
+            drop-shadow(0 0 40px rgba(255, 40, 40, 0.25));
+}
+body.react-mode-active .horror-munki--moon {
+    transform: translate(0, 0) scale(1);
+}
+body.react-mode-active .horror-munki--ice {
+    transform: translate(0, 0) scale(1);
+}
+
+/* Slow ominous breathing — barely-perceptible scale pulse while visible.
+   Kicks in AFTER the entry transform finishes (~5 s) so it doesn't fight
+   the creep-in. */
+@keyframes horror-munki-breathe {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(0, -0.6%) scale(1.015); }
+}
+body.react-mode-active .horror-munki--moon { animation: horror-munki-breathe 5.2s ease-in-out 5s infinite; }
+body.react-mode-active .horror-munki--ice  { animation: horror-munki-breathe 5.6s ease-in-out 5s infinite; }
+
+/* Reduced-motion: no creep, no breathing — a quick low-opacity flash so the
+   kid is still aware something's happening without motion sickness. */
+@media (prefers-reduced-motion: reduce) {
+    .horror-munki { transition: opacity 0.6s ease-in; transform: none !important; }
+    .horror-munki--moon, .horror-munki--ice { animation: none !important; }
+    body.react-mode-active .horror-munki { opacity: 0.7; }
+}
 
 /* ====== HEADER ====== */
 header {
@@ -257,72 +293,10 @@ main {
     pointer-events: none;
 }
 
-/* ====== DANCE FLOOR ======
-   CSS-built stage that the Munkis stand on. A perspective-tilted grid
-   suggests depth, and a soft footlight glows up the front edge so the
-   row of slots reads as standing on a real platform. Sits behind the
-   .stage grid (z-index 0) and inside .stage-wrap's clip box. */
-.stage-wrap::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -10%;
-    height: 75%;
-    pointer-events: none;
-    z-index: 0;
-    background:
-        /* footlight glow rising from the front edge */
-        radial-gradient(
-            ellipse 60% 40% at 50% 100%,
-            rgba(45, 212, 191, 0.28),
-            transparent 70%
-        ),
-        /* perspective floor tile lines (horizontal) */
-        repeating-linear-gradient(
-            0deg,
-            transparent 0px,
-            transparent 30px,
-            rgba(45, 212, 191, 0.16) 30px,
-            rgba(45, 212, 191, 0.16) 32px
-        ),
-        /* vertical seams */
-        repeating-linear-gradient(
-            90deg,
-            transparent 0px,
-            transparent 80px,
-            rgba(45, 212, 191, 0.10) 80px,
-            rgba(45, 212, 191, 0.10) 82px
-        );
-    transform: perspective(900px) rotateX(58deg);
-    transform-origin: 50% 100%;
-    opacity: 0.55;
-}
-
-/* Madballz / horror modes tint the floor warmer. */
-body[data-mode="madballz"] .stage-wrap::after,
-body.react-mode-active .stage-wrap::after {
-    background:
-        radial-gradient(
-            ellipse 60% 40% at 50% 100%,
-            rgba(239, 68, 68, 0.32),
-            transparent 70%
-        ),
-        repeating-linear-gradient(
-            0deg,
-            transparent 0px,
-            transparent 30px,
-            rgba(239, 68, 68, 0.18) 30px,
-            rgba(239, 68, 68, 0.18) 32px
-        ),
-        repeating-linear-gradient(
-            90deg,
-            transparent 0px,
-            transparent 80px,
-            rgba(168, 85, 247, 0.14) 80px,
-            rgba(168, 85, 247, 0.14) 82px
-        );
-}
+/* (Earlier versions painted a CSS-built dance floor here. Now the
+   stage.jpg BG photo is the floor itself, so this block is intentionally
+   empty — the .stage-wrap dot pattern and the per-slot footlight halos
+   below provide enough on-stage texture.) */
 
 .stage {
     display: grid;

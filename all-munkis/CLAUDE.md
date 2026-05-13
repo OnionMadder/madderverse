@@ -35,9 +35,20 @@ ad-free / kid-friendly branding). This file captures only what's specific to
     N+1) to Ice or Moon accrues dwell time on every quarter note. After
     `REACT_DWELL_BEATS` (8) beats it trips into react mode and auto-cycles
     its expression 1→2→3→4→5 on every beat. `body.react-mode-active` is
-    toggled whenever any slot is reacting (Phase 3 will use it to swap to
-    a horror BG). Dwell resets when the trigger or victim is moved away.
-    See `tickReactState()`.
+    toggled whenever any slot is reacting. Dwell resets when the trigger
+    or victim is moved away. See `tickReactState()`.
+  - **Horror mode visuals + audio** — while `body.react-mode-active` is
+    set:
+      - the body BG (the `stage.jpg` photo) darkens + desaturates via a
+        slow 4-s `filter: brightness(0.55) saturate(0.45) contrast(1.12)`,
+      - the `Moon` and `Ice` Munki sprites (cropped from
+        `assets/bg-img/bg-munkis.png`) creep into view from the lower
+        corners over ~4.5 s, then settle into a subtle 5-s "breathing"
+        scale animation,
+      - a Tone.js sub-bass drone (twin detuned sawtooths → lowpass →
+        Distortion → Gain) ramps its gain 0 → 0.32 over 4 s and sits in
+        the mix until react ends. All three back off on the reverse
+        transition.
 
 ## File layout
 
@@ -47,12 +58,16 @@ all-munkis/
   game.js               # everything below in one IIFE
   style.css             # @imports the bundled JetBrains Mono TTF
   assets/
-    bg/                 # OPTIONAL — per-mode backgrounds (Phase 3). Six
-                        # images, two per mode (normal + horror). Drop them
-                        # at e.g. bank1-normal.jpg / bank1-horror.jpg,
-                        # then point the matching --bg-<mode>-{normal,horror}
-                        # CSS variable at `url('assets/bg/<file>') center /
-                        # cover` to replace the placeholder gradient.
+    bg-img/             # Shared stage background art.
+      stage.jpg           # One generic stage photo behind every screen
+                          # (Bank 1 / Bank 2 / Madballz). Set as the body
+                          # background-image in style.css.
+      bg-munkis.png       # 870×992 sprite sheet, two frames:
+                          #   bg-moon (x=2,   y=2, w=432, h=988)
+                          #   bg-ice  (x=436, y=2, w=432, h=988)
+      bg-munkis.json      # frame coords (mirrored into the index.html
+                          # SVG viewBox attributes for .horror-munki--moon
+                          # and .horror-munki--ice).
     JetBrainsMono-VariableFont_wght.ttf
     vendor/
       tone.min.js          # Self-hosted Tone.js v14.8.49 (MIT). Loaded by
@@ -109,7 +124,7 @@ all-munkis/
 | **isTriggerAdjacent(idx)** | True when slot N-1 or N+1 holds Ice or Moon (linear 5-slot row). |
 | **isIceOnStage / updateIceFreeze** | Ice Munki freeze logic — toggles `.frozen-by-ice` on every other active slot when Ice is placed. |
 | **moonRules / attachMoonChaos** | Moon Munki click chaos — `attachMoonChaos()` adds a document-level click listener; `moonRules()` picks a random effect (hue, invert, shuffle, rain, glitch text, tilt, phantom). |
-| **updateBodyMode()** | Writes `body.dataset.mode` (`"bank-1"` / `"bank-2"` / `"madballz"`) so the CSS picks the matching `--bg-<mode>-normal` for the body BG, the matching `--bg-<mode>-horror` for the `body::before` overlay, and the right floor tint on `.stage-wrap::after`. Called from init, `nudgeBank`, `enterMadballzMode`, and `exitMadballzMode`. |
+| **setReactDrone(on)** | Ramps the Tone.js sub-bass drone (`toneDroneGain.gain`) 0 → 0.32 or back to 0 over 4 s. Called only on react-mode transitions (`anyWasReacting` edge-detect in `tickReactState`) so the drone holds steady during react and silently rests the rest of the time. |
 | **ART** | `bodyArt(c)`, `headShapeArt(c)`, `headModArt(frameName, sheetName)`, `headPhonesArt()`, `hairArt(c)`, `headArt(c, expr)`, `characterArt(id, slotIndex?)`. All return SVG strings. |
 | **HAIR** | `HAIR_STYLES`, `HAIR_COLORS`, `hairSvg(style, color, dark)`, `assignRandomHair()` (picks ~55% of mods at init, skips horror-trigger ones). |
 | **STATE** | `slots = new Array(NUM_SLOTS).fill(null)` |
@@ -197,30 +212,13 @@ and render at expression 1 (idle).
 ### Replace a Madballz character's head
 - Change its `headFrame` (and `sheet` if switching sheets). Body stays.
 
-### Swap in real background images (Phase 3)
-The body BG and the horror crossfade overlay are driven by 6 CSS variables
-at the top of `style.css`:
-
-```
-:root {
-    --bg-bank1-normal:   /* placeholder gradient */
-    --bg-bank1-horror:   /* placeholder gradient */
-    --bg-bank2-normal:   ...
-    --bg-bank2-horror:   ...
-    --bg-madballz-normal:...
-    --bg-madballz-horror:...
-}
-```
-
-To replace any one of them with a real image, just rewrite that line, e.g.:
-
-```
---bg-bank1-normal: url('assets/bg/bank1-normal.jpg') center / cover;
-```
-
-The horror variant fades in on top of the normal one whenever
-`body.react-mode-active` is set (see `tickReactState`). No JS change
-required — pure CSS swap.
+### Swap in new stage art
+The body BG is just `url('assets/bg-img/stage.jpg')` in `style.css` — drop
+in a replacement at that path (any dimensions; `background-size: cover`
+handles the framing) and every screen retints. The horror-mode corner
+characters live in `assets/bg-img/bg-munkis.png` (frames `bg-moon` and
+`bg-ice`); to swap those, keep the file at the same path and update the
+SVG `viewBox` attributes in `index.html` to match the new frame coords.
 
 ### Tweak the expression rules
 - Edit `expressionForSlot(slotIndex)`. Keep the contract: returns 1..5.

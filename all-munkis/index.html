@@ -76,6 +76,17 @@
     <!-- Full-screen "BOO!" text that flashes during a jump scare. -->
     <div id="booOverlay" class="boo-overlay" aria-hidden="true">BOO!</div>
 
+    <!-- Horror-mode corner Munkis: Moon creeps in from the lower-left edge,
+         Ice from the lower-right. Slowly fade + slide into view while
+         body.react-mode-active is set, then fade back out when react mode
+         ends. Frames cropped from assets/bg-img/bg-munkis.png. -->
+    <svg class="horror-munki horror-munki--moon" viewBox="2 2 432 988" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+        <image href="assets/bg-img/bg-munkis.png" x="0" y="0" width="870" height="992"/>
+    </svg>
+    <svg class="horror-munki horror-munki--ice" viewBox="436 2 432 988" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+        <image href="assets/bg-img/bg-munkis.png" x="0" y="0" width="870" height="992"/>
+    </svg>
+
     <!-- Story modal: opens when the player hits the LORE button. The lore
          explains the 7 crew colors, the BLACK Watchers (one per bank), the
          4 WHITE evils (Ice, Moon, Void, Static), and the Madballz tie-in. -->

@@ -1,0 +1,55 @@
+{
+  "frames": {
+    "bg-moon": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 432,
+        "h": 988
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 432,
+        "h": 988
+      },
+      "sourceSize": {
+        "w": 432,
+        "h": 865
+      }
+    },
+    "bg-ice": {
+      "frame": {
+        "x": 436,
+        "y": 2,
+        "w": 432,
+        "h": 988
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 432,
+        "h": 988
+      },
+      "sourceSize": {
+        "w": 432,
+        "h": 988
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 870,
+      "h": 992
+    },
+    "scale": "1"
+  }
+}

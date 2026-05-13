@@ -33,6 +33,9 @@
     let tonePad = null;       // PolySynth — sustained chord per bar
     let toneBell = null;      // FMSynth — section-transition sparkle
     let toneHat = null;       // MetalSynth — off-beat hi-hat tick
+    let toneDrone = null;     // Oscillator — low rumble that swells during react mode
+    let toneDroneGain = null; // Drone's gain envelope (ramps on react in/out)
+    let anyWasReacting = false; // edge-detect react mode transitions for the drone
 
     let horrorTriggers = 0;
     let activeBankIndex = 0;
@@ -118,7 +121,37 @@
         });
         Tone.connect(toneHat, masterGain);
 
+        // Sub-bass drone for react mode. A pair of slightly detuned low
+        // sawtooths through a heavy lowpass — when any Munki tips into
+        // react mode, the drone swells up over ~4 s and just sits there
+        // ominously until react ends. It's silent the rest of the time
+        // (start gain at zero, ramp on transitions in tickReactState).
+        const droneOsc1 = new Tone.Oscillator({ frequency: 55, type: 'sawtooth' });
+        const droneOsc2 = new Tone.Oscillator({ frequency: 55.5, type: 'sawtooth' });
+        const droneFilter = new Tone.Filter({ type: 'lowpass', frequency: 240, Q: 4 });
+        const droneShape = new Tone.Distortion(0.35);
+        toneDroneGain = new Tone.Gain(0);
+        droneOsc1.connect(droneFilter);
+        droneOsc2.connect(droneFilter);
+        droneFilter.connect(droneShape);
+        droneShape.connect(toneDroneGain);
+        Tone.connect(toneDroneGain, masterGain);
+        droneOsc1.start();
+        droneOsc2.start();
+        toneDrone = { osc1: droneOsc1, osc2: droneOsc2, filter: droneFilter };
+
         toneReady = true;
+    }
+
+    // Ramp the sub-bass drone up or down depending on whether react mode
+    // is active. Long 4-s envelope so the menace sneaks in rather than
+    // popping. Called from tickReactState only on a transition.
+    function setReactDrone(on) {
+        if (!toneReady || !toneDroneGain) return;
+        const now = Tone.now();
+        toneDroneGain.gain.cancelScheduledValues(now);
+        toneDroneGain.gain.setValueAtTime(toneDroneGain.gain.value, now);
+        toneDroneGain.gain.linearRampToValueAtTime(on ? 0.32 : 0, now + 4);
     }
 
     function schedule() {
@@ -904,7 +937,6 @@ const CHARACTERS = {
         activeBankIndex = i;
         saveProgress();
         updateBankLabel();
-        updateBodyMode();
         renderTray();
         attachTrayHandlers();
     }
@@ -917,20 +949,6 @@ const CHARACTERS = {
         const unlockedCount = BANKS.filter(b => b.unlocked).length;
         if (prev) prev.disabled = unlockedCount < 2 || isMadballzMode;
         if (next) next.disabled = unlockedCount < 2 || isMadballzMode;
-    }
-
-    // Sets body.dataset.mode for the per-mode background image. CSS reads
-    // this to pick the right BG variable pair (normal + horror). Called
-    // any time the active mode changes: init, nudgeBank, enter/exit
-    // Madballz. Banks 3 and 4 fall back to bank-2 styling for now since
-    // they don't have their own art yet.
-    function updateBodyMode() {
-        let mode;
-        if (isMadballzMode) mode = 'madballz';
-        else if (activeBankIndex === 0) mode = 'bank-1';
-        else if (activeBankIndex === 1) mode = 'bank-2';
-        else mode = 'bank-2';
-        document.body.dataset.mode = mode;
     }
 
     const SHEETS = {
@@ -1224,6 +1242,11 @@ const CHARACTERS = {
             }
         }
         document.body.classList.toggle('react-mode-active', anyReacting);
+        // Drone fires the sub-bass swell on transitions in/out of react mode.
+        if (anyReacting !== anyWasReacting) {
+            setReactDrone(anyReacting);
+            anyWasReacting = anyReacting;
+        }
         toRender.forEach(i => renderSlot(i));
     }
 
@@ -1830,7 +1853,6 @@ const CHARACTERS = {
         ensureAudio();
         isMadballzMode = true;
         document.body.classList.add('madballz-mode');
-        updateBodyMode();
         const meet = document.getElementById('madballzBtn');
         const back = document.getElementById('backBtn');
         if (meet) meet.hidden = true;
@@ -1846,7 +1868,6 @@ const CHARACTERS = {
     function exitMadballzMode() {
         isMadballzMode = false;
         document.body.classList.remove('madballz-mode');
-        updateBodyMode();
         const meet = document.getElementById('madballzBtn');
         const back = document.getElementById('backBtn');
         if (meet) meet.hidden = !madballzUnlocked;
@@ -2010,7 +2031,6 @@ const CHARACTERS = {
     // ---------- INIT ----------
     function init() {
         loadProgress();
-        updateBodyMode();
         buildStage();
         renderTray();
         renderAllSlots();
