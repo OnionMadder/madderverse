@@ -385,6 +385,153 @@ body.dancing .draw-canvas {
     -webkit-backdrop-filter: blur(6px);
 }
 
+/* ============ TOOL TRAY (craft-supply look) ============
+
+   The draw panel (#drawPanel) opts in via .tool-tray. This is the
+   "open craft box" surface — warm cream gradient, dark hand-stamped
+   stroke, three labeled sections (Colors / Brushes / Actions) sitting
+   in their own dashed cards inside. Scoped specifically with the
+   .tool-tray class so the dance-panel keeps its existing dark/neon
+   styling. */
+
+.tool-tray {
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, #fffaef 0%, transparent 70%),
+        linear-gradient(165deg, #fff3d6 0%, #ffd9a8 100%);
+    border: 3px solid #1a0f33;
+    border-radius: 18px;
+    padding: 14px;
+    gap: 14px;
+    color: #1a0f33;
+    box-shadow:
+        0 10px 28px rgba(0, 0, 0, 0.35),
+        inset 0 0 0 2px rgba(255, 255, 255, 0.55),
+        inset 0 -6px 0 rgba(26, 15, 51, 0.08);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.tool-section {
+    background: rgba(255, 255, 255, 0.55);
+    border: 2px dashed rgba(26, 15, 51, 0.22);
+    border-radius: 14px;
+    padding: 6px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Section titles read as taped-on craft labels: cursive Caveat, pink,
+   slight rotation, soft dark stamp shadow. Lifted out of the dashed
+   card with a negative top margin so they cap the section like a tag. */
+.tool-title {
+    margin: -16px 0 2px;
+    align-self: flex-start;
+    font-family: var(--font-cursive);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1;
+    color: #ff6ec7;
+    padding: 2px 12px 4px;
+    background: #fff;
+    border: 2px solid #1a0f33;
+    border-radius: 10px;
+    transform: rotate(-2.5deg);
+    box-shadow: 0 2px 0 rgba(26, 15, 51, 0.35);
+}
+
+.tool-section .panel-row {
+    justify-content: center;
+}
+.tool-section.tool-actions .panel-row { gap: 10px; }
+.tool-section.tool-brushes .panel-row { gap: 12px; }
+
+/* ---- Swatch styling inside the tray ---- */
+
+.tool-tray .swatch {
+    width: 46px;
+    height: 46px;
+    border: 3px solid #1a0f33;
+    box-shadow: 0 3px 0 rgba(26, 15, 51, 0.35);
+}
+.tool-tray .swatch[data-color="#ffffff"] {
+    /* Keep white-swatch dark-bordered against cream so it's still visible. */
+    border-color: #1a0f33;
+}
+.tool-tray .swatch.active {
+    border-color: #1a0f33;
+    transform: translateY(-3px) scale(1.1);
+    box-shadow:
+        0 0 0 4px #ff6ec7,
+        0 6px 0 rgba(26, 15, 51, 0.4);
+}
+
+/* ---- Brush-size buttons read as marker tips ---- */
+
+.tool-tray .size-btn {
+    width: 48px;
+    height: 48px;
+    background: #fff;
+    border: 3px solid #1a0f33;
+    box-shadow: 0 3px 0 rgba(26, 15, 51, 0.35);
+}
+.tool-tray .size-btn .dot {
+    background: #1a0f33;
+}
+.tool-tray .size-btn.active {
+    background: #fff;
+    border-color: #1a0f33;
+    box-shadow:
+        0 0 0 4px #ff6ec7,
+        0 3px 0 rgba(26, 15, 51, 0.35);
+    transform: translateY(-2px);
+}
+.tool-tray .size-btn.active .dot {
+    background: #ff6ec7;
+}
+
+/* ---- Buttons inside the tray: white face, dark stamp ---- */
+
+.tool-tray .btn {
+    background: #fff;
+    color: #1a0f33;
+    border: 3px solid #1a0f33;
+    box-shadow: 0 4px 0 #1a0f33;
+    text-shadow: none;
+    text-transform: uppercase;
+}
+.tool-tray .btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #1a0f33;
+}
+.tool-tray .btn.active {
+    background: #ff6ec7;
+    border-color: #1a0f33;
+    color: #1a0f33;
+}
+.tool-tray .btn.primary {
+    /* DANCE button — keep the gradient identity, restamp on dark for
+       contrast with the cream tray. */
+    background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
+    color: #1a0f33;
+    border: 3px solid #1a0f33;
+    box-shadow:
+        0 4px 0 #1a0f33,
+        0 0 18px rgba(255, 110, 199, 0.45);
+}
+.tool-tray .btn.primary:active {
+    box-shadow:
+        0 2px 0 #1a0f33,
+        0 0 18px rgba(255, 110, 199, 0.45);
+}
+@media (hover: hover) {
+    .tool-tray .btn:hover { background: #ffe9c8; }
+    .tool-tray .btn.primary:hover {
+        filter: brightness(1.06);
+        background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
+    }
+}
+
 .panel-row {
     display: flex;
     flex-wrap: wrap;

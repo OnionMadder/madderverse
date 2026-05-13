@@ -138,17 +138,26 @@
         </div>
     </div>
 
-    <div class="panel" id="drawPanel">
-        <div class="panel-row palette" id="palette" aria-label="Color palette"></div>
-        <div class="panel-row sizes-row">
-            <div class="sizes" id="sizes" aria-label="Brush size"></div>
-            <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
-        </div>
-        <div class="panel-row actions">
-            <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
-            <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
-            <button id="playBtn" class="btn primary" type="button">▶ DANCE</button>
-        </div>
+    <div class="panel tool-tray" id="drawPanel">
+        <section class="tool-section tool-colors">
+            <h3 class="tool-title">Colors</h3>
+            <div class="panel-row palette" id="palette" aria-label="Color palette"></div>
+        </section>
+        <section class="tool-section tool-brushes">
+            <h3 class="tool-title">Brushes</h3>
+            <div class="panel-row sizes-row">
+                <div class="sizes" id="sizes" aria-label="Brush size"></div>
+                <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
+            </div>
+        </section>
+        <section class="tool-section tool-actions">
+            <h3 class="tool-title">Actions</h3>
+            <div class="panel-row actions">
+                <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
+                <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
+                <button id="playBtn" class="btn primary" type="button">▶ DANCE</button>
+            </div>
+        </section>
     </div>
 
     <div class="panel dance-panel" id="dancePanel" hidden>
