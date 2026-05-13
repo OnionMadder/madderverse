@@ -146,6 +146,7 @@ const els = {
     btnStart:    document.getElementById('btn-start'),
     btnReplay:   document.getElementById('btn-replay'),
     btnMute:     document.getElementById('btn-mute'),
+    btnReturn:   document.getElementById('btn-return'),
     stage:       document.getElementById('game-stage'),
     tub:         document.getElementById('tub-butter'),
     pileZone:    document.getElementById('pile-zone'),
@@ -304,6 +305,8 @@ const state = {
 function showScreen(name) {
     Object.values(SCREENS).forEach(s => s.classList.remove('active'));
     SCREENS[name].classList.add('active');
+    // Return button visible on menu + feast; hidden during gameplay.
+    if (els.btnReturn) els.btnReturn.classList.toggle('hidden', name === 'game');
 }
 
 const rand   = (min, max) => min + Math.random() * (max - min);
