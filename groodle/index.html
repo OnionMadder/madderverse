@@ -29,6 +29,9 @@
     <meta name="apple-mobile-web-app-title" content="Groodle" />
     <meta name="application-name" content="Groodle" />
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&display=swap" />
     <link rel="stylesheet" href="style.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -37,12 +40,18 @@
 <header class="top">
     <a href="../" class="back" aria-label="Back to The Madderverse">&larr; MADDERVERSE</a>
     <h1>Gr<span class="neon-pink">oo</span>dle</h1>
+    <p class="tagline">We Groove. We Doodle. We Groodle.</p>
 </header>
 
 <main>
     <div class="stage-row">
         <div class="hint-tag" aria-hidden="true">
             <span>STAY IN THE LINES TO GROOVE!</span>
+        </div>
+
+        <div class="draw-mode-row">
+            <button id="drawModeBtn" class="btn draw-mode-btn" type="button" aria-pressed="false">✏️ DRAW</button>
+            <p class="draw-hint" id="drawHint" aria-live="polite">Tap to start scribbling. Tap <strong>DONE</strong> when finished to scroll the page again.</p>
         </div>
 
         <div class="stage-wrap">
@@ -130,19 +139,26 @@
         </div>
     </div>
 
-    <div class="panel" id="drawPanel">
-        <div class="panel-row palette" id="palette" aria-label="Color palette"></div>
-        <div class="panel-row sizes-row">
-            <div class="sizes" id="sizes" aria-label="Brush size"></div>
-            <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
-        </div>
-        <div class="panel-row actions">
-            <button id="drawModeBtn" class="btn" type="button" aria-pressed="false">✏️ DRAW</button>
-            <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
-            <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
-            <button id="playBtn" class="btn primary" type="button">▶ DANCE</button>
-        </div>
-        <p class="draw-hint" id="drawHint" aria-live="polite">Tap <strong>DRAW</strong> to scribble. Tap <strong>DONE</strong> to scroll the page again.</p>
+    <div class="panel tool-tray" id="drawPanel">
+        <section class="tool-section tool-colors">
+            <h3 class="tool-title">Colors</h3>
+            <div class="panel-row palette" id="palette" aria-label="Color palette"></div>
+        </section>
+        <section class="tool-section tool-brushes">
+            <h3 class="tool-title">Brushes</h3>
+            <div class="panel-row sizes-row">
+                <div class="sizes" id="sizes" aria-label="Brush size"></div>
+                <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
+            </div>
+        </section>
+        <section class="tool-section tool-actions">
+            <h3 class="tool-title">Actions</h3>
+            <div class="panel-row actions">
+                <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
+                <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
+                <button id="playBtn" class="btn primary" type="button">▶ DANCE</button>
+            </div>
+        </section>
     </div>
 
     <div class="panel dance-panel" id="dancePanel" hidden>

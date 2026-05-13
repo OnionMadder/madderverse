@@ -8,6 +8,11 @@
     --font-body:   'Trebuchet MS', 'Verdana', system-ui, sans-serif;
     --font-chunky: 'Comic Sans MS', 'Marker Felt', 'Chalkboard SE',
                    'Bradley Hand', 'Trebuchet MS', cursive, sans-serif;
+    /* Caveat is loaded via Google Fonts in index.html. The fallback chain
+       degrades to the chunky stack so the title still feels playful if
+       the network call is blocked / hasn't finished. */
+    --font-cursive: 'Caveat', 'Marker Felt', 'Bradley Hand', cursive,
+                    var(--font-chunky);
 }
 
 html, body {
@@ -61,9 +66,12 @@ header.top {
 
 header.top h1 {
     margin: 0;
-    font-family: var(--font-chunky);
-    font-size: 64px;
-    letter-spacing: 2px;
+    /* Caveat is a handwritten cursive — visually denser per em than the
+       chunky stack, so we bump font-size and zero out letter-spacing so
+       letterforms can actually connect. */
+    font-family: var(--font-cursive);
+    font-size: 92px;
+    letter-spacing: 0;
     color: #00ffcc;
     text-shadow:
         0 0 18px rgba(0, 255, 204, 0.45),
@@ -82,6 +90,22 @@ header.top h1 .neon-pink {
         0 6px 0 rgba(26, 15, 51, 0.5);
     display: inline-block;
     transform: rotate(3deg);
+}
+
+/* "We Groove. We Doodle. We Groodle." sits just below the title in the
+   header. Clean sans (body font) so it doesn't fight the cursive flourish
+   above; tracked out a touch so the three short clauses breathe. */
+.tagline {
+    margin: 6px 0 0;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #d6bdff;
+    /* Subtle pink shadow lines up with the title's pink "oo" so the
+       header reads as one composition. */
+    text-shadow: 0 1px 0 rgba(26, 15, 51, 0.5);
 }
 
 /* ============ MAIN LAYOUT ============ */
@@ -209,9 +233,15 @@ body.dancing .stage {
 /* ----- background variants (also reused for thumbnails) ----- */
 
 .bg-studio {
+    /* Studio = clean white-to-cool-gray with the pink floor glow.
+       Replaced the prior cream / peach gradient since cream clashes with
+       the onioncore dark / teal / pink palette used across the rest of
+       Madderverse. The faint lavender tint at the bottom edge picks up
+       the page background's purple so the canvas frames into the page
+       rather than sitting on it as a bright slab. */
     background:
         radial-gradient(ellipse 70% 28% at 50% 92%, rgba(255, 110, 199, 0.22) 0%, transparent 70%),
-        linear-gradient(180deg, #fff8ec 0%, #fff0d6 70%, #ffd9a8 100%);
+        linear-gradient(180deg, #ffffff 0%, #fafafa 60%, #ececf4 100%);
 }
 
 .bg-disco {
@@ -267,9 +297,13 @@ body.dancing .stage {
 .silhouette-outline-layer { z-index: 3; }
 
 /* Pale wash inside the silhouette so the kid sees the body shape even
-   before any strokes — this is the "coloring page" surface. */
+   before any strokes — this is the "coloring page" surface. Slight cool
+   tint (vs pure white) so the figure still reads as a distinct shape on
+   the studio background (which is now off-white rather than cream); on
+   the dark backgrounds — disco / outdoors / night — it still appears
+   essentially white because the tint is so subtle. */
 .silhouette-fill > * {
-    fill: rgba(255, 255, 255, 0.94);
+    fill: rgba(232, 232, 244, 0.94);
 }
 
 /* Outline shapes provide the SourceAlpha that the
@@ -361,6 +395,162 @@ body.dancing .draw-canvas {
     -webkit-backdrop-filter: blur(6px);
 }
 
+/* ============ TOOL TRAY (modern studio-counter look) ============
+
+   The draw panel (#drawPanel) opts in via .tool-tray. Deep-purple tray
+   with a soft pink halo at the top + teal dashed compartments inside,
+   white tape labels (Colors / Brushes / Actions) capping each one.
+   Scoped specifically with the .tool-tray class so the dance-panel
+   keeps its existing dark/neon styling. */
+
+.tool-tray {
+    /* Dark studio-counter tray: deep purple base with a soft pink halo
+       at the top edge + teal hairline inner glow. Cream was pulled out
+       because it fought the onioncore palette; the "supply tray" feeling
+       now comes from the dashed teal section cards + the white tape
+       labels inside, not from a warm paper backdrop. */
+    background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
+        linear-gradient(165deg, #3b1f6b 0%, #1a0f33 100%);
+    border: 3px solid rgba(0, 255, 204, 0.5);
+    border-radius: 18px;
+    padding: 14px;
+    gap: 14px;
+    color: #fff;
+    box-shadow:
+        0 10px 28px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        inset 0 0 22px rgba(255, 110, 199, 0.08);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.tool-section {
+    /* Glassy dark card with teal-tinted dashed border so each section
+       reads as its own "compartment" against the dark tray. */
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px dashed rgba(0, 255, 204, 0.4);
+    border-radius: 14px;
+    padding: 6px 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Section titles read as taped-on craft labels: cursive Caveat, pink,
+   slight rotation, soft dark stamp shadow. Lifted out of the dashed
+   card with a negative top margin so they cap the section like a tag. */
+.tool-title {
+    margin: -16px 0 2px;
+    align-self: flex-start;
+    font-family: var(--font-cursive);
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 1;
+    color: #ff6ec7;
+    padding: 2px 12px 4px;
+    background: #fff;
+    border: 2px solid #1a0f33;
+    border-radius: 10px;
+    transform: rotate(-2.5deg);
+    box-shadow: 0 2px 0 rgba(26, 15, 51, 0.35);
+}
+
+.tool-section .panel-row {
+    justify-content: center;
+}
+.tool-section.tool-actions .panel-row { gap: 10px; }
+.tool-section.tool-brushes .panel-row { gap: 12px; }
+
+/* ---- Swatch styling inside the tray ---- */
+
+.tool-tray .swatch {
+    width: 46px;
+    height: 46px;
+    border: 3px solid #1a0f33;
+    box-shadow: 0 3px 0 rgba(26, 15, 51, 0.35);
+}
+.tool-tray .swatch[data-color="#ffffff"] {
+    /* Keep the white-swatch dark-bordered so it stays visible regardless
+       of how the tray background reads. */
+    border-color: #1a0f33;
+}
+.tool-tray .swatch.active {
+    border-color: #1a0f33;
+    transform: translateY(-3px) scale(1.1);
+    box-shadow:
+        0 0 0 4px #ff6ec7,
+        0 6px 0 rgba(26, 15, 51, 0.4);
+}
+
+/* ---- Brush-size buttons read as marker tips ---- */
+
+.tool-tray .size-btn {
+    width: 48px;
+    height: 48px;
+    background: #fff;
+    border: 3px solid #1a0f33;
+    box-shadow: 0 3px 0 rgba(26, 15, 51, 0.35);
+}
+.tool-tray .size-btn .dot {
+    background: #1a0f33;
+}
+.tool-tray .size-btn.active {
+    background: #fff;
+    border-color: #1a0f33;
+    box-shadow:
+        0 0 0 4px #ff6ec7,
+        0 3px 0 rgba(26, 15, 51, 0.35);
+    transform: translateY(-2px);
+}
+.tool-tray .size-btn.active .dot {
+    background: #ff6ec7;
+}
+
+/* ---- Buttons inside the tray: white face, dark stamp ---- */
+
+.tool-tray .btn {
+    background: #fff;
+    color: #1a0f33;
+    border: 3px solid #1a0f33;
+    box-shadow: 0 4px 0 #1a0f33;
+    text-shadow: none;
+    text-transform: uppercase;
+}
+.tool-tray .btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 2px 0 #1a0f33;
+}
+.tool-tray .btn.active {
+    background: #ff6ec7;
+    border-color: #1a0f33;
+    color: #1a0f33;
+}
+.tool-tray .btn.primary {
+    /* DANCE button — pink → yellow → teal gradient identity preserved,
+       framed by the dark stamp border so it pops on the dark tray. */
+    background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
+    color: #1a0f33;
+    border: 3px solid #1a0f33;
+    box-shadow:
+        0 4px 0 #1a0f33,
+        0 0 18px rgba(255, 110, 199, 0.45);
+}
+.tool-tray .btn.primary:active {
+    box-shadow:
+        0 2px 0 #1a0f33,
+        0 0 18px rgba(255, 110, 199, 0.45);
+}
+@media (hover: hover) {
+    /* Soft cool gray on hover (not cream) — keeps the white-button look
+       but reads as a "lit" state against the dark tray. */
+    .tool-tray .btn:hover { background: #f0f0f4; }
+    .tool-tray .btn.primary:hover {
+        filter: brightness(1.06);
+        background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
+    }
+}
+
 .panel-row {
     display: flex;
     flex-wrap: wrap;
@@ -426,11 +616,71 @@ body.dancing .draw-canvas {
 
 .actions { gap: 8px; }
 
-/* Small instructional line under the actions row. Shown only on touch
-   devices where the DRAW toggle has the most teaching value; on desktop
-   the pointer makes the mode self-evident. */
+/* ============ DRAW-MODE ROW (above the canvas) ============ */
+
+/* Sits immediately above .stage-wrap. The button is the first thing a
+   visitor sees when they look at the figure — "tap here to start
+   scribbling" energy. Hidden during dance because drawing is locked
+   off then; we use display:none so the row collapses and the canvas
+   sits higher rather than leaving an empty gap. */
+.draw-mode-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: min(94vw, 380px);
+    gap: 4px;
+}
+
+body.dancing .draw-mode-row {
+    display: none;
+}
+
+.draw-mode-btn {
+    /* Wider than a normal .btn — fills the canvas width visually so it
+       reads as "the entry point to the canvas below". Flat bottom so it
+       feels physically attached to the stage. */
+    width: 100%;
+    border-radius: 16px 16px 6px 6px;
+    font-size: 18px;
+    padding: 14px 18px;
+    /* Direct pink → teal so DRAW reads as a distinct gradient from the
+       3-stop DANCE button below, and so the button has no warm/peach
+       midtone (peach was reading as cream-adjacent on small screens). */
+    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
+    color: #1a0f33;
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    box-shadow:
+        0 4px 0 rgba(0, 0, 0, 0.4),
+        0 0 24px rgba(255, 110, 199, 0.35);
+    /* Gentle pulse so the affordance reads at-a-glance on first paint
+       without being annoying. Stops once the user has clicked it (any
+       .drawing-active state ends the pulse). */
+    animation: drawCue 2.6s ease-in-out infinite;
+}
+
+.draw-mode-btn.active {
+    /* Drawing in progress — calm the button down and shift to a "stop"
+       palette so it reads as a different control. */
+    background: linear-gradient(135deg, #00ffcc 0%, #43aa8b 100%);
+    box-shadow:
+        0 4px 0 rgba(0, 0, 0, 0.4),
+        0 0 18px rgba(0, 255, 204, 0.4);
+    animation: none;
+}
+
+@keyframes drawCue {
+    0%, 100% { transform: scale(1);    box-shadow: 0 4px 0 rgba(0,0,0,0.4), 0 0 24px rgba(255, 110, 199, 0.35); }
+    50%      { transform: scale(1.02); box-shadow: 0 6px 0 rgba(0,0,0,0.4), 0 0 32px rgba(255, 110, 199, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .draw-mode-btn { animation: none; }
+}
+
+/* Small teaching line under the button. Touch-only — on desktop the
+   pointer makes the mode self-evident. */
 .draw-hint {
-    margin: 4px 0 0;
+    margin: 0;
     font-family: var(--font-body);
     font-size: 12px;
     text-align: center;

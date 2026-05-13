@@ -59,7 +59,7 @@
 
     <main>
         <div class="stage-wrap">
-            <div id="stage" class="stage" aria-label="5 munki slots"></div>
+            <div id="stage" class="stage" aria-label="6 munki slots"></div>
         </div>
     </main>
 
@@ -71,10 +71,42 @@
         </div>
         <div class="tray-hint" id="trayHint">Drag a Munki onto the stage · Tap on stage to react · Drag off stage to remove</div>
         <div id="tray" class="tray" aria-label="character tray"></div>
+        <!-- Swap altar. Hidden until Moon is unlocked; then shows the
+             not-currently-active evil. Drag onto the 7th-wheel chip in the
+             tray to swap. Populated by renderMunkiAltar() in game.js. -->
+        <div id="munkiAltar" class="munki-altar" aria-label="swap altar" hidden></div>
     </div>
 
     <!-- Full-screen "BOO!" text that flashes during a jump scare. -->
     <div id="booOverlay" class="boo-overlay" aria-hidden="true">BOO!</div>
+
+    <!-- Egg counter chip. Hidden by default; revealed once the kid finds
+         their first hidden interaction. Updated by updateEggCounter() to
+         show e.g. "🌙 2/5". After Moon unlocks, swaps to "🌙 FOUND". -->
+    <div id="eggCounter" class="egg-counter" aria-live="polite" hidden>
+        <span class="egg-counter-icon" aria-hidden="true">🌙</span>
+        <span class="egg-counter-text">0/5</span>
+    </div>
+
+    <!-- Moon Munki reveal overlay. Fades in when the 5th egg is found,
+         shows a moon glyph + "MOON MUNKI AWAKENED" text, fades out after
+         ~3.5s. Tapping it dismisses early. Only fires once per kid (the
+         moonUnlocked persisted flag gates it). -->
+    <div id="moonReveal" class="moon-reveal" aria-hidden="true" role="dialog">
+        <div class="moon-reveal-card">
+            <div class="moon-reveal-glyph" aria-hidden="true">🌙</div>
+            <div class="moon-reveal-title">MOON MUNKI AWAKENED</div>
+            <div class="moon-reveal-sub">He joins your bank.</div>
+        </div>
+    </div>
+
+    <!-- Hidden corner hotspots for the 4-corners egg. 60×60 transparent
+         taps in each viewport corner. pointer-events: auto in CSS so they
+         catch taps without showing anything. -->
+    <div id="cornerTL" class="corner-egg corner-tl" aria-hidden="true"></div>
+    <div id="cornerTR" class="corner-egg corner-tr" aria-hidden="true"></div>
+    <div id="cornerBR" class="corner-egg corner-br" aria-hidden="true"></div>
+    <div id="cornerBL" class="corner-egg corner-bl" aria-hidden="true"></div>
 
     <!-- Horror-mode corner Munkis: Moon creeps in from the lower-left edge,
          Ice from the lower-right. Slowly fade + slide into view while

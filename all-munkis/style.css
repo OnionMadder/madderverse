@@ -300,7 +300,7 @@ main {
 
 .stage {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 4px;
     position: relative;
     z-index: 1;
@@ -1185,6 +1185,169 @@ body.moon-invert {
 @keyframes moon-invert-flash {
     0%, 100% { filter: invert(0); }
     50%      { filter: invert(1) hue-rotate(180deg); }
+}
+
+/* ====== MUNKI ALTAR (Ice ↔ Moon swap chip) ======
+   Lives below the regular tray. The chip is a scaled-down clone of a
+   regular tray-chip so all the existing styling applies. Drag onto the
+   active 7th-wheel chip in the bank to swap; bank stays at 7 chips. */
+.munki-altar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0 0;
+    margin: 0 auto;
+}
+.munki-altar[hidden] { display: none; }
+.munki-altar .altar-chip {
+    transform: scale(0.78);
+    transform-origin: top center;
+    margin: -6px 0;
+    border-color: rgba(167, 139, 250, 0.6);
+    box-shadow: 0 0 14px rgba(167, 139, 250, 0.35);
+}
+.munki-altar .altar-hint {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(196, 181, 253, 0.7);
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+    margin-top: 2px;
+}
+
+/* Highlight the bank chip that's a valid swap drop target during an
+   altar drag — mirrors the .drop-target glow on stage slots. */
+.tray-chip.swap-target {
+    border-color: #c4b5fd;
+    box-shadow: 0 0 22px rgba(167, 139, 250, 0.7);
+    animation: swap-target-pulse 0.9s ease-in-out infinite;
+}
+@keyframes swap-target-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.06); }
+}
+
+/* ====== EASTER-EGG COUNTER + MOON REVEAL ======
+   The counter chip lives top-right of the viewport. It stays hidden until
+   the kid finds their first egg, then fades in and animates each bump.
+   The hidden corner hotspots catch the 4-corners egg without leaving any
+   visible mark. The moon-reveal overlay celebrates the 5th find. */
+.egg-counter {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0) + 10px);
+    right: calc(env(safe-area-inset-right, 0) + 10px);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    color: #e9d5ff;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    box-shadow: 0 0 14px rgba(167, 139, 250, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    pointer-events: none;
+}
+.egg-counter.shown {
+    opacity: 1;
+    transform: translateY(0);
+}
+.egg-counter.bump {
+    animation: egg-counter-bump 0.55s ease-out;
+}
+.egg-counter.found-all {
+    color: #fde68a;
+    border-color: rgba(251, 191, 36, 0.7);
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.45);
+}
+.egg-counter[hidden] { display: none; }
+@keyframes egg-counter-bump {
+    0%   { transform: translateY(0)    scale(1); }
+    35%  { transform: translateY(-3px) scale(1.18); }
+    100% { transform: translateY(0)    scale(1); }
+}
+
+/* Corner hotspots — invisible 60×60 squares anchored to each viewport
+   corner. Sit above the page chrome so taps register even on top of the
+   header and footer. */
+.corner-egg {
+    position: fixed;
+    width: 60px;
+    height: 60px;
+    z-index: 40;
+    pointer-events: auto;
+    background: transparent;
+}
+.corner-tl { top: 0;    left: 0; }
+.corner-tr { top: 0;    right: 0; }
+.corner-br { bottom: 0; right: 0; }
+.corner-bl { bottom: 0; left: 0; }
+
+/* Moon reveal — full-screen dimmer + centered card with a big floating
+   moon glyph. open class flips opacity + scale; tapping anywhere on the
+   overlay also dismisses early (handled in JS). */
+.moon-reveal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 8, 24, 0);
+    opacity: 0;
+    pointer-events: none;
+    transition: background 0.5s ease, opacity 0.5s ease;
+}
+.moon-reveal.open {
+    background: rgba(8, 8, 24, 0.82);
+    opacity: 1;
+    pointer-events: auto;
+}
+.moon-reveal-card {
+    text-align: center;
+    color: #fbeffb;
+    font-family: 'Fredoka', sans-serif;
+    transform: scale(0.7);
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.moon-reveal.open .moon-reveal-card { transform: scale(1); }
+.moon-reveal-glyph {
+    font-size: 96px;
+    line-height: 1;
+    filter: drop-shadow(0 0 24px rgba(167, 139, 250, 0.8));
+    animation: moon-float 3.2s ease-in-out infinite;
+    animation-play-state: paused;
+}
+.moon-reveal.open .moon-reveal-glyph { animation-play-state: running; }
+@keyframes moon-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-10px); }
+}
+.moon-reveal-title {
+    margin-top: 18px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: #e9d5ff;
+    text-shadow: 0 0 14px rgba(167, 139, 250, 0.7);
+}
+.moon-reveal-sub {
+    margin-top: 8px;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    color: rgba(233, 213, 255, 0.78);
 }
 
 /* Tilt only the playfield — header/tray stay anchored so the kid still
