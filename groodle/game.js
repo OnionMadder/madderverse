@@ -69,6 +69,12 @@
 
     let state = null;
     let danceSessionStart = 0;
+    /* True for the current session only when trackVisit detected a real
+       calendar-day rollover (last visit non-null AND != today). The
+       Bedhead predicate reads this flag — it's deliberately not in
+       state.counters because the achievement should unlock for *this*
+       returning visit, not stay perpetually true. */
+    let bedheadEligible = false;
 
     function clone(x) { return JSON.parse(JSON.stringify(x)); }
 
@@ -130,6 +136,7 @@
     function trackStroke() {
         state.counters.strokes += 1;
         saveState();
+        checkAchievements();
     }
     function trackColorUsed(color) {
         const c = state.counters;
@@ -142,49 +149,56 @@
             c.colorsUsedEver.push(color);
             dirty = true;
         }
-        if (dirty) saveState();
+        if (dirty) {
+            saveState();
+            checkAchievements();
+        }
     }
     function trackEraserUsed() {
         if (state.counters.hasUsedEraser) return;
         state.counters.hasUsedEraser = true;
         saveState();
+        checkAchievements();
     }
     function trackSurpriseUsed() {
         if (state.counters.hasUsedSurprise) return;
         state.counters.hasUsedSurprise = true;
         saveState();
+        checkAchievements();
     }
     function trackDrawingFinished() {
         state.counters.drawingsFinished += 1;
         state.counters.colorsUsedThisDrawing = [];
         saveState();
+        checkAchievements();
     }
     function trackClearDrawing() {
         state.counters.colorsUsedThisDrawing = [];
         saveState();
+        /* No achievement check here — clearing only removes progress
+           toward Rainbow Day; it can't unlock anything. */
     }
     function trackBeatExperienced(beat) {
         if (state.counters.beatsExperienced.indexOf(beat) !== -1) return;
         state.counters.beatsExperienced.push(beat);
         saveState();
+        checkAchievements();
     }
     function trackDanceSession(seconds) {
         if (seconds > state.counters.longestDanceSec) {
             state.counters.longestDanceSec = seconds;
             saveState();
+            checkAchievements();
         }
     }
     function trackVisit() {
         const today = todayKey();
         const last = state.counters.lastVisitDate;
         if (last !== today) {
+            if (last !== null) bedheadEligible = true;
             state.counters.lastVisitDate = today;
             saveState();
         }
-        /* `last` (the previous date string) is returned so the achievement
-           engine in the next commit can unlock Bedhead when it's non-null
-           and different from today. */
-        return last;
     }
 
     /* ============ CURRENCY ============ */
@@ -196,8 +210,6 @@
         if (currencyValueEl) currencyValueEl.textContent = String(state.doodles);
     }
 
-    /* Used by the upcoming achievement-unlock path. Kept in the persistence
-       neighborhood now so it's a one-liner to import for callers. */
     function addDoodles(n) {
         if (!n) return;
         state.doodles = Math.max(0, state.doodles + n);
@@ -211,6 +223,226 @@
             void currencyPillEl.offsetWidth;
             currencyPillEl.classList.add('bump');
         }
+    }
+
+    /* ============ ACHIEVEMENTS ============
+
+       Static catalog: each entry has an id (used as the storage key
+       inside state.achievements), a display title + one-line desc, the
+       Doodles reward, an emoji icon, and a `check` predicate that's a
+       pure function of state + the bedheadEligible session flag.
+
+       The unlock engine just iterates the catalog after every counter
+       mutation; predicates that are already-unlocked are skipped, and
+       newly-true ones fire the toast + addDoodles. */
+
+    const FULL_LOOP_SEC = BARS_PER_LOOP * STEPS_PER_BAR * SECONDS_PER_STEP;
+
+    const ACHIEVEMENTS = [
+        { id: 'first-groodle',    title: 'First Groodle',    desc: 'Finish your first drawing.',         reward: 10, icon: '🎨',
+          check: () => state.counters.drawingsFinished >= 1 },
+        { id: 'five-groodles',    title: 'Five Groodles',    desc: 'Finish five drawings.',              reward: 25, icon: '🖼️',
+          check: () => state.counters.drawingsFinished >= 5 },
+        { id: 'rainbow-day',      title: 'Rainbow Day',      desc: 'Use every color in one drawing.',    reward: 30, icon: '🌈',
+          check: () => state.counters.colorsUsedThisDrawing.length >= COLORS.length },
+        { id: 'eraser-apprentice',title: 'Eraser Apprentice',desc: 'Use the eraser tool.',                reward:  5, icon: '🧽',
+          check: () => state.counters.hasUsedEraser },
+        { id: 'beat-boom',        title: 'Beat BOOM',        desc: 'Dance to the BOOM beat.',             reward: 10, icon: '🥁',
+          check: () => state.counters.beatsExperienced.indexOf('BOOM') !== -1 },
+        { id: 'beat-funky',       title: 'Beat FUNKY',       desc: 'Dance to the FUNKY beat.',            reward: 10, icon: '🎷',
+          check: () => state.counters.beatsExperienced.indexOf('FUNKY') !== -1 },
+        { id: 'beat-shuffle',     title: 'Beat SHUFFLE',     desc: 'Dance to the SHUFFLE beat.',          reward: 10, icon: '🪩',
+          check: () => state.counters.beatsExperienced.indexOf('SHUFFLE') !== -1 },
+        { id: 'beat-wild',        title: 'Beat WILD',        desc: 'Dance to the WILD beat.',             reward: 10, icon: '🎸',
+          check: () => state.counters.beatsExperienced.indexOf('WILD') !== -1 },
+        { id: 'all-beat-champion',title: 'All-Beat Champion',desc: 'Dance to all four beats.',            reward: 25, icon: '🏆',
+          check: () => state.counters.beatsExperienced.length >= BEATS.length },
+        { id: 'dance-floor',      title: 'Dance Floor',      desc: 'Dance for a full song without stopping.', reward: 20, icon: '🕺',
+          check: () => state.counters.longestDanceSec >= FULL_LOOP_SEC },
+        { id: 'bedhead',          title: 'Bedhead',          desc: 'Come back the next day.',             reward: 30, icon: '😴',
+          check: () => bedheadEligible },
+        { id: 'doodler',          title: 'Doodler',          desc: 'Make 100 brush strokes.',              reward: 25, icon: '✏️',
+          check: () => state.counters.strokes >= 100 },
+        { id: 'big-doodler',      title: 'Big Doodler',      desc: 'Make 500 brush strokes.',              reward: 50, icon: '🖌️',
+          check: () => state.counters.strokes >= 500 },
+        { id: 'color-curator',    title: 'Color Curator',    desc: 'Try 8 different colors across your drawings.', reward: 20, icon: '🎭',
+          check: () => state.counters.colorsUsedEver.length >= 8 },
+        { id: 'surprise-hat',     title: 'Surprise Hat',     desc: 'Discover the SURPRISE button.',        reward: 15, icon: '🎲',
+          check: () => state.counters.hasUsedSurprise }
+    ];
+
+    const ACHIEVEMENT_BY_ID = {};
+    ACHIEVEMENTS.forEach(a => { ACHIEVEMENT_BY_ID[a.id] = a; });
+
+    function isUnlocked(id) {
+        const rec = state.achievements[id];
+        return !!(rec && rec.unlocked);
+    }
+
+    function unlockAchievement(ach) {
+        if (isUnlocked(ach.id)) return;
+        state.achievements[ach.id] = { unlocked: true, ts: Date.now() };
+        saveState();
+        addDoodles(ach.reward);
+        showAchievementToast(ach);
+        /* If the board is currently open, refresh it so the user sees the
+           card flip from locked to unlocked while looking at it. */
+        if (achievementsModalEl && !achievementsModalEl.hidden) {
+            renderAchievementBoard();
+        }
+    }
+
+    function checkAchievements() {
+        if (!state) return;
+        for (let i = 0; i < ACHIEVEMENTS.length; i++) {
+            const a = ACHIEVEMENTS[i];
+            if (isUnlocked(a.id)) continue;
+            try {
+                if (a.check()) unlockAchievement(a);
+            } catch (e) { /* defensive: a malformed predicate can't take
+                             down the whole engine */ }
+        }
+    }
+
+    /* ============ TOAST ============
+
+       Single-file queue: only one toast on screen at a time so they
+       don't overlap visually. Subsequent unlocks wait their turn. */
+
+    let toastContainerEl = null;
+    const toastQueue = [];
+    let toastBusy = false;
+
+    function showAchievementToast(ach) {
+        toastQueue.push(ach);
+        if (!toastBusy) drainToastQueue();
+    }
+
+    function drainToastQueue() {
+        if (toastQueue.length === 0) { toastBusy = false; return; }
+        toastBusy = true;
+        const ach = toastQueue.shift();
+        const el = document.createElement('div');
+        el.className = 'achievement-toast';
+        el.setAttribute('role', 'status');
+        el.innerHTML =
+            '<div class="toast-icon" aria-hidden="true"></div>' +
+            '<div class="toast-body">' +
+                '<div class="toast-meta">Achievement unlocked</div>' +
+                '<div class="toast-title"></div>' +
+                '<div class="toast-reward"></div>' +
+            '</div>';
+        /* textContent assignment instead of building the string with the
+           ach values directly — keeps user-visible strings safe even if a
+           future achievement title contains characters HTML cares about. */
+        el.querySelector('.toast-icon').textContent = ach.icon;
+        el.querySelector('.toast-title').textContent = ach.title;
+        el.querySelector('.toast-reward').textContent = '+' + ach.reward + ' 🪙';
+        toastContainerEl.appendChild(el);
+        /* next frame: let the browser paint the start state then add
+           .show so the transition runs. */
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => el.classList.add('show'));
+        });
+        setTimeout(() => {
+            el.classList.remove('show');
+            el.classList.add('hide');
+            setTimeout(() => {
+                el.remove();
+                drainToastQueue();
+            }, 400);
+        }, 2800);
+    }
+
+    /* ============ MODAL ============
+
+       Generic open/close used by the achievements board and (next
+       commit) the hat shop. Click outside the sheet (anything tagged
+       data-close="1") dismisses. Escape closes. Body scroll is locked
+       while open. */
+
+    let openModalEl = null;
+
+    function openModal(el) {
+        if (!el || openModalEl === el) return;
+        if (openModalEl) closeModal();
+        openModalEl = el;
+        el.hidden = false;
+        el.setAttribute('aria-hidden', 'false');
+        document.documentElement.classList.add('modal-open');
+        /* Two RAFs so the browser commits hidden=false + initial
+           transforms before we trigger the .open transition. */
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => el.classList.add('open'));
+        });
+    }
+
+    function closeModal() {
+        if (!openModalEl) return;
+        const el = openModalEl;
+        el.classList.remove('open');
+        el.setAttribute('aria-hidden', 'true');
+        document.documentElement.classList.remove('modal-open');
+        openModalEl = null;
+        /* Wait out the slide-down transition before hiding so the sheet
+           animates away rather than snapping. Matches .modal-sheet's
+           transition duration with a small buffer. */
+        setTimeout(() => { if (!openModalEl) el.hidden = true; }, 360);
+    }
+
+    function attachModalDismissers(el) {
+        el.addEventListener('click', (e) => {
+            const t = e.target;
+            if (t && t.closest && t.closest('[data-close="1"]')) closeModal();
+        });
+    }
+
+    /* ============ ACHIEVEMENT BOARD ============ */
+
+    let achievementsModalEl = null;
+    let achievementsListEl = null;
+    let achievementsStatsEl = null;
+
+    function renderAchievementBoard() {
+        if (!achievementsListEl) return;
+        const unlockedCount = ACHIEVEMENTS.filter(a => isUnlocked(a.id)).length;
+        achievementsStatsEl.textContent =
+            unlockedCount + ' / ' + ACHIEVEMENTS.length + ' unlocked';
+        achievementsListEl.innerHTML = '';
+        /* Unlocked first, then locked in catalog order. Within unlocked,
+           sort by unlock timestamp descending so the most recent appears
+           at the top — kids like seeing what they just earned. */
+        const sorted = ACHIEVEMENTS.slice().sort((a, b) => {
+            const au = isUnlocked(a.id), bu = isUnlocked(b.id);
+            if (au !== bu) return au ? -1 : 1;
+            if (au && bu) {
+                return (state.achievements[b.id].ts || 0) - (state.achievements[a.id].ts || 0);
+            }
+            return ACHIEVEMENTS.indexOf(a) - ACHIEVEMENTS.indexOf(b);
+        });
+        for (let i = 0; i < sorted.length; i++) {
+            const a = sorted[i];
+            const unlocked = isUnlocked(a.id);
+            const card = document.createElement('div');
+            card.className = 'ach-card ' + (unlocked ? 'unlocked' : 'locked');
+            card.innerHTML =
+                '<div class="ach-icon" aria-hidden="true"></div>' +
+                '<div class="ach-body">' +
+                    '<div class="ach-title"></div>' +
+                    '<div class="ach-desc"></div>' +
+                '</div>' +
+                '<div class="ach-reward"></div>';
+            card.querySelector('.ach-icon').textContent = unlocked ? a.icon : '🔒';
+            card.querySelector('.ach-title').textContent = a.title;
+            card.querySelector('.ach-desc').textContent = a.desc;
+            card.querySelector('.ach-reward').textContent = '+' + a.reward + ' 🪙';
+            achievementsListEl.appendChild(card);
+        }
+    }
+
+    function openAchievements() {
+        renderAchievementBoard();
+        openModal(achievementsModalEl);
     }
 
     /* ============ STATE ============ */
@@ -884,6 +1116,8 @@
             setDrawMode(!isDrawMode);
         });
 
+        document.getElementById('openAchievementsBtn').addEventListener('click', openAchievements);
+
         document.getElementById('eraserBtn').addEventListener('click', () => {
             isErasing = !isErasing;
             const btn = document.getElementById('eraserBtn');
@@ -919,6 +1153,11 @@
         state = loadState();
         currencyPillEl = document.getElementById('currencyPill');
         currencyValueEl = document.getElementById('currencyValue');
+        toastContainerEl = document.getElementById('toastContainer');
+        achievementsModalEl = document.getElementById('achievementsModal');
+        achievementsListEl = document.getElementById('achievementsList');
+        achievementsStatsEl = document.getElementById('achievementStats');
+        if (achievementsModalEl) attachModalDismissers(achievementsModalEl);
         renderCurrency();
         trackVisit();
 
@@ -930,6 +1169,17 @@
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');
         bubbleEl = document.getElementById('beatBubble');
+
+        /* Defensive: if a returning user is on a release where the
+           achievement catalog grew, retroactively unlock anything their
+           historic counters already satisfy. Also fires Bedhead when
+           bedheadEligible is true from the trackVisit above. */
+        checkAchievements();
+
+        /* Global Escape closes whatever modal is open. */
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && openModalEl) closeModal();
+        });
 
         /* Stop the dance when the tab/app goes to the background. RAF
            naturally pauses on hidden tabs, but the audio scheduler's

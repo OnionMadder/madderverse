@@ -141,6 +141,13 @@
                 <span class="bg-preview bg-night"></span>
             </button>
         </div>
+
+        <div class="shelf-row" id="shelfRow">
+            <button class="btn shelf-btn" id="openAchievementsBtn" type="button">
+                <span class="shelf-icon" aria-hidden="true">🏆</span>
+                <span class="shelf-label">Achievements</span>
+            </button>
+        </div>
     </div>
 
     <div class="panel tool-tray" id="drawPanel">
@@ -164,6 +171,20 @@
             </div>
         </section>
     </div>
+
+    <div class="modal" id="achievementsModal" hidden aria-hidden="true" role="dialog" aria-labelledby="achievementsModalTitle">
+        <div class="modal-backdrop" data-close="1"></div>
+        <div class="modal-sheet" role="document">
+            <header class="modal-header">
+                <h2 id="achievementsModalTitle"><span aria-hidden="true">🏆</span> Achievements</h2>
+                <button class="modal-close" type="button" data-close="1" aria-label="Close achievements">✕</button>
+            </header>
+            <div class="modal-stats" id="achievementStats" aria-live="polite"></div>
+            <div class="modal-body" id="achievementsList"></div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
     <div class="panel dance-panel" id="dancePanel" hidden>
         <div class="now-playing">
