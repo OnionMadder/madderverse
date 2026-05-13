@@ -120,6 +120,18 @@
                             <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
                         </g>
                     </svg>
+
+                    <!-- Hat layer. Sits above the outline so hats land on
+                         top of the head ring (not under it). Same viewBox
+                         and aspect handling as the silhouette so hat
+                         coordinates live in the same 400×600 logical
+                         space; positions out-of-body (above head, beside
+                         head) are allowed since this SVG isn't clipped.
+                         renderEquippedHat() in game.js drops the equipped
+                         hat's SVG fragment into #hatLayerInner. -->
+                    <svg class="hat-layer" id="hatLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                        <g id="hatLayerInner"></g>
+                    </svg>
                 </div>
 
                 <div class="stage-floor" id="stageFloor" aria-hidden="true"></div>
@@ -146,6 +158,10 @@
             <button class="btn shelf-btn" id="openAchievementsBtn" type="button">
                 <span class="shelf-icon" aria-hidden="true">🏆</span>
                 <span class="shelf-label">Achievements</span>
+            </button>
+            <button class="btn shelf-btn" id="openHatShopBtn" type="button">
+                <span class="shelf-icon" aria-hidden="true">🎩</span>
+                <span class="shelf-label">Hat Shop</span>
             </button>
         </div>
     </div>
@@ -181,6 +197,18 @@
             </header>
             <div class="modal-stats" id="achievementStats" aria-live="polite"></div>
             <div class="modal-body" id="achievementsList"></div>
+        </div>
+    </div>
+
+    <div class="modal" id="hatShopModal" hidden aria-hidden="true" role="dialog" aria-labelledby="hatShopModalTitle">
+        <div class="modal-backdrop" data-close="1"></div>
+        <div class="modal-sheet" role="document">
+            <header class="modal-header">
+                <h2 id="hatShopModalTitle"><span aria-hidden="true">🎩</span> Hat Shop</h2>
+                <button class="modal-close" type="button" data-close="1" aria-label="Close hat shop">✕</button>
+            </header>
+            <div class="modal-stats">Balance: <span id="hatShopBalance">🪙 0</span></div>
+            <div class="modal-body hat-grid" id="hatShopGrid"></div>
         </div>
     </div>
 

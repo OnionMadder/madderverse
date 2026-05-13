@@ -347,6 +347,19 @@ body.dancing .stage {
 .silhouette-fill-layer    { z-index: 1; }
 .silhouette-outline-layer { z-index: 3; }
 
+/* Hat layer sits above the outline so hats land on top of the head
+   ring rather than being trimmed by it. Same absolute fill + no
+   pointer events as the silhouette layers; the SVG inherits the
+   creature's transform so hats dance with the figure. */
+.hat-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 4;
+}
+
 /* Pale wash inside the silhouette so the kid sees the body shape even
    before any strokes — this is the "coloring page" surface. Slight cool
    tint (vs pure white) so the figure still reads as a distinct shape on
@@ -593,6 +606,109 @@ body.dancing .shelf-row { display: none; }
 .modal-open, .modal-open body {
     overflow: hidden;
     overscroll-behavior: contain;
+}
+
+/* ============ HAT SHOP ============ */
+
+.hat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+@media (min-width: 480px) {
+    .hat-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 720px) {
+    .hat-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.hat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s;
+}
+.hat-card.owned {
+    border-color: rgba(0, 255, 204, 0.5);
+}
+.hat-card.equipped {
+    border-color: #ff6ec7;
+    background:
+        radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
+        rgba(0, 0, 0, 0.35);
+    box-shadow: 0 0 14px rgba(255, 110, 199, 0.25);
+}
+.hat-card.locked { opacity: 0.65; }
+
+.hat-preview {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 90%, rgba(0, 0, 0, 0.25) 0%, transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
+    border-radius: 10px;
+    display: block;
+}
+/* The preview's silhouette head reuses the same wash tone as the
+   in-stage figure so it reads as a mini-Groodle. */
+
+.hat-name {
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 1.2;
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.hat-card.locked .hat-name { color: rgba(255, 255, 255, 0.55); }
+
+.hat-action {
+    width: 100%;
+    padding: 7px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    font-weight: bold;
+    text-transform: uppercase;
+    border: 2px solid #1a0f33;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 36px;
+}
+.hat-action.buy {
+    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
+    color: #1a0f33;
+    box-shadow: 0 3px 0 #1a0f33;
+}
+.hat-action.buy:active { transform: translateY(2px); box-shadow: 0 1px 0 #1a0f33; }
+.hat-action.own {
+    background: rgba(0, 255, 204, 0.18);
+    border-color: #00ffcc;
+    color: #fff;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.hat-action.own:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+.hat-action.equipped-tag {
+    background: #ff6ec7;
+    color: #1a0f33;
+    border-color: #1a0f33;
+    cursor: default;
+}
+.hat-action.locked-tag {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.55);
+    cursor: not-allowed;
+}
+@media (hover: hover) {
+    .hat-action.buy:hover { filter: brightness(1.06); }
+    .hat-action.own:hover { background: rgba(0, 255, 204, 0.28); }
 }
 
 /* ============ ACHIEVEMENT CARDS ============ */

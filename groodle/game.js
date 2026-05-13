@@ -445,6 +445,233 @@
         openModal(achievementsModalEl);
     }
 
+    /* ============ HATS ============
+
+       Static catalog of 15 hats (+ a 'no-hat' default that's always
+       owned for free). Each `svg` is the inner markup of a <g> that
+       gets dropped into #hatLayerInner — coordinates live in the same
+       0..400 × 0..600 viewBox as the silhouette layers. Most hats sit
+       around y=0..50 (above and on the head crown at y=42); a few
+       break that convention deliberately (snorkel mask covers the
+       eyes at y=78..118, antlers/halo go up to y=-20).
+
+       The hat-layer SVG is unclipped, so hat geometry is allowed to
+       extend outside the body silhouette. Hats follow the dance
+       transforms because the SVG element is a child of .creature. */
+
+    const HATS = [
+        { id: 'no-hat',       name: 'No Hat',        price:   0, svg: '' },
+
+        { id: 'beanie',       name: 'Beanie',        price:  20, svg:
+            '<path d="M148,50 Q148,6 200,2 Q252,6 252,50 Z" fill="#43aa8b" stroke="#1a0f33" stroke-width="3"/>' +
+            '<path d="M148,46 Q200,38 252,46 L252,58 Q200,52 148,58 Z" fill="#1d3557" stroke="#1a0f33" stroke-width="3"/>' +
+            '<circle cx="200" cy="-2" r="10" fill="#ff6ec7" stroke="#1a0f33" stroke-width="3"/>' },
+
+        { id: 'baseball-cap', name: 'Baseball Cap',  price:  25, svg:
+            '<path d="M148,48 Q148,8 200,8 Q252,8 252,48 L252,52 Q200,46 148,52 Z" fill="#e63946" stroke="#1a0f33" stroke-width="3"/>' +
+            '<path d="M200,46 L302,54 L302,62 L200,62 Z" fill="#e63946" stroke="#1a0f33" stroke-width="3"/>' +
+            '<circle cx="200" cy="24" r="8" fill="#fff" stroke="#1a0f33" stroke-width="2"/>' },
+
+        { id: 'beret',        name: 'Beret',         price:  30, svg:
+            '<ellipse cx="198" cy="40" rx="68" ry="14" fill="#7209b7" stroke="#1a0f33" stroke-width="3"/>' +
+            '<ellipse cx="200" cy="44" rx="46" ry="6" fill="#1a0f33"/>' +
+            '<circle cx="240" cy="22" r="9" fill="#7209b7" stroke="#1a0f33" stroke-width="3"/>' },
+
+        { id: 'cowboy-hat',   name: 'Cowboy Hat',    price:  50, svg:
+            '<ellipse cx="200" cy="52" rx="108" ry="12" fill="#6f4e37" stroke="#1a0f33" stroke-width="3"/>' +
+            '<path d="M160,12 Q200,2 240,12 L235,48 L165,48 Z" fill="#6f4e37" stroke="#1a0f33" stroke-width="3"/>' +
+            '<rect x="165" y="38" width="70" height="10" fill="#1a0f33"/>' +
+            '<circle cx="200" cy="43" r="4" fill="#ffd23f"/>' },
+
+        { id: 'top-hat',      name: 'Top Hat',       price:  60, svg:
+            '<ellipse cx="200" cy="50" rx="74" ry="7" fill="#1a0f33" stroke="#1a0f33" stroke-width="3"/>' +
+            '<rect x="164" y="-18" width="72" height="64" fill="#1a0f33" stroke="#1a0f33" stroke-width="3"/>' +
+            '<rect x="164" y="28" width="72" height="12" fill="#00ffcc"/>' },
+
+        { id: 'sombrero',     name: 'Sombrero',      price:  65, svg:
+            '<ellipse cx="200" cy="56" rx="132" ry="14" fill="#6f4e37" stroke="#1a0f33" stroke-width="3"/>' +
+            '<ellipse cx="200" cy="48" rx="120" ry="6" fill="#e63946" stroke="#1a0f33" stroke-width="2"/>' +
+            '<path d="M168,28 Q200,12 232,28 L228,50 L172,50 Z" fill="#6f4e37" stroke="#1a0f33" stroke-width="3"/>' +
+            '<rect x="170" y="42" width="60" height="8" fill="#43aa8b"/>' },
+
+        { id: 'bunny-ears',   name: 'Bunny Ears',    price:  70, svg:
+            '<g stroke="#1a0f33" stroke-width="3" stroke-linejoin="round">' +
+                '<ellipse cx="178" cy="-6" rx="14" ry="40" fill="#fff" transform="rotate(-10 178 -6)"/>' +
+                '<ellipse cx="178" cy="0" rx="6" ry="28" fill="#ff6ec7" transform="rotate(-10 178 0)"/>' +
+                '<ellipse cx="222" cy="-6" rx="14" ry="40" fill="#fff" transform="rotate(10 222 -6)"/>' +
+                '<ellipse cx="222" cy="0" rx="6" ry="28" fill="#ff6ec7" transform="rotate(10 222 0)"/>' +
+            '</g>' },
+
+        { id: 'wizard-hat',   name: 'Wizard Hat',    price:  75, svg:
+            '<ellipse cx="200" cy="50" rx="86" ry="9" fill="#3b1f6b" stroke="#1a0f33" stroke-width="3"/>' +
+            '<path d="M166,46 L200,-40 L234,46 Z" fill="#3b1f6b" stroke="#1a0f33" stroke-width="3" stroke-linejoin="round"/>' +
+            '<path d="M195,16 L200,4 L205,16 L218,18 L207,26 L210,38 L200,32 L190,38 L193,26 L182,18 Z" fill="#ffd23f" stroke="#1a0f33" stroke-width="1.5"/>' +
+            '<circle cx="218" cy="-2" r="2.5" fill="#ffd23f"/>' +
+            '<circle cx="186" cy="-12" r="2.5" fill="#ffd23f"/>' },
+
+        { id: 'witch-hat',    name: 'Witch Hat',     price:  80, svg:
+            '<ellipse cx="200" cy="50" rx="92" ry="10" fill="#1a0f33" stroke="#1a0f33" stroke-width="3"/>' +
+            '<path d="M168,46 L194,-12 Q220,-26 236,-8 L232,46 Z" fill="#1a0f33" stroke="#1a0f33" stroke-width="3" stroke-linejoin="round"/>' +
+            '<path d="M168,38 L232,38 L234,48 L166,48 Z" fill="#ff6ec7" stroke="#1a0f33" stroke-width="2"/>' +
+            '<path d="M188,30 L192,38 L200,32 L208,38 L212,30" stroke="#ffd23f" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>' },
+
+        { id: 'antlers',      name: 'Antlers',       price:  90, svg:
+            '<g stroke="#6f4e37" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M168,44 Q146,18 138,-18"/>' +
+                '<path d="M152,8 L132,-6"/>' +
+                '<path d="M148,-8 L130,-20"/>' +
+                '<path d="M232,44 Q254,18 262,-18"/>' +
+                '<path d="M248,8 L268,-6"/>' +
+                '<path d="M252,-8 L270,-20"/>' +
+            '</g>' },
+
+        { id: 'helmet',       name: 'Helmet',        price:  90, svg:
+            '<path d="M146,48 Q146,2 200,2 Q254,2 254,48 Q254,60 200,62 Q146,60 146,48 Z" fill="#9a9aa6" stroke="#1a0f33" stroke-width="3"/>' +
+            '<rect x="156" y="36" width="88" height="14" rx="4" fill="#1a0f33"/>' +
+            '<rect x="158" y="38" width="84" height="10" rx="3" fill="#87ceeb"/>' +
+            '<rect x="148" y="22" width="104" height="6" fill="#00ffcc"/>' +
+            '<rect x="148" y="14" width="104" height="6" fill="#ff6ec7"/>' },
+
+        { id: 'crown',        name: 'Crown',         price: 100, svg:
+            '<rect x="150" y="40" width="100" height="14" fill="#ffd23f" stroke="#1a0f33" stroke-width="3"/>' +
+            '<path d="M150,52 L160,8 L182,34 L200,0 L218,34 L240,8 L250,52 Z" fill="#ffd23f" stroke="#1a0f33" stroke-width="3" stroke-linejoin="round"/>' +
+            '<circle cx="160" cy="8" r="6" fill="#e63946" stroke="#1a0f33" stroke-width="2"/>' +
+            '<circle cx="200" cy="0" r="7" fill="#43aa8b" stroke="#1a0f33" stroke-width="2"/>' +
+            '<circle cx="240" cy="8" r="6" fill="#1d3557" stroke="#1a0f33" stroke-width="2"/>' },
+
+        { id: 'tiara',        name: 'Tiara',         price: 100, svg:
+            '<path d="M170,46 Q200,18 230,46" stroke="#d9d9e6" stroke-width="6" fill="none" stroke-linecap="round"/>' +
+            '<path d="M172,44 L178,32 L188,40 L194,28 L200,16 L206,28 L212,40 L222,32 L228,44 Z" fill="#d9d9e6" stroke="#1a0f33" stroke-width="2" stroke-linejoin="round"/>' +
+            '<circle cx="200" cy="18" r="5" fill="#ff6ec7" stroke="#1a0f33" stroke-width="1.5"/>' +
+            '<circle cx="185" cy="34" r="3" fill="#43aa8b" stroke="#1a0f33" stroke-width="1"/>' +
+            '<circle cx="215" cy="34" r="3" fill="#1d3557" stroke="#1a0f33" stroke-width="1"/>' },
+
+        { id: 'snorkel-mask', name: 'Snorkel Mask',  price: 110, svg:
+            '<rect x="156" y="78" width="88" height="40" rx="12" fill="#1d3557" stroke="#1a0f33" stroke-width="3"/>' +
+            '<circle cx="180" cy="98" r="11" fill="#87ceeb" stroke="#1a0f33" stroke-width="2"/>' +
+            '<circle cx="220" cy="98" r="11" fill="#87ceeb" stroke="#1a0f33" stroke-width="2"/>' +
+            '<circle cx="177" cy="95" r="3" fill="#fff" opacity="0.75"/>' +
+            '<circle cx="217" cy="95" r="3" fill="#fff" opacity="0.75"/>' +
+            '<rect x="246" y="60" width="10" height="50" rx="3" fill="#ffd23f" stroke="#1a0f33" stroke-width="3"/>' +
+            '<rect x="240" y="58" width="22" height="8" rx="2" fill="#e63946" stroke="#1a0f33" stroke-width="2"/>' },
+
+        { id: 'halo',         name: 'Halo',          price: 150, svg:
+            '<ellipse cx="200" cy="20" rx="56" ry="9" fill="none" stroke="#ffd23f" stroke-width="7"/>' +
+            '<ellipse cx="200" cy="20" rx="56" ry="9" fill="none" stroke="#fff8c0" stroke-width="2.5" opacity="0.85"/>' +
+            '<ellipse cx="200" cy="20" rx="46" ry="5" fill="none" stroke="#ffd23f" stroke-width="2" opacity="0.45"/>' }
+    ];
+
+    const HAT_BY_ID = {};
+    HATS.forEach(h => { HAT_BY_ID[h.id] = h; });
+
+    /* In-game (.creature) hat layer. Updated on equip / load / surprise.
+       Surprise repaints the canvas but never touches the hat layer, so
+       a kid's hat survives across SURPRISE / CLEAR / DANCE transitions. */
+    let hatLayerInnerEl = null;
+
+    function renderEquippedHat() {
+        if (!hatLayerInnerEl) return;
+        const hat = HAT_BY_ID[state.hats.equipped] || HAT_BY_ID['no-hat'];
+        hatLayerInnerEl.innerHTML = hat.svg || '';
+    }
+
+    function buyHat(id) {
+        const hat = HAT_BY_ID[id];
+        if (!hat) return;
+        const alreadyOwned = state.hats.owned.indexOf(id) !== -1;
+        if (alreadyOwned) { equipHat(id); return; }
+        if (hat.price > 0 && state.doodles < hat.price) return;
+        state.doodles -= hat.price;
+        state.hats.owned.push(id);
+        state.hats.equipped = id;
+        saveState();
+        renderCurrency();
+        renderEquippedHat();
+        buildHatShopGrid();
+    }
+
+    function equipHat(id) {
+        if (state.hats.owned.indexOf(id) === -1) return;
+        state.hats.equipped = id;
+        saveState();
+        renderEquippedHat();
+        buildHatShopGrid();
+    }
+
+    /* ============ HAT SHOP UI ============ */
+
+    let hatShopModalEl = null;
+    let hatShopGridEl = null;
+    let hatShopBalanceEl = null;
+
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, (c) =>
+            ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function buildHatShopGrid() {
+        if (!hatShopGridEl) return;
+        if (hatShopBalanceEl) {
+            hatShopBalanceEl.textContent = '🪙 ' + state.doodles + ' Doodles';
+        }
+        hatShopGridEl.innerHTML = '';
+        for (let i = 0; i < HATS.length; i++) {
+            const hat = HATS[i];
+            const owned = state.hats.owned.indexOf(hat.id) !== -1;
+            const equipped = state.hats.equipped === hat.id;
+            const affordable = state.doodles >= hat.price;
+
+            const card = document.createElement('div');
+            card.className = 'hat-card';
+            if (equipped) card.classList.add('equipped');
+            else if (owned) card.classList.add('owned');
+            else if (!affordable && hat.price > 0) card.classList.add('locked');
+
+            /* The preview is a mini-Groodle: same wash circle for the
+               head as the in-stage figure, then the hat on top. Crop
+               viewBox to the upper body so the hat dominates the card. */
+            const previewSvg =
+                '<svg class="hat-preview" viewBox="100 -50 200 230" aria-hidden="true">' +
+                    '<circle cx="200" cy="100" r="58" fill="rgba(232, 232, 244, 0.94)" stroke="#1a0f33" stroke-width="3"/>' +
+                    '<g>' + hat.svg + '</g>' +
+                '</svg>';
+
+            let actionHtml;
+            if (equipped) {
+                actionHtml = '<button class="hat-action equipped-tag" type="button" disabled>✓ Equipped</button>';
+            } else if (owned) {
+                actionHtml = '<button class="hat-action own" type="button" data-action="equip">Wear</button>';
+            } else if (hat.price === 0) {
+                /* No-Hat row when not currently equipped — treat as a
+                   free equip (price 0). */
+                actionHtml = '<button class="hat-action own" type="button" data-action="buy">Wear</button>';
+            } else if (affordable) {
+                actionHtml = '<button class="hat-action buy" type="button" data-action="buy">Buy &nbsp;' + hat.price + ' 🪙</button>';
+            } else {
+                actionHtml = '<button class="hat-action locked-tag" type="button" disabled>🔒 ' + hat.price + ' 🪙</button>';
+            }
+
+            card.innerHTML = previewSvg +
+                '<div class="hat-name">' + escapeHtml(hat.name) + '</div>' +
+                actionHtml;
+
+            const btn = card.querySelector('button[data-action]');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (btn.dataset.action === 'equip') equipHat(hat.id);
+                    else buyHat(hat.id);
+                });
+            }
+
+            hatShopGridEl.appendChild(card);
+        }
+    }
+
+    function openHatShop() {
+        buildHatShopGrid();
+        openModal(hatShopModalEl);
+    }
+
     /* ============ STATE ============ */
 
     let currentColor = '#000000';
@@ -1117,6 +1344,7 @@
         });
 
         document.getElementById('openAchievementsBtn').addEventListener('click', openAchievements);
+        document.getElementById('openHatShopBtn').addEventListener('click', openHatShop);
 
         document.getElementById('eraserBtn').addEventListener('click', () => {
             isErasing = !isErasing;
@@ -1157,8 +1385,14 @@
         achievementsModalEl = document.getElementById('achievementsModal');
         achievementsListEl = document.getElementById('achievementsList');
         achievementsStatsEl = document.getElementById('achievementStats');
+        hatShopModalEl = document.getElementById('hatShopModal');
+        hatShopGridEl = document.getElementById('hatShopGrid');
+        hatShopBalanceEl = document.getElementById('hatShopBalance');
+        hatLayerInnerEl = document.getElementById('hatLayerInner');
         if (achievementsModalEl) attachModalDismissers(achievementsModalEl);
+        if (hatShopModalEl) attachModalDismissers(hatShopModalEl);
         renderCurrency();
+        renderEquippedHat();
         trackVisit();
 
         buildCanvas();
