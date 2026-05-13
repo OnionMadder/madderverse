@@ -8,23 +8,32 @@ ad-free / kid-friendly branding). This file captures only what's specific to
 
 ## What it is
 
-- 8-slot stage × 22-mod tray. Drag a chip onto a slot, the mod's voice joins
-  the loop. Tap a filled slot to clear it.
+- 5-slot stage × 22-mod tray. **Tap** a tray chip to teleport its Munki onto
+  the next empty stage slot. **Tap** a Munki on stage to cycle its head
+  expression 1→2→3→4→5→1. **Drag** a Munki off the stage to clear it.
+  If the stage is full, the tapped chip shakes to signal "no room."
 - Pure HTML/CSS/JS. No build step. **All audio is synthesized via WebAudio**
   — there are no audio files anywhere.
-- Two ambient layers that aren't user-controlled mods:
+- Ambient + horror layers that aren't user-controlled mods:
   - **`BASE_SONG`** — Cmaj→Am two-bar background loop ("Bala's Theme"). Toggle
     via the `SONG` button.
   - **Jumpscare** — manual via the `BOO!` button, **and** auto-fires when
-    `MOON` or `ICE` lands in a slot (drag, drop, or REMIX). 1.5s, debounced.
-  - **Ice freeze** — additional layer on top of the jumpscare: when Ice
-    Munki is on the stage, every other active slot freezes to "DEATH"
-    (cyan tint, ❄ flake, 💀 RIP flag). Morbidly absurd, not gory. Thaws
-    automatically when no Ice Munki remains. See `updateIceFreeze()`.
+    `MOON` or `ICE` lands in a slot. 1.5s, debounced.
+  - **Ice freeze** — when Ice Munki is on the stage, every other active
+    slot gets the cyan tint + ❄ flake + 💀 RIP visual via
+    `.frozen-by-ice`. Morbidly absurd, not gory. Thaws automatically
+    when no Ice Munki remains. See `updateIceFreeze()`.
   - **Moon Rules** — while Moon Munki is on the stage, ANY click on the
     page rolls a random chaos event (hue rotate, invert flash, slot
     shuffle, 🌙 rain, subtitle glitch, page tilt, phantom Munki).
     Cooldown 700ms. Wired in `attachMoonChaos()`.
+  - **React mode** — a regular Munki on a slot directly adjacent (N-1 or
+    N+1) to Ice or Moon accrues dwell time on every quarter note. After
+    `REACT_DWELL_BEATS` (8) beats it trips into react mode and auto-cycles
+    its expression 1→2→3→4→5 on every beat. `body.react-mode-active` is
+    toggled whenever any slot is reacting (Phase 3 will use it to swap to
+    a horror BG). Dwell resets when the trigger or victim is moved away.
+    See `tickReactState()`.
 
 ## File layout
 
@@ -63,7 +72,7 @@ all-munkis/
 
 | Section | What lives there |
 |---|---|
-| **CONFIG** | `TEMPO=100`, `STEPS_PER_BAR=16`, `NUM_SLOTS=8`, `BARS_PER_LOOP=2` |
+| **CONFIG** | `TEMPO=100`, `STEPS_PER_BAR=16`, `NUM_SLOTS=5`, `BARS_PER_LOOP=2`, `REACT_DWELL_BEATS=8`, `PLACED_SHOCK_MS=600`, `DRAG_THRESHOLD_PX=12` |
 | **AUDIO ENGINE** | `audioCtx`, `masterGain` + `DynamicsCompressor` bus, `isMuted`, `isBaseSongOn`, `isJumpScareActive`, `currentStep`, `currentBar` |
 | `ensureAudio()` | Lazily creates context + compressor on first user interaction |
 | `schedule()` | Look-ahead scheduler. Advances `currentStep` 0..15 then increments `currentBar` 0..1 |
@@ -75,14 +84,18 @@ all-munkis/
 | **HORROR_TRIGGER_MODS** | `Set(['moon', 'ice'])`. Auto-trigger jumpscare when one of these is placed (and wasn't already there). |
 | **SHEETS** | `{ munki: {src, sheetW, sheetH, frames}, mb: {…} }`. Frame coords mirror the matching JSON. Munki frames are `{expr}-{color}` (5×8 = 40 frames); Madballz frames are `mb-{id}` (8 static frames). |
 | **COLOR_BY_BODY** | Maps each Munki's `bodyColor` hex to its single-letter color code (B/G/O/P/R/X/Y/Z). Used by `headArt` to pick which column of `default-heads.png` to render. |
-| **expressionForSlot(slotIndex)** | Returns 1..5 per slot based on game state. 2 during jumpscare or for ~600 ms after a fresh drop (`placedAt` Map). 3 if Ice is on stage. 5 if Moon is on stage. 1 otherwise. Ice/Moon themselves stay on row 1. |
+| **expressionForSlot(slotIndex)** | Returns 1..5 per slot. Priority: jumpscare → 2; react mode → cycle 1..5 on beat (`reactStartBeat` Map + `beatCounter`); just placed → 2 (`placedAt` Map, ~600 ms); manual tap → that row (`manualExpression` Map); default → 1. |
+| **cycleManualExpression(idx)** | Tap-on-stage handler — bumps `manualExpression[idx]` to the next row, wrapping 5→1. |
+| **tickReactState()** | Called from `scheduleStep` on every quarter note. Increments `dwellBeats[idx]` for any regular Munki adjacent to Ice/Moon; trips it into react mode at `REACT_DWELL_BEATS`. Re-renders just the affected slots and toggles `body.react-mode-active`. |
+| **isTriggerAdjacent(idx)** | True when slot N-1 or N+1 holds Ice or Moon (linear 5-slot row). |
 | **isIceOnStage / updateIceFreeze** | Ice Munki freeze logic — toggles `.frozen-by-ice` on every other active slot when Ice is placed. |
 | **moonRules / attachMoonChaos** | Moon Munki click chaos — `attachMoonChaos()` adds a document-level click listener; `moonRules()` picks a random effect (hue, invert, shuffle, rain, glitch text, tilt, phantom). |
 | **ART** | `bodyArt(c)`, `headShapeArt(c)`, `headModArt(frameName, sheetName)`, `headPhonesArt()`, `hairArt(c)`, `headArt(c, expr)`, `characterArt(id, slotIndex?)`. All return SVG strings. |
 | **HAIR** | `HAIR_STYLES`, `HAIR_COLORS`, `hairSvg(style, color, dark)`, `assignRandomHair()` (picks ~55% of mods at init, skips horror-trigger ones). |
 | **STATE** | `slots = new Array(NUM_SLOTS).fill(null)` |
 | **UI / RENDER** | `buildStage`, `renderTray`, `renderSlot`, `renderAllSlots`, `setSlot` |
-| **DRAG & DROP** | Pointer events, single delegated stage click handler, `findSlotAt`. |
+| **TRAY: tap-to-place** | Plain `click` listener on every chip — `setSlot(slots.indexOf(null), id)`. If `indexOf` returns -1 the chip shakes (`.shake` keyframes). Re-attached after every `renderTray()` (init / bank switch / mode switch). |
+| **STAGE: tap-cycle + drag-clear** | Single delegated pointer-event listener on `#stage`. `pointerdown` records start; if the pointer moves past `DRAG_THRESHOLD_PX` it's a drag (slot gets `.dragging-off`). On `pointerup`, a drag released outside any stage slot clears via `setSlot(idx, null)`; otherwise it's a tap and calls `cycleManualExpression(idx)`. `findSlotAt(x, y)` helps the drag branch decide. |
 | **UI SOUNDS** | `playDropSound`, `playClearSound` |
 | **JUMP SCARE** | `triggerJumpScare()` toggles `body.jumpscare` for 1.5s + `playJumpScareSound()` (distorted shriek + sub thud) |
 | **HEADER BUTTONS** | `attachHeaderHandlers()` wires REMIX, CLEAR, SONG, BOO!, mute |

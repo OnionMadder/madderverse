@@ -28,6 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="The Madderverse" />
     <meta name="application-name" content="The Madderverse" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 
@@ -58,7 +59,7 @@
 
     <main>
         <div class="stage-wrap">
-            <div id="stage" class="stage" aria-label="8 munki slots"></div>
+            <div id="stage" class="stage" aria-label="5 munki slots"></div>
         </div>
     </main>
 
@@ -68,7 +69,7 @@
             <span id="bankLabel" class="bank-label">BANK 1</span>
             <button id="bankNext" class="bank-arrow" type="button" aria-label="Next bank">&rsaquo;</button>
         </div>
-        <div class="tray-hint" id="trayHint">Drag a friend · BLACK protects · WHITE corrupts · ICE freezes · MOON rules</div>
+        <div class="tray-hint" id="trayHint">Tap to add · Tap on stage to change face · Drag off stage to clear</div>
         <div id="tray" class="tray" aria-label="character tray"></div>
     </div>
 
@@ -105,5 +106,14 @@
     </div>
 
     <script src="game.js"></script>
+
+    <footer class="site-footer-slim" aria-label="Site info">
+        <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="../">The Madderverse</a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="../about.html">About</a>
+    </footer>
+    <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

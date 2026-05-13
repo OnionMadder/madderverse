@@ -8,7 +8,7 @@
     const SECONDS_PER_STEP = 60 / TEMPO / 4; // 0.15s
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
-    const NUM_SLOTS = 8;
+    const NUM_SLOTS = 5;
     const BARS_PER_LOOP = 2;                
     const MADBALLZ_UNLOCK_THRESHOLD = 3;
     const STORAGE_KEY = 'all-munkis-progress-v1';
@@ -78,7 +78,7 @@
         }
         if (step % 4 === 0) {
             const delayMs = Math.max(0, (when - audioCtx.currentTime) * 1000);
-            setTimeout(pulseActiveIcons, delayMs);
+            setTimeout(() => { pulseActiveIcons(); tickReactState(); }, delayMs);
         }
     }
 
@@ -791,6 +791,7 @@ const CHARACTERS = {
         saveProgress();
         updateBankLabel();
         renderTray();
+        attachTrayHandlers();
     }
 
     function updateBankLabel() {
@@ -1010,28 +1011,91 @@ const CHARACTERS = {
     }
 
     // ---------- EXPRESSION (state → 1..5 row of default-heads) ----------
-    // Each Munki picks a row of default-heads based on game state at render
+    // Each slot picks a row of default-heads based on game state at render
     // time. Madballz mods have a static `headFrame` and ignore this.
-    //   1  default / silly        (tray chips + idle on stage)
-    //   2  shocked                (just placed, ~600 ms, OR during a jumpscare)
-    //   3  sad                    (Ice on stage; this slot isn't ice/moon)
-    //   5  angry                  (Moon on stage; this slot isn't ice/moon)
-    // Ice and Moon themselves stay on row 1 (their X/Z glitch-grey row 1 is
-    // already creepy enough — locking them keeps the menace constant).
+    // Priority (highest first):
+    //   jumpscare    →  2 (shocked, briefest gate)
+    //   react mode   →  cycles 1→2→3→4→5→1 on every quarter note (auto-fired
+    //                   after dwelling adjacent to Ice or Moon for
+    //                   REACT_DWELL_BEATS beats — see tickReactState)
+    //   just placed  →  2 (shocked, ~600 ms after a fresh drop)
+    //   manual tap   →  whichever expression the kid last tapped to
+    //   default      →  1 (silly / idle)
     const PLACED_SHOCK_MS = 600;
-    const placedAt = new Map();
+    const placedAt = new Map();         // slotIndex → performance.now()
+    const manualExpression = new Map();  // slotIndex → 1..5 (set by tap-cycle)
+    const dwellBeats = new Map();        // slotIndex → consecutive beats adjacent to a trigger
+    const reactStartBeat = new Map();    // slotIndex → beatCounter when react fired
+    const REACT_DWELL_BEATS = 8;         // ~4.8 s at 100 BPM
+    let beatCounter = 0;                 // monotonically ticks on every quarter note
 
     function expressionForSlot(slotIndex) {
         if (slotIndex == null) return 1;
         if (isJumpScareActive) return 2;
         const id = slots[slotIndex];
         if (!id) return 1;
+        const r = reactStartBeat.get(slotIndex);
+        if (r !== undefined) return ((beatCounter - r) % 5) + 1;
         const t = placedAt.get(slotIndex);
         if (t !== undefined && (performance.now() - t) < PLACED_SHOCK_MS) return 2;
-        if (id === 'ice' || id === 'moon') return 1;
-        if (slots.indexOf('moon') !== -1) return 5;
-        if (slots.indexOf('ice')  !== -1) return 3;
+        const m = manualExpression.get(slotIndex);
+        if (m !== undefined) return m;
         return 1;
+    }
+
+    // Tap on a stage slot cycles its expression 1 → 2 → 3 → 4 → 5 → 1.
+    // The result is read by expressionForSlot until a higher-priority state
+    // (jumpscare, react mode, fresh placement) overrides it.
+    function cycleManualExpression(slotIndex) {
+        const cur = manualExpression.get(slotIndex) || 1;
+        manualExpression.set(slotIndex, (cur % 5) + 1);
+    }
+
+    // True if either immediate neighbour in the linear 5-slot row holds an
+    // antagonist (Ice or Moon). Used by the react-mode dwell ticker.
+    function isTriggerAdjacent(idx) {
+        const left  = idx > 0             ? slots[idx - 1] : null;
+        const right = idx < NUM_SLOTS - 1 ? slots[idx + 1] : null;
+        const evil = id => id === 'ice' || id === 'moon';
+        return evil(left) || evil(right);
+    }
+
+    // Beat-quantised state machine. Fires once per quarter note (from
+    // scheduleStep). Increments dwell for every regular Munki next to an
+    // antagonist; trips that Munki into react mode when dwell crosses
+    // REACT_DWELL_BEATS. Resets dwell when the kid moves things around so
+    // the kid can rescue a Munki by sliding it away in time.
+    function tickReactState() {
+        beatCounter++;
+        let anyReacting = false;
+        const toRender = new Set();
+        for (let i = 0; i < NUM_SLOTS; i++) {
+            const id = slots[i];
+            // Empty slots and the antagonists themselves never react.
+            if (!id || id === 'ice' || id === 'moon') {
+                if (dwellBeats.delete(i))     toRender.add(i);
+                if (reactStartBeat.delete(i)) toRender.add(i);
+                continue;
+            }
+            if (isTriggerAdjacent(i)) {
+                const next = (dwellBeats.get(i) || 0) + 1;
+                dwellBeats.set(i, next);
+                if (next >= REACT_DWELL_BEATS && !reactStartBeat.has(i)) {
+                    reactStartBeat.set(i, beatCounter);
+                    manualExpression.delete(i); // react overrides any prior tap
+                    toRender.add(i);
+                }
+            } else {
+                if (dwellBeats.delete(i))     toRender.add(i);
+                if (reactStartBeat.delete(i)) toRender.add(i);
+            }
+            if (reactStartBeat.has(i)) {
+                anyReacting = true;
+                toRender.add(i); // expression cycles every beat
+            }
+        }
+        document.body.classList.toggle('react-mode-active', anyReacting);
+        toRender.forEach(i => renderSlot(i));
     }
 
     // headArt composes the head layers (shape circle → sprite → hair → cans).
@@ -1130,14 +1194,17 @@ const CHARACTERS = {
     function setSlot(index, charId) {
         const wasHorror = HORROR_TRIGGER_MODS.has(slots[index]);
         const iceWasOn = isIceOnStage();
-        const moonWasOn = slots.indexOf('moon') !== -1;
         slots[index] = charId;
-        // Track placement time so expressionForSlot can show the "shocked"
-        // row for ~600ms after a fresh drop. Re-render once that window
-        // closes so the face settles back to row 1 (or 3/5 if Ice/Moon is
-        // still on stage). Cleared on remove so empty slots don't shock
-        // again next time something lands here.
+        // Replacing or clearing a slot resets every per-slot state map so
+        // the new occupant starts from a clean default. dwell + react are
+        // cheap to rebuild via the beat tick if conditions re-apply.
+        manualExpression.delete(index);
+        dwellBeats.delete(index);
+        reactStartBeat.delete(index);
         if (charId) {
+            // Track placement time so expressionForSlot shows the "shocked"
+            // row for ~600 ms after a fresh drop. Schedule a re-render
+            // once that window closes so the face settles back to row 1.
             placedAt.set(index, performance.now());
             setTimeout(() => {
                 if (slots[index] === charId) renderSlot(index);
@@ -1162,18 +1229,8 @@ const CHARACTERS = {
         // shimmer once on the transition INTO an iced stage. Stage thaws
         // automatically when the last Ice Munki is cleared.
         const iceNowOn = isIceOnStage();
-        const moonNowOn = slots.indexOf('moon') !== -1;
         updateIceFreeze();
         if (iceNowOn && !iceWasOn) playIceFreezeSound();
-        // When ice or moon presence flips, every other slot's expression
-        // changes (sad/angry/default). Re-render the others so their face
-        // sprite picks up the new state. The slot we just touched was
-        // already rendered above with the fresh placedAt.
-        if (iceNowOn !== iceWasOn || moonNowOn !== moonWasOn) {
-            for (let i = 0; i < NUM_SLOTS; i++) {
-                if (i !== index) renderSlot(i);
-            }
-        }
     }
 
     function isIceOnStage() {
@@ -1200,84 +1257,97 @@ const CHARACTERS = {
         });
     }
 
-    // ---------- DRAG & DROP (pointer events: mouse + touch + pen) ----------
-    let drag = null;
-
-    function startDrag(chip, pointerId, x, y) {
-        ensureAudio();
-        const charId = chip.dataset.char;
-        const ghost = document.createElement('div');
-        ghost.id = 'drag-ghost';
-        ghost.innerHTML = characterArt(charId);
-        ghost.style.left = x + 'px';
-        ghost.style.top = y + 'px';
-        document.body.appendChild(ghost);
-        chip.classList.add('dragging');
-        drag = { charId, ghost, chip, pointerId };
+    // ---------- TRAY: tap-to-place ----------
+    // A tap on a tray chip teleports its Munki onto the next empty stage
+    // slot. If the stage is already full, the chip shakes briefly to signal
+    // "no room" — clear someone first.
+    function attachTrayHandlers() {
+        document.querySelectorAll('.tray-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                ensureAudio();
+                const charId = chip.dataset.char;
+                const emptyIdx = slots.indexOf(null);
+                if (emptyIdx === -1) {
+                    chip.classList.remove('shake');
+                    void chip.offsetWidth; // restart the keyframes
+                    chip.classList.add('shake');
+                    return;
+                }
+                setSlot(emptyIdx, charId);
+                playDropSound();
+            });
+        });
     }
 
-    function moveDrag(x, y) {
-        if (!drag) return;
-        drag.ghost.style.left = x + 'px';
-        drag.ghost.style.top = y + 'px';
-        document.querySelectorAll('.stage-slot').forEach(s => s.classList.remove('drop-hover'));
-        const target = findSlotAt(x, y);
-        if (target) target.classList.add('drop-hover');
-    }
-
-    function endDrag(x, y) {
-        if (!drag) return;
-        const target = findSlotAt(x, y);
-        if (target) {
-            const idx = parseInt(target.dataset.index, 10);
-            setSlot(idx, drag.charId);
-            playDropSound();
-        }
-        document.querySelectorAll('.stage-slot').forEach(s => s.classList.remove('drop-hover'));
-        drag.chip.classList.remove('dragging');
-        drag.ghost.remove();
-        drag = null;
-    }
+    // ---------- STAGE: tap-to-cycle + drag-off-to-clear ----------
+    // pointerdown on a filled slot starts tracking. If the pointer moves
+    // past DRAG_THRESHOLD_PX, treat it as a drag — release outside any
+    // stage slot clears the Munki. Release without moving (a tap) cycles
+    // the head expression 1 → 2 → 3 → 4 → 5 → 1 instead.
+    const DRAG_THRESHOLD_PX = 12;
+    const slotDragState = new Map();
 
     function findSlotAt(x, y) {
         const els = document.elementsFromPoint(x, y);
         return els.find(el => el.classList && el.classList.contains('stage-slot'));
     }
 
-    function attachTrayHandlers() {
-        document.querySelectorAll('.tray-chip').forEach(chip => {
-            chip.addEventListener('pointerdown', e => {
-                e.preventDefault();
-                chip.setPointerCapture(e.pointerId);
-                startDrag(chip, e.pointerId, e.clientX, e.clientY);
-            });
-            chip.addEventListener('pointermove', e => {
-                if (drag && drag.pointerId === e.pointerId) moveDrag(e.clientX, e.clientY);
-            });
-            chip.addEventListener('pointerup', e => {
-                if (drag && drag.pointerId === e.pointerId) {
-                    endDrag(e.clientX, e.clientY);
-                    if (chip.hasPointerCapture(e.pointerId)) chip.releasePointerCapture(e.pointerId);
-                }
-            });
-            chip.addEventListener('pointercancel', e => {
-                if (drag && drag.pointerId === e.pointerId) endDrag(e.clientX, e.clientY);
-            });
-        });
-    }
-
     function attachSlotHandlers() {
-        // Single delegated listener on the stage so we don't need to rewire on
-        // every slot re-render.
-        document.getElementById('stage').addEventListener('click', e => {
-            if (drag) return;
+        const stage = document.getElementById('stage');
+        stage.addEventListener('pointerdown', e => {
             const slot = e.target.closest('.stage-slot');
             if (!slot) return;
             const idx = parseInt(slot.dataset.index, 10);
-            if (slots[idx]) {
-                setSlot(idx, null);
-                playClearSound();
+            if (!slots[idx]) return; // empty slot — nothing to grab or tap
+            e.preventDefault();
+            ensureAudio(); // unlock audio on first interaction
+            // setPointerCapture can throw InvalidPointerId for synthetic
+            // events (testing) — guard so the handler still records state.
+            try { slot.setPointerCapture(e.pointerId); } catch (_) {}
+            slotDragState.set(e.pointerId, {
+                slot, idx,
+                startX: e.clientX, startY: e.clientY,
+                dragging: false
+            });
+        });
+        stage.addEventListener('pointermove', e => {
+            const state = slotDragState.get(e.pointerId);
+            if (!state) return;
+            const dx = e.clientX - state.startX;
+            const dy = e.clientY - state.startY;
+            if (!state.dragging && (dx * dx + dy * dy) > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
+                state.dragging = true;
+                state.slot.classList.add('dragging-off');
             }
+        });
+        stage.addEventListener('pointerup', e => {
+            const state = slotDragState.get(e.pointerId);
+            if (!state) return;
+            slotDragState.delete(e.pointerId);
+            try {
+                if (state.slot.hasPointerCapture(e.pointerId)) {
+                    state.slot.releasePointerCapture(e.pointerId);
+                }
+            } catch (_) {}
+            state.slot.classList.remove('dragging-off');
+            if (state.dragging) {
+                // Drag — clear if the kid let go outside the stage area.
+                const overSlot = findSlotAt(e.clientX, e.clientY);
+                if (!overSlot) {
+                    setSlot(state.idx, null);
+                    playClearSound();
+                }
+            } else {
+                // Tap — cycle the expression and re-render just this slot.
+                cycleManualExpression(state.idx);
+                renderSlot(state.idx);
+            }
+        });
+        stage.addEventListener('pointercancel', e => {
+            const state = slotDragState.get(e.pointerId);
+            if (!state) return;
+            slotDragState.delete(e.pointerId);
+            state.slot.classList.remove('dragging-off');
         });
     }
 
@@ -1662,8 +1732,8 @@ const CHARACTERS = {
         const hint = document.getElementById('trayHint');
         if (!hint) return;
         hint.textContent = isMadballzMode
-            ? 'MADBALLZ MODE · 6 Madballz · ICE + MOON last (they are friends)'
-            : 'Drag a friend · BLACK protects · WHITE corrupts · ICE freezes · MOON rules';
+            ? 'MADBALLZ MODE · Tap to add · Tap on stage to change face · Drag off to clear'
+            : 'Tap to add · Tap on stage to change face · Drag off stage to clear';
     }
 
     function openStoryModal() {
