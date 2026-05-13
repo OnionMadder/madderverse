@@ -43,6 +43,12 @@ all-munkis/
   game.js               # everything below in one IIFE
   style.css             # @imports the bundled JetBrains Mono TTF
   assets/
+    bg/                 # OPTIONAL — per-mode backgrounds (Phase 3). Six
+                        # images, two per mode (normal + horror). Drop them
+                        # at e.g. bank1-normal.jpg / bank1-horror.jpg,
+                        # then point the matching --bg-<mode>-{normal,horror}
+                        # CSS variable at `url('assets/bg/<file>') center /
+                        # cover` to replace the placeholder gradient.
     JetBrainsMono-VariableFont_wght.ttf
     sprites/
       default-heads.png    # 1602×1002, 40 Munki heads = 5 expression rows
@@ -90,6 +96,7 @@ all-munkis/
 | **isTriggerAdjacent(idx)** | True when slot N-1 or N+1 holds Ice or Moon (linear 5-slot row). |
 | **isIceOnStage / updateIceFreeze** | Ice Munki freeze logic — toggles `.frozen-by-ice` on every other active slot when Ice is placed. |
 | **moonRules / attachMoonChaos** | Moon Munki click chaos — `attachMoonChaos()` adds a document-level click listener; `moonRules()` picks a random effect (hue, invert, shuffle, rain, glitch text, tilt, phantom). |
+| **updateBodyMode()** | Writes `body.dataset.mode` (`"bank-1"` / `"bank-2"` / `"madballz"`) so the CSS picks the matching `--bg-<mode>-normal` for the body BG, the matching `--bg-<mode>-horror` for the `body::before` overlay, and the right floor tint on `.stage-wrap::after`. Called from init, `nudgeBank`, `enterMadballzMode`, and `exitMadballzMode`. |
 | **ART** | `bodyArt(c)`, `headShapeArt(c)`, `headModArt(frameName, sheetName)`, `headPhonesArt()`, `hairArt(c)`, `headArt(c, expr)`, `characterArt(id, slotIndex?)`. All return SVG strings. |
 | **HAIR** | `HAIR_STYLES`, `HAIR_COLORS`, `hairSvg(style, color, dark)`, `assignRandomHair()` (picks ~55% of mods at init, skips horror-trigger ones). |
 | **STATE** | `slots = new Array(NUM_SLOTS).fill(null)` |
@@ -176,6 +183,31 @@ and render at expression 1 (idle).
 
 ### Replace a Madballz character's head
 - Change its `headFrame` (and `sheet` if switching sheets). Body stays.
+
+### Swap in real background images (Phase 3)
+The body BG and the horror crossfade overlay are driven by 6 CSS variables
+at the top of `style.css`:
+
+```
+:root {
+    --bg-bank1-normal:   /* placeholder gradient */
+    --bg-bank1-horror:   /* placeholder gradient */
+    --bg-bank2-normal:   ...
+    --bg-bank2-horror:   ...
+    --bg-madballz-normal:...
+    --bg-madballz-horror:...
+}
+```
+
+To replace any one of them with a real image, just rewrite that line, e.g.:
+
+```
+--bg-bank1-normal: url('assets/bg/bank1-normal.jpg') center / cover;
+```
+
+The horror variant fades in on top of the normal one whenever
+`body.react-mode-active` is set (see `tickReactState`). No JS change
+required — pure CSS swap.
 
 ### Tweak the expression rules
 - Edit `expressionForSlot(slotIndex)`. Keep the contract: returns 1..5.

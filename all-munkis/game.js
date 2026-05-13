@@ -790,6 +790,7 @@ const CHARACTERS = {
         activeBankIndex = i;
         saveProgress();
         updateBankLabel();
+        updateBodyMode();
         renderTray();
         attachTrayHandlers();
     }
@@ -802,6 +803,20 @@ const CHARACTERS = {
         const unlockedCount = BANKS.filter(b => b.unlocked).length;
         if (prev) prev.disabled = unlockedCount < 2 || isMadballzMode;
         if (next) next.disabled = unlockedCount < 2 || isMadballzMode;
+    }
+
+    // Sets body.dataset.mode for the per-mode background image. CSS reads
+    // this to pick the right BG variable pair (normal + horror). Called
+    // any time the active mode changes: init, nudgeBank, enter/exit
+    // Madballz. Banks 3 and 4 fall back to bank-2 styling for now since
+    // they don't have their own art yet.
+    function updateBodyMode() {
+        let mode;
+        if (isMadballzMode) mode = 'madballz';
+        else if (activeBankIndex === 0) mode = 'bank-1';
+        else if (activeBankIndex === 1) mode = 'bank-2';
+        else mode = 'bank-2';
+        document.body.dataset.mode = mode;
     }
 
     const SHEETS = {
@@ -1701,6 +1716,7 @@ const CHARACTERS = {
         ensureAudio();
         isMadballzMode = true;
         document.body.classList.add('madballz-mode');
+        updateBodyMode();
         const meet = document.getElementById('madballzBtn');
         const back = document.getElementById('backBtn');
         if (meet) meet.hidden = true;
@@ -1716,6 +1732,7 @@ const CHARACTERS = {
     function exitMadballzMode() {
         isMadballzMode = false;
         document.body.classList.remove('madballz-mode');
+        updateBodyMode();
         const meet = document.getElementById('madballzBtn');
         const back = document.getElementById('backBtn');
         if (meet) meet.hidden = !madballzUnlocked;
@@ -1879,6 +1896,7 @@ const CHARACTERS = {
     // ---------- INIT ----------
     function init() {
         loadProgress();
+        updateBodyMode();
         buildStage();
         renderTray();
         renderAllSlots();

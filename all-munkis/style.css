@@ -8,11 +8,43 @@ html, body {
     min-height: 100%;
 }
 
+/* ====== PER-MODE BACKGROUND IMAGES ======
+   Six placeholder gradients, one pair (normal / horror) per "mode" (Bank 1,
+   Bank 2, Madballz). When the real images land at
+   assets/bg/<mode>-{normal,horror}.<ext>, swap a single line per variable:
+       --bg-bank1-normal: url('assets/bg/bank1-normal.jpg') center / cover;
+   The horror variant fades in on top of the normal one whenever any Munki
+   on stage is in react mode (body.react-mode-active). Mode is set by
+   game.js via body.dataset.mode = "bank-1" | "bank-2" | "madballz". */
+:root {
+    --bg-bank1-normal:
+        radial-gradient(ellipse at 20% 0%,   rgba( 45,212,191,0.22), transparent 55%),
+        radial-gradient(ellipse at 80% 100%, rgba(219, 39,119,0.20), transparent 55%),
+        linear-gradient(180deg, #0a0a1a 0%, #14081a 100%);
+    --bg-bank1-horror:
+        radial-gradient(circle  at 50%  50%, rgba(239, 68, 68,0.45), transparent 65%),
+        linear-gradient(180deg, #2a0808 0%, #000 100%);
+    --bg-bank2-normal:
+        radial-gradient(ellipse at 20% 100%, rgba(251,191, 36,0.20), transparent 60%),
+        radial-gradient(ellipse at 80%   0%, rgba(167,139,250,0.25), transparent 60%),
+        linear-gradient(180deg, #0a0a2a 0%, #1f1426 100%);
+    --bg-bank2-horror:
+        radial-gradient(circle  at 50%  50%, rgba( 96,165,250,0.35), transparent 70%),
+        linear-gradient(180deg, #00161f 0%, #000 100%);
+    --bg-madballz-normal:
+        radial-gradient(ellipse at 20%   0%, rgba(168, 85,247,0.30), transparent 60%),
+        radial-gradient(ellipse at 80% 100%, rgba(239, 68, 68,0.22), transparent 60%),
+        linear-gradient(180deg, #14081a 0%, #0b0b18 100%);
+    --bg-madballz-horror:
+        radial-gradient(circle  at 50%  50%, rgba(239, 68, 68,0.55), transparent 60%),
+        linear-gradient(180deg, #1f0014 0%, #000 100%);
+}
+
 body {
     background-color: #000;
-    background-image:
-        radial-gradient(ellipse at 20% 0%, rgba(45, 212, 191, 0.10), transparent 55%),
-        radial-gradient(ellipse at 80% 100%, rgba(219, 39, 119, 0.12), transparent 55%);
+    background-image: var(--bg-bank1-normal); /* updated by JS via dataset.mode */
+    background-attachment: fixed;
+    background-size: cover;
     color: #2dd4bf;
     font-family: 'JetBrains Mono', monospace;
     overflow-x: hidden;
@@ -22,7 +54,34 @@ body {
     touch-action: manipulation;
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);
+    position: relative;
 }
+
+/* Mode selectors live on body[data-mode=...]; horror variant fades in via
+   ::before whenever react-mode-active is set on body. */
+body[data-mode="bank-1"]   { background-image: var(--bg-bank1-normal); }
+body[data-mode="bank-2"]   { background-image: var(--bg-bank2-normal); }
+body[data-mode="madballz"] { background-image: var(--bg-madballz-normal); }
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image: var(--bg-bank1-horror);
+    background-attachment: fixed;
+    background-size: cover;
+    opacity: 0;
+    transition: opacity 0.6s ease-in-out;
+    z-index: 0;
+}
+body[data-mode="bank-1"]::before   { background-image: var(--bg-bank1-horror); }
+body[data-mode="bank-2"]::before   { background-image: var(--bg-bank2-horror); }
+body[data-mode="madballz"]::before { background-image: var(--bg-madballz-horror); }
+body.react-mode-active::before { opacity: 1; }
+
+/* Keep content above the fixed BG ::before overlay. */
+body > * { position: relative; z-index: 1; }
 
 /* ====== HEADER ====== */
 header {
@@ -196,6 +255,73 @@ main {
     background-size: 30px 30px;
     opacity: 0.32;
     pointer-events: none;
+}
+
+/* ====== DANCE FLOOR ======
+   CSS-built stage that the Munkis stand on. A perspective-tilted grid
+   suggests depth, and a soft footlight glows up the front edge so the
+   row of slots reads as standing on a real platform. Sits behind the
+   .stage grid (z-index 0) and inside .stage-wrap's clip box. */
+.stage-wrap::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -10%;
+    height: 75%;
+    pointer-events: none;
+    z-index: 0;
+    background:
+        /* footlight glow rising from the front edge */
+        radial-gradient(
+            ellipse 60% 40% at 50% 100%,
+            rgba(45, 212, 191, 0.28),
+            transparent 70%
+        ),
+        /* perspective floor tile lines (horizontal) */
+        repeating-linear-gradient(
+            0deg,
+            transparent 0px,
+            transparent 30px,
+            rgba(45, 212, 191, 0.16) 30px,
+            rgba(45, 212, 191, 0.16) 32px
+        ),
+        /* vertical seams */
+        repeating-linear-gradient(
+            90deg,
+            transparent 0px,
+            transparent 80px,
+            rgba(45, 212, 191, 0.10) 80px,
+            rgba(45, 212, 191, 0.10) 82px
+        );
+    transform: perspective(900px) rotateX(58deg);
+    transform-origin: 50% 100%;
+    opacity: 0.55;
+}
+
+/* Madballz / horror modes tint the floor warmer. */
+body[data-mode="madballz"] .stage-wrap::after,
+body.react-mode-active .stage-wrap::after {
+    background:
+        radial-gradient(
+            ellipse 60% 40% at 50% 100%,
+            rgba(239, 68, 68, 0.32),
+            transparent 70%
+        ),
+        repeating-linear-gradient(
+            0deg,
+            transparent 0px,
+            transparent 30px,
+            rgba(239, 68, 68, 0.18) 30px,
+            rgba(239, 68, 68, 0.18) 32px
+        ),
+        repeating-linear-gradient(
+            90deg,
+            transparent 0px,
+            transparent 80px,
+            rgba(168, 85, 247, 0.14) 80px,
+            rgba(168, 85, 247, 0.14) 82px
+        );
 }
 
 .stage {
@@ -403,7 +529,7 @@ main {
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0));
+    padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0) + var(--mv-slim-h, 22px));
     background: linear-gradient(to top, rgba(0,0,0,0.96) 60%, rgba(0,0,0,0.6));
     border-top: 1px solid rgba(45, 212, 191, 0.3);
     backdrop-filter: blur(12px);
@@ -567,25 +693,6 @@ main {
 /* ====== Tall narrow phones — give the tray a touch more breathing room ====== */
 @media (max-height: 700px) and (max-width: 720px) {
     main { padding-bottom: 200px; }
-}
-
-/* ====== REACT MODE ======
-   While any Munki on stage has dwelled adjacent to Ice or Moon long enough
-   to enter react mode, body.react-mode-active is set. Phase 3 swaps to
-   the horror BG via this hook — for now, a subtle red vignette flashes in
-   so the kid sees that *something* shifted. */
-body.react-mode-active::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 2;
-    background: radial-gradient(circle at 50% 50%, rgba(239, 68, 68, 0.0), rgba(239, 68, 68, 0.18));
-    animation: react-vignette 0.6s ease-out;
-}
-@keyframes react-vignette {
-    0%   { opacity: 0; }
-    100% { opacity: 1; }
 }
 
 /* ====== JUMP SCARE ======
@@ -771,11 +878,11 @@ body.jumpscare .stage-slot.active .char-art {
 /* ====== MADBALLZ MODE (whole-screen palette swap) ====== */
 /* Activated by adding `body.madballz-mode` when the player taps "MEET THE
    MADBALLZ". Tints the whole screen red/violet to signal "you are in the
-   bad neighborhood now". The stage + tray + chips all retint together. */
+   bad neighborhood now". The stage + tray + chips all retint together.
+   The body background-image is owned by --bg-madballz-normal (see the
+   per-mode BG block at the top of this file); this rule only tweaks
+   chrome colors. */
 body.madballz-mode {
-    background-image:
-        radial-gradient(ellipse at 20% 0%, rgba(239, 68, 68, 0.18), transparent 55%),
-        radial-gradient(ellipse at 80% 100%, rgba(168, 85, 247, 0.22), transparent 55%);
     color: #f0abfc;
 }
 body.madballz-mode header {
