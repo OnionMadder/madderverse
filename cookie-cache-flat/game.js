@@ -578,7 +578,14 @@ function spawnCookie() {
     // are 1:1. This is what kills the "neighbour cookie chunks" bleed —
     // when the element matches the cell exactly, the scaled sheet image
     // has no empty space inside the element to leak adjacent cells.
-    const cookieW = Math.min(Math.max(W * 0.18, 72), 120);
+    //
+    // Rounded to integers + applied via inline style below so the element
+    // box exactly matches the size we pass to applySprite. The CSS class
+    // sets a 18vw default, but that uses *viewport* width while we use
+    // *stage* width (smaller after the new frame padding) — and the CSS
+    // height uses an independent 13.5vw clamp that can drift off 4:3 at
+    // some viewports. Both mismatches were showing up as mobile bleed.
+    const cookieW = Math.round(Math.min(Math.max(W * 0.18, 72), 120));
     const cookieH = isVeggie ? cookieW : Math.round(cookieW * 0.75);
 
     const startX = fromLeft ? -cookieW : W + cookieW;
@@ -599,6 +606,8 @@ function spawnCookie() {
     el.className = isVeggie ? 'flying-veggie' : 'flying-cookie';
     el.style.left = '0px';
     el.style.top  = '0px';
+    el.style.width  = cookieW + 'px';
+    el.style.height = cookieH + 'px';
     applySprite(el, sprite.sheet, sprite.frame, cookieW, cookieH);
 
     // Lock in the speed multiplier at spawn time. Streak speedup AND the
@@ -698,6 +707,7 @@ function catchCookie(c) {
     if (c.eatenSprite) {
         const eatenH = Math.round(c.w * 968 / 1080);
         c.h = eatenH;
+        c.el.style.width  = c.w + 'px';
         c.el.style.height = eatenH + 'px';
         c.el.style.top = (c.y - eatenH / 2) + 'px';
         applySprite(c.el, c.eatenSprite.sheet, c.eatenSprite.frame, c.w, c.h);
