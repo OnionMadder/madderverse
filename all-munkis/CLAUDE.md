@@ -36,17 +36,25 @@ all-munkis/
   assets/
     JetBrainsMono-VariableFont_wght.ttf
     sprites/
-      default-heads.png    # 4330×4381, 16 Munki heads named by id
-                           # (high, hiss, ice, mega, moon, shadow, sine,
-                           # snare, spark, srivi, star, amber, flute, fog,
-                           # green, grumble). Heads come in 4 colors:
-                           # PURPLE / GREEN / BLUE / ORANGE.
+      default-heads.png    # 1602×1002, 40 Munki heads = 5 expression rows
+                           # × 8 color columns. Frame names are
+                           # `{expr}-{color}`, e.g. `3-G`. Composed on
+                           # render — Munkis pick their COLOR from their
+                           # bodyColor (see COLOR_BY_BODY) and their
+                           # EXPRESSION from game state (see expressionForSlot).
+                           # Expressions: 1 silly (default) → 2 shocked
+                           # → 3 sad → 4 smug → 5 angry.
+                           # Colors: B G O P R Y are crew colors. X (black,
+                           # glitch-grey) is pinned to Moon Munki; Z (white,
+                           # glitch-grey) is pinned to Ice Munki — both are
+                           # evil in lore.
       default-heads.json   # frame coords (mirrored into SHEETS.munki)
       mb-heads.png         # 4330×2191, 8 Madballz heads named by id
                            # (mb-skull, mb-sad, mb-zombie, mb-snooze,
                            # mb-scared, mb-cool, mb-grump, mb-eye).
                            # Heads come in 4 colors: PURPLE / ORANGE /
-                           # GREEN / TEAL.
+                           # GREEN / TEAL. Static — Madballz keep their
+                           # single `headFrame` and ignore expression state.
       mb-heads.json        # frame coords (mirrored into SHEETS.mb)
   .claude/launch.json     # `python -m http.server 8770` — used by preview tools
 ```
@@ -65,10 +73,12 @@ all-munkis/
 | **CHARACTERS** | The 22-mod dict. **See "Adding a mod" below.** Body color must match the head sprite color — see comment above `SHEETS`. |
 | **STANDARD_ORDER / MADBALLZ_ORDER** | Tray order arrays. Munkis are grouped by HEAD COLOR (green → orange → purple → blue) and Ice Munki + Moon Munki are pinned to the very end on **every page**, including the Madballz tray. |
 | **HORROR_TRIGGER_MODS** | `Set(['moon', 'ice'])`. Auto-trigger jumpscare when one of these is placed (and wasn't already there). |
-| **SHEETS** | `{ munki: {src, sheetW, sheetH, frames}, madballs: {…} }`. Frame names map to coord rects mirrored from the JSON files. Munki frame names = character ids; the comment annotates each one's color. |
+| **SHEETS** | `{ munki: {src, sheetW, sheetH, frames}, mb: {…} }`. Frame coords mirror the matching JSON. Munki frames are `{expr}-{color}` (5×8 = 40 frames); Madballz frames are `mb-{id}` (8 static frames). |
+| **COLOR_BY_BODY** | Maps each Munki's `bodyColor` hex to its single-letter color code (B/G/O/P/R/X/Y/Z). Used by `headArt` to pick which column of `default-heads.png` to render. |
+| **expressionForSlot(slotIndex)** | Returns 1..5 per slot based on game state. 2 during jumpscare or for ~600 ms after a fresh drop (`placedAt` Map). 3 if Ice is on stage. 5 if Moon is on stage. 1 otherwise. Ice/Moon themselves stay on row 1. |
 | **isIceOnStage / updateIceFreeze** | Ice Munki freeze logic — toggles `.frozen-by-ice` on every other active slot when Ice is placed. |
 | **moonRules / attachMoonChaos** | Moon Munki click chaos — `attachMoonChaos()` adds a document-level click listener; `moonRules()` picks a random effect (hue, invert, shuffle, rain, glitch text, tilt, phantom). |
-| **ART** | `bodyArt(c)`, `headShapeArt(c)`, `headFaceArt()`, `headModArt(frameName, sheetName)`, `headPhonesArt()`, `hairArt(c)`, `headArt(c)`, `characterArt(id)`. All return SVG strings. |
+| **ART** | `bodyArt(c)`, `headShapeArt(c)`, `headModArt(frameName, sheetName)`, `headPhonesArt()`, `hairArt(c)`, `headArt(c, expr)`, `characterArt(id, slotIndex?)`. All return SVG strings. |
 | **HAIR** | `HAIR_STYLES`, `HAIR_COLORS`, `hairSvg(style, color, dark)`, `assignRandomHair()` (picks ~55% of mods at init, skips horror-trigger ones). |
 | **STATE** | `slots = new Array(NUM_SLOTS).fill(null)` |
 | **UI / RENDER** | `buildStage`, `renderTray`, `renderSlot`, `renderAllSlots`, `setSlot` |
@@ -83,11 +93,17 @@ all-munkis/
 ```js
 mod_id: {
     label: 'DISPLAY NAME',          // shown in chip + slot
-    bodyColor: '#hex',               // body fill
+    bodyColor: '#hex',               // body fill — ALSO selects the head
+                                    //   sprite column via COLOR_BY_BODY
+                                    //   for Munkis (no headFrame).
     bodyHi:    '#hex',               // body highlight oval
     bodyShade: '#hex',               // body stroke + feet
-    headFrame: 'frame name',         // optional. Key into SHEETS[sheet].frames
-    sheet:     'munki' | 'madballs', // optional. Defaults to 'munki'.
+    headFrame: 'mb-skull',           // optional. Madballz ONLY — pins a
+                                    //   static frame name. Munkis don't
+                                    //   set this; their frame is built at
+                                    //   render time as `${expr}-${letter}`.
+    sheet:     'mb',                 // optional. Pair with headFrame for
+                                    //   the Madballz sheet. Munkis omit.
     play(ctx, out, when, step) {     // WebAudio scheduling. step is 0..15.
         // create oscillators/noise/filters, connect to `out`,
         // schedule with start/stop relative to `when`.
@@ -100,39 +116,57 @@ mod_id: {
 
 ## The visual layering (per character)
 
-`characterArt(id)` returns:
+`characterArt(id, slotIndex?)` returns:
 
 ```
 .char-art
 ├── .char-body          (SVG, full ellipse + feet, animates squash/stretch on beat)
 └── .char-head          (animates head bob on beat)
     ├── .head-shape     z-index 1   colored circle, body color, drop-shadow
-    ├── .head-face      z-index 2   generic SVG face (only if no headFrame)
-    │   OR .head-mod    z-index 2   <svg><image> cropped to a sheet frame
+    ├── .head-mod       z-index 2   <svg><image> cropped to a sheet frame
+    │                              (Munki: `{expr}-{color}` in default-heads;
+    │                               Madballz: static frame in mb-heads)
     ├── .char-hair      z-index 2   procedural SVG hair (only if c.hair set)
     └── .head-phones    z-index 3   oversized SVG cans, overflow:visible
 ```
 
-All four head sub-layers share the same 100×100 viewBox so the headphones
-stay anchored regardless of which face/mod/hair is underneath. The bounce
-keyframes (`char-body-bounce`, `char-head-bob`) are in `style.css` and fire
-when a `.beat` class is added to `.char-art` on quarter notes.
+All head sub-layers share the same 100×100 viewBox so the headphones stay
+anchored when the sprite frame swaps (e.g. a Munki shocked → angry on a
+state change). The bounce keyframes (`char-body-bounce`, `char-head-bob`)
+are in `style.css` and fire when a `.beat` class is added to `.char-art`
+on quarter notes.
+
+`slotIndex` is passed for chips on the stage so `expressionForSlot` can
+pick the right row; tray chips, drag ghosts, and moon phantoms omit it
+and render at expression 1 (idle).
 
 ## How to make common changes
 
-### Add a new mod
-1. Add an entry to `CHARACTERS` (see shape above). Body color **must** match
-   the head sprite color (purple body for purple head, etc.).
-2. If giving it a sprite head, add the frame name + coords to the matching
-   `SHEETS[sheet].frames` block (mirror from the JSON). For Munkis, frame
-   name = character id.
-3. Add the id to `STANDARD_ORDER` (or `MADBALLZ_ORDER`) at the right
-   position for its color group. **Ice + Moon must remain the last two
-   entries on every page.**
-4. To make it a horror trigger, add the id to `HORROR_TRIGGER_MODS`.
+### Add a new Munki
+1. Add an entry to `CHARACTERS` (see shape above). Pick one of the 6 crew
+   `bodyColor`s — that hex must already be in `COLOR_BY_BODY` (otherwise
+   no head sprite will render). Do NOT set `headFrame` — Munkis pick their
+   frame at render time.
+2. Add the id to `STANDARD_ORDER` at the right position for its color
+   group. **Ice + Moon must remain the last two entries.**
 
-### Replace a character's head
-- Just change its `headFrame` (and `sheet` if switching sheets). Body stays.
+### Add a new Madballz mod
+1. Add an entry to `CHARACTERS` with `sheet: 'mb'` and `headFrame: 'mb-…'`
+   pointing at a frame in `SHEETS.mb`. Body color matches that head's
+   background per the existing convention.
+2. Add the id to `MADBALLZ_ORDER`.
+
+### Change a Munki's color
+- Change its `bodyColor` to another hex in `COLOR_BY_BODY`. The head
+  sprite column follows automatically. (X = Moon-only, Z = Ice-only —
+  don't reassign these to other Munkis.)
+
+### Replace a Madballz character's head
+- Change its `headFrame` (and `sheet` if switching sheets). Body stays.
+
+### Tweak the expression rules
+- Edit `expressionForSlot(slotIndex)`. Keep the contract: returns 1..5.
+  `headArt` slots the result into the frame name `${expr}-${letter}`.
 
 ### Add a new hair style
 - Add the style name to `HAIR_STYLES` and a `case` in `hairSvg()`'s switch.
@@ -172,10 +206,14 @@ When adding a new mod, pick a register/role that isn't crowded.
 - **Moon chaos has a 700ms cooldown** — `moonChaosCooldown` blocks rapid
   spam. Don't shorten it without testing on a low-end phone; the
   effects (page hue rotate, invert flash) get seizure-y if stacked.
-- **Body color must match head sprite color** — checked at PR time.
-  Purple head → purple body. The `default-heads.png` sheet is laid out as
-  4 rows × 4 columns; the comment beside each entry in `SHEETS.munki` is
-  the source of truth for which color each frame is.
+- **Body color drives head color** — `headArt` looks up the Munki's
+  `bodyColor` in `COLOR_BY_BODY` to pick which column of `default-heads.png`
+  to crop. If you set a custom body hex not in that map, the sprite layer
+  renders empty and only the flat `headShapeArt` circle shows. Add the hex
+  to `COLOR_BY_BODY` (or pick an existing one) before shipping.
+- **X (black) and Z (white) are reserved for Moon and Ice** — they are
+  the only colors with the "glitch-grey" evil face set. Don't reassign
+  these letters to regular crew Munkis.
 - **Headphones use `overflow="visible"`** so cups extend past the SVG box.
   Don't switch the SVG element to `overflow: hidden` or the chunky cartoon
   silhouette breaks.
@@ -226,3 +264,12 @@ The session that built the current shape did, in order:
    characters that match the new sprites; added two new audio profiles
    (`mb-snooze` yawn pad, `mb-scared` shiver). Madballz tray now also
    color-grouped (purple → orange → green → teal) with Ice + Moon last.
+10. New `default-heads.png` (1602×1002), 40 frames = 5 expression rows ×
+   8 color columns. Removed the procedural SVG face system
+   (`headFaceArt`, `EYE/MOUTH/BROW/EXTRA_RENDERERS`, per-character
+   `face: {…}` properties) and replaced it with sprite-based heads that
+   pick their expression from game state (`expressionForSlot`): 2 on a
+   fresh drop or during a jumpscare, 3 if Ice is on stage, 5 if Moon is
+   on stage, 1 otherwise. Moon's body flipped white → dark `#1f2937` to
+   match its new X (black-glitch) head. Ice keeps the white body, now
+   paired with the Z (white-glitch) head.

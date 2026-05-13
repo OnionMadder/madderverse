@@ -178,9 +178,8 @@
     };
 const CHARACTERS = {
         green: {
-            label: 'Green Gear',
+            label: 'Green',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            face: { eyes: 'gear', mouth: 'smirk', brow: 'sharp' },
             play(ctx, out, when, step) {
                 const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
                 const freq = hook[step];
@@ -205,7 +204,6 @@ const CHARACTERS = {
         high: {
             label: 'High-Z',
             bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
-            face: { eyes: 'button', mouth: 'o', brow: 'raised' },
             play(ctx, out, when, step) {
                 if (![2, 6, 10, 14].includes(step)) return;
                 const n = noiseSource(ctx, 0.04);
@@ -221,9 +219,8 @@ const CHARACTERS = {
         },
 
         shadow: {
-            label: 'Shadow Pulse',
+            label: 'Shadow',
             bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
-            face: { eyes: 'slant', mouth: 'smirk' },
             play(ctx, out, when, step) {
                 if (step % 2 !== 0) return;
                 const n = noiseSource(ctx, 0.05);
@@ -241,9 +238,8 @@ const CHARACTERS = {
         },
 
         mega: {
-            label: 'Mega Thump',
+            label: 'Mega',
             bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
-            face: { eyes: 'button', mouth: 'fanged', brow: 'sharp' },
             play(ctx, out, when, step) {
                 if (step % 4 !== 0) return;
                 const o = ctx.createOscillator();
@@ -267,9 +263,8 @@ const CHARACTERS = {
         },
 
         amber: {
-            label: 'Amber Arp',
+            label: 'Amber',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            face: { eyes: 'star', mouth: 'smile', extra: 'blush' },
             play(ctx, out, when, step) {
                 if (step !== 5 && step !== 13) return;
                 const notes = [659.25, 783.99, 987.77, 1318.51];
@@ -291,7 +286,6 @@ const CHARACTERS = {
         srivi: {
             label: 'Srivi-Bot',
             bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
-            face: { eyes: 'gear', mouth: 'straight' },
             play(ctx, out, when, step) {
                 const lowSteps = [0, 6, 10];
                 const highSteps = [3, 8, 13];
@@ -321,9 +315,8 @@ const CHARACTERS = {
         },
 
         grumble: {
-            label: 'Grumble Bass',
+            label: 'Grumble',
             bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
-            face: { eyes: 'slant', mouth: 'straight', brow: 'sharp' },
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const root = step === 0 ? 65.41 : 98.00;
@@ -348,9 +341,8 @@ const CHARACTERS = {
         },
 
         sine: {
-            label: 'Sine Wave',
+            label: 'Sine',
             bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
-            face: { eyes: 'button', mouth: 'smile' },
             play(ctx, out, when, step) {
                 const seq = { 2: 130.81, 6: 164.81, 10: 196.00, 14: 164.81 };
                 const f = seq[step];
@@ -368,9 +360,8 @@ const CHARACTERS = {
         },
 
         hiss: {
-            label: 'Hiss Shell',
+            label: 'Hiss',
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            face: { eyes: 'slant', mouth: 'fanged' },
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.18);
@@ -388,7 +379,6 @@ const CHARACTERS = {
         snare: {
             label: 'Snare-Bot',
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            face: { eyes: 'dot', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step !== 4 && step !== 12) return;
                 const n = noiseSource(ctx, 0.13);
@@ -414,9 +404,8 @@ const CHARACTERS = {
         },
 
         flute: {
-            label: 'Vibe Berry',
+            label: 'Vibe',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            face: { eyes: 'sleepy', mouth: 'smile', extra: 'blush' },
             play(ctx, out, when, step) {
                 const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
                 const freq = melody[step];
@@ -441,9 +430,8 @@ const CHARACTERS = {
         },
 
         star: {
-            label: 'Star Ping',
+            label: 'Star',
             bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
-            face: { eyes: 'star', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const notes = [1046.5, 1318.51, 1567.98];
@@ -463,9 +451,8 @@ const CHARACTERS = {
         },
 
         fog: {
-            label: 'Fog Chord',
+            label: 'Fog',
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            face: { eyes: 'sleepy', mouth: 'smile' },
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const chord = [261.63, 329.63, 392.00];
@@ -485,9 +472,8 @@ const CHARACTERS = {
         },
 
         moon: {
-            label: 'Moon Munki',
-            bodyColor: '#f8fafc', bodyHi: '#ffffff', bodyShade: '#94a3b8',
-            face: { eyes: 'googly', mouth: 'o', brow: 'arched' },
+            label: 'Moon',
+            bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
             play(ctx, out, when, step) {
                 if (step !== 0) return;
                 const o = ctx.createOscillator();
@@ -513,9 +499,8 @@ const CHARACTERS = {
         },
 
         spark: {
-            label: 'Spark Snap',
+            label: 'Spark',
             bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
-            face: { eyes: 'asterisk', mouth: 'o' },
             play(ctx, out, when, step) {
                 if (step % 2 !== 1) return;
                 const n = noiseSource(ctx, 0.025);
@@ -531,9 +516,8 @@ const CHARACTERS = {
         },
 
         ice: {
-            label: 'Ice Munki',
+            label: 'Ice',
             bodyColor: '#f8fafc', bodyHi: '#ffffff', bodyShade: '#94a3b8',
-            face: { eyes: 'slant', mouth: 'fanged', brow: 'sharp' },
             play(ctx, out, when, step) {
                 const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
                 const freq = seq[step];
@@ -558,7 +542,7 @@ const CHARACTERS = {
         // GREEN:  mb-cool
         // TEAL:   mb-eye
         'mb-skull': {
-            label: 'Skull Buzz', sheet: 'mb', headFrame: 'mb-skull',
+            label: 'Skull', sheet: 'mb', headFrame: 'mb-skull',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Bone-rumble: sub thud filtered low — fits the skull vibe.
             play(ctx, out, when, step) {
@@ -578,7 +562,7 @@ const CHARACTERS = {
         },
 
         'mb-zombie': {
-            label: 'Zombi Bone', sheet: 'mb', headFrame: 'mb-zombie',
+            label: 'Zombi', sheet: 'mb', headFrame: 'mb-zombie',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Distorted alien-pluck — sawtooth through a wave shaper, sweeps
             // pitch + filter for that "zorbie zombie" stagger.
@@ -603,7 +587,7 @@ const CHARACTERS = {
         },
 
         'mb-grump': {
-            label: 'Grump Bones', sheet: 'mb', headFrame: 'mb-grump',
+            label: 'Grump', sheet: 'mb', headFrame: 'mb-grump',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Chopper-LFO bass — angry pulsing low end.
             play(ctx, out, when, step) {
@@ -628,7 +612,7 @@ const CHARACTERS = {
         },
 
         'mb-sad': {
-            label: 'Sad Drip', sheet: 'mb', headFrame: 'mb-sad',
+            label: 'Sad', sheet: 'mb', headFrame: 'mb-sad',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
             // Triangle wave drip — descending pitch fits a teardrop falling.
             play(ctx, out, when, step) {
@@ -649,7 +633,7 @@ const CHARACTERS = {
         },
 
         'mb-snooze': {
-            label: 'Snooze Goo', sheet: 'mb', headFrame: 'mb-snooze',
+            label: 'Snooze', sheet: 'mb', headFrame: 'mb-snooze',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
             // Long yawn pad — sine with light vibrato, fades up then sleeps
             // back down across most of the bar.
@@ -675,7 +659,7 @@ const CHARACTERS = {
         },
 
         'mb-scared': {
-            label: 'Crack Shiver', sheet: 'mb', headFrame: 'mb-scared',
+            label: 'Shiver', sheet: 'mb', headFrame: 'mb-scared',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
             // Shaky percussion — high-pass noise burst + a quick triangle
             // pitch-drop tap, fires on the off-beat.
@@ -703,7 +687,7 @@ const CHARACTERS = {
         },
 
         'mb-cool': {
-            label: 'Cool Brain', sheet: 'mb', headFrame: 'mb-cool',
+            label: 'Cool', sheet: 'mb', headFrame: 'mb-cool',
             bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
             // Random sine notes — picks an octave for that "shades say
             // whatever" cool randomness.
@@ -724,7 +708,7 @@ const CHARACTERS = {
         },
 
         'mb-eye': {
-            label: 'Eye Pop', sheet: 'mb', headFrame: 'mb-eye',
+            label: 'Eye', sheet: 'mb', headFrame: 'mb-eye',
             bodyColor: '#0e7490', bodyHi: '#22d3ee', bodyShade: '#083344',
             // Square wave electric blip — rising pitch, hi-pass filtered for
             // a sharp electric snap.
@@ -821,25 +805,38 @@ const CHARACTERS = {
 
     const SHEETS = {
         munki: {
-            src: 'assets/sprites/blank-heads.png',
-            sheetW: 4330,
-            sheetH: 2174,
-            // 8 color frames — frame names match the new body-color palette.
-            // Canon Munkis use procedural faces (headFaceArt) and don't read
-            // these frames; kept here for reference and future sheet-based
-            // head shapes if we ever want richer-than-CSS-circle rendering.
-            // BLACK = always good (one Watcher per bank).
-            // WHITE = always evil (Ice, Moon, Void, Static).
-            // The other 6 are regular crew colors (one per bank, per color).
+            src: 'assets/sprites/default-heads.png',
+            sheetW: 1602,
+            sheetH: 1002,
+            // 40 frames = 5 expression rows × 8 color columns.
+            // Frame names are `{expression}-{color}` where expression ∈ 1..5
+            // (1 silly/default → 2 shocked → 3 sad → 4 smug → 5 angry) and
+            // color ∈ {B,G,O,P,R,Y} for regular Munkis, plus X (black) and
+            // Z (white) which both glitch to grey — reserved for the two
+            // antagonists (Moon Munki = X, Ice Munki = Z).
+            // Expression is chosen dynamically per slot by expressionForSlot;
+            // see headArt for how the frame name is composed at render time.
             frames: {
-                'black':  { x: 2,    y: 2,    w: 1080, h: 1076 },
-                'blue':   { x: 1084, y: 2,    w: 1080, h: 1075 },
-                'green':  { x: 2166, y: 2,    w: 1080, h: 1072 },
-                'orange': { x: 3248, y: 2,    w: 1080, h: 1080 },
-                'purple': { x: 2,    y: 1084, w: 1080, h: 1075 },
-                'red':    { x: 1084, y: 1084, w: 1080, h: 1076 },
-                'white':  { x: 2166, y: 1084, w: 1080, h: 1085 },
-                'yellow': { x: 3248, y: 1084, w: 1080, h: 1088 }
+                '1-B': { x:    2, y:   2, w: 198, h: 198 }, '1-G': { x:  202, y:   2, w: 198, h: 198 },
+                '1-O': { x:  402, y:   2, w: 198, h: 198 }, '1-P': { x:  602, y:   2, w: 198, h: 198 },
+                '1-R': { x:  802, y:   2, w: 198, h: 198 }, '1-X': { x: 1002, y:   2, w: 198, h: 198 },
+                '1-Y': { x: 1202, y:   2, w: 198, h: 198 }, '1-Z': { x: 1402, y:   2, w: 198, h: 198 },
+                '2-B': { x:    2, y: 202, w: 198, h: 198 }, '2-G': { x:  202, y: 202, w: 198, h: 198 },
+                '2-O': { x:  402, y: 202, w: 198, h: 198 }, '2-P': { x:  602, y: 202, w: 198, h: 198 },
+                '2-R': { x:  802, y: 202, w: 198, h: 198 }, '2-X': { x: 1002, y: 202, w: 198, h: 198 },
+                '2-Y': { x: 1202, y: 202, w: 198, h: 198 }, '2-Z': { x: 1402, y: 202, w: 198, h: 198 },
+                '3-B': { x:    2, y: 402, w: 198, h: 198 }, '3-G': { x:  202, y: 402, w: 198, h: 198 },
+                '3-O': { x:  402, y: 402, w: 198, h: 198 }, '3-P': { x:  602, y: 402, w: 198, h: 198 },
+                '3-R': { x:  802, y: 402, w: 198, h: 198 }, '3-X': { x: 1002, y: 402, w: 198, h: 198 },
+                '3-Y': { x: 1202, y: 402, w: 198, h: 198 }, '3-Z': { x: 1402, y: 402, w: 198, h: 198 },
+                '4-B': { x:    2, y: 602, w: 198, h: 198 }, '4-G': { x:  202, y: 602, w: 198, h: 198 },
+                '4-O': { x:  402, y: 602, w: 198, h: 198 }, '4-P': { x:  602, y: 602, w: 198, h: 198 },
+                '4-R': { x:  802, y: 602, w: 198, h: 198 }, '4-X': { x: 1002, y: 602, w: 198, h: 198 },
+                '4-Y': { x: 1202, y: 602, w: 198, h: 198 }, '4-Z': { x: 1402, y: 602, w: 198, h: 198 },
+                '5-B': { x:    2, y: 802, w: 198, h: 198 }, '5-G': { x:  202, y: 802, w: 198, h: 198 },
+                '5-O': { x:  402, y: 802, w: 198, h: 198 }, '5-P': { x:  602, y: 802, w: 198, h: 198 },
+                '5-R': { x:  802, y: 802, w: 198, h: 198 }, '5-X': { x: 1002, y: 802, w: 198, h: 198 },
+                '5-Y': { x: 1202, y: 802, w: 198, h: 198 }, '5-Z': { x: 1402, y: 802, w: 198, h: 198 }
             }
         },
         mb: {
@@ -877,165 +874,33 @@ const CHARACTERS = {
             + `</svg>`;
     }
 
-    // Colored head circle (matches body color). r=44 in the 100 viewBox; the
-    // .head-mod / .head-face siblings inset to match this radius so the sprite
-    // fills exactly the visible circle (no gaps under the headphones).
-    // Maps body-color hex to the matching frame name in blank-heads.png so
-    // headShapeArt can crop the right colored circle for each character.
+    // Maps a Munki's bodyColor hex to its single-letter color code in
+    // default-heads.png. Used by headArt to compose the dynamic frame name
+    // `${expression}-${color}`. X = black-glitch (Moon), Z = white-glitch
+    // (Ice). The other 6 letters are regular crew colors.
     const COLOR_BY_BODY = {
-        '#1f2937': 'black',  '#1e88e5': 'blue',   '#43a047': 'green',  '#ff9800': 'orange',
-        '#9c27b0': 'purple', '#dc2626': 'red',    '#f8fafc': 'white',  '#fbbf24': 'yellow'
+        '#1f2937': 'X',  '#1e88e5': 'B',  '#43a047': 'G',  '#ff9800': 'O',
+        '#9c27b0': 'P',  '#dc2626': 'R',  '#f8fafc': 'Z',  '#fbbf24': 'Y'
     };
 
-    // Head circle = sprite frame from blank-heads.png matching the
-    // character's body color. SVG viewBox crops to the frame; the inner
-    // <image> shows the full sheet. Falls back to a flat colored circle if
-    // the body color isn't in the palette (custom-skin guard).
+    // Flat colored circle that sits behind the head sprite. The sprite is a
+    // complete head (circle + face), so this backdrop only shows through any
+    // transparent edges of the PNG — a safety net, not the primary visual.
     function headShapeArt(c) {
-        const sheet = SHEETS.munki;
-        const colorName = COLOR_BY_BODY[c.bodyColor];
-        const f = colorName && sheet && sheet.frames[colorName];
-        if (!f) {
-            return `<svg class="head-shape" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-                + `<circle cx="50" cy="50" r="44" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3"/>`
-                + `</svg>`;
-        }
-        return `<svg class="head-shape" viewBox="${f.x} ${f.y} ${f.w} ${f.h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            + `<image href="${sheet.src}" x="0" y="0" width="${sheet.sheetW}" height="${sheet.sheetH}"/>`
+        return `<svg class="head-shape" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+            + `<circle cx="50" cy="50" r="44" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3"/>`
             + `</svg>`;
     }
 
-    // Generic Munki face — used as a fallback when no headFrame is set.
-    // ---------- FACE FEATURE POOL ----------
-    // Each renderer returns SVG fragments inside the standard 100×100 viewBox.
-    // Eyes sit around y=50, brow ~y=40, mouth ~y=66-76, cheeks ~y=58-66.
-    // Body color must match the head circle (always #f8fafc for evils, the
-    // character's bodyColor for regulars) — these features are color-agnostic
-    // overlays that read on any head circle.
-    const EYE_RENDERERS = {
-        dot:      () =>
-            `<circle cx="38" cy="52" r="3" fill="#000"/>` +
-            `<circle cx="62" cy="52" r="3" fill="#000"/>`,
-        button:   () =>
-            `<circle cx="38" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>` +
-            `<circle cx="62" cy="50" r="7" fill="#fff" stroke="#000" stroke-width="2"/>` +
-            `<circle cx="38" cy="51" r="3.5" fill="#000"/>` +
-            `<circle cx="62" cy="51" r="3.5" fill="#000"/>` +
-            `<circle cx="39" cy="50" r="1.4" fill="#fff"/>` +
-            `<circle cx="63" cy="50" r="1.4" fill="#fff"/>`,
-        slant:    () =>
-            `<line x1="31" y1="48" x2="44" y2="55" stroke="#000" stroke-width="3.5" stroke-linecap="round"/>` +
-            `<line x1="69" y1="48" x2="56" y2="55" stroke="#000" stroke-width="3.5" stroke-linecap="round"/>`,
-        asterisk: () =>
-            `<g stroke="#000" stroke-width="2.5" stroke-linecap="round">` +
-            `<line x1="32" y1="50" x2="44" y2="50"/>` +
-            `<line x1="38" y1="44" x2="38" y2="56"/>` +
-            `<line x1="33" y1="45" x2="43" y2="55"/>` +
-            `<line x1="33" y1="55" x2="43" y2="45"/>` +
-            `<line x1="56" y1="50" x2="68" y2="50"/>` +
-            `<line x1="62" y1="44" x2="62" y2="56"/>` +
-            `<line x1="57" y1="45" x2="67" y2="55"/>` +
-            `<line x1="57" y1="55" x2="67" y2="45"/>` +
-            `</g>`,
-        googly:   () =>
-            `<circle cx="38" cy="50" r="9" fill="#fff" stroke="#000" stroke-width="2"/>` +
-            `<circle cx="62" cy="50" r="9" fill="#fff" stroke="#000" stroke-width="2"/>` +
-            `<circle cx="40" cy="52" r="4" fill="#000"/>` +
-            `<circle cx="60" cy="48" r="4" fill="#000"/>`,
-        gear:     () =>
-            `<g fill="#000">` +
-            `<polygon points="38,42 41,46 45,46 43,50 45,54 41,54 38,58 35,54 31,54 33,50 31,46 35,46"/>` +
-            `<polygon points="62,42 65,46 69,46 67,50 69,54 65,54 62,58 59,54 55,54 57,50 55,46 59,46"/>` +
-            `</g>` +
-            `<circle cx="38" cy="50" r="2" fill="#fff"/>` +
-            `<circle cx="62" cy="50" r="2" fill="#fff"/>`,
-        star:     () =>
-            `<g fill="#fff" stroke="#000" stroke-width="1.5">` +
-            `<polygon points="38,42 40.5,48 47,48 41.5,52 43.5,58 38,54.5 32.5,58 34.5,52 29,48 35.5,48"/>` +
-            `<polygon points="62,42 64.5,48 71,48 65.5,52 67.5,58 62,54.5 56.5,58 58.5,52 53,48 59.5,48"/>` +
-            `</g>`,
-        sleepy:   () =>
-            `<path d="M 30 52 Q 38 47 46 52" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
-            `<path d="M 54 52 Q 62 47 70 52" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`
-    };
-
-    const MOUTH_RENDERERS = {
-        smile:    () =>
-            `<path d="M 38 66 Q 50 76 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
-        smirk:    () =>
-            `<path d="M 38 70 Q 50 74 62 67" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
-        o:        () =>
-            `<ellipse cx="50" cy="71" rx="6" ry="7" fill="#000"/>` +
-            `<ellipse cx="50" cy="69" rx="3" ry="3" fill="#7f1d1d"/>`,
-        fanged:   () =>
-            `<path d="M 38 66 Q 50 72 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
-            `<polygon points="44,67 47,72 49,67" fill="#fff" stroke="#000" stroke-width="1"/>` +
-            `<polygon points="51,67 53,72 56,67" fill="#fff" stroke="#000" stroke-width="1"/>`,
-        straight: () =>
-            `<line x1="40" y1="70" x2="60" y2="70" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
-        tongue:   () =>
-            `<path d="M 38 66 Q 50 76 62 66" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
-            `<ellipse cx="50" cy="74" rx="5" ry="6" fill="#ec4899"/>`
-    };
-
-    const BROW_RENDERERS = {
-        arched: () =>
-            `<path d="M 30 40 Q 38 36 46 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
-            `<path d="M 54 40 Q 62 36 70 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
-        sharp:  () =>
-            `<line x1="30" y1="42" x2="46" y2="38" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
-            `<line x1="70" y1="42" x2="54" y2="38" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
-        flat:   () =>
-            `<line x1="30" y1="40" x2="46" y2="40" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
-            `<line x1="54" y1="40" x2="70" y2="40" stroke="#000" stroke-width="3" stroke-linecap="round"/>`,
-        raised: () =>
-            `<path d="M 30 40 Q 38 33 46 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>` +
-            `<path d="M 54 40 Q 62 33 70 40" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/>`
-    };
-
-    const EXTRA_RENDERERS = {
-        blush:         () =>
-            `<ellipse cx="24" cy="62" rx="5" ry="3" fill="#ec4899" opacity="0.5"/>` +
-            `<ellipse cx="76" cy="62" rx="5" ry="3" fill="#ec4899" opacity="0.5"/>`,
-        freckles:      () =>
-            `<g fill="#92400e" opacity="0.7">` +
-            `<circle cx="34" cy="62" r="0.8"/>` +
-            `<circle cx="40" cy="63" r="0.8"/>` +
-            `<circle cx="36" cy="65" r="0.8"/>` +
-            `<circle cx="60" cy="62" r="0.8"/>` +
-            `<circle cx="66" cy="63" r="0.8"/>` +
-            `<circle cx="64" cy="65" r="0.8"/>` +
-            `</g>`,
-        'beauty-mark': () =>
-            `<circle cx="62" cy="76" r="1.2" fill="#1f2937"/>`,
-        scar:          () =>
-            `<path d="M 28 50 L 22 56 L 26 60 L 22 64" fill="none" stroke="#7f1d1d" stroke-width="1.5"/>`
-    };
-
-    // Compose a face from a {eyes, mouth, brow, extra} combo. Missing fields
-    // fall back to the friendly defaults (button eyes, smile mouth). The
-    // result is the inner-head SVG that sits between .head-shape (colored
-    // circle) and .head-phones in the layered head rig.
-    function headFaceArt(face) {
-        face = face || {};
-        const brow  = face.brow  ? (BROW_RENDERERS[face.brow]   || (() => ''))() : '';
-        const eyes  = (EYE_RENDERERS[face.eyes]   || EYE_RENDERERS.button)();
-        const mouth = (MOUTH_RENDERERS[face.mouth] || MOUTH_RENDERERS.smile)();
-        const extra = face.extra ? (EXTRA_RENDERERS[face.extra] || (() => ''))() : '';
-        return `<svg class="head-face" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
-            + brow + eyes + mouth + extra
-            + `</svg>`;
-    }
-
-    // Custom head sprite cropped from one of the spritesheets. The SVG viewBox
-    // crops to the named frame's pixel coords, while the inner <image> shows
-    // the full sheet — preserveAspectRatio scales the cropped frame into the
-    // SVG's display box (which is 100% of .head-mod = the head circle area).
-    // Defaults to the 'munki' sheet; pass 'mb' for the Madballz Modz set.
+    // Head sprite cropped from one of the spritesheets. The SVG viewBox crops
+    // to the named frame's pixel coords; the inner <image> shows the full
+    // sheet — preserveAspectRatio scales the cropped frame into .head-mod
+    // (which fills the head circle area). 'munki' is the dynamic default-heads
+    // sheet (`{expr}-{color}` frames); 'mb' is the static Madballz sheet.
     function headModArt(frameName, sheetName) {
         const sheet = SHEETS[sheetName || 'munki'];
         const f = sheet && sheet.frames[frameName];
-        if (!f) return headFaceArt(); // fall back to placeholder face
+        if (!f) return '';
         return `<svg class="head-mod" viewBox="${f.x} ${f.y} ${f.w} ${f.h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
             + `<image href="${sheet.src}" x="0" y="0" width="${sheet.sheetW}" height="${sheet.sheetH}"/>`
             + `</svg>`;
@@ -1144,16 +1009,52 @@ const CHARACTERS = {
         });
     }
 
-    function headArt(c) {
-        const inner = c.headFrame ? headModArt(c.headFrame, c.sheet) : headFaceArt(c.face);
+    // ---------- EXPRESSION (state → 1..5 row of default-heads) ----------
+    // Each Munki picks a row of default-heads based on game state at render
+    // time. Madballz mods have a static `headFrame` and ignore this.
+    //   1  default / silly        (tray chips + idle on stage)
+    //   2  shocked                (just placed, ~600 ms, OR during a jumpscare)
+    //   3  sad                    (Ice on stage; this slot isn't ice/moon)
+    //   5  angry                  (Moon on stage; this slot isn't ice/moon)
+    // Ice and Moon themselves stay on row 1 (their X/Z glitch-grey row 1 is
+    // already creepy enough — locking them keeps the menace constant).
+    const PLACED_SHOCK_MS = 600;
+    const placedAt = new Map();
+
+    function expressionForSlot(slotIndex) {
+        if (slotIndex == null) return 1;
+        if (isJumpScareActive) return 2;
+        const id = slots[slotIndex];
+        if (!id) return 1;
+        const t = placedAt.get(slotIndex);
+        if (t !== undefined && (performance.now() - t) < PLACED_SHOCK_MS) return 2;
+        if (id === 'ice' || id === 'moon') return 1;
+        if (slots.indexOf('moon') !== -1) return 5;
+        if (slots.indexOf('ice')  !== -1) return 3;
+        return 1;
+    }
+
+    // headArt composes the head layers (shape circle → sprite → hair → cans).
+    // For Munkis, the sprite frame is computed from `${expr}-${color letter}`
+    // where expr comes from expressionForSlot. Madballz keep their static
+    // `headFrame` (e.g. 'mb-skull') and ignore expression.
+    function headArt(c, expr) {
+        let inner = '';
+        if (c.headFrame) {
+            inner = headModArt(c.headFrame, c.sheet);
+        } else {
+            const letter = COLOR_BY_BODY[c.bodyColor];
+            if (letter) inner = headModArt(`${expr}-${letter}`, 'munki');
+        }
         return headShapeArt(c) + inner + hairArt(c) + headPhonesArt();
     }
 
-    function characterArt(id) {
+    function characterArt(id, slotIndex) {
         const c = CHARACTERS[id];
+        const expr = expressionForSlot(slotIndex);
         return `<div class="char-art" data-char="${id}">`
             + `<div class="char-body">${bodyArt(c)}</div>`
-            + `<div class="char-head">${headArt(c)}</div>`
+            + `<div class="char-head">${headArt(c, expr)}</div>`
             + `</div>`;
     }
 
@@ -1206,7 +1107,7 @@ const CHARACTERS = {
             slot.dataset.char = id;
             slot.title = ch.label;
             slot.innerHTML = `
-                <div class="slot-icon">${characterArt(id)}</div>
+                <div class="slot-icon">${characterArt(id, index)}</div>
                 <div class="slot-label">${ch.label}</div>
             `;
         } else {
@@ -1229,7 +1130,21 @@ const CHARACTERS = {
     function setSlot(index, charId) {
         const wasHorror = HORROR_TRIGGER_MODS.has(slots[index]);
         const iceWasOn = isIceOnStage();
+        const moonWasOn = slots.indexOf('moon') !== -1;
         slots[index] = charId;
+        // Track placement time so expressionForSlot can show the "shocked"
+        // row for ~600ms after a fresh drop. Re-render once that window
+        // closes so the face settles back to row 1 (or 3/5 if Ice/Moon is
+        // still on stage). Cleared on remove so empty slots don't shock
+        // again next time something lands here.
+        if (charId) {
+            placedAt.set(index, performance.now());
+            setTimeout(() => {
+                if (slots[index] === charId) renderSlot(index);
+            }, PLACED_SHOCK_MS + 30);
+        } else {
+            placedAt.delete(index);
+        }
         renderSlot(index);
         // Lore: ICE MUNKI and MOON MUNKI are the antagonists — placing one
         // onto a slot tears the level into horror mode for a moment. Only
@@ -1247,8 +1162,18 @@ const CHARACTERS = {
         // shimmer once on the transition INTO an iced stage. Stage thaws
         // automatically when the last Ice Munki is cleared.
         const iceNowOn = isIceOnStage();
+        const moonNowOn = slots.indexOf('moon') !== -1;
         updateIceFreeze();
         if (iceNowOn && !iceWasOn) playIceFreezeSound();
+        // When ice or moon presence flips, every other slot's expression
+        // changes (sad/angry/default). Re-render the others so their face
+        // sprite picks up the new state. The slot we just touched was
+        // already rendered above with the fresh placedAt.
+        if (iceNowOn !== iceWasOn || moonNowOn !== moonWasOn) {
+            for (let i = 0; i < NUM_SLOTS; i++) {
+                if (i !== index) renderSlot(i);
+            }
+        }
     }
 
     function isIceOnStage() {
@@ -1400,9 +1325,13 @@ const CHARACTERS = {
         playJumpScareSound();
 
         document.body.classList.add('jumpscare');
+        // Refresh every active slot so faces snap to the shocked row for the
+        // duration of the scare, then flip back when the gate releases.
+        renderAllSlots();
         setTimeout(() => {
             document.body.classList.remove('jumpscare');
             isJumpScareActive = false;
+            renderAllSlots();
         }, 1500);
     }
 
