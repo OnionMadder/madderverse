@@ -233,9 +233,15 @@ body.dancing .stage {
 /* ----- background variants (also reused for thumbnails) ----- */
 
 .bg-studio {
+    /* Studio = clean white-to-cool-gray with the pink floor glow.
+       Replaced the prior cream / peach gradient since cream clashes with
+       the onioncore dark / teal / pink palette used across the rest of
+       Madderverse. The faint lavender tint at the bottom edge picks up
+       the page background's purple so the canvas frames into the page
+       rather than sitting on it as a bright slab. */
     background:
         radial-gradient(ellipse 70% 28% at 50% 92%, rgba(255, 110, 199, 0.22) 0%, transparent 70%),
-        linear-gradient(180deg, #fff8ec 0%, #fff0d6 70%, #ffd9a8 100%);
+        linear-gradient(180deg, #ffffff 0%, #fafafa 60%, #ececf4 100%);
 }
 
 .bg-disco {
@@ -291,9 +297,13 @@ body.dancing .stage {
 .silhouette-outline-layer { z-index: 3; }
 
 /* Pale wash inside the silhouette so the kid sees the body shape even
-   before any strokes — this is the "coloring page" surface. */
+   before any strokes — this is the "coloring page" surface. Slight cool
+   tint (vs pure white) so the figure still reads as a distinct shape on
+   the studio background (which is now off-white rather than cream); on
+   the dark backgrounds — disco / outdoors / night — it still appears
+   essentially white because the tint is so subtle. */
 .silhouette-fill > * {
-    fill: rgba(255, 255, 255, 0.94);
+    fill: rgba(232, 232, 244, 0.94);
 }
 
 /* Outline shapes provide the SourceAlpha that the
@@ -385,35 +395,41 @@ body.dancing .draw-canvas {
     -webkit-backdrop-filter: blur(6px);
 }
 
-/* ============ TOOL TRAY (craft-supply look) ============
+/* ============ TOOL TRAY (modern studio-counter look) ============
 
-   The draw panel (#drawPanel) opts in via .tool-tray. This is the
-   "open craft box" surface — warm cream gradient, dark hand-stamped
-   stroke, three labeled sections (Colors / Brushes / Actions) sitting
-   in their own dashed cards inside. Scoped specifically with the
-   .tool-tray class so the dance-panel keeps its existing dark/neon
-   styling. */
+   The draw panel (#drawPanel) opts in via .tool-tray. Deep-purple tray
+   with a soft pink halo at the top + teal dashed compartments inside,
+   white tape labels (Colors / Brushes / Actions) capping each one.
+   Scoped specifically with the .tool-tray class so the dance-panel
+   keeps its existing dark/neon styling. */
 
 .tool-tray {
+    /* Dark studio-counter tray: deep purple base with a soft pink halo
+       at the top edge + teal hairline inner glow. Cream was pulled out
+       because it fought the onioncore palette; the "supply tray" feeling
+       now comes from the dashed teal section cards + the white tape
+       labels inside, not from a warm paper backdrop. */
     background:
-        radial-gradient(ellipse 80% 60% at 50% 0%, #fffaef 0%, transparent 70%),
-        linear-gradient(165deg, #fff3d6 0%, #ffd9a8 100%);
-    border: 3px solid #1a0f33;
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
+        linear-gradient(165deg, #3b1f6b 0%, #1a0f33 100%);
+    border: 3px solid rgba(0, 255, 204, 0.5);
     border-radius: 18px;
     padding: 14px;
     gap: 14px;
-    color: #1a0f33;
+    color: #fff;
     box-shadow:
-        0 10px 28px rgba(0, 0, 0, 0.35),
-        inset 0 0 0 2px rgba(255, 255, 255, 0.55),
-        inset 0 -6px 0 rgba(26, 15, 51, 0.08);
+        0 10px 28px rgba(0, 0, 0, 0.5),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        inset 0 0 22px rgba(255, 110, 199, 0.08);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
 
 .tool-section {
-    background: rgba(255, 255, 255, 0.55);
-    border: 2px dashed rgba(26, 15, 51, 0.22);
+    /* Glassy dark card with teal-tinted dashed border so each section
+       reads as its own "compartment" against the dark tray. */
+    background: rgba(0, 0, 0, 0.25);
+    border: 2px dashed rgba(0, 255, 204, 0.4);
     border-radius: 14px;
     padding: 6px 10px 12px;
     display: flex;
@@ -455,7 +471,8 @@ body.dancing .draw-canvas {
     box-shadow: 0 3px 0 rgba(26, 15, 51, 0.35);
 }
 .tool-tray .swatch[data-color="#ffffff"] {
-    /* Keep white-swatch dark-bordered against cream so it's still visible. */
+    /* Keep the white-swatch dark-bordered so it stays visible regardless
+       of how the tray background reads. */
     border-color: #1a0f33;
 }
 .tool-tray .swatch.active {
@@ -510,8 +527,8 @@ body.dancing .draw-canvas {
     color: #1a0f33;
 }
 .tool-tray .btn.primary {
-    /* DANCE button — keep the gradient identity, restamp on dark for
-       contrast with the cream tray. */
+    /* DANCE button — pink → yellow → teal gradient identity preserved,
+       framed by the dark stamp border so it pops on the dark tray. */
     background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
     color: #1a0f33;
     border: 3px solid #1a0f33;
@@ -525,7 +542,9 @@ body.dancing .draw-canvas {
         0 0 18px rgba(255, 110, 199, 0.45);
 }
 @media (hover: hover) {
-    .tool-tray .btn:hover { background: #ffe9c8; }
+    /* Soft cool gray on hover (not cream) — keeps the white-button look
+       but reads as a "lit" state against the dark tray. */
+    .tool-tray .btn:hover { background: #f0f0f4; }
     .tool-tray .btn.primary:hover {
         filter: brightness(1.06);
         background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
@@ -624,7 +643,10 @@ body.dancing .draw-mode-row {
     border-radius: 16px 16px 6px 6px;
     font-size: 18px;
     padding: 14px 18px;
-    background: linear-gradient(135deg, #ff6ec7 0%, #ffb86c 60%, #00ffcc 100%);
+    /* Direct pink → teal so DRAW reads as a distinct gradient from the
+       3-stop DANCE button below, and so the button has no warm/peach
+       midtone (peach was reading as cream-adjacent on small screens). */
+    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
     color: #1a0f33;
     border: 3px solid rgba(255, 255, 255, 0.5);
     box-shadow:
