@@ -450,11 +450,68 @@ body.dancing .draw-canvas {
 
 .actions { gap: 8px; }
 
-/* Small instructional line under the actions row. Shown only on touch
-   devices where the DRAW toggle has the most teaching value; on desktop
-   the pointer makes the mode self-evident. */
+/* ============ DRAW-MODE ROW (above the canvas) ============ */
+
+/* Sits immediately above .stage-wrap. The button is the first thing a
+   visitor sees when they look at the figure — "tap here to start
+   scribbling" energy. Hidden during dance because drawing is locked
+   off then; we use display:none so the row collapses and the canvas
+   sits higher rather than leaving an empty gap. */
+.draw-mode-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: min(94vw, 380px);
+    gap: 4px;
+}
+
+body.dancing .draw-mode-row {
+    display: none;
+}
+
+.draw-mode-btn {
+    /* Wider than a normal .btn — fills the canvas width visually so it
+       reads as "the entry point to the canvas below". Flat bottom so it
+       feels physically attached to the stage. */
+    width: 100%;
+    border-radius: 16px 16px 6px 6px;
+    font-size: 18px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #ff6ec7 0%, #ffb86c 60%, #00ffcc 100%);
+    color: #1a0f33;
+    border: 3px solid rgba(255, 255, 255, 0.5);
+    box-shadow:
+        0 4px 0 rgba(0, 0, 0, 0.4),
+        0 0 24px rgba(255, 110, 199, 0.35);
+    /* Gentle pulse so the affordance reads at-a-glance on first paint
+       without being annoying. Stops once the user has clicked it (any
+       .drawing-active state ends the pulse). */
+    animation: drawCue 2.6s ease-in-out infinite;
+}
+
+.draw-mode-btn.active {
+    /* Drawing in progress — calm the button down and shift to a "stop"
+       palette so it reads as a different control. */
+    background: linear-gradient(135deg, #00ffcc 0%, #43aa8b 100%);
+    box-shadow:
+        0 4px 0 rgba(0, 0, 0, 0.4),
+        0 0 18px rgba(0, 255, 204, 0.4);
+    animation: none;
+}
+
+@keyframes drawCue {
+    0%, 100% { transform: scale(1);    box-shadow: 0 4px 0 rgba(0,0,0,0.4), 0 0 24px rgba(255, 110, 199, 0.35); }
+    50%      { transform: scale(1.02); box-shadow: 0 6px 0 rgba(0,0,0,0.4), 0 0 32px rgba(255, 110, 199, 0.55); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .draw-mode-btn { animation: none; }
+}
+
+/* Small teaching line under the button. Touch-only — on desktop the
+   pointer makes the mode self-evident. */
 .draw-hint {
-    margin: 4px 0 0;
+    margin: 0;
     font-family: var(--font-body);
     font-size: 12px;
     text-align: center;
