@@ -105,7 +105,7 @@ function roundEase(p) {
 }
 
 const CFG = {
-    duration:        60,
+    duration:        30,
     gravity:         900,
     minHorizSpeed:   180,
     maxHorizSpeed:   320,
@@ -236,15 +236,17 @@ const SFX_VARIANTS = {
 };
 
 const SFX_POOL = { catch: [], veg: [], chomp: [], lick: [] };
-const SFX_START = document.getElementById('snd-start');
-const SFX_BURP  = document.getElementById('snd-burp');
+const SFX_START       = document.getElementById('snd-start');
+const SFX_BURP        = document.getElementById('snd-burp');
+const SFX_LEVEL_MUSIC = document.getElementById('snd-level-music');
 
 const audio = {
-    muted:        false,
-    sfxVol:       0.85,
-    startVol:     0.9,
-    burpVol:      0.85,
-    activeCount:  0,
+    muted:         false,
+    sfxVol:        0.85,
+    startVol:      0.9,
+    burpVol:       0.85,
+    levelMusicVol: 0.55,   // sits under SFX so cookie/veg taps stay punchy
+    activeCount:   0,
     maxConcurrent: 5,
 };
 
@@ -302,6 +304,26 @@ function playBurpSfx() {
     } catch (_) {}
 }
 
+// Level background music — started when the gameplay loop begins (after
+// the countdown's "GO!"), stopped at round end or abort. CFG.duration is
+// set to match the clip length so it plays through once per round.
+function playLevelMusic() {
+    if (audio.muted || !SFX_LEVEL_MUSIC) return;
+    try {
+        SFX_LEVEL_MUSIC.currentTime = 0;
+        SFX_LEVEL_MUSIC.volume = audio.levelMusicVol;
+        SFX_LEVEL_MUSIC.play().catch(() => {});
+    } catch (_) {}
+}
+
+function stopLevelMusic() {
+    if (!SFX_LEVEL_MUSIC) return;
+    try {
+        SFX_LEVEL_MUSIC.pause();
+        SFX_LEVEL_MUSIC.currentTime = 0;
+    } catch (_) {}
+}
+
 // Synthesized "streak break" — quick descending sawtooth, ~300ms.
 // Uses a single shared AudioContext so we don't churn on every break.
 let _streakBreakCtx = null;
@@ -331,7 +353,14 @@ function playStreakBreakSfx() {
 
 function toggleMute() {
     audio.muted = !audio.muted;
-    if (audio.muted) stopStartSfx();
+    if (audio.muted) {
+        stopStartSfx();
+        stopLevelMusic();
+    } else if (state.running) {
+        // Unmuting mid-round — pick the level music back up so the player
+        // doesn't have to wait for the next round to hear it.
+        playLevelMusic();
+    }
     if (els.btnMute) {
         els.btnMute.classList.toggle('muted', audio.muted);
         els.btnMute.textContent = audio.muted ? '🔇' : '🔊';
@@ -406,6 +435,7 @@ function abortRound() {
     state.cookies.forEach(c => c.el && c.el.remove());
     state.cookies = [];
     stopStartSfx();
+    stopLevelMusic();
     stopGlitches();
     exitGameFullscreen();
     showScreen('menu');
@@ -1077,6 +1107,10 @@ function startRound() {
             state.lastTs  = 0;
             state.rafId   = requestAnimationFrame(loop);
             scheduleNextGlitch();
+            // Hand off from the countdown jingle to the level music so the
+            // two don't overlap, then start the round soundtrack.
+            stopStartSfx();
+            playLevelMusic();
         });
     });
 }
@@ -1104,6 +1138,7 @@ function endRound() {
     state.cookies.forEach(c => c.el && c.el.remove());
     state.cookies = [];
     stopStartSfx();
+    stopLevelMusic();
     stopGlitches();
     // Note: fullscreen is kept through the feast screen so PLAY AGAIN
     // feels seamless. Esc or abortRound() exits fullscreen when needed.
