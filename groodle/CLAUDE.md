@@ -13,27 +13,54 @@ to `groodle/`.
   palette + brush sizes; the canvas's 2D context is hard-clipped to the
   body shape (via `ctx.clip(buildBodyPath())` in `buildCanvas`) so strokes
   outside the silhouette are never painted to the bitmap at all.
-- DANCE button switches modes: drawing stops, the whole creature (silhouette
-  + canvas as one unit) animates with translate / rotate / scale on every
-  audio beat. Audio is procedural Web Audio — kick, snare, hat, bass, lead —
-  no audio files anywhere.
-- 4 MOVES × 4 BEATS combine for 16 grooves; kid cycles each independently
-  with the ↻ MOVE / ↻ BEAT buttons.
-- 4 background presets (studio, disco, outdoors, night) chosen via thumbnail
-  buttons below the stage.
+- DANCE button toggles ▶ DANCE / ■ STOP in place — drawing **stays
+  enabled** while the creature dances (the canvas pointer events remain
+  live), so kids can keep editing on a bouncing canvas. The dance-dock
+  ■ STOP exit is kept as a redundant escape hatch.
+- Audio is procedural Web Audio — kick, snare, hat, bass, lead — no
+  audio files anywhere. 4 MOVES × 4 BEATS combine for 16 grooves; kid
+  cycles each independently with the ↻ MOVE / ↻ BEAT buttons.
+- 8 background presets (studio, disco, outdoors, night, sunset,
+  underwater, stadium, candy) chosen via thumbnail buttons in the Stage
+  drawer.
+- 4 poses (standing, cheer, star, groovy) chosen from the Pose picker in
+  the Stage drawer. Each pose is data-driven via `POSES` and re-renders
+  the SVG silhouette groups + the canvas clip when selected.
+- **Coloring-book pages** ("freedom inside a fence"): the kid can pick
+  a pre-made line-art template (Robot, Princess, Astronaut, Clown,
+  Pirate, Superhero) from the 📖 Pages dock button and color inside
+  the lines. Pressing DANCE while a page is loaded unlocks that page's
+  achievement + Doodles reward. The body silhouette is the *outer*
+  fence; the page template adds an *inner* structure.
+- **Public Gallery** (optional, Supabase-backed): the 💾 SAVE button in
+  the New drawer composites the silhouette + drawing + outline into a
+  PNG and uploads it to a public Supabase bucket; the 🖼️ Gallery dock
+  button shows the most recent submissions. Anonymous + kid-safe name
+  field. While the Supabase credentials in `game.js` are placeholders,
+  both buttons render but display a setup hint — see `SUPABASE_SETUP.md`.
 
 ## File layout
 
 ```
 groodle/
-  index.html   — silhouette SVG + draw canvas + tool panels + bg picker
-  style.css    — full stylesheet (no build, no preprocessor)
-  game.js      — single IIFE; canvas drawing + audio engine + dance loop
-  cover.jpg    — hub-page card art
+  index.html         — silhouette SVG + draw canvas + tool dock + drawers + modals
+  style.css          — full stylesheet (no build, no preprocessor)
+  game.js            — single IIFE; canvas + audio + dance + pages + gallery
+  cover.jpg          — hub-page card art
+  SUPABASE_SETUP.md  — one-shot SQL + RLS setup for the public gallery
 ```
 
-All three are loaded directly by the browser. Path conventions match the
-rest of the hub (relative for in-game assets, absolute for SEO / favicon).
+All runtime files are loaded directly by the browser. Path conventions
+match the rest of the hub (relative for in-game assets, absolute for SEO
+/ favicon). The Supabase JS SDK is loaded from jsDelivr in `index.html`
+and only does work once the placeholder credentials in `game.js` are
+filled in.
+
+**`game.js` is a single IIFE.** If you ever see `})();` appear twice in
+the file (e.g. after a sloppy paste), the whole game initializes twice
+— double event handlers, double audio scheduler, two `state` objects
+fighting over the same localStorage key. The fix is to keep exactly one
+IIFE; verify with `grep -n '^})();$' game.js` showing one match.
 
 ## Architecture (`game.js`, top → bottom)
 
@@ -47,8 +74,10 @@ rest of the hub (relative for in-game assets, absolute for SEO / favicon).
 | **SYNTH VOICES** | `kick`, `snare`, `hat`, `bass`, `lead`. All synthesized with oscillators + filters; no samples. |
 | **CANVAS** | `buildCanvas` sizes the canvas at `STAGE_W*dpr × STAGE_H*dpr`, scales the 2D context so coordinates are in logical 400×600 units, and calls `ctx.clip(buildBodyPath())` so the drawable area is the silhouette itself. `buildBodyPath` constructs a `Path2D` from `BODY_SHAPES` (using `addRoundRect` + a `DOMMatrix` for each transformed rect). `getPos(e)` converts pointer coords to logical units. `attachDrawing` wires the pointer events. |
 | **TOOLS UI** | `buildPalette`, `buildSizes`, `attachBgPicker` — generates the swatches / size pucks and the 4 background thumbnails. |
-| `drawSurprise()` | Goofy default character (skin fill, green shirt, blue pants, red star, eyes, smile, purple hair tufts) so kids can hit DANCE without drawing first. Relies on the clip to trim everything outside the silhouette. |
-| **DANCE** | `startDance` / `stopDance` toggles the panel + audio. `danceFrame` runs the RAF loop. `applyMove(move, beats)` computes the per-move transform. `scheduleBubblePulse` flashes the corner bubble on quarter notes. |
+| `drawSurprise()` | Goofy default character (skin fill, green shirt, blue pants, red star, eyes, smile, purple hair tufts) so kids can hit DANCE without drawing first. Relies on the clip to trim everything outside the silhouette. Nulls `currentPageId` before clearing so SURPRISE doesn't fight with a stamped page template. |
+| **DANCE** | `startDance` / `stopDance` toggle audio + `body.dancing` class; `togglePlay` is the unified click handler on `#playBtn`. `setPlayBtnState(playing)` flips the button between "▶ Dance" and "■ Stop" labels. The draw canvas pointer-events stay live the whole time — drawing while dancing is intentional. `danceFrame` runs the RAF loop; `applyMove(move, beats)` computes the per-move transform; `scheduleBubblePulse` flashes the corner bubble on quarter notes. |
+| **PAGES** | `PAGES` is a static catalog of coloring-book templates; each has its own `draw(ctx)` that strokes line-art on the same clipped 2D context the kid draws on. `applyPage(id)` clears the canvas and stamps in the chosen page; `clearCanvas()` re-stamps the active template so CLEAR resets to "freshly outlined" instead of fully blank. `startDance()` calls `trackPageCompleted(currentPageId)` so pressing DANCE with a page loaded unlocks its achievement. SURPRISE explicitly nulls `currentPageId` first so it doesn't fight with the template re-stamp. |
+| **GALLERY** | `composeGroodleBlob()` re-renders the kid's drawing into an offscreen 800×1200 PNG using the same `buildBodyPath` the live canvas uses — silhouette fill, draw canvas, outline ring, no SVG serialization. `submitGroodle()` uploads to the `groodle-art` bucket then inserts a `groodles` row; `loadRecentGroodles()` pulls the latest 48 rows for the gallery modal. Both bail to a friendly empty state when `SUPABASE_URL`/`SUPABASE_ANON_KEY` are still placeholders. |
 | **INIT** | `init()` builds everything; fires on `DOMContentLoaded`. |
 
 ## The silhouette + clip trick
@@ -191,6 +220,22 @@ stay in lockstep:
 All four must contain the **same shapes** or the visible body and the
 drawable area will disagree. There's no pose abstraction today — see
 TODO 1 below for what a real pose system would look like.
+
+## Adding a new coloring-book page
+
+1. Append an entry to `PAGES` in `game.js` — `{ id, label, emoji,
+   draw: (c) => {...} }`. The `draw` function paints onto the same
+   clipped 2D context as free drawing, so anything outside the
+   silhouette is trimmed for free; design lines around `(200, 100)` for
+   the head and `(200, 264)` for torso center.
+2. Add a per-page achievement to `ACHIEVEMENTS` (`id: 'page-<id>'`,
+   reward 15 Doodles) and bump the `page-master` check's threshold if
+   you've changed the total number of pages.
+3. Refresh — `buildPagesGrid` is data-driven, no UI change needed.
+
+Pages don't get a thumbnail today; the cards are emoji + label. If you
+want true thumbnails, the cheapest add is a `<canvas>` per card that
+runs `page.draw` once at the card's logical scale during `buildPagesGrid`.
 
 ## Local dev
 

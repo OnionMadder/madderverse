@@ -34,6 +34,11 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&display=swap" />
     <link rel="stylesheet" href="style.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+    <!-- Supabase JS client (used by the public-gallery save/browse flow).
+         While SUPABASE_URL/KEY in game.js are still placeholders, this
+         loads but stays inert — the gallery UI displays a setup hint
+         instead. See groodle/SUPABASE_SETUP.md. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 </head>
 <body>
 
@@ -130,6 +135,14 @@
     <button class="dock-btn" id="openAchievementsBtn" type="button" aria-label="Wins">
         <span class="dock-icon" aria-hidden="true">🏆</span>
         <span class="dock-label">Wins</span>
+    </button>
+    <button class="dock-btn" id="openPagesBtn" type="button" aria-label="Pages">
+        <span class="dock-icon" aria-hidden="true">📖</span>
+        <span class="dock-label">Pages</span>
+    </button>
+    <button class="dock-btn" id="openGalleryBtn" type="button" aria-label="Gallery">
+        <span class="dock-icon" aria-hidden="true">🖼️</span>
+        <span class="dock-label">Gallery</span>
     </button>
     <button class="dock-btn" data-drawer="new" type="button" aria-label="New Groodle">
         <span class="dock-icon" aria-hidden="true">🆕</span>
@@ -254,6 +267,7 @@
             <div class="actions">
                 <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
                 <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
+                <button id="saveBtn" class="btn" type="button">💾 SAVE</button>
             </div>
         </div>
     </section>
@@ -284,6 +298,47 @@
         </header>
         <div class="modal-stats">Balance: <span id="hatShopBalance">🪙 0</span></div>
         <div class="modal-body hat-grid" id="hatShopGrid"></div>
+    </div>
+</div>
+
+<div class="modal" id="pagesModal" hidden aria-hidden="true" role="dialog" aria-labelledby="pagesModalTitle">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-sheet" role="document">
+        <header class="modal-header">
+            <h2 id="pagesModalTitle"><span aria-hidden="true">📖</span> Coloring Book</h2>
+            <button class="modal-close" type="button" data-close="1" aria-label="Close coloring book">✕</button>
+        </header>
+        <div class="modal-stats">Pick a page to color, then hit ▶ DANCE to finish it.</div>
+        <div class="modal-body page-grid" id="pagesGrid"></div>
+    </div>
+</div>
+
+<div class="modal" id="saveModal" hidden aria-hidden="true" role="dialog" aria-labelledby="saveModalTitle">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-sheet save-sheet" role="document">
+        <header class="modal-header">
+            <h2 id="saveModalTitle"><span aria-hidden="true">💾</span> Save to Gallery</h2>
+            <button class="modal-close" type="button" data-close="1" aria-label="Close save dialog">✕</button>
+        </header>
+        <div class="modal-body save-body">
+            <label for="saveNameInput" class="save-label">Sign your Groodle</label>
+            <input id="saveNameInput" type="text" class="save-input" maxlength="24" autocomplete="off" spellcheck="false" placeholder="e.g. PurpleTiger42" />
+            <div class="save-status" id="saveModalStatus" aria-live="polite">Sign your Groodle, then tap Save.</div>
+            <button id="saveSubmitBtn" class="btn primary save-submit" type="button">Save to Gallery</button>
+            <p class="save-hint">Your drawing will appear in the public Gallery. Don't include personal info.</p>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="galleryModal" hidden aria-hidden="true" role="dialog" aria-labelledby="galleryModalTitle">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-sheet" role="document">
+        <header class="modal-header">
+            <h2 id="galleryModalTitle"><span aria-hidden="true">🖼️</span> Gallery</h2>
+            <button class="modal-close" type="button" data-close="1" aria-label="Close gallery">✕</button>
+        </header>
+        <div class="modal-stats">Latest Groodles from around the world</div>
+        <div class="modal-body gallery-grid" id="galleryGrid"></div>
     </div>
 </div>
 

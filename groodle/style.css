@@ -493,10 +493,12 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
        a CSS clip-path here would just duplicate the same mask. */
 }
 
-body.dancing .draw-canvas {
-    cursor: default;
-    pointer-events: none;
-}
+/* Dance mode no longer disables drawing — the draw canvas remains
+   interactive so kids can keep editing while the creature grooves.
+   The pointer-events: none rule that used to live here was deliberately
+   removed; isPlaying checks inside the pointer handlers no-op strokes
+   during dance instead, so we keep the cursor / hit-testing alive for
+   the always-editable experience. */
 
 .stage-floor {
     position: absolute;
@@ -1279,4 +1281,200 @@ body:not(.dancing) .dance-dock { display: none; }
 .drawer-open, .drawer-open body {
     overflow: hidden;
     overscroll-behavior: contain;
+}
+
+/* ============ COLORING-BOOK PAGES MODAL ============
+
+   Same responsive grid as the hat shop. Each card is a button so a kid
+   can tap anywhere on it to pick the page; the "Color it" / "✓ Done"
+   pill at the bottom is a visual label, not a separate hit target. */
+
+.page-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+@media (min-width: 480px) {
+    .page-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 720px) {
+    .page-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.page-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+    transition: border-color 0.2s, background 0.2s, transform 0.1s;
+    -webkit-tap-highlight-color: transparent;
+}
+.page-card:active { transform: scale(0.97); }
+.page-card.done {
+    border-color: rgba(0, 255, 204, 0.6);
+    background:
+        radial-gradient(ellipse 100% 60% at 50% 0%, rgba(0, 255, 204, 0.14) 0%, transparent 70%),
+        rgba(0, 0, 0, 0.35);
+}
+.page-card-blank {
+    border-color: rgba(255, 110, 199, 0.5);
+    background:
+        radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255, 110, 199, 0.16) 0%, transparent 70%),
+        rgba(0, 0, 0, 0.35);
+}
+@media (hover: hover) {
+    .page-card:hover { border-color: rgba(0, 255, 204, 0.55); }
+}
+
+.page-emoji {
+    font-size: 38px;
+    line-height: 1.05;
+}
+.page-name {
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 0.4px;
+}
+.page-action {
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border-radius: 10px;
+    background: rgba(0, 255, 204, 0.16);
+    color: #d6bdff;
+    border: 1px solid rgba(0, 255, 204, 0.35);
+    align-self: center;
+}
+.page-card.done .page-action {
+    background: #00ffcc;
+    color: #1a0f33;
+    border-color: #00ffcc;
+}
+.page-card-blank .page-action {
+    background: rgba(255, 110, 199, 0.2);
+    border-color: rgba(255, 110, 199, 0.5);
+    color: #fff;
+}
+
+/* ============ SAVE DIALOG ============
+
+   Narrower than the achievement / hat / pages modals (single-column
+   form). The sheet is centered; the body holds the name field, status
+   line, primary submit button, and a one-line safety hint. */
+
+.save-sheet { max-width: 380px; }
+
+.save-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 2px;
+}
+
+.save-label {
+    font-size: 12px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #d6bdff;
+    font-weight: bold;
+}
+
+.save-input {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(0, 255, 204, 0.5);
+    color: #fff;
+    font-size: 16px;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+.save-input:focus {
+    outline: none;
+    border-color: #ff6ec7;
+    box-shadow: 0 0 0 3px rgba(255, 110, 199, 0.25);
+}
+
+.save-status {
+    font-size: 13px;
+    color: #d6bdff;
+    min-height: 18px;
+    text-align: center;
+}
+
+.save-submit { align-self: stretch; }
+
+.save-hint {
+    margin: 4px 0 0;
+    font-size: 11px;
+    line-height: 1.4;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+/* ============ GALLERY GRID ============ */
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+@media (min-width: 480px) {
+    .gallery-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 720px) {
+    .gallery-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.gallery-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 14px;
+}
+
+.gallery-img {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    object-fit: contain;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 90%, rgba(0, 0, 0, 0.25) 0%, transparent 70%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(236, 236, 244, 0.92) 100%);
+    border-radius: 10px;
+}
+
+.gallery-name {
+    font-size: 13px;
+    font-weight: bold;
+    text-align: center;
+    color: #fff;
+    word-break: break-word;
+}
+
+.gallery-empty {
+    grid-column: 1 / -1;
+    padding: 32px 16px;
+    text-align: center;
+    color: #d6bdff;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.gallery-empty code {
+    background: rgba(0, 0, 0, 0.35);
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 12px;
 }
