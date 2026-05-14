@@ -498,31 +498,38 @@
         'funky-fresh':     { x: 656, y: 739, w: 216, h: 196 }
     };
 
-    /* Prices ramp from 20 → 130 roughly in step with visual complexity
-       and "rare-feel" of each design. anchor.y is mostly +25..+35 so
-       the hat's bottom-center sits a touch inside the head crown
-       rather than floating above it; a couple of designs (rocket-ship,
-       gelatinous-cube) need their own anchor / scale tuning because
-       they engulf or extend far past the head. The user will iterate
-       these values once they're seen on the live figure. */
+    /* Prices ramp from 20 → 130 roughly with visual complexity. anchor.y
+       values are calibrated for the sheet shipped at assets/sprites/
+       hats.json, which is trimmed: false — each frame carries built-in
+       transparent bottom padding (where the wearer's head sits in the
+       source artwork). Bottom-center anchoring would otherwise float
+       the visible hat content well above the head crown, so anchor.y
+       values are generous (≈80-100) to push the sprite far enough down
+       that the visible artwork lands on the head. Outliers:
+         - rocket-ship / giggle-boot: tall narrow standing sprites,
+           smaller anchor pulls them up so the rocket / boot rests on
+           the crown rather than going off the top.
+         - gelatinous-cube: meant to engulf the head, anchored deeper.
+         - cool-kids: cap + sunglasses, anchored deeper so the lenses
+           land at the eye line. */
     const HATS = [
-        { id: 'no-hat',          name: 'No Hat',          price:   0, sprite: null,              anchor: { x: 0, y:  0 }, scale: 1.00 },
-        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y: 26 }, scale: 0.65 },
-        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y: 26 }, scale: 0.65 },
-        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y: 24 }, scale: 0.70 },
-        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 0, y: 30 }, scale: 0.65 },
-        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y: 26 }, scale: 0.70 },
-        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y: 18 }, scale: 0.55 },
-        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y: 28 }, scale: 0.65 },
-        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y: 28 }, scale: 0.70 },
-        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y: 26 }, scale: 0.70 },
-        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y: 18 }, scale: 0.50 },
-        { id: 'gross-out',       name: 'Gross-Out',       price:  80, sprite: 'gross-out',       anchor: { x: 0, y: 28 }, scale: 0.70 },
-        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 55 }, scale: 0.65 },
-        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y: 24 }, scale: 0.60 },
-        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y: 32 }, scale: 0.65 },
-        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y: 28 }, scale: 0.65 },
-        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y: 28 }, scale: 0.70 }
+        { id: 'no-hat',          name: 'No Hat',          price:   0, sprite: null,              anchor: { x: 0, y:   0 }, scale: 1.00 },
+        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y:  85 }, scale: 0.65 },
+        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y:  85 }, scale: 0.65 },
+        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y:  85 }, scale: 0.70 },
+        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 0, y: 105 }, scale: 0.65 },
+        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y:  85 }, scale: 0.70 },
+        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y:  65 }, scale: 0.55 },
+        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y:  85 }, scale: 0.65 },
+        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y:  85 }, scale: 0.70 },
+        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y:  80 }, scale: 0.70 },
+        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y:  55 }, scale: 0.50 },
+        { id: 'gross-out',       name: 'Gross-Out',       price:  80, sprite: 'gross-out',       anchor: { x: 0, y:  85 }, scale: 0.70 },
+        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 115 }, scale: 0.65 },
+        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y:  80 }, scale: 0.60 },
+        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y:  95 }, scale: 0.65 },
+        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y:  85 }, scale: 0.65 },
+        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y:  85 }, scale: 0.70 }
     ];
 
     const HAT_BY_ID = {};
@@ -671,11 +678,6 @@
     let currentSize = 12;
     let isErasing = false;
     let isDrawing = false;
-    /* When false the canvas behaves as a passive picture: single-finger
-       swipes pass through to the page so the kid (or parent thumb-scrolling
-       past) can scroll. The DRAW button toggles this on; finishing a
-       drawing session (DONE / DANCE) toggles it back off. */
-    let isDrawMode = false;
     let lastX = 0, lastY = 0;
 
     let canvas = null;
@@ -962,12 +964,13 @@
 
     function attachDrawing() {
         canvas.addEventListener('pointerdown', (e) => {
-            /* Bail out unless the kid has explicitly entered draw mode.
-               Without this gate, a thumb-swipe through the silhouette while
-               the kid is just looking at their figure would get captured as
-               a stroke. With it, touches pass through to the page and the
-               browser uses the canvas's touch-action: pan-y to scroll. */
-            if (isPlaying || !isDrawMode) return;
+            /* Drawing is always on (no explicit "draw mode" gate). The
+               canvas's touch-action: pan-y means the browser routes
+               mostly-vertical drags to page scroll instead of firing
+               pointer events here, so a thumb passing through the
+               silhouette to scroll still works. Horizontal / diagonal
+               drags get captured for strokes. */
+            if (isPlaying) return;
             try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
             /* Cache the rect once per stroke so subsequent pointermove
                events skip the getBoundingClientRect layout read. */
@@ -1002,7 +1005,7 @@
         });
 
         canvas.addEventListener('pointermove', (e) => {
-            if (!isDrawing || isPlaying || !isDrawMode) return;
+            if (!isDrawing || isPlaying) return;
             const p = getPos(e);
             if (isErasing) {
                 ctx.save();
@@ -1046,27 +1049,6 @@
            when the kid starts over. trackClearDrawing is a no-op for
            any other counters. */
         if (state) trackClearDrawing();
-    }
-
-    /* ============ DRAW MODE ============ */
-
-    /* Default state is VIEW: the canvas is a passive picture, swipes scroll
-       the page. Entering DRAW mode flips touch-action via a CSS class and
-       lets pointerdown actually capture strokes. */
-    function setDrawMode(on) {
-        isDrawMode = !!on;
-        if (canvas) canvas.classList.toggle('drawing-active', isDrawMode);
-        const btn = document.getElementById('drawModeBtn');
-        if (btn) {
-            btn.classList.toggle('active', isDrawMode);
-            btn.setAttribute('aria-pressed', isDrawMode ? 'true' : 'false');
-            btn.textContent = isDrawMode ? '✓ DONE' : '✏️ DRAW';
-        }
-        if (!isDrawMode) {
-            /* Cancel any in-flight stroke so the next entry into draw mode
-               doesn't think we're mid-drag. */
-            isDrawing = false;
-        }
     }
 
     /* ============ TOOLS UI ============ */
@@ -1192,11 +1174,6 @@
 
     function startDance() {
         if (isPlaying) return;
-        /* Hard-exit draw mode on the way into dance — even though
-           pointer-events: none stops new strokes, leaving drawing-active
-           on the canvas would block page scroll over the figure while
-           it's animating. */
-        setDrawMode(false);
         /* Pressing DANCE finishes the current drawing (commits it as a
            groodle). drawingsFinished and First/Five Groodle hinge on this
            — it's the only moment in the game with a clear "I'm done"
@@ -1331,10 +1308,6 @@
     function attachHandlers() {
         document.getElementById('clearBtn').addEventListener('click', clearCanvas);
         document.getElementById('randomBtn').addEventListener('click', drawSurprise);
-
-        document.getElementById('drawModeBtn').addEventListener('click', () => {
-            setDrawMode(!isDrawMode);
-        });
 
         document.getElementById('openAchievementsBtn').addEventListener('click', openAchievements);
         document.getElementById('openHatShopBtn').addEventListener('click', openHatShop);

@@ -407,31 +407,22 @@ body.dancing .stage {
     width: 100%;
     height: 100%;
     z-index: 2;
-    /* Default: allow the page to scroll/zoom right through the canvas so a
-       thumb swipe doesn't get hijacked. Drawing mode opts in below by
-       toggling .drawing-active on the element via game.js. */
+    /* Allow vertical page scroll + pinch-zoom right through the canvas
+       so a thumb swipe doesn't get hijacked; the browser's gesture
+       heuristic gives mostly-horizontal / diagonal drags to the canvas
+       as pointer events for drawing. No explicit "draw mode" gate —
+       drawing works on first touch. */
     touch-action: pan-y pinch-zoom;
-    cursor: default;
+    cursor: crosshair;
     /* Drawing is clipped to the silhouette inside game.js via ctx.clip()
        on a Path2D built from BODY_SHAPES — see buildBodyPath() / buildCanvas.
        That clip is the single source of truth for "the drawable area";
        a CSS clip-path here would just duplicate the same mask. */
 }
 
-/* Active drawing mode: single-finger touches are captured for strokes.
-   Two-finger gestures (pinch-zoom) are still allowed so kids/parents can
-   zoom in on the work without leaving draw mode. */
-.draw-canvas.drawing-active {
-    touch-action: pinch-zoom;
-    cursor: crosshair;
-}
-
 body.dancing .draw-canvas {
     cursor: default;
     pointer-events: none;
-    /* Belt-and-braces: even if drawing-active leaked in somehow, dance mode
-       must never capture page scroll. */
-    touch-action: pan-y pinch-zoom;
 }
 
 .stage-floor {
@@ -589,10 +580,16 @@ body.dancing .left-hud { display: none; }
     max-height: 88vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    /* Hide the native scrollbar — kept scroll behavior, dropped the
+       chrome. The kid-friendly visual stays unbroken by a system
+       scrollbar gutter. */
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* legacy IE / Edge */
     transform: translateY(100%);
     transition: transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1);
     box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.5);
 }
+.modal-sheet::-webkit-scrollbar { display: none; }  /* WebKit (Chrome / Safari) */
 .modal.open .modal-sheet { transform: translateY(0); }
 
 @media (min-width: 720px) {
@@ -1125,85 +1122,6 @@ body.dancing .left-hud { display: none; }
 }
 
 .actions { gap: 8px; }
-
-/* ============ DRAW-MODE ROW (above the canvas) ============ */
-
-/* Sits immediately above .stage-wrap. The button is the first thing a
-   visitor sees when they look at the figure — "tap here to start
-   scribbling" energy. Hidden during dance because drawing is locked
-   off then; we use display:none so the row collapses and the canvas
-   sits higher rather than leaving an empty gap. */
-.draw-mode-row {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    width: min(94vw, 380px);
-    gap: 4px;
-}
-
-body.dancing .draw-mode-row {
-    display: none;
-}
-
-.draw-mode-btn {
-    /* Wider than a normal .btn — fills the canvas width visually so it
-       reads as "the entry point to the canvas below". Flat bottom so it
-       feels physically attached to the stage. */
-    width: 100%;
-    border-radius: 16px 16px 6px 6px;
-    font-size: 18px;
-    padding: 14px 18px;
-    /* Direct pink → teal so DRAW reads as a distinct gradient from the
-       3-stop DANCE button below, and so the button has no warm/peach
-       midtone (peach was reading as cream-adjacent on small screens). */
-    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
-    color: #1a0f33;
-    border: 3px solid rgba(255, 255, 255, 0.5);
-    box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.4),
-        0 0 24px rgba(255, 110, 199, 0.35);
-    /* Gentle pulse so the affordance reads at-a-glance on first paint
-       without being annoying. Stops once the user has clicked it (any
-       .drawing-active state ends the pulse). */
-    animation: drawCue 2.6s ease-in-out infinite;
-}
-
-.draw-mode-btn.active {
-    /* Drawing in progress — calm the button down and shift to a "stop"
-       palette so it reads as a different control. */
-    background: linear-gradient(135deg, #00ffcc 0%, #43aa8b 100%);
-    box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.4),
-        0 0 18px rgba(0, 255, 204, 0.4);
-    animation: none;
-}
-
-@keyframes drawCue {
-    0%, 100% { transform: scale(1);    box-shadow: 0 4px 0 rgba(0,0,0,0.4), 0 0 24px rgba(255, 110, 199, 0.35); }
-    50%      { transform: scale(1.02); box-shadow: 0 6px 0 rgba(0,0,0,0.4), 0 0 32px rgba(255, 110, 199, 0.55); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .draw-mode-btn { animation: none; }
-}
-
-/* Small teaching line under the button. Touch-only — on desktop the
-   pointer makes the mode self-evident. */
-.draw-hint {
-    margin: 0;
-    font-family: var(--font-body);
-    font-size: 12px;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.65);
-    line-height: 1.35;
-}
-.draw-hint strong {
-    color: #00ffcc;
-    font-weight: bold;
-}
-@media (hover: hover) and (pointer: fine) {
-    .draw-hint { display: none; }
-}
 
 /* ============ BUTTONS ============ */
 
