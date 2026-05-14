@@ -567,6 +567,78 @@
        so we sell rotation via animated wedges on the wheel platform.
        ============================================================ */
 
+    /* Clay types — chunk A of Day 4. Each entry drives the body
+       gradient (left-edge -> center -> right-edge stops), the
+       outline, the highlight tint, the fired overlay color, and
+       the small picker-swatch color. Currently selected type is
+       SHAPE.clayTypeId; the gallery preserves each entry's type
+       so a porcelain pot stays porcelain in the vault. Galaxy
+       is the weird one — exists for the modder.                */
+    const CLAY_TYPES = [
+        {
+            id: "earthenware",
+            label: "EARTH",
+            flavor: "Common red clay. The default.",
+            unfired: ["#2c1306", "#5a2b14", "#a25a2c", "#b06a36",
+                      "#7a3d1a", "#2c1306"],
+            swatch: "#a25a2c",
+            firedTint: "rgba(180, 70, 22, 0.22)",
+            outline:   "#1f0a02",
+            highlight: "rgba(255, 224, 184, 0.34)"
+        },
+        {
+            id: "porcelain",
+            label: "PORCY",
+            flavor: "Smooth white. Very expensive.",
+            unfired: ["#9a8d7c", "#cdc1ad", "#ebe3cf", "#f4eddb",
+                      "#cfc4af", "#9a8d7c"],
+            swatch: "#ebe3cf",
+            firedTint: "rgba(255, 218, 175, 0.16)",
+            outline:   "#5a4e40",
+            highlight: "rgba(255, 255, 240, 0.45)"
+        },
+        {
+            id: "stoneware",
+            label: "STONE",
+            flavor: "Speckled gray-brown. Practical.",
+            unfired: ["#241f1a", "#4d4338", "#7e7361", "#8a7e69",
+                      "#5a5042", "#241f1a"],
+            swatch: "#7e7361",
+            firedTint: "rgba(120, 90, 60, 0.22)",
+            outline:   "#1a1612",
+            highlight: "rgba(255, 245, 220, 0.34)"
+        },
+        {
+            id: "basalt",
+            label: "BASALT",
+            flavor: "Volcanic charcoal black.",
+            unfired: ["#070707", "#1c1a17", "#3b342e", "#433c34",
+                      "#22201c", "#070707"],
+            swatch: "#1c1a17",
+            firedTint: "rgba(40, 35, 30, 0.34)",
+            outline:   "#000000",
+            highlight: "rgba(140, 120, 105, 0.48)"
+        },
+        {
+            id: "galaxy",
+            label: "GALAXY",
+            flavor: "Deep blue. Shimmers if you tilt it.",
+            unfired: ["#03060f", "#0d1338", "#1e2880", "#2c3aa0",
+                      "#111a52", "#03060f"],
+            swatch: "#1e2880",
+            firedTint: "rgba(90, 60, 200, 0.30)",
+            outline:   "#02030a",
+            highlight: "rgba(185, 205, 255, 0.55)"
+        }
+    ];
+
+    function currentClay() {
+        for (let i = 0; i < CLAY_TYPES.length; i++) {
+            if (CLAY_TYPES[i].id === SHAPE.clayTypeId) return CLAY_TYPES[i];
+        }
+        return CLAY_TYPES[0];
+    }
+
     const SHAPE = {
         /* Logical canvas size. Display scales via CSS aspect-ratio;
            backing store is W*dpr × H*dpr. */
@@ -575,6 +647,10 @@
         centerX: 200,
         baseY:  510,    /* pot base sits here, on the wheel */
         topY:   95,     /* fully-extended pot rim height */
+
+        /* Clay material — see CLAY_TYPES above. Swap via the
+           clay-picker tray on the shape screen. */
+        clayTypeId: "earthenware",
 
         /* Sample model */
         N:      28,
@@ -629,6 +705,7 @@
         resetClay();
         attachShapePointer();
         wireShapeButtons();
+        buildClayPicker();
 
         /* DPR can change on display swap. Re-size when the canvas
            is reflowed (cheap — only rebuilds the backing store). */
@@ -636,6 +713,44 @@
             const ro = new ResizeObserver(function () { sizeShapeCanvas(); });
             ro.observe(canvas);
         }
+    }
+
+    function buildClayPicker() {
+        const pick = document.getElementById("clayPicker");
+        if (!pick) return;
+        /* Wipe existing swatches (keep the row label that's in HTML) */
+        Array.from(pick.querySelectorAll(".clay-swatch")).forEach(function (b) {
+            b.remove();
+        });
+        CLAY_TYPES.forEach(function (mat) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "clay-swatch";
+            btn.dataset.clay = mat.id;
+            btn.title = mat.flavor;
+            btn.setAttribute("aria-label", mat.label + " clay — " + mat.flavor);
+
+            const disc = document.createElement("span");
+            disc.className = "clay-disc";
+            disc.style.background = mat.swatch;
+            btn.appendChild(disc);
+
+            const name = document.createElement("span");
+            name.className = "clay-name";
+            name.textContent = mat.label;
+            btn.appendChild(name);
+
+            if (mat.id === SHAPE.clayTypeId) btn.classList.add("active");
+            btn.addEventListener("click", function () { setClay(mat.id); });
+            pick.appendChild(btn);
+        });
+    }
+
+    function setClay(clayTypeId) {
+        SHAPE.clayTypeId = clayTypeId;
+        document.querySelectorAll(".clay-swatch[data-clay]").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.clay === clayTypeId);
+        });
     }
 
     function sizeShapeCanvas() {
@@ -867,7 +982,9 @@
             buildPotPath(ctx);
             ctx.clip();
             ctx.globalCompositeOperation = "overlay";
-            ctx.fillStyle = "rgba(180, 70, 22, 0.20)";
+            /* Per-clay fired tint — porcelain stays cream, basalt
+               glazes nearly black, galaxy gets a violet shift. */
+            ctx.fillStyle = currentClay().firedTint;
             ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
             ctx.globalCompositeOperation = "source-over";
             /* Subtle gloss highlight on top to feel "vitrified" */
@@ -1038,16 +1155,19 @@
         ctx.fill();
         ctx.restore();
 
-        /* Fill pot body */
+        /* Fill pot body — gradient stops come from the active clay
+           material so porcelain reads cream, basalt reads charcoal,
+           galaxy reads deep-blue, etc.                              */
+        const mat = currentClay();
         buildPotPath(ctx);
-
         const grad = ctx.createLinearGradient(cx - maxR, 0, cx + maxR, 0);
-        grad.addColorStop(0.00, "#2c1306");
-        grad.addColorStop(0.18, "#5a2b14");
-        grad.addColorStop(0.42, "#a25a2c");
-        grad.addColorStop(0.55, "#b06a36");
-        grad.addColorStop(0.78, "#7a3d1a");
-        grad.addColorStop(1.00, "#2c1306");
+        const stops = mat.unfired;
+        grad.addColorStop(0.00, stops[0]);
+        grad.addColorStop(0.18, stops[1]);
+        grad.addColorStop(0.42, stops[2]);
+        grad.addColorStop(0.55, stops[3]);
+        grad.addColorStop(0.78, stops[4]);
+        grad.addColorStop(1.00, stops[5]);
         ctx.fillStyle = grad;
         ctx.fill();
 
@@ -1056,10 +1176,13 @@
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
+        const hlColor = mat.highlight;
+        /* derive 0-alpha variant of the same color for the edges */
+        const hlEdge = hlColor.replace(/[\d.]+\)$/, "0)");
         const hl = ctx.createLinearGradient(cx - 36, 0, cx + 14, 0);
-        hl.addColorStop(0,   "rgba(255, 224, 184, 0)");
-        hl.addColorStop(0.5, "rgba(255, 224, 184, 0.34)");
-        hl.addColorStop(1,   "rgba(255, 224, 184, 0)");
+        hl.addColorStop(0,   hlEdge);
+        hl.addColorStop(0.5, hlColor);
+        hl.addColorStop(1,   hlEdge);
         ctx.fillStyle = hl;
         ctx.fillRect(cx - 40, clay[N - 1].y - 4, 60, SHAPE.baseY - clay[N - 1].y + 14);
 
@@ -1079,7 +1202,7 @@
 
         /* Outline */
         buildPotPath(ctx);
-        ctx.strokeStyle = "#1f0a02";
+        ctx.strokeStyle = mat.outline;
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
@@ -2666,6 +2789,7 @@
                 clay: SHAPE.clay.map(function (c) {
                     return { y: c.y, radius: c.radius };
                 }),
+                clayTypeId: SHAPE.clayTypeId,
                 paintDataUrl: (D.paintCanvas)
                     ? D.paintCanvas.toDataURL("image/png")
                     : null,
@@ -3338,7 +3462,9 @@
     function renderSavedPot(ctx, entry, opts) {
         opts = opts || {};
         const savedClay = SHAPE.clay;
+        const savedClayTypeId = SHAPE.clayTypeId;
         SHAPE.clay = entry.clay || SHAPE.clay;
+        if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
         try {
             if (opts.background !== false) {
                 ctx.fillStyle = "#0c1f25";
@@ -3383,6 +3509,7 @@
             drawRim(ctx);
         } finally {
             SHAPE.clay = savedClay;
+            SHAPE.clayTypeId = savedClayTypeId;
         }
     }
 
