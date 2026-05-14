@@ -1974,20 +1974,43 @@
         ctx.fillStyle = grad;
         ctx.fill();
 
-        /* Highlight strip near the centerline (offset slightly left to
-           sell light coming from the upper-left). */
+        /* Highlight strip — rolls left/right as the wheel spins
+           in SHAPE mode (sells the rotation that a symmetric
+           silhouette can't show by itself). In DECORATE the
+           wheel is conceptually stopped so we render the
+           highlight at its original static offset. In KILN it
+           animates with the kiln's spin.                       */
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
         const hlColor = mat.highlight;
-        /* derive 0-alpha variant of the same color for the edges */
-        const hlEdge = hlColor.replace(/[\d.]+\)$/, "0)");
-        const hl = ctx.createLinearGradient(cx - 36, 0, cx + 14, 0);
-        hl.addColorStop(0,   hlEdge);
-        hl.addColorStop(0.5, hlColor);
-        hl.addColorStop(1,   hlEdge);
-        ctx.fillStyle = hl;
-        ctx.fillRect(cx - 40, clay[N - 1].y - 4, 60, SHAPE.baseY - clay[N - 1].y + 14);
+        const hlAlphaMatch = hlColor.match(/([\d.]+)\)\s*$/);
+        const baseAlpha = hlAlphaMatch ? parseFloat(hlAlphaMatch[1]) : 0.34;
+        const hlEdge = hlColor.replace(/[\d.]+\)\s*$/, "0)");
+
+        let hlX, alphaMult;
+        if (currentScreen === "decorate") {
+            hlX = cx - 11;          /* original static position */
+            alphaMult = 1.0;
+        } else {
+            const phase = SHAPE.wheelPhase;
+            const visibility = Math.max(0, Math.cos(phase));
+            hlX = cx + Math.sin(phase) * (maxR * 0.55);
+            alphaMult = visibility;
+        }
+
+        if (alphaMult > 0.02) {
+            const dynamicAlpha = (baseAlpha * alphaMult).toFixed(3);
+            const fullColor = hlColor.replace(/[\d.]+\)\s*$/,
+                                              dynamicAlpha + ")");
+            const hl = ctx.createLinearGradient(hlX - 25, 0, hlX + 25, 0);
+            hl.addColorStop(0,   hlEdge);
+            hl.addColorStop(0.5, fullColor);
+            hl.addColorStop(1,   hlEdge);
+            ctx.fillStyle = hl;
+            ctx.fillRect(hlX - 30, clay[N - 1].y - 4,
+                         60, SHAPE.baseY - clay[N - 1].y + 14);
+        }
 
         /* Faint horizontal throwing rings (potter's mark) — only
            visible where the clay catches the light. */
@@ -3694,10 +3717,10 @@
         const dt = Math.min(48, t - D.lastT);
         D.lastT = t;
 
-        /* Wheel keeps spinning while decorating — same state as SHAPE. */
-        SHAPE.wheelPhase += (2 * Math.PI * SHAPE.WHEEL_RPM / 60) * (dt / 1000);
-        if (SHAPE.wheelPhase > Math.PI * 2) SHAPE.wheelPhase -= Math.PI * 2;
-
+        /* Wheel is FROZEN in decorate so the pot reads as "off
+           the wheel" while you paint. drawPot also keys off
+           currentScreen to pin the highlight strip to a static
+           offset instead of animating it. */
         renderPotScene(D.ctx, { paintCanvas: D.paintCanvas, particles: false });
         D.rafId = requestAnimationFrame(decorateFrame);
     }
