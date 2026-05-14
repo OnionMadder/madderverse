@@ -2449,6 +2449,118 @@
         return GLAZE_PACKS[0];
     }
 
+    /* ============================================================
+       MEGA PACK — Day 5 chunk D
+       ============================================================
+       Custom PNG stamps the user commits to assets/patterns/.
+       To add a stamp:
+         1. Drop a PNG (transparent bg recommended) into
+            lets-crayte-pootery/assets/patterns/
+         2. Add an entry to MEGA_STAMP_FILES below with a unique
+            id (becomes the pattern id) + the filename
+         3. Commit + push — the next page load will show the
+            stamp in the MEGA tab.
+       The pack stays hidden until at least one stamp is
+       registered, so an empty manifest doesn't pollute the
+       tab strip.
+       ============================================================ */
+
+    const MEGA_PACK = {
+        id: "mega",
+        label: "MEGA",
+        glazes: [
+            "#ff2e88", "#33ff66", "#ffea00",
+            "#00d4ff", "#ff8c1a", "#9534d8", "#f4f6ea"
+        ],
+        patterns: []
+    };
+
+    /* Stamp manifest. Add entries here as you commit PNGs.
+       Example (uncomment AFTER the file lands in the folder):
+
+           { id: "shrek",     file: "shrek.png" },
+           { id: "doge",      file: "doge.png" },
+           { id: "rare-pepe", file: "rare-pepe.png" }
+    */
+    const MEGA_STAMP_FILES = [
+        // { id: "your-stamp", file: "your-stamp.png" },
+    ];
+
+    /* Image cache — populated by loadMegaStamps so the PATTERN
+       drawer can reach the HTMLImageElement on each render. */
+    const MEGA_IMAGES = Object.create(null);
+
+    function megaStampDrawer(id) {
+        return function (ctx, x, y, r, _c) {
+            const img = MEGA_IMAGES[id];
+            const size = r * 1.9;
+            if (img && img.complete && img.naturalWidth > 0) {
+                ctx.save();
+                /* Preserve aspect ratio: fit the image within a
+                   2r x 2r box and center. */
+                const ratio = img.naturalWidth / img.naturalHeight;
+                let w = size * 2;
+                let h = size * 2;
+                if (ratio > 1) h = w / ratio;
+                else if (ratio < 1) w = h * ratio;
+                ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
+                ctx.restore();
+            } else {
+                /* Not loaded yet — placeholder ring so the stamp
+                   doesn't render as a void. Replaced once onload
+                   fires + the UI rebuilds. */
+                ctx.strokeStyle = "rgba(255, 46, 136, 0.55)";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        };
+    }
+
+    function loadMegaStamps() {
+        if (!MEGA_STAMP_FILES || MEGA_STAMP_FILES.length === 0) return;
+
+        let registered = 0;
+        MEGA_STAMP_FILES.forEach(function (entry) {
+            if (!entry || !entry.id || !entry.file) return;
+            if (MEGA_PACK.patterns.indexOf(entry.id) >= 0) return;
+
+            const img = new Image();
+            /* Same-origin requests don't need CORS; if a user ever
+               moves PNGs to an external host they should set
+               img.crossOrigin = "anonymous" here. */
+            img.onload = function () {
+                /* Rebuild the decorate palette so the placeholder
+                   icon swaps to the real image. */
+                if (currentScreen === "decorate" &&
+                    typeof buildToolUI === "function") {
+                    buildToolUI();
+                }
+            };
+            img.onerror = function () {
+                console.warn("[CRAYte] mega stamp missing: " + entry.file);
+            };
+            img.src = "assets/patterns/" + entry.file;
+            MEGA_IMAGES[entry.id] = img;
+
+            PATTERN_DRAWERS[entry.id] = megaStampDrawer(entry.id);
+            MEGA_PACK.patterns.push(entry.id);
+            registered++;
+        });
+
+        if (registered > 0 && GLAZE_PACKS.indexOf(MEGA_PACK) < 0) {
+            GLAZE_PACKS.push(MEGA_PACK);
+        }
+    }
+
+    /* Register on module eval — happens after PATTERN_DRAWERS is
+       defined and before init() so the MEGA pack is ready when
+       decorate first mounts. */
+    loadMegaStamps();
+
     /* The MODDED pack's "@rgb-cycle" glaze cycles through HSL in
        real time. Strokes / stamps placed with it capture the
        current cycle color at paint time, so a single stroke
