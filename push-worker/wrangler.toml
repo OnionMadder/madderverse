@@ -1,0 +1,53 @@
+# ----------------------------------------------------------------
+# Madderverse push gateway — Cloudflare Worker
+# ----------------------------------------------------------------
+# Deploy with:   wrangler deploy
+# Local dev:     wrangler dev
+# Tail logs:     wrangler tail
+#
+# Before the first deploy you must:
+#   1) wrangler login
+#   2) wrangler kv:namespace create SUBSCRIPTIONS         # paste id below
+#   3) wrangler kv:namespace create SUBSCRIPTIONS --preview  # paste preview_id below
+#   4) wrangler secret put VAPID_PUBLIC_KEY    (base64url)
+#      wrangler secret put VAPID_PRIVATE_KEY   (base64url)
+#      wrangler secret put VAPID_SUBJECT       (mailto:you@example.com)
+#      wrangler secret put ADMIN_TOKEN         (random opaque string)
+#   5) Add the custom domain push.onionmadder.rocks via the
+#      Cloudflare dashboard (Workers & Pages -> this worker ->
+#      Triggers -> Custom Domains), which provisions DNS for you.
+# ----------------------------------------------------------------
+
+name = "madderverse-push"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = false
+
+# Custom domain is provisioned via the dashboard (Custom Domains),
+# not via routes, so DNS + TLS cert get handled automatically. If
+# you'd rather declare it in code, uncomment the route block below
+# AFTER push.onionmadder.rocks resolves through Cloudflare.
+#
+# [[routes]]
+# pattern = "push.onionmadder.rocks/*"
+# custom_domain = true
+
+# KV namespace for subscription records.
+# Run `wrangler kv:namespace create SUBSCRIPTIONS` and paste the
+# returned id here. Also create --preview for `wrangler dev`.
+[[kv_namespaces]]
+binding = "SUBSCRIPTIONS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_KV_NAMESPACE_PREVIEW_ID"
+
+# Non-secret config. Bump CORS_ALLOW_ORIGINS if you host another
+# Madderverse property that needs to subscribe.
+[vars]
+CORS_ALLOW_ORIGINS = "https://madderverse.org,https://www.madderverse.org,http://localhost:8000,http://127.0.0.1:8000"
+DEFAULT_TOPICS     = "pack-drop,battle-start,battle-end"
+
+# Observability — keeps `wrangler tail` useful without enabling
+# the paid log-push product.
+[observability]
+enabled = true
