@@ -678,7 +678,10 @@ a:focus-visible {
     max-width: 420px;
 }
 
-/* Clay picker (Day 4 chunk A — material selection) */
+/* Clay picker (Day 4 chunk A — material selection)
+   Matches the GLAZE/STAMPS palette pattern: label fixed-width on
+   the left, swatches in a horizontal-scroll row to the right so
+   nothing gets cut off when there are more clays than fit. */
 .clay-picker {
     display: flex;
     align-items: center;
@@ -690,10 +693,23 @@ a:focus-visible {
     box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.45);
     width: 100%;
     max-width: 420px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--teal-low) transparent;
+    -webkit-overflow-scrolling: touch;
+}
+
+.clay-picker::-webkit-scrollbar       { height: 6px; }
+.clay-picker::-webkit-scrollbar-track { background: transparent; }
+.clay-picker::-webkit-scrollbar-thumb {
+    background: var(--teal-low);
+    border-radius: 3px;
 }
 
 .clay-picker .row-label {
     min-width: 44px;
+    flex: 0 0 auto;
     font-family: var(--font-mono);
     font-size: 10px;
     letter-spacing: 1.4px;
@@ -702,12 +718,13 @@ a:focus-visible {
 }
 
 .clay-swatch {
-    flex: 1;
+    flex: 0 0 auto;
+    min-width: 56px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 6px 4px;
+    padding: 6px 8px;
     background: var(--bg-panel);
     border: 1px solid var(--teal-low);
     border-radius: var(--radius-sm);
