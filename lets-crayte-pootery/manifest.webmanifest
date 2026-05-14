@@ -1,0 +1,36 @@
+{
+  "name": "Let's CRAYte! Pootery",
+  "short_name": "Pootery",
+  "description": "Shape clay on a spinning wheel, decorate it, fire it. Public gallery + pot battles.",
+  "id": "/lets-crayte-pootery/",
+  "start_url": "/lets-crayte-pootery/",
+  "scope": "/lets-crayte-pootery/",
+  "display": "standalone",
+  "display_override": ["standalone", "fullscreen", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "theme_color": "#ff2e88",
+  "background_color": "#06141a",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://madderverse.org/assets/favi/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

@@ -20,12 +20,22 @@
     <meta name="twitter:description" content="Shape clay on a spinning wheel, decorate with cursed glazes, fire it in the kiln." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
     <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
-    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <!-- Pootery-specific manifest (replaces the hub-wide one for this game)
+         so "Add to Home Screen" installs Pootery as its own app, not the
+         Madderverse hub. -->
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
     <meta name="theme-color" content="#ff2e88" />
-    <meta name="apple-mobile-web-app-title" content="CRAYte Pootery" />
+    <!-- iOS PWA: full-screen + black-translucent status bar match the
+         onioncore palette. Without these the app launches in a Safari-
+         chrome window even when installed to the Home Screen. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pootery" />
     <meta name="application-name" content="Let's CRAYte! Pootery" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -76,6 +86,13 @@
             <button class="big-btn" id="btnTrophies" type="button">
                 <span class="btn-label">TROPHIES</span>
                 <span class="btn-glyph" aria-hidden="true">&#9733;</span>
+            </button>
+            <!-- Install button — hidden by default; revealed when
+                 the browser fires beforeinstallprompt OR when we
+                 detect iOS Safari + not yet installed. -->
+            <button class="big-btn install" id="btnInstall" type="button" hidden>
+                <span class="btn-label">INSTALL APP</span>
+                <span class="btn-glyph" aria-hidden="true">&darr;</span>
             </button>
         </div>
 

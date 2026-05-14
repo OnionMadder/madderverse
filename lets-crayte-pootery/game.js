@@ -95,6 +95,98 @@
             });
     }
 
+    /* ---------- 0c. PWA INSTALL ----------
+       Service worker registration + Add-to-Home-Screen prompt.
+       Android Chrome / Edge fire `beforeinstallprompt` before
+       letting us call .prompt() on it later (must be triggered
+       by a user gesture). iOS Safari doesn't fire that event —
+       users have to use the share-sheet "Add to Home Screen",
+       so we surface a hint instead. Once installed, the launch
+       runs with display-mode: standalone — we hide the button.
+       ============================================================ */
+
+    let deferredInstallPrompt = null;
+
+    function isStandaloneInstalled() {
+        return window.matchMedia("(display-mode: standalone)").matches
+            || window.navigator.standalone === true;   /* iOS legacy */
+    }
+
+    function isIOSLike() {
+        const ua = navigator.userAgent || "";
+        return /iPhone|iPad|iPod/.test(ua);
+    }
+
+    /* Register the SW once (no-op if already controlling). The
+       browser handles update detection; cache invalidation lives
+       in sw.js via CACHE_VERSION. */
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function () {
+            navigator.serviceWorker.register("sw.js", { scope: "./" })
+                .catch(function (e) {
+                    console.warn("[CRAYte] SW register failed", e);
+                });
+        });
+    }
+
+    /* Capture the install prompt event the moment the browser
+       decides we're installable. Don't call .prompt() yet —
+       that requires a user gesture, so we stash it until the
+       INSTALL APP button is clicked. */
+    window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        const btn = document.getElementById("btnInstall");
+        if (btn && !isStandaloneInstalled()) btn.hidden = false;
+    });
+
+    /* Browser tells us the install finished — clean up. */
+    window.addEventListener("appinstalled", function () {
+        deferredInstallPrompt = null;
+        const btn = document.getElementById("btnInstall");
+        if (btn) btn.hidden = true;
+    });
+
+    function wireInstallButton() {
+        const btn = document.getElementById("btnInstall");
+        if (!btn) return;
+        /* iOS path: no beforeinstallprompt, but we still want to
+           tell the user how to install. Show the button if we're
+           on iOS Safari + not already installed. */
+        if (isIOSLike() && !isStandaloneInstalled()) {
+            btn.hidden = false;
+        }
+        /* Hide if already running as an installed app */
+        if (isStandaloneInstalled()) btn.hidden = true;
+
+        btn.addEventListener("click", function () {
+            if (deferredInstallPrompt) {
+                /* Android / Chromium — native prompt. */
+                deferredInstallPrompt.prompt();
+                deferredInstallPrompt.userChoice.then(function (choice) {
+                    if (choice && choice.outcome === "accepted") {
+                        btn.hidden = true;
+                    }
+                    deferredInstallPrompt = null;
+                });
+            } else if (isIOSLike()) {
+                /* iOS — share-sheet instructions. */
+                alert(
+                    "To install:\n\n" +
+                    "1. Tap the share button (square with an up-arrow)\n" +
+                    "2. Scroll down to \"Add to Home Screen\"\n" +
+                    "3. Tap Add"
+                );
+            } else {
+                /* Desktop / unknown — generic hint. */
+                alert(
+                    "Use your browser menu and pick " +
+                    "\"Install app\" or \"Add to Home Screen\"."
+                );
+            }
+        });
+    }
+
     /* ---------- 0b. POT BATTLES (Day 5 chunk F) ----------
        Backend helpers for the battles / battle_entries /
        battle_votes tables. UI lives in the BATTLES gallery tab
@@ -725,6 +817,7 @@
         });
 
         wireSpecsPanel();
+        wireInstallButton();
     }
 
     /* Temporary "feature not built yet" feedback. Swaps the button

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Let's CRAYte! Pootery">
+  <!-- Square with rounded corners — pink onioncore frame -->
+  <rect width="512" height="512" rx="96" fill="#ff2e88"/>
+  <rect x="28" y="28" width="456" height="456" rx="80" fill="#0c1f25"/>
+
+  <!-- Inner teal frame -->
+  <rect x="44" y="44" width="424" height="424" rx="68" fill="none" stroke="#00ffcc" stroke-width="3" stroke-opacity="0.4"/>
+
+  <!-- Pot body — clay gradient -->
+  <defs>
+    <linearGradient id="clay" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"    stop-color="#2c1306"/>
+      <stop offset="0.20" stop-color="#5a2b14"/>
+      <stop offset="0.45" stop-color="#a25a2c"/>
+      <stop offset="0.55" stop-color="#b06a36"/>
+      <stop offset="0.80" stop-color="#7a3d1a"/>
+      <stop offset="1"    stop-color="#2c1306"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Wheel base -->
+  <ellipse cx="256" cy="400" rx="140" ry="20" fill="#1a3942"/>
+  <ellipse cx="256" cy="400" rx="140" ry="20" fill="none" stroke="#0c2228" stroke-width="3"/>
+
+  <!-- Pot silhouette (slight vase shape) -->
+  <path d="M180 400 Q156 320 170 230 Q176 200 200 200 L312 200 Q336 200 342 230 Q356 320 332 400 Q322 410 256 410 Q190 410 180 400 Z"
+        fill="url(#clay)" stroke="#1a0e08" stroke-width="3"/>
+
+  <!-- Rim opening (dark ellipse) -->
+  <ellipse cx="256" cy="204" rx="58" ry="10" fill="#1a0904"/>
+  <ellipse cx="256" cy="204" rx="58" ry="10" fill="none" stroke="#3c1806" stroke-width="2"/>
+
+  <!-- Highlight strip -->
+  <rect x="232" y="220" width="14" height="170" fill="#ffe0b8" opacity="0.28" rx="3"/>
+
+  <!-- "POOT" chunky label at the bottom -->
+  <g transform="translate(256 458)">
+    <text text-anchor="middle"
+          font-family="Impact, 'Bungee', 'Haettenschweiler', 'Arial Narrow Bold', sans-serif"
+          font-size="38" font-weight="900"
+          fill="#00ffcc"
+          stroke="#000" stroke-width="3"
+          paint-order="stroke fill"
+          letter-spacing="3">POOT</text>
+  </g>
+</svg>

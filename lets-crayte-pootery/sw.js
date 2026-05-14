@@ -1,0 +1,117 @@
+/* ============================================================
+   Let's CRAYte! Pootery — service worker
+   ============================================================
+   Makes the app installable + offline-capable on phones.
+
+   Caching strategies:
+   - HTML / navigations: network-first (so the latest build
+     lands the moment the user's online; falls back to cache
+     when offline).
+   - Static assets (CSS/JS/SVG/manifest): cache-first; on a
+     hit we still kick off a background fetch to keep the
+     cache fresh.
+   - Supabase + any cross-origin requests: never intercepted
+     (the public gallery / battles need live data).
+   - POST/PUT/DELETE: pass through, never cached.
+
+   Cache invalidation:
+   - Bump CACHE_VERSION on every release that ships a new
+     asset list or wants to force a clean install.
+   - activate() deletes any cache that doesn't match the
+     current version.
+   ============================================================ */
+
+const CACHE_VERSION = "pootery-v1";
+const SCOPE = "/lets-crayte-pootery/";
+
+const PRECACHE_URLS = [
+    SCOPE,
+    SCOPE + "index.html",
+    SCOPE + "style.css",
+    SCOPE + "game.js",
+    SCOPE + "manifest.webmanifest",
+    SCOPE + "icons/icon.svg",
+    SCOPE + "icons/icon-maskable.svg",
+    /* Shared hub asset — the slim footer stylesheet is loaded
+       by index.html. */
+    "/assets/css/site-footer.css"
+];
+
+self.addEventListener("install", function (event) {
+    event.waitUntil(
+        caches.open(CACHE_VERSION).then(function (cache) {
+            /* addAll fails atomically if any URL 404s — wrap
+               each one so a missing asset doesn't kill the
+               whole install. */
+            return Promise.all(PRECACHE_URLS.map(function (u) {
+                return cache.add(u).catch(function (e) {
+                    console.warn("[CRAYte-sw] precache miss:", u, e);
+                });
+            }));
+        }).then(function () { return self.skipWaiting(); })
+    );
+});
+
+self.addEventListener("activate", function (event) {
+    event.waitUntil(
+        caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (k) {
+                if (k !== CACHE_VERSION) return caches.delete(k);
+                return null;
+            }));
+        }).then(function () { return self.clients.claim(); })
+    );
+});
+
+self.addEventListener("fetch", function (event) {
+    const req = event.request;
+    const url = new URL(req.url);
+
+    /* Bypass: cross-origin (Supabase, GoatCounter, Google
+       Fonts, etc.) and non-GET. */
+    if (url.origin !== self.location.origin) return;
+    if (req.method !== "GET") return;
+
+    /* HTML / page navigations -> network-first. */
+    if (req.mode === "navigate" || req.destination === "document") {
+        event.respondWith(
+            fetch(req)
+                .then(function (res) {
+                    /* Update cache silently in the background. */
+                    const copy = res.clone();
+                    caches.open(CACHE_VERSION).then(function (c) {
+                        c.put(req, copy);
+                    });
+                    return res;
+                })
+                .catch(function () { return caches.match(req); })
+        );
+        return;
+    }
+
+    /* Static assets -> cache-first with background refresh. */
+    event.respondWith(
+        caches.match(req).then(function (cached) {
+            const networkFetch = fetch(req).then(function (res) {
+                /* Only cache OK same-origin GETs. */
+                if (res && res.ok && res.type === "basic") {
+                    const copy = res.clone();
+                    caches.open(CACHE_VERSION).then(function (c) {
+                        c.put(req, copy);
+                    });
+                }
+                return res;
+            }).catch(function () { return cached; });
+            return cached || networkFetch;
+        })
+    );
+});
+
+/* Allow the page to ask the SW to skip waiting if it ever
+   defers activation (we use skipWaiting in install above so
+   this is mostly belt-and-suspenders).                        */
+self.addEventListener("message", function (event) {
+    if (event.data && event.data.type === "SKIP_WAITING") {
+        self.skipWaiting();
+    }
+});
