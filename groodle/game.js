@@ -1320,29 +1320,35 @@
 
         let ty = 0, rot = 0, sx = 1, sy = 1, tx = 0;
 
+        /* Motion magnitudes roughly doubled vs the prior compact-stage
+           values. The full-viewport figure is ~50% larger in absolute
+           px on a phone, so the old 14 px bounce was reading as ~2 %
+           of figure height. Pumping these up plus dropping the CSS
+           transition smoother gives motion that's actually visible at
+           an arm's-length viewing distance. */
         if (move === 'BOUNCE') {
-            ty = -bouncePulse * 14;
-            sy = 1 - bouncePulse * 0.06;
-            sx = 1 + bouncePulse * 0.06;
+            ty = -bouncePulse * 32;
+            sy = 1 - bouncePulse * 0.12;
+            sx = 1 + bouncePulse * 0.12;
         } else if (move === 'TWIST') {
-            rot = Math.sin(halfPhase) * 6;
-            ty = -bouncePulse * 8;
-            sy = 1 - bouncePulse * 0.04;
+            rot = Math.sin(halfPhase) * 14;
+            ty = -bouncePulse * 18;
+            sy = 1 - bouncePulse * 0.08;
         } else if (move === 'DISCO') {
             const swing = Math.sin(beatPhase);
-            rot = swing * 9;
-            ty = -bouncePulse * 12;
-            sy = 1 - bouncePulse * 0.08;
-            sx = 1 + bouncePulse * 0.08;
-            tx = swing * 4;
+            rot = swing * 18;
+            ty = -bouncePulse * 26;
+            sy = 1 - bouncePulse * 0.14;
+            sx = 1 + bouncePulse * 0.14;
+            tx = swing * 10;
         } else if (move === 'PARTY') {
             const swing = Math.sin(beatPhase);
             const flap = Math.sin(beatPhase * 2);
-            rot = swing * 12 + flap * 4;
-            ty = -bouncePulse * 22;
-            sy = 1 - bouncePulse * 0.12;
-            sx = 1 + bouncePulse * 0.12;
-            tx = swing * 8;
+            rot = swing * 22 + flap * 8;
+            ty = -bouncePulse * 44;
+            sy = 1 - bouncePulse * 0.22;
+            sx = 1 + bouncePulse * 0.22;
+            tx = swing * 18;
         }
 
         const parts = [];

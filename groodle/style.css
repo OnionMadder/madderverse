@@ -363,7 +363,10 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
     inset: 0;
     z-index: 2;
     transform-origin: 50% 92%;
-    transition: transform 0.04s linear;
+    /* No CSS transition on transform — applyMove() writes a new value
+       every RAF tick, and a 40 ms transition on top of 16 ms writes
+       was muddling visible motion on the larger full-viewport figure.
+       will-change keeps the compositor layer warm. */
     will-change: transform;
 }
 
