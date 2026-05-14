@@ -177,31 +177,6 @@ main {
     gap: 12px;
 }
 
-/* ============ HINT TAG ============ */
-
-.hint-tag {
-    display: inline-block;
-    background: linear-gradient(135deg, #ffe066 0%, #ffd23f 100%);
-    color: #1a0f33;
-    font-family: var(--font-chunky);
-    font-weight: bold;
-    font-size: 16px;
-    letter-spacing: 1px;
-    padding: 10px 18px;
-    border-radius: 18px;
-    transform: rotate(-3deg);
-    box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.4),
-        inset 0 -3px 0 rgba(26, 15, 51, 0.18);
-    border: 3px solid #1a0f33;
-    text-transform: uppercase;
-    transition: opacity 0.3s;
-}
-
-body.dancing .hint-tag {
-    opacity: 0;
-}
-
 /* ============ BACKGROUND PICKER ============ */
 
 .bg-picker {
