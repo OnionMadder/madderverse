@@ -177,17 +177,18 @@ main {
     gap: 12px;
 }
 
-/* ============ BACKGROUND PICKER ============ */
+/* ============ BACKGROUND PICKER ============
+
+   Lives inside the Stage tool-section now (was a standalone dark
+   panel between the canvas and the tool tray). No more own background
+   / border / padding — those are provided by the wrapping tool-section
+   card. Just the thumb grid. */
 
 .bg-picker {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 8px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .bg-thumb {
@@ -293,6 +294,51 @@ body.dancing .stage {
         radial-gradient(circle at 88% 55%, #fff 0%, transparent 0.4%),
         radial-gradient(circle at 50% 30%, rgba(255, 255, 200, 0.9) 0%, transparent 4%),
         linear-gradient(180deg, #0a1838 0%, #1a2c5a 100%);
+}
+
+.bg-sunset {
+    /* Warm horizon-to-zenith gradient with a sun glow at the bottom-right.
+       Pink → orange → gold horizon. */
+    background:
+        radial-gradient(circle at 78% 78%, #ffd23f 0%, rgba(255, 210, 63, 0.4) 6%, transparent 14%),
+        linear-gradient(180deg, #2b1454 0%, #7209b7 22%, #ff6ec7 55%, #ff9966 78%, #ffd23f 100%);
+}
+
+.bg-underwater {
+    /* Deep blue with bubbles + a few highlight orbs near the surface. */
+    background:
+        radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.55) 0%, transparent 3%),
+        radial-gradient(circle at 62% 30%, rgba(255, 255, 255, 0.45) 0%, transparent 2.5%),
+        radial-gradient(circle at 78% 60%, rgba(135, 206, 235, 0.55) 0%, transparent 3%),
+        radial-gradient(circle at 38% 75%, rgba(255, 255, 255, 0.4) 0%, transparent 2%),
+        radial-gradient(circle at 18% 50%, rgba(0, 255, 204, 0.3) 0%, transparent 2.5%),
+        radial-gradient(ellipse 80% 30% at 50% 0%, rgba(135, 206, 235, 0.4) 0%, transparent 70%),
+        linear-gradient(180deg, #1f5f9c 0%, #143560 60%, #0a1f3a 100%);
+}
+
+.bg-stadium {
+    /* Dark concert venue with crossing spotlight beams of neon pink,
+       teal, and gold sweeping in from the corners. */
+    background:
+        linear-gradient(125deg, rgba(255, 110, 199, 0.4) 0%, transparent 38%),
+        linear-gradient(55deg,  rgba(0, 255, 204, 0.38) 0%, transparent 40%),
+        linear-gradient(95deg,  rgba(255, 210, 63, 0.22) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 18% at 50% 88%, rgba(255, 110, 199, 0.28) 0%, transparent 70%),
+        linear-gradient(180deg, #0a0518 0%, #2b1454 100%);
+}
+
+.bg-candy {
+    /* Bright purple-to-pink base with a sprinkle of neon dots in the
+       brand colors (teal, pink, gold, purple). */
+    background:
+        radial-gradient(circle at 15% 22%, #ff6ec7 0%, rgba(255, 110, 199, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 78% 14%, #00ffcc 0%, rgba(0, 255, 204, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 50% 55%, #ffd23f 0%, rgba(255, 210, 63, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 28% 78%, #7209b7 0%, rgba(114, 9, 183, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 84% 65%, #ff6ec7 0%, rgba(255, 110, 199, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 62% 88%, #00ffcc 0%, rgba(0, 255, 204, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 12% 60%, #ffd23f 0%, rgba(255, 210, 63, 0.55) 1.5%, transparent 3%),
+        linear-gradient(165deg, #7209b7 0%, #ff6ec7 100%);
 }
 
 .creature {
