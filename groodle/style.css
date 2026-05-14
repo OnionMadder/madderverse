@@ -419,53 +419,84 @@ body.dancing .draw-canvas {
     z-index: 5;
 }
 
-/* ============ SHELF ROW ============
+/* ============ LEFT-SIDE HUD ============
 
-   Sits between the bg-picker and the tool tray. Holds the entry-points
-   for the meta-game (Achievements + Hat Shop). Width matches the stage
-   so the row reads as a sibling of the canvas above and the tool tray
-   below — visual grouping is "what you're doing right now (canvas)" /
-   "where you're doing it (bg-picker)" / "your progression (shelf)" /
-   "your tools (tray)". Hidden during dance because both modals would
-   interrupt the music. */
+   Fixed-position vertical strip on the left edge of the viewport with
+   the progression entry-points (Achievements + Hat Shop). Replaces the
+   prior .shelf-row that sat between bg-picker and tool tray; floats
+   over the page on both phone and desktop so it doesn't compete with
+   the canvas for horizontal space. Hidden during dance because both
+   modals would interrupt the music; the dance composition reclaims the
+   left edge for the figure. */
 
-.shelf-row {
-    width: min(94vw, 380px);
+.left-hud {
+    position: fixed;
+    top: 110px;
+    left: 0;
+    z-index: 100;
     display: flex;
-    gap: 10px;
-    justify-content: stretch;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 6px;
+    background:
+        radial-gradient(ellipse 100% 60% at 0% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
+        linear-gradient(135deg, rgba(26, 15, 51, 0.88) 0%, rgba(59, 31, 107, 0.88) 100%);
+    border: 2px solid rgba(0, 255, 204, 0.45);
+    border-left: none;
+    border-radius: 0 16px 16px 0;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
-body.dancing .shelf-row { display: none; }
+body.dancing .left-hud { display: none; }
 
-.shelf-btn {
-    flex: 1;
+.hud-btn {
+    width: 56px;
     min-height: 56px;
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    background: rgba(0, 0, 0, 0.45);
+    gap: 2px;
+    padding: 6px 4px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(0, 255, 204, 0.4);
     color: #fff;
-    border: 2px solid rgba(0, 255, 204, 0.5);
-    box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.4),
-        inset 0 0 12px rgba(0, 255, 204, 0.08);
-    font-size: 14px;
+    font-family: var(--font-chunky);
+    font-size: 10px;
     letter-spacing: 1px;
+    font-weight: bold;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
-.shelf-btn .shelf-icon { font-size: 22px; line-height: 1; }
-.shelf-btn .shelf-label { font-weight: bold; }
-.shelf-btn:active {
-    transform: translateY(2px);
-    box-shadow:
-        0 2px 0 rgba(0, 0, 0, 0.4),
-        inset 0 0 12px rgba(0, 255, 204, 0.08);
-}
+.hud-btn .hud-icon { font-size: 22px; line-height: 1; }
+.hud-btn .hud-label { line-height: 1; }
+.hud-btn:active { transform: scale(0.96); }
 @media (hover: hover) {
-    .shelf-btn:hover {
+    .hud-btn:hover {
         border-color: #00ffcc;
-        background: rgba(0, 255, 204, 0.12);
+        background: rgba(0, 255, 204, 0.18);
     }
+}
+
+@media (min-width: 720px) {
+    /* Desktop / tablet land: a touch bigger so the HUD reads as a real
+       sidebar widget rather than a corner badge. */
+    .left-hud {
+        top: 140px;
+        gap: 8px;
+        padding: 12px 8px;
+    }
+    .hud-btn {
+        width: 72px;
+        min-height: 72px;
+        font-size: 11px;
+        gap: 4px;
+    }
+    .hud-btn .hud-icon { font-size: 28px; }
 }
 
 /* ============ MODAL ============

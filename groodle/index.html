@@ -151,17 +151,23 @@
             </button>
         </div>
 
-        <div class="shelf-row" id="shelfRow">
-            <button class="btn shelf-btn" id="openAchievementsBtn" type="button">
-                <span class="shelf-icon" aria-hidden="true">🏆</span>
-                <span class="shelf-label">Achievements</span>
-            </button>
-            <button class="btn shelf-btn" id="openHatShopBtn" type="button">
-                <span class="shelf-icon" aria-hidden="true">🎩</span>
-                <span class="shelf-label">Hat Shop</span>
-            </button>
-        </div>
     </div>
+
+    <!-- Left-side HUD — fixed-position vertical strip with progression
+         entry-points (Achievements + Hat Shop). Lives outside .stage-row
+         so it floats over the page on both mobile and desktop. The
+         button IDs stay the same as the prior .shelf-row so attachHandlers
+         in game.js doesn't need a change. -->
+    <aside class="left-hud" id="leftHud" aria-label="Progression menu">
+        <button class="hud-btn" id="openAchievementsBtn" type="button">
+            <span class="hud-icon" aria-hidden="true">🏆</span>
+            <span class="hud-label">Wins</span>
+        </button>
+        <button class="hud-btn" id="openHatShopBtn" type="button">
+            <span class="hud-icon" aria-hidden="true">🎩</span>
+            <span class="hud-label">Hats</span>
+        </button>
+    </aside>
 
     <div class="panel tool-tray" id="drawPanel">
         <section class="tool-section tool-colors">
