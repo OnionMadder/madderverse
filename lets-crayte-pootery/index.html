@@ -266,6 +266,69 @@
 
 </main>
 
+<!-- ============================================================
+     SCREEN: GALLERY  (chunk 6 — localStorage + PNG export)
+     ============================================================ -->
+<main class="screen" id="screen-gallery" hidden>
+
+    <div class="screen-titlebar">
+        <button class="back-btn" id="galleryBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;POT VAULT&nbsp;&gt;</h2>
+        <span class="screen-status" id="galleryCount">0 POTS</span>
+    </div>
+
+    <div class="gallery-stack">
+
+        <div class="a-lot-of-pots" id="lotOfPotsBanner" hidden>
+            <span class="lop-glyph" aria-hidden="true">&#x2606;</span>
+            <span class="lop-text">YOU HAVE A LOT OF POTS. WE LOVE THAT FOR YOU.</span>
+        </div>
+
+        <div class="gallery-grid" id="galleryGrid"></div>
+
+        <div class="gallery-empty" id="galleryEmpty" hidden>
+            <div class="empty-glyph" aria-hidden="true">&#x2317;</div>
+            <h3 class="empty-title">NO POTS YET</h3>
+            <p class="empty-sub">Shape some clay. Fire it. Come back.</p>
+            <button class="big-btn primary" id="galleryStartBtn" type="button">
+                <span class="btn-label">START SHAPING</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Detail modal — opens when a thumbnail is tapped -->
+    <aside class="pot-detail" id="potDetail" hidden>
+        <div class="pot-detail-card">
+            <div class="detail-titlebar">
+                <span class="detail-pack" id="detailPack">BASIC</span>
+                <span class="detail-date" id="detailDate"></span>
+                <button class="specs-close" id="detailClose" type="button" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="detail-canvas-wrap">
+                <canvas id="detailCanvas" width="400" height="600"
+                        aria-label="Pot preview"></canvas>
+            </div>
+            <label class="detail-name-row">
+                <span class="row-label">NAME</span>
+                <input class="detail-name-input" id="detailName" type="text"
+                       maxlength="40" placeholder="UNNAMED POT" />
+            </label>
+            <div class="detail-actions">
+                <button class="btn-control" id="detailDelete" type="button">
+                    <span class="btn-label">DELETE</span>
+                </button>
+                <button class="btn-control primary" id="detailExport" type="button">
+                    <span class="btn-label">EXPORT PNG</span>
+                    <span class="btn-glyph" aria-hidden="true">&darr;</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+</main>
+
 <footer class="site-footer">
     <ul class="footer-nav">
         <li><a href="../about.html">About</a></li>

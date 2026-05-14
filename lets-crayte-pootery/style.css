@@ -1174,7 +1174,299 @@ a:focus-visible {
     flex: 1;
 }
 
-/* ----- 11. Responsive nudges ----- */
+/* ----- 11. GALLERY screen (chunk 6 — localStorage thumb grid + PNG export) ----- */
+
+#screen-gallery {
+    padding-top: 12px;
+    padding-bottom: 30px;
+}
+
+.gallery-stack {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+.a-lot-of-pots {
+    width: 100%;
+    max-width: 720px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(90deg, rgba(255,46,136,0.15), rgba(0,255,204,0.10));
+    border: 1px solid var(--pink);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--ink);
+    box-shadow: 0 0 14px rgba(255, 46, 136, 0.25);
+}
+
+.a-lot-of-pots[hidden] { display: none; }
+
+.lop-glyph {
+    color: var(--pink-bright);
+    font-size: 18px;
+    text-shadow: 0 0 8px rgba(255, 46, 136, 0.6);
+}
+
+.gallery-grid {
+    width: 100%;
+    max-width: 720px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.gallery-grid:empty { display: none; }
+
+.pot-card {
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(0,0,0,0.18) 0 1px,
+            transparent 1px 2px),
+        linear-gradient(180deg, #082028 0%, #051218 100%);
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: pointer;
+    transition: border-color 0.12s ease,
+                box-shadow 0.12s ease,
+                transform 0.06s ease;
+    text-align: left;
+}
+
+.pot-card:hover,
+.pot-card:focus-visible {
+    border-color: var(--pink-bright);
+    box-shadow: 0 0 14px rgba(255, 46, 136, 0.35);
+    outline: none;
+    transform: translateY(-2px);
+}
+
+.pot-thumb {
+    aspect-ratio: 400 / 600;
+    background: #06141a;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--teal-low);
+}
+
+.pot-thumb canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.pot-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pot-name {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--ink);
+    text-shadow: 1px 1px 0 #000;
+    /* truncate */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pot-date {
+    font-family: var(--font-lcd);
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--teal-dim);
+}
+
+.pot-pack-tag {
+    align-self: flex-start;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.2px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0, 255, 204, 0.1);
+    color: var(--teal);
+    border: 1px solid var(--teal-low);
+}
+
+/* Empty state */
+.gallery-empty {
+    width: 100%;
+    max-width: 420px;
+    margin-top: 30px;
+    padding: 24px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(0,0,0,0.18) 0 1px,
+            transparent 1px 2px),
+        linear-gradient(180deg, #082028 0%, #051218 100%);
+    border: 1px dashed var(--teal-low);
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+
+.gallery-empty[hidden] { display: none; }
+
+.empty-glyph {
+    font-size: 64px;
+    color: var(--teal-low);
+    line-height: 1;
+}
+
+.empty-title {
+    margin: 0;
+    font-family: var(--font-title);
+    color: var(--pink-bright);
+    font-size: 22px;
+    letter-spacing: 3px;
+    text-shadow: 2px 2px 0 #000;
+}
+
+.empty-sub {
+    margin: 0;
+    font-family: var(--font-lcd);
+    font-size: 18px;
+    color: var(--ink-dim);
+    letter-spacing: 1px;
+}
+
+.gallery-empty .big-btn {
+    width: 100%;
+    max-width: 280px;
+    margin-top: 8px;
+}
+
+/* Detail modal */
+.pot-detail {
+    position: fixed;
+    inset: 0;
+    z-index: 220;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.pot-detail[hidden] { display: none; }
+
+.pot-detail-card {
+    width: min(440px, 96vw);
+    max-height: 96vh;
+    overflow-y: auto;
+    background: #051419;
+    border: 2px solid var(--teal);
+    border-radius: var(--radius-md);
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 30px rgba(0, 255, 204, 0.35);
+}
+
+.detail-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(180deg, var(--teal) 0%, #00b890 100%);
+    color: #002b22;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.2px;
+}
+
+.detail-pack {
+    background: rgba(0, 0, 0, 0.45);
+    color: var(--teal);
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 1.6px;
+}
+
+.detail-date {
+    flex: 1;
+    color: #002b22;
+    font-family: var(--font-lcd);
+    font-size: 13px;
+    text-align: right;
+    margin-right: 8px;
+}
+
+.detail-canvas-wrap {
+    background: #06141a;
+    padding: 8px;
+}
+
+#detailCanvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 400 / 600;
+    height: auto;
+    background: #0c1f25;
+    border-radius: var(--radius-sm);
+}
+
+.detail-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border-top: 1px dashed var(--teal-low);
+}
+
+.detail-name-row .row-label {
+    min-width: 56px;
+}
+
+.detail-name-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--bg-deep);
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+    font-family: var(--font-lcd);
+    font-size: 18px;
+    letter-spacing: 1px;
+    -webkit-text-fill-color: var(--ink); /* iOS dark-mode safety */
+}
+
+.detail-name-input:focus {
+    outline: none;
+    border-color: var(--pink);
+    box-shadow: 0 0 8px rgba(255, 46, 136, 0.3);
+}
+
+.detail-actions {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px 14px;
+}
+
+.detail-actions .btn-control {
+    flex: 1;
+    padding: 12px 10px;
+}
+
+/* ----- 12. Responsive nudges ----- */
 
 @media (max-width: 480px) {
     .title-stack { gap: 22px; }

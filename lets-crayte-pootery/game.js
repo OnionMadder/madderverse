@@ -2774,7 +2774,374 @@
         }
     });
 
-    /* ---------- 8. INIT (must run after all registerScreen calls) ---------- */
+    /* ============================================================
+       GALLERY SCREEN — chunk 6: thumbnail grid + PNG export
+       ============================================================
+       Source of truth is localStorage key "crayte-gallery" — same
+       key the kiln writes to on every successful firing. Each
+       thumbnail re-renders the saved pot at small size using the
+       same drawPot / drawRim / fired-overlay chain as the live
+       canvas; the clay snapshot is swapped into SHAPE.clay for
+       the duration of each render (synchronous within a .then()
+       callback, so no race even with parallel thumbnail loads).
+       ============================================================ */
+
+    const GALLERY = {
+        items: [],
+        detailEntry: null,
+        inited: false
+    };
+
+    const GALLERY_KEY  = "crayte-gallery";
+    const LOT_OF_POTS  = 50;
+
+    function loadGalleryEntries() {
+        try {
+            const raw = localStorage.getItem(GALLERY_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function saveGalleryEntries(arr) {
+        try {
+            /* Strip the cached _paintImg before serializing — Image
+               objects don't survive JSON. */
+            const clean = arr.map(function (e) {
+                const o = {};
+                for (const k in e) {
+                    if (k === "_paintImg") continue;
+                    o[k] = e[k];
+                }
+                return o;
+            });
+            localStorage.setItem(GALLERY_KEY, JSON.stringify(clean));
+            return true;
+        } catch (e) {
+            console.warn("[CRAYte] gallery save failed", e);
+            return false;
+        }
+    }
+
+    function loadEntryPaint(entry) {
+        if (entry._paintImg) return Promise.resolve(entry._paintImg);
+        if (!entry.paintDataUrl) return Promise.resolve(null);
+        return new Promise(function (resolve) {
+            const img = new Image();
+            img.onload  = function () { entry._paintImg = img; resolve(img); };
+            img.onerror = function () { resolve(null); };
+            img.src = entry.paintDataUrl;
+        });
+    }
+
+    function formatPotDate(ts) {
+        const d = new Date(ts);
+        const pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" +
+               pad(d.getDate()) + " " + pad(d.getHours()) + ":" +
+               pad(d.getMinutes());
+    }
+
+    /* Pack-id -> friendly label for the detail tag. Falls back to
+       the id itself for any future-added pack. */
+    function packLabel(packId) {
+        for (let i = 0; i < GLAZE_PACKS.length; i++) {
+            if (GLAZE_PACKS[i].id === packId) return GLAZE_PACKS[i].label;
+        }
+        return (packId || "BASIC").toUpperCase();
+    }
+
+    /* ----- 8A. Render a saved entry into any 2D context -----
+       Logical coords are 400×600. Caller is responsible for the
+       ctx transform so the logical space maps to the destination
+       canvas size. clay-swap is purely synchronous within this
+       call, so no race with parallel renders.                   */
+    function renderSavedPot(ctx, entry, opts) {
+        opts = opts || {};
+        const savedClay = SHAPE.clay;
+        SHAPE.clay = entry.clay || SHAPE.clay;
+        try {
+            if (opts.background !== false) {
+                ctx.fillStyle = "#0c1f25";
+                ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+                drawShapeBackdrop(ctx);
+            }
+            if (opts.wheel !== false) drawWheel(ctx);
+            drawPot(ctx);
+            if (entry._paintImg) {
+                ctx.save();
+                buildPotPath(ctx);
+                ctx.clip();
+                ctx.drawImage(entry._paintImg, 0, 0, SHAPE.W, SHAPE.H);
+                ctx.restore();
+            }
+            if (entry.fired) {
+                ctx.save();
+                buildPotPath(ctx);
+                ctx.clip();
+                ctx.globalCompositeOperation = "overlay";
+                ctx.fillStyle = "rgba(180, 70, 22, 0.20)";
+                ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+                ctx.globalCompositeOperation = "source-over";
+                const g = ctx.createLinearGradient(0, 80, 0, 510);
+                g.addColorStop(0,    "rgba(255, 245, 220, 0.10)");
+                g.addColorStop(0.35, "rgba(255, 245, 220, 0.00)");
+                g.addColorStop(1,    "rgba(0, 0, 0, 0.12)");
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+                ctx.restore();
+            }
+            drawRim(ctx);
+        } finally {
+            SHAPE.clay = savedClay;
+        }
+    }
+
+    function renderEntryIntoCanvas(canvas, entry) {
+        const cssW = canvas.clientWidth  || canvas.width;
+        const cssH = canvas.clientHeight || canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+        const bw = Math.max(1, Math.round(cssW * dpr));
+        const bh = Math.max(1, Math.round(cssH * dpr));
+        if (canvas.width !== bw)  canvas.width  = bw;
+        if (canvas.height !== bh) canvas.height = bh;
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(dpr * (cssW / SHAPE.W), 0, 0,
+                         dpr * (cssH / SHAPE.H), 0, 0);
+        renderSavedPot(ctx, entry);
+    }
+
+    /* ----- 8B. Grid building ----- */
+
+    function buildThumbCard(entry) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "pot-card";
+        card.dataset.id = entry.id;
+
+        const thumb = document.createElement("div");
+        thumb.className = "pot-thumb";
+        const canvas = document.createElement("canvas");
+        canvas.width = 200;
+        canvas.height = 300;
+        thumb.appendChild(canvas);
+        card.appendChild(thumb);
+
+        const meta = document.createElement("div");
+        meta.className = "pot-meta";
+
+        const name = document.createElement("span");
+        name.className = "pot-name";
+        name.textContent = entry.name || "UNNAMED POT";
+        meta.appendChild(name);
+
+        const date = document.createElement("span");
+        date.className = "pot-date";
+        date.textContent = formatPotDate(entry.createdAt);
+        meta.appendChild(date);
+
+        const tag = document.createElement("span");
+        tag.className = "pot-pack-tag";
+        tag.textContent = packLabel(entry.packId);
+        meta.appendChild(tag);
+
+        card.appendChild(meta);
+
+        card.addEventListener("click", function () { openDetail(entry); });
+
+        /* Render async — paint may be a dataURL that needs loading. */
+        loadEntryPaint(entry).then(function () {
+            renderEntryIntoCanvas(canvas, entry);
+        });
+
+        return card;
+    }
+
+    function refreshGalleryGrid() {
+        const grid = document.getElementById("galleryGrid");
+        const empty = document.getElementById("galleryEmpty");
+        const count = document.getElementById("galleryCount");
+        const banner = document.getElementById("lotOfPotsBanner");
+        if (!grid) return;
+
+        GALLERY.items = loadGalleryEntries();
+        grid.innerHTML = "";
+
+        if (GALLERY.items.length === 0) {
+            if (empty)  empty.hidden = false;
+            if (banner) banner.hidden = true;
+            if (count)  count.textContent = "0 POTS";
+            return;
+        }
+        if (empty) empty.hidden = true;
+
+        if (count) {
+            count.textContent = GALLERY.items.length +
+                (GALLERY.items.length === 1 ? " POT" : " POTS");
+        }
+        if (banner) banner.hidden = GALLERY.items.length < LOT_OF_POTS;
+
+        /* Newest first */
+        const arr = GALLERY.items.slice().reverse();
+        for (let i = 0; i < arr.length; i++) {
+            grid.appendChild(buildThumbCard(arr[i]));
+        }
+    }
+
+    /* ----- 8C. Detail modal ----- */
+
+    function openDetail(entry) {
+        GALLERY.detailEntry = entry;
+        const panel  = document.getElementById("potDetail");
+        const canvas = document.getElementById("detailCanvas");
+        const name   = document.getElementById("detailName");
+        const date   = document.getElementById("detailDate");
+        const pack   = document.getElementById("detailPack");
+        if (!panel || !canvas) return;
+
+        if (name) name.value = entry.name || "";
+        if (date) date.textContent = formatPotDate(entry.createdAt);
+        if (pack) pack.textContent = packLabel(entry.packId);
+
+        panel.hidden = false;
+
+        loadEntryPaint(entry).then(function () {
+            renderEntryIntoCanvas(canvas, entry);
+        });
+    }
+
+    function closeDetail() {
+        GALLERY.detailEntry = null;
+        const panel = document.getElementById("potDetail");
+        if (panel) panel.hidden = true;
+    }
+
+    function saveDetailName() {
+        const entry = GALLERY.detailEntry;
+        if (!entry) return;
+        const input = document.getElementById("detailName");
+        if (!input) return;
+        const newName = input.value.trim();
+        if ((entry.name || "") === newName) return;
+        entry.name = newName;
+        /* Persist to the master array (find by id and patch). */
+        const arr = loadGalleryEntries();
+        for (let i = 0; i < arr.length; i++) {
+            if (arr[i].id === entry.id) { arr[i].name = newName; break; }
+        }
+        saveGalleryEntries(arr);
+    }
+
+    function deleteCurrentEntry() {
+        const entry = GALLERY.detailEntry;
+        if (!entry) return;
+        const ok = window.confirm(
+            "Delete this pot? This cannot be undone."
+        );
+        if (!ok) return;
+        const arr = loadGalleryEntries().filter(function (e) {
+            return e.id !== entry.id;
+        });
+        saveGalleryEntries(arr);
+        closeDetail();
+        refreshGalleryGrid();
+    }
+
+    /* ----- 8D. PNG export -----
+       Renders the current detail entry to a high-res offscreen
+       canvas (800×1200 — 2× logical) and triggers a download.
+       Includes the wheel + backdrop so the exported PNG reads
+       as a complete artwork, not just a floating silhouette.   */
+    function exportCurrentEntry() {
+        const entry = GALLERY.detailEntry;
+        if (!entry) return;
+        const W = 800, H = 1200;
+        const off = document.createElement("canvas");
+        off.width = W;
+        off.height = H;
+        const ctx = off.getContext("2d");
+        ctx.setTransform(W / SHAPE.W, 0, 0, H / SHAPE.H, 0, 0);
+
+        loadEntryPaint(entry).then(function () {
+            /* Backdrop + wheel ON for shareable image */
+            renderSavedPot(ctx, entry);
+
+            off.toBlob(function (blob) {
+                if (!blob) return;
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                const safe = (entry.name && entry.name.trim()) ||
+                             ("pootery-" + entry.id);
+                a.href = url;
+                a.download = safe.replace(/[^a-z0-9_-]+/gi, "_") + ".png";
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function () {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 200);
+            }, "image/png");
+        });
+    }
+
+    /* ----- 8E. Init / wiring ----- */
+
+    function initGallery() {
+        const back  = document.getElementById("galleryBack");
+        const startBtn = document.getElementById("galleryStartBtn");
+        const close = document.getElementById("detailClose");
+        const del   = document.getElementById("detailDelete");
+        const expt  = document.getElementById("detailExport");
+        const name  = document.getElementById("detailName");
+        const panel = document.getElementById("potDetail");
+
+        if (back) back.addEventListener("click", function () {
+            closeDetail();
+            showScreen("title");
+        });
+
+        if (startBtn) startBtn.addEventListener("click", function () {
+            showScreen("shape");
+        });
+
+        if (close) close.addEventListener("click", closeDetail);
+
+        if (del) del.addEventListener("click", deleteCurrentEntry);
+
+        if (expt) expt.addEventListener("click", exportCurrentEntry);
+
+        if (name) {
+            name.addEventListener("change", saveDetailName);
+            name.addEventListener("blur",   saveDetailName);
+        }
+
+        if (panel) {
+            panel.addEventListener("click", function (e) {
+                if (e.target === panel) closeDetail();
+            });
+        }
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" && panel && !panel.hidden) closeDetail();
+        });
+    }
+
+    registerScreen("gallery", {
+        onEnter: function () {
+            if (!GALLERY.inited) {
+                initGallery();
+                GALLERY.inited = true;
+            }
+            refreshGalleryGrid();
+        },
+        onLeave: function () {
+            closeDetail();
+        }
+    });
+
+    /* ---------- 9. INIT (must run after all registerScreen calls) ---------- */
 
     function init() {
         initTitle();
@@ -2787,7 +3154,7 @@
         init();
     }
 
-    /* ---------- 9. EXPORT ----------
+    /* ---------- 10. EXPORT ----------
        A tiny window namespace so chunks 2+ can register screens
        without rewriting this file. Strictly internal.            */
     window.CRAYte = {
