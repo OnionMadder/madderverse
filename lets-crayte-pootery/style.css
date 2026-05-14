@@ -863,6 +863,149 @@ a:focus-visible {
     -webkit-user-select: none;
 }
 
+/* Floating overlay button on the canvas frame (undo lives here).
+   Sits in the top-right corner of the canvas-wrap, slightly inset. */
+.canvas-wrap { position: relative; }
+
+.canvas-overlay-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(12, 31, 37, 0.85);
+    border: 1px solid var(--teal-low);
+    color: var(--teal);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: background 0.12s ease,
+                border-color 0.12s ease,
+                color 0.12s ease,
+                box-shadow 0.12s ease,
+                transform 0.06s ease;
+    text-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
+}
+
+.canvas-overlay-btn:hover,
+.canvas-overlay-btn:focus-visible {
+    background: rgba(20, 64, 74, 0.9);
+    border-color: var(--teal);
+    color: var(--pink-bright);
+    outline: none;
+    box-shadow: 0 0 14px rgba(255, 46, 136, 0.35);
+}
+
+.canvas-overlay-btn:active {
+    transform: translateY(1px);
+}
+
+.canvas-overlay-btn[disabled] {
+    opacity: 0.35;
+    cursor: not-allowed;
+    color: var(--ink-low);
+    border-color: var(--ink-low);
+    text-shadow: none;
+    box-shadow: none;
+}
+
+/* Stamp rotation row */
+.rotate-row {
+    align-items: center;
+}
+
+.rotate-slider {
+    flex: 1;
+    height: 24px;
+    background: transparent;
+    cursor: pointer;
+    /* Reset native styling so we can style the track + thumb */
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.rotate-slider::-webkit-slider-runnable-track {
+    height: 4px;
+    background: linear-gradient(90deg,
+        var(--teal-low) 0%,
+        var(--pink) 100%);
+    border-radius: 2px;
+}
+
+.rotate-slider::-moz-range-track {
+    height: 4px;
+    background: linear-gradient(90deg,
+        var(--teal-low) 0%,
+        var(--pink) 100%);
+    border-radius: 2px;
+}
+
+.rotate-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--pink-bright);
+    border: 2px solid #fff;
+    margin-top: -6px;
+    cursor: grab;
+    box-shadow: 0 0 8px rgba(255, 46, 136, 0.55);
+}
+
+.rotate-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--pink-bright);
+    border: 2px solid #fff;
+    cursor: grab;
+    box-shadow: 0 0 8px rgba(255, 46, 136, 0.55);
+}
+
+.rotate-slider:focus-visible {
+    outline: none;
+}
+
+.rotate-slider:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px rgba(0, 255, 204, 0.45),
+                0 0 12px rgba(255, 46, 136, 0.55);
+}
+
+.rotate-value {
+    min-width: 42px;
+    text-align: right;
+    font-family: var(--font-lcd);
+    font-size: 16px;
+    color: var(--teal-dim);
+    text-shadow: 0 0 5px rgba(0, 255, 204, 0.35);
+}
+
+.rotate-reset {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--bg-panel);
+    border: 1px solid var(--teal-low);
+    color: var(--teal-dim);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.rotate-reset:hover,
+.rotate-reset:focus-visible {
+    color: var(--pink-bright);
+    border-color: var(--pink-bright);
+    outline: none;
+}
+
 .decorate-stack {
     display: flex;
     flex-direction: column;

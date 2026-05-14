@@ -248,6 +248,13 @@
         <div class="canvas-wrap">
             <canvas id="decorateCanvas" width="400" height="600"
                     aria-label="Locked pot. Drag to paint, tap to stamp."></canvas>
+            <!-- Floating UNDO button — pinned to the top-right of
+                 the canvas frame. Ctrl/Cmd+Z works too. Disabled
+                 when there's nothing to undo. -->
+            <button class="canvas-overlay-btn" id="undoBtn" type="button"
+                    title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+                <span aria-hidden="true">&#x21B6;</span>
+            </button>
         </div>
 
         <div class="decorate-tools">
@@ -277,6 +284,21 @@
                 </button>
                 <button class="size-btn" data-size="24" type="button" aria-label="Thick">
                     <span class="size-dot s-thick"></span>
+                </button>
+            </div>
+
+            <!-- Stamp rotation (applied to stamp placement only;
+                 brush + eraser ignore it). 15deg steps so the
+                 slider has 24 detents around the circle. -->
+            <div class="tool-row rotate-row">
+                <span class="row-label">ROT</span>
+                <input type="range" min="0" max="345" step="15" value="0"
+                       id="stampRotate" class="rotate-slider"
+                       aria-label="Stamp rotation in degrees" />
+                <span class="rotate-value" id="stampRotateValue">0&deg;</span>
+                <button class="rotate-reset" id="stampRotateReset" type="button"
+                        title="Reset rotation" aria-label="Reset rotation">
+                    <span aria-hidden="true">&#x21BA;</span>
                 </button>
             </div>
 

@@ -2958,17 +2958,65 @@
         tool:    "brush",     /* "brush" | "stamp" | "eraser" */
         size:    14,          /* logical-px stroke half-thickness */
         pattern: "dot",
+        stampRotation: 0,     /* radians — applied in stampAt */
 
         pointer: null,
         pointerActive: false,
         lastPaintPos: null,
         strokedThisGesture: false,
 
+        /* Undo stack — PNG dataURL snapshots of the paint canvas
+           taken at the start of each user gesture. PNG compresses
+           sparse canvases extremely well so 20 levels stays under
+           ~2MB even with busy decoration. */
+        undoStack: [],
+
         running: false,
         rafId: null,
         lastT: 0,
         inited: false
     };
+
+    const UNDO_LIMIT = 20;
+
+    function pushUndoSnapshot() {
+        if (!D.paintCanvas) return;
+        try {
+            D.undoStack.push(D.paintCanvas.toDataURL("image/png"));
+            while (D.undoStack.length > UNDO_LIMIT) D.undoStack.shift();
+        } catch (e) {
+            console.warn("[CRAYte] undo snapshot failed", e);
+        }
+        updateUndoButton();
+    }
+
+    function popUndo() {
+        if (D.undoStack.length === 0) return;
+        const dataUrl = D.undoStack.pop();
+        const img = new Image();
+        img.onload = function () {
+            D.paintCtx.save();
+            /* Reset transform so drawImage lands in pixel coords,
+               not the DPR-scaled logical space. Snapshot was taken
+               at native canvas resolution via toDataURL. */
+            D.paintCtx.setTransform(1, 0, 0, 1, 0, 0);
+            D.paintCtx.clearRect(0, 0, D.paintCanvas.width, D.paintCanvas.height);
+            D.paintCtx.drawImage(img, 0, 0);
+            D.paintCtx.restore();
+            updateUndoButton();
+        };
+        img.src = dataUrl;
+    }
+
+    function clearUndoStack() {
+        D.undoStack.length = 0;
+        updateUndoButton();
+    }
+
+    function updateUndoButton() {
+        const btn = document.getElementById("undoBtn");
+        if (btn) btn.disabled = D.undoStack.length === 0;
+    }
 
     function activePack() {
         for (let i = 0; i < GLAZE_PACKS.length; i++) {
@@ -3140,6 +3188,7 @@
         attachDecoratePointer();
         wireDecorateButtons();
         attachPackTabs();
+        wireUndoAndRotate();
         buildToolUI();
 
         if (typeof ResizeObserver === "function") {
@@ -3152,6 +3201,43 @@
         document.querySelectorAll(".pack-tab[data-pack]").forEach(function (b) {
             b.addEventListener("click", function () { setPack(b.dataset.pack); });
         });
+    }
+
+    function wireUndoAndRotate() {
+        /* Undo button */
+        const undoBtn = document.getElementById("undoBtn");
+        if (undoBtn) undoBtn.addEventListener("click", popUndo);
+
+        /* Global Ctrl/Cmd+Z — only fires on decorate screen and
+           only when focus isn't in a text input (don't hijack
+           the gallery name field or the auth email field). */
+        document.addEventListener("keydown", function (e) {
+            if (!(e.ctrlKey || e.metaKey)) return;
+            if (e.key !== "z" && e.key !== "Z") return;
+            if (e.shiftKey) return;   /* leave shift+ctrl+z for future redo */
+            if (currentScreen !== "decorate") return;
+            const t = e.target;
+            if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+            e.preventDefault();
+            popUndo();
+        });
+
+        /* Rotation slider */
+        const slider = document.getElementById("stampRotate");
+        const valEl  = document.getElementById("stampRotateValue");
+        const reset  = document.getElementById("stampRotateReset");
+
+        function applyRotation(deg) {
+            const d = ((deg % 360) + 360) % 360;
+            D.stampRotation = d * Math.PI / 180;
+            if (slider && slider.value !== String(d)) slider.value = d;
+            if (valEl) valEl.textContent = d + "°";
+        }
+
+        if (slider) slider.addEventListener("input", function () {
+            applyRotation(parseInt(slider.value, 10) || 0);
+        });
+        if (reset) reset.addEventListener("click", function () { applyRotation(0); });
     }
 
     function sizeDecorateCanvas() {
@@ -3213,6 +3299,11 @@
             D.pointerActive = true;
             D.lastPaintPos = p;
             D.strokedThisGesture = false;
+            /* Snapshot BEFORE the gesture so undo restores the
+               canvas to its pre-gesture state. One snapshot per
+               gesture = one undo per stroke / stamp / eraser
+               action — natural Ctrl+Z behavior. */
+            pushUndoSnapshot();
             if (D.tool === "stamp") {
                 stampAt(p);
                 D.strokedThisGesture = true;
@@ -3291,7 +3382,19 @@
         /* Slightly bigger than brush dot so a "thin" stamp still
            reads as a recognizable shape. */
         const r = D.size * 1.7;
-        fn(D.paintCtx, p.x, p.y, r, currentPaintColor());
+        const color = currentPaintColor();
+        const ctx = D.paintCtx;
+        if (D.stampRotation) {
+            /* Rotate around the stamp's center: translate to (p.x,
+               p.y), rotate, then draw the stamp at (0,0). */
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(D.stampRotation);
+            fn(ctx, 0, 0, r, color);
+            ctx.restore();
+        } else {
+            fn(ctx, p.x, p.y, r, color);
+        }
         stampClick();
         haptic(15);
         noteGlazeUsed(D.glaze);
@@ -3414,12 +3517,18 @@
         if (back) back.addEventListener("click", function () {
             /* Re-shape escape hatch: unlock clay; paint persists so
                the decoration deforms with any re-shaping (the paint
-               composite is clipped to the new silhouette). */
+               composite is clipped to the new silhouette). Undo
+               stack is decorate-scope; clear it on the way out. */
+            clearUndoStack();
             SHAPE.clayLocked = false;
             showScreen("shape");
         });
 
         if (clear) clear.addEventListener("click", function () {
+            /* Make CLEAR undoable — push the current state before
+               wiping. One tap CLEAR + one tap UNDO restores the
+               previous paint, which is the expected mental model. */
+            pushUndoSnapshot();
             clearPaint();
             flashButton(clear);
         });
@@ -3430,6 +3539,8 @@
                 /* User gesture — wake up Web Audio here so the kiln
                    roar can play (browsers block context until then). */
                 ensureKilnAudio();
+                /* Firing commits — no undo back through the firing. */
+                clearUndoStack();
                 showScreen("kiln");
             } else {
                 flashStub(fire, "KILN OFFLINE");
