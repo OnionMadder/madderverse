@@ -463,10 +463,12 @@
 
     /* ----- 5F. Render ----- */
 
-    function renderShape() {
-        const ctx = SHAPE.ctx;
+    /* Shared by both SHAPE and DECORATE. Both screens render the same
+       pot from SHAPE.clay; decorate optionally composites a paint layer
+       clipped to the pot path. */
+    function renderPotScene(ctx, opts) {
+        opts = opts || {};
 
-        /* Background */
         ctx.fillStyle = "#0c1f25";
         ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
         drawShapeBackdrop(ctx);
@@ -478,15 +480,29 @@
         /* Pot silhouette + 3-D shading */
         drawPot(ctx);
 
-        /* Rim opening on top (ellipse — gives the open-top look) */
+        /* Paint layer (decorate mode) — clipped to the pot silhouette
+           so strokes outside the body never show. */
+        if (opts.paintCanvas) {
+            ctx.save();
+            buildPotPath(ctx);
+            ctx.clip();
+            ctx.drawImage(opts.paintCanvas, 0, 0, SHAPE.W, SHAPE.H);
+            ctx.restore();
+        }
+
+        /* Rim opening on top — drawn AFTER paint so the rim ring
+           stays visible even with a painted pot. */
         drawRim(ctx);
 
-        /* Particles last so they're on top */
-        drawParticles(ctx);
+        /* Particles last so they're on top. Decorate disables. */
+        if (opts.particles !== false) drawParticles(ctx);
 
         /* Decorative HUD ticks in the corners — onioncore polish */
         drawCornerTicks(ctx);
     }
+
+    /* Back-compat alias used by SHAPE's frame loop. */
+    function renderShape() { renderPotScene(SHAPE.ctx); }
 
     function drawShapeBackdrop(ctx) {
         /* Faint vertical gradient — top a touch lighter than bottom
@@ -767,7 +783,515 @@
         }
     });
 
-    /* ---------- 6. INIT (must run after all registerScreen calls) ---------- */
+    /* Eager init: build the default cylinder before any screen
+       mounts so renderPotScene has a clay array to read even if
+       the user jumps to decorate without entering shape (e.g.,
+       deep links via window.CRAYte.showScreen, future "load from
+       gallery" paths). resetClay() is idempotent; initShape will
+       re-run it from a clean state. */
+    resetClay();
+
+    /* ============================================================
+       DECORATE SCREEN — chunk 3: brushes / glazes / stamps
+       ============================================================
+       Same pot from SHAPE.clay (locked). An offscreen paint canvas
+       accumulates strokes / stamps; renderPotScene composites it
+       clipped to the pot's silhouette so paint outside the body
+       is never visible. Chunk 4 will add themed packs as new
+       entries in GLAZE_PACKS without changing this layer.
+       ============================================================ */
+
+    /* ----- 6A. Stamp drawers -----
+       Each pattern is a function that draws itself into ctx at
+       (x, y) with radius r and fill/stroke color c. Used both for
+       on-canvas stamping and for the mini icons in the palette.   */
+    const PATTERN_DRAWERS = {
+        dot: function (ctx, x, y, r, c) {
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
+            ctx.fill();
+        },
+        ring: function (ctx, x, y, r, c) {
+            ctx.strokeStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.32);
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.75, 0, Math.PI * 2);
+            ctx.stroke();
+        },
+        star: function (ctx, x, y, r, c) {
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            for (let i = 0; i < 10; i++) {
+                const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+                const rad = (i % 2 === 0) ? r : r * 0.42;
+                const px = x + Math.cos(a) * rad;
+                const py = y + Math.sin(a) * rad;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+        },
+        chevron: function (ctx, x, y, r, c) {
+            ctx.strokeStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.32);
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            ctx.moveTo(x - r * 0.9, y + r * 0.35);
+            ctx.lineTo(x, y - r * 0.35);
+            ctx.lineTo(x + r * 0.9, y + r * 0.35);
+            ctx.stroke();
+        },
+        wave: function (ctx, x, y, r, c) {
+            ctx.strokeStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.30);
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            const steps = 18;
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const px = x - r + t * 2 * r;
+                const py = y + Math.sin(t * Math.PI * 2) * r * 0.42;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+        },
+        triangle: function (ctx, x, y, r, c) {
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            ctx.moveTo(x, y - r * 0.85);
+            ctx.lineTo(x + r * 0.74, y + r * 0.45);
+            ctx.lineTo(x - r * 0.74, y + r * 0.45);
+            ctx.closePath();
+            ctx.fill();
+        },
+        x: function (ctx, x, y, r, c) {
+            ctx.strokeStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.30);
+            ctx.lineCap = "round";
+            const k = r * 0.65;
+            ctx.beginPath();
+            ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k);
+            ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k);
+            ctx.stroke();
+        },
+        heart: function (ctx, x, y, r, c) {
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            const top = y - r * 0.35;
+            ctx.moveTo(x, top + r * 0.30);
+            ctx.bezierCurveTo(x, top - r * 0.15,
+                              x - r * 0.95, top - r * 0.05,
+                              x - r * 0.95, top + r * 0.50);
+            ctx.bezierCurveTo(x - r * 0.95, top + r * 0.95,
+                              x - r * 0.40, top + r * 1.05,
+                              x, y + r * 0.70);
+            ctx.bezierCurveTo(x + r * 0.40, top + r * 1.05,
+                              x + r * 0.95, top + r * 0.95,
+                              x + r * 0.95, top + r * 0.50);
+            ctx.bezierCurveTo(x + r * 0.95, top - r * 0.05,
+                              x, top - r * 0.15,
+                              x, top + r * 0.30);
+            ctx.fill();
+        }
+    };
+
+    /* ----- 6B. Decorate state -----
+       Chunk 4 will append more entries to GLAZE_PACKS for themed
+       packs (Candy / Plushie / Good Dog / MODDED / GAMER) and
+       reuse buildToolUI to rebuild the palette on tab switch.   */
+    const GLAZE_PACKS = [
+        {
+            id: "core",
+            label: "BASIC",
+            glazes: [
+                "#3a2218",   /* dark clay */
+                "#7a3a18",   /* sienna */
+                "#cc6633",   /* terracotta */
+                "#e4b13e",   /* amber */
+                "#e9e4c8",   /* bone */
+                "#f4f6ea",   /* milk white */
+                "#5f8d5d",   /* sage */
+                "#2b6b6c",   /* deep teal */
+                "#244e9b",   /* cobalt */
+                "#7a3c8c",   /* plum */
+                "#b53939",   /* crimson */
+                "#1a0e08"    /* ink */
+            ],
+            patterns: ["dot", "ring", "star", "chevron",
+                       "wave", "triangle", "x", "heart"]
+        }
+    ];
+
+    const D = {
+        canvas: null,
+        ctx: null,
+        paintCanvas: null,   /* offscreen — accumulates strokes / stamps */
+        paintCtx: null,
+        dpr: 1,
+
+        activePackId: "core",
+        glaze:   "#cc6633",
+        tool:    "brush",     /* "brush" | "stamp" | "eraser" */
+        size:    14,          /* logical-px stroke half-thickness */
+        pattern: "dot",
+
+        pointer: null,
+        pointerActive: false,
+        lastPaintPos: null,
+        strokedThisGesture: false,
+
+        running: false,
+        rafId: null,
+        lastT: 0,
+        inited: false
+    };
+
+    function activePack() {
+        for (let i = 0; i < GLAZE_PACKS.length; i++) {
+            if (GLAZE_PACKS[i].id === D.activePackId) return GLAZE_PACKS[i];
+        }
+        return GLAZE_PACKS[0];
+    }
+
+    /* ----- 6C. Init / sizing ----- */
+
+    function initDecorate() {
+        const c = document.getElementById("decorateCanvas");
+        if (!c) {
+            console.warn("[CRAYte] no #decorateCanvas");
+            return;
+        }
+        D.canvas = c;
+        D.ctx = c.getContext("2d");
+
+        /* Offscreen paint layer — DPR-scaled so strokes look crisp
+           on retina. Coordinates are in logical 400×600 space via
+           setTransform; resize keeps existing strokes by drawImage
+           through a temp canvas. */
+        D.paintCanvas = document.createElement("canvas");
+        D.paintCtx = D.paintCanvas.getContext("2d");
+        sizeDecorateCanvas();
+
+        D.paintCtx.lineCap = "round";
+        D.paintCtx.lineJoin = "round";
+
+        attachDecoratePointer();
+        wireDecorateButtons();
+        buildToolUI();
+
+        if (typeof ResizeObserver === "function") {
+            const ro = new ResizeObserver(function () { sizeDecorateCanvas(); });
+            ro.observe(c);
+        }
+    }
+
+    function sizeDecorateCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        D.dpr = dpr;
+        const bw = Math.round(SHAPE.W * dpr);
+        const bh = Math.round(SHAPE.H * dpr);
+        if (D.canvas) {
+            if (D.canvas.width !== bw)  D.canvas.width  = bw;
+            if (D.canvas.height !== bh) D.canvas.height = bh;
+            D.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+        if (D.paintCanvas && (D.paintCanvas.width !== bw ||
+                              D.paintCanvas.height !== bh)) {
+            /* Preserve existing paint across DPR / resize. */
+            const tmp = document.createElement("canvas");
+            tmp.width  = D.paintCanvas.width  || 1;
+            tmp.height = D.paintCanvas.height || 1;
+            if (D.paintCanvas.width && D.paintCanvas.height) {
+                tmp.getContext("2d").drawImage(D.paintCanvas, 0, 0);
+            }
+            D.paintCanvas.width  = bw;
+            D.paintCanvas.height = bh;
+            D.paintCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            D.paintCtx.lineCap = "round";
+            D.paintCtx.lineJoin = "round";
+            if (tmp.width > 1 && tmp.height > 1) {
+                D.paintCtx.drawImage(tmp, 0, 0, SHAPE.W, SHAPE.H);
+            }
+        }
+    }
+
+    function clearPaint() {
+        if (!D.paintCtx) return;
+        D.paintCtx.save();
+        D.paintCtx.setTransform(1, 0, 0, 1, 0, 0);
+        D.paintCtx.clearRect(0, 0, D.paintCanvas.width, D.paintCanvas.height);
+        D.paintCtx.restore();
+    }
+
+    /* ----- 6D. Pointer / paint ----- */
+
+    function decPointerPos(e) {
+        const r = D.canvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - r.left) * SHAPE.W / r.width,
+            y: (e.clientY - r.top)  * SHAPE.H / r.height
+        };
+    }
+
+    function attachDecoratePointer() {
+        const c = D.canvas;
+
+        c.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            try { c.setPointerCapture(e.pointerId); } catch (_) {}
+            const p = decPointerPos(e);
+            D.pointer = p;
+            D.pointerActive = true;
+            D.lastPaintPos = p;
+            D.strokedThisGesture = false;
+            if (D.tool === "stamp") {
+                stampAt(p);
+                D.strokedThisGesture = true;
+            } else {
+                paintDot(p);
+                D.strokedThisGesture = true;
+            }
+        });
+
+        c.addEventListener("pointermove", function (e) {
+            if (!D.pointerActive) return;
+            const p = decPointerPos(e);
+            if (D.tool === "brush" || D.tool === "eraser") {
+                paintStrokeTo(p);
+            }
+            D.lastPaintPos = p;
+            D.pointer = p;
+        });
+
+        function endPointer(e) {
+            if (!D.pointerActive) return;
+            D.pointerActive = false;
+            D.lastPaintPos = null;
+            try { c.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
+        c.addEventListener("pointerup",     endPointer);
+        c.addEventListener("pointercancel", endPointer);
+        c.addEventListener("pointerleave",  endPointer);
+    }
+
+    function paintDot(p) {
+        const ctx = D.paintCtx;
+        ctx.save();
+        if (D.tool === "eraser") {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.fillStyle = "#000";
+        } else {
+            ctx.fillStyle = D.glaze;
+        }
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, D.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    function paintStrokeTo(p) {
+        const ctx = D.paintCtx;
+        const last = D.lastPaintPos;
+        if (!last) { paintDot(p); return; }
+        ctx.save();
+        if (D.tool === "eraser") {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.strokeStyle = "#000";
+        } else {
+            ctx.strokeStyle = D.glaze;
+        }
+        ctx.lineWidth = D.size * 2;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function stampAt(p) {
+        const fn = PATTERN_DRAWERS[D.pattern];
+        if (!fn) return;
+        /* Slightly bigger than brush dot so a "thin" stamp still
+           reads as a recognizable shape. */
+        const r = D.size * 1.7;
+        fn(D.paintCtx, p.x, p.y, r, D.glaze);
+    }
+
+    /* ----- 6E. Tool UI ----- */
+
+    function buildToolUI() {
+        const pack = activePack();
+
+        /* Glaze swatches */
+        const gp = document.getElementById("glazePalette");
+        if (gp) {
+            gp.innerHTML = "";
+            pack.glazes.forEach(function (hex) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "swatch";
+                btn.dataset.glaze = hex;
+                btn.style.background = hex;
+                btn.setAttribute("aria-label", "Glaze " + hex);
+                if (hex === D.glaze) btn.classList.add("active");
+                btn.addEventListener("click", function () {
+                    D.glaze = hex;
+                    gp.querySelectorAll(".swatch").forEach(function (s) {
+                        s.classList.toggle("active", s.dataset.glaze === hex);
+                    });
+                    /* Picking a glaze while on eraser snaps back to brush. */
+                    if (D.tool === "eraser") setTool("brush");
+                });
+                gp.appendChild(btn);
+            });
+        }
+
+        /* Pattern stamps */
+        const pp = document.getElementById("patternPalette");
+        if (pp) {
+            pp.innerHTML = "";
+            pack.patterns.forEach(function (id) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "stamp-btn";
+                btn.dataset.pattern = id;
+                btn.setAttribute("aria-label", "Pattern " + id);
+                /* Mini preview canvas as the icon */
+                const mini = document.createElement("canvas");
+                mini.width = 36;
+                mini.height = 36;
+                const mctx = mini.getContext("2d");
+                mctx.translate(18, 18);
+                const fn = PATTERN_DRAWERS[id];
+                if (fn) fn(mctx, 0, 0, 12, "#eaf6f4");
+                btn.appendChild(mini);
+                if (id === D.pattern) btn.classList.add("active");
+                btn.addEventListener("click", function () {
+                    D.pattern = id;
+                    pp.querySelectorAll(".stamp-btn").forEach(function (s) {
+                        s.classList.toggle("active", s.dataset.pattern === id);
+                    });
+                    /* Picking a stamp implies STAMP mode. */
+                    setTool("stamp");
+                });
+                pp.appendChild(btn);
+            });
+        }
+
+        /* Tool-mode buttons */
+        document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                setTool(b.dataset.tool);
+            });
+            b.classList.toggle("active", b.dataset.tool === D.tool);
+        });
+
+        /* Size pucks */
+        document.querySelectorAll(".size-btn[data-size]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                D.size = parseInt(b.dataset.size, 10);
+                document.querySelectorAll(".size-btn").forEach(function (s) {
+                    s.classList.toggle("active", s.dataset.size === b.dataset.size);
+                });
+            });
+            b.classList.toggle("active",
+                parseInt(b.dataset.size, 10) === D.size);
+        });
+    }
+
+    function setTool(tool) {
+        D.tool = tool;
+        document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.tool === tool);
+        });
+        if (D.canvas) {
+            D.canvas.style.cursor = (tool === "eraser") ? "cell" : "crosshair";
+        }
+    }
+
+    /* ----- 6F. Buttons ----- */
+
+    function wireDecorateButtons() {
+        const back  = document.getElementById("decBack");
+        const clear = document.getElementById("decClear");
+        const fire  = document.getElementById("decFire");
+
+        if (back) back.addEventListener("click", function () {
+            /* Re-shape escape hatch: unlock clay; paint persists so
+               the decoration deforms with any re-shaping (the paint
+               composite is clipped to the new silhouette). */
+            SHAPE.clayLocked = false;
+            showScreen("shape");
+        });
+
+        if (clear) clear.addEventListener("click", function () {
+            clearPaint();
+            flashButton(clear);
+        });
+
+        if (fire) fire.addEventListener("click", function () {
+            flashButton(fire);
+            if (SCREENS["kiln"]) {
+                showScreen("kiln");
+            } else {
+                flashStub(fire, "KILN OFFLINE");
+            }
+        });
+    }
+
+    /* ----- 6G. Frame loop ----- */
+
+    function decorateFrame(t) {
+        if (!D.running) return;
+        if (!D.lastT) D.lastT = t;
+        const dt = Math.min(48, t - D.lastT);
+        D.lastT = t;
+
+        /* Wheel keeps spinning while decorating — same state as SHAPE. */
+        SHAPE.wheelPhase += (2 * Math.PI * SHAPE.WHEEL_RPM / 60) * (dt / 1000);
+        if (SHAPE.wheelPhase > Math.PI * 2) SHAPE.wheelPhase -= Math.PI * 2;
+
+        renderPotScene(D.ctx, { paintCanvas: D.paintCanvas, particles: false });
+        D.rafId = requestAnimationFrame(decorateFrame);
+    }
+
+    function startDecorateLoop() {
+        if (D.running) return;
+        D.running = true;
+        D.lastT = 0;
+        D.rafId = requestAnimationFrame(decorateFrame);
+    }
+
+    function stopDecorateLoop() {
+        D.running = false;
+        if (D.rafId) cancelAnimationFrame(D.rafId);
+        D.rafId = null;
+    }
+
+    /* ----- 6H. Register with the router ----- */
+
+    registerScreen("decorate", {
+        onEnter: function () {
+            if (!D.inited) {
+                initDecorate();
+                D.inited = true;
+            } else {
+                sizeDecorateCanvas();
+            }
+            startDecorateLoop();
+        },
+        onLeave: function () {
+            stopDecorateLoop();
+        }
+    });
+
+    /* ---------- 7. INIT (must run after all registerScreen calls) ---------- */
 
     function init() {
         initTitle();
@@ -780,7 +1304,7 @@
         init();
     }
 
-    /* ---------- 7. EXPORT ----------
+    /* ---------- 8. EXPORT ----------
        A tiny window namespace so chunks 2+ can register screens
        without rewriting this file. Strictly internal.            */
     window.CRAYte = {

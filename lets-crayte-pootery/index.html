@@ -149,7 +149,70 @@
 
 </main>
 
-<!-- Chunk 3 will mount #screen-decorate below. -->
+<!-- ============================================================
+     SCREEN: DECORATE  (chunk 3 — brushes / glazes / stamps)
+     ============================================================ -->
+<main class="screen" id="screen-decorate" hidden>
+
+    <div class="screen-titlebar">
+        <button class="back-btn" id="decBack" type="button">&larr; RE-SHAPE</button>
+        <h2 class="screen-title">&lt;&nbsp;COLOR THE THING&nbsp;&gt;</h2>
+        <span class="screen-status">UNFIRED</span>
+    </div>
+
+    <div class="decorate-stack">
+
+        <div class="canvas-wrap">
+            <canvas id="decorateCanvas" width="400" height="600"
+                    aria-label="Locked pot. Drag to paint, tap to stamp."></canvas>
+        </div>
+
+        <div class="decorate-tools">
+
+            <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
+                <button class="tool-btn" data-tool="brush"  type="button">BRUSH</button>
+                <button class="tool-btn" data-tool="stamp"  type="button">STAMP</button>
+                <button class="tool-btn" data-tool="eraser" type="button">ERASE</button>
+            </div>
+
+            <div class="tool-row size-row">
+                <span class="row-label">SIZE</span>
+                <button class="size-btn" data-size="6"  type="button" aria-label="Thin">
+                    <span class="size-dot s-thin"></span>
+                </button>
+                <button class="size-btn" data-size="14" type="button" aria-label="Medium">
+                    <span class="size-dot s-med"></span>
+                </button>
+                <button class="size-btn" data-size="24" type="button" aria-label="Thick">
+                    <span class="size-dot s-thick"></span>
+                </button>
+            </div>
+
+            <div class="tool-row palette-row">
+                <span class="row-label">GLAZE</span>
+                <div class="palette glaze-palette" id="glazePalette" role="listbox" aria-label="Glaze colors"></div>
+            </div>
+
+            <div class="tool-row palette-row">
+                <span class="row-label">STAMPS</span>
+                <div class="palette pattern-palette" id="patternPalette" role="listbox" aria-label="Stamp patterns"></div>
+            </div>
+
+        </div>
+
+        <div class="decorate-controls">
+            <button class="btn-control" id="decClear" type="button">
+                <span class="btn-label">CLEAR</span>
+            </button>
+            <button class="btn-control primary" id="decFire" type="button">
+                <span class="btn-label">FIRE IT</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+        </div>
+
+    </div>
+
+</main>
 
 <footer class="site-footer">
     <ul class="footer-nav">
