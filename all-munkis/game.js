@@ -2391,6 +2391,27 @@
         });
     }
 
+    // ---------- TRAY HEIGHT TRACKER ----------
+    // The fixed-position tray-wrap wraps onto 2 rows on phones and 1 row on
+    // tablets+. main reads --tray-h to size its padding-bottom so the stage
+    // always sits just above the tray no matter which layout is active.
+    // ResizeObserver re-measures on orientation change + viewport resize +
+    // first paint after the tray fonts/sprites load.
+    function watchTrayHeight() {
+        const tray = document.querySelector('.tray-wrap');
+        if (!tray) return;
+        const apply = () => {
+            const h = Math.ceil(tray.getBoundingClientRect().height);
+            document.documentElement.style.setProperty('--tray-h', `${h}px`);
+        };
+        apply();
+        if ('ResizeObserver' in window) {
+            new ResizeObserver(apply).observe(tray);
+        }
+        window.addEventListener('resize', apply);
+        window.addEventListener('orientationchange', apply);
+    }
+
     // ---------- INIT ----------
     function init() {
         loadProgress();
@@ -2405,6 +2426,7 @@
         attachHeaderHandlers();
         attachMoonChaos();
         attachEggDetectors();
+        watchTrayHeight();
         updateTrayHint();
         // If Moon is unlocked, surface the altar chip so the kid can swap.
         renderMunkiAltar();

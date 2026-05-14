@@ -30,16 +30,23 @@ body {
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);
     position: relative;
+    /* Vertical flex column so main can fill the viewport height between
+       the header and the (fixed) tray — used by the stage's flex-end
+       positioning that drops the Munkis to the BG floor. */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
     /* Slow filter transition gives the horror buildup time to settle in
        rather than snapping; the 4 s ease matches the corner-Munki creep. */
     transition: filter 4s ease-in-out;
 }
 
-/* React mode darkens and desaturates the whole stage photo — the world
-   slowly going wrong while the corner Munkis approach. */
-body.react-mode-active {
-    filter: brightness(0.55) saturate(0.45) contrast(1.12);
-}
+/* React mode intentionally leaves the page layout + colors alone — the
+   only horror cue is the corner Ice/Moon Munkis creeping into view (see
+   the .horror-munki block below). Per design: "the layout of the screen
+   doesn't change in horror mode, just Ice and Moon Munki slowly fading
+   in and getting bigger/more defined/scarier." */
 
 /* Soft dark vignette over the BG photo so the UI chrome reads against any
    stage art the user drops in. Always present, not tied to react mode. */
@@ -57,64 +64,62 @@ body::before {
 body > * { position: relative; z-index: 1; }
 
 /* ====== HORROR-MODE CORNER MUNKIS ======
-   Moon Munki creeps in from the lower-left, Ice Munki from the lower-right.
-   They're invisible by default and slide + fade into view over ~4 s when
-   body.react-mode-active is set. The slow approach is the new "scary":
-   the kid sees them before they realise they're being watched. Frames are
-   cropped via the SVG viewBox from assets/bg-img/bg-munkis.png. */
+   Moon Munki creeps in from the lower-left corner, Ice Munki from the
+   lower-right. Anchored to the viewport bottom so their feet always touch
+   the bottom of the screen (responsive: height is capped by viewport
+   width so the sprites don't overwhelm narrow phones).
+   The reveal is intentionally slow — ~12 s of fade-in while the sprites
+   scale up and a soft blur lifts. The user should not notice them
+   arriving; they should look up and find someone already there. */
 .horror-munki {
     position: fixed;
-    bottom: -2vh;
-    height: 86vh;
+    bottom: 0;
+    height: min(78vh, 70vw);
     width: auto;
     aspect-ratio: 432 / 988;
     pointer-events: none;
     z-index: 40;          /* over the stage, under modals/jumpscare/tray */
     opacity: 0;
-    /* The Munki starts pushed off-screen by 25% of its width plus a slight
-       droop, so the slow ease feels like they're rising from the wings. */
-    filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.7));
+    transform-origin: 50% 100%;  /* scale up from feet so they "stand up" */
+    filter: blur(8px) drop-shadow(0 12px 32px rgba(0, 0, 0, 0.7));
     transition:
-        opacity   4.5s ease-in,
-        transform 5s   ease-in-out,
-        filter    4.5s ease-in;
+        opacity   12s ease-in,
+        transform 12s ease-out,
+        filter    12s ease-in;
 }
 .horror-munki--moon {
-    left:  -8vw;
-    transform: translate(-25%, 22%) scale(0.92);
+    left: 0;
+    transform: translateX(-12%) scale(0.55);
 }
 .horror-munki--ice {
-    right: -8vw;
-    transform: translate( 25%, 22%) scale(0.92);
+    right: 0;
+    transform: translateX( 12%) scale(0.55);
 }
 
 body.react-mode-active .horror-munki {
-    opacity: 0.95;
-    /* Subtle blood-red glow once visible. */
-    filter: drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
-            drop-shadow(0 0 40px rgba(255, 40, 40, 0.25));
+    opacity: 0.96;
+    /* Final pose: sharp focus + a dim blood-red glow that says "they're
+       definitely here now." */
+    filter: blur(0) drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
+                    drop-shadow(0 0 40px rgba(255, 40, 40, 0.28));
 }
-body.react-mode-active .horror-munki--moon {
-    transform: translate(0, 0) scale(1);
-}
-body.react-mode-active .horror-munki--ice {
-    transform: translate(0, 0) scale(1);
-}
+body.react-mode-active .horror-munki--moon { transform: translateX(0) scale(1); }
+body.react-mode-active .horror-munki--ice  { transform: translateX(0) scale(1); }
 
 /* Slow ominous breathing — barely-perceptible scale pulse while visible.
-   Kicks in AFTER the entry transform finishes (~5 s) so it doesn't fight
+   Kicks in AFTER the entry transform finishes (~12 s) so it doesn't fight
    the creep-in. */
 @keyframes horror-munki-breathe {
     0%, 100% { transform: translate(0, 0) scale(1); }
     50%      { transform: translate(0, -0.6%) scale(1.015); }
 }
-body.react-mode-active .horror-munki--moon { animation: horror-munki-breathe 5.2s ease-in-out 5s infinite; }
-body.react-mode-active .horror-munki--ice  { animation: horror-munki-breathe 5.6s ease-in-out 5s infinite; }
+body.react-mode-active .horror-munki--moon { animation: horror-munki-breathe 5.2s ease-in-out 12s infinite; }
+body.react-mode-active .horror-munki--ice  { animation: horror-munki-breathe 5.6s ease-in-out 12s infinite; }
 
-/* Reduced-motion: no creep, no breathing — a quick low-opacity flash so the
-   kid is still aware something's happening without motion sickness. */
+/* Reduced-motion: no slow creep, no breathing — a short opacity fade so
+   the kid is still aware something's happening without the motion. */
 @media (prefers-reduced-motion: reduce) {
-    .horror-munki { transition: opacity 0.6s ease-in; transform: none !important; }
+    .horror-munki { transition: opacity 1.2s ease-in; transform: none !important; filter: none; }
     .horror-munki--moon, .horror-munki--ice { animation: none !important; }
     body.react-mode-active .horror-munki { opacity: 0.7; }
 }
@@ -261,42 +266,35 @@ h1 {
 .icon-btn:hover { background: rgba(45, 212, 191, 0.1); }
 .icon-btn.muted { color: #db2777; border-color: #db2777; }
 
-/* ====== MAIN / STAGE ====== */
+/* ====== MAIN / STAGE ======
+   main is a vertical flex container that fills the viewport between the
+   header and the fixed tray. justify-content: flex-end pins the stage
+   to the bottom of main's content area — which lands the Munkis directly
+   above the tray, looking like they're standing on the rainbow floor of
+   the stage.jpg background photo. */
 main {
+    /* flex:1 fills the viewport height between the header and the (fixed)
+       tray, since body is now a flex column. padding-bottom reserves the
+       tray's actual height (set on --tray-h by JS) so the Munkis on stage
+       come to rest just above the tray. */
+    flex: 1 1 auto;
+    width: 100%;
     max-width: 1200px;
     margin: 0 auto;
-    padding: 22px 18px 240px;
+    padding: 22px 18px calc(var(--tray-h, 240px) + 12px);
     display: flex;
     flex-direction: column;
+    justify-content: flex-end;
     gap: 20px;
 }
 
+/* The frame is gone — no border, no backdrop blur, no dot pattern. The
+   Munkis sit directly on the BG photo's rainbow floor. .stage-wrap stays
+   in markup so the existing JS hooks (and any descendant selectors) keep
+   working, but it's now a transparent positioning shell. */
 .stage-wrap {
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(45, 212, 191, 0.25);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-    border-radius: 18px;
-    padding: 22px 14px;
     position: relative;
-    overflow: hidden;
 }
-
-.stage-wrap::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background-image: radial-gradient(rgba(45, 212, 191, 0.18) 1px, transparent 1px);
-    background-size: 30px 30px;
-    opacity: 0.32;
-    pointer-events: none;
-}
-
-/* (Earlier versions painted a CSS-built dance floor here. Now the
-   stage.jpg BG photo is the floor itself, so this block is intentionally
-   empty — the .stage-wrap dot pattern and the per-slot footlight halos
-   below provide enough on-stage texture.) */
 
 .stage {
     display: grid;
@@ -634,10 +632,8 @@ main {
     width: 100%;
 }
 
-/* ====== DESKTOP: roomier bottom padding so the wrapped tray clears ====== */
-@media (min-width: 760px) {
-    main { padding-bottom: 290px; }
-}
+/* (Desktop tray padding is now driven by --tray-h on main — see the main
+   rule above. No fixed override needed.) */
 
 /* ====== MOBILE TUNING ====== */
 @media (max-width: 720px) {
@@ -649,8 +645,7 @@ main {
     .icon-btn { width: 40px; height: 40px; font-size: 18px; }
     .subtitle { font-size: 10px; letter-spacing: 0.14em; }
 
-    main { padding: 14px 10px 220px; gap: 14px; }
-    .stage-wrap { padding: 14px 8px; border-radius: 14px; }
+    main { padding: 14px 10px calc(var(--tray-h, 240px) + 10px); gap: 14px; }
     .stage { gap: 4px; }
     .slot-label { font-size: 9px; letter-spacing: 0.08em; margin-top: 2px; }
 
@@ -663,18 +658,15 @@ main {
     h1 { font-size: 26px; }
     .status { font-size: 9px; letter-spacing: 0.2em; }
     .subtitle { font-size: 9px; }
-    main { padding: 12px 6px 210px; }
-    .stage-wrap { padding: 10px 4px; }
+    main { padding: 12px 6px calc(var(--tray-h, 240px) + 8px); }
     .stage { gap: 3px; }
     .slot-label { font-size: 8px; }
     .tray-chip { width: 70px; height: 92px; }
     .chip-label { font-size: 8px; }
 }
 
-/* ====== Tall narrow phones — give the tray a touch more breathing room ====== */
-@media (max-height: 700px) and (max-width: 720px) {
-    main { padding-bottom: 200px; }
-}
+/* (Was: explicit padding-bottom on short phones. Now main reads --tray-h
+   on every breakpoint so the value auto-tracks the actual tray height.) */
 
 /* ====== JUMP SCARE ======
    When body.jumpscare is set, four things happen at once:
@@ -871,13 +863,8 @@ body.madballz-mode header {
 }
 body.madballz-mode .status { color: #ef4444; }
 body.madballz-mode .subtitle { color: rgba(239, 68, 68, 0.7); }
-body.madballz-mode .stage-wrap {
-    border-color: rgba(168, 85, 247, 0.45);
-    box-shadow: 0 8px 32px 0 rgba(60, 0, 30, 0.85);
-}
-body.madballz-mode .stage-wrap::before {
-    background-image: radial-gradient(rgba(168, 85, 247, 0.2) 1px, transparent 1px);
-}
+/* (Dormant: previously re-themed the .stage-wrap frame in Madballz mode.
+   The frame is gone in the redesign — Munkis stand directly on the BG.) */
 /* Madballz dance floor — recolour the active slot footlight halo to the
    purple palette so the spotlight reads against the red/violet BG. */
 body.madballz-mode .stage-slot.active::before {
