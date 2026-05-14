@@ -209,9 +209,17 @@
                     aria-label="Pottery wheel. Drag to shape the clay."></canvas>
         </div>
 
-        <!-- Side rail: stacks under canvas on phone, sits to the
-             right of canvas on tablet+ (>=768px wide). -->
+        <!-- Side rail: on tablet+ (>=768px) sits to the right of
+             the canvas. On phone (<768px) it becomes a fixed
+             bottom-sheet drawer — drawer-handle stays visible
+             while the rest slides off-screen until tapped open. -->
         <div class="shape-side-rail">
+
+            <button class="drawer-handle" type="button"
+                    aria-expanded="false" aria-label="Show tools">
+                <span class="drawer-pull" aria-hidden="true">&#9650;</span>
+                <span class="drawer-label">TOOLS</span>
+            </button>
 
             <div class="clay-picker" id="clayPicker" role="tablist" aria-label="Clay material">
                 <span class="row-label">CLAY</span>
@@ -263,11 +271,17 @@
             </button>
         </div>
 
-        <!-- Side rail: tools + controls stack here. On phone this
-             sits below the canvas (default flex column). On
-             tablet+ (>=768px) flex flips to row and the rail
-             docks to the right of the canvas. -->
+        <!-- Side rail: on tablet+ (>=768px) sits to the right of
+             the canvas. On phone (<768px) becomes a fixed
+             bottom-sheet drawer; .drawer-handle stays visible
+             while the rest slides off-screen until tapped open. -->
         <div class="decorate-side-rail">
+
+        <button class="drawer-handle" type="button"
+                aria-expanded="false" aria-label="Show tools">
+            <span class="drawer-pull" aria-hidden="true">&#9650;</span>
+            <span class="drawer-label">TOOLS</span>
+        </button>
 
         <div class="decorate-tools">
 

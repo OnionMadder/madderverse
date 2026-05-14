@@ -6843,10 +6843,46 @@
 
     /* ---------- 9. INIT (must run after all registerScreen calls) ---------- */
 
+    /* Bottom-sheet drawer wiring (phone only). The .drawer-handle
+       inside each side-rail toggles .is-open. Tapping the canvas
+       auto-collapses any open drawer so the user can paint /
+       shape without first dismissing it. */
+    function wireDrawerHandles() {
+        document.querySelectorAll(".drawer-handle").forEach(function (h) {
+            h.addEventListener("click", function () {
+                const rail = h.parentElement;
+                if (!rail) return;
+                const open = rail.classList.toggle("is-open");
+                h.setAttribute("aria-expanded", open ? "true" : "false");
+                h.setAttribute("aria-label",
+                    open ? "Hide tools" : "Show tools");
+            });
+        });
+
+        function collapseOpenDrawers() {
+            document.querySelectorAll(
+                ".shape-side-rail.is-open, .decorate-side-rail.is-open"
+            ).forEach(function (rail) {
+                rail.classList.remove("is-open");
+                const h = rail.querySelector(".drawer-handle");
+                if (h) {
+                    h.setAttribute("aria-expanded", "false");
+                    h.setAttribute("aria-label", "Show tools");
+                }
+            });
+        }
+
+        ["shapeCanvas", "decorateCanvas"].forEach(function (id) {
+            const c = document.getElementById(id);
+            if (c) c.addEventListener("pointerdown", collapseOpenDrawers);
+        });
+    }
+
     function init() {
         initTitle();
         initEggs();
         showScreen("title");
+        wireDrawerHandles();
         /* Phase 1: kick off auth boot AFTER the title is mounted
            so the user sees something immediately. The auth
            round-trip is async (esp. on the callback hash path,
