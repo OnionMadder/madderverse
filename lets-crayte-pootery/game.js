@@ -943,6 +943,129 @@
 
     /* ----- 5F. Render ----- */
 
+    /* OVERFIRED overlay (Day 4 chunk B) — heavy multiply char +
+       seeded crack network + ash blobs + ember specks. Clipped
+       to the pot path. Caller already swapped SHAPE.clay if it
+       wants a specific shape. Seed must be non-zero (use a hash
+       of the entry id or a Date.now() at overheat time).        */
+    function drawOverfiredOverlay(ctx, seed) {
+        const rand = mulberry32(seed || 1);
+        ctx.save();
+        buildPotPath(ctx);
+        ctx.clip();
+
+        /* Deep char — heavier multiply than the chunk-8 first pass. */
+        ctx.globalCompositeOperation = "multiply";
+        ctx.fillStyle = "rgba(48, 22, 8, 0.65)";
+        ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+        ctx.globalCompositeOperation = "source-over";
+
+        /* Crack network — 6 jagged polylines wandering across the
+           pot, each with optional perpendicular branch. */
+        for (let c = 0; c < 6; c++) {
+            let x = SHAPE.centerX + (rand() - 0.5) * 200;
+            let y = 110 + rand() * 380;
+            let angle = rand() * Math.PI * 2;
+            ctx.strokeStyle = "rgba(0, 0, 0, " +
+                (0.45 + rand() * 0.25) + ")";
+            ctx.lineWidth = 0.6 + rand() * 0.6;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            const segs = 6 + Math.floor(rand() * 4);
+            for (let s = 0; s < segs; s++) {
+                angle += (rand() - 0.5) * 1.4;
+                x += Math.cos(angle) * (5 + rand() * 7);
+                y += Math.sin(angle) * (5 + rand() * 7);
+                ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            if (rand() < 0.6) {
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                const bx = x + Math.cos(angle + 1.3) * 8;
+                const by = y + Math.sin(angle + 1.3) * 8;
+                ctx.lineTo(bx, by);
+                ctx.stroke();
+            }
+        }
+
+        /* Ash blobs — bigger than chunk-8 dots, irregular. */
+        for (let i = 0; i < 14; i++) {
+            const px = SHAPE.centerX + (rand() - 0.5) * 180;
+            const py = 100 + rand() * 400;
+            const r1 = 2 + rand() * 5;
+            const r2 = r1 * (0.4 + rand() * 0.4);
+            ctx.fillStyle = "rgba(0, 0, 0, " +
+                (0.30 + rand() * 0.30) + ")";
+            ctx.beginPath();
+            ctx.ellipse(px, py, r1, r2,
+                        rand() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        /* Ember-orange specks. */
+        for (let i = 0; i < 6; i++) {
+            const px = SHAPE.centerX + (rand() - 0.5) * 160;
+            const py = 130 + rand() * 360;
+            ctx.fillStyle = "rgba(255, 90, 30, " +
+                (0.30 + rand() * 0.35) + ")";
+            ctx.beginPath();
+            ctx.arc(px, py, 0.8 + rand() * 1.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    /* EXPLODED memorial (Day 4 chunk B) — the gallery treats an
+       exploded entry like a tribute. We render the saved pot
+       (so the user can still see what it looked like) and then
+       overlay severe cracks + a dimmer + a tilted EXPLODED tag.
+       Seeded for stability.                                      */
+    function drawExplodedMemorial(ctx, seed) {
+        const rand = mulberry32(seed || 1);
+        /* Dim the whole image */
+        ctx.save();
+        ctx.fillStyle = "rgba(0, 0, 0, 0.40)";
+        ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+        /* Severe cracks — straight lines radiating from a central
+           "impact point" + a few wandering polylines for texture. */
+        const cx = SHAPE.centerX + (rand() - 0.5) * 60;
+        const cy = 200 + rand() * 200;
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.lineWidth = 1.2;
+        const radial = 9;
+        for (let i = 0; i < radial; i++) {
+            const a = (i / radial) * Math.PI * 2 + rand() * 0.4;
+            const len = 100 + rand() * 130;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + Math.cos(a) * len, cy + Math.sin(a) * len);
+            ctx.stroke();
+        }
+        /* Central impact glow */
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 90);
+        g.addColorStop(0,    "rgba(255, 200, 100, 0.55)");
+        g.addColorStop(0.4,  "rgba(255, 90, 30, 0.30)");
+        g.addColorStop(1,    "rgba(255, 90, 30, 0)");
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+        ctx.restore();
+
+        /* Tilted "EXPLODED" tag stamped in the corner */
+        ctx.save();
+        ctx.translate(SHAPE.W * 0.5, SHAPE.H * 0.18);
+        ctx.rotate(-0.14);
+        ctx.font = "bold 28px \"Bungee\", Impact, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 5;
+        ctx.strokeText("EXPLODED", 0, 0);
+        ctx.fillStyle = "#ff4040";
+        ctx.fillText("EXPLODED", 0, 0);
+        ctx.restore();
+    }
+
     /* Shared by SHAPE, DECORATE, and KILN. All three render the same
        pot from SHAPE.clay; decorate composites a paint layer, kiln
        additionally applies a "fired" warm overlay + can suppress its
@@ -997,28 +1120,12 @@
             ctx.restore();
         }
 
-        /* OVERFIRED — chunk-8 egg, layers a darker burnt char on
-           top of the normal fired tint. */
+        /* OVERFIRED — chunk-8 egg, refined in Day 4 chunk B.
+           Heavier multiply char + crack network + ash + embers.
+           Same renderer used by gallery thumbnails — deterministic
+           per-pot via the seed. */
         if (opts.overfired) {
-            ctx.save();
-            buildPotPath(ctx);
-            ctx.clip();
-            ctx.globalCompositeOperation = "multiply";
-            ctx.fillStyle = "rgba(60, 28, 10, 0.55)";
-            ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
-            ctx.globalCompositeOperation = "source-over";
-            /* Scattered black crackle marks */
-            for (let i = 0; i < 36; i++) {
-                const px = SHAPE.centerX +
-                    (Math.random() - 0.5) * 200;
-                const py = 100 + Math.random() * 400;
-                ctx.fillStyle = "rgba(0, 0, 0, " +
-                    (0.18 + Math.random() * 0.30) + ")";
-                ctx.beginPath();
-                ctx.arc(px, py, 1 + Math.random() * 2, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.restore();
+            drawOverfiredOverlay(ctx, (opts.overfiredSeed | 0) || 1);
         }
 
         /* Rim opening on top — drawn AFTER paint so the rim ring
@@ -1417,6 +1524,31 @@
         ctx.lineTo(x, y + r);
         ctx.quadraticCurveTo(x, y, x + r, y);
         ctx.closePath();
+    }
+
+    /* Deterministic PRNG (Mulberry32) — used by anything that
+       wants frame-to-frame stable randomness from a seed.
+       Returns a [0, 1) generator. Currently powers the
+       overfired crack/ash pattern so it doesn't flicker. */
+    function mulberry32(seed) {
+        let t = (seed | 0) >>> 0;
+        return function () {
+            t = (t + 0x6D2B79F5) | 0;
+            let r = Math.imul(t ^ (t >>> 15), 1 | t);
+            r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+            return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+        };
+    }
+
+    /* Cheap string -> 32-bit hash for seeding from entry IDs. */
+    function strHash(s) {
+        s = String(s || "");
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < s.length; i++) {
+            h ^= s.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
     }
 
     /* Tint a hex color lighter (amt > 0) or darker (amt < 0).
@@ -2642,6 +2774,9 @@
         crackleTimer: 0,
 
         fired: false,        /* true once the firing reveal lands */
+        exploded: false,     /* set true if the pot blows up mid-fire */
+        willExplode: false,  /* the 3% roll, decided at intro */
+        shards: [],          /* clay shrapnel during/after explosion */
         audio: null,
         savedId: null,       /* id of the latest auto-saved pot */
 
@@ -2652,13 +2787,19 @@
     };
 
     const KILN_DUR = {
-        intro:   500,
-        closing: 700,
-        firing:  3500,
-        opening: 700,
-        reveal:  1500,
-        done:    Infinity
+        intro:    500,
+        closing:  700,
+        firing:   3500,
+        opening:  700,
+        reveal:   1500,
+        exploded: 2500,   /* shards-fly window after a kaboom */
+        done:     Infinity
     };
+
+    /* ~3% chance any given firing ends in tears. The reward
+       loop is that exploded pots still save to the gallery as
+       their own kind of trophy — see autoSaveFiredPot. */
+    const EXPLODE_CHANCE = 0.03;
 
     const NICE_POT_LINES = [
         "NICE POT",
@@ -2668,6 +2809,17 @@
         "VERY WAS POOTED",
         "CONGRATS DUDE",
         "SO CRAYTED"
+    ];
+
+    const EXPLODED_LINES = [
+        "POT EXPLODED",
+        "WELP",
+        "RIP POT",
+        "POOTSPLOSION",
+        "NOT THE POT",
+        "POT FELL APART",
+        "KILN SAID NO",
+        "TOO MUCH CLAY ENERGY"
     ];
 
     /* ----- 7A. Init ----- */
@@ -2749,14 +2901,20 @@
     function showCelebrate() {
         const cel = document.getElementById("kilnCelebrate");
         const sub = document.getElementById("kilnSub");
+        const title = document.getElementById("kilnCelebTitle");
         const saved = document.getElementById("kilnSaved");
         const ctrls = document.getElementById("kilnControls");
-        if (sub) sub.textContent = NICE_POT_LINES[
-            Math.floor(Math.random() * NICE_POT_LINES.length)
+        const pool = KILN.exploded ? EXPLODED_LINES : NICE_POT_LINES;
+        if (sub) sub.textContent = pool[
+            Math.floor(Math.random() * pool.length)
         ];
+        if (title) title.textContent = KILN.exploded ? "EXPLODED" : "FIRED";
+        if (cel) cel.classList.toggle("is-exploded", KILN.exploded);
         if (saved) {
             saved.textContent = KILN.savedId
-                ? "✓ SAVED TO GALLERY"
+                ? (KILN.exploded
+                    ? "✓ SHRAPNEL ARCHIVED"
+                    : "✓ SAVED TO GALLERY")
                 : "⚠ SAVE FAILED";
             saved.hidden = false;
         }
@@ -2797,7 +2955,13 @@
                 fired: true,
                 /* Chunk-8 egg: overheated pots get an extra-crispy
                    render in the gallery + a tag. */
-                overfired: EGG.overheatTriggered === true
+                overfired: EGG.overheatTriggered === true,
+                /* Stable seed so the saved char pattern matches
+                   what the user saw in the kiln. */
+                overfiredSeed: EGG.overheatSeed || 0,
+                /* Day-4 chunk B: exploded pots saved as shattered
+                   trophies rather than thrown out. */
+                exploded: KILN.exploded === true
             };
             existing.push(entry);
             /* Cap at 50 — keep newest. Brief calls for the "you have
@@ -2955,6 +3119,120 @@
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size * (1 - t * 0.5), 0, Math.PI * 2);
             ctx.fill();
+        }
+    }
+
+    /* ----- 7E2. Shards (kiln explosion) -----
+       28 chunks of clay launch outward from the pot at the
+       moment of detonation. Each carries gravity + rotation +
+       its own clay-colored facets so they look like ceramic
+       fragments, not just generic confetti.                   */
+    function spawnExplosion() {
+        KILN.shards.length = 0;
+        const mat = currentClay();
+        /* The shards inherit one of the clay's gradient stops so a
+           porcelain explosion is white shards, a galaxy explosion
+           is blue, etc. */
+        const palette = mat.unfired.slice(1, 5);
+        const count = 28;
+        for (let i = 0; i < count; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const speed = 0.18 + Math.random() * 0.25;
+            const startY = 150 + Math.random() * 320;
+            KILN.shards.push({
+                x:  SHAPE.centerX + (Math.random() - 0.5) * 80,
+                y:  startY,
+                vx: Math.cos(a) * speed,
+                vy: Math.sin(a) * speed - 0.18,   /* bias upward */
+                rot: Math.random() * Math.PI * 2,
+                vrot: (Math.random() - 0.5) * 0.012,
+                size: 7 + Math.random() * 14,
+                color: palette[Math.floor(Math.random() * palette.length)],
+                edge:  mat.outline,
+                life:  KILN_DUR.exploded,
+                age:   0
+            });
+        }
+    }
+
+    function updateShards(dt) {
+        const s = KILN.shards;
+        const grav = 0.0009;
+        for (let i = s.length - 1; i >= 0; i--) {
+            const p = s[i];
+            p.age += dt;
+            if (p.age >= p.life) { s.splice(i, 1); continue; }
+            p.vy += grav * dt;
+            p.x  += p.vx * dt;
+            p.y  += p.vy * dt;
+            p.rot += p.vrot * dt;
+        }
+    }
+
+    function drawKilnShards(ctx) {
+        const s = KILN.shards;
+        for (let i = 0; i < s.length; i++) {
+            const p = s[i];
+            const t = p.age / p.life;
+            const a = Math.max(0, 1 - t * 0.85);
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.rot);
+            /* Jagged triangular shard */
+            ctx.fillStyle = p.color;
+            ctx.strokeStyle = p.edge;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(0, -p.size * 0.5);
+            ctx.lineTo(p.size * 0.45, p.size * 0.3);
+            ctx.lineTo(-p.size * 0.35, p.size * 0.55);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    /* Explosion SFX — big low rumble + sharp crack + reverb-y
+       crackle tail. All synthesized, no samples.               */
+    function explosionSfx() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const now = ctx.currentTime;
+        /* Low rumble */
+        const rumbleLen = Math.floor(ctx.sampleRate * 0.7);
+        const buf = ctx.createBuffer(1, rumbleLen, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < rumbleLen; i++) {
+            const env = Math.pow(1 - i / rumbleLen, 0.45);
+            const white = Math.random() * 2 - 1;
+            last = (last + 0.03 * white) / 1.03;
+            data[i] = last * 4.5 * env;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 380;
+        const gR = ctx.createGain();
+        gR.gain.value = 0.45;
+        src.connect(lp); lp.connect(gR); gR.connect(ctx.destination);
+        src.start(now);
+        /* Sharp transient */
+        const oscK = ctx.createOscillator();
+        oscK.type = "square";
+        oscK.frequency.setValueAtTime(90, now);
+        oscK.frequency.exponentialRampToValueAtTime(22, now + 0.18);
+        const gK = ctx.createGain();
+        gK.gain.setValueAtTime(0.42, now);
+        gK.gain.exponentialRampToValueAtTime(0.001, now + 0.30);
+        oscK.connect(gK); gK.connect(ctx.destination);
+        oscK.start(now); oscK.stop(now + 0.32);
+        /* Crackle tail (4 quick pops) */
+        for (let i = 0; i < 4; i++) {
+            setTimeout(kilnCrackle, 80 + i * 90 + Math.random() * 60);
         }
     }
 
@@ -3189,19 +3467,23 @@
         /* Pot in place (translated during intro for slide-in). The
            pot's own backdrop is suppressed — kiln chrome is its own
            background. Wheel + corners suppressed (kiln chrome owns
-           those areas). */
-        ctx.save();
-        ctx.translate(0, KILN.potOffsetY);
-        renderPotScene(ctx, {
-            paintCanvas: D.paintCanvas,
-            particles:   false,
-            background:  false,
-            wheel:       false,
-            corners:     false,
-            fired:       KILN.fired,
-            overfired:   EGG.overheatTriggered
-        });
-        ctx.restore();
+           those areas). Skip the pot entirely once the kiln has
+           detonated — there's nothing left to render. */
+        if (!KILN.exploded) {
+            ctx.save();
+            ctx.translate(0, KILN.potOffsetY);
+            renderPotScene(ctx, {
+                paintCanvas: D.paintCanvas,
+                particles:   false,
+                background:  false,
+                wheel:       false,
+                corners:     false,
+                fired:       KILN.fired,
+                overfired:   EGG.overheatTriggered,
+                overfiredSeed: EGG.overheatSeed
+            });
+            ctx.restore();
+        }
 
         /* Glow comes from BEHIND the doors when doors are mostly
            closed (firing). For visual layering we draw it now —
@@ -3216,6 +3498,9 @@
 
         /* Sparks live ABOVE the kiln (chimney smoke). */
         drawKilnSparks(ctx);
+
+        /* Shards on top of everything during explosion. */
+        if (KILN.shards.length) drawKilnShards(ctx);
     }
 
     /* ----- 7G. State machine ----- */
@@ -3228,6 +3513,14 @@
             KILN.doorProgress = 1.0;
             KILN.glowIntensity = 0;
             KILN.fired = false;
+            KILN.exploded = false;
+            KILN.shards.length = 0;
+            /* Roll the 3% kaboom now so the kiln knows whether
+               it's heading for FIRED or EXPLODED before doors
+               close. EGG.oneFrameFire skips the roll (devs want
+               predictable behavior). */
+            KILN.willExplode = !EGG.oneFrameFire &&
+                               Math.random() < EXPLODE_CHANCE;
             clearOverheat();
             hideCelebrate();
             /* 1-FRAME EXPLOSION ON FIRE (dev egg) — skip every
@@ -3260,6 +3553,14 @@
             kilnDing();
             haptic([12, 40, 24, 40, 60]);
             showCelebrate();
+        } else if (state === "exploded") {
+            setKilnStatus("EXPLODED");
+            KILN.exploded = true;
+            spawnExplosion();
+            explosionSfx();
+            haptic([90, 40, 60, 40, 200]);
+            autoSaveFiredPot();
+            showCelebrate();
         } else if (state === "done") {
             /* user takes the wheel from here */
         }
@@ -3267,11 +3568,15 @@
 
     function kilnAdvance() {
         switch (KILN.state) {
-            case "intro":   kilnEnter("closing"); break;
-            case "closing": kilnEnter("firing");  break;
-            case "firing":  kilnEnter("opening"); break;
-            case "opening": kilnEnter("reveal");  break;
-            case "reveal":  kilnEnter("done");    break;
+            case "intro":    kilnEnter("closing");  break;
+            case "closing":  kilnEnter("firing");   break;
+            /* Firing branches: explode at the peak (~60% in) or
+               continue to a normal opening + reveal. */
+            case "firing":   kilnEnter(KILN.willExplode
+                                ? "exploded" : "opening"); break;
+            case "opening":  kilnEnter("reveal");   break;
+            case "reveal":   kilnEnter("done");     break;
+            case "exploded": kilnEnter("done");     break;
         }
     }
 
@@ -3319,6 +3624,14 @@
                 kilnCrackle();
                 KILN.crackleTimer = 0;
             }
+            /* Pre-emptive kaboom at the peak (~60% in) — gives
+               the explosion time to play its full 2.5s window
+               before the user clicks anything. The else branch
+               in kilnAdvance still routes to "opening" if we
+               somehow reach 100% without detonating. */
+            if (KILN.willExplode && t01 >= 0.60) {
+                kilnEnter("exploded");
+            }
         } else if (st === "opening") {
             KILN.potOffsetY = 0;
             KILN.doorProgress = t01;
@@ -3327,6 +3640,12 @@
             KILN.potOffsetY = 0;
             KILN.doorProgress = 1;
             KILN.glowIntensity = 0;
+        } else if (st === "exploded") {
+            /* Doors fling open + a brief glow flare that fades fast */
+            KILN.potOffsetY = 0;
+            KILN.doorProgress = Math.min(1, t01 * 3);
+            KILN.glowIntensity = Math.max(0, 1.0 - t01 * 2.5);
+            updateShards(dt);
         } else { /* idle */
             KILN.doorProgress = 1;
             KILN.glowIntensity = 0;
@@ -3496,17 +3815,19 @@
                 ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
                 ctx.restore();
             }
-            /* Overfired-tag entries get the burnt char overlay too. */
+            /* Overfired-tag entries get the burnt char overlay too —
+               same renderer as the kiln so gallery matches reveal. */
             if (entry.overfired) {
-                ctx.save();
-                buildPotPath(ctx);
-                ctx.clip();
-                ctx.globalCompositeOperation = "multiply";
-                ctx.fillStyle = "rgba(60, 28, 10, 0.55)";
-                ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
-                ctx.restore();
+                const seed = entry.overfiredSeed || strHash(entry.id);
+                drawOverfiredOverlay(ctx, seed);
             }
             drawRim(ctx);
+            /* Exploded memorial — overlay a "shattered" treatment
+               on top of the rendered pot. Deterministic seed from
+               the entry id so the cracks are stable.              */
+            if (entry.exploded) {
+                drawExplodedMemorial(ctx, strHash(entry.id));
+            }
         } finally {
             SHAPE.clay = savedClay;
             SHAPE.clayTypeId = savedClayTypeId;
@@ -3928,6 +4249,10 @@
 
     function triggerOverheat() {
         EGG.overheatTriggered = true;
+        /* Freeze the crack-network seed once per overheat so the
+           pattern stays put across frames + reads as the same
+           pot in the gallery save. */
+        EGG.overheatSeed = (Date.now() & 0x7fffffff) | 1;
         document.body.classList.add("kiln-overheat");
         /* Longer roar + extra crackle storm */
         kilnRoar(2.5);

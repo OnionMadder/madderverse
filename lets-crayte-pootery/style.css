@@ -1216,6 +1216,34 @@ a:focus-visible {
         0 0 14px rgba(255, 140, 30, 0.55);
 }
 
+/* Exploded variant — red/violent palette instead of celebratory
+   orange. The text shake reads as a small "this hurts" tremor. */
+.kiln-celebrate.is-exploded .celebrate-title {
+    color: #fff;
+    text-shadow:
+        4px 4px 0 #7a1818,
+        -2px -2px 0 #ff3a3a,
+        0 0 28px rgba(255, 60, 30, 0.85),
+        0 0 56px rgba(255, 30, 20, 0.55);
+    transform: rotate(-2deg);
+    animation: explode-jitter 0.10s steps(2) 8;
+}
+
+.kiln-celebrate.is-exploded .celebrate-sub {
+    color: #ff9060;
+    text-shadow:
+        2px 2px 0 #000,
+        0 0 14px rgba(255, 90, 30, 0.7);
+}
+
+@keyframes explode-jitter {
+    0%   { transform: translate(0, 0) rotate(-2deg); }
+    25%  { transform: translate(-3px, 1px) rotate(-3deg); }
+    50%  { transform: translate(3px, -2px) rotate(-1deg); }
+    75%  { transform: translate(-2px, 2px) rotate(-3deg); }
+    100% { transform: translate(0, 0) rotate(-2deg); }
+}
+
 .celebrate-saved {
     margin: 22px 0 0;
     font-family: var(--font-lcd);
