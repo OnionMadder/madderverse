@@ -80,13 +80,19 @@
     <!-- Full-screen "BOO!" text that flashes during a jump scare. -->
     <div id="booOverlay" class="boo-overlay" aria-hidden="true">BOO!</div>
 
-    <!-- Egg counter chip. Hidden by default; revealed once the kid finds
-         their first hidden interaction. Updated by updateEggCounter() to
-         show e.g. "🌙 2/5". After Moon unlocks, swaps to "🌙 FOUND". -->
-    <div id="eggCounter" class="egg-counter" aria-live="polite" hidden>
+    <!-- Egg counter chip. Hidden by default; revealed on first achievement.
+         Tap to open the achievements panel listing every unlocked entry. -->
+    <button id="eggCounter" class="egg-counter" type="button" aria-live="polite"
+            aria-haspopup="dialog" aria-label="Open achievements" hidden>
         <span class="egg-counter-icon" aria-hidden="true">🌙</span>
         <span class="egg-counter-text">0/5</span>
-    </div>
+    </button>
+
+    <!-- Achievements panel — populated by renderAchievementsPanel() on open.
+         Lists only the achievements the kid has unlocked; locked ones don't
+         appear at all so the discovery surface stays intact. -->
+    <aside id="achievementsPanel" class="achievements-panel"
+           aria-hidden="true" role="dialog" aria-label="Achievements"></aside>
 
     <!-- Moon Munki reveal overlay. Fades in when the 5th egg is found,
          shows a moon glyph + "MOON MUNKI AWAKENED" text, fades out after

@@ -46,23 +46,50 @@
     let madballzUnlocked = false;
     let isMadballzMode = false;
 
-    // ---------- EASTER-EGG STATE ----------
-    // 5 hidden interactions the kid can find across the page. Each id is
-    // recorded once in munkiSightings (set, deduped). Hitting MOON_UNLOCK_
-    // THRESHOLD unique sightings flips moonUnlocked, plays the reveal
-    // animation, and appends Moon to the bank. Persists across sessions
-    // via the existing STORAGE_KEY payload (see loadProgress / saveProgress).
+    // ---------- ACHIEVEMENTS ----------
+    // Hidden discoveries scattered across the page. Each grants moon points;
+    // when total points hits MOON_UNLOCK_THRESHOLD, Moon Munki unlocks. The
+    // 5 originals are kept at 1pt each so existing save data unlocks Moon
+    // at the same time it always did. The 8 new ones give the redesign
+    // more discovery surface without grinding.
     //
-    // Egg ids — see attachEggDetectors() for the gestures behind each:
-    //   titleClick    — tap the "MUNKIS" word 5× within 8s
-    //   corners       — tap all 4 viewport corners within 10s
-    //   rainbowOrder  — place all 6 rainbow Munkis in correct R-O-Y-G-B-P slots
-    //   chipSpam      — tap any single tray chip 7× without dragging
-    //   stageTriple   — triple-tap the empty stage area within 1s
+    // Detector wiring lives in attachEggDetectors() (originals) plus
+    // checkAchievementsAfterSlot / cycle / etc. for the new ones.
+    const ACHIEVEMENTS = [
+        // ----- Original 5 hidden interactions -----
+        { id: 'titleClick',    name: 'Title Tapper',       points: 1 },
+        { id: 'corners',       name: 'Corner Crawler',     points: 1 },
+        { id: 'rainbowOrder',  name: 'Rainbow Order',      points: 1 },
+        { id: 'chipSpam',      name: 'Bank Stalker',       points: 1 },
+        { id: 'stageTriple',   name: 'Stage Whisperer',    points: 1 },
+        // ----- New 8 -----
+        { id: 'solidSquad',    name: 'Solid Squad',        points: 1 },
+        { id: 'solidSequence', name: 'Solid Sequence',     points: 2 },
+        { id: 'patternMaker',  name: 'Pattern Maker',      points: 2 },
+        { id: 'band3',         name: '3 Bands',            points: 1 },
+        { id: 'band10',        name: '10 Bands',           points: 2 },
+        { id: 'band20',        name: '20 Bands',           points: 3 },
+        { id: 'coldSnap',      name: 'Cold Snap',          points: 1 },
+        { id: 'touchOutsider', name: 'Touch the Outsider', points: 3 }
+    ];
+    const ACHIEVEMENT_BY_ID = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
+    // The first 5 ids — kept around so existing detector code that refers
+    // to EGG_IDS keeps working. New achievements use grantAchievement(id)
+    // directly without going through this list.
     const EGG_IDS = ['titleClick', 'corners', 'rainbowOrder', 'chipSpam', 'stageTriple'];
-    const MOON_UNLOCK_THRESHOLD = EGG_IDS.length;
-    const munkiSightings = new Set();
+    const MOON_UNLOCK_THRESHOLD = 5;
+    // achievements: Map<id, { unlocked_at, points_awarded }>
+    const achievements = new Map();
+    // Lifetime band counter — increments every time the stage transitions
+    // from <6 placements to =6. Persisted. Drives the 3/10/20 Bands tier.
+    let bandCount = 0;
     let moonUnlocked = false;
+
+    function totalAchievementPoints() {
+        let n = 0;
+        achievements.forEach(meta => { n += (meta.points_awarded | 0); });
+        return n;
+    }
 
     // Which evil rides the 7th-wheel slot in the bank. Pre-Moon-unlock this
     // is always 'ice'. Post-unlock the kid can drag-swap (see the altar
@@ -1066,6 +1093,9 @@
     function cycleManualExpression(slotIndex) {
         const cur = manualExpression.get(slotIndex) || 1;
         manualExpression.set(slotIndex, (cur % 5) + 1);
+        // Count intentional taps for the solidSequence achievement (5 taps
+        // = one full 1→2→3→4→5→1 cycle on that slot).
+        if (typeof bumpSlotTapCount === 'function') bumpSlotTapCount(slotIndex);
     }
 
     // True if either immediate neighbour in the linear 5-slot row holds an
@@ -1234,6 +1264,8 @@
         manualExpression.delete(index);
         dwellBeats.delete(index);
         reactStartBeat.delete(index);
+        // New occupant restarts the solidSequence tap counter for this slot.
+        resetSlotTapCount(index);
         if (charId) {
             // Track placement time so expressionForSlot shows the "shocked"
             // row for ~600 ms after a fresh drop. Schedule a re-render
@@ -1269,6 +1301,12 @@
         // Jealousy: if the rainbow is now complete, deepen the sulk on the
         // 7th-wheel chip; otherwise drop back to the idle sulk.
         checkSulkState();
+        // New achievement family: solid colours, palindromic / repeating
+        // patterns, band-fill milestones, first encounter with Ice or Moon.
+        if (charId) checkColdSnap(charId);
+        checkSolidSquad();
+        checkPattern();
+        checkBandMilestones();
     }
 
     function isIceOnStage() {
@@ -1766,10 +1804,20 @@
     }
 
     // ---------- STORY PROGRESSION & MADBALLZ MODE ----------
-    // Persistence: { horrorTriggers, madballzUnlocked, munkiSightings,
-    //               moonUnlocked, activeBankIndex, unlockedBanks }
-    // We swallow storage errors (private mode, quota) so a flaky client
-    // never breaks the game.
+    // Persistence keys:
+    //   horrorTriggers   — counter (legacy: also gates dormant Madballz mode)
+    //   madballzUnlocked — dormant feature flag, still persisted for safety
+    //   achievements     — { id: { unlocked_at, points_awarded } } map
+    //   moonUnlocked     — bool, set when total achievement points ≥ threshold
+    //   seventhWheel     — 'ice' | 'moon', which evil sits in the bank
+    //   bandCount        — lifetime count of 6/6 stage fills (drives the
+    //                      3/10/20 Bands achievements)
+    //   activeBankIndex  — legacy from the multi-bank era; still clamped
+    //   unlockedBanks    — legacy parallel array; still hydrated for safety
+    // Legacy fields auto-migrated on load:
+    //   munkiSightings   — array of egg ids; promoted into `achievements`
+    //                      with their canonical point values
+    // Storage errors are swallowed so a flaky client never breaks the game.
     function loadProgress() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY);
@@ -1777,19 +1825,36 @@
             const obj = JSON.parse(raw);
             horrorTriggers = (obj.horrorTriggers | 0);
             madballzUnlocked = !!obj.madballzUnlocked;
-            // Easter-egg progress. munkiSightings persists which unique eggs
-            // the kid found; moonUnlocked is the once-flipped reward flag.
+            moonUnlocked = !!obj.moonUnlocked;
+            bandCount = (obj.bandCount | 0);
+            // Legacy migration: any old munkiSightings array becomes an
+            // achievement record with the canonical point value. Run BEFORE
+            // the achievements object so a corrupt object can't shadow good
+            // legacy data, and so the new object can overwrite legacy.
             if (Array.isArray(obj.munkiSightings)) {
                 obj.munkiSightings.forEach(id => {
-                    if (EGG_IDS.includes(id)) munkiSightings.add(id);
+                    const def = ACHIEVEMENT_BY_ID[id];
+                    if (def && !achievements.has(id)) {
+                        achievements.set(id, {
+                            unlocked_at: null,
+                            points_awarded: def.points
+                        });
+                    }
                 });
             }
-            moonUnlocked = !!obj.moonUnlocked;
+            if (obj.achievements && typeof obj.achievements === 'object') {
+                Object.entries(obj.achievements).forEach(([id, meta]) => {
+                    if (ACHIEVEMENT_BY_ID[id] && meta) {
+                        achievements.set(id, {
+                            unlocked_at: meta.unlocked_at || null,
+                            points_awarded: (meta.points_awarded | 0) || ACHIEVEMENT_BY_ID[id].points
+                        });
+                    }
+                });
+            }
             if (obj.seventhWheel === 'moon' || obj.seventhWheel === 'ice') {
                 seventhWheel = obj.seventhWheel;
             }
-            // Clamp activeBankIndex to a known + unlocked bank so a stale
-            // localStorage value can't push us into an empty bank.
             const idx = (obj.activeBankIndex | 0);
             if (idx >= 0 && idx < BANKS.length && BANKS[idx].unlocked) {
                 activeBankIndex = idx;
@@ -1804,11 +1869,14 @@
 
     function saveProgress() {
         try {
+            const achievementsObj = {};
+            achievements.forEach((meta, id) => { achievementsObj[id] = meta; });
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 horrorTriggers,
                 madballzUnlocked,
-                munkiSightings: [...munkiSightings],
+                achievements: achievementsObj,
                 moonUnlocked,
+                bandCount,
                 seventhWheel,
                 activeBankIndex,
                 unlockedBanks: BANKS.map(b => b.unlocked)
@@ -1952,22 +2020,31 @@
         if (ico) ico.textContent = speaking ? '⏹' : '🔊';
     }
 
-    // ---------- EASTER-EGG DETECTORS ----------
-    // findEgg(id) is the single entry point — each detector below calls it
-    // when its gesture completes. Duplicate ids are deduped via the Set.
-    // First sighting reveals the counter chip; the threshold-th sighting
-    // flips moonUnlocked and plays the reveal.
-    function findEgg(id) {
-        if (!EGG_IDS.includes(id)) return;
-        if (munkiSightings.has(id)) return;
-        munkiSightings.add(id);
+    // ---------- ACHIEVEMENT GRANT / UI ----------
+    // grantAchievement(id) is the single entry point — each detector calls it
+    // when its trigger fires. Idempotent: already-unlocked ids are no-ops.
+    // Awarding pulls points from the canonical ACHIEVEMENT_BY_ID lookup so
+    // the value is single-sourced. Threshold cross flips moonUnlocked.
+    //
+    // findEgg(id) is kept as an alias so existing detector code reads
+    // naturally for the 5 original eggs.
+    function grantAchievement(id) {
+        const def = ACHIEVEMENT_BY_ID[id];
+        if (!def) return;
+        if (achievements.has(id)) return;
+        achievements.set(id, {
+            unlocked_at: new Date().toISOString(),
+            points_awarded: def.points
+        });
         saveProgress();
         showEggCounter();
         bumpEggCounter();
-        if (munkiSightings.size >= MOON_UNLOCK_THRESHOLD && !moonUnlocked) {
+        showAchievementToast(def);
+        if (totalAchievementPoints() >= MOON_UNLOCK_THRESHOLD && !moonUnlocked) {
             unlockMoon();
         }
     }
+    function findEgg(id) { grantAchievement(id); }
 
     function showEggCounter() {
         const el = document.getElementById('eggCounter');
@@ -1982,15 +2059,105 @@
         const el = document.getElementById('eggCounter');
         if (!el) return;
         const text = el.querySelector('.egg-counter-text');
+        const pts = totalAchievementPoints();
         if (text) {
             text.textContent = moonUnlocked
-                ? 'FOUND'
-                : `${munkiSightings.size}/${MOON_UNLOCK_THRESHOLD}`;
+                ? `FOUND · ${pts}`
+                : `${pts}/${MOON_UNLOCK_THRESHOLD}`;
         }
         el.classList.toggle('found-all', moonUnlocked);
         el.classList.remove('bump');
         void el.offsetWidth;
         el.classList.add('bump');
+    }
+
+    // Brief celebratory toast under the egg counter naming the achievement
+    // and the points it was worth. Stays visible ~3 s, fades out, stacks
+    // gracefully if a second unlock fires before the first dismisses (each
+    // toast appears below the prior one).
+    let toastOffset = 0;
+    function showAchievementToast(def) {
+        const root = document.body;
+        const toast = document.createElement('div');
+        toast.className = 'achievement-toast';
+        toast.innerHTML = `
+            <div class="achievement-toast-title">${def.name}</div>
+            <div class="achievement-toast-points">+${def.points} moon point${def.points === 1 ? '' : 's'}</div>
+        `;
+        const myOffset = toastOffset;
+        toastOffset += 1;
+        toast.style.setProperty('--toast-stack', String(myOffset));
+        root.appendChild(toast);
+        requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add('shown')));
+        setTimeout(() => {
+            toast.classList.remove('shown');
+            setTimeout(() => {
+                toast.remove();
+                toastOffset = Math.max(0, toastOffset - 1);
+            }, 400);
+        }, 2800);
+    }
+
+    // Click-to-open panel listing every unlocked achievement. Hidden by
+    // default; tap the eggCounter chip to toggle. Locked achievements
+    // intentionally don't appear (the discovery IS the reward).
+    function toggleAchievementsPanel() {
+        const panel = document.getElementById('achievementsPanel');
+        if (!panel) return;
+        if (panel.classList.contains('open')) {
+            panel.classList.remove('open');
+            panel.setAttribute('aria-hidden', 'true');
+            return;
+        }
+        renderAchievementsPanel();
+        panel.classList.add('open');
+        panel.setAttribute('aria-hidden', 'false');
+    }
+
+    function renderAchievementsPanel() {
+        const panel = document.getElementById('achievementsPanel');
+        if (!panel) return;
+        const pts = totalAchievementPoints();
+        const unlockedDefs = ACHIEVEMENTS.filter(a => achievements.has(a.id));
+        // Sort by unlock time (most recent first); legacy null timestamps
+        // get pushed to the bottom so newly-earned items stay on top.
+        unlockedDefs.sort((a, b) => {
+            const ta = (achievements.get(a.id).unlocked_at || '');
+            const tb = (achievements.get(b.id).unlocked_at || '');
+            return tb.localeCompare(ta);
+        });
+        const headline = moonUnlocked
+            ? `🌙 MOON UNLOCKED · ${pts} pts`
+            : `${pts}/${MOON_UNLOCK_THRESHOLD} moon points`;
+        const items = unlockedDefs.length
+            ? unlockedDefs.map(a => `
+                <li class="achievement-row">
+                    <span class="achievement-name">${a.name}</span>
+                    <span class="achievement-points">+${a.points}</span>
+                </li>`).join('')
+            : '<li class="achievement-empty">No achievements yet — try things.</li>';
+        panel.innerHTML = `
+            <div class="achievements-head">
+                <span class="achievements-title">${headline}</span>
+                <button type="button" class="achievements-close" aria-label="Close">&times;</button>
+            </div>
+            <ul class="achievements-list">${items}</ul>
+        `;
+        const closeBtn = panel.querySelector('.achievements-close');
+        if (closeBtn) closeBtn.addEventListener('click', toggleAchievementsPanel);
+    }
+
+    function attachCounterPanelToggle() {
+        const counter = document.getElementById('eggCounter');
+        if (counter) counter.addEventListener('click', toggleAchievementsPanel);
+        // Click outside the panel also closes it.
+        document.addEventListener('pointerdown', e => {
+            const panel = document.getElementById('achievementsPanel');
+            if (!panel || !panel.classList.contains('open')) return;
+            if (e.target.closest('#achievementsPanel') || e.target.closest('#eggCounter')) return;
+            panel.classList.remove('open');
+            panel.setAttribute('aria-hidden', 'true');
+        });
     }
 
     function unlockMoon() {
@@ -2115,6 +2282,96 @@
             if (slots[i] !== RAINBOW_ORDER[i]) return;
         }
         findEgg('rainbowOrder');
+    }
+
+    // ---------- NEW ACHIEVEMENT DETECTORS ----------
+    // Per-slot tap counter for the head-cycle solidSequence achievement.
+    // Reset when a slot is cleared or replaced; bumps on cycleManualExpression.
+    const slotTapCount = new Map();
+    function bumpSlotTapCount(idx) {
+        slotTapCount.set(idx, (slotTapCount.get(idx) || 0) + 1);
+        checkSolidSequence();
+    }
+    function resetSlotTapCount(idx) { slotTapCount.delete(idx); }
+
+    function isStageFull() {
+        for (let i = 0; i < NUM_SLOTS; i++) if (!slots[i]) return false;
+        return true;
+    }
+
+    function stageBodyColors() {
+        return slots.map(id => id ? CHARACTERS[id].bodyColor : null);
+    }
+
+    function isSolidStage() {
+        if (!isStageFull()) return false;
+        const colors = stageBodyColors();
+        return colors.every(c => c === colors[0]);
+    }
+
+    // Achievement: Solid Squad — 6/6 same body color.
+    function checkSolidSquad() { if (isSolidStage()) grantAchievement('solidSquad'); }
+
+    // Achievement: Solid Sequence — every slot has been tap-cycled at least
+    // 5 times (one full 1→2→3→4→5→1 loop) while the squad is still solid.
+    function checkSolidSequence() {
+        if (!isSolidStage()) return;
+        for (let i = 0; i < NUM_SLOTS; i++) {
+            if ((slotTapCount.get(i) || 0) < 5) return;
+        }
+        grantAchievement('solidSequence');
+    }
+
+    // Achievement: Pattern Maker — 6/6 stage forms a palindrome or a
+    // repeating unit of length 2 or 3 (by character id).
+    function checkPattern() {
+        if (!isStageFull()) return;
+        const s = slots;
+        const palindrome =
+            s[0] === s[5] && s[1] === s[4] && s[2] === s[3] &&
+            // exclude the trivial all-same case from THIS detector — solidSquad
+            // handles that one and would double-fire here.
+            !(s[0] === s[1] && s[1] === s[2]);
+        const rep2 = s[0] === s[2] && s[2] === s[4]
+                  && s[1] === s[3] && s[3] === s[5]
+                  && s[0] !== s[1];
+        const rep3 = s[0] === s[3] && s[1] === s[4] && s[2] === s[5]
+                  && !(s[0] === s[1] && s[1] === s[2]);
+        if (palindrome || rep2 || rep3) grantAchievement('patternMaker');
+    }
+
+    // Achievement: 3/10/20 Bands — lifetime counter of "stage hit 6/6" events.
+    // wasFull tracks the prior-tick fullness so we only count the transition.
+    let stageWasFull = false;
+    function checkBandMilestones() {
+        const nowFull = isStageFull();
+        if (nowFull && !stageWasFull) {
+            bandCount++;
+            saveProgress();
+            if (bandCount >= 3)  grantAchievement('band3');
+            if (bandCount >= 10) grantAchievement('band10');
+            if (bandCount >= 20) grantAchievement('band20');
+        }
+        stageWasFull = nowFull;
+    }
+
+    // Achievement: Cold Snap — fires the first time Ice or Moon lands on
+    // the stage. setSlot calls this with the charId being placed.
+    function checkColdSnap(charId) {
+        if (charId === 'ice' || charId === 'moon') grantAchievement('coldSnap');
+    }
+
+    // Achievement: Touch the Outsider — tap the horror-munki corner sprite
+    // while it's visible (i.e., react-mode-active). The SVGs default to
+    // pointer-events:none; we override only during react mode (see CSS) and
+    // listen for pointerdown on document, matching by element class.
+    function attachOutsiderTapDetector() {
+        document.addEventListener('pointerdown', e => {
+            if (!document.body.classList.contains('react-mode-active')) return;
+            const el = e.target.closest('.horror-munki');
+            if (!el) return;
+            grantAchievement('touchOutsider');
+        });
     }
 
     // ---------- JEALOUSY FLAVOR ----------
@@ -2426,13 +2683,15 @@
         attachHeaderHandlers();
         attachMoonChaos();
         attachEggDetectors();
+        attachOutsiderTapDetector();
+        attachCounterPanelToggle();
         watchTrayHeight();
         updateTrayHint();
         // If Moon is unlocked, surface the altar chip so the kid can swap.
         renderMunkiAltar();
         // If the kid found any eggs on a prior visit, restore the counter
         // chip with the saved count (no animation — it's not "new").
-        if (munkiSightings.size > 0 || moonUnlocked) {
+        if (achievements.size > 0 || moonUnlocked) {
             showEggCounter();
             bumpEggCounter();
         }

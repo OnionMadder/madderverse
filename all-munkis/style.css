@@ -1319,7 +1319,14 @@ body.moon-invert {
 .egg-counter.shown {
     opacity: 1;
     transform: translateY(0);
+    /* The chip becomes a button once visible — opens the achievements panel
+       on tap. Default visibility uses pointer-events:none to ignore stray
+       taps before any unlock; .shown lifts that. */
+    pointer-events: auto;
+    cursor: pointer;
 }
+.egg-counter.shown:hover { background: rgba(15, 23, 42, 0.92); }
+.egg-counter.shown:active { transform: translateY(0) scale(0.95); }
 .egg-counter.bump {
     animation: egg-counter-bump 0.55s ease-out;
 }
@@ -1478,3 +1485,137 @@ body.moon-tilt main {
     .moon-rain span { animation-duration: 1.4s; }
     .moon-phantom { animation: moon-phantom-pop 0.6s ease-out forwards; }
 }
+
+/* ====== ACHIEVEMENT TOAST + PANEL ======
+   Toasts pop under the egg counter when a new achievement unlocks. Stack
+   when multiple unlocks fire in quick succession via --toast-stack. The
+   panel is a small dialog that opens when the counter is tapped. */
+.achievement-toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0) + 56px + (var(--toast-stack, 0) * 64px));
+    right: calc(env(safe-area-inset-right, 0) + 10px);
+    z-index: 55;
+    min-width: 180px;
+    max-width: 260px;
+    padding: 8px 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.95), rgba(99, 102, 241, 0.95));
+    color: #fff;
+    font-family: 'Fredoka', sans-serif;
+    text-align: right;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 24px rgba(167, 139, 250, 0.5);
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.3s ease;
+    pointer-events: none;
+}
+.achievement-toast.shown {
+    opacity: 1;
+    transform: translateX(0);
+}
+.achievement-toast-title {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+}
+.achievement-toast-points {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 1px;
+}
+
+.achievements-panel {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0) + 50px);
+    right: calc(env(safe-area-inset-right, 0) + 10px);
+    z-index: 60;
+    width: min(280px, calc(100vw - 20px));
+    max-height: min(360px, calc(100vh - 80px));
+    overflow-y: auto;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #e9d5ff;
+    font-family: 'Fredoka', sans-serif;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+}
+.achievements-panel.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+.achievements-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(167, 139, 250, 0.25);
+}
+.achievements-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fde68a;
+}
+.achievements-close {
+    background: transparent;
+    border: none;
+    color: rgba(233, 213, 255, 0.7);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.achievements-close:hover { color: #fff; }
+.achievements-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.achievement-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(167, 139, 250, 0.12);
+    font-size: 13px;
+}
+.achievement-row:last-child { border-bottom: none; }
+.achievement-name {
+    color: #e9d5ff;
+    letter-spacing: 0.02em;
+}
+.achievement-points {
+    color: #fde68a;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.achievement-empty {
+    list-style: none;
+    padding: 12px 4px;
+    text-align: center;
+    color: rgba(233, 213, 255, 0.6);
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* Horror-mode corner sprites become tap-targets so 'Touch the Outsider'
+   can fire. They stay non-interactive in normal play. */
+body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
