@@ -1703,7 +1703,14 @@ a:focus-visible {
     .big-title .oo,
     .clay-drifter,
     .marquee-tape span,
-    .swatch.dynamic-rgb {
+    .swatch.dynamic-rgb,
+    .celebrate-saved,
+    .dev-frame,
+    .kiln-overheat #kilnCanvas,
+    .pingas-flash,
+    .overclocked-toast {
         animation: none;
     }
+    /* Keep the kiln glitch filter visible even without the shake
+       so the overheated state still reads correctly. */
 }
