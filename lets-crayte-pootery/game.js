@@ -5337,6 +5337,21 @@
         canvas.width = 200;
         canvas.height = 300;
         thumb.appendChild(canvas);
+
+        /* Shared indicator -- on the user's own pot that they've
+           also pushed to the EVERYONE gallery. Reads as "this is
+           ALSO out there," not "this is gone." Hidden on public-tab
+           rows (which are themselves the "out there" copy) so we
+           don't double-flag.                                    */
+        if (entry.publicId && !entry._isPublic) {
+            const flag = document.createElement("span");
+            flag.className = "pot-shared-flag";
+            flag.setAttribute("aria-label", "Shared to Everyone gallery");
+            flag.title = "Shared to Everyone gallery";
+            flag.textContent = "\u{1F310}";   /* globe */
+            thumb.appendChild(flag);
+        }
+
         card.appendChild(thumb);
 
         const meta = document.createElement("div");
@@ -6079,6 +6094,7 @@
         if (pack) pack.textContent = packLabel(entry.packId);
 
         refreshDetailSubmitButton();
+        refreshDetailUnshareButton();
         refreshDetailCopyLink();
         setPotURLParam(entry);
 
@@ -6253,7 +6269,10 @@
         if (close)  close.addEventListener("click", closeDetail);
         if (del)    del.addEventListener("click",   deleteCurrentEntry);
         if (expt)   expt.addEventListener("click",  exportCurrentEntry);
-        if (submit) submit.addEventListener("click", submitCurrentToPublic);
+        if (submit) submit.addEventListener("click", startShareFlow);
+
+        const unshare = document.getElementById("detailUnshare");
+        if (unshare) unshare.addEventListener("click", unshareCurrent);
 
         const copyLink = document.getElementById("detailCopyLink");
         if (copyLink) copyLink.addEventListener("click", copyDetailLink);
@@ -6286,7 +6305,26 @@
         wireBattleUI();
     }
 
-    function submitCurrentToPublic() {
+    /* ============================================================
+       SHARE FLOW (rewritten)
+       ============================================================
+       Three-step flow tuned for a 5-year-old player to understand
+       that sharing CREATES A COPY, not MOVES the pot:
+
+         1) Tap SHARE TO EVERYONE on a personal pot.
+         2) If this is the first share ever on this device, show
+            the "sharing makes a copy" onboarding modal once.
+         3) Show the two-card share-confirm modal -- their pot in
+            MINE on the left ("STAYS HERE"), the same pot on the
+            right ("NEW COPY" in EVERYONE). Author input lives here.
+         4) On confirm, upload. On success, close confirm modal,
+            play the "+1 copy lifts off" animation overlay (which
+            visually proves the original stays).
+       ============================================================ */
+
+    const SHARE_ONBOARD_KEY = "crayte-share-onboard-seen";
+
+    function startShareFlow() {
         const entry = GALLERY.detailEntry;
         if (!entry || entry._isPublic) return;
         if (!supabaseEnabled()) {
@@ -6294,56 +6332,233 @@
             return;
         }
         if (entry.publicId) {
-            alert("This pot is already public.");
+            alert("This pot is already shared. Use STOP SHARING to remove it.");
             return;
         }
-        const author = (window.prompt(
-            "Sign your pot (optional). Anyone can see this name.",
-            entry._author || ""
-        ) || "").trim() || "anonymous";
-        const btn = document.getElementById("detailSubmit");
+
+        const goConfirm = function () { openShareConfirmModal(entry); };
+
+        let seen = false;
+        try { seen = localStorage.getItem(SHARE_ONBOARD_KEY) === "yes"; } catch (_) {}
+        if (!seen) {
+            openShareOnboardModal(goConfirm);
+        } else {
+            goConfirm();
+        }
+    }
+
+    /* ----- First-time onboarding ----- */
+
+    function openShareOnboardModal(onDone) {
+        const modal = document.getElementById("shareOnboardModal");
+        const ok    = document.getElementById("shareOnboardOk");
+        if (!modal || !ok) { onDone && onDone(); return; }
+        modal.hidden = false;
+        const handler = function () {
+            try { localStorage.setItem(SHARE_ONBOARD_KEY, "yes"); } catch (_) {}
+            modal.hidden = true;
+            ok.removeEventListener("click", handler);
+            onDone && onDone();
+        };
+        ok.addEventListener("click", handler);
+    }
+
+    /* ----- Two-card confirm modal ----- */
+
+    function openShareConfirmModal(entry) {
+        const modal  = document.getElementById("shareConfirmModal");
+        const mine   = document.getElementById("sharePreviewMine");
+        const copy   = document.getElementById("sharePreviewCopy");
+        const input  = document.getElementById("shareConfirmAuthor");
+        const cancel = document.getElementById("shareConfirmCancel");
+        const go     = document.getElementById("shareConfirmGo");
+        if (!modal || !mine || !copy || !cancel || !go) return;
+
+        /* Render the user's actual pot into both preview cards
+           so the kid can SEE the same pot appearing twice. */
+        const cMine = mine.querySelector("canvas");
+        const cCopy = copy.querySelector("canvas");
+        loadEntryPaint(entry).then(function () {
+            if (cMine) renderEntryIntoCanvas(cMine, entry);
+            if (cCopy) renderEntryIntoCanvas(cCopy, entry);
+        });
+
+        if (input) {
+            try {
+                const remembered = localStorage.getItem("crayte-author") || "";
+                input.value = entry._author || remembered;
+            } catch (_) { input.value = entry._author || ""; }
+        }
+
+        modal.hidden = false;
+
+        const cleanup = function () {
+            modal.hidden = true;
+            cancel.removeEventListener("click", onCancel);
+            go.removeEventListener("click", onGo);
+            modal.removeEventListener("click", onBackdrop);
+        };
+        const onCancel = function () { cleanup(); };
+        const onBackdrop = function (e) { if (e.target === modal) cleanup(); };
+        const onGo = function () {
+            const author = (input && input.value || "").trim() || "anonymous";
+            try { localStorage.setItem("crayte-author", author === "anonymous" ? "" : author); } catch (_) {}
+            go.disabled = true;
+            cancel.disabled = true;
+            const lbl = go.querySelector(".btn-label");
+            if (lbl) lbl.textContent = "SHARING...";
+            uploadShareCopy(entry, author).then(function (ok) {
+                go.disabled = false;
+                cancel.disabled = false;
+                if (lbl) lbl.textContent = "YES, SHARE A COPY";
+                if (ok) {
+                    cleanup();
+                    playShareCompleteAnim();
+                } else {
+                    if (lbl) lbl.textContent = "TRY AGAIN";
+                }
+            });
+        };
+        cancel.addEventListener("click", onCancel);
+        go.addEventListener("click", onGo);
+        modal.addEventListener("click", onBackdrop);
+    }
+
+    /* Upload + local state patch. Resolves true on success. */
+    function uploadShareCopy(entry, author) {
+        return submitPublicPot(entry, author).then(function (row) {
+            if (!row || !row.id) return false;
+            entry.publicId = row.id;
+            entry._author  = author;
+            const arr = loadGalleryEntries();
+            for (let i = 0; i < arr.length; i++) {
+                if (arr[i].id === entry.id) {
+                    arr[i].publicId = row.id;
+                    arr[i]._author  = author;
+                    break;
+                }
+            }
+            saveGalleryEntries(arr);
+            GALLERY.publicCache = null;
+            refreshDetailSubmitButton();
+            refreshDetailCopyLink();
+            return true;
+        });
+    }
+
+    /* "+1 copy lifts off" overlay that fires after a successful
+       share. Plays from anywhere -- a fixed-position overlay so it
+       doesn't depend on the gallery tab being active. The pot
+       thumbnail on the left is rendered from GALLERY.detailEntry so
+       the kid sees "same pot, now ALSO in Everyone." */
+    function playShareCompleteAnim() {
+        const entry = GALLERY.detailEntry;
+        if (!entry) return;
+        const overlay = document.getElementById("shareCompleteOverlay");
+        if (!overlay) return;
+        const stayCanvas = overlay.querySelector(".share-complete-stay canvas");
+        const flyCanvas  = overlay.querySelector(".share-complete-fly canvas");
+        loadEntryPaint(entry).then(function () {
+            if (stayCanvas) renderEntryIntoCanvas(stayCanvas, entry);
+            if (flyCanvas)  renderEntryIntoCanvas(flyCanvas, entry);
+        });
+        overlay.hidden = false;
+        overlay.classList.remove("is-playing");
+        /* Force reflow so the class re-add triggers animation. */
+        void overlay.offsetWidth;
+        overlay.classList.add("is-playing");
+        setTimeout(function () {
+            overlay.classList.remove("is-playing");
+            overlay.hidden = true;
+            /* Refresh the open MINE tab grid so the new globe
+               indicator appears immediately under the modal. */
+            if (currentScreen === "gallery" && GALLERY.tab === "mine") {
+                refreshGalleryGrid();
+            }
+        }, 2200);
+    }
+
+    /* ----- Unshare ----- */
+
+    function unshareCurrent() {
+        const entry = GALLERY.detailEntry;
+        if (!entry || !entry.publicId) return;
+        const ok = window.confirm(
+            "Stop sharing this pot?\n\n" +
+            "Your pot stays in your gallery. Only the copy in Everyone is removed."
+        );
+        if (!ok) return;
+
+        const btn = document.getElementById("detailUnshare");
         if (btn) {
             btn.disabled = true;
             const lbl = btn.querySelector(".btn-label");
-            if (lbl) lbl.textContent = "UPLOADING...";
+            if (lbl) lbl.textContent = "STOPPING...";
         }
-        submitPublicPot(entry, author).then(function (row) {
+
+        deletePublicPot(entry.publicId).then(function (success) {
             if (btn) btn.disabled = false;
-            if (row && row.id) {
-                /* Mark the local entry as already submitted so the
-                   button reflects that on subsequent opens. */
-                entry.publicId = row.id;
-                entry._author = author;
-                const arr = loadGalleryEntries();
-                for (let i = 0; i < arr.length; i++) {
-                    if (arr[i].id === entry.id) {
-                        arr[i].publicId = row.id;
-                        arr[i]._author = author;
-                        break;
-                    }
+            const lbl = btn && btn.querySelector(".btn-label");
+            if (!success) {
+                if (lbl) lbl.textContent = "TRY AGAIN";
+                return;
+            }
+            if (lbl) lbl.textContent = "STOP SHARING";
+            entry.publicId = null;
+            const arr = loadGalleryEntries();
+            for (let i = 0; i < arr.length; i++) {
+                if (arr[i].id === entry.id) {
+                    delete arr[i].publicId;
+                    break;
                 }
-                saveGalleryEntries(arr);
-                /* Invalidate the public cache so a refresh on the
-                   PUBLIC tab shows the new pot. */
-                GALLERY.publicCache = null;
-                refreshDetailSubmitButton();
-                refreshDetailCopyLink();
-                if (btn) {
-                    const lbl = btn.querySelector(".btn-label");
-                    if (lbl) lbl.textContent = "✓ PUBLIC";
-                }
-            } else {
-                if (btn) {
-                    const lbl = btn.querySelector(".btn-label");
-                    if (lbl) lbl.textContent = "FAILED — RETRY";
-                }
+            }
+            saveGalleryEntries(arr);
+            GALLERY.publicCache = null;
+            refreshDetailSubmitButton();
+            refreshDetailCopyLink();
+            refreshDetailUnshareButton();
+            if (currentScreen === "gallery" && GALLERY.tab === "mine") {
+                refreshGalleryGrid();
             }
         });
     }
 
-    /* Update the SUBMIT button visibility / label to match the
-       current detail entry's state (local & not-yet-public => show;
-       public entry or already-submitted => hide or "ALREADY PUBLIC"). */
+    /* DELETE the public copy. Owner-only via RLS (user_id auth
+       check). Returns true on 2xx. */
+    function deletePublicPot(publicId) {
+        if (!supabaseEnabled() || !publicId) return Promise.resolve(false);
+        const url = SUPABASE_URL + "/rest/v1/public_pots?id=eq." +
+                    encodeURIComponent(publicId);
+        return fetch(url, {
+            method: "DELETE",
+            headers: supabaseHeaders({
+                "Prefer": "return=minimal"
+            })
+        }).then(function (r) {
+            return r.ok;
+        }).catch(function () { return false; });
+    }
+
+    /* Show/hide STOP SHARING based on whether this entry has a
+       publicId we can revoke. Hidden for public-tab entries
+       (you can't unshare someone else's pot) and for anonymous
+       local entries that have never been shared. */
+    function refreshDetailUnshareButton() {
+        const btn = document.getElementById("detailUnshare");
+        if (!btn) return;
+        const entry = GALLERY.detailEntry;
+        const canUnshare = !!(entry && !entry._isPublic && entry.publicId);
+        btn.hidden = !canUnshare;
+        const lbl = btn.querySelector(".btn-label");
+        if (lbl) lbl.textContent = "STOP SHARING";
+    }
+
+    /* Show/hide the SHARE TO EVERYONE button:
+         - hidden for public-tab entries (you don't share someone
+           else's pot) and for entries already-shared by us (STOP
+           SHARING takes over that slot)
+         - shown with the friendly "share a copy" wording on
+           personal pots that aren't yet shared                     */
     function refreshDetailSubmitButton() {
         const submit = document.getElementById("detailSubmit");
         const del    = document.getElementById("detailDelete");
@@ -6355,10 +6570,13 @@
             return;
         }
         if (del) del.hidden = false;
-        submit.hidden = false;
-        submit.disabled = !!entry.publicId;
+        /* Already-shared local entries hide SHARE; STOP SHARING
+           shows up instead (refreshDetailUnshareButton handles
+           that side). */
+        submit.hidden = !!entry.publicId;
+        submit.disabled = false;
         const lbl = submit.querySelector(".btn-label");
-        if (lbl) lbl.textContent = entry.publicId ? "✓ PUBLIC" : "SUBMIT PUBLIC";
+        if (lbl) lbl.textContent = "SHARE TO EVERYONE";
     }
 
     registerScreen("gallery", {

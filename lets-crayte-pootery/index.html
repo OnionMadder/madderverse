@@ -686,8 +686,12 @@
                     <span class="btn-label">DELETE</span>
                 </button>
                 <button class="btn-control" id="detailSubmit" type="button">
-                    <span class="btn-label">SUBMIT PUBLIC</span>
-                    <span class="btn-glyph" aria-hidden="true">&uarr;</span>
+                    <span class="btn-label">SHARE TO EVERYONE</span>
+                    <span class="btn-glyph" aria-hidden="true">&#x1F310;</span>
+                </button>
+                <button class="btn-control" id="detailUnshare" type="button" hidden>
+                    <span class="btn-label">STOP SHARING</span>
+                    <span class="btn-glyph" aria-hidden="true">&times;</span>
                 </button>
                 <button class="btn-control" id="detailCopyLink" type="button" hidden>
                     <span class="btn-label">COPY LINK</span>
@@ -702,6 +706,102 @@
     </aside>
 
 </main>
+
+<!-- ============================================================
+     SHARE CONFIRM MODAL
+     ============================================================
+     Two-card preview that visually shows the user that their
+     pot stays in MINE and a copy goes to EVERYONE. Built to
+     make the "non-destructive" outcome obvious before tap.
+     ============================================================ -->
+<aside class="share-confirm-modal" id="shareConfirmModal" hidden>
+    <div class="share-confirm-card">
+        <h3 class="share-confirm-title">SHARE THIS POT?</h3>
+        <p class="share-confirm-lede">
+            Your pot stays in your gallery. A copy goes to Everyone.
+        </p>
+
+        <div class="share-preview-row">
+            <div class="share-preview-col">
+                <div class="share-preview-label">YOUR GALLERY</div>
+                <div class="share-preview-thumb" id="sharePreviewMine">
+                    <canvas width="160" height="240"></canvas>
+                    <span class="share-preview-tag">STAYS HERE</span>
+                </div>
+            </div>
+            <div class="share-preview-arrow" aria-hidden="true">
+                <span class="share-preview-plus">+</span>
+            </div>
+            <div class="share-preview-col">
+                <div class="share-preview-label">EVERYONE</div>
+                <div class="share-preview-thumb is-copy" id="sharePreviewCopy">
+                    <canvas width="160" height="240"></canvas>
+                    <span class="share-preview-tag">NEW COPY</span>
+                </div>
+            </div>
+        </div>
+
+        <label class="share-confirm-author-row">
+            <span class="row-label">SIGN AS</span>
+            <input class="detail-name-input" id="shareConfirmAuthor"
+                   type="text" maxlength="40" placeholder="anonymous" />
+        </label>
+
+        <div class="share-confirm-actions">
+            <button class="btn-control" id="shareConfirmCancel" type="button">
+                <span class="btn-label">NEVERMIND</span>
+            </button>
+            <button class="btn-control primary" id="shareConfirmGo" type="button">
+                <span class="btn-label">YES, SHARE A COPY</span>
+                <span class="btn-glyph" aria-hidden="true">&#x1F310;</span>
+            </button>
+        </div>
+    </div>
+</aside>
+
+<!-- ============================================================
+     FIRST-SHARE ONBOARDING MODAL
+     ============================================================
+     Surfaces ONCE per device the first time the user is about to
+     share a pot. Reassures: "your pot stays, a copy goes."
+     ============================================================ -->
+<aside class="share-onboard-modal" id="shareOnboardModal" hidden>
+    <div class="share-onboard-card">
+        <div class="share-onboard-anim" aria-hidden="true">
+            <div class="share-onboard-source"></div>
+            <div class="share-onboard-copy"></div>
+            <div class="share-onboard-plus">+1</div>
+        </div>
+        <h3 class="share-onboard-title">SHARING MAKES A COPY</h3>
+        <p class="share-onboard-body">
+            When you share, your pot <strong>stays right where it is</strong>.
+            A copy of it appears in the Everyone gallery so other people can see it.
+        </p>
+        <button class="btn-control primary" id="shareOnboardOk" type="button">
+            <span class="btn-label">GOT IT</span>
+            <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+        </button>
+    </div>
+</aside>
+
+<!-- ============================================================
+     SHARE COMPLETE OVERLAY
+     ============================================================
+     "+1 copy lifts off" — pot on the left stays put, copy on
+     the right slides up + fades. Makes the non-destructive
+     outcome visible the moment sharing completes.
+     ============================================================ -->
+<aside class="share-complete-overlay" id="shareCompleteOverlay" hidden aria-live="polite">
+    <div class="share-complete-stay">
+        <canvas width="120" height="180"></canvas>
+        <span class="share-complete-label">YOUR POT</span>
+    </div>
+    <div class="share-complete-fly">
+        <canvas width="120" height="180"></canvas>
+        <span class="share-complete-badge">+1</span>
+        <span class="share-complete-label">COPY SHARED</span>
+    </div>
+</aside>
 
 <!-- ============================================================
      PUSH OPT-IN MODAL (chunk W3)
