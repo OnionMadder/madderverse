@@ -10,6 +10,189 @@
 (function () {
     "use strict";
 
+    /* ---------- 0. AUDIO BOOTSTRAP ----------
+       Single shared AudioContext. Web Audio requires a user
+       gesture to start; we lazy-create on the first gesture
+       anywhere on the page, then any sound function can call
+       ensureAudio() to get the context (returns null if creation
+       failed or the context is still suspended — sound funcs
+       must no-op silently in that case). KILN, SHAPE, and the
+       title-screen poot all route through here.                */
+
+    let audioCtx = null;
+
+    function ensureAudio() {
+        if (audioCtx) {
+            if (audioCtx.state === "suspended") {
+                try { audioCtx.resume(); } catch (_) {}
+            }
+            return audioCtx;
+        }
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        try {
+            audioCtx = new AC();
+            if (audioCtx.state === "suspended") {
+                try { audioCtx.resume(); } catch (_) {}
+            }
+        } catch (e) {
+            audioCtx = null;
+        }
+        return audioCtx;
+    }
+
+    /* First user gesture anywhere on the page unlocks audio. */
+    function unlockAudioOnce() {
+        ensureAudio();
+        document.removeEventListener("pointerdown", unlockAudioOnce, true);
+        document.removeEventListener("keydown",     unlockAudioOnce, true);
+    }
+    document.addEventListener("pointerdown", unlockAudioOnce, true);
+    document.addEventListener("keydown",     unlockAudioOnce, true);
+
+    /* "Poot" — short, low, farty sawtooth blip with a tiny pitch
+       wobble and a band-pass to round off the buzz. Used on the
+       title screen, synced to the clay-drifter animation cycle. */
+    function poot() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const now = ctx.currentTime;
+
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.exponentialRampToValueAtTime(58, now + 0.28);
+
+        /* Pitch wobble for the comedic farty character. */
+        const lfo = ctx.createOscillator();
+        lfo.frequency.value = 17;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 7;
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+
+        /* Band-pass shapes it into "poot" not "buzz". */
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 200;
+        bp.Q.value = 3.5;
+
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0,    now);
+        g.gain.linearRampToValueAtTime(0.13, now + 0.025);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+        osc.connect(bp);
+        bp.connect(g);
+        g.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.34);
+        lfo.start(now);
+        lfo.stop(now + 0.34);
+    }
+
+    /* Wet-clay sustain — low-pass-filtered noise with an LFO
+       riding the cutoff. Subtle, sits under the squelch pops.   */
+    let wetLoop = null;
+
+    function wetLoopStart() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        if (wetLoop) return;
+
+        const len = Math.floor(ctx.sampleRate * 0.5);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        /* Pink-ish noise via Voss-McCartney-style filter. */
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < len; i++) {
+            const w = Math.random() * 2 - 1;
+            b0 = 0.99765 * b0 + w * 0.0990460;
+            b1 = 0.96300 * b1 + w * 0.2965164;
+            b2 = 0.57000 * b2 + w * 1.0526913;
+            data[i] = (b0 + b1 + b2 + w * 0.1848) * 0.13;
+        }
+
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 480;
+        lp.Q.value = 3.5;
+
+        const lfo = ctx.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.value = 2.2;
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.value = 260;
+        lfo.connect(lfoGain);
+        lfoGain.connect(lp.frequency);
+
+        const g = ctx.createGain();
+        const now = ctx.currentTime;
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.08, now + 0.10);
+
+        src.connect(lp);
+        lp.connect(g);
+        g.connect(ctx.destination);
+        src.start(now);
+        lfo.start(now);
+
+        wetLoop = { src: src, lfo: lfo, g: g, ctx: ctx };
+    }
+
+    function wetLoopStop() {
+        if (!wetLoop) return;
+        const { src, lfo, g, ctx } = wetLoop;
+        const now = ctx.currentTime;
+        g.gain.cancelScheduledValues(now);
+        g.gain.setValueAtTime(g.gain.value, now);
+        g.gain.linearRampToValueAtTime(0, now + 0.18);
+        try { src.stop(now + 0.20); } catch (_) {}
+        try { lfo.stop(now + 0.20); } catch (_) {}
+        wetLoop = null;
+    }
+
+    /* Squelch — short pitched noise pop, swept band-pass. Fires
+       on actual clay deformation; throttled in applyShaping so
+       a sustained drag emits one every ~90-160ms.              */
+    function squelch() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const now = ctx.currentTime;
+
+        const len = Math.floor(ctx.sampleRate * 0.09);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) {
+            const env = Math.exp(-i / len * 4.5);
+            data[i] = (Math.random() * 2 - 1) * env;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        const startF = 420 + Math.random() * 260;
+        const endF   = startF * (0.45 + Math.random() * 0.25);
+        bp.frequency.setValueAtTime(startF, now);
+        bp.frequency.exponentialRampToValueAtTime(endF, now + 0.075);
+        bp.Q.value = 6;
+
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0,    now);
+        g.gain.linearRampToValueAtTime(0.09, now + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+
+        src.connect(bp);
+        bp.connect(g);
+        g.connect(ctx.destination);
+        src.start(now);
+    }
+
     /* ---------- 1. SCREEN ROUTER ----------
        Screens are <main class="screen" id="screen-{id}">. Showing
        one hides the others. Each screen optionally registers an
@@ -61,9 +244,43 @@
     /* ---------- 2. TITLE SCREEN ---------- */
 
     registerScreen("title", {
-        onEnter: function () { startClock(); },
-        onLeave: function () { stopClock(); }
+        onEnter: function () {
+            startClock();
+            startTitlePoot();
+        },
+        onLeave: function () {
+            stopClock();
+            stopTitlePoot();
+        }
     });
+
+    /* ---------- 2A. TITLE POOT ----------
+       The clay-drifter CSS animation is a 14s loop with peak
+       visibility around the 50% mark. We schedule a poot at
+       ~7s into each cycle so it sounds like the particle is
+       making the noise. If audio isn't unlocked yet, poot()
+       no-ops silently; the first time it does fire, the user
+       has already interacted somewhere so audio is alive.   */
+
+    const TITLE_POOT = {
+        firstT: null,    /* setTimeout — initial offset */
+        intervalT: null  /* setInterval — repeating cycle */
+    };
+
+    function startTitlePoot() {
+        stopTitlePoot();
+        TITLE_POOT.firstT = setTimeout(function () {
+            poot();
+            TITLE_POOT.intervalT = setInterval(poot, 14000);
+        }, 7000);
+    }
+
+    function stopTitlePoot() {
+        if (TITLE_POOT.firstT)    clearTimeout(TITLE_POOT.firstT);
+        if (TITLE_POOT.intervalT) clearInterval(TITLE_POOT.intervalT);
+        TITLE_POOT.firstT = null;
+        TITLE_POOT.intervalT = null;
+    }
 
     function initTitle() {
         const btnStart    = document.getElementById("btnStart");
@@ -328,6 +545,7 @@
             SHAPE.pointerLastX = p.x;
             SHAPE.pointerLastY = p.y;
             SHAPE.pointerActive = true;
+            wetLoopStart();   /* sustained wet hum under the squelches */
         });
 
         c.addEventListener("pointermove", function (e) {
@@ -340,6 +558,7 @@
             SHAPE.pointerActive = false;
             SHAPE.pointer = null;
             try { c.releasePointerCapture(e.pointerId); } catch (_) {}
+            wetLoopStop();
         }
         c.addEventListener("pointerup",     endPointer);
         c.addEventListener("pointercancel", endPointer);
@@ -768,7 +987,18 @@
         /* Shaping */
         if (SHAPE.pointerActive && SHAPE.pointer && !SHAPE.clayLocked) {
             const didShape = applyShaping(SHAPE.pointer, dt);
-            if (didShape) emitParticles(SHAPE.pointer);
+            if (didShape) {
+                emitParticles(SHAPE.pointer);
+                /* Throttled squelch — fires once every 90-160ms
+                   while clay is actually being reshaped. */
+                SHAPE.squelchT = (SHAPE.squelchT || 0) + dt;
+                if (SHAPE.squelchT > 90 + Math.random() * 70) {
+                    squelch();
+                    SHAPE.squelchT = 0;
+                }
+            } else {
+                SHAPE.squelchT = 0;
+            }
         }
 
         updateParticles(dt);
@@ -2232,17 +2462,14 @@
 
     /* ----- 7D. Audio (Web Audio, all synthesized) ----- */
 
+    /* Routes through the shared bootstrap so KILN, SHAPE, and the
+       title poot all live on the same AudioContext. KILN.audio
+       kept as a cache for the rest of the chunk-5 functions that
+       still reference it; populate it here on first call.       */
     function ensureKilnAudio() {
-        if (!KILN.audio) {
-            const AC = window.AudioContext || window.webkitAudioContext;
-            if (!AC) return null;
-            try { KILN.audio = new AC(); }
-            catch (e) { KILN.audio = null; return null; }
-        }
-        if (KILN.audio.state === "suspended") {
-            try { KILN.audio.resume(); } catch (_) {}
-        }
-        return KILN.audio;
+        const ctx = ensureAudio();
+        if (ctx) KILN.audio = ctx;
+        return ctx;
     }
 
     function kilnRoar(durationSec) {
