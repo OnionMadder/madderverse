@@ -5352,6 +5352,22 @@
             thumb.appendChild(flag);
         }
 
+        /* Trophy emblem -- when this local pot's battle entry has
+           won a trophy. Sits in the top-left corner so it doesn't
+           collide with the shared-globe. */
+        if (!entry._isPublic) {
+            const trophy = bestTrophyForLocalEntry(entry);
+            if (trophy) {
+                const tEl = document.createElement("span");
+                tEl.className = "pot-trophy-flag tier-" + trophy.tier;
+                tEl.setAttribute("aria-label",
+                    trophyNameForTier(trophy.tier));
+                tEl.title = trophyNameForTier(trophy.tier);
+                tEl.textContent = "\u{1F3C6}";   /* trophy */
+                thumb.appendChild(tEl);
+            }
+        }
+
         card.appendChild(thumb);
 
         const meta = document.createElement("div");
@@ -5468,8 +5484,448 @@
         cachedAt:   0,
         cachedEntries: null,
         cachedVotes: null,
-        myVotes: null      /* Set of entry_ids voted this session */
+        myVotes: null,     /* Set of entry_ids voted this session */
+        /* Trophy resolution / reveal */
+        revealQueue: [],   /* trophies pending celebratory modal on this load */
+        revealing:   false /* mutex so we don't overlap reveal modals */
     };
+
+    /* ============================================================
+       TROPHIES (chunk T)
+       ============================================================
+       Three tiers, picked by the user. Capitalization is the
+       spec; don't lowercase PINGAS.                             */
+    const TROPHY_TIERS = {
+        first:     "Holy Heck, A Pot",
+        second:    "The Silver PINGAS",
+        honorable: "Technically a Pot"
+    };
+
+    function trophyNameForTier(tier) { return TROPHY_TIERS[tier] || ""; }
+
+    /* Compute placements from raw entries + votes. Pure function;
+       used both during the resolution write and locally when the
+       backend hasn't been updated yet but we want a preview.
+
+       Rules (matches the user's spec verbatim):
+        - 1st = top distinct vote tier; ties co-place
+        - 2nd = next distinct vote tier; ties co-place
+        - HM  = distinct tier(s) at positions 3+; reach depends
+                on total submissions:
+                    < 3 subs        -> no HM
+                    3 or 4 subs     -> tier[2] only
+                    5+ subs         -> tier[2..4] (up to "position 5")
+        - 0-vote pots can still place (a 1-submission battle
+          still crowns a 1st-place winner).
+       Returns { first:[entryId,...], second:[...], honorable:[...] }. */
+    function computePlacements(entries, votes) {
+        const result = { first: [], second: [], honorable: [] };
+        if (!Array.isArray(entries) || entries.length === 0) return result;
+
+        const tally = {};
+        (votes || []).forEach(function (v) {
+            tally[v.entry_id] = (tally[v.entry_id] || 0) + 1;
+        });
+
+        /* Bucket entries by vote count. */
+        const byCount = new Map();
+        entries.forEach(function (e) {
+            const c = tally[e.id] || 0;
+            if (!byCount.has(c)) byCount.set(c, []);
+            byCount.get(c).push(e.id);
+        });
+        const counts = Array.from(byCount.keys()).sort(function (a, b) { return b - a; });
+
+        if (counts.length === 0) return result;
+        result.first = byCount.get(counts[0]).slice();
+        if (counts.length >= 2) {
+            result.second = byCount.get(counts[1]).slice();
+        }
+
+        const total = entries.length;
+        if (total >= 5) {
+            for (let i = 2; i < Math.min(counts.length, 5); i++) {
+                result.honorable = result.honorable.concat(byCount.get(counts[i]));
+            }
+        } else if (total >= 3 && counts.length >= 3) {
+            result.honorable = byCount.get(counts[2]).slice();
+        }
+        return result;
+    }
+
+    /* Returns the tier name a given entry_id belongs to in the
+       passed placements object, or null if it didn't place.    */
+    function entryTier(placements, entryId) {
+        if (!placements) return null;
+        if (Array.isArray(placements.first)     && placements.first.indexOf(entryId)     >= 0) return "first";
+        if (Array.isArray(placements.second)    && placements.second.indexOf(entryId)    >= 0) return "second";
+        if (Array.isArray(placements.honorable) && placements.honorable.indexOf(entryId) >= 0) return "honorable";
+        return null;
+    }
+
+    /* If this battle is expired + unresolved AND we have entries
+       + votes loaded, race to write the placements via an atomic
+       PostgREST UPDATE filtered by resolved_at IS NULL. The first
+       client to land the write wins; later clients see the row
+       already-resolved on next fetch.
+
+       Returns Promise<placements-object | null> -- the placements
+       are returned (computed locally) so callers can render
+       immediately without a re-fetch. */
+    function resolveBattleIfNeeded(battle, entries, votes) {
+        if (!battle || battle.placements) {
+            return Promise.resolve(battle ? battle.placements : null);
+        }
+        const expired = new Date(battle.expires_at).getTime() <= Date.now();
+        if (!expired) return Promise.resolve(null);
+        if (!supabaseEnabled()) return Promise.resolve(null);
+
+        const placements = computePlacements(entries, votes);
+        if (placements.first.length === 0) {
+            /* Empty battle (no submissions) -- mark resolved so we
+               don't keep retrying every load, but no trophies. */
+        }
+        const url = SUPABASE_URL +
+            "/rest/v1/battles?id=eq." + encodeURIComponent(battle.id) +
+            "&resolved_at=is.null";
+        return fetch(url, {
+            method: "PATCH",
+            headers: supabaseHeaders({
+                "Content-Type": "application/json",
+                "Prefer":       "return=representation"
+            }),
+            body: JSON.stringify({
+                placements:  placements,
+                resolved_at: new Date().toISOString()
+            })
+        }).then(function (r) {
+            if (!r.ok) return null;
+            return r.json().then(function (rows) {
+                if (Array.isArray(rows) && rows[0]) {
+                    /* Persist back onto the cached battle row so
+                       subsequent renders skip the write. */
+                    battle.placements  = rows[0].placements;
+                    battle.resolved_at = rows[0].resolved_at;
+                    return rows[0].placements;
+                }
+                /* Empty array => someone else already resolved;
+                   keep going (the next fetch will pick it up). */
+                return null;
+            });
+        }).catch(function () { return null; });
+    }
+
+    /* Track which battle_entry_ids the user has submitted from
+       this device so anonymous users still get trophy reveals +
+       gallery badges. Set per local entry too (entry.battleEntries
+       array) so we can map local pot -> award without a join. */
+    function rememberMyBattleEntry(localEntry, battleId, entryRow) {
+        if (!localEntry || !entryRow) return;
+        const ref = { battleId: battleId, battleEntryId: entryRow.id };
+        localEntry.battleEntries = (localEntry.battleEntries || []).concat([ref]);
+        const arr = loadGalleryEntries();
+        for (let i = 0; i < arr.length; i++) {
+            if (arr[i].id === localEntry.id) {
+                arr[i].battleEntries = (arr[i].battleEntries || []).concat([ref]);
+                break;
+            }
+        }
+        saveGalleryEntries(arr);
+
+        /* Also write a global list keyed by battle_entry_id so
+           reveal-on-load doesn't need to scan every local pot. */
+        try {
+            const key = "crayte-my-battle-entries";
+            const raw = JSON.parse(localStorage.getItem(key) || "[]");
+            raw.push(ref);
+            /* Cap at 500 entries so this localStorage key never
+               balloons; trophies on older entries beyond 500 just
+               won't auto-reveal. The user can still see them on
+               the battle results page. */
+            while (raw.length > 500) raw.shift();
+            localStorage.setItem(key, JSON.stringify(raw));
+        } catch (_) {}
+    }
+
+    function loadMyBattleEntries() {
+        try {
+            const raw = JSON.parse(
+                localStorage.getItem("crayte-my-battle-entries") || "[]");
+            return Array.isArray(raw) ? raw : [];
+        } catch (_) { return []; }
+    }
+
+    /* Cache of {battleEntryId -> {tier, battle}} for trophies the
+       user has earned. Populated by checkTrophyReveals() so we
+       can light up gallery thumbnails + pot-detail badges without
+       a per-render network round-trip. Persisted to localStorage
+       so the badge survives reloads while offline.              */
+    const TROPHY_CACHE = { map: null };
+
+    function trophyCacheLoad() {
+        if (TROPHY_CACHE.map) return TROPHY_CACHE.map;
+        try {
+            const raw = JSON.parse(
+                localStorage.getItem("crayte-trophy-cache") || "{}");
+            TROPHY_CACHE.map = (raw && typeof raw === "object") ? raw : {};
+        } catch (_) { TROPHY_CACHE.map = {}; }
+        return TROPHY_CACHE.map;
+    }
+
+    function trophyCacheWrite(battleEntryId, tier, battle) {
+        const map = trophyCacheLoad();
+        map[battleEntryId] = {
+            tier:      tier,
+            battleId:  battle.id,
+            theme:     battle.theme || "",
+            wonAt:     battle.resolved_at || new Date().toISOString()
+        };
+        try {
+            localStorage.setItem("crayte-trophy-cache", JSON.stringify(map));
+        } catch (_) {}
+    }
+
+    /* Look up the best trophy this local entry has earned (across
+       any of its battle submissions). Returns {tier, battleId,
+       theme} or null. "Best" = first > second > honorable.       */
+    const TIER_RANK = { first: 0, second: 1, honorable: 2 };
+    function bestTrophyForLocalEntry(entry) {
+        if (!entry || !Array.isArray(entry.battleEntries)) return null;
+        const cache = trophyCacheLoad();
+        let best = null;
+        entry.battleEntries.forEach(function (ref) {
+            const rec = cache[ref.battleEntryId];
+            if (!rec) return;
+            if (!best || TIER_RANK[rec.tier] < TIER_RANK[best.tier]) best = rec;
+        });
+        return best;
+    }
+
+    function loadRevealedTrophies() {
+        try {
+            const raw = JSON.parse(
+                localStorage.getItem("crayte-trophies-revealed") || "[]");
+            return new Set(Array.isArray(raw) ? raw : []);
+        } catch (_) { return new Set(); }
+    }
+
+    function markTrophyRevealed(battleEntryId) {
+        const s = loadRevealedTrophies();
+        s.add(battleEntryId);
+        try {
+            localStorage.setItem("crayte-trophies-revealed",
+                JSON.stringify(Array.from(s)));
+        } catch (_) {}
+    }
+
+    /* Walk this device's battle entries + look up each parent
+       battle. For any resolved battle where my entry placed in
+       a tier I haven't yet seen, queue a reveal. Awaits the
+       fetch chain then drains the queue serially. */
+    function checkTrophyReveals() {
+        if (!supabaseEnabled()) return Promise.resolve();
+        const mine = loadMyBattleEntries();
+        if (mine.length === 0) return Promise.resolve();
+
+        const seen = loadRevealedTrophies();
+        const unrevealed = mine.filter(function (m) {
+            return !seen.has(m.battleEntryId);
+        });
+        if (unrevealed.length === 0) return Promise.resolve();
+
+        /* Deduplicate battle_ids so we don't fetch the same battle
+           twice (a single battle has at most 3 of our entries). */
+        const battleIds = Array.from(new Set(unrevealed.map(function (m) { return m.battleId; })));
+        const inClause = "(" + battleIds.join(",") + ")";
+        const url = SUPABASE_URL +
+            "/rest/v1/battles?select=*&id=in." +
+            encodeURIComponent(inClause);
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (battles) {
+                battles.forEach(function (battle) {
+                    if (!battle.placements) return;
+                    /* For each of my entries in this battle, check
+                       if it placed. */
+                    unrevealed.forEach(function (m) {
+                        if (m.battleId !== battle.id) return;
+                        const tier = entryTier(battle.placements, m.battleEntryId);
+                        if (!tier) {
+                            /* Didn't place; still mark seen so we
+                               don't recheck every load. */
+                            markTrophyRevealed(m.battleEntryId);
+                            return;
+                        }
+                        /* Cache the trophy so gallery thumbnails +
+                           pot-detail badges have offline data. */
+                        trophyCacheWrite(m.battleEntryId, tier, battle);
+                        BATTLE.revealQueue.push({
+                            battle:         battle,
+                            battleEntryId:  m.battleEntryId,
+                            tier:           tier
+                        });
+                    });
+                });
+                drainTrophyRevealQueue();
+            })
+            .catch(function () { /* best-effort */ });
+    }
+
+    function drainTrophyRevealQueue() {
+        if (BATTLE.revealing) return;
+        const next = BATTLE.revealQueue.shift();
+        if (!next) return;
+        BATTLE.revealing = true;
+        showTrophyReveal(next.battle, next.battleEntryId, next.tier, function () {
+            markTrophyRevealed(next.battleEntryId);
+            BATTLE.revealing = false;
+            /* Brief gap before chaining the next one so phones
+               can settle. */
+            setTimeout(drainTrophyRevealQueue, 300);
+        });
+    }
+
+    function showTrophyReveal(battle, battleEntryId, tier, onDone) {
+        const modal     = document.getElementById("trophyRevealModal");
+        const nameEl    = document.getElementById("trophyRevealName");
+        const themeEl   = document.getElementById("trophyRevealTheme");
+        const canvas    = document.getElementById("trophyRevealCanvas");
+        const okBtn     = document.getElementById("trophyRevealOk");
+        const viewBtn   = document.getElementById("trophyRevealView");
+        const ribbonEl  = document.getElementById("trophyRevealRibbon");
+        if (!modal || !nameEl || !okBtn || !viewBtn) { onDone && onDone(); return; }
+
+        nameEl.textContent  = trophyNameForTier(tier);
+        if (themeEl)  themeEl.textContent  = battle.theme || "BATTLE";
+        if (ribbonEl) ribbonEl.dataset.tier = tier;
+        modal.dataset.tier = tier;
+
+        /* Pull the entry row so we can render the winning pot. */
+        fetchBattleEntryById(battleEntryId).then(function (entryRow) {
+            if (!entryRow || !canvas) return;
+            const entry = normalizePublicRow(entryRow);
+            loadEntryPaint(entry).then(function () {
+                renderEntryIntoCanvas(canvas, entry);
+            });
+        });
+
+        modal.hidden = false;
+        playTrophyFanfare(tier);
+
+        const cleanup = function () {
+            modal.hidden = true;
+            okBtn.removeEventListener("click", onOk);
+            viewBtn.removeEventListener("click", onView);
+            onDone && onDone();
+        };
+        const onOk = function () { cleanup(); };
+        const onView = function () {
+            cleanup();
+            /* Jump to gallery -> battles -> open this battle. */
+            GALLERY.tab = "battles";
+            showScreen("gallery");
+            setTimeout(function () { openBattleDetail(battle); }, 250);
+        };
+        okBtn.addEventListener("click", onOk);
+        viewBtn.addEventListener("click", onView);
+    }
+
+    /* The reveal-modal close handlers are wired once at boot
+       rather than per-reveal so the same listeners survive
+       across the .revealQueue draining. */
+    function wireTrophyRevealModal() {
+        const modal = document.getElementById("trophyRevealModal");
+        if (!modal) return;
+        modal.addEventListener("click", function (e) {
+            /* Click outside the card -> treat as OK (mark seen +
+               continue draining). */
+            if (e.target === modal) {
+                const ok = document.getElementById("trophyRevealOk");
+                if (ok) ok.click();
+            }
+        });
+    }
+
+    /* Tap on the pot-detail trophy badge -> jump to that battle. */
+    function wireDetailTrophyBadge() {
+        const badge = document.getElementById("detailTrophyBadge");
+        if (!badge) return;
+        badge.addEventListener("click", function () {
+            const battleId = badge.dataset.battle;
+            if (!battleId) return;
+            /* Close pot-detail, swap to BATTLES tab, open the
+               battle. We don't have the full battle row in the
+               cache here -- fetch it. */
+            closeDetail();
+            const url = SUPABASE_URL + "/rest/v1/battles?select=*&id=eq." +
+                encodeURIComponent(battleId) + "&limit=1";
+            fetch(url, { headers: supabaseHeaders() })
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .then(function (rows) {
+                    if (rows && rows[0]) {
+                        GALLERY.tab = "battles";
+                        showScreen("gallery");
+                        setTimeout(function () {
+                            openBattleDetail(rows[0]);
+                        }, 250);
+                    }
+                });
+        });
+    }
+
+    function fetchBattleEntryById(id) {
+        if (!supabaseEnabled() || !id) return Promise.resolve(null);
+        const url = SUPABASE_URL +
+            "/rest/v1/battle_entries?select=*&id=eq." +
+            encodeURIComponent(id) + "&limit=1";
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (rows) { return rows && rows[0] ? rows[0] : null; })
+            .catch(function () { return null; });
+    }
+
+    /* Brief synthesized fanfare. Notes scale with tier (1st gets
+       the highest + brightest, HM gets a single short blip). */
+    function playTrophyFanfare(tier) {
+        const ctx = ensureAudio();
+        if (!ctx) return;
+        const t0 = ctx.currentTime;
+        let notes;
+        if (tier === "first") {
+            /* C major bugle call -> high triumphant chord */
+            notes = [
+                [392.00, 0.00, 0.18],   /* G4 */
+                [523.25, 0.18, 0.18],   /* C5 */
+                [659.25, 0.36, 0.30],   /* E5 */
+                [783.99, 0.66, 0.45]    /* G5 hold */
+            ];
+        } else if (tier === "second") {
+            notes = [
+                [392.00, 0.00, 0.18],   /* G4 */
+                [523.25, 0.18, 0.22],   /* C5 */
+                [587.33, 0.40, 0.35]    /* D5 */
+            ];
+        } else {
+            notes = [
+                [392.00, 0.00, 0.18],   /* G4 */
+                [466.16, 0.18, 0.32]    /* A#4 */
+            ];
+        }
+        notes.forEach(function (n) {
+            const freq = n[0], offset = n[1], dur = n[2];
+            const osc = ctx.createOscillator();
+            const g   = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.value = freq;
+            g.gain.setValueAtTime(0, t0 + offset);
+            g.gain.linearRampToValueAtTime(0.18, t0 + offset + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.001, t0 + offset + dur);
+            osc.connect(g).connect(ctx.destination);
+            osc.start(t0 + offset);
+            osc.stop(t0 + offset + dur + 0.02);
+        });
+    }
+
 
     function loadMyVotes() {
         if (BATTLE.myVotes) return BATTLE.myVotes;
@@ -5741,12 +6197,24 @@
             const ids = entries.map(function (e) { return e.id; });
             return fetchBattleVotes(ids).then(function (votes) {
                 BATTLE.cachedVotes = votes;
-                renderBattleEntries(entries, votes, expired, grid);
+                /* If the battle is expired but not yet resolved on
+                   the server, race to write the placements. Either
+                   way we end up with a placements object to render
+                   from -- battle.placements after a successful
+                   resolve, or a local computation if we lost the
+                   race (next reload will pick up the server's). */
+                return resolveBattleIfNeeded(battle, entries, votes)
+                    .then(function (resolved) {
+                        const placements = resolved
+                            || battle.placements
+                            || (expired ? computePlacements(entries, votes) : null);
+                        renderBattleEntries(entries, votes, expired, grid, placements);
+                    });
             });
         });
     }
 
-    function renderBattleEntries(entries, votes, expired, grid) {
+    function renderBattleEntries(entries, votes, expired, grid, placements) {
         if (!grid) return;
         grid.innerHTML = "";
 
@@ -5756,20 +6224,21 @@
             tally[v.entry_id] = (tally[v.entry_id] || 0) + 1;
         });
 
-        /* Determine winner (highest vote count, only if expired) */
-        let winnerId = null;
-        if (expired) {
-            let max = -1;
-            entries.forEach(function (e) {
-                const c = tally[e.id] || 0;
-                if (c > max) { max = c; winnerId = e.id; }
-            });
-            if (max <= 0) winnerId = null;
-        }
-
         const myVotes = loadMyVotes();
 
-        entries.forEach(function (raw) {
+        /* When the battle has resolved (placements exist), render
+           in trophy-tier order with section headers. Otherwise
+           render in original chronological order (the live
+           voting view).                                          */
+        const showTrophies = expired && placements &&
+            (placements.first.length > 0);
+
+        const byId = {};
+        entries.forEach(function (e) { byId[e.id] = e; });
+
+        /* Helper -- build one entry card. Same shape as before,
+           plus tier-aware decoration. */
+        const buildEntryCard = function (raw, tier) {
             /* Normalize to the same shape buildThumbCard uses */
             const entry = normalizePublicRow(raw);
             entry.id = "battle-" + raw.id;  /* avoid clash */
@@ -5777,12 +6246,14 @@
 
             const card = document.createElement("div");
             card.className = "battle-entry-card";
-            if (raw.id === winnerId) card.classList.add("is-winner");
-
-            if (raw.id === winnerId) {
+            if (tier) {
+                card.classList.add("is-trophy");
+                card.classList.add("is-trophy-" + tier);
+            }
+            if (tier) {
                 const tag = document.createElement("span");
-                tag.className = "battle-winner-tag";
-                tag.textContent = "★ WINNER";
+                tag.className = "battle-winner-tag tier-" + tier;
+                tag.textContent = trophyNameForTier(tier);
                 card.appendChild(tag);
             }
 
@@ -5838,12 +6309,55 @@
             voteRow.appendChild(voteBtn);
 
             card.appendChild(voteRow);
-            grid.appendChild(card);
 
             loadEntryPaint(entry).then(function () {
                 renderEntryIntoCanvas(canvas, entry);
             });
-        });
+            return card;
+        };
+
+        if (showTrophies) {
+            /* Tier-grouped rendering -- one section per tier, then
+               any unranked entries (0-vote pots that didn't make
+               HM, only relevant in battles with >5 submissions)
+               in a final "OTHER ENTRIES" section. */
+            const sections = [
+                { tier: "first",     label: trophyNameForTier("first")     },
+                { tier: "second",    label: trophyNameForTier("second"),
+                    skipIfEmpty: true },
+                { tier: "honorable", label: trophyNameForTier("honorable"),
+                    skipIfEmpty: true }
+            ];
+            const placedIds = new Set();
+            sections.forEach(function (s) {
+                const ids = placements[s.tier] || [];
+                if (ids.length === 0 && s.skipIfEmpty) return;
+                const head = document.createElement("h4");
+                head.className = "battle-tier-head tier-" + s.tier;
+                head.textContent = s.label;
+                grid.appendChild(head);
+                ids.forEach(function (id) {
+                    placedIds.add(id);
+                    const raw = byId[id];
+                    if (raw) grid.appendChild(buildEntryCard(raw, s.tier));
+                });
+            });
+            const rest = entries.filter(function (e) { return !placedIds.has(e.id); });
+            if (rest.length > 0) {
+                const head = document.createElement("h4");
+                head.className = "battle-tier-head tier-rest";
+                head.textContent = "OTHER ENTRIES";
+                grid.appendChild(head);
+                rest.forEach(function (raw) {
+                    grid.appendChild(buildEntryCard(raw, null));
+                });
+            }
+        } else {
+            /* Live (or pre-resolution) view: chronological. */
+            entries.forEach(function (raw) {
+                grid.appendChild(buildEntryCard(raw, null));
+            });
+        }
     }
 
     function handleVoteClick(entryId, btn, countEl) {
@@ -5945,6 +6459,10 @@
         submitBattleEntry(battle.id, entry, author).then(function (row) {
             closeSubmitPicker();
             if (row) {
+                /* Remember the link from this local pot to the
+                   battle_entry it spawned -- powers trophy reveal
+                   + gallery emblem when the battle resolves. */
+                rememberMyBattleEntry(entry, battle.id, row);
                 /* Refresh the open battle detail so the new entry
                    shows up. */
                 loadAndRenderBattleEntries(battle);
@@ -6096,6 +6614,7 @@
         refreshDetailSubmitButton();
         refreshDetailUnshareButton();
         refreshDetailCopyLink();
+        refreshDetailTrophyBadge();
         setPotURLParam(entry);
 
         panel.hidden = false;
@@ -6103,6 +6622,26 @@
         loadEntryPaint(entry).then(function () {
             renderEntryIntoCanvas(canvas, entry);
         });
+    }
+
+    /* Show / hide the trophy badge on the detail modal. Tapping
+       it jumps to the awarding battle's detail view.            */
+    function refreshDetailTrophyBadge() {
+        const badge = document.getElementById("detailTrophyBadge");
+        if (!badge) return;
+        const entry = GALLERY.detailEntry;
+        const trophy = entry && !entry._isPublic ? bestTrophyForLocalEntry(entry) : null;
+        if (!trophy) {
+            badge.hidden = true;
+            return;
+        }
+        badge.hidden = false;
+        badge.dataset.tier  = trophy.tier;
+        badge.dataset.battle = trophy.battleId;
+        const nameEl = badge.querySelector(".detail-trophy-name");
+        const themeEl = badge.querySelector(".detail-trophy-theme");
+        if (nameEl)  nameEl.textContent  = trophyNameForTier(trophy.tier);
+        if (themeEl) themeEl.textContent = trophy.theme;
     }
 
     function closeDetail() {
@@ -6276,6 +6815,8 @@
 
         const copyLink = document.getElementById("detailCopyLink");
         if (copyLink) copyLink.addEventListener("click", copyDetailLink);
+
+        wireDetailTrophyBadge();
 
         if (name) {
             name.addEventListener("change", saveDetailName);
@@ -6882,12 +7423,130 @@
                        detail from a profile still shows the @handle. */
                     pots.forEach(function (p) { p._profile = profile; });
                     renderProfilePots(profile, pots);
+                    /* 3) fetch their battle trophies + render the shelf */
+                    return fetchProfileTrophies(profile).then(function (trophies) {
+                        renderProfileTrophyShelf(trophies);
+                    });
                 });
             })
             .catch(function (e) {
                 console.warn("[CRAYte] profile load failed", e);
                 setProfileUI("missing");
             });
+    }
+
+    /* Pull all battle_entries this user has submitted, then the
+       parent battles, and derive a flat list of {tier, theme,
+       wonAt, entryRow}. Used by the Trophy Shelf section.       */
+    function fetchProfileTrophies(profile) {
+        if (!supabaseEnabled() || !profile || !profile.id) {
+            return Promise.resolve([]);
+        }
+        const userId = profile.id;
+        return fetch(SUPABASE_URL + "/rest/v1/battle_entries?select=*" +
+                "&user_id=eq." + encodeURIComponent(userId) +
+                "&order=created_at.desc&limit=200",
+              { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (entries) {
+                if (!entries || entries.length === 0) return [];
+                const battleIds = Array.from(new Set(
+                    entries.map(function (e) { return e.battle_id; })));
+                const inClause = "(" + battleIds.join(",") + ")";
+                return fetch(SUPABASE_URL + "/rest/v1/battles?select=*" +
+                        "&id=in." + encodeURIComponent(inClause),
+                      { headers: supabaseHeaders() })
+                    .then(function (r) { return r.ok ? r.json() : []; })
+                    .then(function (battles) {
+                        const byId = {};
+                        battles.forEach(function (b) { byId[b.id] = b; });
+                        const trophies = [];
+                        entries.forEach(function (e) {
+                            const b = byId[e.battle_id];
+                            if (!b || !b.placements) return;
+                            const tier = entryTier(b.placements, e.id);
+                            if (!tier) return;
+                            trophies.push({
+                                tier:     tier,
+                                battle:   b,
+                                entry:    e,
+                                wonAt:    b.resolved_at || b.created_at
+                            });
+                        });
+                        /* Sort: tier rank ascending (first first),
+                           then most-recent wonAt. */
+                        trophies.sort(function (a, b) {
+                            const t = TIER_RANK[a.tier] - TIER_RANK[b.tier];
+                            if (t !== 0) return t;
+                            return new Date(b.wonAt) - new Date(a.wonAt);
+                        });
+                        return trophies;
+                    });
+            })
+            .catch(function () { return []; });
+    }
+
+    function renderProfileTrophyShelf(trophies) {
+        const shelf = document.getElementById("profileTrophyShelf");
+        const list  = document.getElementById("profileTrophyList");
+        const count = document.getElementById("profileTrophyCount");
+        if (!shelf || !list) return;
+        list.innerHTML = "";
+        if (!trophies || trophies.length === 0) {
+            shelf.hidden = true;
+            return;
+        }
+        shelf.hidden = false;
+        if (count) count.textContent = trophies.length +
+            (trophies.length === 1 ? " TROPHY" : " TROPHIES");
+
+        trophies.forEach(function (t) {
+            const card = document.createElement("div");
+            card.className = "trophy-shelf-card tier-" + t.tier;
+
+            const thumb = document.createElement("div");
+            thumb.className = "trophy-shelf-thumb";
+            const canvas = document.createElement("canvas");
+            canvas.width = 160;
+            canvas.height = 240;
+            thumb.appendChild(canvas);
+            card.appendChild(thumb);
+
+            const meta = document.createElement("div");
+            meta.className = "trophy-shelf-meta";
+
+            const nameEl = document.createElement("span");
+            nameEl.className = "trophy-shelf-name";
+            nameEl.textContent = trophyNameForTier(t.tier);
+            meta.appendChild(nameEl);
+
+            const themeEl = document.createElement("span");
+            themeEl.className = "trophy-shelf-theme";
+            themeEl.textContent = t.battle.theme || "(untitled battle)";
+            meta.appendChild(themeEl);
+
+            const dateEl = document.createElement("span");
+            dateEl.className = "trophy-shelf-date";
+            dateEl.textContent = formatPotDate(new Date(t.wonAt).getTime());
+            meta.appendChild(dateEl);
+
+            card.appendChild(meta);
+
+            /* Clicking the card jumps to that battle's results. */
+            card.addEventListener("click", function () {
+                GALLERY.tab = "battles";
+                showScreen("gallery");
+                setTimeout(function () { openBattleDetail(t.battle); }, 250);
+            });
+
+            list.appendChild(card);
+
+            /* Render the entry's pot into the thumb canvas. */
+            const entry = normalizePublicRow(t.entry);
+            loadEntryPaint(entry).then(function () {
+                renderEntryIntoCanvas(canvas, entry);
+            });
+        });
     }
 
     function renderProfileHeader(profile) {
@@ -7669,6 +8328,12 @@
            listeners when ready — no blocking. Once auth resolves,
            honor any ?profile=<handle> deep-link in the URL. */
         initAuth().then(checkURLDeepLinks);
+        /* Trophy reveal -- runs in parallel with auth boot.
+           Doesn't need a session (uses crayte-my-battle-entries
+           from localStorage) so anonymous players still see
+           their wins.                                          */
+        setTimeout(checkTrophyReveals, 600);
+        wireTrophyRevealModal();
     }
 
     if (document.readyState === "loading") {
@@ -7683,7 +8348,15 @@
     window.CRAYte = {
         registerScreen: registerScreen,
         showScreen: function (id) { showScreen(id); },
-        get currentScreen() { return currentScreen; }
+        get currentScreen() { return currentScreen; },
+        /* Pure helpers exposed for verification + admin tinkering.
+           Internal callers should still use the in-module names. */
+        _trophy: {
+            computePlacements: computePlacements,
+            entryTier:         entryTier,
+            tierName:          trophyNameForTier,
+            TIERS:             TROPHY_TIERS
+        }
     };
 
 })();

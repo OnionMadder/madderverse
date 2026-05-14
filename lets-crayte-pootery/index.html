@@ -447,6 +447,16 @@
         No potter found with that handle.
     </p>
 
+    <!-- Trophy shelf -- battle trophies this potter has won.
+         Hidden until at least 1 trophy lands. -->
+    <section class="profile-trophy-shelf" id="profileTrophyShelf" hidden>
+        <div class="trophy-shelf-titlebar">
+            <h3 class="trophy-shelf-title">&#x1F3C6; TROPHY SHELF</h3>
+            <span class="trophy-shelf-count" id="profileTrophyCount">&mdash;</span>
+        </div>
+        <div class="trophy-shelf-list" id="profileTrophyList"></div>
+    </section>
+
     <div class="profile-grid" id="profileGrid"></div>
 </main>
 
@@ -675,6 +685,14 @@
             <div class="detail-canvas-wrap">
                 <canvas id="detailCanvas" width="400" height="600"
                         aria-label="Pot preview"></canvas>
+                <!-- Trophy badge — only visible on local pots that
+                     have won a battle. Tap to jump to results. -->
+                <button class="detail-trophy-badge" id="detailTrophyBadge"
+                        type="button" hidden>
+                    <span class="detail-trophy-glyph" aria-hidden="true">&#x1F3C6;</span>
+                    <span class="detail-trophy-name">&mdash;</span>
+                    <span class="detail-trophy-theme">&mdash;</span>
+                </button>
             </div>
             <label class="detail-name-row">
                 <span class="row-label">NAME</span>
@@ -706,6 +724,42 @@
     </aside>
 
 </main>
+
+<!-- ============================================================
+     TROPHY REVEAL MODAL
+     ============================================================
+     Surfaces on app load when the player has won a battle they
+     submitted to and hasn't been shown that trophy before.
+     Triumphant — chunky display font, slight tilt, ribbon glow.
+     ============================================================ -->
+<aside class="trophy-reveal-modal" id="trophyRevealModal" hidden>
+    <div class="trophy-reveal-card">
+        <div class="trophy-reveal-burst" aria-hidden="true"></div>
+        <div class="trophy-reveal-ribbon" id="trophyRevealRibbon">
+            <span class="trophy-reveal-glyph" aria-hidden="true">&#x1F3C6;</span>
+            <span class="trophy-reveal-eyebrow">YOU GOT AN AWARD</span>
+        </div>
+        <h2 class="trophy-reveal-name" id="trophyRevealName">&mdash;</h2>
+        <p class="trophy-reveal-context">
+            for your pot in the
+            <span class="trophy-reveal-theme" id="trophyRevealTheme">&mdash;</span>
+            battle
+        </p>
+        <div class="trophy-reveal-canvas-wrap">
+            <canvas id="trophyRevealCanvas" width="200" height="300"
+                    aria-label="Winning pot"></canvas>
+        </div>
+        <div class="trophy-reveal-actions">
+            <button class="btn-control" id="trophyRevealOk" type="button">
+                <span class="btn-label">SWEET</span>
+            </button>
+            <button class="btn-control primary" id="trophyRevealView" type="button">
+                <span class="btn-label">VIEW BATTLE RESULTS</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+        </div>
+    </div>
+</aside>
 
 <!-- ============================================================
      SHARE CONFIRM MODAL
