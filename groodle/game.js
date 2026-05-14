@@ -14,19 +14,80 @@
     ];
     const SIZES = [4, 12, 22];
 
-    /* The 6 shapes that form the silhouette. Must stay in sync with the
-       <clipPath id="bodyClip">, <g class="silhouette-fill">, and
-       <g class="silhouette-outline"> blocks in index.html — same numbers,
-       same transforms. Used by buildBodyPath() to clip the canvas so the
-       kid literally cannot paint outside the body. */
-    const BODY_SHAPES = [
-        { type: 'circle', cx: 200, cy: 100, r: 58 },
-        { type: 'rect',   x: 155,  y: 148,   w: 90, h: 232, r: 42 },
-        { type: 'rect',   x: -18,  y: -160,  w: 36, h: 172, r: 18, tx: 165, ty: 180, rot: -52 },
-        { type: 'rect',   x: -18,  y: -160,  w: 36, h: 172, r: 18, tx: 235, ty: 180, rot:  52 },
-        { type: 'rect',   x: -17,  y: 0,     w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
-        { type: 'rect',   x: -17,  y: 0,     w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
-    ];
+    /* Poses are the data behind the silhouette: a list of shape records
+       (circle or transformed roundrect) that get unioned into a Path2D
+       and rendered into the three SVG groups in index.html (clipPath,
+       silhouette-fill, silhouette-outline) at init / on pose change.
+
+       Adding a pose is a matter of dropping a new entry into POSES —
+       the silhouette renderer and the canvas clip both read from the
+       currently-selected pose's shapes. Picker buttons are generated
+       from this dict so the UI auto-grows. */
+    const POSES = {
+        standing: {
+            name: 'Standing',
+            icon: '🧍',
+            origin: '50% 92%',
+            shapes: [
+                { type: 'circle', cx: 200, cy: 100, r: 58 },
+                { type: 'rect',   x: 155, y: 148,  w: 90, h: 232, r: 42 },
+                { type: 'rect',   x: -18, y: -160, w: 36, h: 172, r: 18, tx: 165, ty: 180, rot: -52 },
+                { type: 'rect',   x: -18, y: -160, w: 36, h: 172, r: 18, tx: 235, ty: 180, rot:  52 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
+            ]
+        },
+        cheer: {
+            name: 'Cheering',
+            icon: '🙌',
+            origin: '50% 92%',
+            shapes: [
+                { type: 'circle', cx: 200, cy: 100, r: 58 },
+                { type: 'rect',   x: 155, y: 148,  w: 90, h: 232, r: 42 },
+                /* Arms point up-and-out: native rect extends downward from
+                   the shoulder origin, rot 150° / -150° flips it so the
+                   tip lands above the head. */
+                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 168, ty: 168, rot:  150 },
+                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 232, ty: 168, rot: -150 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
+            ]
+        },
+        star: {
+            name: 'Star',
+            icon: '⭐',
+            origin: '50% 90%',
+            shapes: [
+                { type: 'circle', cx: 200, cy: 100, r: 58 },
+                { type: 'rect',   x: 155, y: 148,  w: 90, h: 208, r: 42 },
+                /* Jumping-jack: arms horizontal-and-slightly-raised, legs
+                   spread wide. */
+                { type: 'rect',   x: -18, y: 0,    w: 36, h: 158, r: 18, tx: 168, ty: 180, rot:  108 },
+                { type: 'rect',   x: -18, y: 0,    w: 36, h: 158, r: 18, tx: 232, ty: 180, rot: -108 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 196, r: 17, tx: 172, ty: 352, rot: -28 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 196, r: 17, tx: 228, ty: 352, rot:  28 }
+            ]
+        },
+        groovy: {
+            name: 'Groovy',
+            icon: '💃',
+            origin: '50% 92%',
+            shapes: [
+                { type: 'circle', cx: 200, cy: 100, r: 58 },
+                { type: 'rect',   x: 155, y: 148,  w: 90, h: 232, r: 42 },
+                /* One arm raised (left), one extended down-and-out (right)
+                   — classic disco-point pose. */
+                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 168, ty: 168, rot:  155 },
+                { type: 'rect',   x: -18, y: -160, w: 36, h: 172, r: 18, tx: 235, ty: 180, rot:   62 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 178, ty: 370, rot: -12 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 222, ty: 370, rot:  12 }
+            ]
+        }
+    };
+
+    function getCurrentPose() {
+        return POSES[(state && state.pose) || 'standing'] || POSES.standing;
+    }
 
     const TEMPO = 112;
     const STEPS_PER_BAR = 16;
@@ -64,7 +125,8 @@
         hats: {
             owned: ['no-hat'],
             equipped: 'no-hat'
-        }
+        },
+        pose: 'standing'
     };
 
     let state = null;
@@ -978,11 +1040,15 @@
        the SVG: SVG "translate(tx ty) rotate(rot)" means rotate-about-origin
        first, THEN translate — which is exactly the matrix you get by
        calling translateSelf followed by rotateSelf on an identity DOMMatrix
-       (post-multiplication: M = T * R, applied as M*p = T*(R*p)). */
+       (post-multiplication: M = T * R, applied as M*p = T*(R*p)).
+
+       Pulls shapes from the currently-selected pose so a pose change
+       re-clips the canvas to the new figure outline. */
     function buildBodyPath() {
         const path = new Path2D();
-        for (let i = 0; i < BODY_SHAPES.length; i++) {
-            const s = BODY_SHAPES[i];
+        const shapes = getCurrentPose().shapes;
+        for (let i = 0; i < shapes.length; i++) {
+            const s = shapes[i];
             const sub = new Path2D();
             if (s.type === 'circle') {
                 sub.arc(s.cx, s.cy, s.r, 0, Math.PI * 2);
@@ -1001,6 +1067,56 @@
         return path;
     }
 
+    /* SVG-string version of the same shape data — drops into the three
+       <g> / <clipPath> groups inside the silhouette layers on init and
+       on every pose change. The transform attribute mirrors what
+       buildBodyPath's DOMMatrix does (translate then rotate, applied
+       right-to-left). */
+    function shapeToSvgString(s) {
+        if (s.type === 'circle') {
+            return '<circle cx="' + s.cx + '" cy="' + s.cy + '" r="' + s.r + '"/>';
+        }
+        if (s.type === 'rect') {
+            const rx = s.r != null ? ' rx="' + s.r + '"' : '';
+            let xform = '';
+            if (s.tx || s.ty || s.rot) {
+                xform = ' transform="translate(' + (s.tx || 0) + ' ' + (s.ty || 0) +
+                        ') rotate(' + (s.rot || 0) + ')"';
+            }
+            return '<rect x="' + s.x + '" y="' + s.y + '" width="' + s.w +
+                   '" height="' + s.h + '"' + rx + xform + '/>';
+        }
+        return '';
+    }
+
+    function renderPoseSvg(pose) {
+        return pose.shapes.map(shapeToSvgString).join('');
+    }
+
+    /* Updates the three silhouette groups (clipPath / fill / outline)
+       AND the creature's transform-origin to match the pose's anchor
+       (default 50% 92% so feet stay planted, some poses tweak this).
+       Caller is responsible for re-clipping the canvas and saving
+       state. */
+    function renderPoseDom(pose) {
+        const svg = renderPoseSvg(pose);
+        const clip = document.querySelector('#bodyClip');
+        const fill = document.querySelector('.silhouette-fill');
+        const outline = document.querySelector('.silhouette-outline');
+        if (clip) clip.innerHTML = svg;
+        if (fill) fill.innerHTML = svg;
+        if (outline) outline.innerHTML = svg;
+        if (creature && pose.origin) {
+            creature.style.transformOrigin = pose.origin;
+        }
+    }
+
+    /* Tracks whether the context has a save() pushed for the current
+       clip. applyCanvasClip uses this to restore the previous clip
+       state before installing a new one — so pose changes don't pile
+       up clips on the state stack. */
+    let canvasClipSaved = false;
+
     function buildCanvas() {
         canvas = document.getElementById('drawCanvas');
         creature = document.getElementById('creature');
@@ -1014,13 +1130,54 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         // Hard-clip the drawing surface to the silhouette so strokes outside
-        // the body are never painted to the bitmap (not just visually masked
-        // by CSS clip-path). This is the source of truth for "the drawable
-        // area" — drawing a wide brush near the edge gets cleanly cropped,
-        // dragging outside the body simply paints nothing, and the eraser
-        // can only ever act on pixels that are actually visible.
-        ctx.clip(buildBodyPath());
+        // the body are never painted to the bitmap. Wrapped in save() so
+        // applyCanvasClip can later restore() to pop this clip and install
+        // a different one for a new pose.
+        applyCanvasClip();
         attachDrawing();
+    }
+
+    /* Reset the canvas to a clean state (no drawings) and clip to the
+       currently-selected pose's silhouette. Called once from buildCanvas
+       and again whenever the user picks a new pose. The pre-existing
+       drawing gets wiped — different pose, fresh canvas. */
+    function applyCanvasClip() {
+        if (canvasClipSaved) {
+            // Pop the previous clip + scale state so we start from a
+            // clean stack.
+            ctx.restore();
+            canvasClipSaved = false;
+        }
+        // The setTransform(1,0,0,1,0,0) + clearRect-in-pixel-space combo
+        // wipes every pixel regardless of any leftover clip / transform.
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Re-establish the dpr scale + line caps.
+        const dpr = Math.max(2, window.devicePixelRatio || 1);
+        ctx.scale(dpr, dpr);
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        // save() before clip() so the next applyCanvasClip can restore()
+        // back to this clean state.
+        ctx.save();
+        ctx.clip(buildBodyPath());
+        canvasClipSaved = true;
+    }
+
+    /* Public entry point for pose switching. Updates state, re-renders
+       the silhouette SVG groups, and re-clips the canvas. Marking the
+       chosen pose-btn active is left to the caller (attachPosePicker
+       handles it). */
+    function applyPose(poseId) {
+        if (!POSES[poseId]) return;
+        state.pose = poseId;
+        saveState();
+        /* trackClearDrawing — switching pose clears the drawing surface,
+           so the per-drawing color tally needs to reset along with it
+           (matches the same reset that clearCanvas does). */
+        trackClearDrawing();
+        renderPoseDom(POSES[poseId]);
+        applyCanvasClip();
     }
 
     /* Convert pointer event coords to logical canvas coords (0..400, 0..600).
@@ -1179,6 +1336,35 @@
                 btn.classList.add('active');
                 bgLayer.className = 'bg-layer bg-' + name;
             });
+        });
+    }
+
+    /* Pose picker — generated from POSES so adding a new entry to the
+       dictionary above grows the UI automatically. Each tap calls
+       applyPose() which wipes the canvas + re-renders the silhouette
+       + re-clips. */
+    function buildPosePicker() {
+        const root = document.getElementById('posePicker');
+        if (!root) return;
+        root.innerHTML = '';
+        const currentId = (state && state.pose) || 'standing';
+        Object.keys(POSES).forEach((id) => {
+            const pose = POSES[id];
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pose-btn' + (id === currentId ? ' active' : '');
+            btn.dataset.pose = id;
+            btn.setAttribute('aria-label', pose.name + ' pose');
+            btn.innerHTML =
+                '<span class="pose-icon" aria-hidden="true">' + pose.icon + '</span>' +
+                '<span class="pose-name"></span>';
+            btn.querySelector('.pose-name').textContent = pose.name;
+            btn.addEventListener('click', () => {
+                applyPose(id);
+                root.querySelectorAll('.pose-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            });
+            root.appendChild(btn);
         });
     }
 
@@ -1450,10 +1636,16 @@
         renderEquippedHat();
         trackVisit();
 
+        /* Render the silhouette SVG for the saved pose BEFORE buildCanvas
+           runs — buildCanvas reads getCurrentPose().shapes for its clip,
+           so the canvas-level drawable area lines up with what the kid
+           sees onscreen. */
+        renderPoseDom(getCurrentPose());
         buildCanvas();
         buildPalette();
         buildSizes();
         attachBgPicker();
+        buildPosePicker();
         attachHandlers();
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');
