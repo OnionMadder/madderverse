@@ -156,6 +156,148 @@
         wetLoop = null;
     }
 
+    /* Wheel hum — a low sustained drone that plays whenever the
+       wheel is visually spinning (shape / decorate / kiln). Two
+       slightly-detuned sines through a low-pass + tremolo so it
+       has texture without being intrusive. ~0.03 gain — sits
+       under everything else.                                   */
+    let wheelHum = null;
+
+    function wheelHumStart() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        if (wheelHum) return;
+        const now = ctx.currentTime;
+
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        osc1.type = "sine";
+        osc2.type = "sine";
+        osc1.frequency.value = 78;
+        osc2.frequency.value = 78 * 1.012;   /* tiny detune */
+
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 280;
+        lp.Q.value = 0.7;
+
+        /* Slow tremolo */
+        const trem = ctx.createOscillator();
+        trem.type = "sine";
+        trem.frequency.value = 0.6;
+        const tremGain = ctx.createGain();
+        tremGain.gain.value = 0.008;
+
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.03, now + 0.4);
+
+        trem.connect(tremGain);
+        tremGain.connect(g.gain);
+
+        osc1.connect(lp);
+        osc2.connect(lp);
+        lp.connect(g);
+        g.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        trem.start(now);
+
+        wheelHum = { osc1, osc2, trem, g, ctx };
+    }
+
+    function wheelHumStop() {
+        if (!wheelHum) return;
+        const { osc1, osc2, trem, g, ctx } = wheelHum;
+        const now = ctx.currentTime;
+        g.gain.cancelScheduledValues(now);
+        g.gain.setValueAtTime(g.gain.value, now);
+        g.gain.linearRampToValueAtTime(0, now + 0.40);
+        try { osc1.stop(now + 0.45); } catch (_) {}
+        try { osc2.stop(now + 0.45); } catch (_) {}
+        try { trem.stop(now + 0.45); } catch (_) {}
+        wheelHum = null;
+    }
+
+    /* Brush stroke softness — short high-pass noise puff. Fires
+       on a fraction of paint moves so a long stroke sounds like
+       a stream of soft bristly "shh"es rather than a constant
+       hiss. Volume ~0.04.                                       */
+    function brushStroke() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const now = ctx.currentTime;
+
+        const len = Math.floor(ctx.sampleRate * 0.10);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) {
+            const env = Math.exp(-i / len * 3);
+            data[i] = (Math.random() * 2 - 1) * env;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 2200 + Math.random() * 800;
+        hp.Q.value = 0.7;
+
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0,    now);
+        g.gain.linearRampToValueAtTime(0.04, now + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+
+        src.connect(hp);
+        hp.connect(g);
+        g.connect(ctx.destination);
+        src.start(now);
+    }
+
+    /* Stamp click — sharp wood-block-ish pluck. Two stacked
+       sines (high + low) with a tight envelope. One per stamp
+       placement, no throttle needed.                            */
+    function stampClick() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const now = ctx.currentTime;
+
+        /* High click */
+        const oscH = ctx.createOscillator();
+        oscH.type = "sine";
+        oscH.frequency.setValueAtTime(1800, now);
+        oscH.frequency.exponentialRampToValueAtTime(900, now + 0.05);
+        const gH = ctx.createGain();
+        gH.gain.setValueAtTime(0,    now);
+        gH.gain.linearRampToValueAtTime(0.10, now + 0.003);
+        gH.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        oscH.connect(gH);
+        gH.connect(ctx.destination);
+
+        /* Body */
+        const oscL = ctx.createOscillator();
+        oscL.type = "triangle";
+        oscL.frequency.setValueAtTime(420, now);
+        oscL.frequency.exponentialRampToValueAtTime(180, now + 0.08);
+        const gL = ctx.createGain();
+        gL.gain.setValueAtTime(0,    now);
+        gL.gain.linearRampToValueAtTime(0.08, now + 0.004);
+        gL.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        oscL.connect(gL);
+        gL.connect(ctx.destination);
+
+        oscH.start(now); oscH.stop(now + 0.12);
+        oscL.start(now); oscL.stop(now + 0.16);
+    }
+
+    /* Haptic feedback — no-ops on platforms without vibrate.
+       Patterns chosen to feel like the matching audio event.    */
+    function haptic(pattern) {
+        if (!navigator.vibrate) return;
+        try { navigator.vibrate(pattern); } catch (_) {}
+    }
+
     /* Squelch — short pitched noise pop, swept band-pass. Fires
        on actual clay deformation; throttled in applyShaping so
        a sustained drag emits one every ~90-160ms.              */
@@ -247,6 +389,7 @@
         onEnter: function () {
             startClock();
             startTitlePoot();
+            wheelHumStop();   /* wheel only hums when it's spinning */
         },
         onLeave: function () {
             stopClock();
@@ -546,6 +689,7 @@
             SHAPE.pointerLastY = p.y;
             SHAPE.pointerActive = true;
             wetLoopStart();   /* sustained wet hum under the squelches */
+            haptic(5);        /* light tap — "you grabbed the clay" */
         });
 
         c.addEventListener("pointermove", function (e) {
@@ -1032,9 +1176,13 @@
                 sizeShapeCanvas();
             }
             startShapeLoop();
+            wheelHumStart();   /* wheel is spinning */
         },
         onLeave: function () {
             stopShapeLoop();
+            /* Don't stop the hum here — decorate/kiln may follow
+               and the wheel keeps spinning across all three. The
+               title/gallery onEnter handlers stop it. */
         }
     });
 
@@ -2070,6 +2218,11 @@
         ctx.lineTo(p.x, p.y);
         ctx.stroke();
         ctx.restore();
+        /* Soft "shh" on a fraction of moves — a long stroke
+           becomes a stream of brushy puffs, not a constant hiss.
+           Only for brush (eraser stays silent — it's destructive
+           and the user wants to focus on what they're removing). */
+        if (D.tool === "brush" && Math.random() < 0.18) brushStroke();
     }
 
     function stampAt(p) {
@@ -2079,6 +2232,8 @@
            reads as a recognizable shape. */
         const r = D.size * 1.7;
         fn(D.paintCtx, p.x, p.y, r, currentPaintColor());
+        stampClick();
+        haptic(15);
     }
 
     /* ----- 6E. Tool UI ----- */
@@ -2260,6 +2415,7 @@
                 sizeDecorateCanvas();
             }
             startDecorateLoop();
+            wheelHumStart();
         },
         onLeave: function () {
             stopDecorateLoop();
@@ -2880,15 +3036,18 @@
         } else if (state === "firing") {
             setKilnStatus("FIRING IT");
             kilnDoorThunk(1.0);
+            haptic([22]);
             kilnRoar(KILN_DUR.firing / 1000);
         } else if (state === "opening") {
             setKilnStatus("DOORS OPENING");
             kilnDoorThunk(0.6);
+            haptic([16]);
         } else if (state === "reveal") {
             setKilnStatus("FIRED");
             KILN.fired = true;
             autoSaveFiredPot();
             kilnDing();
+            haptic([12, 40, 24, 40, 60]);
             showCelebrate();
         } else if (state === "done") {
             /* user takes the wheel from here */
@@ -2994,6 +3153,7 @@
             hideCelebrate();
             kilnEnter("intro");
             startKilnLoop();
+            wheelHumStart();
         },
         onLeave: function () {
             stopKilnLoop();
@@ -3362,6 +3522,7 @@
                 GALLERY.inited = true;
             }
             refreshGalleryGrid();
+            wheelHumStop();
         },
         onLeave: function () {
             closeDetail();
