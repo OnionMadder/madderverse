@@ -816,6 +816,81 @@ a:focus-visible {
     gap: 6px;
 }
 
+/* Pack tabs (chunk 4) — 6 small tabs above tool-modes that switch
+   the active GLAZE_PACK. Scrolls horizontally on tight viewports. */
+.pack-tabs {
+    gap: 4px;
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+    border-bottom: 1px dashed var(--teal-low);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+.pack-tabs::-webkit-scrollbar { display: none; }
+
+.pack-tab {
+    flex: 1 0 auto;
+    padding: 7px 9px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.4px;
+    background: var(--bg-deep);
+    color: var(--teal-dim);
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-sm);
+    transition: background 0.12s ease,
+                color 0.12s ease,
+                border-color 0.12s ease,
+                box-shadow 0.12s ease,
+                transform 0.06s ease;
+    text-shadow: 1px 1px 0 #000;
+    white-space: nowrap;
+}
+
+.pack-tab:hover,
+.pack-tab:focus-visible {
+    color: var(--teal);
+    border-color: var(--teal);
+    background: rgba(0, 255, 204, 0.06);
+    outline: none;
+}
+
+.pack-tab:active {
+    transform: translateY(1px);
+}
+
+.pack-tab.active {
+    background: linear-gradient(180deg, #ff3d96 0%, #b81866 100%);
+    color: #fff;
+    border-color: var(--pink-bright);
+    box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 0.20),
+        0 0 12px rgba(255, 46, 136, 0.55);
+}
+
+/* MODDED's @rgb-cycle glaze — the swatch itself cycles through
+   the rainbow so the user knows the strokes will too. */
+.swatch.dynamic-rgb {
+    background:
+        linear-gradient(135deg,
+            #ff0040 0%,
+            #ff8800 14%,
+            #ffee00 28%,
+            #00ff44 42%,
+            #00bbff 56%,
+            #2200ff 70%,
+            #ff00aa 84%,
+            #ff0040 100%);
+    background-size: 360% 360%;
+    animation: rgb-slide 3.6s linear infinite;
+}
+
+@keyframes rgb-slide {
+    0%   { background-position: 0%   50%; }
+    100% { background-position: 360% 50%; }
+}
+
 .tool-btn {
     flex: 1;
     padding: 10px 6px;
@@ -1017,7 +1092,8 @@ a:focus-visible {
     .big-title,
     .big-title .oo,
     .clay-drifter,
-    .marquee-tape span {
+    .marquee-tape span,
+    .swatch.dynamic-rgb {
         animation: none;
     }
 }

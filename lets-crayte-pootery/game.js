@@ -801,10 +801,100 @@
        entries in GLAZE_PACKS without changing this layer.
        ============================================================ */
 
-    /* ----- 6A. Stamp drawers -----
-       Each pattern is a function that draws itself into ctx at
-       (x, y) with radius r and fill/stroke color c. Used both for
-       on-canvas stamping and for the mini icons in the palette.   */
+    /* ----- 6A. Stamp drawers + helpers -----
+       Each pattern is a function (ctx, x, y, r, c) that draws
+       itself at (x, y) with radius r and ink/fill color c. The
+       same drawers are used for on-canvas stamping AND for the
+       mini palette icons.
+
+       Helpers below are shared by the themed-pack stamps (chunk
+       4 adds 23 more drawers — silhouettes, pixel art, text
+       labels, circuit traces). Keep them generic.               */
+
+    function roundedRect(ctx, x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+    }
+
+    /* Tint a hex color lighter (amt > 0) or darker (amt < 0).
+       amt is a [-1, 1] fraction; non-hex inputs pass through. */
+    function shiftColor(hex, amt) {
+        if (typeof hex !== "string" || hex.charAt(0) !== "#") return hex;
+        let h = hex.slice(1);
+        if (h.length === 3) h = h.split("").map(function (c) { return c + c; }).join("");
+        if (h.length !== 6) return hex;
+        let r = parseInt(h.slice(0, 2), 16);
+        let g = parseInt(h.slice(2, 4), 16);
+        let b = parseInt(h.slice(4, 6), 16);
+        const pad = function (v) {
+            v = Math.max(0, Math.min(255, Math.round(v)));
+            return (v < 16 ? "0" : "") + v.toString(16);
+        };
+        if (amt >= 0) {
+            r += (255 - r) * amt;
+            g += (255 - g) * amt;
+            b += (255 - b) * amt;
+        } else {
+            r *= (1 + amt);
+            g *= (1 + amt);
+            b *= (1 + amt);
+        }
+        return "#" + pad(r) + pad(g) + pad(b);
+    }
+
+    /* Text in a chunky framed box — used by GOOD BOY, POWER,
+       GAME OVER, PRESS START stamps. Bungee is the title font
+       (already in <head>); fallback chain keeps it chunky. */
+    function textStamp(ctx, x, y, r, color, text, opts) {
+        opts = opts || {};
+        const fontSize  = (opts.fontSize || 0.42) * r;
+        const fontStack = opts.fontFamily ||
+            '"Bungee", "Impact", "Haettenschweiler", "Arial Narrow Bold", sans-serif';
+        ctx.save();
+        ctx.font = fontSize + "px " + fontStack;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const tw = ctx.measureText(text).width;
+        const padX = r * 0.18;
+        const padY = r * 0.12;
+        const w = tw + padX * 2;
+        const h = fontSize + padY * 2;
+        ctx.fillStyle = "#000";
+        roundedRect(ctx, x - w / 2, y - h / 2, w, h, h * 0.22);
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1.5, r * 0.06);
+        roundedRect(ctx, x - w / 2 + 1, y - h / 2 + 1, w - 2, h - 2, h * 0.22);
+        ctx.stroke();
+        ctx.fillStyle = color;
+        ctx.fillText(text, x, y + 1);
+        ctx.restore();
+    }
+
+    /* Rasterized pixel art — used by pixel-heart, pixel-skull,
+       cloud-8bit. Cell size scales with stamp radius.         */
+    function pixelGrid(ctx, x, y, color, grid, cell) {
+        const rows = grid.length;
+        const cols = grid[0].length;
+        const ox = x - (cols * cell) / 2;
+        const oy = y - (rows * cell) / 2;
+        ctx.fillStyle = color;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                if (grid[r][c]) ctx.fillRect(ox + c * cell, oy + r * cell, cell, cell);
+            }
+        }
+    }
     const PATTERN_DRAWERS = {
         dot: function (ctx, x, y, r, c) {
             ctx.fillStyle = c;
@@ -896,17 +986,536 @@
                               x, top - r * 0.15,
                               x, top + r * 0.30);
             ctx.fill();
+        },
+
+        /* ===== CANDY pack ===== */
+        lollipop: function (ctx, x, y, r, c) {
+            /* stick */
+            ctx.strokeStyle = "#f4f4ea";
+            ctx.lineWidth = Math.max(2, r * 0.14);
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            ctx.moveTo(x, y + r * 0.10);
+            ctx.lineTo(x, y + r * 0.95);
+            ctx.stroke();
+            /* candy disc */
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            ctx.arc(x, y - r * 0.20, r * 0.62, 0, Math.PI * 2);
+            ctx.fill();
+            /* swirl */
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = Math.max(1.4, r * 0.10);
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            for (let t = 0; t < Math.PI * 4; t += 0.18) {
+                const rad = 1.5 + t * r * 0.06;
+                const px = x + Math.cos(t) * rad;
+                const py = y - r * 0.20 + Math.sin(t) * rad;
+                if (t === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+        },
+
+        "candy-cane": function (ctx, x, y, r, c) {
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            roundedRect(ctx, x - r * 0.30, y - r * 0.90,
+                        r * 0.60, r * 1.80, r * 0.18);
+            ctx.fill();
+            ctx.clip();
+            ctx.strokeStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.20);
+            for (let i = -3; i <= 5; i++) {
+                ctx.beginPath();
+                ctx.moveTo(x - r + i * r * 0.45, y - r);
+                ctx.lineTo(x + r + i * r * 0.45, y + r);
+                ctx.stroke();
+            }
+            ctx.restore();
+            /* dark outline for definition */
+            ctx.strokeStyle = "rgba(0,0,0,0.4)";
+            ctx.lineWidth = Math.max(1, r * 0.05);
+            roundedRect(ctx, x - r * 0.30, y - r * 0.90,
+                        r * 0.60, r * 1.80, r * 0.18);
+            ctx.stroke();
+        },
+
+        gumballs: function (ctx, x, y, r, c) {
+            /* cluster of 5 gumballs in slightly varied tints */
+            const spots = [
+                [ 0.00,  0.00, 0.42, c],
+                [-0.55, -0.40, 0.28, shiftColor(c,  0.18)],
+                [ 0.55, -0.40, 0.28, shiftColor(c, -0.18)],
+                [-0.50,  0.45, 0.28, shiftColor(c,  0.28)],
+                [ 0.50,  0.45, 0.28, shiftColor(c, -0.10)]
+            ];
+            for (let i = 0; i < spots.length; i++) {
+                const s = spots[i];
+                ctx.fillStyle = s[3];
+                ctx.beginPath();
+                ctx.arc(x + s[0] * r, y + s[1] * r, r * s[2], 0, Math.PI * 2);
+                ctx.fill();
+                /* highlight */
+                ctx.fillStyle = "rgba(255,255,255,0.4)";
+                ctx.beginPath();
+                ctx.arc(x + s[0] * r - r * s[2] * 0.35,
+                        y + s[1] * r - r * s[2] * 0.35,
+                        r * s[2] * 0.22, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        },
+
+        drip: function (ctx, x, y, r, c) {
+            /* glaze drip — teardrop */
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            ctx.moveTo(x, y - r * 0.95);
+            ctx.bezierCurveTo(x + r * 0.55, y - r * 0.40,
+                              x + r * 0.65, y + r * 0.55,
+                              x, y + r * 0.95);
+            ctx.bezierCurveTo(x - r * 0.65, y + r * 0.55,
+                              x - r * 0.55, y - r * 0.40,
+                              x, y - r * 0.95);
+            ctx.fill();
+            /* shine */
+            ctx.fillStyle = "rgba(255,255,255,0.42)";
+            ctx.beginPath();
+            ctx.ellipse(x - r * 0.18, y + r * 0.15, r * 0.10, r * 0.30,
+                        -0.3, 0, Math.PI * 2);
+            ctx.fill();
+        },
+
+        /* ===== PLUSHIE pack ===== */
+        teddy: function (ctx, x, y, r, c) {
+            const belly = shiftColor(c, 0.28);
+            const dark  = shiftColor(c, -0.30);
+            /* body */
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            ctx.arc(x, y + r * 0.30, r * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+            /* head */
+            ctx.beginPath();
+            ctx.arc(x, y - r * 0.35, r * 0.42, 0, Math.PI * 2);
+            ctx.fill();
+            /* ears */
+            ctx.beginPath();
+            ctx.arc(x - r * 0.38, y - r * 0.68, r * 0.18, 0, Math.PI * 2);
+            ctx.arc(x + r * 0.38, y - r * 0.68, r * 0.18, 0, Math.PI * 2);
+            ctx.fill();
+            /* ear inners */
+            ctx.fillStyle = belly;
+            ctx.beginPath();
+            ctx.arc(x - r * 0.38, y - r * 0.68, r * 0.10, 0, Math.PI * 2);
+            ctx.arc(x + r * 0.38, y - r * 0.68, r * 0.10, 0, Math.PI * 2);
+            ctx.fill();
+            /* belly patch */
+            ctx.beginPath();
+            ctx.arc(x, y + r * 0.32, r * 0.34, 0, Math.PI * 2);
+            ctx.fill();
+            /* snout */
+            ctx.fillStyle = belly;
+            ctx.beginPath();
+            ctx.arc(x, y - r * 0.22, r * 0.18, 0, Math.PI * 2);
+            ctx.fill();
+            /* eyes */
+            ctx.fillStyle = "#1a0e08";
+            ctx.beginPath();
+            ctx.arc(x - r * 0.14, y - r * 0.42, r * 0.06, 0, Math.PI * 2);
+            ctx.arc(x + r * 0.14, y - r * 0.42, r * 0.06, 0, Math.PI * 2);
+            ctx.fill();
+            /* nose */
+            ctx.fillStyle = dark;
+            ctx.beginPath();
+            ctx.arc(x, y - r * 0.26, r * 0.05, 0, Math.PI * 2);
+            ctx.fill();
+        },
+
+        paw: function (ctx, x, y, r, c) {
+            ctx.fillStyle = c;
+            /* 4 toe beans */
+            const toes = [
+                [-0.38, -0.40, 0.18],
+                [-0.12, -0.60, 0.18],
+                [ 0.12, -0.60, 0.18],
+                [ 0.38, -0.40, 0.18]
+            ];
+            for (let i = 0; i < toes.length; i++) {
+                const t = toes[i];
+                ctx.beginPath();
+                ctx.arc(x + t[0] * r, y + t[1] * r, r * t[2], 0, Math.PI * 2);
+                ctx.fill();
+            }
+            /* main pad — three-lobed */
+            ctx.beginPath();
+            ctx.moveTo(x - r * 0.42, y + r * 0.10);
+            ctx.bezierCurveTo(x - r * 0.55, y + r * 0.30,
+                              x - r * 0.35, y + r * 0.55,
+                              x,            y + r * 0.50);
+            ctx.bezierCurveTo(x + r * 0.35, y + r * 0.55,
+                              x + r * 0.55, y + r * 0.30,
+                              x + r * 0.42, y + r * 0.10);
+            ctx.bezierCurveTo(x + r * 0.25, y - r * 0.05,
+                              x - r * 0.25, y - r * 0.05,
+                              x - r * 0.42, y + r * 0.10);
+            ctx.fill();
+        },
+
+        button: function (ctx, x, y, r, c) {
+            const dark = shiftColor(c, -0.35);
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.72, 0, Math.PI * 2);
+            ctx.fill();
+            /* rim ring */
+            ctx.strokeStyle = dark;
+            ctx.lineWidth = Math.max(1, r * 0.07);
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.58, 0, Math.PI * 2);
+            ctx.stroke();
+            /* 4 thread holes */
+            ctx.fillStyle = "#1a0e08";
+            const holes = [[-0.18, -0.18], [0.18, -0.18],
+                           [-0.18,  0.18], [0.18,  0.18]];
+            for (let i = 0; i < holes.length; i++) {
+                ctx.beginPath();
+                ctx.arc(x + holes[i][0] * r, y + holes[i][1] * r,
+                        r * 0.075, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            /* thread X */
+            ctx.strokeStyle = "rgba(0,0,0,0.55)";
+            ctx.lineWidth = Math.max(1, r * 0.04);
+            ctx.beginPath();
+            ctx.moveTo(x - r * 0.18, y - r * 0.18);
+            ctx.lineTo(x + r * 0.18, y + r * 0.18);
+            ctx.moveTo(x + r * 0.18, y - r * 0.18);
+            ctx.lineTo(x - r * 0.18, y + r * 0.18);
+            ctx.stroke();
+        },
+
+        "plush-grain": function (ctx, x, y, r, c) {
+            /* soft cross-hatch — short fuzz tufts */
+            ctx.strokeStyle = c;
+            ctx.lineWidth = Math.max(1, r * 0.06);
+            ctx.lineCap = "round";
+            for (let i = 0; i < 22; i++) {
+                /* deterministic-ish positions via i for stability */
+                const a = (i * 137.5) % 360 * Math.PI / 180;
+                const rad = ((i * 41) % 80) / 100 * r * 0.85;
+                const px = x + Math.cos(a) * rad;
+                const py = y + Math.sin(a) * rad;
+                const ang = (i * 29) % 180 * Math.PI / 180;
+                const len = r * 0.18;
+                ctx.beginPath();
+                ctx.moveTo(px - Math.cos(ang) * len * 0.5,
+                           py - Math.sin(ang) * len * 0.5);
+                ctx.lineTo(px + Math.cos(ang) * len * 0.5,
+                           py + Math.sin(ang) * len * 0.5);
+                ctx.stroke();
+            }
+        },
+
+        /* ===== GOOD DOG pack ===== */
+        bone: function (ctx, x, y, r, c) {
+            ctx.fillStyle = c;
+            /* shaft */
+            roundedRect(ctx, x - r * 0.75, y - r * 0.18,
+                        r * 1.50, r * 0.36, r * 0.10);
+            ctx.fill();
+            /* 4 bulb ends */
+            const ends = [[-0.75, -0.30], [-0.75, 0.30],
+                          [ 0.75, -0.30], [ 0.75, 0.30]];
+            for (let i = 0; i < ends.length; i++) {
+                ctx.beginPath();
+                ctx.arc(x + ends[i][0] * r, y + ends[i][1] * r,
+                        r * 0.30, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            /* subtle outline */
+            ctx.strokeStyle = "rgba(0,0,0,0.35)";
+            ctx.lineWidth = Math.max(1, r * 0.05);
+            roundedRect(ctx, x - r * 0.75, y - r * 0.18,
+                        r * 1.50, r * 0.36, r * 0.10);
+            ctx.stroke();
+        },
+
+        doghouse: function (ctx, x, y, r, c) {
+            ctx.save();
+            /* body */
+            ctx.fillStyle = c;
+            roundedRect(ctx, x - r * 0.70, y - r * 0.10,
+                        r * 1.40, r * 0.85, r * 0.05);
+            ctx.fill();
+            /* roof */
+            ctx.fillStyle = shiftColor(c, -0.30);
+            ctx.beginPath();
+            ctx.moveTo(x - r * 0.85, y - r * 0.05);
+            ctx.lineTo(x, y - r * 0.75);
+            ctx.lineTo(x + r * 0.85, y - r * 0.05);
+            ctx.closePath();
+            ctx.fill();
+            /* door (arched) — punch through */
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.beginPath();
+            ctx.arc(x, y + r * 0.40, r * 0.25, Math.PI, 0);
+            ctx.lineTo(x + r * 0.25, y + r * 0.75);
+            ctx.lineTo(x - r * 0.25, y + r * 0.75);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        },
+
+        goodboy: function (ctx, x, y, r, c) {
+            textStamp(ctx, x, y, r, c, "GOOD BOY");
+        },
+
+        whosagoodboy: function (ctx, x, y, r, c) {
+            textStamp(ctx, x, y, r, c, "WHO'S A GOOD BOY?",
+                      { fontSize: 0.28 });
+        },
+
+        dachshund: function (ctx, x, y, r, c) {
+            ctx.fillStyle = c;
+            /* long body */
+            ctx.beginPath();
+            ctx.ellipse(x, y, r * 0.82, r * 0.26, 0, 0, Math.PI * 2);
+            ctx.fill();
+            /* head */
+            ctx.beginPath();
+            ctx.arc(x - r * 0.72, y - r * 0.12, r * 0.22, 0, Math.PI * 2);
+            ctx.fill();
+            /* snout */
+            ctx.beginPath();
+            ctx.ellipse(x - r * 0.92, y - r * 0.04,
+                        r * 0.13, r * 0.09, 0, 0, Math.PI * 2);
+            ctx.fill();
+            /* droopy ear */
+            ctx.fillStyle = shiftColor(c, -0.25);
+            ctx.beginPath();
+            ctx.ellipse(x - r * 0.65, y - r * 0.04,
+                        r * 0.12, r * 0.20, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            /* 4 short legs */
+            ctx.fillStyle = c;
+            const legs = [-0.50, -0.18, 0.28, 0.58];
+            for (let i = 0; i < legs.length; i++) {
+                roundedRect(ctx, x + legs[i] * r - r * 0.06,
+                            y + r * 0.18, r * 0.12, r * 0.30, r * 0.04);
+                ctx.fill();
+            }
+            /* tail */
+            ctx.beginPath();
+            roundedRect(ctx, x + r * 0.70, y - r * 0.04,
+                        r * 0.28, r * 0.08, r * 0.03);
+            ctx.fill();
+            /* eye */
+            ctx.fillStyle = "#1a0e08";
+            ctx.beginPath();
+            ctx.arc(x - r * 0.70, y - r * 0.16, r * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+        },
+
+        /* ===== MODDED pack ===== */
+        circuit: function (ctx, x, y, r, c) {
+            ctx.strokeStyle = c;
+            ctx.fillStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.10);
+            ctx.lineCap = "square";
+            /* L-shaped trace */
+            ctx.beginPath();
+            ctx.moveTo(x - r * 0.70, y - r * 0.55);
+            ctx.lineTo(x - r * 0.70, y + r * 0.15);
+            ctx.lineTo(x + r * 0.35, y + r * 0.15);
+            ctx.lineTo(x + r * 0.35, y + r * 0.70);
+            ctx.stroke();
+            /* pads */
+            const pads = [[-0.70, -0.55], [0.35, 0.70]];
+            for (let i = 0; i < pads.length; i++) {
+                ctx.beginPath();
+                ctx.arc(x + pads[i][0] * r, y + pads[i][1] * r,
+                        r * 0.13, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            /* zig-zag resistor */
+            ctx.lineWidth = Math.max(2, r * 0.07);
+            ctx.beginPath();
+            const baseY = y + r * 0.15;
+            for (let i = 0; i < 7; i++) {
+                const px = x - r * 0.50 + i * r * 0.12;
+                const py = baseY + (i % 2 === 0 ? -r * 0.14 : r * 0.14);
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.stroke();
+        },
+
+        "fan-hex": function (ctx, x, y, r, c) {
+            ctx.strokeStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.10);
+            /* outer hex */
+            for (let pass = 0; pass < 2; pass++) {
+                const size = pass === 0 ? r * 0.90 : r * 0.48;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+                    const px = x + Math.cos(a) * size;
+                    const py = y + Math.sin(a) * size;
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+                ctx.stroke();
+            }
+            /* center dot */
+            ctx.fillStyle = c;
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.10, 0, Math.PI * 2);
+            ctx.fill();
+        },
+
+        "rgb-strip": function (ctx, x, y, r, c) {
+            const colors = ["#ff3030", "#ffaa30", "#ffff30",
+                            "#30ff30", "#30c0ff", "#5040ff", "#cc40ff"];
+            const segW = (r * 1.50) / colors.length;
+            const startX = x - r * 0.75;
+            /* dark backing */
+            ctx.fillStyle = "#0c0c0c";
+            roundedRect(ctx, startX - r * 0.06, y - r * 0.25,
+                        r * 1.62, r * 0.50, r * 0.10);
+            ctx.fill();
+            /* LEDs */
+            for (let i = 0; i < colors.length; i++) {
+                ctx.fillStyle = colors[i];
+                roundedRect(ctx, startX + i * segW + segW * 0.10,
+                            y - r * 0.18, segW * 0.80, r * 0.36,
+                            r * 0.07);
+                ctx.fill();
+                /* shine */
+                ctx.fillStyle = "rgba(255,255,255,0.45)";
+                ctx.beginPath();
+                ctx.ellipse(startX + i * segW + segW * 0.50,
+                            y - r * 0.05,
+                            segW * 0.30, r * 0.06,
+                            0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        },
+
+        power: function (ctx, x, y, r, c) {
+            textStamp(ctx, x, y, r, c, "POWER");
+        },
+
+        reset: function (ctx, x, y, r, c) {
+            textStamp(ctx, x, y, r, c, "RESET");
+        },
+
+        trace: function (ctx, x, y, r, c) {
+            ctx.strokeStyle = c;
+            ctx.fillStyle = c;
+            ctx.lineWidth = Math.max(2, r * 0.10);
+            ctx.lineCap = "square";
+            ctx.lineJoin = "miter";
+            /* serpentine right-angle path */
+            ctx.beginPath();
+            ctx.moveTo(x - r * 0.85, y - r * 0.55);
+            ctx.lineTo(x - r * 0.30, y - r * 0.55);
+            ctx.lineTo(x - r * 0.30, y);
+            ctx.lineTo(x + r * 0.30, y);
+            ctx.lineTo(x + r * 0.30, y - r * 0.40);
+            ctx.lineTo(x + r * 0.85, y - r * 0.40);
+            ctx.stroke();
+            /* vias */
+            const vias = [[-0.85, -0.55], [-0.30, 0], [0.30, 0], [0.85, -0.40]];
+            for (let i = 0; i < vias.length; i++) {
+                ctx.beginPath();
+                ctx.arc(x + vias[i][0] * r, y + vias[i][1] * r,
+                        r * 0.09, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        },
+
+        /* ===== GAMER pack ===== */
+        "pixel-heart": function (ctx, x, y, r, c) {
+            const cell = r * 0.18;
+            pixelGrid(ctx, x, y, c, [
+                [0,1,1,0,1,1,0],
+                [1,1,1,1,1,1,1],
+                [1,1,1,1,1,1,1],
+                [0,1,1,1,1,1,0],
+                [0,0,1,1,1,0,0],
+                [0,0,0,1,0,0,0]
+            ], cell);
+        },
+
+        "pixel-skull": function (ctx, x, y, r, c) {
+            const cell = r * 0.16;
+            pixelGrid(ctx, x, y, c, [
+                [0,1,1,1,1,1,0],
+                [1,1,1,1,1,1,1],
+                [1,0,1,1,1,0,1],
+                [1,1,1,1,1,1,1],
+                [0,1,0,1,0,1,0],
+                [0,1,1,1,1,1,0]
+            ], cell);
+        },
+
+        "cloud-8bit": function (ctx, x, y, r, c) {
+            const cell = r * 0.15;
+            pixelGrid(ctx, x, y, c, [
+                [0,0,0,1,1,1,0,0,0],
+                [0,0,1,1,1,1,1,0,0],
+                [0,1,1,1,1,1,1,1,0],
+                [1,1,1,1,1,1,1,1,1],
+                [1,1,1,1,1,1,1,1,1],
+                [0,1,1,1,1,1,1,1,0]
+            ], cell);
+        },
+
+        controller: function (ctx, x, y, r, c) {
+            /* body */
+            ctx.fillStyle = c;
+            roundedRect(ctx, x - r * 0.85, y - r * 0.32,
+                        r * 1.70, r * 0.64, r * 0.28);
+            ctx.fill();
+            /* grips */
+            ctx.beginPath();
+            ctx.arc(x - r * 0.62, y + r * 0.18, r * 0.22, 0, Math.PI * 2);
+            ctx.arc(x + r * 0.62, y + r * 0.18, r * 0.22, 0, Math.PI * 2);
+            ctx.fill();
+            /* D-pad */
+            ctx.fillStyle = "#1a0e08";
+            ctx.fillRect(x - r * 0.52, y - r * 0.08, r * 0.34, r * 0.16);
+            ctx.fillRect(x - r * 0.43, y - r * 0.17, r * 0.16, r * 0.34);
+            /* 4 face buttons */
+            const cb = [[0.24, -0.10], [0.45, 0.05], [0.24, 0.20], [0.03, 0.05]];
+            for (let i = 0; i < cb.length; i++) {
+                ctx.beginPath();
+                ctx.arc(x + cb[i][0] * r, y + cb[i][1] * r,
+                        r * 0.07, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        },
+
+        "game-over": function (ctx, x, y, r, c) {
+            textStamp(ctx, x, y, r, c, "GAME OVER");
+        },
+
+        "press-start": function (ctx, x, y, r, c) {
+            textStamp(ctx, x, y, r, c, "PRESS START", { fontSize: 0.30 });
         }
     };
 
     /* ----- 6B. Decorate state -----
-       Chunk 4 will append more entries to GLAZE_PACKS for themed
-       packs (Candy / Plushie / Good Dog / MODDED / GAMER) and
-       reuse buildToolUI to rebuild the palette on tab switch.   */
+       Each pack defines its own glaze list + pattern list. The
+       active pack drives the GLAZE + STAMPS palette rows. Tabs
+       above the rows switch the active pack. The "@rgb-cycle"
+       glaze id is a dynamic glaze whose color cycles through HSL
+       in real time — see currentPaintColor().                   */
     const GLAZE_PACKS = [
         {
-            id: "core",
-            label: "BASIC",
+            id: "core",  label: "BASIC",
             glazes: [
                 "#3a2218",   /* dark clay */
                 "#7a3a18",   /* sienna */
@@ -923,6 +1532,67 @@
             ],
             patterns: ["dot", "ring", "star", "chevron",
                        "wave", "triangle", "x", "heart"]
+        },
+        {
+            id: "candy", label: "CANDY",
+            glazes: [
+                "#d92128",   /* cherry red */
+                "#2b6fff",   /* blue raspberry */
+                "#b3e51c",   /* sour green */
+                "#ffa6c9",   /* cotton candy pink */
+                "#4a230b",   /* root beer brown */
+                "#ff7a00",   /* orange creamsicle */
+                "#9534d8"    /* grape soda */
+            ],
+            patterns: ["lollipop", "candy-cane", "gumballs", "drip"]
+        },
+        {
+            id: "plushie", label: "PLUSH",
+            glazes: [
+                "#a07050",   /* teddy brown */
+                "#ffc8e0",   /* pastel pink */
+                "#fff4e0",   /* soft cream */
+                "#c8aedb",   /* lavender */
+                "#b8d8ed"    /* sky blue */
+            ],
+            patterns: ["teddy", "paw", "button", "plush-grain"]
+        },
+        {
+            id: "doggo", label: "DOGGO",
+            glazes: [
+                "#d9a567",   /* golden retriever */
+                "#f4f4ec",   /* dalmatian white */
+                "#8a9aaa",   /* husky gray */
+                "#5a3422",   /* chocolate lab */
+                "#2a2a2a"    /* black lab */
+            ],
+            patterns: ["paw", "bone", "doghouse", "goodboy",
+                       "whosagoodboy", "dachshund"]
+        },
+        {
+            id: "modded", label: "MODDED",
+            glazes: [
+                "@rgb-cycle",   /* animated rainbow */
+                "#39ff14",      /* neon green */
+                "#ff10a0",      /* hot pink */
+                "#00d4ff",      /* electric blue */
+                "#0a0a0a",      /* black ops */
+                "#c8c8c8"       /* brushed aluminum */
+            ],
+            patterns: ["circuit", "fan-hex", "rgb-strip",
+                       "power", "reset", "trace"]
+        },
+        {
+            id: "gamer", label: "GAMER",
+            glazes: [
+                "#33ff66",   /* CRT green */
+                "#ff8c1a",   /* retro orange */
+                "#ff2a8a",   /* arcade pink */
+                "#2a3a3a",   /* scanline gray */
+                "#ffea00"    /* hi-score yellow */
+            ],
+            patterns: ["pixel-heart", "controller", "game-over",
+                       "pixel-skull", "cloud-8bit", "press-start"]
         }
     ];
 
@@ -957,6 +1627,32 @@
         return GLAZE_PACKS[0];
     }
 
+    /* The MODDED pack's "@rgb-cycle" glaze cycles through HSL in
+       real time. Strokes / stamps placed with it capture the
+       current cycle color at paint time, so a single stroke
+       produces a smooth rainbow trail (the user sees the swatch
+       cycling and can time their motion). Chunk 8 will layer a
+       real-time animated overlay on top (the OVERCLOCKED easter
+       egg). For any static hex, this just passes through.       */
+    function currentPaintColor() {
+        if (D.glaze === "@rgb-cycle") {
+            const h = (performance.now() * 0.18) % 360;
+            return "hsl(" + h.toFixed(1) + ", 95%, 55%)";
+        }
+        return D.glaze;
+    }
+
+    function setPack(packId) {
+        if (D.activePackId === packId) return;
+        D.activePackId = packId;
+        const pack = activePack();
+        /* Snap glaze + pattern back to the new pack's first item
+           so the user never has a non-existent selection. */
+        D.glaze = pack.glazes[0];
+        D.pattern = pack.patterns[0];
+        buildToolUI();
+    }
+
     /* ----- 6C. Init / sizing ----- */
 
     function initDecorate() {
@@ -981,12 +1677,19 @@
 
         attachDecoratePointer();
         wireDecorateButtons();
+        attachPackTabs();
         buildToolUI();
 
         if (typeof ResizeObserver === "function") {
             const ro = new ResizeObserver(function () { sizeDecorateCanvas(); });
             ro.observe(c);
         }
+    }
+
+    function attachPackTabs() {
+        document.querySelectorAll(".pack-tab[data-pack]").forEach(function (b) {
+            b.addEventListener("click", function () { setPack(b.dataset.pack); });
+        });
     }
 
     function sizeDecorateCanvas() {
@@ -1085,7 +1788,7 @@
             ctx.globalCompositeOperation = "destination-out";
             ctx.fillStyle = "#000";
         } else {
-            ctx.fillStyle = D.glaze;
+            ctx.fillStyle = currentPaintColor();
         }
         ctx.beginPath();
         ctx.arc(p.x, p.y, D.size, 0, Math.PI * 2);
@@ -1102,7 +1805,7 @@
             ctx.globalCompositeOperation = "destination-out";
             ctx.strokeStyle = "#000";
         } else {
-            ctx.strokeStyle = D.glaze;
+            ctx.strokeStyle = currentPaintColor();
         }
         ctx.lineWidth = D.size * 2;
         ctx.lineCap = "round";
@@ -1120,7 +1823,7 @@
         /* Slightly bigger than brush dot so a "thin" stamp still
            reads as a recognizable shape. */
         const r = D.size * 1.7;
-        fn(D.paintCtx, p.x, p.y, r, D.glaze);
+        fn(D.paintCtx, p.x, p.y, r, currentPaintColor());
     }
 
     /* ----- 6E. Tool UI ----- */
@@ -1128,22 +1831,36 @@
     function buildToolUI() {
         const pack = activePack();
 
+        /* Pack tabs — markup is static (chunk-4 added 6 tabs to
+           index.html). Click handlers attached once via
+           attachPackTabs(); here we just toggle .active. */
+        document.querySelectorAll(".pack-tab[data-pack]").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.pack === pack.id);
+        });
+
         /* Glaze swatches */
         const gp = document.getElementById("glazePalette");
         if (gp) {
             gp.innerHTML = "";
-            pack.glazes.forEach(function (hex) {
+            pack.glazes.forEach(function (gid) {
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = "swatch";
-                btn.dataset.glaze = hex;
-                btn.style.background = hex;
-                btn.setAttribute("aria-label", "Glaze " + hex);
-                if (hex === D.glaze) btn.classList.add("active");
+                btn.dataset.glaze = gid;
+                if (gid === "@rgb-cycle") {
+                    /* CSS handles the animated rainbow background. */
+                    btn.classList.add("dynamic-rgb");
+                    btn.setAttribute("aria-label", "RGB cycle glaze");
+                    btn.title = "RGB CYCLE";
+                } else {
+                    btn.style.background = gid;
+                    btn.setAttribute("aria-label", "Glaze " + gid);
+                }
+                if (gid === D.glaze) btn.classList.add("active");
                 btn.addEventListener("click", function () {
-                    D.glaze = hex;
+                    D.glaze = gid;
                     gp.querySelectorAll(".swatch").forEach(function (s) {
-                        s.classList.toggle("active", s.dataset.glaze === hex);
+                        s.classList.toggle("active", s.dataset.glaze === gid);
                     });
                     /* Picking a glaze while on eraser snaps back to brush. */
                     if (D.tool === "eraser") setTool("brush");
