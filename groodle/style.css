@@ -36,42 +36,101 @@ html, body {
     -webkit-tap-highlight-color: transparent;
 }
 
-/* ============ HEADER ============ */
+/* ============ TOP-EDGE OVERLAYS ============
 
-header.top {
-    text-align: center;
-    padding: 14px 16px 6px;
-    position: relative;
-}
+   Back link, title, and currency pill float over the full-viewport
+   stage as fixed elements. Nothing in the document flow reserves space
+   for them. */
 
-.back {
-    position: absolute;
-    top: 14px;
-    left: 14px;
-    font-size: 12px;
+.back-floating {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    font-size: 18px;
     font-weight: bold;
-    letter-spacing: 1.5px;
+    letter-spacing: 1px;
     text-decoration: none;
     color: #d6bdff;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(26, 15, 51, 0.55);
     border: 1px solid rgba(255, 255, 255, 0.18);
     padding: 6px 10px;
     border-radius: 10px;
+    line-height: 1;
     transition: background 0.15s;
-    z-index: 10;
+    z-index: 110;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
 @media (hover: hover) {
-    .back:hover { background: rgba(255, 255, 255, 0.16); }
+    .back-floating:hover { background: rgba(0, 255, 204, 0.22); }
 }
 
-/* Currency pill — mirror of .back, top-right. Yellow accent because
-   Doodles are a value/score (yellow is already the brand "kid-money"
-   tone used in the hint-tag and the DANCE gradient). Label collapses
-   on small phones so the pill stays compact next to the title. */
+.title-overlay {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 105;
+    padding: 4px 18px 8px;
+    border-radius: 0 0 18px 18px;
+    background:
+        radial-gradient(ellipse 100% 100% at 50% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
+        rgba(26, 15, 51, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+    text-align: center;
+    max-width: 70vw;
+}
+.title-overlay h1 {
+    margin: 0;
+    font-family: var(--font-cursive);
+    font-size: 38px;
+    letter-spacing: 0;
+    color: #00ffcc;
+    line-height: 1;
+    text-shadow:
+        0 0 14px rgba(0, 255, 204, 0.45),
+        0 2px 0 #1a0f33;
+    transform: rotate(-1.5deg);
+    display: inline-block;
+}
+.title-overlay h1 .neon-pink {
+    color: #ff6ec7;
+    text-shadow:
+        0 0 14px rgba(255, 110, 199, 0.55),
+        0 2px 0 #1a0f33;
+    display: inline-block;
+    transform: rotate(3deg);
+}
+.title-overlay .tagline {
+    margin: 2px 0 0;
+    font-family: var(--font-body);
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #d6bdff;
+    line-height: 1.1;
+}
+@media (min-width: 720px) {
+    .title-overlay { padding: 6px 24px 10px; }
+    .title-overlay h1 { font-size: 52px; }
+    .title-overlay .tagline { font-size: 11px; }
+}
+
+/* Hide title during dance so the figure has the whole frame to itself. */
+body.dancing .title-overlay { opacity: 0; transition: opacity 0.3s; }
+
+/* Currency pill — top-right fixed overlay. Yellow accent because
+   Doodles are a value/score. Label collapses on small phones so the
+   pill stays compact. Hidden during dance to clear visual noise. */
 .currency-pill {
-    position: absolute;
-    top: 14px;
-    right: 14px;
+    position: fixed;
+    top: 12px;
+    right: 12px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -83,11 +142,14 @@ header.top {
     font-size: 13px;
     font-weight: bold;
     letter-spacing: 0.5px;
-    z-index: 10;
+    z-index: 110;
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.4),
         inset 0 0 8px rgba(255, 210, 63, 0.08);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
+body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
 .currency-icon { font-size: 16px; line-height: 1; }
 .currency-value { font-variant-numeric: tabular-nums; }
 .currency-label {
@@ -115,78 +177,14 @@ header.top {
     .currency-pill.bump { animation: none; }
 }
 
-header.top h1 {
-    margin: 0;
-    /* Caveat is a handwritten cursive — visually denser per em than the
-       chunky stack, so we bump font-size and zero out letter-spacing so
-       letterforms can actually connect. */
-    font-family: var(--font-cursive);
-    font-size: 92px;
-    letter-spacing: 0;
-    color: #00ffcc;
-    text-shadow:
-        0 0 18px rgba(0, 255, 204, 0.45),
-        0 3px 0 #1a0f33,
-        0 6px 0 rgba(26, 15, 51, 0.5);
-    line-height: 1;
-    transform: rotate(-1.5deg);
-    display: inline-block;
-}
-
-header.top h1 .neon-pink {
-    color: #ff6ec7;
-    text-shadow:
-        0 0 18px rgba(255, 110, 199, 0.55),
-        0 3px 0 #1a0f33,
-        0 6px 0 rgba(26, 15, 51, 0.5);
-    display: inline-block;
-    transform: rotate(3deg);
-}
-
-/* "We Groove. We Doodle. We Groodle." sits just below the title in the
-   header. Clean sans (body font) so it doesn't fight the cursive flourish
-   above; tracked out a touch so the three short clauses breathe. */
-.tagline {
-    margin: 6px 0 0;
-    font-family: var(--font-body);
-    font-size: 14px;
-    font-weight: bold;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    color: #d6bdff;
-    /* Subtle pink shadow lines up with the title's pink "oo" so the
-       header reads as one composition. */
-    text-shadow: 0 1px 0 rgba(26, 15, 51, 0.5);
-}
-
-/* ============ MAIN LAYOUT ============ */
-
-main {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 12px;
-    gap: 14px;
-}
-
-.stage-row {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-}
-
 /* ============ BACKGROUND PICKER ============
 
-   Lives inside the Stage tool-section now (was a standalone dark
-   panel between the canvas and the tool tray). No more own background
-   / border / padding — those are provided by the wrapping tool-section
-   card. Just the thumb grid. */
+   Lives inside the Stage drawer. Just a flex-wrap grid of thumbnail
+   buttons — the wrapping drawer-section provides the panel chrome. */
 
 .bg-picker {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     flex-wrap: wrap;
     justify-content: center;
 }
@@ -219,36 +217,42 @@ main {
     border-radius: 6px;
 }
 
-/* ============ STAGE & CREATURE ============ */
+/* ============ STAGE & CREATURE ============
 
-.stage-wrap {
-    position: relative;
-    display: flex;
-    justify-content: center;
-}
+   Stage fills the entire viewport — no scroll to compete between the
+   canvas and tools. The figure inside (.creature) keeps its native
+   400x600 logical box via the SVG layers' preserveAspectRatio="meet";
+   on viewports that don't match 2:3 (most phones), the background
+   color shows around the figure in the letterbox region. */
 
 .stage {
-    position: relative;
-    width: min(94vw, 380px);
-    aspect-ratio: 2 / 3;
-    border-radius: 16px;
-    box-shadow:
-        0 12px 40px rgba(0, 0, 0, 0.5),
-        inset 0 0 0 4px #fff,
-        inset 0 0 0 6px rgba(0, 255, 204, 0.4);
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     user-select: none;
     -webkit-user-select: none;
-    transition: box-shadow 0.3s;
+    z-index: 1;
 }
 
-body.dancing .stage {
-    box-shadow:
-        0 12px 40px rgba(0, 0, 0, 0.5),
-        inset 0 0 0 4px #fff,
-        inset 0 0 0 6px #ff6ec7,
-        0 0 32px rgba(255, 110, 199, 0.3);
+/* Override of the .creature rule defined below — fits the figure into
+   the largest 2:3 box that fills the viewport without distorting. The
+   left/right/top/bottom: 0 with margin: auto centers an explicitly
+   sized element on both axes. min() picks whichever dimension is the
+   limit (height on portrait phones, width on landscape / desktop). */
+.stage > .creature {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    margin: auto;
+    width: min(100vw, calc(100dvh * 2 / 3));
+    height: min(100dvh, calc(100vw * 3 / 2));
+    z-index: 2;
 }
+
+/* Stage floor is positioned via percentages relative to .creature, so
+   it follows the figure's centered 2:3 box. */
 
 .bg-layer {
     position: absolute;
@@ -407,12 +411,13 @@ body.dancing .stage {
     width: 100%;
     height: 100%;
     z-index: 2;
-    /* Allow vertical page scroll + pinch-zoom right through the canvas
-       so a thumb swipe doesn't get hijacked; the browser's gesture
-       heuristic gives mostly-horizontal / diagonal drags to the canvas
-       as pointer events for drawing. No explicit "draw mode" gate —
-       drawing works on first touch. */
-    touch-action: pan-y pinch-zoom;
+    /* The canvas IS the page now (.stage fills the entire viewport),
+       so the previous pan-y / drawing dance-of-heuristics is gone.
+       touch-action: none means every touch becomes a draw event with
+       no scroll competition. There's nothing below the canvas in the
+       viewport that needs scrolling to reach — tools live as
+       fixed-position dock overlays. */
+    touch-action: none;
     cursor: crosshair;
     /* Drawing is clipped to the silhouette inside game.js via ctx.clip()
        on a Path2D built from BODY_SHAPES — see buildBodyPath() / buildCanvas.
@@ -454,86 +459,6 @@ body.dancing .draw-canvas {
     box-shadow: 0 0 12px #ff6ec7;
     transition: opacity 0.06s linear, transform 0.06s linear;
     z-index: 5;
-}
-
-/* ============ LEFT-SIDE HUD ============
-
-   Fixed-position vertical strip on the left edge of the viewport with
-   the progression entry-points (Achievements + Hat Shop). Replaces the
-   prior .shelf-row that sat between bg-picker and tool tray; floats
-   over the page on both phone and desktop so it doesn't compete with
-   the canvas for horizontal space. Hidden during dance because both
-   modals would interrupt the music; the dance composition reclaims the
-   left edge for the figure. */
-
-.left-hud {
-    position: fixed;
-    top: 110px;
-    left: 0;
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 8px 6px;
-    background:
-        radial-gradient(ellipse 100% 60% at 0% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
-        linear-gradient(135deg, rgba(26, 15, 51, 0.88) 0%, rgba(59, 31, 107, 0.88) 100%);
-    border: 2px solid rgba(0, 255, 204, 0.45);
-    border-left: none;
-    border-radius: 0 16px 16px 0;
-    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-}
-body.dancing .left-hud { display: none; }
-
-.hud-btn {
-    width: 56px;
-    min-height: 56px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 6px 4px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 2px solid rgba(0, 255, 204, 0.4);
-    color: #fff;
-    font-family: var(--font-chunky);
-    font-size: 10px;
-    letter-spacing: 1px;
-    font-weight: bold;
-    text-transform: uppercase;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    transition: background 0.15s, border-color 0.15s, transform 0.05s;
-}
-.hud-btn .hud-icon { font-size: 22px; line-height: 1; }
-.hud-btn .hud-label { line-height: 1; }
-.hud-btn:active { transform: scale(0.96); }
-@media (hover: hover) {
-    .hud-btn:hover {
-        border-color: #00ffcc;
-        background: rgba(0, 255, 204, 0.18);
-    }
-}
-
-@media (min-width: 720px) {
-    /* Desktop / tablet land: a touch bigger so the HUD reads as a real
-       sidebar widget rather than a corner badge. */
-    .left-hud {
-        top: 140px;
-        gap: 8px;
-        padding: 12px 8px;
-    }
-    .hud-btn {
-        width: 72px;
-        min-height: 72px;
-        font-size: 11px;
-        gap: 4px;
-    }
-    .hud-btn .hud-icon { font-size: 28px; }
 }
 
 /* ============ MODAL ============
@@ -887,187 +812,17 @@ body.dancing .left-hud { display: none; }
     .achievement-toast.hide { transform: none; }
 }
 
-/* ============ PANELS ============ */
+/* ============ DRAWER CONTROLS ============
 
-.panel {
-    width: min(94vw, 460px);
-    background: rgba(0, 0, 0, 0.45);
-    border: 2px solid rgba(255, 255, 255, 0.12);
-    border-radius: 16px;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-}
-
-/* ============ TOOL TRAY (modern studio-counter look) ============
-
-   The draw panel (#drawPanel) opts in via .tool-tray. Deep-purple tray
-   with a soft pink halo at the top + teal dashed compartments inside,
-   white tape labels (Colors / Brushes / Actions) capping each one.
-   Scoped specifically with the .tool-tray class so the dance-panel
-   keeps its existing dark/neon styling. */
-
-.tool-tray {
-    /* Dark studio-counter tray: deep purple base with a soft pink halo
-       at the top edge + teal hairline inner glow. Cream was pulled out
-       because it fought the onioncore palette; the "supply tray" feeling
-       now comes from the dashed teal section cards + the white tape
-       labels inside, not from a warm paper backdrop. */
-    background:
-        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
-        linear-gradient(165deg, #3b1f6b 0%, #1a0f33 100%);
-    border: 3px solid rgba(0, 255, 204, 0.5);
-    border-radius: 18px;
-    padding: 14px;
-    gap: 14px;
-    color: #fff;
-    box-shadow:
-        0 10px 28px rgba(0, 0, 0, 0.5),
-        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-        inset 0 0 22px rgba(255, 110, 199, 0.08);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-}
-
-.tool-section {
-    /* Glassy dark card with teal-tinted dashed border so each section
-       reads as its own "compartment" against the dark tray. */
-    background: rgba(0, 0, 0, 0.25);
-    border: 2px dashed rgba(0, 255, 204, 0.4);
-    border-radius: 14px;
-    padding: 6px 10px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-/* Section titles read as taped-on craft labels: cursive Caveat, pink,
-   slight rotation, soft dark stamp shadow. Lifted out of the dashed
-   card with a negative top margin so they cap the section like a tag. */
-.tool-title {
-    margin: -16px 0 2px;
-    align-self: flex-start;
-    font-family: var(--font-cursive);
-    font-weight: 700;
-    font-size: 24px;
-    line-height: 1;
-    color: #ff6ec7;
-    padding: 2px 12px 4px;
-    background: #fff;
-    border: 2px solid #1a0f33;
-    border-radius: 10px;
-    transform: rotate(-2.5deg);
-    box-shadow: 0 2px 0 rgba(26, 15, 51, 0.35);
-}
-
-.tool-section .panel-row {
-    justify-content: center;
-}
-.tool-section.tool-actions .panel-row { gap: 10px; }
-.tool-section.tool-brushes .panel-row { gap: 12px; }
-
-/* ---- Swatch styling inside the tray ---- */
-
-.tool-tray .swatch {
-    width: 46px;
-    height: 46px;
-    border: 3px solid #1a0f33;
-    box-shadow: 0 3px 0 rgba(26, 15, 51, 0.35);
-}
-.tool-tray .swatch[data-color="#ffffff"] {
-    /* Keep the white-swatch dark-bordered so it stays visible regardless
-       of how the tray background reads. */
-    border-color: #1a0f33;
-}
-.tool-tray .swatch.active {
-    border-color: #1a0f33;
-    transform: translateY(-3px) scale(1.1);
-    box-shadow:
-        0 0 0 4px #ff6ec7,
-        0 6px 0 rgba(26, 15, 51, 0.4);
-}
-
-/* ---- Brush-size buttons read as marker tips ---- */
-
-.tool-tray .size-btn {
-    width: 48px;
-    height: 48px;
-    background: #fff;
-    border: 3px solid #1a0f33;
-    box-shadow: 0 3px 0 rgba(26, 15, 51, 0.35);
-}
-.tool-tray .size-btn .dot {
-    background: #1a0f33;
-}
-.tool-tray .size-btn.active {
-    background: #fff;
-    border-color: #1a0f33;
-    box-shadow:
-        0 0 0 4px #ff6ec7,
-        0 3px 0 rgba(26, 15, 51, 0.35);
-    transform: translateY(-2px);
-}
-.tool-tray .size-btn.active .dot {
-    background: #ff6ec7;
-}
-
-/* ---- Buttons inside the tray: white face, dark stamp ---- */
-
-.tool-tray .btn {
-    background: #fff;
-    color: #1a0f33;
-    border: 3px solid #1a0f33;
-    box-shadow: 0 4px 0 #1a0f33;
-    text-shadow: none;
-    text-transform: uppercase;
-}
-.tool-tray .btn:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 #1a0f33;
-}
-.tool-tray .btn.active {
-    background: #ff6ec7;
-    border-color: #1a0f33;
-    color: #1a0f33;
-}
-.tool-tray .btn.primary {
-    /* DANCE button — pink → yellow → teal gradient identity preserved,
-       framed by the dark stamp border so it pops on the dark tray. */
-    background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
-    color: #1a0f33;
-    border: 3px solid #1a0f33;
-    box-shadow:
-        0 4px 0 #1a0f33,
-        0 0 18px rgba(255, 110, 199, 0.45);
-}
-.tool-tray .btn.primary:active {
-    box-shadow:
-        0 2px 0 #1a0f33,
-        0 0 18px rgba(255, 110, 199, 0.45);
-}
-@media (hover: hover) {
-    /* Soft cool gray on hover (not cream) — keeps the white-button look
-       but reads as a "lit" state against the dark tray. */
-    .tool-tray .btn:hover { background: #f0f0f4; }
-    .tool-tray .btn.primary:hover {
-        filter: brightness(1.06);
-        background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
-    }
-}
-
-.panel-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
+   Generic styles for the inputs that live inside drawers (palette,
+   sizes, eraser, action buttons). The drawer chrome itself is below
+   under DRAWER. */
 
 .palette {
-    gap: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
 }
 
 .swatch {
@@ -1121,7 +876,24 @@ body.dancing .left-hud { display: none; }
     display: block;
 }
 
-.actions { gap: 8px; }
+/* "sizes-row" wraps the row of three size-btns plus the inline ERASER
+   button inside the Brush drawer. */
+.sizes-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+/* Generic "actions" row of buttons inside a drawer (used by the New
+   drawer: Surprise + Clear side by side). */
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
 
 /* ============ BUTTONS ============ */
 
@@ -1171,40 +943,270 @@ body.dancing .left-hud { display: none; }
     }
 }
 
-/* ============ DANCE PANEL ============ */
+/* ============ BEAT DRAWER (now-playing) ============ */
 
-.dance-panel .now-playing {
+.now-playing {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 18px;
-    font-size: 12px;
-    letter-spacing: 1.5px;
-    color: #d6bdff;
+    flex-direction: column;
+    gap: 12px;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: #fff;
     text-transform: uppercase;
 }
-.dance-panel .now-playing strong {
+.now-playing .np-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(0, 255, 204, 0.25);
+    border-radius: 12px;
+    padding: 10px 14px;
+}
+.now-playing .np-label {
+    flex: 0 0 48px;
+    font-size: 11px;
+    color: #d6bdff;
+    letter-spacing: 1.5px;
+}
+.now-playing strong {
+    flex: 1 1 auto;
     color: #00ffcc;
-    margin-left: 6px;
+    font-size: 16px;
+    font-family: var(--font-cursive);
+    letter-spacing: 0;
+    text-transform: none;
 }
 
 /* ============ FOOTER ============ */
 /* Footer styles live in /assets/css/site-footer.css (.site-footer)
-   so the look is uniform across the Madderverse. */
+   so the look is uniform across the Madderverse. The footer sits
+   below the fullscreen stage in document flow; scrolling past the
+   stage (which the canvas now blocks via touch-action: none) is only
+   possible by swiping the tool-dock area, so the footer is
+   effectively a "scroll-to-discover" element for parents. */
 
-/* ============ DESKTOP LAYOUT ============ */
+/* ============ TOOL DOCK + DRAWERS ============
 
-@media (min-width: 760px) {
-    main {
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: center;
-        flex-wrap: wrap;
-        max-width: 1000px;
-        margin: 0 auto;
-        gap: 24px;
+   The big mobile UX shift: instead of a tool tray below the canvas,
+   tools live as fixed-position floating icons along the bottom edge.
+   Tapping an icon opens a corresponding slide-up drawer. Only one
+   drawer is open at a time; openDrawer() in game.js manages the
+   switch. Dance mode hides the draw dock and reveals .dance-dock. */
+
+.tool-dock,
+.dance-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 90;
+    display: flex;
+    justify-content: space-around;
+    align-items: stretch;
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom)) 6px;
+    gap: 4px;
+    background:
+        linear-gradient(180deg, transparent 0%, rgba(10, 5, 25, 0.55) 35%, rgba(10, 5, 25, 0.85) 100%);
+    pointer-events: auto;
+}
+
+body.dancing .tool-dock { display: none; }
+body:not(.dancing) .dance-dock { display: none; }
+
+.dock-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 2px;
+    border-radius: 14px;
+    background: rgba(26, 15, 51, 0.7);
+    border: 2px solid rgba(0, 255, 204, 0.4);
+    color: #fff;
+    font-family: var(--font-chunky);
+    font-size: 10px;
+    letter-spacing: 0.6px;
+    font-weight: bold;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+.dock-btn .dock-icon { font-size: 22px; line-height: 1; }
+.dock-btn .dock-label { line-height: 1; }
+.dock-btn:active { transform: scale(0.94); }
+.dock-btn.active {
+    border-color: #ff6ec7;
+    background: rgba(255, 110, 199, 0.22);
+}
+@media (hover: hover) {
+    .dock-btn:hover {
+        border-color: #00ffcc;
+        background: rgba(0, 255, 204, 0.18);
     }
-    .stage-row { width: auto; flex: 0 0 auto; }
-    .stage { width: 380px; }
-    .panel { width: 320px; }
+}
+
+/* Primary dock button (DANCE) — pink → yellow → teal gradient,
+   visually distinct from the regular dock buttons. */
+.dock-btn.primary {
+    background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%);
+    color: #1a0f33;
+    border-color: rgba(26, 15, 51, 0.5);
+}
+.dock-btn.primary:hover { filter: brightness(1.06); background: linear-gradient(135deg, #ff6ec7 0%, #ffd23f 50%, #00ffcc 100%); }
+
+/* Stop button (during dance) — solid red-ish to read as an exit. */
+.dock-btn.stop {
+    background: linear-gradient(135deg, #e63946 0%, #ff6ec7 100%);
+    color: #fff;
+    border-color: rgba(26, 15, 51, 0.5);
+}
+
+@media (min-width: 720px) {
+    /* On wider screens give the dock more breathing room and don't
+       let buttons stretch ridiculously wide. */
+    .tool-dock, .dance-dock {
+        justify-content: center;
+        gap: 10px;
+    }
+    .dock-btn {
+        flex: 0 0 auto;
+        min-width: 84px;
+        min-height: 72px;
+        font-size: 11px;
+    }
+    .dock-btn .dock-icon { font-size: 28px; }
+}
+
+/* ---- Drawer host: fixed full-viewport overlay that's hidden when
+   no drawer is open. Backdrop dims the canvas without hiding it. ---- */
+
+.drawer-host {
+    position: fixed;
+    inset: 0;
+    z-index: 150;
+    pointer-events: none;
+}
+.drawer-host.open { pointer-events: auto; }
+
+.drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(10, 5, 25, 0.55);
+    opacity: 0;
+    transition: opacity 0.2s ease-out;
+    pointer-events: none;
+}
+.drawer-host.open .drawer-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.drawer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+    max-height: 50dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background:
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255, 110, 199, 0.22) 0%, transparent 70%),
+        linear-gradient(170deg, #3b1f6b 0%, #1a0f33 100%);
+    border: 3px solid rgba(0, 255, 204, 0.5);
+    border-bottom: none;
+    border-radius: 22px 22px 0 0;
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.5);
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+    /* Hidden scrollbar — kept scroll behavior, dropped the chrome. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.drawer::-webkit-scrollbar { display: none; }
+.drawer.open { transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+    .drawer { transition: none; }
+    .drawer-backdrop { transition: none; }
+}
+
+@media (min-width: 720px) {
+    /* On wider screens, the drawer becomes a centered card rather
+       than a full-width sheet so the canvas isn't entirely covered. */
+    .drawer {
+        left: auto;
+        right: 24px;
+        bottom: 100px;
+        max-width: 380px;
+        border: 3px solid rgba(0, 255, 204, 0.5);
+        border-radius: 22px;
+    }
+}
+
+.drawer-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px dashed rgba(0, 255, 204, 0.25);
+}
+.drawer-head h2 {
+    margin: 0;
+    font-family: var(--font-cursive);
+    font-size: 26px;
+    color: #ff6ec7;
+    line-height: 1;
+    text-shadow: 0 2px 0 #1a0f33;
+}
+
+.drawer-close {
+    appearance: none;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 14px;
+    cursor: pointer;
+    line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+}
+@media (hover: hover) {
+    .drawer-close:hover { background: rgba(255, 255, 255, 0.18); }
+}
+
+.drawer-body { display: flex; flex-direction: column; gap: 14px; }
+
+.drawer-section { display: flex; flex-direction: column; gap: 8px; }
+.drawer-section-label {
+    margin: 0;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #d6bdff;
+    font-weight: bold;
+}
+
+.drawer-text {
+    margin: 0;
+    font-size: 13px;
+    text-align: center;
+    color: #d6bdff;
+    line-height: 1.4;
+}
+
+/* Lock body scroll while a drawer / modal is open. */
+.drawer-open, .drawer-open body {
+    overflow: hidden;
+    overscroll-behavior: contain;
 }

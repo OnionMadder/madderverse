@@ -397,6 +397,79 @@
         });
     }
 
+    /* ============ DRAWER ============
+
+       Slide-up bottom-sheet panels for the floating tool dock. Only
+       one drawer is open at a time; openDrawer() switches between
+       them. Closes on:
+         * tap of [data-drawer-close="1"] (the X or the dim backdrop),
+         * tap of a different dock button (handled by openDrawer
+           switching to that drawer),
+         * tap of the same dock button again (toggle off),
+         * Escape key (global handler in init),
+         * entering dance mode (startDance calls closeDrawer). */
+
+    let drawerHostEl = null;
+    let openDrawerEl = null;
+    let activeDockBtn = null;
+
+    function openDrawer(id) {
+        const el = id ? document.getElementById('drawer' + id.charAt(0).toUpperCase() + id.slice(1)) : null;
+        if (!el) return;
+        if (openDrawerEl === el) { closeDrawer(); return; }
+        if (openDrawerEl) closeDrawer({ instant: true });
+        openDrawerEl = el;
+        if (drawerHostEl) {
+            drawerHostEl.hidden = false;
+            drawerHostEl.setAttribute('aria-hidden', 'false');
+            drawerHostEl.classList.add('open');
+        }
+        el.hidden = false;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => el.classList.add('open'));
+        });
+        /* Mark whichever dock button has data-drawer=id as active so
+           the user has visual feedback on which drawer is open. */
+        const btn = document.querySelector('.dock-btn[data-drawer="' + id + '"]');
+        if (activeDockBtn) activeDockBtn.classList.remove('active');
+        activeDockBtn = btn;
+        if (btn) btn.classList.add('active');
+    }
+
+    function closeDrawer(opts) {
+        if (!openDrawerEl) return;
+        const el = openDrawerEl;
+        el.classList.remove('open');
+        openDrawerEl = null;
+        if (activeDockBtn) { activeDockBtn.classList.remove('active'); activeDockBtn = null; }
+        const finishHide = () => {
+            if (!openDrawerEl) {
+                el.hidden = true;
+                if (drawerHostEl) {
+                    drawerHostEl.classList.remove('open');
+                    drawerHostEl.hidden = true;
+                    drawerHostEl.setAttribute('aria-hidden', 'true');
+                }
+            }
+        };
+        if (opts && opts.instant) finishHide();
+        else setTimeout(finishHide, 320);
+    }
+
+    function attachDrawerHostDismissers() {
+        if (!drawerHostEl) return;
+        drawerHostEl.addEventListener('click', (e) => {
+            const t = e.target;
+            if (t && t.closest && t.closest('[data-drawer-close="1"]')) closeDrawer();
+        });
+    }
+
+    function attachDockButtons() {
+        document.querySelectorAll('.dock-btn[data-drawer]').forEach((btn) => {
+            btn.addEventListener('click', () => openDrawer(btn.getAttribute('data-drawer')));
+        });
+    }
+
     /* ============ ACHIEVEMENT BOARD ============ */
 
     let achievementsModalEl = null;
@@ -514,22 +587,22 @@
            land at the eye line. */
     const HATS = [
         { id: 'no-hat',          name: 'No Hat',          price:   0, sprite: null,              anchor: { x: 0, y:   0 }, scale: 1.00 },
-        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y:  85 }, scale: 0.65 },
-        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y:  85 }, scale: 0.65 },
-        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y:  85 }, scale: 0.70 },
-        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 0, y: 105 }, scale: 0.65 },
-        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y:  85 }, scale: 0.70 },
-        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y:  65 }, scale: 0.55 },
-        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y:  85 }, scale: 0.65 },
-        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y:  85 }, scale: 0.70 },
-        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y:  80 }, scale: 0.70 },
-        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y:  55 }, scale: 0.50 },
+        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y:  80 }, scale: 0.65 },
+        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y:  65 }, scale: 0.65 },
+        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y:  55 }, scale: 0.70 },
+        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 5, y:  80 }, scale: 0.65 },
+        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y:  80 }, scale: 0.70 },
+        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y:  45 }, scale: 0.55 },
+        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y:  65 }, scale: 0.65 },
+        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y:  55 }, scale: 0.70 },
+        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y:  50 }, scale: 0.70 },
+        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y:  65 }, scale: 0.50 },
         { id: 'gross-out',       name: 'Gross-Out',       price:  80, sprite: 'gross-out',       anchor: { x: 0, y:  85 }, scale: 0.70 },
-        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 115 }, scale: 0.65 },
-        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y:  80 }, scale: 0.60 },
-        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y:  95 }, scale: 0.65 },
-        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y:  85 }, scale: 0.65 },
-        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y:  85 }, scale: 0.70 }
+        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 120 }, scale: 0.65 },
+        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y:  60 }, scale: 0.60 },
+        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y:  75 }, scale: 0.65 },
+        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y: 120 }, scale: 0.65 },
+        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y: 120 }, scale: 0.70 }
     ];
 
     const HAT_BY_ID = {};
@@ -1184,9 +1257,18 @@
         const begin = () => {
             isPlaying = true;
             danceSessionStart = Date.now();
+            /* body.dancing handles all the visibility toggling now:
+                 * tool-dock → hidden
+                 * dance-dock → shown
+                 * title-overlay → faded
+                 * currency-pill → faded
+                 * draw-canvas → pointer-events: none
+               (CSS rules in style.css under each element.) */
             document.body.classList.add('dancing');
-            document.getElementById('drawPanel').hidden = true;
-            document.getElementById('dancePanel').hidden = false;
+            /* If a drawer was open when DANCE was tapped, close it so
+               the dance composition is clean. The Beat drawer is still
+               reachable mid-dance via the dance-dock. */
+            closeDrawer();
             updateMoveBeatLabels();
             startAudio();
             danceStartTime = audioCtx.currentTime;
@@ -1208,8 +1290,6 @@
         }
         stopAudio();
         document.body.classList.remove('dancing');
-        document.getElementById('drawPanel').hidden = false;
-        document.getElementById('dancePanel').hidden = true;
         creature.style.transform = '';
         if (floorEl) {
             floorEl.style.transform = 'translateX(-50%)';
@@ -1355,8 +1435,11 @@
         hatShopGridEl = document.getElementById('hatShopGrid');
         hatShopBalanceEl = document.getElementById('hatShopBalance');
         hatLayerInnerEl = document.getElementById('hatLayerInner');
+        drawerHostEl = document.getElementById('drawerHost');
         if (achievementsModalEl) attachModalDismissers(achievementsModalEl);
         if (hatShopModalEl) attachModalDismissers(hatShopModalEl);
+        attachDrawerHostDismissers();
+        attachDockButtons();
         renderCurrency();
         renderEquippedHat();
         trackVisit();
@@ -1376,9 +1459,11 @@
            bedheadEligible is true from the trackVisit above. */
         checkAchievements();
 
-        /* Global Escape closes whatever modal is open. */
+        /* Global Escape closes whatever modal / drawer is open. */
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && openModalEl) closeModal();
+            if (e.key !== 'Escape') return;
+            if (openModalEl) closeModal();
+            else if (openDrawerEl) closeDrawer();
         });
 
         /* Stop the dance when the tab/app goes to the background. RAF
