@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120">
-    <text x="4" y="14" font-family="monospace" font-size="9" fill="#1a0f33" opacity="0.55">PLACEHOLDER</text>
-    <path d="M30,108 Q30,28 100,24 Q170,28 170,108 L170,116 Q100,108 30,116 Z" fill="#e63946" stroke="#1a0f33" stroke-width="4" stroke-linejoin="round"/>
-    <path d="M100,106 L196,114 L196,118 L100,118 Z" fill="#e63946" stroke="#1a0f33" stroke-width="4" stroke-linejoin="round"/>
-    <circle cx="100" cy="58" r="11" fill="#ffffff" stroke="#1a0f33" stroke-width="3"/>
-</svg>

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120">
-    <text x="4" y="14" font-family="monospace" font-size="9" fill="#1a0f33" opacity="0.55">PLACEHOLDER</text>
-    <ellipse cx="100" cy="104" rx="82" ry="10" fill="#3b1f6b" stroke="#1a0f33" stroke-width="4"/>
-    <path d="M60,98 L100,2 L140,98 Z" fill="#3b1f6b" stroke="#1a0f33" stroke-width="4" stroke-linejoin="round"/>
-    <path d="M94,52 L100,38 L106,52 L120,55 L108,64 L112,78 L100,70 L88,78 L92,64 L80,55 Z" fill="#ffd23f" stroke="#1a0f33" stroke-width="2"/>
-    <circle cx="122" cy="32" r="3.5" fill="#ffd23f"/>
-    <circle cx="86" cy="22" r="3" fill="#ffd23f"/>
-</svg>
