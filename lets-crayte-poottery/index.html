@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <title>Let's CRAYte! Poottery</title>
+    <link rel="canonical" href="https://madderverse.org/lets-crayte-poottery/" />
+    <meta property="og:url" content="https://madderverse.org/lets-crayte-poottery/" />
+    <meta name="twitter:url" content="https://madderverse.org/lets-crayte-poottery/" />
+    <meta name="title" content="Let's CRAYte! Poottery - Throw, Glaze, Fire. A Pottery Wheel from The Madderverse." />
+    <meta name="description" content="Shape clay on a spinning wheel, decorate with cursed glazes, fire it in the kiln. A pottery sim with extra Os. From The Madderverse." />
+    <meta name="keywords" content="lets crayte poottery, pottery game, pottery wheel, clay shaping, ceramics, kiln, glaze, decorating, indie game, browser game, The Madderverse, Onion Madder, Mad Sundar LLC" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Let's CRAYte! Poottery - Throw, Glaze, Fire" />
+    <meta property="og:description" content="Shape clay on a spinning wheel, decorate with cursed glazes, fire it in the kiln. A pottery sim with extra Os." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Let's CRAYte! Poottery - Throw, Glaze, Fire" />
+    <meta name="twitter:description" content="Shape clay on a spinning wheel, decorate with cursed glazes, fire it in the kiln." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#ff2e88" />
+    <meta name="apple-mobile-web-app-title" content="CRAYte Poottery" />
+    <meta name="application-name" content="Let's CRAYte! Poottery" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body class="screen-title">
+
+<header class="top">
+    <a href="../" class="back" aria-label="Back to The Madderverse">&larr; MADDERVERSE</a>
+    <span class="crt-clock" id="crtClock" aria-hidden="true">00:00:00</span>
+</header>
+
+<!-- ============================================================
+     SCREEN: TITLE
+     The first thing you see. Stays mounted; other screens swap in
+     above it via [hidden]. Chunks 2-3 add #screen-shape and
+     #screen-decorate (and chunk 5+ adds kiln/gallery).
+     ============================================================ -->
+<main class="screen" id="screen-title">
+
+    <div class="title-stack">
+
+        <div class="marquee-tape" aria-hidden="true">
+            <span>&#9650; NOW LOADING &nbsp;&middot;&nbsp; FRESH CLAY &nbsp;&middot;&nbsp; WET HANDS &nbsp;&middot;&nbsp; FIRE GOOD &nbsp;&middot;&nbsp; POOTTERY ENJOYER &nbsp;&middot;&nbsp; NOW LOADING &nbsp;&middot;&nbsp; FRESH CLAY &nbsp;&middot;&nbsp; WET HANDS &nbsp;&middot;&nbsp; FIRE GOOD &nbsp;&middot;&nbsp; POOTTERY ENJOYER &nbsp;&middot;&nbsp;</span>
+        </div>
+
+        <h1 class="big-title" aria-label="Let's CRAYte! Poottery">
+            <span class="line-1">Let's <span class="crayte">CRAYte!</span></span>
+            <span class="line-2">P<span class="oo">oo</span>ttery</span>
+        </h1>
+
+        <p class="cursed-sub" id="cursedSub">
+            <span class="lcd-frame"><span class="lcd-pre">&gt;</span> Now with 100&#37; more CLAYY_</span>
+        </p>
+
+        <div class="menu-buttons">
+            <button class="big-btn primary" id="btnStart" type="button">
+                <span class="btn-label">START SHAPING</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+            <button class="big-btn" id="btnGallery" type="button">
+                <span class="btn-label">GALLERY</span>
+                <span class="btn-glyph" aria-hidden="true">&#9636;</span>
+            </button>
+            <button class="big-btn" id="btnSettings" type="button">
+                <span class="btn-label">SETTINGS</span>
+                <span class="btn-glyph" aria-hidden="true">&#9881;</span>
+            </button>
+        </div>
+
+        <!-- Drifting clay particle. Pure CSS animation, doesn't tax JS. -->
+        <div class="clay-drifter" aria-hidden="true"></div>
+
+    </div>
+
+    <!-- Hidden specs-sheet hook for the chunk-8 easter egg. Tiny,
+         tucked in the corner. Toggling .specs-open on body opens it. -->
+    <button class="specs-hook" id="specsHook" type="button" aria-label="System info">
+        <span aria-hidden="true">[?]</span>
+    </button>
+
+    <aside class="specs-panel" id="specsPanel" hidden>
+        <div class="specs-frame">
+            <div class="specs-titlebar">
+                <span>SYSTEM_SPECS.TXT</span>
+                <button class="specs-close" id="specsClose" type="button" aria-label="Close">&#10005;</button>
+            </div>
+            <pre class="specs-body">
+&gt; CPU.............HOT
+&gt; RAM.............ALL OF IT
+&gt; GPU.............RGB (definitely)
+&gt; STORAGE.........WET (clay)
+&gt; PSU.............YES
+&gt; COOLING.........NEGATIVE
+&gt; OVERCLOCK.......???
+&gt; FAN_SPEED.......LOUD
+&gt; CLAY_GB.........INFINITE
+&gt; UPTIME..........SINCE 2008
+            </pre>
+        </div>
+    </aside>
+
+</main>
+
+<!-- Chunks 2-3 will mount additional <main class="screen" id="screen-..."> blocks below. -->
+
+<footer class="site-footer">
+    <ul class="footer-nav">
+        <li><a href="../about.html">About</a></li>
+        <li><a href="../legal.html">Privacy &amp; Legal</a></li>
+        <li><a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar</a></li>
+    </ul>
+    <p class="footer-tagline">Free &middot; Ad-free &middot; Kid-friendly</p>
+    <p class="footer-copy">&copy; <span id="year"></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a>. All games made with care.</p>
+</footer>
+
+<script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+<script src="game.js"></script>
+
+</body>
+</html>
