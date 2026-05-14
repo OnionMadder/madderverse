@@ -862,6 +862,62 @@
         src.start(now);
     }
 
+    /* Spray hiss — tiny high-pass-filtered noise puff. Played
+       on a fraction of spray-tool pointer moves so a sustained
+       hold sounds like a continuous airbrush, not a constant
+       wall of hiss. ~0.03 gain — sits well under wet loop.    */
+    function spraySound() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const now = ctx.currentTime;
+        const len = Math.floor(ctx.sampleRate * 0.05);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) {
+            const env = Math.pow(1 - i / len, 1.5);
+            data[i] = (Math.random() * 2 - 1) * env;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 4200 + Math.random() * 800;
+        const g = ctx.createGain();
+        g.gain.value = 0.03;
+        src.connect(hp); hp.connect(g); g.connect(ctx.destination);
+        src.start(now);
+    }
+
+    /* Splatter — short wet "thwap". Brown noise burst through a
+       fast-decaying low-bandpass. One per actual splat event. */
+    function splatterSound() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const now = ctx.currentTime;
+        const len = Math.floor(ctx.sampleRate * 0.10);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < len; i++) {
+            const w = Math.random() * 2 - 1;
+            last = (last + 0.04 * w) / 1.04;
+            const env = Math.pow(1 - i / len, 2.8);
+            data[i] = last * 4 * env;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.setValueAtTime(230 + Math.random() * 90, now);
+        bp.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+        bp.Q.value = 4;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.13, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+        src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+        src.start(now);
+    }
+
     /* Stamp click — sharp wood-block-ish pluck. Two stacked
        sines (high + low) with a tight envelope. One per stamp
        placement, no throttle needed.                            */
@@ -905,41 +961,56 @@
         try { navigator.vibrate(pattern); } catch (_) {}
     }
 
-    /* Squelch — short pitched noise pop, swept band-pass. Fires
-       on actual clay deformation; throttled in applyShaping so
-       a sustained drag emits one every ~90-160ms.              */
+    /* Squelch — sloppier, wetter "blorp" than the original
+       chunk-7 version: wider pitch sweep, longer tail, higher
+       Q for more resonance, occasional double-blip via a
+       second deeper layer for cartoon mouth-feel. Fires on
+       actual clay deformation; throttled in applyShaping so a
+       sustained drag emits one every ~90-160ms.                */
     function squelch() {
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
 
-        const len = Math.floor(ctx.sampleRate * 0.09);
-        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-        const data = buf.getChannelData(0);
-        for (let i = 0; i < len; i++) {
-            const env = Math.exp(-i / len * 4.5);
-            data[i] = (Math.random() * 2 - 1) * env;
+        /* Layer 1: bright noise sweep — the wet "shh" attack */
+        const len1 = Math.floor(ctx.sampleRate * 0.14);
+        const buf1 = ctx.createBuffer(1, len1, ctx.sampleRate);
+        const data1 = buf1.getChannelData(0);
+        for (let i = 0; i < len1; i++) {
+            const env = Math.exp(-i / len1 * 3.2);
+            data1[i] = (Math.random() * 2 - 1) * env;
         }
-        const src = ctx.createBufferSource();
-        src.buffer = buf;
+        const src1 = ctx.createBufferSource();
+        src1.buffer = buf1;
+        const bp1 = ctx.createBiquadFilter();
+        bp1.type = "bandpass";
+        const startF = 360 + Math.random() * 460;
+        const endF   = startF * (0.28 + Math.random() * 0.32);
+        bp1.frequency.setValueAtTime(startF, now);
+        bp1.frequency.exponentialRampToValueAtTime(endF, now + 0.10);
+        bp1.Q.value = 8;
+        const g1 = ctx.createGain();
+        g1.gain.setValueAtTime(0,    now);
+        g1.gain.linearRampToValueAtTime(0.11, now + 0.005);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        src1.connect(bp1); bp1.connect(g1); g1.connect(ctx.destination);
+        src1.start(now);
 
-        const bp = ctx.createBiquadFilter();
-        bp.type = "bandpass";
-        const startF = 420 + Math.random() * 260;
-        const endF   = startF * (0.45 + Math.random() * 0.25);
-        bp.frequency.setValueAtTime(startF, now);
-        bp.frequency.exponentialRampToValueAtTime(endF, now + 0.075);
-        bp.Q.value = 6;
-
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0,    now);
-        g.gain.linearRampToValueAtTime(0.09, now + 0.005);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
-
-        src.connect(bp);
-        bp.connect(g);
-        g.connect(ctx.destination);
-        src.start(now);
+        /* Layer 2: random ~30% of the time, deeper "blorp" body
+           below the main sweep. Adds cartoon mouth-feel. */
+        if (Math.random() < 0.30) {
+            const osc = ctx.createOscillator();
+            osc.type = "sine";
+            const f0 = 110 + Math.random() * 60;
+            osc.frequency.setValueAtTime(f0, now);
+            osc.frequency.exponentialRampToValueAtTime(f0 * 0.55, now + 0.08);
+            const g2 = ctx.createGain();
+            g2.gain.setValueAtTime(0.06, now);
+            g2.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+            osc.connect(g2); g2.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.12);
+        }
     }
 
     /* ---------- 1. SCREEN ROUTER ----------
@@ -3334,8 +3405,59 @@
         c.addEventListener("pointerleave",  endPointer);
     }
 
+    /* Spray + splat painter (Day-5 QoL chunk).
+       kind = "spray"    -> ~16 small low-alpha dots clustered
+                            tightly around p, density-builds
+                            into soft airbrush gradient.
+       kind = "splatter" -> ~6 bigger high-alpha dots scattered
+                            further out, less density.
+       Uses globalAlpha rather than building rgba strings so the
+       same code path handles hex glazes and hsl() RGB-cycle. */
+    function spraySplat(p, kind) {
+        const ctx = D.paintCtx;
+        const isSplat = (kind === "splatter");
+        const dots    = isSplat ? (4 + Math.floor(Math.random() * 5))
+                                : (12 + Math.floor(Math.random() * 8));
+        const spread  = isSplat ? (D.size * 2.6) : (D.size * 1.3);
+        const baseAlpha = isSplat ? 0.38 : 0.10;
+        ctx.save();
+        ctx.fillStyle = currentPaintColor();
+        for (let i = 0; i < dots; i++) {
+            /* sqrt(rand) for uniform distribution in disk
+               (otherwise dots cluster at center). */
+            const a = Math.random() * Math.PI * 2;
+            const r = Math.sqrt(Math.random()) * spread;
+            const dx = p.x + Math.cos(a) * r;
+            const dy = p.y + Math.sin(a) * r;
+            const dotR = isSplat
+                ? (1 + Math.random() * 3)
+                : (0.6 + Math.random() * 1.5);
+            ctx.globalAlpha = baseAlpha * (0.7 + Math.random() * 0.6);
+            ctx.beginPath();
+            ctx.arc(dx, dy, dotR, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+        noteGlazeUsed(D.glaze);
+    }
+
+    /* Splatter is throttled in paintStrokeTo so drag-events
+       don't paint a continuous wall — every 3rd move emits. */
+    let _splatStrokeCount = 0;
+
     function paintDot(p) {
         const ctx = D.paintCtx;
+        if (D.tool === "spray") {
+            spraySplat(p, "spray");
+            spraySound();
+            return;
+        }
+        if (D.tool === "splatter") {
+            spraySplat(p, "splatter");
+            splatterSound();
+            haptic(10);
+            return;
+        }
         ctx.save();
         if (D.tool === "eraser") {
             ctx.globalCompositeOperation = "destination-out";
@@ -3354,6 +3476,22 @@
         const ctx = D.paintCtx;
         const last = D.lastPaintPos;
         if (!last) { paintDot(p); return; }
+
+        if (D.tool === "spray") {
+            spraySplat(p, "spray");
+            if (Math.random() < 0.18) spraySound();
+            return;
+        }
+        if (D.tool === "splatter") {
+            _splatStrokeCount++;
+            if (_splatStrokeCount % 3 === 0) {
+                spraySplat(p, "splatter");
+                splatterSound();
+                haptic(8);
+            }
+            return;
+        }
+
         ctx.save();
         if (D.tool === "eraser") {
             ctx.globalCompositeOperation = "destination-out";
