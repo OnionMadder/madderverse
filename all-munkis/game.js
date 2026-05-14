@@ -1135,9 +1135,12 @@
         return headShapeArt(c) + inner + hairArt(c) + headPhonesArt();
     }
 
-    function characterArt(id, slotIndex) {
+    // forceExpr (optional) overrides the game-state expression — used by
+    // the 7th-wheel chip rendering so the lonely Munki always wears a sad
+    // face (sprite row 3) instead of the chip-default silly (row 1).
+    function characterArt(id, slotIndex, forceExpr) {
         const c = CHARACTERS[id];
-        const expr = expressionForSlot(slotIndex);
+        const expr = forceExpr != null ? forceExpr : expressionForSlot(slotIndex);
         return `<div class="char-art" data-char="${id}">`
             + `<div class="char-body">${bodyArt(c)}</div>`
             + `<div class="char-head">${headArt(c, expr)}</div>`
@@ -1173,12 +1176,20 @@
             el.title = ch.label;
             // Mark the antagonists so the chip can pulse / glow distinctly.
             if (HORROR_TRIGGER_MODS.has(id)) el.classList.add('chip-bad');
+            // The 7th-wheel evil (the one not on stage in any rainbow run)
+            // wears a sad face by default and gets a .sulk class for the
+            // CSS droop/sigh animation. checkSulkState() may later upgrade
+            // it to .sulk-deep when the rainbow on stage is complete.
+            const isSulker = !isMadballzMode && id === seventhWheel;
+            const expr = isSulker ? 3 : undefined;
+            if (isSulker) el.classList.add('sulk');
             el.innerHTML = `
-                <div class="chip-icon">${characterArt(id)}</div>
+                <div class="chip-icon">${characterArt(id, undefined, expr)}</div>
                 <div class="chip-label">${ch.label}</div>
             `;
             tray.appendChild(el);
         });
+        checkSulkState();
     }
 
     function renderSlot(index) {
@@ -1255,6 +1266,9 @@
         if (iceNowOn && !iceWasOn) playIceFreezeSound();
         // Easter egg: stage now matches the rainbow R-O-Y-G-B-P order?
         checkRainbowEgg();
+        // Jealousy: if the rainbow is now complete, deepen the sulk on the
+        // 7th-wheel chip; otherwise drop back to the idle sulk.
+        checkSulkState();
     }
 
     function isIceOnStage() {
@@ -2055,6 +2069,12 @@
         document.addEventListener('trayChipTap', e => {
             const charId = e.detail && e.detail.charId;
             if (!charId) return;
+            // Jealousy flavor: a tap on the lonely 7th-wheel chip pops a
+            // speech bubble. Doesn't conflict with chipSpam — both fire.
+            if (charId === seventhWheel) {
+                const chipEl = document.querySelector(`#tray .tray-chip[data-char="${charId}"]`);
+                maybeSpeakJealousy(charId, chipEl);
+            }
             const now = performance.now();
             const arr = spamTaps.get(charId) || [];
             arr.push(now);
@@ -2097,6 +2117,77 @@
         findEgg('rainbowOrder');
     }
 
+    // ---------- JEALOUSY FLAVOR ----------
+    // The 7th-wheel evil is the lonely one — the rainbow has 6 slots and 6
+    // colors, so one of Ice/Moon always sits out. checkSulkState() runs after
+    // every stage change and bumps the bank's 7th chip + the altar chip to
+    // .sulk-deep when the rainbow is fully on stage ("they really did it
+    // without me"). showSpeechBubble() / JEALOUS_QUOTES surface a tiny tap-
+    // triggered thought bubble per kid-friendly emotional storytelling.
+    function isRainbowComplete() {
+        for (let i = 0; i < RAINBOW_ORDER.length; i++) {
+            if (slots[i] !== RAINBOW_ORDER[i]) return false;
+        }
+        return true;
+    }
+
+    function checkSulkState() {
+        const deep = isRainbowComplete();
+        document.querySelectorAll('.tray-chip.sulk, .altar-chip.sulk').forEach(el => {
+            el.classList.toggle('sulk-deep', deep);
+        });
+    }
+
+    // 5–6 lines per evil, picked at random on each tap. Kept short + warm
+    // — sad-but-cute, not bleak. Ice leans cold/lonely, Moon leans dark/
+    // wishful. The user's brief said don't overdo it.
+    const JEALOUS_QUOTES = {
+        ice: [
+            "why don't they ever pick me?",
+            "i'm not THAT cold...",
+            "brrrr. just me again.",
+            "i'd be a beautiful 7th color.",
+            "it's lonely on the side."
+        ],
+        moon: [
+            "i see you up there...",
+            "maybe next time?",
+            "i light up at night, you know.",
+            "save a slot for me?",
+            "don't forget about me."
+        ]
+    };
+
+    let bubbleCooldown = false;
+    function showSpeechBubble(chipEl, text) {
+        if (!chipEl || bubbleCooldown) return;
+        bubbleCooldown = true;
+        setTimeout(() => { bubbleCooldown = false; }, 450);
+        // Remove any prior bubble first so rapid taps don't stack.
+        document.querySelectorAll('.speech-bubble').forEach(b => b.remove());
+        const bubble = document.createElement('div');
+        bubble.className = 'speech-bubble';
+        bubble.textContent = text;
+        document.body.appendChild(bubble);
+        // Anchor above the chip. Uses fixed positioning so it doesn't shift
+        // when the page scrolls during the auto-dismiss.
+        const r = chipEl.getBoundingClientRect();
+        bubble.style.left = `${r.left + r.width / 2}px`;
+        bubble.style.top  = `${r.top - 8}px`;
+        requestAnimationFrame(() => bubble.classList.add('shown'));
+        setTimeout(() => {
+            bubble.classList.remove('shown');
+            setTimeout(() => bubble.remove(), 360);
+        }, 2400);
+    }
+
+    function maybeSpeakJealousy(charId, chipEl) {
+        const lines = JEALOUS_QUOTES[charId];
+        if (!lines) return;
+        const text = lines[Math.floor(Math.random() * lines.length)];
+        showSpeechBubble(chipEl, text);
+    }
+
     // ---------- MUNKI ALTAR (Ice ↔ Moon swap, post-unlock) ----------
     // After Moon unlocks, the alt-evil sits in a small "altar" chip next to
     // the tray. The kid drags it onto the active 7th-wheel chip in the bank
@@ -2115,9 +2206,11 @@
         const altId = altWheel();
         const ch = CHARACTERS[altId];
         // Mirror the regular tray-chip markup so the visual stays consistent.
+        // The altar chip is by definition the OTHER lonely Munki — gets the
+        // sad expression and .sulk class just like the bank's 7th wheel.
         altar.innerHTML = `
-            <div class="altar-chip tray-chip altar-chip-alt" data-char="${altId}" title="${ch.label}">
-                <div class="chip-icon">${characterArt(altId)}</div>
+            <div class="altar-chip tray-chip altar-chip-alt sulk" data-char="${altId}" title="${ch.label}">
+                <div class="chip-icon">${characterArt(altId, undefined, 3)}</div>
                 <div class="chip-label">${ch.label}</div>
             </div>
             <div class="altar-hint">drag to swap</div>
@@ -2178,6 +2271,10 @@
                     swapSeventhWheel();
                 }
                 clearTrayGhost();
+            } else {
+                // No-drag tap on the altar chip — the alternate evil is also
+                // the lonely one (the rainbow doesn't pick either of them).
+                maybeSpeakJealousy(state.charId, state.chip);
             }
         });
         chip.addEventListener('pointercancel', e => {
