@@ -7651,6 +7651,66 @@
         }
     });
 
+    /* Synchronous adopt-from-URL handler. Runs BEFORE the trophy
+       reveal timer fires so a freshly-adopted entry's reveal
+       fires on the same load.
+
+       URL shape: ?adopt=<battleId>:<entryId>,<battleId>:<entryId>
+       Empty / missing pairs are ignored. Strips the param from
+       the URL bar after running so refresh doesn't redo it. */
+    function adoptFromURL() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const raw = params.get("adopt");
+            if (!raw) return;
+
+            const refs = raw.split(",").map(function (pair) {
+                const parts = pair.split(":");
+                if (parts.length !== 2) return null;
+                const battleId      = parts[0].trim();
+                const battleEntryId = parts[1].trim();
+                if (!battleId || !battleEntryId) return null;
+                return { battleId: battleId, battleEntryId: battleEntryId };
+            }).filter(Boolean);
+
+            if (refs.length === 0) {
+                stripAdoptParam();
+                return;
+            }
+
+            const existing = loadMyBattleEntries();
+            const merged = existing.concat(
+                refs.filter(function (r) {
+                    return !existing.some(function (x) {
+                        return x.battleEntryId === r.battleEntryId;
+                    });
+                })
+            );
+            localStorage.setItem(
+                "crayte-my-battle-entries", JSON.stringify(merged));
+
+            /* Clear the seen flag for adopted entries so the
+               reveal can fire (instead of being silenced as
+               "already shown"). */
+            const seen = loadRevealedTrophies();
+            refs.forEach(function (r) { seen.delete(r.battleEntryId); });
+            localStorage.setItem(
+                "crayte-trophies-revealed",
+                JSON.stringify(Array.from(seen)));
+
+            stripAdoptParam();
+        } catch (_) { /* best-effort */ }
+    }
+
+    function stripAdoptParam() {
+        try {
+            const url = new URL(window.location.href);
+            if (!url.searchParams.has("adopt")) return;
+            url.searchParams.delete("adopt");
+            history.replaceState(null, "", url.toString());
+        } catch (_) {}
+    }
+
     /* On cold load, honor ?profile=<handle> and ?pot=<uuid> in
        the URL — deep-link straight to the target after auth has
        had a chance to resolve (so signed-in callers see their
@@ -8327,6 +8387,12 @@
            which fetches /user) and notifies via onAuthChange
            listeners when ready — no blocking. Once auth resolves,
            honor any ?profile=<handle> deep-link in the URL. */
+        /* ?adopt=<battleId>:<entryId>,... -- backfill a device's
+           crayte-my-battle-entries so trophies on existing battle
+           submissions can reveal. Pre-trophy-code entries don't
+           have the localStorage link, so this URL is the way to
+           recover them on phones / tablets without dev tools. */
+        adoptFromURL();
         initAuth().then(checkURLDeepLinks);
         /* Trophy reveal -- runs in parallel with auth boot.
            Doesn't need a session (uses crayte-my-battle-entries
