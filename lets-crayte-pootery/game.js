@@ -463,19 +463,22 @@
 
     /* ----- 5F. Render ----- */
 
-    /* Shared by both SHAPE and DECORATE. Both screens render the same
-       pot from SHAPE.clay; decorate optionally composites a paint layer
-       clipped to the pot path. */
+    /* Shared by SHAPE, DECORATE, and KILN. All three render the same
+       pot from SHAPE.clay; decorate composites a paint layer, kiln
+       additionally applies a "fired" warm overlay + can suppress its
+       own backdrop so the kiln's chrome wraps the scene.            */
     function renderPotScene(ctx, opts) {
         opts = opts || {};
 
-        ctx.fillStyle = "#0c1f25";
-        ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
-        drawShapeBackdrop(ctx);
+        if (opts.background !== false) {
+            ctx.fillStyle = "#0c1f25";
+            ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+            drawShapeBackdrop(ctx);
+        }
 
         /* Wheel platform — drawn first so the pot covers the front
            half, leaving the back rim visible as an arc. */
-        drawWheel(ctx);
+        if (opts.wheel !== false) drawWheel(ctx);
 
         /* Pot silhouette + 3-D shading */
         drawPot(ctx);
@@ -490,6 +493,28 @@
             ctx.restore();
         }
 
+        /* Fired overlay — warm-tone "overlay" composite that pumps
+           midtone saturation and shifts toward kiln-orange. Brief
+           calls for "deeper / richer glaze color (slight color shift
+           to suggest firing has set the glaze)." Clipped to pot. */
+        if (opts.fired) {
+            ctx.save();
+            buildPotPath(ctx);
+            ctx.clip();
+            ctx.globalCompositeOperation = "overlay";
+            ctx.fillStyle = "rgba(180, 70, 22, 0.20)";
+            ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+            ctx.globalCompositeOperation = "source-over";
+            /* Subtle gloss highlight on top to feel "vitrified" */
+            const g = ctx.createLinearGradient(0, 80, 0, 510);
+            g.addColorStop(0,    "rgba(255, 245, 220, 0.10)");
+            g.addColorStop(0.35, "rgba(255, 245, 220, 0.00)");
+            g.addColorStop(1,    "rgba(0, 0, 0, 0.12)");
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+            ctx.restore();
+        }
+
         /* Rim opening on top — drawn AFTER paint so the rim ring
            stays visible even with a painted pot. */
         drawRim(ctx);
@@ -498,7 +523,7 @@
         if (opts.particles !== false) drawParticles(ctx);
 
         /* Decorative HUD ticks in the corners — onioncore polish */
-        drawCornerTicks(ctx);
+        if (opts.corners !== false) drawCornerTicks(ctx);
     }
 
     /* Back-compat alias used by SHAPE's frame loop. */
@@ -1955,6 +1980,9 @@
         if (fire) fire.addEventListener("click", function () {
             flashButton(fire);
             if (SCREENS["kiln"]) {
+                /* User gesture — wake up Web Audio here so the kiln
+                   roar can play (browsers block context until then). */
+                ensureKilnAudio();
                 showScreen("kiln");
             } else {
                 flashStub(fire, "KILN OFFLINE");
@@ -2008,7 +2036,745 @@
         }
     });
 
-    /* ---------- 7. INIT (must run after all registerScreen calls) ---------- */
+    /* ============================================================
+       KILN SCREEN — chunk 5: firing animation
+       ============================================================
+       State machine: intro -> closing -> firing -> opening ->
+       reveal -> done. Each transition fires the matching audio
+       (door thunk, kiln roar, ding) and triggers auto-save when
+       reveal lands. The pot itself renders via renderPotScene
+       with opts.fired so the same composite chain handles the
+       fired-glaze warmth.
+       ============================================================ */
+
+    const KILN = {
+        canvas: null,
+        ctx: null,
+        dpr: 1,
+
+        state: "idle",       /* idle | intro | closing | firing | opening | reveal | done */
+        stateT: 0,
+
+        doorProgress: 1.0,   /* 1 = fully open, 0 = fully closed */
+        potOffsetY: 0,       /* slide-in from below during intro */
+        glowIntensity: 0,    /* 0-1 — orange interior glow */
+        glowPhase: 0,        /* for pulsing */
+        sparks: [],
+        crackleTimer: 0,
+
+        fired: false,        /* true once the firing reveal lands */
+        audio: null,
+        savedId: null,       /* id of the latest auto-saved pot */
+
+        lastT: 0,
+        rafId: null,
+        running: false,
+        inited: false
+    };
+
+    const KILN_DUR = {
+        intro:   500,
+        closing: 700,
+        firing:  3500,
+        opening: 700,
+        reveal:  1500,
+        done:    Infinity
+    };
+
+    const NICE_POT_LINES = [
+        "NICE POT",
+        "POT IS HARD NOW",
+        "POTTERY ACHIEVED",
+        "HOT STUFF",
+        "VERY WAS POOTED",
+        "CONGRATS DUDE",
+        "SO CRAYTED"
+    ];
+
+    /* ----- 7A. Init ----- */
+
+    function initKiln() {
+        const c = document.getElementById("kilnCanvas");
+        if (!c) { console.warn("[CRAYte] no #kilnCanvas"); return; }
+        KILN.canvas = c;
+        KILN.ctx = c.getContext("2d");
+        sizeKilnCanvas();
+        wireKilnButtons();
+
+        if (typeof ResizeObserver === "function") {
+            const ro = new ResizeObserver(function () { sizeKilnCanvas(); });
+            ro.observe(c);
+        }
+    }
+
+    function sizeKilnCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        KILN.dpr = dpr;
+        const c = KILN.canvas;
+        if (!c) return;
+        const bw = Math.round(SHAPE.W * dpr);
+        const bh = Math.round(SHAPE.H * dpr);
+        if (c.width !== bw)  c.width  = bw;
+        if (c.height !== bh) c.height = bh;
+        KILN.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    /* ----- 7B. Buttons ----- */
+
+    function wireKilnButtons() {
+        const back    = document.getElementById("kilnBack");
+        const again   = document.getElementById("kilnAgain");
+        const fresh   = document.getElementById("kilnNew");
+        const gallery = document.getElementById("kilnGallery");
+
+        if (back) back.addEventListener("click", function () {
+            stopKilnLoop();
+            /* Drop fired status if user bailed mid-firing; keep it
+               otherwise so a subsequent re-fire still looks fired. */
+            if (KILN.state !== "done" && KILN.state !== "reveal") {
+                KILN.fired = false;
+            }
+            SHAPE.clayLocked = false;
+            showScreen("decorate");
+        });
+
+        if (again) again.addEventListener("click", function () {
+            /* Lock clay back so decorate stays in paint mode. */
+            SHAPE.clayLocked = true;
+            showScreen("decorate");
+        });
+
+        if (fresh) fresh.addEventListener("click", function () {
+            /* Fresh slate — reset clay + paint, return to shape. */
+            resetClay();
+            if (typeof clearPaint === "function") clearPaint();
+            SHAPE.clayLocked = false;
+            KILN.fired = false;
+            showScreen("shape");
+        });
+
+        if (gallery) gallery.addEventListener("click", function () {
+            if (SCREENS["gallery"]) {
+                showScreen("gallery");
+            } else {
+                flashStub(gallery, "GALLERY SOON");
+            }
+        });
+    }
+
+    function setKilnStatus(text) {
+        const el = document.getElementById("kilnStatus");
+        if (el) el.textContent = text;
+    }
+
+    function showCelebrate() {
+        const cel = document.getElementById("kilnCelebrate");
+        const sub = document.getElementById("kilnSub");
+        const saved = document.getElementById("kilnSaved");
+        const ctrls = document.getElementById("kilnControls");
+        if (sub) sub.textContent = NICE_POT_LINES[
+            Math.floor(Math.random() * NICE_POT_LINES.length)
+        ];
+        if (saved) {
+            saved.textContent = KILN.savedId
+                ? "✓ SAVED TO GALLERY"
+                : "⚠ SAVE FAILED";
+            saved.hidden = false;
+        }
+        if (cel) cel.hidden = false;
+        if (ctrls) ctrls.hidden = false;
+    }
+
+    function hideCelebrate() {
+        const cel = document.getElementById("kilnCelebrate");
+        const ctrls = document.getElementById("kilnControls");
+        if (cel) cel.hidden = true;
+        if (ctrls) ctrls.hidden = true;
+    }
+
+    /* ----- 7C. Auto-save (chunk 6 reads from the same key) ----- */
+
+    function autoSaveFiredPot() {
+        try {
+            const key = "crayte-gallery";
+            let existing = [];
+            try {
+                existing = JSON.parse(localStorage.getItem(key) || "[]");
+                if (!Array.isArray(existing)) existing = [];
+            } catch (_) { existing = []; }
+
+            const entry = {
+                id: "pot-" + Date.now() + "-" +
+                    Math.random().toString(36).slice(2, 8),
+                createdAt: Date.now(),
+                clay: SHAPE.clay.map(function (c) {
+                    return { y: c.y, radius: c.radius };
+                }),
+                paintDataUrl: (D.paintCanvas)
+                    ? D.paintCanvas.toDataURL("image/png")
+                    : null,
+                packId: D.activePackId,
+                fired: true
+            };
+            existing.push(entry);
+            /* Cap at 50 — keep newest. Brief calls for the "you have
+               a lot of pots" celebration screen at ~50.            */
+            while (existing.length > 50) existing.shift();
+            localStorage.setItem(key, JSON.stringify(existing));
+            KILN.savedId = entry.id;
+            return true;
+        } catch (e) {
+            console.warn("[CRAYte] auto-save failed", e);
+            KILN.savedId = null;
+            return false;
+        }
+    }
+
+    /* ----- 7D. Audio (Web Audio, all synthesized) ----- */
+
+    function ensureKilnAudio() {
+        if (!KILN.audio) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return null;
+            try { KILN.audio = new AC(); }
+            catch (e) { KILN.audio = null; return null; }
+        }
+        if (KILN.audio.state === "suspended") {
+            try { KILN.audio.resume(); } catch (_) {}
+        }
+        return KILN.audio;
+    }
+
+    function kilnRoar(durationSec) {
+        const ctx = ensureKilnAudio();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        /* Brown-ish noise via low-pass-filtered noise buffer */
+        const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.5),
+                                      ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        let last = 0;
+        for (let i = 0; i < data.length; i++) {
+            const white = Math.random() * 2 - 1;
+            last = (last + 0.02 * white) / 1.02;
+            data[i] = last * 3.5;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 220;
+        lp.Q.value = 1.2;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.20, now + 0.5);
+        g.gain.linearRampToValueAtTime(0.20, now + Math.max(0.5, durationSec - 0.5));
+        g.gain.linearRampToValueAtTime(0,    now + durationSec);
+        src.connect(lp); lp.connect(g); g.connect(ctx.destination);
+        src.start(now);
+        src.stop(now + durationSec + 0.05);
+    }
+
+    function kilnCrackle() {
+        const ctx = ensureKilnAudio();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        const len = Math.floor(ctx.sampleRate * 0.06);
+        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < len; i++) {
+            const env = Math.pow(1 - i / len, 2.5);
+            data[i] = (Math.random() * 2 - 1) * env;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = 1100;
+        const g = ctx.createGain();
+        g.gain.value = 0.07 + Math.random() * 0.05;
+        src.connect(hp); hp.connect(g); g.connect(ctx.destination);
+        src.start(now);
+    }
+
+    function kilnDoorThunk(strength) {
+        const ctx = ensureKilnAudio();
+        if (!ctx) return;
+        strength = strength || 1;
+        const now = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(55, now + 0.32);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.45 * strength, now);
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.45);
+    }
+
+    function kilnDing() {
+        const ctx = ensureKilnAudio();
+        if (!ctx) return;
+        const now = ctx.currentTime;
+        /* Two-tone bell (perfect fifth) for a "pot done" celebration */
+        [1320, 1980].forEach(function (freq, i) {
+            const osc = ctx.createOscillator();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            const g = ctx.createGain();
+            const start = now + i * 0.05;
+            g.gain.setValueAtTime(0, start);
+            g.gain.linearRampToValueAtTime(0.18, start + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.001, start + 1.6);
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(start);
+            osc.stop(start + 1.7);
+        });
+    }
+
+    /* ----- 7E. Sparks (rise above the chimney during firing) ----- */
+
+    function emitKilnSpark() {
+        if (KILN.sparks.length > 36) return;
+        const cx = SHAPE.centerX + (Math.random() - 0.5) * 50;
+        KILN.sparks.push({
+            x: cx,
+            y: 60 + Math.random() * 20,
+            vx: (Math.random() - 0.5) * 0.04,
+            vy: -0.06 - Math.random() * 0.05,
+            life: 900 + Math.random() * 600,
+            age: 0,
+            size: 1.2 + Math.random() * 1.6,
+            hue: 22 + Math.random() * 22
+        });
+    }
+
+    function updateSparks(dt) {
+        const s = KILN.sparks;
+        for (let i = s.length - 1; i >= 0; i--) {
+            const p = s[i];
+            p.age += dt;
+            if (p.age >= p.life) { s.splice(i, 1); continue; }
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            /* Sparks drift sideways slightly */
+            p.vx += (Math.random() - 0.5) * 0.0008 * dt;
+        }
+    }
+
+    function drawKilnSparks(ctx) {
+        const s = KILN.sparks;
+        for (let i = 0; i < s.length; i++) {
+            const p = s[i];
+            const t = p.age / p.life;
+            const a = (1 - t) * 0.9;
+            ctx.fillStyle = "hsla(" + p.hue + ", 100%, 65%, " + a + ")";
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * (1 - t * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    /* ----- 7F. Kiln chrome ----- */
+
+    /* Layout constants for the kiln frame around the doorway. */
+    const KILN_FRAME = {
+        wallX:   18,        /* left wall thickness */
+        wallY:   60,        /* top wall (under chimney) */
+        floorY:  20,        /* bottom wall thickness */
+        doorY0:  60,        /* top of doorway */
+        doorY1:  580,       /* bottom of doorway */
+        doorX0:  18,        /* left edge of doorway interior */
+        doorX1:  382,       /* right edge of doorway interior */
+        chimneyX0: 162,
+        chimneyX1: 238,
+        chimneyTop: 0,
+        chimneyBot: 60
+    };
+
+    function drawKilnChrome(ctx) {
+        const f = KILN_FRAME;
+
+        /* Outer body fill — dark steel with subtle vertical gradient */
+        const body = ctx.createLinearGradient(0, 0, 0, SHAPE.H);
+        body.addColorStop(0,   "#1a2830");
+        body.addColorStop(0.6, "#101c22");
+        body.addColorStop(1,   "#0a1418");
+        ctx.fillStyle = body;
+        /* Top hood */
+        ctx.fillRect(0, 0, SHAPE.W, f.doorY0);
+        /* Left wall */
+        ctx.fillRect(0, f.doorY0, f.doorX0, f.doorY1 - f.doorY0);
+        /* Right wall */
+        ctx.fillRect(f.doorX1, f.doorY0, SHAPE.W - f.doorX1, f.doorY1 - f.doorY0);
+        /* Hearth floor */
+        ctx.fillRect(0, f.doorY1, SHAPE.W, SHAPE.H - f.doorY1);
+
+        /* Chimney cutout (lighter — looks like it's open to sky/smoke) */
+        ctx.fillStyle = "#06141a";
+        ctx.fillRect(f.chimneyX0, 0, f.chimneyX1 - f.chimneyX0,
+                     f.chimneyBot);
+
+        /* Chimney walls (frame the cutout) */
+        ctx.fillStyle = body;
+        const chW = 12;
+        ctx.fillRect(f.chimneyX0 - chW, 0, chW, f.chimneyBot + 4);
+        ctx.fillRect(f.chimneyX1,       0, chW, f.chimneyBot + 4);
+
+        /* Copper trim along the doorway opening */
+        const copperGrad = ctx.createLinearGradient(0, 0, SHAPE.W, 0);
+        copperGrad.addColorStop(0,    "#5a3010");
+        copperGrad.addColorStop(0.5,  "#c08040");
+        copperGrad.addColorStop(1,    "#5a3010");
+        ctx.fillStyle = copperGrad;
+        const tw = 4;
+        /* Top trim */
+        ctx.fillRect(f.doorX0 - tw, f.doorY0 - tw,
+                     f.doorX1 - f.doorX0 + tw * 2, tw);
+        /* Left trim */
+        ctx.fillRect(f.doorX0 - tw, f.doorY0,
+                     tw, f.doorY1 - f.doorY0);
+        /* Right trim */
+        ctx.fillRect(f.doorX1, f.doorY0,
+                     tw, f.doorY1 - f.doorY0);
+        /* Bottom trim */
+        ctx.fillRect(f.doorX0 - tw, f.doorY1,
+                     f.doorX1 - f.doorX0 + tw * 2, tw);
+
+        /* Rivets along the hood */
+        ctx.fillStyle = "#4a5860";
+        for (let x = 30; x < SHAPE.W - 30; x += 28) {
+            ctx.beginPath();
+            ctx.arc(x, 12, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x, 42, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        /* CRT-style nameplate on the hood */
+        ctx.fillStyle = "#0a1418";
+        roundedRect(ctx, SHAPE.W / 2 - 70, 22, 140, 22, 4);
+        ctx.fill();
+        ctx.strokeStyle = "#c08040";
+        ctx.lineWidth = 1;
+        roundedRect(ctx, SHAPE.W / 2 - 70, 22, 140, 22, 4);
+        ctx.stroke();
+        ctx.fillStyle = "#ff6a2a";
+        ctx.font = "13px " + "\"VT323\", \"Courier New\", monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("KILN-9000", SHAPE.W / 2, 34);
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
+
+        /* Heat-indicator LED — pulses brighter during firing */
+        const ledX = SHAPE.W / 2 + 80;
+        const ledOn = KILN.glowIntensity > 0.1;
+        if (ledOn) {
+            ctx.fillStyle = "rgba(255, 80, 30, 0.5)";
+            ctx.beginPath();
+            ctx.arc(ledX, 34, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.fillStyle = ledOn ? "#ff5a1f" : "#3a1818";
+        ctx.beginPath();
+        ctx.arc(ledX, 34, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function drawKilnDoors(ctx, progress) {
+        /* progress: 1 = fully open (doors hidden against walls),
+                    0 = fully closed (doors meet at centerX).      */
+        const f = KILN_FRAME;
+        const doorH = f.doorY1 - f.doorY0;
+        const halfDoor = (f.doorX1 - f.doorX0) / 2;
+        /* When open, doors are tucked behind a strip along the walls. */
+        const tucked = 6;
+        const leftDoorX  = f.doorX0 - tucked + progress * (halfDoor - tucked) * 0;
+        const closedLeftX  = f.doorX0;
+        const openLeftX    = f.doorX0 - halfDoor + tucked;
+        const lx = openLeftX + (closedLeftX - openLeftX) * (1 - progress);
+
+        const closedRightX = f.doorX0 + halfDoor;
+        const openRightX   = f.doorX1 - tucked;
+        const rx = openRightX + (closedRightX - openRightX) * (1 - progress);
+
+        /* Door body gradient */
+        const dGrad = ctx.createLinearGradient(0, 0, 0, doorH);
+        dGrad.addColorStop(0,   "#22323a");
+        dGrad.addColorStop(0.5, "#101a22");
+        dGrad.addColorStop(1,   "#0a1418");
+
+        /* Left door */
+        ctx.fillStyle = dGrad;
+        ctx.fillRect(lx, f.doorY0, halfDoor, doorH);
+        /* Right door */
+        ctx.fillRect(rx, f.doorY0, halfDoor, doorH);
+
+        /* Door-edge highlight */
+        ctx.strokeStyle = "rgba(255, 200, 140, 0.18)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(lx + halfDoor - 0.5, f.doorY0);
+        ctx.lineTo(lx + halfDoor - 0.5, f.doorY1);
+        ctx.moveTo(rx + 0.5, f.doorY0);
+        ctx.lineTo(rx + 0.5, f.doorY1);
+        ctx.stroke();
+
+        /* Door rivets — 4 down the inner edge of each */
+        ctx.fillStyle = "#4a5860";
+        for (let i = 0; i < 4; i++) {
+            const y = f.doorY0 + 40 + i * ((doorH - 80) / 3);
+            ctx.beginPath();
+            ctx.arc(lx + halfDoor - 14, y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(rx + 14, y, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        /* Copper handles */
+        ctx.fillStyle = "#c08040";
+        roundedRect(ctx, lx + halfDoor - 22, f.doorY0 + doorH / 2 - 18,
+                    6, 36, 2);
+        ctx.fill();
+        roundedRect(ctx, rx + 16,           f.doorY0 + doorH / 2 - 18,
+                    6, 36, 2);
+        ctx.fill();
+    }
+
+    function drawKilnGlow(ctx) {
+        const f = KILN_FRAME;
+        const intensity = KILN.glowIntensity *
+            (0.85 + 0.15 * Math.sin(KILN.glowPhase * 0.18));
+
+        /* Interior glow — radial from the seam between doors. The
+           glow leaks out where the doors are most closed. */
+        const cx = SHAPE.centerX;
+        const cy = (f.doorY0 + f.doorY1) / 2;
+        const seamGap = Math.max(0, (1 - KILN.doorProgress)); /* 0..1 */
+
+        ctx.save();
+        ctx.globalCompositeOperation = "lighter";
+
+        /* Big radial body glow visible through the doorway interior
+           (when doors are fully closed, this still bleeds through
+           the door faces a touch — sells the heat). */
+        const bigR = 240;
+        const radGlow = ctx.createRadialGradient(cx, cy, 20, cx, cy, bigR);
+        radGlow.addColorStop(0,
+            "rgba(255, 180, 60, " + (0.55 * intensity) + ")");
+        radGlow.addColorStop(0.4,
+            "rgba(255, 90, 30, "  + (0.35 * intensity) + ")");
+        radGlow.addColorStop(1, "rgba(255, 90, 30, 0)");
+        ctx.fillStyle = radGlow;
+        ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+
+        /* Bright seam line where the doors meet — most visible at
+           the moment of full closure. */
+        if (seamGap > 0.85) {
+            const seamA = (seamGap - 0.85) / 0.15;
+            const seamGrad = ctx.createLinearGradient(cx - 12, 0, cx + 12, 0);
+            seamGrad.addColorStop(0,   "rgba(255, 200, 80, 0)");
+            seamGrad.addColorStop(0.5,
+                "rgba(255, 240, 120, " + (0.9 * seamA * intensity) + ")");
+            seamGrad.addColorStop(1,   "rgba(255, 200, 80, 0)");
+            ctx.fillStyle = seamGrad;
+            ctx.fillRect(cx - 12, f.doorY0, 24, f.doorY1 - f.doorY0);
+        }
+
+        /* Chimney plume — column of warm glow rising out the top */
+        const chimGrad = ctx.createLinearGradient(0, 0, 0, f.chimneyBot);
+        chimGrad.addColorStop(0, "rgba(255, 90, 30, 0)");
+        chimGrad.addColorStop(1, "rgba(255, 180, 60, " + (0.55 * intensity) + ")");
+        ctx.fillStyle = chimGrad;
+        ctx.fillRect(KILN_FRAME.chimneyX0, 0,
+                     KILN_FRAME.chimneyX1 - KILN_FRAME.chimneyX0,
+                     f.chimneyBot);
+
+        ctx.restore();
+    }
+
+    function renderKiln() {
+        const ctx = KILN.ctx;
+
+        /* Background */
+        ctx.fillStyle = "#04101a";
+        ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+
+        /* Pot in place (translated during intro for slide-in). The
+           pot's own backdrop is suppressed — kiln chrome is its own
+           background. Wheel + corners suppressed (kiln chrome owns
+           those areas). */
+        ctx.save();
+        ctx.translate(0, KILN.potOffsetY);
+        renderPotScene(ctx, {
+            paintCanvas: D.paintCanvas,
+            particles:   false,
+            background:  false,
+            wheel:       false,
+            corners:     false,
+            fired:       KILN.fired
+        });
+        ctx.restore();
+
+        /* Glow comes from BEHIND the doors when doors are mostly
+           closed (firing). For visual layering we draw it now —
+           the doors will mask most of it. */
+        if (KILN.glowIntensity > 0) drawKilnGlow(ctx);
+
+        /* Kiln chrome wraps around the pot. */
+        drawKilnChrome(ctx);
+
+        /* Doors over the doorway. */
+        drawKilnDoors(ctx, KILN.doorProgress);
+
+        /* Sparks live ABOVE the kiln (chimney smoke). */
+        drawKilnSparks(ctx);
+    }
+
+    /* ----- 7G. State machine ----- */
+
+    function kilnEnter(state) {
+        KILN.state = state;
+        KILN.stateT = 0;
+        if (state === "intro") {
+            setKilnStatus("LOADING");
+            KILN.doorProgress = 1.0;
+            KILN.glowIntensity = 0;
+            KILN.fired = false;
+            hideCelebrate();
+        } else if (state === "closing") {
+            setKilnStatus("DOORS CLOSING");
+        } else if (state === "firing") {
+            setKilnStatus("FIRING IT");
+            kilnDoorThunk(1.0);
+            kilnRoar(KILN_DUR.firing / 1000);
+        } else if (state === "opening") {
+            setKilnStatus("DOORS OPENING");
+            kilnDoorThunk(0.6);
+        } else if (state === "reveal") {
+            setKilnStatus("FIRED");
+            KILN.fired = true;
+            autoSaveFiredPot();
+            kilnDing();
+            showCelebrate();
+        } else if (state === "done") {
+            /* user takes the wheel from here */
+        }
+    }
+
+    function kilnAdvance() {
+        switch (KILN.state) {
+            case "intro":   kilnEnter("closing"); break;
+            case "closing": kilnEnter("firing");  break;
+            case "firing":  kilnEnter("opening"); break;
+            case "opening": kilnEnter("reveal");  break;
+            case "reveal":  kilnEnter("done");    break;
+        }
+    }
+
+    function kilnFrame(t) {
+        if (!KILN.running) return;
+        if (!KILN.lastT) KILN.lastT = t;
+        const dt = Math.min(48, t - KILN.lastT);
+        KILN.lastT = t;
+
+        SHAPE.wheelPhase += (2 * Math.PI * SHAPE.WHEEL_RPM / 60) * (dt / 1000);
+        if (SHAPE.wheelPhase > Math.PI * 2) SHAPE.wheelPhase -= Math.PI * 2;
+
+        KILN.stateT += dt;
+        KILN.glowPhase += dt / 100;
+
+        const dur = KILN_DUR[KILN.state] || Infinity;
+        if (KILN.stateT >= dur) kilnAdvance();
+
+        /* Per-state derived values */
+        const st = KILN.state, t01 = KILN.stateT / dur;
+        if (st === "intro") {
+            /* slide pot up from below */
+            const eased = 1 - Math.pow(1 - t01, 3); /* easeOutCubic */
+            KILN.potOffsetY = (1 - eased) * 220;
+            KILN.doorProgress = 1.0;
+            KILN.glowIntensity = 0;
+        } else if (st === "closing") {
+            KILN.potOffsetY = 0;
+            KILN.doorProgress = 1 - t01;
+            KILN.glowIntensity = t01 * 0.25;
+        } else if (st === "firing") {
+            KILN.potOffsetY = 0;
+            KILN.doorProgress = 0;
+            /* Ramp up to peak in the first 25%, hold, then cool */
+            if (t01 < 0.25) {
+                KILN.glowIntensity = 0.25 + (t01 / 0.25) * 0.75;
+            } else if (t01 < 0.80) {
+                KILN.glowIntensity = 1.0;
+            } else {
+                KILN.glowIntensity = 1.0 - (t01 - 0.80) / 0.20 * 0.55;
+            }
+            if (Math.random() < 0.6) emitKilnSpark();
+            KILN.crackleTimer += dt;
+            if (KILN.crackleTimer > 160 + Math.random() * 240) {
+                kilnCrackle();
+                KILN.crackleTimer = 0;
+            }
+        } else if (st === "opening") {
+            KILN.potOffsetY = 0;
+            KILN.doorProgress = t01;
+            KILN.glowIntensity = Math.max(0, 0.45 - t01 * 0.45);
+        } else if (st === "reveal" || st === "done") {
+            KILN.potOffsetY = 0;
+            KILN.doorProgress = 1;
+            KILN.glowIntensity = 0;
+        } else { /* idle */
+            KILN.doorProgress = 1;
+            KILN.glowIntensity = 0;
+        }
+
+        updateSparks(dt);
+        renderKiln();
+        KILN.rafId = requestAnimationFrame(kilnFrame);
+    }
+
+    function startKilnLoop() {
+        if (KILN.running) return;
+        KILN.running = true;
+        KILN.lastT = 0;
+        KILN.rafId = requestAnimationFrame(kilnFrame);
+    }
+
+    function stopKilnLoop() {
+        KILN.running = false;
+        if (KILN.rafId) cancelAnimationFrame(KILN.rafId);
+        KILN.rafId = null;
+    }
+
+    /* ----- 7H. Register with the router ----- */
+
+    registerScreen("kiln", {
+        onEnter: function () {
+            if (!KILN.inited) {
+                initKiln();
+                KILN.inited = true;
+            } else {
+                sizeKilnCanvas();
+            }
+            KILN.sparks.length = 0;
+            hideCelebrate();
+            kilnEnter("intro");
+            startKilnLoop();
+        },
+        onLeave: function () {
+            stopKilnLoop();
+            hideCelebrate();
+        }
+    });
+
+    /* ---------- 8. INIT (must run after all registerScreen calls) ---------- */
 
     function init() {
         initTitle();
@@ -2021,7 +2787,7 @@
         init();
     }
 
-    /* ---------- 8. EXPORT ----------
+    /* ---------- 9. EXPORT ----------
        A tiny window namespace so chunks 2+ can register screens
        without rewriting this file. Strictly internal.            */
     window.CRAYte = {

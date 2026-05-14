@@ -223,6 +223,49 @@
 
 </main>
 
+<!-- ============================================================
+     SCREEN: KILN  (chunk 5 — firing animation)
+     ============================================================ -->
+<main class="screen" id="screen-kiln" hidden>
+
+    <div class="screen-titlebar">
+        <button class="back-btn" id="kilnBack" type="button">&larr; DECORATE</button>
+        <h2 class="screen-title">&lt;&nbsp;THE FIRING&nbsp;&gt;</h2>
+        <span class="screen-status" id="kilnStatus">READY</span>
+    </div>
+
+    <div class="kiln-stack">
+
+        <div class="canvas-wrap kiln-wrap">
+            <canvas id="kilnCanvas" width="400" height="600"
+                    aria-label="Kiln. Pot is being fired."></canvas>
+
+            <!-- Celebration overlay sits on top of the canvas;
+                 reveals after the firing sequence completes.   -->
+            <aside class="kiln-celebrate" id="kilnCelebrate" hidden>
+                <h3 class="celebrate-title">FIRED</h3>
+                <p class="celebrate-sub" id="kilnSub">NICE&nbsp;POT</p>
+                <p class="celebrate-saved" id="kilnSaved">&#10003;&nbsp;SAVED TO GALLERY</p>
+            </aside>
+        </div>
+
+        <div class="kiln-controls" id="kilnControls" hidden>
+            <button class="btn-control" id="kilnAgain" type="button">
+                <span class="btn-label">DECORATE</span>
+            </button>
+            <button class="btn-control" id="kilnNew" type="button">
+                <span class="btn-label">NEW POT</span>
+            </button>
+            <button class="btn-control primary" id="kilnGallery" type="button">
+                <span class="btn-label">GALLERY</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+        </div>
+
+    </div>
+
+</main>
+
 <footer class="site-footer">
     <ul class="footer-nav">
         <li><a href="../about.html">About</a></li>
