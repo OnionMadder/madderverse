@@ -87,6 +87,10 @@
                 <span class="btn-label">TROPHIES</span>
                 <span class="btn-glyph" aria-hidden="true">&#9733;</span>
             </button>
+            <button class="big-btn" id="btnAccount" type="button">
+                <span class="btn-label">SIGN IN</span>
+                <span class="btn-glyph" aria-hidden="true">&#9784;</span>
+            </button>
             <!-- Install button — hidden by default; revealed when
                  the browser fires beforeinstallprompt OR when we
                  detect iOS Safari + not yet installed. -->
@@ -343,6 +347,85 @@
 
     </div>
 
+</main>
+
+<!-- ============================================================
+     SCREEN: ACCOUNT  (Phase 1 — sign-in + profile)
+     ============================================================ -->
+<main class="screen" id="screen-account" hidden>
+    <div class="screen-titlebar">
+        <button class="back-btn" id="accountBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;ACCOUNT&nbsp;&gt;</h2>
+        <span class="screen-status" id="accountStatus">SIGNED OUT</span>
+    </div>
+
+    <!-- SIGNED-OUT VIEW -->
+    <section class="account-stack" id="accountSignedOut">
+        <div class="account-card">
+            <h3 class="account-headline">SIGN IN TO POOTERY</h3>
+            <p class="account-blurb">
+                Optional. You can keep playing 100% offline. Signing in lets
+                you claim your pots, follow other potters, and sync
+                progress across devices.
+            </p>
+
+            <button class="big-btn install" id="signInGoogleBtn" type="button">
+                <span class="btn-label">CONTINUE WITH GOOGLE</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+
+            <div class="account-divider"><span>OR</span></div>
+
+            <label class="detail-name-row">
+                <span class="row-label">EMAIL</span>
+                <input class="detail-name-input" id="signInEmail" type="email"
+                       autocomplete="email" placeholder="you@example.com" />
+            </label>
+            <button class="big-btn primary" id="signInMagicBtn" type="button">
+                <span class="btn-label">SEND MAGIC LINK</span>
+                <span class="btn-glyph" aria-hidden="true">&#9993;</span>
+            </button>
+            <p class="account-foot" id="signInStatus" hidden></p>
+        </div>
+    </section>
+
+    <!-- SIGNED-IN VIEW -->
+    <section class="account-stack" id="accountSignedIn" hidden>
+        <div class="account-card">
+            <h3 class="account-headline" id="profileHeadline">YOUR PROFILE</h3>
+
+            <label class="detail-name-row">
+                <span class="row-label">@HANDLE</span>
+                <input class="detail-name-input" id="profileUsername" type="text"
+                       maxlength="20" autocomplete="off" spellcheck="false"
+                       placeholder="3-20 lowercase / digits / underscore" />
+            </label>
+
+            <label class="detail-name-row">
+                <span class="row-label">NAME</span>
+                <input class="detail-name-input" id="profileDisplayName" type="text"
+                       maxlength="40" placeholder="What everyone sees" />
+            </label>
+
+            <label class="detail-name-row" style="align-items:flex-start;">
+                <span class="row-label">BIO</span>
+                <textarea class="detail-name-input" id="profileBio" rows="3"
+                          maxlength="200" placeholder="A line about you (optional)"></textarea>
+            </label>
+
+            <p class="account-foot" id="profileStatus" hidden></p>
+
+            <div class="detail-actions">
+                <button class="btn-control" id="signOutBtn" type="button">
+                    <span class="btn-label">SIGN OUT</span>
+                </button>
+                <button class="btn-control primary" id="profileSaveBtn" type="button">
+                    <span class="btn-label">SAVE</span>
+                    <span class="btn-glyph" aria-hidden="true">&#10003;</span>
+                </button>
+            </div>
+        </div>
+    </section>
 </main>
 
 <!-- ============================================================

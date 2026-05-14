@@ -10,6 +10,255 @@
 (function () {
     "use strict";
 
+    /* ---------- 0. SUPABASE AUTH ----------
+       Magic-link + Google OAuth. Session JWT cached in
+       localStorage; refreshed transparently when near expiry.
+       The shim sits in front of every Supabase request — when
+       a user is signed in, authHeader() sends their JWT as
+       the Authorization bearer (so RLS sees auth.uid()); when
+       signed out, the anon key is used for both apikey and
+       Authorization (RLS treats the call as anonymous, exactly
+       as before).                                              */
+
+    const AUTH = {
+        session: null,   /* { access_token, refresh_token, expires_at, user } */
+        profile: null,   /* row from profiles table */
+        loaded:  false,
+        listeners: []
+    };
+
+    const AUTH_KEY = "crayte-auth-session";
+
+    function loadStoredSession() {
+        try {
+            const raw = localStorage.getItem(AUTH_KEY);
+            if (!raw) return null;
+            const s = JSON.parse(raw);
+            if (s && s.access_token && s.expires_at) return s;
+        } catch (_) {}
+        return null;
+    }
+
+    function saveStoredSession(s) {
+        try {
+            if (s) localStorage.setItem(AUTH_KEY, JSON.stringify(s));
+            else   localStorage.removeItem(AUTH_KEY);
+        } catch (_) {}
+    }
+
+    function currentUserId() {
+        return (AUTH.session && AUTH.session.user)
+            ? AUTH.session.user.id : null;
+    }
+
+    function isSignedIn() {
+        return !!currentUserId();
+    }
+
+    /* Subscribe to auth-state changes. Each listener fn() runs
+       whenever sign-in / sign-out / profile-update lands. */
+    function onAuthChange(fn) {
+        AUTH.listeners.push(fn);
+    }
+
+    function notifyAuthListeners() {
+        AUTH.listeners.forEach(function (fn) {
+            try { fn(); } catch (e) { console.warn("[CRAYte] auth listener", e); }
+        });
+    }
+
+    /* Token refresh — exchange the long-lived refresh_token for
+       a fresh access_token when the current one is near expiry.
+       Returns true on success, false if the refresh failed (in
+       which case the session is cleared).                       */
+    function refreshAuthSession() {
+        if (!AUTH.session || !AUTH.session.refresh_token) {
+            return Promise.resolve(false);
+        }
+        return fetch(
+            SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token",
+            {
+                method: "POST",
+                headers: {
+                    "apikey":       SUPABASE_KEY,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    refresh_token: AUTH.session.refresh_token
+                })
+            }
+        ).then(function (r) {
+            if (!r.ok) {
+                AUTH.session = null;
+                AUTH.profile = null;
+                saveStoredSession(null);
+                return false;
+            }
+            return r.json().then(function (data) {
+                AUTH.session = {
+                    access_token:  data.access_token,
+                    refresh_token: data.refresh_token,
+                    expires_at:    Date.now() + (data.expires_in || 3600) * 1000,
+                    user:          data.user
+                };
+                saveStoredSession(AUTH.session);
+                return true;
+            });
+        }).catch(function (e) {
+            console.warn("[CRAYte] auth refresh failed", e);
+            return false;
+        });
+    }
+
+    function fetchProfile() {
+        const uid = currentUserId();
+        if (!uid) return Promise.resolve(null);
+        return fetch(
+            SUPABASE_URL + "/rest/v1/profiles?id=eq." + uid + "&select=*",
+            { headers: supabaseHeaders() }
+        ).then(function (r) {
+            return r.ok ? r.json() : [];
+        }).then(function (rows) {
+            AUTH.profile = (rows && rows[0]) || null;
+            return AUTH.profile;
+        }).catch(function () { return null; });
+    }
+
+    function updateProfile(patch) {
+        const uid = currentUserId();
+        if (!uid) return Promise.resolve(null);
+        return fetch(
+            SUPABASE_URL + "/rest/v1/profiles?id=eq." + uid,
+            {
+                method: "PATCH",
+                headers: supabaseHeaders({
+                    "Content-Type": "application/json",
+                    "Prefer":       "return=representation"
+                }),
+                body: JSON.stringify(patch)
+            }
+        ).then(function (r) {
+            if (!r.ok) return null;
+            return r.json().then(function (rows) {
+                AUTH.profile = (rows && rows[0]) || AUTH.profile;
+                notifyAuthListeners();
+                return AUTH.profile;
+            });
+        });
+    }
+
+    /* Magic-link sign-in. Returns { ok: bool, error?: string }.
+       On success, Supabase emails a one-tap link to the address;
+       the user clicks it and lands back here with #access_token
+       in the URL hash, which initAuth() consumes.              */
+    function signInWithMagicLink(email) {
+        if (!supabaseEnabled()) return Promise.resolve({ ok: false, error: "offline" });
+        const redirect = window.location.origin + window.location.pathname;
+        return fetch(SUPABASE_URL + "/auth/v1/otp", {
+            method: "POST",
+            headers: {
+                "apikey":       SUPABASE_KEY,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                email:   email,
+                options: { emailRedirectTo: redirect }
+            })
+        }).then(function (r) {
+            if (r.ok) return { ok: true };
+            return r.json().then(function (data) {
+                return { ok: false, error: data.error_description || data.msg || "send failed" };
+            }).catch(function () {
+                return { ok: false, error: "send failed" };
+            });
+        }).catch(function (e) {
+            return { ok: false, error: e.message || "network" };
+        });
+    }
+
+    /* Google OAuth — full-page redirect. The user comes back to
+       the same path with #access_token in the URL hash. */
+    function signInWithGoogle() {
+        if (!supabaseEnabled()) return;
+        const redirect = window.location.origin + window.location.pathname;
+        window.location.href = SUPABASE_URL +
+            "/auth/v1/authorize?provider=google&redirect_to=" +
+            encodeURIComponent(redirect);
+    }
+
+    function signOut() {
+        const access = AUTH.session && AUTH.session.access_token;
+        const done = function () {
+            AUTH.session = null;
+            AUTH.profile = null;
+            saveStoredSession(null);
+            notifyAuthListeners();
+        };
+        if (!access) { done(); return Promise.resolve(); }
+        return fetch(SUPABASE_URL + "/auth/v1/logout", {
+            method: "POST",
+            headers: supabaseHeaders()
+        }).catch(function () { /* ignore */ })
+          .then(done);
+    }
+
+    /* Boot — runs once on page load. Consumes the OAuth/magic-
+       link callback hash if present, else restores any cached
+       session and refreshes if near-expiry.                    */
+    function initAuth() {
+        const hash = window.location.hash || "";
+        if (hash.indexOf("access_token=") >= 0) {
+            const params = new URLSearchParams(hash.replace(/^#/, ""));
+            const access = params.get("access_token");
+            if (access) {
+                AUTH.session = {
+                    access_token:  access,
+                    refresh_token: params.get("refresh_token") || null,
+                    expires_at:    Date.now() +
+                                   (parseInt(params.get("expires_in") || "3600", 10) * 1000),
+                    user:          null
+                };
+                /* Replace the URL so the hash doesn't linger if the
+                   user copies the URL. Done in two steps to satisfy
+                   browsers that strip the hash via replaceState. */
+                window.history.replaceState(
+                    null, "", window.location.pathname + window.location.search
+                );
+                return fetch(SUPABASE_URL + "/auth/v1/user", {
+                    headers: supabaseHeaders()
+                })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (user) {
+                    if (user) AUTH.session.user = user;
+                    saveStoredSession(AUTH.session);
+                    return fetchProfile();
+                })
+                .then(function () {
+                    AUTH.loaded = true;
+                    notifyAuthListeners();
+                });
+            }
+        }
+        const stored = loadStoredSession();
+        if (stored) {
+            AUTH.session = stored;
+            const nearExpiry = (stored.expires_at - Date.now()) < 60000;
+            const ready = nearExpiry
+                ? refreshAuthSession().then(function (ok) {
+                      if (!ok) return null;
+                      return fetchProfile();
+                  })
+                : fetchProfile();
+            return ready.then(function () {
+                AUTH.loaded = true;
+                notifyAuthListeners();
+            });
+        }
+        AUTH.loaded = true;
+        notifyAuthListeners();
+        return Promise.resolve();
+    }
+
     /* ---------- 0a. SUPABASE BACKEND ----------
        Public gallery + (future) pot battles live in a Supabase
        project. The anon/publishable key below is SAFE to embed
@@ -36,9 +285,16 @@
     }
 
     function supabaseHeaders(extra) {
+        /* apikey is always the publishable key. Authorization is
+           the signed-in user's JWT when we have one — RLS sees
+           auth.uid() and allows owner-only operations. When
+           signed out, we send the anon key in both positions
+           (the same behavior as before chunk 1 of Phase 1). */
+        const authToken = (AUTH.session && AUTH.session.access_token)
+            ? AUTH.session.access_token : SUPABASE_KEY;
         const h = {
             "apikey":        SUPABASE_KEY,
-            "Authorization": "Bearer " + SUPABASE_KEY
+            "Authorization": "Bearer " + authToken
         };
         if (extra) for (const k in extra) h[k] = extra[k];
         return h;
@@ -73,7 +329,12 @@
             overfired:      !!entry.overfired,
             exploded:       !!entry.exploded,
             clay:           entry.clay         || null,
-            paint_data_url: entry.paintDataUrl || null
+            paint_data_url: entry.paintDataUrl || null,
+            /* Phase 1 chunk 1d: tag the pot with the signed-in
+               user's id if any, so it shows up on their profile
+               and they can rename/claim it later. Anon submits
+               leave this NULL — same RLS behavior as before. */
+            user_id:        currentUserId()
         };
         return fetch(url, {
             method: "POST",
@@ -247,7 +508,8 @@
             }),
             body: JSON.stringify({
                 theme: theme.slice(0, 40),
-                created_by: (author || "anonymous").slice(0, 40)
+                created_by: (author || "anonymous").slice(0, 40),
+                user_id: currentUserId()
             })
         })
             .then(function (r) {
@@ -306,7 +568,8 @@
             overfired:      !!entry.overfired,
             exploded:       !!entry.exploded,
             clay:           entry.clay         || null,
-            paint_data_url: entry.paintDataUrl || null
+            paint_data_url: entry.paintDataUrl || null,
+            user_id:        currentUserId()
         };
         return fetch(SUPABASE_URL + "/rest/v1/battle_entries", {
             method: "POST",
@@ -809,6 +1072,11 @@
                 }
             });
         }
+
+        const btnAccount = document.getElementById("btnAccount");
+        if (btnAccount) btnAccount.addEventListener("click", function () {
+            showScreen("account");
+        });
 
         /* Achievements screen back button */
         const achBack = document.getElementById("achBack");
@@ -5190,6 +5458,175 @@
         }
     });
 
+    /* ============================================================
+       ACCOUNT screen (Phase 1)
+       ============================================================ */
+
+    function initAccountScreen() {
+        const back = document.getElementById("accountBack");
+        if (back) back.addEventListener("click", function () {
+            showScreen("title");
+        });
+
+        const googleBtn = document.getElementById("signInGoogleBtn");
+        if (googleBtn) googleBtn.addEventListener("click", signInWithGoogle);
+
+        const magicBtn = document.getElementById("signInMagicBtn");
+        const emailInp = document.getElementById("signInEmail");
+        const status   = document.getElementById("signInStatus");
+        if (magicBtn) magicBtn.addEventListener("click", function () {
+            const email = (emailInp.value || "").trim();
+            if (!email || email.indexOf("@") < 0) {
+                if (status) {
+                    status.hidden = false;
+                    status.classList.add("is-error");
+                    status.textContent = "Enter a valid email.";
+                }
+                return;
+            }
+            magicBtn.disabled = true;
+            const lbl = magicBtn.querySelector(".btn-label");
+            if (lbl) lbl.textContent = "SENDING...";
+            signInWithMagicLink(email).then(function (res) {
+                magicBtn.disabled = false;
+                if (lbl) lbl.textContent = "SEND MAGIC LINK";
+                if (status) status.hidden = false;
+                if (res.ok) {
+                    if (status) {
+                        status.classList.remove("is-error");
+                        status.textContent = "Check " + email + " — link inside.";
+                    }
+                } else {
+                    if (status) {
+                        status.classList.add("is-error");
+                        status.textContent = res.error || "Send failed. Try again.";
+                    }
+                }
+            });
+        });
+
+        const signOutBtn = document.getElementById("signOutBtn");
+        if (signOutBtn) signOutBtn.addEventListener("click", function () {
+            signOutBtn.disabled = true;
+            signOut().then(function () {
+                signOutBtn.disabled = false;
+                refreshAccountScreen();
+            });
+        });
+
+        const saveBtn = document.getElementById("profileSaveBtn");
+        if (saveBtn) saveBtn.addEventListener("click", function () {
+            const username = (document.getElementById("profileUsername").value || "")
+                .trim().toLowerCase();
+            const displayName = (document.getElementById("profileDisplayName").value || "").trim();
+            const bio = (document.getElementById("profileBio").value || "").trim();
+            const status = document.getElementById("profileStatus");
+
+            /* Client-side validate the username format so a bad input
+               doesn't burn a Supabase round-trip. */
+            if (username && !/^[a-z0-9_]{3,20}$/.test(username)) {
+                if (status) {
+                    status.hidden = false;
+                    status.classList.add("is-error");
+                    status.textContent = "@handle: 3-20 chars, lowercase/digits/underscore only.";
+                }
+                return;
+            }
+
+            saveBtn.disabled = true;
+            const lbl = saveBtn.querySelector(".btn-label");
+            if (lbl) lbl.textContent = "SAVING...";
+            updateProfile({
+                username:     username || null,
+                display_name: displayName || null,
+                bio:          bio || null,
+                updated_at:   new Date().toISOString()
+            }).then(function (p) {
+                saveBtn.disabled = false;
+                if (lbl) lbl.textContent = "SAVE";
+                if (status) status.hidden = false;
+                if (p) {
+                    if (status) {
+                        status.classList.remove("is-error");
+                        status.textContent = "Saved.";
+                    }
+                    updateAuthUI();
+                } else {
+                    if (status) {
+                        status.classList.add("is-error");
+                        status.textContent = "Save failed — username may be taken.";
+                    }
+                }
+            });
+        });
+    }
+
+    function refreshAccountScreen() {
+        const outView = document.getElementById("accountSignedOut");
+        const inView  = document.getElementById("accountSignedIn");
+        const status  = document.getElementById("accountStatus");
+        const signed  = isSignedIn();
+        if (outView) outView.hidden = signed;
+        if (inView)  inView.hidden  = !signed;
+        if (status)  status.textContent = signed ? "SIGNED IN" : "SIGNED OUT";
+        if (signed) {
+            const p = AUTH.profile || {};
+            const u = (AUTH.session && AUTH.session.user) || {};
+            const uname  = document.getElementById("profileUsername");
+            const dname  = document.getElementById("profileDisplayName");
+            const bio    = document.getElementById("profileBio");
+            const head   = document.getElementById("profileHeadline");
+            if (uname) uname.value = p.username || "";
+            if (dname) dname.value = p.display_name || u.email || "";
+            if (bio)   bio.value   = p.bio || "";
+            if (head)  head.textContent = p.username
+                ? "@" + p.username
+                : (p.display_name || u.email || "YOUR PROFILE");
+            const stat = document.getElementById("profileStatus");
+            if (stat) stat.hidden = true;
+        } else {
+            const inStatus = document.getElementById("signInStatus");
+            if (inStatus) inStatus.hidden = true;
+        }
+    }
+
+    registerScreen("account", {
+        onEnter: function () {
+            if (!AUTH._screenInited) {
+                initAccountScreen();
+                AUTH._screenInited = true;
+            }
+            refreshAccountScreen();
+            wheelHumStop();
+        }
+    });
+
+    /* Update the TITLE-screen ACCOUNT button + any other places
+       that reflect auth state. Called by notifyAuthListeners on
+       sign-in / sign-out / profile change. */
+    function updateAuthUI() {
+        const btn = document.getElementById("btnAccount");
+        if (btn) {
+            const lbl = btn.querySelector(".btn-label");
+            if (lbl) {
+                if (isSignedIn()) {
+                    const p = AUTH.profile || {};
+                    const u = AUTH.session.user || {};
+                    const name = p.username
+                        ? "@" + p.username
+                        : (p.display_name || u.email || "ACCOUNT");
+                    lbl.textContent = name.toUpperCase().slice(0, 20);
+                } else {
+                    lbl.textContent = "SIGN IN";
+                }
+            }
+        }
+        /* If the account screen is mounted, refresh its view too. */
+        if (currentScreen === "account") refreshAccountScreen();
+    }
+
+    onAuthChange(updateAuthUI);
+
     /* ----- Achievements screen registration (uses helpers below) ----- */
 
     function refreshAchievementsGrid() {
@@ -5835,6 +6272,12 @@
         initTitle();
         initEggs();
         showScreen("title");
+        /* Phase 1: kick off auth boot AFTER the title is mounted
+           so the user sees something immediately. The auth
+           round-trip is async (esp. on the callback hash path,
+           which fetches /user) and notifies via onAuthChange
+           listeners when ready — no blocking. */
+        initAuth();
     }
 
     if (document.readyState === "loading") {

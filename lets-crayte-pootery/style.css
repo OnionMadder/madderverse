@@ -1995,6 +1995,97 @@ a:focus-visible {
     to   { transform: translateX(120%); opacity: 0; }
 }
 
+/* ----- 14a. ACCOUNT screen (Phase 1 — auth + profile) ----- */
+
+#screen-account {
+    padding-top: 12px;
+    padding-bottom: 30px;
+}
+
+.account-stack {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.account-stack[hidden] { display: none; }
+
+.account-card {
+    width: 100%;
+    max-width: 480px;
+    padding: 20px;
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(0,0,0,0.18) 0 1px,
+            transparent 1px 2px),
+        linear-gradient(180deg, #082028 0%, #051218 100%);
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.45);
+}
+
+.account-headline {
+    margin: 0;
+    font-family: var(--font-title);
+    font-size: clamp(18px, 4vw, 24px);
+    letter-spacing: 2px;
+    color: var(--pink-bright);
+    text-align: center;
+    text-shadow: 2px 2px 0 #000, 0 0 12px rgba(255, 46, 136, 0.45);
+}
+
+.account-blurb {
+    margin: 0;
+    font-family: var(--font-lcd);
+    font-size: 16px;
+    line-height: 1.3;
+    color: var(--ink-dim);
+    text-align: center;
+}
+
+.account-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--ink-low);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    margin: 4px 0;
+}
+
+.account-divider::before,
+.account-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--teal-low);
+}
+
+.account-foot {
+    margin: 4px 0 0;
+    font-family: var(--font-lcd);
+    font-size: 15px;
+    text-align: center;
+    color: var(--teal);
+    text-shadow: 0 0 6px rgba(0, 255, 204, 0.35);
+    min-height: 18px;
+}
+
+.account-foot.is-error {
+    color: #ff8060;
+    text-shadow: 0 0 6px rgba(255, 80, 30, 0.4);
+}
+
+.account-card textarea.detail-name-input {
+    resize: vertical;
+    line-height: 1.3;
+    padding: 10px;
+}
+
 /* ----- 14. Pot battles (Day 5 chunk F) ----- */
 
 /* Battle card in the BATTLES tab — replaces the pot grid layout */
