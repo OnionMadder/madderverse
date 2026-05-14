@@ -113,7 +113,43 @@
 
 </main>
 
-<!-- Chunks 2-3 will mount additional <main class="screen" id="screen-..."> blocks below. -->
+<!-- ============================================================
+     SCREEN: SHAPE  (chunk 2 — wheel-throwing)
+     ============================================================ -->
+<main class="screen" id="screen-shape" hidden>
+
+    <div class="screen-titlebar">
+        <button class="back-btn" id="shapeBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;WET HANDS&nbsp;&gt;</h2>
+        <span class="screen-status" id="shapeStatus">FRESH&nbsp;CLAY</span>
+    </div>
+
+    <div class="shape-stack">
+
+        <div class="canvas-wrap">
+            <canvas id="shapeCanvas" width="400" height="600"
+                    aria-label="Pottery wheel. Drag to shape the clay."></canvas>
+        </div>
+
+        <p class="shape-hint" id="shapeHint">
+            Drag the clay. Pinch in to NARROW. Push out to WIDEN.
+        </p>
+
+        <div class="shape-controls">
+            <button class="btn-control" id="shapeReset" type="button">
+                <span class="btn-label">RESET</span>
+            </button>
+            <button class="btn-control primary" id="shapeFinish" type="button">
+                <span class="btn-label">FINISH FORM</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+        </div>
+
+    </div>
+
+</main>
+
+<!-- Chunk 3 will mount #screen-decorate below. -->
 
 <footer class="site-footer">
     <ul class="footer-nav">
