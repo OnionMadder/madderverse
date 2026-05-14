@@ -9,9 +9,9 @@
      GET  /health                  -> 200 OK
      POST /subscribe               -> store/refresh a subscription
      POST /unsubscribe             -> delete a subscription
-     POST /send/pack-drop          -> admin-only fanout (W2)
-     POST /send/battle-start       -> admin-only fanout (W2)
-     POST /send/battle-end         -> admin-only fanout (W2)
+     POST /send/pack-drop          -> admin-only fanout
+     POST /send/battle-start       -> admin-only fanout
+     POST /send/battle-end         -> admin-only fanout
 
    KV shape (keyed by sha-256 of endpoint, base64url):
      subscription:<hash> -> StoredSubscription (see types below)
@@ -20,6 +20,8 @@
    the `user_id` field on each subscription is opaque and any
    caller may use it for whatever attribution it likes.
    ============================================================ */
+
+import { sendPush } from "./push.js";
 
 export interface Env {
     SUBSCRIPTIONS: KVNamespace;
@@ -80,14 +82,16 @@ export default {
                     return handleUnsubscribe(req, env, origin);
 
                 case "/send/pack-drop":
+                    if (req.method !== "POST") return methodNotAllowed(origin, env);
+                    return handleSend(req, env, origin, "pack-drop");
+
                 case "/send/battle-start":
+                    if (req.method !== "POST") return methodNotAllowed(origin, env);
+                    return handleSend(req, env, origin, "battle-start");
+
                 case "/send/battle-end":
                     if (req.method !== "POST") return methodNotAllowed(origin, env);
-                    /* Send implementation lands in chunk W2 -- the
-                       admin-protected stub keeps the wire-shape
-                       stable so the frontend + scripts can be built
-                       against it without waiting. */
-                    return notImplemented(origin, env);
+                    return handleSend(req, env, origin, "battle-end");
 
                 default:
                     return json(
@@ -255,10 +259,148 @@ function methodNotAllowed(origin: string | null, env: Env): Response {
     );
 }
 
-function notImplemented(origin: string | null, env: Env): Response {
+/* ============================================================
+   /send/<topic>
+   ============================================================
+   Admin-only fanout. Requires `Authorization: Bearer <ADMIN_TOKEN>`.
+   Body: { title:string, body:string, url?:string, icon?:string }.
+   Iterates KV in pages, encrypts + signs per subscription, posts
+   in batches of 10 concurrent requests. Deletes any subscription
+   that returns 404/410 (the push service told us it's gone).    */
+
+const SEND_BATCH_SIZE = 10;
+
+interface SendPayload {
+    /* Stable shape consumed by the Pootery service worker's
+       `push` event handler. Keep additions backward-compatible. */
+    topic:    string;
+    title:    string;
+    body:     string;
+    url?:     string;
+    icon?:    string;
+    /* Coarse-grained timestamp for client-side debouncing if a
+       device wakes from sleep and receives a stack of pushes. */
+    sent_at:  string;
+}
+
+interface StoredSubscriptionPlus extends StoredSubscription { _key: string; }
+
+async function handleSend(
+    req: Request, env: Env, origin: string | null, topic: string
+): Promise<Response> {
+    /* Auth gate */
+    const adminToken = env.ADMIN_TOKEN;
+    if (!adminToken) {
+        return json(
+            { error: "admin_token_unset" },
+            500,
+            corsHeaders(origin, env)
+        );
+    }
+    const provided = (req.headers.get("Authorization") || "")
+        .replace(/^Bearer\s+/i, "");
+    if (provided !== adminToken) {
+        return json(
+            { error: "unauthorized" },
+            401,
+            corsHeaders(origin, env)
+        );
+    }
+
+    /* VAPID config gate */
+    if (!env.VAPID_PUBLIC_KEY || !env.VAPID_PRIVATE_KEY || !env.VAPID_SUBJECT) {
+        return json(
+            { error: "vapid_unconfigured" },
+            500,
+            corsHeaders(origin, env)
+        );
+    }
+    const vapid = {
+        publicKey:  env.VAPID_PUBLIC_KEY,
+        privateKey: env.VAPID_PRIVATE_KEY,
+        subject:    env.VAPID_SUBJECT
+    };
+
+    /* Body */
+    let body: any;
+    try { body = await req.json(); }
+    catch { return json({ error: "invalid_json" }, 400, corsHeaders(origin, env)); }
+
+    if (typeof body?.title !== "string" || typeof body?.body !== "string") {
+        return json(
+            { error: "missing_title_or_body" },
+            400,
+            corsHeaders(origin, env)
+        );
+    }
+
+    const payloadObj: SendPayload = {
+        topic,
+        title:   body.title,
+        body:    body.body,
+        url:     typeof body.url  === "string" ? body.url  : undefined,
+        icon:    typeof body.icon === "string" ? body.icon : undefined,
+        sent_at: new Date().toISOString()
+    };
+    const payloadBytes = new TextEncoder().encode(JSON.stringify(payloadObj));
+
+    /* Collect every subscription that's subscribed to this topic.
+       KV.list paginates -- walk all pages. Worker free tier
+       allows up to ~30s wall clock; thousands of subscriptions
+       are fine here. If we ever blow past that we'll need to
+       paginate the work itself (e.g. queue-driven fanout).      */
+    const subs: StoredSubscriptionPlus[] = [];
+    let cursor: string | undefined = undefined;
+    do {
+        const page: KVNamespaceListResult<unknown> = await env.SUBSCRIPTIONS.list({
+            prefix: "subscription:",
+            cursor
+        });
+        for (const k of page.keys) {
+            const raw = await env.SUBSCRIPTIONS.get(k.name);
+            if (!raw) continue;
+            try {
+                const sub = JSON.parse(raw) as StoredSubscription;
+                if (sub.topics && sub.topics.indexOf(topic) >= 0) {
+                    subs.push({ ...sub, _key: k.name });
+                }
+            } catch { /* skip malformed records */ }
+        }
+        cursor = page.list_complete ? undefined : page.cursor;
+    } while (cursor);
+
+    let sent = 0;
+    let failed = 0;
+    let removed = 0;
+
+    for (let i = 0; i < subs.length; i += SEND_BATCH_SIZE) {
+        const batch = subs.slice(i, i + SEND_BATCH_SIZE);
+        const results = await Promise.all(batch.map(async (sub) => {
+            try {
+                const r = await sendPush(sub.endpoint, sub.keys, payloadBytes, vapid);
+                if (r.expired) {
+                    await env.SUBSCRIPTIONS.delete(sub._key);
+                    return { kind: "expired" } as const;
+                }
+                return { kind: r.ok ? "sent" : "failed", status: r.status } as const;
+            } catch (e) {
+                return {
+                    kind: "failed",
+                    status: 0,
+                    error: e instanceof Error ? e.message : String(e)
+                } as const;
+            }
+        }));
+        for (const r of results) {
+            if (r.kind === "sent")    sent++;
+            if (r.kind === "expired") removed++;
+            if (r.kind === "failed")  failed++;
+        }
+    }
+
     return json(
-        { error: "not_implemented", note: "send endpoints land in chunk W2" },
-        501,
+        { ok: true, topic, sent, failed, removed_expired: removed, total: subs.length },
+        200,
         corsHeaders(origin, env)
     );
 }
