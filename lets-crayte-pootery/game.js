@@ -95,6 +95,173 @@
             });
     }
 
+    /* ---------- 0b. POT BATTLES (Day 5 chunk F) ----------
+       Backend helpers for the battles / battle_entries /
+       battle_votes tables. UI lives in the BATTLES gallery tab
+       further down. One vote per browser per entry is enforced
+       by the unique(entry_id, voter_token) constraint on the
+       table — Postgres returns 409 Conflict on a re-vote and
+       the client treats that as "already voted".              */
+
+    /* Per-browser voter token (uuid v4 cached in localStorage).
+       Also doubles as the device id for "you submitted this
+       entry" lookups so people can't vote for their own.      */
+    function getVoterToken() {
+        let t = localStorage.getItem("crayte-voter-token");
+        if (!t) {
+            if (crypto && crypto.randomUUID) {
+                t = crypto.randomUUID();
+            } else {
+                t = "voter-" + Date.now().toString(36) + "-" +
+                    Math.random().toString(36).slice(2, 10);
+            }
+            try { localStorage.setItem("crayte-voter-token", t); }
+            catch (_) {}
+        }
+        return t;
+    }
+
+    /* Persisted author byline across submissions. */
+    function getRememberedAuthor() {
+        return localStorage.getItem("crayte-author") || "";
+    }
+
+    function rememberAuthor(name) {
+        if (!name) return;
+        try { localStorage.setItem("crayte-author", name); }
+        catch (_) {}
+    }
+
+    function fetchBattles(limit) {
+        if (!supabaseEnabled()) return Promise.resolve([]);
+        const n = Math.max(1, Math.min(50, limit || 20));
+        const url = SUPABASE_URL +
+            "/rest/v1/battles?select=*&order=created_at.desc&limit=" + n;
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .catch(function (e) {
+                console.warn("[CRAYte] battles fetch failed", e);
+                return [];
+            });
+    }
+
+    function createBattle(theme, author) {
+        if (!supabaseEnabled()) return Promise.resolve(null);
+        return fetch(SUPABASE_URL + "/rest/v1/battles", {
+            method: "POST",
+            headers: supabaseHeaders({
+                "Content-Type": "application/json",
+                "Prefer":       "return=representation"
+            }),
+            body: JSON.stringify({
+                theme: theme.slice(0, 40),
+                created_by: (author || "anonymous").slice(0, 40)
+            })
+        })
+            .then(function (r) {
+                if (!r.ok) return null;
+                return r.json().then(function (rows) {
+                    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+                });
+            })
+            .catch(function (e) {
+                console.warn("[CRAYte] battle create failed", e);
+                return null;
+            });
+    }
+
+    function fetchBattleEntries(battleId) {
+        if (!supabaseEnabled()) return Promise.resolve([]);
+        const url = SUPABASE_URL + "/rest/v1/battle_entries?select=*" +
+            "&battle_id=eq." + encodeURIComponent(battleId) +
+            "&order=created_at.asc";
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .catch(function (e) {
+                console.warn("[CRAYte] entries fetch failed", e);
+                return [];
+            });
+    }
+
+    /* Vote counts for a battle's entries — fetched as raw vote
+       rows + grouped client-side. PostgREST also supports an
+       aggregate endpoint but the row-count is small enough that
+       the simple GET is cleaner.                              */
+    function fetchBattleVotes(entryIds) {
+        if (!supabaseEnabled() || !entryIds || entryIds.length === 0) {
+            return Promise.resolve([]);
+        }
+        const inClause = encodeURIComponent("(" + entryIds.join(",") + ")");
+        const url = SUPABASE_URL + "/rest/v1/battle_votes?select=*" +
+            "&entry_id=in." + inClause;
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .catch(function (e) {
+                console.warn("[CRAYte] votes fetch failed", e);
+                return [];
+            });
+    }
+
+    function submitBattleEntry(battleId, entry, author) {
+        if (!supabaseEnabled()) return Promise.resolve(null);
+        const body = {
+            battle_id:      battleId,
+            name:           entry.name || "UNNAMED",
+            author:         (author || "anonymous").slice(0, 40),
+            pack_id:        entry.packId       || null,
+            clay_type_id:   entry.clayTypeId   || null,
+            fired:          !!entry.fired,
+            overfired:      !!entry.overfired,
+            exploded:       !!entry.exploded,
+            clay:           entry.clay         || null,
+            paint_data_url: entry.paintDataUrl || null
+        };
+        return fetch(SUPABASE_URL + "/rest/v1/battle_entries", {
+            method: "POST",
+            headers: supabaseHeaders({
+                "Content-Type": "application/json",
+                "Prefer":       "return=representation"
+            }),
+            body: JSON.stringify(body)
+        })
+            .then(function (r) {
+                if (!r.ok) return null;
+                return r.json().then(function (rows) {
+                    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+                });
+            })
+            .catch(function (e) {
+                console.warn("[CRAYte] battle submit failed", e);
+                return null;
+            });
+    }
+
+    function voteForEntry(entryId) {
+        if (!supabaseEnabled()) return Promise.resolve({ ok: false });
+        const token = getVoterToken();
+        return fetch(SUPABASE_URL + "/rest/v1/battle_votes", {
+            method: "POST",
+            headers: supabaseHeaders({
+                "Content-Type": "application/json",
+                "Prefer":       "return=representation"
+            }),
+            body: JSON.stringify({
+                entry_id:    entryId,
+                voter_token: token
+            })
+        })
+            .then(function (r) {
+                /* PostgREST returns 409 on unique-constraint
+                   violation — i.e. "you already voted". */
+                if (r.status === 409) return { ok: false, duplicate: true };
+                return r.ok ? { ok: true } : { ok: false };
+            })
+            .catch(function (e) {
+                console.warn("[CRAYte] vote failed", e);
+                return { ok: false };
+            });
+    }
+
     /* ---------- 0. AUDIO BOOTSTRAP ----------
        Single shared AudioContext. Web Audio requires a user
        gesture to start; we lazy-create on the first gesture
@@ -4153,9 +4320,454 @@
 
         if (GALLERY.tab === "public") {
             renderPublicTab(grid, empty, count, banner);
+        } else if (GALLERY.tab === "battles") {
+            renderBattlesTab(grid, empty, count, banner);
         } else {
             renderMineTab(grid, empty, count, banner);
         }
+    }
+
+    /* ----- 8F. BATTLES (Day 5 chunk F) ----- */
+
+    const BATTLE = {
+        currentBattleId: null,
+        cachedList: null,
+        cachedAt:   0,
+        cachedEntries: null,
+        cachedVotes: null,
+        myVotes: null      /* Set of entry_ids voted this session */
+    };
+
+    function loadMyVotes() {
+        if (BATTLE.myVotes) return BATTLE.myVotes;
+        try {
+            const raw = localStorage.getItem("crayte-battle-votes");
+            BATTLE.myVotes = new Set(raw ? JSON.parse(raw) : []);
+        } catch (_) { BATTLE.myVotes = new Set(); }
+        return BATTLE.myVotes;
+    }
+
+    function rememberMyVote(entryId) {
+        loadMyVotes().add(entryId);
+        try {
+            localStorage.setItem("crayte-battle-votes",
+                JSON.stringify(Array.from(BATTLE.myVotes)));
+        } catch (_) {}
+    }
+
+    function formatBattleTime(expiresAt) {
+        const ms = new Date(expiresAt).getTime() - Date.now();
+        if (ms <= 0) return { text: "FINISHED", live: false };
+        const days  = Math.floor(ms / 86400000);
+        const hours = Math.floor((ms % 86400000) / 3600000);
+        const mins  = Math.floor((ms % 3600000) / 60000);
+        if (days >= 1)  return { text: days + "d " + hours + "h LEFT", live: true };
+        if (hours >= 1) return { text: hours + "h " + mins + "m LEFT", live: true };
+        return { text: mins + "m LEFT", live: true };
+    }
+
+    function renderBattlesTab(grid, empty, count, banner) {
+        if (banner) banner.hidden = true;
+        if (empty)  empty.hidden  = true;
+        grid.innerHTML = "";
+
+        if (!supabaseEnabled()) {
+            if (count) count.textContent = "BATTLES OFFLINE";
+            const msg = document.createElement("p");
+            msg.className = "gallery-msg";
+            msg.textContent = "Battles aren't configured.";
+            grid.appendChild(msg);
+            return;
+        }
+
+        /* Replace the grid contents with a battle-list layout. The
+           gallery-grid CSS doesn't apply to .battle-list — we just
+           reuse the container.                                    */
+        const cta = document.createElement("button");
+        cta.type = "button";
+        cta.className = "battle-new-cta";
+        cta.textContent = "+ POST A NEW THEME";
+        cta.addEventListener("click", openCreateBattleModal);
+        grid.appendChild(cta);
+
+        const list = document.createElement("div");
+        list.className = "battle-list";
+        grid.appendChild(list);
+
+        if (count) count.textContent = "LOADING...";
+        fetchBattles(50).then(function (rows) {
+            if (currentScreen !== "gallery" || GALLERY.tab !== "battles") return;
+            BATTLE.cachedList = rows;
+            BATTLE.cachedAt = Date.now();
+            if (count) {
+                const live = rows.filter(function (b) {
+                    return new Date(b.expires_at).getTime() > Date.now();
+                }).length;
+                count.textContent = rows.length + " BATTLES" +
+                    (live ? " · " + live + " LIVE" : "");
+            }
+            if (rows.length === 0) {
+                const msg = document.createElement("p");
+                msg.className = "gallery-msg";
+                msg.textContent = "No battles yet. Post one!";
+                list.appendChild(msg);
+                return;
+            }
+            rows.forEach(function (b) {
+                list.appendChild(buildBattleCard(b));
+            });
+        });
+    }
+
+    function buildBattleCard(b) {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "battle-card";
+        const time = formatBattleTime(b.expires_at);
+        if (!time.live) card.classList.add("is-expired");
+
+        const theme = document.createElement("div");
+        theme.className = "battle-theme";
+        theme.textContent = b.theme;
+        card.appendChild(theme);
+
+        const meta = document.createElement("div");
+        meta.className = "battle-meta-line";
+        const status = document.createElement("span");
+        status.className = time.live ? "live" : "ended";
+        status.textContent = (time.live ? "★ " : "✓ ") + time.text;
+        meta.appendChild(status);
+        const author = document.createElement("span");
+        author.textContent = "by " + (b.created_by || "anonymous");
+        meta.appendChild(author);
+        card.appendChild(meta);
+
+        card.addEventListener("click", function () { openBattleDetail(b); });
+        return card;
+    }
+
+    /* Create-battle modal */
+    function openCreateBattleModal() {
+        const panel = document.getElementById("createBattleModal");
+        const input = document.getElementById("createBattleTheme");
+        if (!panel || !input) return;
+        input.value = "";
+        panel.hidden = false;
+        setTimeout(function () { input.focus(); }, 50);
+    }
+
+    function closeCreateBattleModal() {
+        const panel = document.getElementById("createBattleModal");
+        if (panel) panel.hidden = true;
+    }
+
+    function submitNewBattle() {
+        const input = document.getElementById("createBattleTheme");
+        if (!input) return;
+        const theme = input.value.trim();
+        if (!theme) return;
+        const author = (window.prompt(
+            "Sign as (optional):",
+            getRememberedAuthor()
+        ) || "").trim() || "anonymous";
+        rememberAuthor(author === "anonymous" ? "" : author);
+        const btn = document.getElementById("createBattleSubmit");
+        if (btn) btn.disabled = true;
+        createBattle(theme, author).then(function (row) {
+            if (btn) btn.disabled = false;
+            if (!row) {
+                alert("Couldn't post the battle. Try again.");
+                return;
+            }
+            closeCreateBattleModal();
+            /* Refresh battles tab + jump straight into the new
+               battle so the user can submit a pot to it. */
+            if (GALLERY.tab === "battles") refreshGalleryGrid();
+            openBattleDetail(row);
+        });
+    }
+
+    /* Battle detail modal */
+    function openBattleDetail(battle) {
+        BATTLE.currentBattleId = battle.id;
+        const panel = document.getElementById("battleDetail");
+        const themeEl = document.getElementById("battleTheme");
+        const time = document.getElementById("battleTimeLeft");
+        const author = document.getElementById("battleAuthor");
+        const grid = document.getElementById("battleGrid");
+        if (!panel) return;
+
+        if (themeEl) themeEl.textContent = battle.theme;
+        if (author) author.textContent = "by " + (battle.created_by || "anonymous");
+        const t = formatBattleTime(battle.expires_at);
+        if (time) time.textContent = t.text;
+
+        if (grid) grid.innerHTML =
+            "<p class='gallery-msg'>Loading entries...</p>";
+
+        panel.hidden = false;
+        loadAndRenderBattleEntries(battle);
+    }
+
+    function loadAndRenderBattleEntries(battle) {
+        const grid  = document.getElementById("battleGrid");
+        const count = document.getElementById("battleEntryCount");
+        const submit = document.getElementById("battleSubmit");
+        const expired = new Date(battle.expires_at).getTime() <= Date.now();
+
+        if (submit) {
+            submit.disabled = expired;
+            const lbl = submit.querySelector(".btn-label");
+            if (lbl) lbl.textContent = expired ? "BATTLE FINISHED" : "SUBMIT A POT";
+        }
+
+        Promise.all([
+            fetchBattleEntries(battle.id),
+            Promise.resolve(null)
+        ]).then(function (results) {
+            const entries = results[0];
+            BATTLE.cachedEntries = entries;
+            if (count) count.textContent = entries.length +
+                (entries.length === 1 ? " ENTRY" : " ENTRIES");
+            if (entries.length === 0) {
+                if (grid) grid.innerHTML =
+                    "<p class='gallery-msg'>No entries yet. Be first.</p>";
+                return;
+            }
+            const ids = entries.map(function (e) { return e.id; });
+            return fetchBattleVotes(ids).then(function (votes) {
+                BATTLE.cachedVotes = votes;
+                renderBattleEntries(entries, votes, expired, grid);
+            });
+        });
+    }
+
+    function renderBattleEntries(entries, votes, expired, grid) {
+        if (!grid) return;
+        grid.innerHTML = "";
+
+        /* Group votes by entry */
+        const tally = {};
+        votes.forEach(function (v) {
+            tally[v.entry_id] = (tally[v.entry_id] || 0) + 1;
+        });
+
+        /* Determine winner (highest vote count, only if expired) */
+        let winnerId = null;
+        if (expired) {
+            let max = -1;
+            entries.forEach(function (e) {
+                const c = tally[e.id] || 0;
+                if (c > max) { max = c; winnerId = e.id; }
+            });
+            if (max <= 0) winnerId = null;
+        }
+
+        const myVotes = loadMyVotes();
+
+        entries.forEach(function (raw) {
+            /* Normalize to the same shape buildThumbCard uses */
+            const entry = normalizePublicRow(raw);
+            entry.id = "battle-" + raw.id;  /* avoid clash */
+            entry._publicId = raw.id;
+
+            const card = document.createElement("div");
+            card.className = "battle-entry-card";
+            if (raw.id === winnerId) card.classList.add("is-winner");
+
+            if (raw.id === winnerId) {
+                const tag = document.createElement("span");
+                tag.className = "battle-winner-tag";
+                tag.textContent = "★ WINNER";
+                card.appendChild(tag);
+            }
+
+            const thumb = document.createElement("div");
+            thumb.className = "battle-entry-thumb";
+            const canvas = document.createElement("canvas");
+            canvas.width = 200;
+            canvas.height = 300;
+            thumb.appendChild(canvas);
+            card.appendChild(thumb);
+
+            const author = document.createElement("span");
+            author.className = "battle-entry-author";
+            author.textContent = entry.author || "anonymous";
+            card.appendChild(author);
+
+            const voteRow = document.createElement("div");
+            voteRow.className = "battle-vote-row";
+
+            const count = document.createElement("span");
+            count.className = "battle-vote-count";
+            count.textContent = (tally[raw.id] || 0);
+            voteRow.appendChild(count);
+
+            const voteBtn = document.createElement("button");
+            voteBtn.type = "button";
+            voteBtn.className = "battle-vote-btn";
+            const alreadyVoted = myVotes.has(raw.id);
+            if (alreadyVoted) voteBtn.classList.add("voted");
+            voteBtn.textContent = alreadyVoted ? "VOTED" : "VOTE";
+            voteBtn.disabled = expired || alreadyVoted;
+            voteBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                handleVoteClick(raw.id, voteBtn, count);
+            });
+            voteRow.appendChild(voteBtn);
+
+            card.appendChild(voteRow);
+            grid.appendChild(card);
+
+            loadEntryPaint(entry).then(function () {
+                renderEntryIntoCanvas(canvas, entry);
+            });
+        });
+    }
+
+    function handleVoteClick(entryId, btn, countEl) {
+        btn.disabled = true;
+        btn.textContent = "...";
+        voteForEntry(entryId).then(function (res) {
+            if (res.ok || res.duplicate) {
+                rememberMyVote(entryId);
+                btn.classList.add("voted");
+                btn.textContent = "VOTED";
+                if (res.ok && countEl) {
+                    countEl.textContent =
+                        (parseInt(countEl.textContent, 10) + 1);
+                }
+            } else {
+                btn.disabled = false;
+                btn.textContent = "RETRY";
+            }
+        });
+    }
+
+    function closeBattleDetail() {
+        const panel = document.getElementById("battleDetail");
+        if (panel) panel.hidden = true;
+        BATTLE.currentBattleId = null;
+    }
+
+    /* Submit picker — pick one of your local pots to submit to
+       the currently-open battle. */
+    function openSubmitPicker() {
+        if (!BATTLE.currentBattleId) return;
+        const battle = BATTLE.cachedList
+            ? BATTLE.cachedList.find(function (b) { return b.id === BATTLE.currentBattleId; })
+            : null;
+        if (!battle) return;
+        const expired = new Date(battle.expires_at).getTime() <= Date.now();
+        if (expired) {
+            alert("This battle has ended.");
+            return;
+        }
+
+        const panel = document.getElementById("submitPickerModal");
+        const themeEl = document.getElementById("submitPickerTheme");
+        const grid = document.getElementById("submitPickerGrid");
+        if (!panel || !grid) return;
+        if (themeEl) themeEl.textContent = battle.theme;
+        grid.innerHTML = "";
+
+        const mine = loadGalleryEntries().slice().reverse();
+        if (mine.length === 0) {
+            panel.hidden = false;
+            return;
+        }
+        mine.forEach(function (entry) {
+            const card = document.createElement("button");
+            card.type = "button";
+            card.className = "pot-card";
+
+            const thumb = document.createElement("div");
+            thumb.className = "pot-thumb";
+            const canvas = document.createElement("canvas");
+            canvas.width = 200;
+            canvas.height = 300;
+            thumb.appendChild(canvas);
+            card.appendChild(thumb);
+
+            const meta = document.createElement("div");
+            meta.className = "pot-meta";
+            const name = document.createElement("span");
+            name.className = "pot-name";
+            name.textContent = entry.name || "UNNAMED POT";
+            meta.appendChild(name);
+            card.appendChild(meta);
+
+            card.addEventListener("click", function () {
+                submitChosenToBattle(entry, battle);
+            });
+
+            grid.appendChild(card);
+            loadEntryPaint(entry).then(function () {
+                renderEntryIntoCanvas(canvas, entry);
+            });
+        });
+
+        panel.hidden = false;
+    }
+
+    function closeSubmitPicker() {
+        const panel = document.getElementById("submitPickerModal");
+        if (panel) panel.hidden = true;
+    }
+
+    function submitChosenToBattle(entry, battle) {
+        const author = (window.prompt(
+            "Sign as (optional):",
+            getRememberedAuthor()
+        ) || "").trim() || "anonymous";
+        rememberAuthor(author === "anonymous" ? "" : author);
+        submitBattleEntry(battle.id, entry, author).then(function (row) {
+            closeSubmitPicker();
+            if (row) {
+                /* Refresh the open battle detail so the new entry
+                   shows up. */
+                loadAndRenderBattleEntries(battle);
+            } else {
+                alert("Couldn't submit. Try again.");
+            }
+        });
+    }
+
+    function wireBattleUI() {
+        const closeB = document.getElementById("battleClose");
+        if (closeB) closeB.addEventListener("click", closeBattleDetail);
+        const panelB = document.getElementById("battleDetail");
+        if (panelB) panelB.addEventListener("click", function (e) {
+            if (e.target === panelB) closeBattleDetail();
+        });
+
+        const closeC = document.getElementById("createBattleClose");
+        if (closeC) closeC.addEventListener("click", closeCreateBattleModal);
+        const panelC = document.getElementById("createBattleModal");
+        if (panelC) panelC.addEventListener("click", function (e) {
+            if (e.target === panelC) closeCreateBattleModal();
+        });
+
+        const createSubmit = document.getElementById("createBattleSubmit");
+        if (createSubmit) createSubmit.addEventListener("click", submitNewBattle);
+
+        const battleSubmit = document.getElementById("battleSubmit");
+        if (battleSubmit) battleSubmit.addEventListener("click", openSubmitPicker);
+
+        const closeP = document.getElementById("submitPickerClose");
+        if (closeP) closeP.addEventListener("click", closeSubmitPicker);
+        const panelP = document.getElementById("submitPickerModal");
+        if (panelP) panelP.addEventListener("click", function (e) {
+            if (e.target === panelP) closeSubmitPicker();
+        });
+
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") {
+                if (panelP && !panelP.hidden) closeSubmitPicker();
+                else if (panelC && !panelC.hidden) closeCreateBattleModal();
+                else if (panelB && !panelB.hidden) closeBattleDetail();
+            }
+        });
     }
 
     function renderMineTab(grid, empty, count, banner) {
@@ -4384,7 +4996,8 @@
             if (e.key === "Escape" && panel && !panel.hidden) closeDetail();
         });
 
-        /* Gallery tabs (Day 5 chunk E — MINE / EVERYONE) */
+        /* Gallery tabs (Day 5 chunk E — MINE / EVERYONE,
+           chunk F — BATTLES) */
         document.querySelectorAll(".gallery-tab[data-tab]").forEach(function (b) {
             b.addEventListener("click", function () {
                 if (GALLERY.tab === b.dataset.tab) return;
@@ -4392,6 +5005,8 @@
                 refreshGalleryGrid();
             });
         });
+
+        wireBattleUI();
     }
 
     function submitCurrentToPublic() {

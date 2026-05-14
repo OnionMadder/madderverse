@@ -354,8 +354,9 @@
     <div class="gallery-stack">
 
         <div class="gallery-tabs" role="tablist" aria-label="Gallery scope">
-            <button class="gallery-tab" data-tab="mine"   type="button">MINE</button>
-            <button class="gallery-tab" data-tab="public" type="button">EVERYONE</button>
+            <button class="gallery-tab" data-tab="mine"    type="button">MINE</button>
+            <button class="gallery-tab" data-tab="public"  type="button">EVERYONE</button>
+            <button class="gallery-tab" data-tab="battles" type="button">BATTLES</button>
         </div>
 
         <div class="a-lot-of-pots" id="lotOfPotsBanner" hidden>
@@ -376,6 +377,69 @@
         </div>
 
     </div>
+
+    <!-- Battle detail modal (Day 5 chunk F) — opens when a
+         battle card is tapped. Shows theme + all entries + vote
+         buttons + a "submit your pot" button. -->
+    <aside class="battle-detail" id="battleDetail" hidden>
+        <div class="battle-detail-card">
+            <div class="detail-titlebar">
+                <span class="detail-pack" id="battleTheme">THEME</span>
+                <span class="detail-date" id="battleTimeLeft">--</span>
+                <button class="specs-close" id="battleClose" type="button" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="battle-meta">
+                <span class="battle-author" id="battleAuthor">by anonymous</span>
+                <span class="battle-entries" id="battleEntryCount">0 ENTRIES</span>
+            </div>
+            <div class="battle-grid" id="battleGrid"></div>
+            <div class="battle-actions">
+                <button class="btn-control primary" id="battleSubmit" type="button">
+                    <span class="btn-label">SUBMIT A POT</span>
+                    <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Create-battle modal — opens from "NEW THEME" on BATTLES tab -->
+    <aside class="create-battle" id="createBattleModal" hidden>
+        <div class="create-battle-card">
+            <div class="detail-titlebar">
+                <span>POST A THEME</span>
+                <button class="specs-close" id="createBattleClose" type="button" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="create-battle-body">
+                <label class="detail-name-row">
+                    <span class="row-label">THEME</span>
+                    <input class="detail-name-input" id="createBattleTheme" type="text"
+                           maxlength="40" placeholder="e.g. BLUE, SPOOKY, PINGAS" />
+                </label>
+                <p class="create-battle-hint">
+                    Theme expires in 7 days. Everyone can submit one or more pots inspired by it.
+                </p>
+                <div class="detail-actions">
+                    <button class="btn-control primary" id="createBattleSubmit" type="button">
+                        <span class="btn-label">POST</span>
+                        <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Submit-to-battle picker — lists your local pots, tap to submit -->
+    <aside class="submit-picker" id="submitPickerModal" hidden>
+        <div class="submit-picker-card">
+            <div class="detail-titlebar">
+                <span>PICK A POT FOR&nbsp;<em id="submitPickerTheme">THEME</em></span>
+                <button class="specs-close" id="submitPickerClose" type="button" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="submit-picker-body" id="submitPickerGrid">
+                <!-- pots injected here -->
+            </div>
+        </div>
+    </aside>
 
     <!-- Detail modal — opens when a thumbnail is tapped -->
     <aside class="pot-detail" id="potDetail" hidden>
