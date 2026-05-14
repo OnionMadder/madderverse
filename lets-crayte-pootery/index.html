@@ -394,6 +394,38 @@
 </main>
 
 <!-- ============================================================
+     SCREEN: PROFILE  (Phase 1 chunk 2 — public profile pages)
+     ============================================================ -->
+<main class="screen" id="screen-profile" hidden>
+    <div class="screen-titlebar">
+        <button class="back-btn" id="profileBack" type="button">&larr; BACK</button>
+        <h2 class="screen-title" id="profileScreenTitle">&lt;&nbsp;PROFILE&nbsp;&gt;</h2>
+        <span class="screen-status" id="profilePotCount">&mdash;</span>
+    </div>
+
+    <section class="profile-header" id="profileHeader">
+        <div class="profile-name-block">
+            <h3 class="profile-display-name" id="profileDisplay">&mdash;</h3>
+            <p class="profile-handle" id="profileHandle">@&mdash;</p>
+        </div>
+        <p class="profile-bio" id="profileBioRead">&mdash;</p>
+        <div class="profile-stats" id="profileStats"></div>
+    </section>
+
+    <p class="profile-loading" id="profileLoading" hidden>
+        &nbsp;Loading potter...
+    </p>
+    <p class="profile-empty" id="profileEmpty" hidden>
+        This potter hasn't shared any pots yet.
+    </p>
+    <p class="profile-missing" id="profileMissing" hidden>
+        No potter found with that handle.
+    </p>
+
+    <div class="profile-grid" id="profileGrid"></div>
+</main>
+
+<!-- ============================================================
      SCREEN: ACCOUNT  (Phase 1 — sign-in + profile)
      ============================================================ -->
 <main class="screen" id="screen-account" hidden>

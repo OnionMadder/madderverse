@@ -308,10 +308,41 @@
             "/rest/v1/public_pots?select=*&order=created_at.desc&limit=" + n;
         return fetch(url, { headers: supabaseHeaders() })
             .then(function (r) { return r.ok ? r.json() : []; })
+            .then(enrichWithProfiles)
             .catch(function (e) {
                 console.warn("[CRAYte] public fetch failed", e);
                 return [];
             });
+    }
+
+    /* Bulk-load profile rows for any user_ids appearing in the
+       passed array of records, then stamp ._profile on each
+       record. Skips records without user_id (true anonymous).  */
+    function enrichWithProfiles(rows) {
+        if (!Array.isArray(rows) || rows.length === 0) return rows;
+        const seen = Object.create(null);
+        const ids = [];
+        rows.forEach(function (r) {
+            const uid = r && r.user_id;
+            if (uid && !seen[uid]) { seen[uid] = true; ids.push(uid); }
+        });
+        if (ids.length === 0) return rows;
+        const inClause = "(" + ids.join(",") + ")";
+        const url = SUPABASE_URL + "/rest/v1/profiles?select=id,username,display_name" +
+            "&id=in." + encodeURIComponent(inClause);
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (profs) {
+                const map = Object.create(null);
+                (profs || []).forEach(function (p) { map[p.id] = p; });
+                rows.forEach(function (r) {
+                    if (r && r.user_id && map[r.user_id]) {
+                        r._profile = map[r.user_id];
+                    }
+                });
+                return rows;
+            })
+            .catch(function () { return rows; });
     }
 
     /* Submit one local pot to the public gallery. Returns the
@@ -492,6 +523,7 @@
             "/rest/v1/battles?select=*&order=created_at.desc&limit=" + n;
         return fetch(url, { headers: supabaseHeaders() })
             .then(function (r) { return r.ok ? r.json() : []; })
+            .then(enrichWithProfiles)
             .catch(function (e) {
                 console.warn("[CRAYte] battles fetch failed", e);
                 return [];
@@ -531,6 +563,7 @@
             "&order=created_at.asc";
         return fetch(url, { headers: supabaseHeaders() })
             .then(function (r) { return r.ok ? r.json() : []; })
+            .then(enrichWithProfiles)
             .catch(function (e) {
                 console.warn("[CRAYte] entries fetch failed", e);
                 return [];
@@ -4867,10 +4900,14 @@
     /* ----- 8B. Grid building ----- */
 
     function buildThumbCard(entry) {
-        const card = document.createElement("button");
-        card.type = "button";
+        /* Card is a div (not <button>) so author byline can be a
+           real <button> nested inside without invalid HTML. The
+           div gets role=button + keyboard handlers for a11y. */
+        const card = document.createElement("div");
         card.className = "pot-card";
         card.dataset.id = entry.id;
+        card.setAttribute("role", "button");
+        card.setAttribute("tabindex", "0");
 
         const thumb = document.createElement("div");
         thumb.className = "pot-thumb";
@@ -4898,17 +4935,41 @@
         tag.textContent = packLabel(entry.packId);
         meta.appendChild(tag);
 
-        /* Public entries also get an author byline. */
+        /* Public entries get an author byline. If the row is
+           linked to a real account (entry._profile.username
+           exists), render as a clickable button that opens the
+           profile. Otherwise plain span — anonymous bylines
+           aren't linkable. */
         if (entry._isPublic && entry.author) {
-            const by = document.createElement("span");
+            const linkable = entry._profile && entry._profile.username;
+            const by = linkable
+                ? document.createElement("button")
+                : document.createElement("span");
             by.className = "pot-author";
-            by.textContent = "by " + entry.author;
+            if (linkable) {
+                by.type = "button";
+                by.classList.add("pot-author-link");
+                by.dataset.profile = entry._profile.username;
+                by.textContent = "by @" + entry._profile.username;
+                by.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    openProfile(entry._profile.username);
+                });
+            } else {
+                by.textContent = "by " + entry.author;
+            }
             meta.appendChild(by);
         }
 
         card.appendChild(meta);
 
         card.addEventListener("click", function () { openDetail(entry); });
+        card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openDetail(entry);
+            }
+        });
 
         /* Render async — paint may be a dataURL that needs loading. */
         loadEntryPaint(entry).then(function () {
@@ -4934,6 +4995,8 @@
             exploded:     !!row.exploded,
             name:         row.name || "",
             author:       row.author || "anonymous",
+            userId:       row.user_id || null,
+            _profile:     row._profile || null,   /* attached by enrichWithProfiles */
             _isPublic:    true,
             _publicId:    row.id
         };
@@ -5053,9 +5116,12 @@
     }
 
     function buildBattleCard(b) {
-        const card = document.createElement("button");
-        card.type = "button";
+        /* Wrapper is a div so we can put a real <button> author
+           byline inside without nesting buttons. */
+        const card = document.createElement("div");
         card.className = "battle-card";
+        card.setAttribute("role", "button");
+        card.setAttribute("tabindex", "0");
         const time = formatBattleTime(b.expires_at);
         if (!time.live) card.classList.add("is-expired");
 
@@ -5070,12 +5136,35 @@
         status.className = time.live ? "live" : "ended";
         status.textContent = (time.live ? "★ " : "✓ ") + time.text;
         meta.appendChild(status);
-        const author = document.createElement("span");
-        author.textContent = "by " + (b.created_by || "anonymous");
+
+        /* Creator byline — clickable if there's a real account. */
+        const profile = b._profile;
+        const linkable = profile && profile.username;
+        const author = linkable
+            ? document.createElement("button")
+            : document.createElement("span");
+        if (linkable) {
+            author.type = "button";
+            author.className = "pot-author-link";
+            author.dataset.profile = profile.username;
+            author.textContent = "by @" + profile.username;
+            author.addEventListener("click", function (e) {
+                e.stopPropagation();
+                openProfile(profile.username);
+            });
+        } else {
+            author.textContent = "by " + (b.created_by || "anonymous");
+        }
         meta.appendChild(author);
         card.appendChild(meta);
 
         card.addEventListener("click", function () { openBattleDetail(b); });
+        card.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                openBattleDetail(b);
+            }
+        });
         return card;
     }
 
@@ -5223,9 +5312,26 @@
             thumb.appendChild(canvas);
             card.appendChild(thumb);
 
-            const author = document.createElement("span");
+            /* Author byline — clickable if the entry has a real
+               account behind it (row.user_id + _profile.username). */
+            const profile = raw._profile;
+            const linkable = profile && profile.username;
+            const author = linkable
+                ? document.createElement("button")
+                : document.createElement("span");
             author.className = "battle-entry-author";
-            author.textContent = entry.author || "anonymous";
+            if (linkable) {
+                author.type = "button";
+                author.classList.add("pot-author-link");
+                author.dataset.profile = profile.username;
+                author.textContent = "@" + profile.username;
+                author.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    openProfile(profile.username);
+                });
+            } else {
+                author.textContent = entry.author || raw.author || "anonymous";
+            }
             card.appendChild(author);
 
             const voteRow = document.createElement("div");
@@ -5952,6 +6058,197 @@
     });
 
     /* ============================================================
+       PROFILE pages (Phase 1 chunk 2)
+       ============================================================
+       Public profile pages. Click any @handle byline anywhere ->
+       lands here. URL param ?profile=<handle> deep-links straight
+       to a profile on cold load.
+       ============================================================ */
+
+    const PROFILE = {
+        currentHandle: null,
+        previousScreen: "title",
+        inited: false
+    };
+
+    function setProfileUI(state) {
+        const loading = document.getElementById("profileLoading");
+        const empty   = document.getElementById("profileEmpty");
+        const missing = document.getElementById("profileMissing");
+        const grid    = document.getElementById("profileGrid");
+        const header  = document.getElementById("profileHeader");
+        if (loading) loading.hidden = state !== "loading";
+        if (empty)   empty.hidden   = state !== "empty";
+        if (missing) missing.hidden = state !== "missing";
+        if (header)  header.hidden  = state === "missing" || state === "loading";
+        if (grid && state === "missing") grid.innerHTML = "";
+    }
+
+    function loadProfile(username) {
+        if (!supabaseEnabled() || !username) {
+            setProfileUI("missing");
+            return;
+        }
+        PROFILE.currentHandle = username;
+        setProfileUI("loading");
+        const grid = document.getElementById("profileGrid");
+        if (grid) grid.innerHTML = "";
+
+        /* 1) fetch the profile row */
+        fetch(SUPABASE_URL + "/rest/v1/profiles?select=*" +
+                "&username=eq." + encodeURIComponent(username),
+              { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (rows) {
+                const profile = rows && rows[0];
+                if (!profile) {
+                    setProfileUI("missing");
+                    const title = document.getElementById("profileScreenTitle");
+                    if (title) title.textContent = "< NOT FOUND >";
+                    return;
+                }
+                renderProfileHeader(profile);
+                /* 2) fetch their public pots */
+                return fetch(
+                    SUPABASE_URL + "/rest/v1/public_pots?select=*" +
+                        "&user_id=eq." + encodeURIComponent(profile.id) +
+                        "&order=created_at.desc&limit=50",
+                    { headers: supabaseHeaders() }
+                )
+                .then(function (r) { return r.ok ? r.json() : []; })
+                .then(function (pots) {
+                    /* Stamp the profile back into each row so the
+                       byline render is consistent + opening a pot
+                       detail from a profile still shows the @handle. */
+                    pots.forEach(function (p) { p._profile = profile; });
+                    renderProfilePots(profile, pots);
+                });
+            })
+            .catch(function (e) {
+                console.warn("[CRAYte] profile load failed", e);
+                setProfileUI("missing");
+            });
+    }
+
+    function renderProfileHeader(profile) {
+        const title  = document.getElementById("profileScreenTitle");
+        const handle = document.getElementById("profileHandle");
+        const disp   = document.getElementById("profileDisplay");
+        const bio    = document.getElementById("profileBioRead");
+        if (title)  title.textContent  = "< @" + profile.username + " >";
+        if (handle) handle.textContent = "@" + profile.username;
+        if (disp)   disp.textContent   = profile.display_name || profile.username;
+        if (bio) {
+            if (profile.bio && profile.bio.trim()) {
+                bio.textContent = profile.bio;
+                bio.hidden = false;
+            } else {
+                bio.textContent = "";
+                bio.hidden = true;
+            }
+        }
+    }
+
+    function renderProfilePots(profile, pots) {
+        const grid   = document.getElementById("profileGrid");
+        const count  = document.getElementById("profilePotCount");
+        const stats  = document.getElementById("profileStats");
+        if (count)  count.textContent =
+            pots.length + (pots.length === 1 ? " POT" : " POTS");
+        if (stats) {
+            stats.innerHTML = "";
+            const potsStat = document.createElement("span");
+            potsStat.className = "profile-stat";
+            potsStat.innerHTML = "<strong>" + pots.length + "</strong>&nbsp;pots";
+            stats.appendChild(potsStat);
+            const expl = pots.filter(function (p) { return p.exploded; }).length;
+            if (expl > 0) {
+                const explStat = document.createElement("span");
+                explStat.className = "profile-stat";
+                explStat.innerHTML = "<strong>" + expl + "</strong>&nbsp;exploded";
+                stats.appendChild(explStat);
+            }
+            const fired = pots.filter(function (p) {
+                return p.fired && !p.exploded;
+            }).length;
+            if (fired > 0) {
+                const firedStat = document.createElement("span");
+                firedStat.className = "profile-stat";
+                firedStat.innerHTML = "<strong>" + fired + "</strong>&nbsp;fired";
+                stats.appendChild(firedStat);
+            }
+        }
+        if (!grid) return;
+        grid.innerHTML = "";
+        if (pots.length === 0) {
+            setProfileUI("empty");
+            return;
+        }
+        setProfileUI("ok");
+        pots.forEach(function (row) {
+            const entry = normalizePublicRow(row);
+            grid.appendChild(buildThumbCard(entry));
+        });
+    }
+
+    function openProfile(username) {
+        if (!username) return;
+        if (currentScreen !== "profile") {
+            PROFILE.previousScreen = currentScreen;
+        }
+        /* Update URL silently so the profile is shareable, without
+           pushing a new history entry (so browser back goes to
+           wherever the user came from in the browser sense). */
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.set("profile", username);
+            window.history.replaceState(null, "", url.toString());
+        } catch (_) {}
+        showScreen("profile");
+        loadProfile(username);
+    }
+
+    function backFromProfile() {
+        try {
+            const url = new URL(window.location.href);
+            url.searchParams.delete("profile");
+            window.history.replaceState(null, "", url.toString());
+        } catch (_) {}
+        showScreen(PROFILE.previousScreen || "title");
+    }
+
+    function initProfileScreen() {
+        const back = document.getElementById("profileBack");
+        if (back) back.addEventListener("click", backFromProfile);
+    }
+
+    registerScreen("profile", {
+        onEnter: function () {
+            if (!PROFILE.inited) {
+                initProfileScreen();
+                PROFILE.inited = true;
+            }
+            wheelHumStop();
+        }
+    });
+
+    /* On cold load, honor ?profile=<handle> in the URL — deep-link
+       straight to that profile after auth has had a chance to
+       resolve (so signed-in callers see their own ownership
+       affordances if they happen to land on their own page). */
+    function checkProfileURL() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const handle = params.get("profile");
+            if (handle) {
+                PROFILE.previousScreen = "title";
+                showScreen("profile");
+                loadProfile(handle);
+            }
+        } catch (_) {}
+    }
+
+    /* ============================================================
        ACHIEVEMENTS — Day 4 chunk C
        ============================================================
        Local-only meta progression. Each achievement has a check
@@ -6548,8 +6845,9 @@
            so the user sees something immediately. The auth
            round-trip is async (esp. on the callback hash path,
            which fetches /user) and notifies via onAuthChange
-           listeners when ready — no blocking. */
-        initAuth();
+           listeners when ready — no blocking. Once auth resolves,
+           honor any ?profile=<handle> deep-link in the URL. */
+        initAuth().then(checkProfileURL);
     }
 
     if (document.readyState === "loading") {
