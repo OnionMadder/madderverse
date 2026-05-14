@@ -12,13 +12,17 @@
     <meta name="keywords" content="lets crayte pootery, pottery game, pottery wheel, clay shaping, ceramics, kiln, glaze, decorating, indie game, browser game, The Madderverse, Onion Madder, Mad Sundar LLC" />
     <meta name="author" content="Onion Madder" />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="The Madderverse" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content="Let's CRAYte! Pootery - Throw, Glaze, Fire" />
     <meta property="og:description" content="Shape clay on a spinning wheel, decorate with cursed glazes, fire it in the kiln. A pottery sim with extra Os." />
     <meta property="og:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <meta property="og:image:alt" content="Let's CRAYte! Pootery — a YTP-themed pottery wheel game." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Let's CRAYte! Pootery - Throw, Glaze, Fire" />
     <meta name="twitter:description" content="Shape clay on a spinning wheel, decorate with cursed glazes, fire it in the kiln." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <meta name="twitter:image:alt" content="Let's CRAYte! Pootery — a YTP-themed pottery wheel game." />
     <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
@@ -70,6 +74,16 @@
         <p class="cursed-sub" id="cursedSub">
             <span class="lcd-frame"><span class="lcd-pre">&gt;</span> Now with 100&#37; more CLAYY_</span>
         </p>
+
+        <!-- Daily theme banner (Phase 2 chunk 4-lite). Rotating
+             prompt from the curated pool — taps land in the
+             BATTLES tab on today's auto-created daily battle. -->
+        <button class="daily-theme-banner" id="dailyThemeBtn" type="button"
+                aria-label="Today's daily theme">
+            <span class="dtb-label">TODAY&rsquo;S THEME</span>
+            <span class="dtb-theme" id="dtbTheme">&mdash;</span>
+            <span class="dtb-cta">TAP TO POT &rarr;</span>
+        </button>
 
         <div class="menu-buttons">
             <button class="big-btn primary" id="btnStart" type="button">
@@ -652,6 +666,10 @@
                 <button class="btn-control" id="detailSubmit" type="button">
                     <span class="btn-label">SUBMIT PUBLIC</span>
                     <span class="btn-glyph" aria-hidden="true">&uarr;</span>
+                </button>
+                <button class="btn-control" id="detailCopyLink" type="button" hidden>
+                    <span class="btn-label">COPY LINK</span>
+                    <span class="btn-glyph" aria-hidden="true">&#x1F517;</span>
                 </button>
                 <button class="btn-control primary" id="detailExport" type="button">
                     <span class="btn-label">EXPORT PNG</span>

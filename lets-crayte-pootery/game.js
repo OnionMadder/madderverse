@@ -301,6 +301,20 @@
     }
 
     /* Fetch latest N public pots, newest first. */
+    /* Fetch a single public_pots row by uuid. Used by the URL
+       deep-link (?pot=<uuid>) so shared pot URLs land straight
+       on the detail modal. Returns null if missing / failed. */
+    function fetchPublicPotById(id) {
+        if (!supabaseEnabled() || !id) return Promise.resolve(null);
+        const url = SUPABASE_URL +
+            "/rest/v1/public_pots?select=*&id=eq." +
+            encodeURIComponent(id) + "&limit=1";
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (rows) { return rows && rows[0] ? rows[0] : null; })
+            .catch(function () { return null; });
+    }
+
     function fetchPublicPots(limit) {
         if (!supabaseEnabled()) return Promise.resolve([]);
         const n = Math.max(1, Math.min(100, limit || 50));
@@ -477,6 +491,68 @@
                 );
             }
         });
+    }
+
+    /* ---------- 0bb. DAILY THEME (Phase 2 chunk 4-lite) ----------
+       Curated rotating prompt pool. Today's prompt is picked
+       deterministically by day-of-year mod pool.length so every
+       user sees the same theme on the same day. The BATTLES tab
+       lazy-creates today's "daily-bot" battle the first time
+       it's loaded each day — anyone visiting kicks off the
+       battle for everyone else.                                */
+
+    const DAILY_THEMES = [
+        "BLUE", "RED", "GOLD", "BLACK", "RAINBOW",
+        "SPOOKY", "CUTE", "GROSS", "FANCY", "TINY",
+        "GIANT", "ALIEN", "ANCIENT", "FUTURE", "GLITCH",
+        "SLIME", "ICE", "FIRE", "GALAXY", "JUNGLE",
+        "ROBOT", "MONSTER", "CANDY", "WIZARD", "GHOST",
+        "OCEAN", "DESERT", "FOREST", "VOLCANO", "CLOUD",
+        "PINGAS", "POOTSPLOSION", "SECRET", "BROKEN"
+    ];
+
+    /* Day-of-year — 1..366 inclusive, locale-stable. */
+    function dayOfYear(d) {
+        const start = Date.UTC(d.getUTCFullYear(), 0, 0);
+        const now   = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+        return Math.floor((now - start) / 86400000);
+    }
+
+    function todaysTheme() {
+        const idx = dayOfYear(new Date()) % DAILY_THEMES.length;
+        return DAILY_THEMES[idx];
+    }
+
+    function isTodayDailyBattle(b) {
+        if (!b || b.created_by !== "daily-bot") return false;
+        if (b.theme !== todaysTheme()) return false;
+        return new Date(b.expires_at).getTime() > Date.now();
+    }
+
+    /* createBattle without owner attribution. user_id stays NULL
+       so the row is system-owned, not credited to whichever user
+       happened to be online first. */
+    function createDailyBattle(theme) {
+        if (!supabaseEnabled()) return Promise.resolve(null);
+        return fetch(SUPABASE_URL + "/rest/v1/battles", {
+            method: "POST",
+            headers: supabaseHeaders({
+                "Content-Type": "application/json",
+                "Prefer":       "return=representation"
+            }),
+            body: JSON.stringify({
+                theme: theme,
+                created_by: "daily-bot",
+                user_id: null
+            })
+        })
+            .then(function (r) {
+                if (!r.ok) return null;
+                return r.json().then(function (rows) {
+                    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+                });
+            })
+            .catch(function () { return null; });
     }
 
     /* ---------- 0b. POT BATTLES (Day 5 chunk F) ----------
@@ -1180,6 +1256,24 @@
         const btnAccount = document.getElementById("btnAccount");
         if (btnAccount) btnAccount.addEventListener("click", function () {
             showScreen("account");
+        });
+
+        /* Daily theme banner — populate with today's theme + wire
+           tap to land in BATTLES tab on today's daily battle. */
+        const dtbBtn   = document.getElementById("dailyThemeBtn");
+        const dtbTheme = document.getElementById("dtbTheme");
+        if (dtbTheme) dtbTheme.textContent = todaysTheme();
+        if (dtbBtn) dtbBtn.addEventListener("click", function () {
+            /* Tell BATTLES tab to surface today's daily on its
+               next render. Set the flag BEFORE navigating so
+               renderBattlesTab can act on it. */
+            BATTLE.openDailyOnLoad = true;
+            GALLERY.tab = "battles";
+            if (SCREENS["gallery"]) {
+                showScreen("gallery");
+            } else {
+                flashStub(dtbBtn, "BATTLES OFFLINE");
+            }
         });
 
         /* Achievements screen back button */
@@ -5101,23 +5195,59 @@
             if (currentScreen !== "gallery" || GALLERY.tab !== "battles") return;
             BATTLE.cachedList = rows;
             BATTLE.cachedAt = Date.now();
-            if (count) {
-                const live = rows.filter(function (b) {
-                    return new Date(b.expires_at).getTime() > Date.now();
-                }).length;
-                count.textContent = rows.length + " BATTLES" +
-                    (live ? " · " + live + " LIVE" : "");
-            }
-            if (rows.length === 0) {
-                const msg = document.createElement("p");
-                msg.className = "gallery-msg";
-                msg.textContent = "No battles yet. Post one!";
-                list.appendChild(msg);
-                return;
-            }
-            rows.forEach(function (b) {
-                list.appendChild(buildBattleCard(b));
+
+            /* Daily-battle housekeeping: if today's daily-bot
+               battle doesn't exist yet, anyone visiting today
+               creates it (first-come, first-served). The created
+               row is appended to the local cache so it renders
+               immediately. */
+            const existingDaily = rows.find(isTodayDailyBattle);
+            const ensureDaily = existingDaily
+                ? Promise.resolve(existingDaily)
+                : createDailyBattle(todaysTheme()).then(function (created) {
+                    if (created) {
+                        /* Re-enrich (give it a _profile slot — empty,
+                           since it has no user_id). */
+                        rows.unshift(created);
+                        BATTLE.cachedList = rows;
+                    }
+                    return created || null;
+                });
+
+            ensureDaily.then(function (daily) {
+                renderBattleList(rows, list, count);
+                if (BATTLE.openDailyOnLoad && daily) {
+                    BATTLE.openDailyOnLoad = false;
+                    openBattleDetail(daily);
+                }
             });
+        });
+    }
+
+    function renderBattleList(rows, list, count) {
+        if (count) {
+            const live = rows.filter(function (b) {
+                return new Date(b.expires_at).getTime() > Date.now();
+            }).length;
+            count.textContent = rows.length + " BATTLES" +
+                (live ? " · " + live + " LIVE" : "");
+        }
+        if (rows.length === 0) {
+            const msg = document.createElement("p");
+            msg.className = "gallery-msg";
+            msg.textContent = "No battles yet. Post one!";
+            list.appendChild(msg);
+            return;
+        }
+        /* Daily-bot battles bubble to the top of the list. */
+        const sorted = rows.slice().sort(function (a, b) {
+            const aDaily = a.created_by === "daily-bot" ? 1 : 0;
+            const bDaily = b.created_by === "daily-bot" ? 1 : 0;
+            if (aDaily !== bDaily) return bDaily - aDaily;
+            return 0;
+        });
+        sorted.forEach(function (b) {
+            list.appendChild(buildBattleCard(b));
         });
     }
 
@@ -5130,10 +5260,19 @@
         card.setAttribute("tabindex", "0");
         const time = formatBattleTime(b.expires_at);
         if (!time.live) card.classList.add("is-expired");
+        if (b.created_by === "daily-bot") card.classList.add("is-daily");
 
         const theme = document.createElement("div");
         theme.className = "battle-theme";
-        theme.textContent = b.theme;
+        if (b.created_by === "daily-bot") {
+            const badge = document.createElement("span");
+            badge.className = "battle-daily-badge";
+            badge.textContent = "★ TODAY";
+            theme.appendChild(badge);
+            theme.appendChild(document.createTextNode(" " + b.theme));
+        } else {
+            theme.textContent = b.theme;
+        }
         card.appendChild(theme);
 
         const meta = document.createElement("div");
@@ -5618,6 +5757,8 @@
         if (pack) pack.textContent = packLabel(entry.packId);
 
         refreshDetailSubmitButton();
+        refreshDetailCopyLink();
+        setPotURLParam(entry);
 
         panel.hidden = false;
 
@@ -5630,6 +5771,72 @@
         GALLERY.detailEntry = null;
         const panel = document.getElementById("potDetail");
         if (panel) panel.hidden = true;
+        clearPotURLParam();
+    }
+
+    /* Show/hide the COPY LINK button. Only public pots have a
+       shareable URL — locals and unsubmitted drafts don't.       */
+    function refreshDetailCopyLink() {
+        const btn = document.getElementById("detailCopyLink");
+        if (!btn) return;
+        const entry = GALLERY.detailEntry;
+        const sharableId = (entry && entry._isPublic && entry._publicId) ||
+                           (entry && entry.publicId) || null;
+        btn.hidden = !sharableId;
+        const lbl = btn.querySelector(".btn-label");
+        if (lbl) lbl.textContent = "COPY LINK";
+        btn.classList.remove("is-copied");
+    }
+
+    function potDeepLinkURL(publicId) {
+        return "https://madderverse.org/lets-crayte-pootery/?pot=" +
+               encodeURIComponent(publicId);
+    }
+
+    function setPotURLParam(entry) {
+        try {
+            const id = (entry && entry._isPublic && entry._publicId) ||
+                       (entry && entry.publicId) || null;
+            const url = new URL(window.location.href);
+            if (id) url.searchParams.set("pot", id);
+            else    url.searchParams.delete("pot");
+            history.replaceState(null, "", url.toString());
+        } catch (_) {}
+    }
+
+    function clearPotURLParam() {
+        try {
+            const url = new URL(window.location.href);
+            if (!url.searchParams.has("pot")) return;
+            url.searchParams.delete("pot");
+            history.replaceState(null, "", url.toString());
+        } catch (_) {}
+    }
+
+    function copyDetailLink() {
+        const entry = GALLERY.detailEntry;
+        if (!entry) return;
+        const id = (entry._isPublic && entry._publicId) || entry.publicId;
+        if (!id) return;
+        const url = potDeepLinkURL(id);
+        const btn = document.getElementById("detailCopyLink");
+        const lbl = btn && btn.querySelector(".btn-label");
+        const flash = function () {
+            if (!btn || !lbl) return;
+            lbl.textContent = "✓ COPIED";
+            btn.classList.add("is-copied");
+            setTimeout(function () {
+                if (lbl) lbl.textContent = "COPY LINK";
+                if (btn) btn.classList.remove("is-copied");
+            }, 1600);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(flash, function () {
+                window.prompt("Copy this link:", url);
+            });
+        } else {
+            window.prompt("Copy this link:", url);
+        }
     }
 
     function saveDetailName() {
@@ -5726,6 +5933,9 @@
         if (expt)   expt.addEventListener("click",  exportCurrentEntry);
         if (submit) submit.addEventListener("click", submitCurrentToPublic);
 
+        const copyLink = document.getElementById("detailCopyLink");
+        if (copyLink) copyLink.addEventListener("click", copyDetailLink);
+
         if (name) {
             name.addEventListener("change", saveDetailName);
             name.addEventListener("blur",   saveDetailName);
@@ -5795,6 +6005,7 @@
                    PUBLIC tab shows the new pot. */
                 GALLERY.publicCache = null;
                 refreshDetailSubmitButton();
+                refreshDetailCopyLink();
                 if (btn) {
                     const lbl = btn.querySelector(".btn-label");
                     if (lbl) lbl.textContent = "✓ PUBLIC";
@@ -6238,14 +6449,38 @@
         }
     });
 
-    /* On cold load, honor ?profile=<handle> in the URL — deep-link
-       straight to that profile after auth has had a chance to
-       resolve (so signed-in callers see their own ownership
-       affordances if they happen to land on their own page). */
-    function checkProfileURL() {
+    /* On cold load, honor ?profile=<handle> and ?pot=<uuid> in
+       the URL — deep-link straight to the target after auth has
+       had a chance to resolve (so signed-in callers see their
+       own ownership affordances if they land on their own page).
+       Pot deep-links take priority — they're how shared pot URLs
+       open straight onto the detail modal. */
+    function checkURLDeepLinks() {
         try {
             const params = new URLSearchParams(window.location.search);
+            const potId  = params.get("pot");
             const handle = params.get("profile");
+
+            if (potId) {
+                /* Land on gallery → EVERYONE so closing the modal
+                   reveals the public grid (encourages browsing). */
+                GALLERY.tab = "everyone";
+                showScreen("gallery");
+                fetchPublicPotById(potId).then(function (row) {
+                    if (!row) {
+                        clearPotURLParam();
+                        return;
+                    }
+                    /* Enrich with profile (best-effort) so the
+                       byline / author shows correctly. */
+                    return enrichWithProfiles([row]).then(function () {
+                        const entry = normalizePublicRow(row);
+                        openDetail(entry);
+                    });
+                }).catch(function () { clearPotURLParam(); });
+                return;
+            }
+
             if (handle) {
                 PROFILE.previousScreen = "title";
                 showScreen("profile");
@@ -6889,7 +7124,7 @@
            which fetches /user) and notifies via onAuthChange
            listeners when ready — no blocking. Once auth resolves,
            honor any ?profile=<handle> deep-link in the URL. */
-        initAuth().then(checkProfileURL);
+        initAuth().then(checkURLDeepLinks);
     }
 
     if (document.readyState === "loading") {

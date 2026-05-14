@@ -326,6 +326,82 @@ a:focus-visible {
     margin-right: 4px;
 }
 
+/* Daily theme banner (Phase 2 chunk 4-lite) — rotating prompt
+   above the menu buttons. Pulses subtly so the kid notices. */
+.daily-theme-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: min(440px, 92vw);
+    padding: 12px 18px;
+    background: linear-gradient(120deg,
+        rgba(255, 46, 136, 0.22) 0%,
+        rgba(0, 255, 204, 0.18) 100%);
+    border: 1.5px solid var(--pink);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.6px;
+    color: var(--ink);
+    cursor: pointer;
+    text-shadow: 1px 1px 0 #000;
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 14px rgba(255, 46, 136, 0.30);
+    animation: daily-pulse 3.5s ease-in-out infinite;
+    transition: transform 0.06s ease, box-shadow 0.15s ease;
+}
+
+.daily-theme-banner:hover,
+.daily-theme-banner:focus-visible {
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 22px rgba(255, 46, 136, 0.55),
+        0 0 32px rgba(0, 255, 204, 0.25);
+    outline: none;
+}
+
+.daily-theme-banner:active { transform: translateY(1px); }
+
+.dtb-label {
+    color: var(--teal-dim);
+    flex: 0 0 auto;
+}
+
+.dtb-theme {
+    flex: 1 1 auto;
+    text-align: center;
+    font-family: var(--font-title);
+    font-size: clamp(18px, 4.5vw, 26px);
+    letter-spacing: 3px;
+    color: var(--pink-bright);
+    text-shadow:
+        2px 2px 0 #000,
+        0 0 10px rgba(255, 46, 136, 0.55);
+}
+
+.dtb-cta {
+    color: var(--teal);
+    flex: 0 0 auto;
+    text-shadow: 0 0 6px rgba(0, 255, 204, 0.4);
+}
+
+@keyframes daily-pulse {
+    0%, 100% { box-shadow: 0 0 0 1px #000, 0 0 14px rgba(255, 46, 136, 0.30); }
+    50%      { box-shadow: 0 0 0 1px #000, 0 0 22px rgba(255, 46, 136, 0.55); }
+}
+
+@media (max-width: 480px) {
+    .daily-theme-banner {
+        flex-wrap: wrap;
+        padding: 10px 14px;
+        gap: 6px;
+    }
+    .dtb-label, .dtb-cta { font-size: 9px; }
+    .dtb-theme { flex-basis: 100%; }
+}
+
 /* Buttons */
 .menu-buttons {
     display: flex;
@@ -858,6 +934,17 @@ a:focus-visible {
         0 0 0 1px rgba(0, 0, 0, 0.5),
         0 5px 0 #02141a,
         0 0 24px var(--teal);
+}
+
+/* COPY LINK -> after click, briefly flash green to confirm. */
+.btn-control.is-copied {
+    background: #1a4030;
+    border-color: #33ff99;
+    color: #d4ffe6;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.5),
+        0 5px 0 #02141a,
+        0 0 18px rgba(51, 255, 153, 0.6);
 }
 
 /* ----- 9. DECORATE screen (chunk 3 — paint / glaze / stamp) ----- */
@@ -2429,6 +2516,30 @@ a:focus-visible {
 .battle-card.is-expired {
     opacity: 0.7;
     border-style: dashed;
+}
+
+.battle-card.is-daily {
+    border-color: var(--pink-bright);
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(0,0,0,0.18) 0 1px,
+            transparent 1px 2px),
+        linear-gradient(180deg, #1a0a18 0%, #08020b 100%);
+    box-shadow: 0 0 14px rgba(255, 46, 136, 0.35);
+}
+
+.battle-daily-badge {
+    display: inline-block;
+    padding: 2px 7px;
+    margin-right: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #ff3d96, #ffa53d);
+    color: #1a0e08;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.3px;
+    text-shadow: none;
+    vertical-align: middle;
 }
 
 .battle-card .battle-theme {
