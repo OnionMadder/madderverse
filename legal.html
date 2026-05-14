@@ -45,7 +45,7 @@
     </section>
 
     <article class="article">
-        <p class="updated">Last updated: 2026-05-07</p>
+        <p class="updated">Last updated: 2026-05-13</p>
 
         <p class="lede">The Madderverse (the &ldquo;Site&rdquo;) is operated by Mad Sundar LLC. By using the Site, you agree to the privacy notice and terms below. If you do not agree, please do not use the Site.</p>
 
@@ -55,25 +55,42 @@
         <h3>What we collect</h3>
         <ul>
             <li><strong>Aggregate visit counts</strong> via <a href="https://www.goatcounter.com/" target="_blank" rel="noopener">GoatCounter</a>, a privacy-friendly analytics service. GoatCounter records the page you visited, your browser type, screen size, the referring page, and a country derived from your IP address. <strong>No cookies are set, no personal information is stored, and no profiles are built.</strong> GoatCounter does not share data with advertisers.</li>
-            <li><strong>Game progress and high scores</strong> are stored locally in your browser using <code>localStorage</code>. This data never leaves your device. Clearing your browser data deletes it.</li>
+            <li><strong>Local game progress</strong> &mdash; high scores, saved pots, achievements, and similar in-game state &mdash; is stored on your device using your browser's <code>localStorage</code>. This data never leaves your device. Clearing your browser data deletes it.</li>
+            <li><strong>Optional public submissions in <em>Let's CRAYte! Pootery</em>.</strong> When you choose to submit a pot to the public gallery, enter a head-to-head pot battle, or vote on a battle entry, the following is sent to a third-party database (<a href="https://supabase.com/" target="_blank" rel="noopener">Supabase</a>, described under &ldquo;Third parties&rdquo; below) so other players can see it:
+                <ul>
+                    <li>The pot you made (its shape data and the painted glaze image).</li>
+                    <li>The name you give the pot (up to 40 characters; optional).</li>
+                    <li>The byline you choose (up to 40 characters; optional, defaults to &ldquo;anonymous&rdquo;).</li>
+                    <li>A random per-browser identifier (UUID) generated the first time you submit or vote. It is used only to prevent double-voting and to mark entries as &ldquo;yours&rdquo; on this device. It is not tied to any real-world identity. Clearing your browser data resets it.</li>
+                </ul>
+                Anyone using the public gallery or battles features can see your submitted pot, its name, and its byline. <strong>Please do not enter your real name, email address, phone number, school, location, or any other personal information into the name or byline fields.</strong> If you regret a submission, contact us via <a href="https://madsundar.com/" target="_blank" rel="noopener">madsundar.com</a> and we will remove it.
+            </li>
         </ul>
 
         <h3>What we do not collect</h3>
         <ul>
-            <li>Names, email addresses, phone numbers, or other identifying information.</li>
-            <li>Account credentials (the Site has no user accounts).</li>
-            <li>Precise location data; only country-level visit aggregates are recorded.</li>
+            <li>Email addresses, phone numbers, real names, or other directly identifying information. We do not ask for any of these.</li>
+            <li>Account credentials (the Site has no user accounts or sign-ins).</li>
+            <li>Precise location data; only country-level visit aggregates are recorded by GoatCounter.</li>
             <li>Tracking cookies, advertising identifiers, browser fingerprints, or social-media trackers.</li>
             <li>Microphone, camera, contacts, or device sensor data.</li>
-            <li>Any information from children directly. We do not have a mechanism to collect personal information from any visitor, including children.</li>
+            <li>Any information from children directly. We do not knowingly solicit personal information from any visitor, including children.</li>
         </ul>
+
+        <h3>User-submitted content in <em>Let's CRAYte! Pootery</em></h3>
+        <p>The public gallery and pot battles in <em>Let's CRAYte! Pootery</em> let players share their creations with each other. Submissions are visible to all other players. Please keep submissions appropriate for a general audience: no sexually explicit imagery, no hate symbols, no threats or harassment, no personal information about yourself or others, and nothing else that violates these terms. Every gallery and battle entry has a <strong>Report</strong> button you can use to flag inappropriate content. We review reports and remove offending submissions; serious or repeated violations may result in the underlying device identifier being blocked from future submissions. Reports can also be filed directly through <a href="https://madsundar.com/" target="_blank" rel="noopener">madsundar.com</a>.</p>
 
         <h3>Children's privacy</h3>
         <p>The Madderverse is designed for general audiences and is intended to be appropriate for children. Because the Site does not collect personal information from any visitor, we do not knowingly collect personal information from children under 13 within the meaning of the U.S. Children's Online Privacy Protection Act (COPPA), or from children under 16 within the meaning of the EU/UK General Data Protection Regulation (GDPR-K).</p>
         <p>If you are a parent or guardian and believe your child has somehow provided personal information to us, please contact us via <a href="https://madsundar.com/" target="_blank" rel="noopener">madsundar.com</a> and we will promptly investigate and, if applicable, delete the information.</p>
 
         <h3>Third parties</h3>
-        <p>The Site uses one third-party service: GoatCounter, described above. We do not embed advertising networks, social-media trackers, chat widgets, or other third-party scripts. The Site is hosted on GitHub Pages; standard server logs maintained by GitHub may apply to the connection itself, governed by <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub's privacy statement</a>.</p>
+        <p>The Site uses two third-party services:</p>
+        <ul>
+            <li><a href="https://www.goatcounter.com/" target="_blank" rel="noopener">GoatCounter</a> for aggregate visit analytics, described above. Used site-wide.</li>
+            <li><a href="https://supabase.com/" target="_blank" rel="noopener">Supabase</a> hosts the database that stores public pot submissions, battle entries, and votes for <em>Let's CRAYte! Pootery</em>. Supabase processes only the data described under &ldquo;What we collect&rdquo; above &mdash; submitted pots, optional names and bylines, and a random per-browser identifier &mdash; and only when you choose to use the public features. Their handling of that data is governed by <a href="https://supabase.com/privacy" target="_blank" rel="noopener">Supabase's privacy policy</a>.</li>
+        </ul>
+        <p>We do not embed advertising networks, social-media trackers, chat widgets, or other third-party scripts. The Site is hosted on GitHub Pages; standard server logs maintained by GitHub may apply to the connection itself, governed by <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noopener">GitHub's privacy statement</a>.</p>
 
         <h3>External links</h3>
         <p>The Site may link to external websites (such as madsundar.com or GoatCounter). Once you leave the Madderverse, this privacy notice no longer applies, and the destination site's policies govern.</p>
@@ -82,10 +99,19 @@
 
         <h3>What you can do</h3>
         <ul>
-            <li>Play the games for free, as much as you'd like.</li>
+            <li>Play the core games for free, as much as you'd like.</li>
             <li>Share links to the games freely.</li>
             <li>Show the games to friends, family, classrooms, libraries, or community spaces.</li>
         </ul>
+
+        <h3>Pricing &amp; in-app purchases</h3>
+        <p>The Madderverse hub and the core gameplay of every game on it are free, and the core experience will remain free. Some games &mdash; including <em>Let's CRAYte! Pootery</em> &mdash; may offer optional <strong>paid content packs</strong> in the future (for example: additional glazes, clay types, themed pot sets, or seasonal decorations). Any paid content will be:</p>
+        <ul>
+            <li><strong>Always optional.</strong> Paid content will never gate the core gameplay loop or block features you already had access to for free.</li>
+            <li><strong>Bought once.</strong> Where we offer paid content, it will be sold as a one-time purchase through your platform's standard billing (such as Google Play in-app purchases). We do not plan to introduce subscriptions for game features.</li>
+            <li><strong>Clearly priced.</strong> Each pack will display its price up front before purchase.</li>
+        </ul>
+        <p>We will not show advertisements in the games and we will not put existing free features behind a paywall. Charges, refunds, and billing disputes for in-app purchases made through Google Play are governed by <a href="https://play.google.com/about/play-terms/" target="_blank" rel="noopener">Google Play's terms</a>; other platforms are governed by their respective billing terms. If our approach to pricing ever changes materially, the &ldquo;Last updated&rdquo; date at the top of this page will reflect the change.</p>
 
         <h3>What you cannot do</h3>
         <ul>
