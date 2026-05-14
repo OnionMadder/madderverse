@@ -325,6 +325,15 @@ main {
     overflow: visible;
 }
 
+/* Filled slots claim the whole touch gesture so a finger drag becomes a
+   drag-to-clear instead of a page scroll. Without this, on mobile the
+   browser steals the gesture for page-scroll before pointermove ever
+   reaches the JS that would have marked the gesture as a drag. Empty
+   slots are left at default so they don't interfere with anything. */
+.stage-slot.active {
+    touch-action: none;
+}
+
 /* Active slot gets a soft footlight halo under the Munki to suggest a
    spotlight on the dance floor — no border or filled box. */
 .stage-slot.active::before {
