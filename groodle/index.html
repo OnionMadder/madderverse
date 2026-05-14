@@ -62,31 +62,23 @@
     <div class="creature" id="creature">
         <!-- Fill layer: pale interior wash that becomes the "coloring
              page" surface (z-index 1). -->
+        <!-- Silhouette fill layer. Shape children are populated from JS
+             (POSES[currentPose].shapes → renderPoseDom) so the figure
+             can swap between standing/cheer/star/groovy at runtime. -->
         <svg class="silhouette-fill-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
             <defs>
-                <clipPath id="bodyClip">
-                    <circle cx="200" cy="100" r="58"/>
-                    <rect x="155" y="148" width="90" height="232" rx="42"/>
-                    <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
-                    <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
-                    <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
-                    <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
-                </clipPath>
+                <clipPath id="bodyClip"></clipPath>
             </defs>
-            <g class="silhouette-fill">
-                <circle cx="200" cy="100" r="58"/>
-                <rect x="155" y="148" width="90" height="232" rx="42"/>
-                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
-                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
-                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
-                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
-            </g>
+            <g class="silhouette-fill"></g>
         </svg>
 
         <canvas class="draw-canvas" id="drawCanvas"></canvas>
 
         <!-- Outline layer (z-index 3): SVG filter renders one unified
              dark ring inside the union of the body shapes. -->
+        <!-- Outline layer (z-index 3). Children populated from JS same
+             as the fill layer; filter renders one unified dark ring
+             inside the union of the body shapes. -->
         <svg class="silhouette-outline-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
             <defs>
                 <filter id="innerOutlineFilter" x="-2%" y="-2%" width="104%" height="104%">
@@ -96,14 +88,7 @@
                     <feComposite operator="in" in="ink" in2="ring"/>
                 </filter>
             </defs>
-            <g class="silhouette-outline" filter="url(#innerOutlineFilter)">
-                <circle cx="200" cy="100" r="58"/>
-                <rect x="155" y="148" width="90" height="232" rx="42"/>
-                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
-                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
-                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
-                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
-            </g>
+            <g class="silhouette-outline" filter="url(#innerOutlineFilter)"></g>
         </svg>
 
         <!-- Hat layer (z-index 4): the equipped hat sprite. -->
@@ -202,6 +187,12 @@
             <button class="drawer-close" type="button" data-drawer-close="1" aria-label="Close stage drawer">✕</button>
         </header>
         <div class="drawer-body">
+            <div class="drawer-section">
+                <h3 class="drawer-section-label">Pose</h3>
+                <div class="pose-picker" id="posePicker" aria-label="Choose pose"></div>
+            </div>
+            <div class="drawer-section">
+                <h3 class="drawer-section-label">Background</h3>
             <div class="bg-picker" id="bgPicker" aria-label="Choose background">
                 <button class="bg-thumb active" type="button" data-bg="studio" aria-label="Studio background">
                     <span class="bg-preview bg-studio"></span>
@@ -227,6 +218,7 @@
                 <button class="bg-thumb" type="button" data-bg="candy" aria-label="Candy background">
                     <span class="bg-preview bg-candy"></span>
                 </button>
+            </div>
             </div>
         </div>
     </section>
