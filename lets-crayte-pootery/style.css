@@ -2550,6 +2550,60 @@ a:focus-visible {
     letter-spacing: 1.6px;
 }
 
+/* ----- 14b. Side-rail layout (tablet+) -----
+   Mobile-first: everything stacks under the canvas. At >=768px
+   the layout flips to canvas-left + side-rail-right so all tools
+   are reachable without scrolling. */
+
+.shape-side-rail,
+.decorate-side-rail,
+.kiln-side-rail {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    max-width: 420px;
+}
+
+@media (min-width: 768px) {
+    .shape-stack,
+    .decorate-stack,
+    .kiln-stack {
+        flex-direction: row;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 28px;
+        max-width: none;
+    }
+
+    .shape-side-rail,
+    .decorate-side-rail,
+    .kiln-side-rail {
+        width: 360px;
+        max-width: 360px;
+        align-items: stretch;
+        flex-shrink: 0;
+    }
+
+    /* In rail mode the inner rows + controls fill the rail width
+       instead of being centered/clamped at 420px. */
+    .shape-side-rail .clay-picker,
+    .shape-side-rail .shape-controls,
+    .shape-side-rail .shape-hint,
+    .decorate-side-rail .decorate-tools,
+    .decorate-side-rail .decorate-controls,
+    .kiln-side-rail .kiln-controls {
+        max-width: none;
+    }
+
+    /* Hint reads as a small instruction line above the controls
+       in the rail — left-aligned makes more sense than centered. */
+    .shape-side-rail .shape-hint {
+        text-align: left;
+    }
+}
+
 /* ----- 15. Responsive nudges ----- */
 
 @media (max-width: 480px) {

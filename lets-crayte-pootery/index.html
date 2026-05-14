@@ -209,23 +209,29 @@
                     aria-label="Pottery wheel. Drag to shape the clay."></canvas>
         </div>
 
-        <div class="clay-picker" id="clayPicker" role="tablist" aria-label="Clay material">
-            <span class="row-label">CLAY</span>
-            <!-- swatches injected by buildClayPicker() -->
-        </div>
+        <!-- Side rail: stacks under canvas on phone, sits to the
+             right of canvas on tablet+ (>=768px wide). -->
+        <div class="shape-side-rail">
 
-        <p class="shape-hint" id="shapeHint">
-            Drag the clay. Pinch in to NARROW. Push out to WIDEN.
-        </p>
+            <div class="clay-picker" id="clayPicker" role="tablist" aria-label="Clay material">
+                <span class="row-label">CLAY</span>
+                <!-- swatches injected by buildClayPicker() -->
+            </div>
 
-        <div class="shape-controls">
-            <button class="btn-control" id="shapeReset" type="button">
-                <span class="btn-label">RESET</span>
-            </button>
-            <button class="btn-control primary" id="shapeFinish" type="button">
-                <span class="btn-label">FINISH FORM</span>
-                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
-            </button>
+            <p class="shape-hint" id="shapeHint">
+                Drag the clay. Pinch in to NARROW. Push out to WIDEN.
+            </p>
+
+            <div class="shape-controls">
+                <button class="btn-control" id="shapeReset" type="button">
+                    <span class="btn-label">RESET</span>
+                </button>
+                <button class="btn-control primary" id="shapeFinish" type="button">
+                    <span class="btn-label">FINISH FORM</span>
+                    <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+                </button>
+            </div>
+
         </div>
 
     </div>
@@ -256,6 +262,12 @@
                 <span aria-hidden="true">&#x21B6;</span>
             </button>
         </div>
+
+        <!-- Side rail: tools + controls stack here. On phone this
+             sits below the canvas (default flex column). On
+             tablet+ (>=768px) flex flips to row and the rail
+             docks to the right of the canvas. -->
+        <div class="decorate-side-rail">
 
         <div class="decorate-tools">
 
@@ -324,6 +336,8 @@
             </button>
         </div>
 
+        </div><!-- /.decorate-side-rail -->
+
     </div>
 
 </main>
@@ -354,6 +368,10 @@
             </aside>
         </div>
 
+        <!-- Side rail: empty during firing, controls appear after
+             reveal. Sits to the right of the kiln on tablet+. -->
+        <div class="kiln-side-rail">
+
         <div class="kiln-controls" id="kilnControls" hidden>
             <button class="btn-control" id="kilnAgain" type="button">
                 <span class="btn-label">DECORATE</span>
@@ -366,6 +384,8 @@
                 <span class="btn-glyph" aria-hidden="true">&#9656;</span>
             </button>
         </div>
+
+        </div><!-- /.kiln-side-rail -->
 
     </div>
 
