@@ -527,6 +527,28 @@
             </div>
         </div>
     </section>
+
+    <!-- ALWAYS-VISIBLE: push notifications settings.
+         Per-device, so it lives outside the signed-in/out
+         partition. Hidden entirely on unsupported browsers via JS. -->
+    <section class="account-stack" id="pushSettingsCard" hidden>
+        <div class="account-card">
+            <h3 class="account-headline">PUSH NOTIFICATIONS</h3>
+            <p class="account-blurb">
+                Get a heads-up when new packs drop or a battle starts /
+                ends. Per-device — turn off any time.
+            </p>
+            <div class="push-toggle-row">
+                <button class="btn-control push-toggle-btn" id="pushToggleBtn" type="button">
+                    <span class="btn-label">OFF</span>
+                    <span class="btn-glyph" aria-hidden="true">&#128276;</span>
+                </button>
+                <p class="push-settings-note" id="pushSettingsNote">
+                    Tap to get a heads-up for new packs + battle starts/ends.
+                </p>
+            </div>
+        </div>
+    </section>
 </main>
 
 <!-- ============================================================
@@ -680,6 +702,32 @@
     </aside>
 
 </main>
+
+<!-- ============================================================
+     PUSH OPT-IN MODAL (chunk W3)
+     ============================================================
+     Surfaces ONCE after the user's first fired pot.
+     ============================================================ -->
+<aside class="push-optin-modal" id="pushOptInModal" hidden>
+    <div class="push-optin-card">
+        <div class="push-optin-glyph" aria-hidden="true">&#128276;</div>
+        <h3 class="push-optin-title">WANT A HEADS-UP?</h3>
+        <p class="push-optin-body">
+            Get notified when new packs drop or a pot battle is
+            starting / ending. Per-device — turn off anytime in your
+            account settings.
+        </p>
+        <div class="push-optin-actions">
+            <button class="btn-control" id="pushOptInNo" type="button">
+                <span class="btn-label">MAYBE LATER</span>
+            </button>
+            <button class="btn-control primary" id="pushOptInYes" type="button">
+                <span class="btn-label">YES, NOTIFY ME</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+        </div>
+    </div>
+</aside>
 
 <footer class="site-footer-slim" aria-label="Site info">
     <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>

@@ -2472,6 +2472,113 @@ a:focus-visible {
     padding: 10px;
 }
 
+/* ----- Push notification settings + opt-in modal (chunk W3) ----- */
+
+.push-toggle-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.push-toggle-btn { align-self: flex-start; }
+.push-toggle-btn.is-on {
+    background: #1a4030;
+    border-color: #33ff99;
+    color: #d4ffe6;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.5),
+        0 5px 0 #02141a,
+        0 0 14px rgba(51, 255, 153, 0.45);
+}
+
+.push-settings-note {
+    margin: 0;
+    color: var(--ink-dim);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.push-optin-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    animation: push-optin-fade 220ms ease-out;
+}
+
+.push-optin-modal[hidden] { display: none; }
+
+@keyframes push-optin-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.push-optin-card {
+    width: 100%;
+    max-width: 360px;
+    padding: 22px 22px 18px;
+    border: 1px solid var(--teal);
+    border-radius: var(--radius-md);
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(0,0,0,0.18) 0 1px,
+            transparent 1px 2px),
+        linear-gradient(180deg, #0a2630 0%, #061319 100%);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.6),
+        0 12px 0 #02141a,
+        0 0 28px rgba(0, 255, 204, 0.35);
+    text-align: center;
+    animation: push-optin-pop 280ms cubic-bezier(.2,.9,.3,1.2);
+}
+
+@keyframes push-optin-pop {
+    from { transform: translateY(20px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+
+.push-optin-glyph {
+    font-size: 38px;
+    line-height: 1;
+    margin-bottom: 8px;
+    color: var(--pink);
+    text-shadow: 0 0 18px rgba(255, 46, 136, 0.5);
+}
+
+.push-optin-title {
+    margin: 0 0 8px;
+    font-size: 18px;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+}
+
+.push-optin-body {
+    margin: 0 0 16px;
+    color: var(--ink-dim);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.push-optin-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: stretch;
+}
+
+.push-optin-actions .btn-control { flex: 1; }
+
+@media (max-width: 480px) {
+    .push-optin-card { padding: 18px 16px 14px; }
+    .push-optin-actions { flex-direction: column; }
+}
+
 /* ----- 14. Pot battles (Day 5 chunk F) ----- */
 
 /* Battle card in the BATTLES tab — replaces the pot grid layout */

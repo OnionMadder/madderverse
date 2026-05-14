@@ -21,7 +21,7 @@
      current version.
    ============================================================ */
 
-const CACHE_VERSION = "pootery-v1";
+const CACHE_VERSION = "pootery-v2";
 const SCOPE = "/lets-crayte-pootery/";
 
 const PRECACHE_URLS = [
@@ -114,4 +114,83 @@ self.addEventListener("message", function (event) {
     if (event.data && event.data.type === "SKIP_WAITING") {
         self.skipWaiting();
     }
+});
+
+/* ============================================================
+   PUSH (chunk W3)
+   ============================================================
+   Payload shape (set by push-worker /send/<topic>):
+     { topic, title, body, url?, icon?, sent_at }
+
+   - On `push` we surface a system notification with the title +
+     body. `data.url` rides along so notificationclick knows where
+     to land.
+   - On `notificationclick` we focus an existing Pootery tab if
+     one is open (and same origin), otherwise open a new one
+     pointed at data.url. The notification closes either way.
+
+   Both handlers are wrapped in try/catch -- a malformed payload
+   or missing data.url must not throw out of the SW (which would
+   kill subsequent push delivery on some browsers).
+   ============================================================ */
+
+const DEFAULT_PUSH_ICON  = "/lets-crayte-pootery/icons/icon.svg";
+const DEFAULT_PUSH_BADGE = "/lets-crayte-pootery/icons/icon-maskable.svg";
+const DEFAULT_PUSH_URL   = "/lets-crayte-pootery/";
+
+self.addEventListener("push", function (event) {
+    let data = {};
+    try {
+        if (event.data) data = event.data.json();
+    } catch (e) {
+        try {
+            data = { title: "Pootery", body: event.data ? event.data.text() : "" };
+        } catch (_) { data = {}; }
+    }
+
+    const title = data.title || "Pootery";
+    const body  = data.body  || "";
+    const url   = data.url   || DEFAULT_PUSH_URL;
+    const icon  = data.icon  || DEFAULT_PUSH_ICON;
+    /* tag groups notifications so a rapid second push of the
+       same topic (e.g. battle-start retry) doesn't stack on
+       the lock screen. */
+    const tag = data.topic ? ("pootery-" + data.topic) : "pootery";
+
+    event.waitUntil(
+        self.registration.showNotification(title, {
+            body:  body,
+            icon:  icon,
+            badge: DEFAULT_PUSH_BADGE,
+            tag:   tag,
+            renotify: true,
+            data:  { url: url, topic: data.topic || "" }
+        })
+    );
+});
+
+self.addEventListener("notificationclick", function (event) {
+    event.notification.close();
+    const target = (event.notification.data && event.notification.data.url) ||
+                   DEFAULT_PUSH_URL;
+    /* Resolve target against the worker's origin so relative URLs
+       (we send /lets-crayte-pootery/?pot=… on Pootery sends) work
+       just as well as absolute https URLs. */
+    const targetURL = new URL(target, self.location.origin).href;
+
+    event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true })
+            .then(function (clientList) {
+                for (let i = 0; i < clientList.length; i++) {
+                    const c = clientList[i];
+                    /* Same-origin existing window -> focus + nav. */
+                    if (c.url && new URL(c.url).origin === self.location.origin) {
+                        return c.focus().then(function () {
+                            if ("navigate" in c) return c.navigate(targetURL);
+                        });
+                    }
+                }
+                return self.clients.openWindow(targetURL);
+            })
+    );
 });

@@ -493,6 +493,323 @@
         });
     }
 
+    /* ---------- 0d. PUSH NOTIFICATIONS (chunk W3) ----------
+       Talks to the Madderverse push gateway at PUSH_WORKER_URL.
+       Browser permission is requested only after the user's first
+       fired pot so the prompt feels earned, not interrogative.
+       Opt-in state is mirrored in localStorage so we know whether
+       to surface the "subscribed" badge in the account screen
+       even before the SW registration resolves.
+       ============================================================ */
+
+    const PUSH_WORKER_URL = "https://push.onionmadder.rocks";
+
+    /* PASTE the VAPID public key here AFTER you generate it on the
+       worker side. Until set, the subscribe flow short-circuits
+       with a friendly "not configured yet" message instead of
+       throwing. The same key is set as VAPID_PUBLIC_KEY in the
+       Cloudflare Worker secrets — they must match.            */
+    const VAPID_PUBLIC_KEY = "REPLACE_WITH_VAPID_PUBLIC_KEY";
+
+    const PUSH_KEYS = {
+        prompted:       "pootery-push-prompted",
+        optIn:          "pootery-push-opt-in",
+        endpoint:       "pootery-push-endpoint",
+        dismissedUntil: "pootery-push-dismissed-until"
+    };
+
+    /* True iff the build has a real VAPID public key wired. */
+    function pushConfigured() {
+        return typeof VAPID_PUBLIC_KEY === "string" &&
+               VAPID_PUBLIC_KEY.indexOf("REPLACE_WITH_") !== 0 &&
+               VAPID_PUBLIC_KEY.length > 40;
+    }
+
+    /* The browser can be in five states; we surface the union to
+       the settings UI:
+         "unsupported" – no SW or PushManager (older iOS Safari)
+         "denied"      – the user blocked notifications globally
+         "default"     – never asked yet
+         "granted-on"  – granted + currently subscribed via us
+         "granted-off" – granted, but we don't have an active sub
+       This is read by refreshPushSettingsUI(). */
+    function pushSupported() {
+        return "serviceWorker" in navigator &&
+               "PushManager" in window &&
+               "Notification" in window;
+    }
+
+    function pushState() {
+        if (!pushSupported()) return "unsupported";
+        const perm = Notification.permission;
+        if (perm === "denied")  return "denied";
+        if (perm === "default") return "default";
+        try {
+            return localStorage.getItem(PUSH_KEYS.optIn) === "yes"
+                ? "granted-on"
+                : "granted-off";
+        } catch (_) { return "granted-off"; }
+    }
+
+    /* base64url -> Uint8Array for the applicationServerKey. */
+    function b64urlToUint8(s) {
+        const pad   = "=".repeat((4 - s.length % 4) % 4);
+        const norm  = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+        const bin   = atob(norm);
+        const out   = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+        return out;
+    }
+
+    function getSWRegistration() {
+        if (!("serviceWorker" in navigator)) return Promise.resolve(null);
+        return navigator.serviceWorker.ready.catch(function () { return null; });
+    }
+
+    /* Subscribe + POST to the gateway. Resolves with
+       { ok:bool, reason?:string }. Caller is responsible for
+       toggling permission first. */
+    function pushSubscribe(userId) {
+        if (!pushSupported())  return Promise.resolve({ ok: false, reason: "unsupported" });
+        if (!pushConfigured()) return Promise.resolve({ ok: false, reason: "unconfigured" });
+        return getSWRegistration().then(function (reg) {
+            if (!reg) return { ok: false, reason: "no-sw" };
+            return reg.pushManager.subscribe({
+                userVisibleOnly:      true,
+                applicationServerKey: b64urlToUint8(VAPID_PUBLIC_KEY)
+            }).then(function (sub) {
+                const json = sub.toJSON();
+                /* Persist endpoint client-side so unsubscribe works
+                   even if pushManager.getSubscription() returns null
+                   later (Safari has been known to lose track). */
+                try {
+                    localStorage.setItem(PUSH_KEYS.endpoint, json.endpoint || "");
+                    localStorage.setItem(PUSH_KEYS.optIn, "yes");
+                } catch (_) {}
+                return fetch(PUSH_WORKER_URL + "/subscribe", {
+                    method:  "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body:    JSON.stringify({
+                        subscription: json,
+                        user_id:      userId || null
+                    })
+                }).then(function (r) {
+                    return { ok: r.ok, reason: r.ok ? "" : "gateway-" + r.status };
+                }).catch(function (e) {
+                    return { ok: false, reason: "network: " + (e && e.message || e) };
+                });
+            }).catch(function (e) {
+                return { ok: false, reason: "subscribe: " + (e && e.message || e) };
+            });
+        });
+    }
+
+    function pushUnsubscribe() {
+        if (!pushSupported()) return Promise.resolve({ ok: true });
+        return getSWRegistration().then(function (reg) {
+            if (!reg) return { ok: true };
+            return reg.pushManager.getSubscription().then(function (sub) {
+                const endpoint = (sub && sub.endpoint) ||
+                    (function () {
+                        try { return localStorage.getItem(PUSH_KEYS.endpoint) || ""; }
+                        catch (_) { return ""; }
+                    })();
+                const localCleanup = function () {
+                    try {
+                        localStorage.setItem(PUSH_KEYS.optIn, "no");
+                        localStorage.removeItem(PUSH_KEYS.endpoint);
+                    } catch (_) {}
+                };
+                /* Tell the gateway first (so it stops sending), then
+                   drop the browser-side subscription. Either step
+                   can fail without affecting the user's intent. */
+                const tellWorker = endpoint
+                    ? fetch(PUSH_WORKER_URL + "/unsubscribe", {
+                          method:  "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body:    JSON.stringify({ endpoint: endpoint })
+                      }).catch(function () { /* best-effort */ })
+                    : Promise.resolve();
+                return tellWorker.then(function () {
+                    if (!sub) { localCleanup(); return { ok: true }; }
+                    return sub.unsubscribe().then(function () {
+                        localCleanup();
+                        return { ok: true };
+                    }).catch(function () {
+                        localCleanup();
+                        return { ok: true };
+                    });
+                });
+            });
+        });
+    }
+
+    /* ----- After-first-pot prompt -----
+       Lives as an overlay sheet in index.html (#pushOptInModal).
+       autoSaveFiredPot() calls maybeShowPushOptIn() once a pot
+       has been saved -- ONE TIME ever, and only if we haven't
+       prompted before + we're not inside a "maybe-later"
+       cool-down. */
+
+    const PUSH_DISMISS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;   /* 7 days */
+
+    function maybeShowPushOptIn() {
+        if (!pushSupported())  return;
+        if (!pushConfigured()) return;
+        if (Notification.permission !== "default") return;
+        try {
+            if (localStorage.getItem(PUSH_KEYS.prompted) === "yes") return;
+            const until = parseInt(localStorage.getItem(PUSH_KEYS.dismissedUntil) || "0", 10);
+            if (until && Date.now() < until) return;
+        } catch (_) {}
+        showPushOptInModal();
+    }
+
+    function showPushOptInModal() {
+        const modal = document.getElementById("pushOptInModal");
+        if (!modal) return;
+        modal.hidden = false;
+    }
+
+    function hidePushOptInModal() {
+        const modal = document.getElementById("pushOptInModal");
+        if (modal) modal.hidden = true;
+    }
+
+    function initPushOptInModal() {
+        const yes  = document.getElementById("pushOptInYes");
+        const no   = document.getElementById("pushOptInNo");
+        const modal = document.getElementById("pushOptInModal");
+        if (!modal) return;
+
+        const markPrompted = function () {
+            try { localStorage.setItem(PUSH_KEYS.prompted, "yes"); } catch (_) {}
+        };
+
+        if (yes) yes.addEventListener("click", function () {
+            yes.disabled = true;
+            const lbl = yes.querySelector(".btn-label");
+            if (lbl) lbl.textContent = "REQUESTING...";
+            Notification.requestPermission().then(function (perm) {
+                yes.disabled = false;
+                if (lbl) lbl.textContent = "YES, NOTIFY ME";
+                markPrompted();
+                if (perm === "granted") {
+                    pushSubscribe(currentUserId()).then(function (res) {
+                        if (!res.ok) {
+                            console.warn("[CRAYte] push subscribe failed:", res.reason);
+                        }
+                        refreshPushSettingsUI();
+                        hidePushOptInModal();
+                    });
+                } else {
+                    refreshPushSettingsUI();
+                    hidePushOptInModal();
+                }
+            });
+        });
+
+        if (no) no.addEventListener("click", function () {
+            try {
+                localStorage.setItem(
+                    PUSH_KEYS.dismissedUntil,
+                    String(Date.now() + PUSH_DISMISS_WINDOW_MS)
+                );
+            } catch (_) {}
+            markPrompted();
+            hidePushOptInModal();
+        });
+
+        /* Click outside the card closes (same as "maybe later"). */
+        modal.addEventListener("click", function (e) {
+            if (e.target === modal && no) no.click();
+        });
+    }
+
+    /* Helper -- returns AUTH user.id if signed in, otherwise null. */
+    function currentUserId() {
+        try {
+            return (AUTH && AUTH.session && AUTH.session.user &&
+                    AUTH.session.user.id) || null;
+        } catch (_) { return null; }
+    }
+
+    /* ----- Account screen toggle -----
+       The toggle is a single button that reflects pushState():
+         - granted-on  -> "ON"    -> tapping unsubscribes
+         - granted-off -> "OFF"   -> tapping subscribes
+         - default     -> "OFF"   -> tapping requests permission first
+         - denied      -> shown disabled with "BLOCKED IN BROWSER"
+         - unsupported -> hidden entirely (no UI noise for an
+                          unsupported browser)                          */
+
+    function refreshPushSettingsUI() {
+        const card     = document.getElementById("pushSettingsCard");
+        const btn      = document.getElementById("pushToggleBtn");
+        const lbl      = btn && btn.querySelector(".btn-label");
+        const note     = document.getElementById("pushSettingsNote");
+        if (!card || !btn) return;
+
+        if (!pushSupported()) { card.hidden = true; return; }
+        card.hidden = false;
+
+        if (!pushConfigured()) {
+            btn.disabled = true;
+            if (lbl) lbl.textContent = "COMING SOON";
+            if (note) note.textContent = "Notifications haven't been turned on for this build yet.";
+            return;
+        }
+
+        const state = pushState();
+        btn.disabled = false;
+        if (state === "denied") {
+            btn.disabled = true;
+            if (lbl) lbl.textContent = "BLOCKED IN BROWSER";
+            if (note) note.textContent =
+                "Notifications are blocked at the browser level. Enable them in your site settings to turn this on.";
+            return;
+        }
+        if (state === "granted-on") {
+            if (lbl) lbl.textContent = "ON";
+            btn.classList.add("is-on");
+            if (note) note.textContent =
+                "You'll get a heads-up for new packs + battle starts/ends.";
+            return;
+        }
+        btn.classList.remove("is-on");
+        if (lbl) lbl.textContent = "OFF";
+        if (note) note.textContent =
+            "Tap to get a heads-up for new packs + battle starts/ends.";
+    }
+
+    function initPushSettingsToggle() {
+        const btn = document.getElementById("pushToggleBtn");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+            const state = pushState();
+            btn.disabled = true;
+            const lbl = btn.querySelector(".btn-label");
+            const restore = function () { btn.disabled = false; refreshPushSettingsUI(); };
+
+            if (state === "granted-on") {
+                if (lbl) lbl.textContent = "UNSUBSCRIBING...";
+                pushUnsubscribe().then(restore);
+                return;
+            }
+            if (state === "default") {
+                if (lbl) lbl.textContent = "REQUESTING...";
+                Notification.requestPermission().then(function (perm) {
+                    if (perm !== "granted") { restore(); return; }
+                    pushSubscribe(currentUserId()).then(restore);
+                });
+                return;
+            }
+            /* granted-off path */
+            if (lbl) lbl.textContent = "SUBSCRIBING...";
+            pushSubscribe(currentUserId()).then(restore);
+        });
+    }
+
     /* ---------- 0bb. DAILY THEME (Phase 2 chunk 4-lite) ----------
        Curated rotating prompt pool. Today's prompt is picked
        deterministically by day-of-year mod pool.length so every
@@ -4114,6 +4431,11 @@
             /* Day-4 chunk C — every new pot may complete an
                achievement; run the check after the save lands. */
             checkAchievements();
+            /* Chunk W3 — first fired pot is the earned moment to
+               surface the push opt-in. maybeShowPushOptIn() is a
+               no-op if we've already prompted, are still inside
+               a "maybe later" window, or push isn't supported.   */
+            maybeShowPushOptIn();
             return true;
         } catch (e) {
             console.warn("[CRAYte] auto-save failed", e);
@@ -6063,6 +6385,8 @@
             showScreen("title");
         });
 
+        initPushSettingsToggle();
+
         const googleBtn = document.getElementById("signInGoogleBtn");
         if (googleBtn) googleBtn.addEventListener("click", signInWithGoogle);
 
@@ -6192,6 +6516,7 @@
                 AUTH._screenInited = true;
             }
             refreshAccountScreen();
+            refreshPushSettingsUI();
             wheelHumStop();
         }
     });
@@ -7118,6 +7443,7 @@
         initEggs();
         showScreen("title");
         wireDrawerHandles();
+        initPushOptInModal();
         /* Phase 1: kick off auth boot AFTER the title is mounted
            so the user sees something immediately. The auth
            round-trip is async (esp. on the callback hash path,
