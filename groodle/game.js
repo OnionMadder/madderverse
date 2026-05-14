@@ -447,71 +447,113 @@
 
     /* ============ HATS ============
 
-       Catalog of 15 purchasable hats + a free 'no-hat' default.
+       Catalog of 16 purchasable hats + a free 'no-hat' default. All
+       artwork lives in a single PNG spritesheet at
+       assets/sprites/hats.png with per-frame coordinates inlined in
+       HAT_FRAMES below (mirrors assets/sprites/hats.json — regenerate
+       this block when the sheet changes).
 
-       Each entry references a sprite file in assets/hats/ rather than
-       carrying inline SVG markup. The renderer drops an SVG <image>
-       into #hatLayerInner pointing at the sprite — works for both PNG
-       and SVG sources. See assets/hats/README.md for the sprite spec.
-
-       Positioning convention (renderEquippedHat applies it):
+       Positioning convention (renderEquippedHat applies via
+       hatImageMarkup):
          * Sprite's bottom-center is the anchor reference point.
          * That point lands at the head crown (canvas 200, 42) shifted
            by anchor.x / anchor.y.
-         * scale multiplies both natural dimensions.
-         * Sprite natural size is HAT_SPRITE_W × HAT_SPRITE_H below;
-           swapping in real art with the same dimensions keeps every
-           anchor / scale value still valid.
+         * scale multiplies each frame's natural pixel dimensions.
+
+       Rendering uses a nested <svg> with its own viewBox = the frame
+       sub-rect of the sheet. The inner <image> draws the full sheet at
+       0,0, and the inner viewBox windows the visible region down to
+       the desired frame — same trick the other Madderverse games use
+       for spritesheets. No <pattern>, no clip-path.
 
        The hat-layer SVG isn't clipped, so hat content is allowed to
        extend outside the body silhouette. Hats follow the dance
        transforms because the SVG element is a child of .creature. */
 
-    const HAT_SPRITE_W = 200;
-    const HAT_SPRITE_H = 120;
     const HEAD_CROWN_X = 200;
     const HEAD_CROWN_Y = 42;
 
+    const HAT_SHEET_URL = 'assets/sprites/hats.png';
+    const HAT_SHEET_W = 874;
+    const HAT_SHEET_H = 963;
+
+    /* Frame coordinates inlined from assets/sprites/hats.json. If the
+       sheet is re-exported with shifted frames, regenerate this object. */
+    const HAT_FRAMES = {
+        'gelatinous-cube': { x:   2, y:   2, w: 216, h: 223 },
+        'giggle-boot':     { x: 220, y:   2, w: 216, h: 201 },
+        'graph-paper':     { x: 438, y:   2, w: 216, h: 138 },
+        'gross-out':       { x: 656, y:   2, w: 216, h: 171 },
+        'haunted-house':   { x:   2, y: 227, w: 216, h: 212 },
+        'metal-gears':     { x: 220, y: 227, w: 216, h: 158 },
+        'rocket-ship':     { x: 438, y: 227, w: 216, h: 283 },
+        'scanner-chic':    { x: 656, y: 227, w: 216, h: 220 },
+        'slime-rancher':   { x:   2, y: 512, w: 216, h: 137 },
+        'the-worminal':    { x: 220, y: 512, w: 216, h: 120 },
+        'tower-defense':   { x: 438, y: 512, w: 216, h: 170 },
+        'candy-bowl':      { x: 656, y: 512, w: 216, h: 225 },
+        'circuit-board':   { x:   2, y: 739, w: 216, h: 222 },
+        'cool-kids':       { x: 220, y: 739, w: 216, h: 160 },
+        'friend-picker':   { x: 438, y: 739, w: 216, h: 139 },
+        'funky-fresh':     { x: 656, y: 739, w: 216, h: 196 }
+    };
+
+    /* Prices ramp from 20 → 130 roughly in step with visual complexity
+       and "rare-feel" of each design. anchor.y is mostly +25..+35 so
+       the hat's bottom-center sits a touch inside the head crown
+       rather than floating above it; a couple of designs (rocket-ship,
+       gelatinous-cube) need their own anchor / scale tuning because
+       they engulf or extend far past the head. The user will iterate
+       these values once they're seen on the live figure. */
     const HATS = [
-        { id: 'no-hat',       name: 'No Hat',        price:   0, sprite: null,                            anchor: { x: 0, y:   0 }, scale: 1.00 },
-        { id: 'beanie',       name: 'Beanie',        price:  20, sprite: 'assets/hats/beanie.svg',        anchor: { x: 0, y:  14 }, scale: 1.05 },
-        { id: 'baseball-cap', name: 'Baseball Cap',  price:  25, sprite: 'assets/hats/baseball-cap.svg',  anchor: { x: 0, y:  14 }, scale: 1.05 },
-        { id: 'beret',        name: 'Beret',         price:  30, sprite: 'assets/hats/beret.svg',         anchor: { x: 0, y:  10 }, scale: 0.95 },
-        { id: 'cowboy-hat',   name: 'Cowboy Hat',    price:  50, sprite: 'assets/hats/cowboy-hat.svg',    anchor: { x: 0, y:  18 }, scale: 1.20 },
-        { id: 'top-hat',      name: 'Top Hat',       price:  60, sprite: 'assets/hats/top-hat.svg',       anchor: { x: 0, y:  10 }, scale: 1.00 },
-        { id: 'sombrero',     name: 'Sombrero',      price:  65, sprite: 'assets/hats/sombrero.svg',      anchor: { x: 0, y:  16 }, scale: 1.40 },
-        { id: 'bunny-ears',   name: 'Bunny Ears',    price:  70, sprite: 'assets/hats/bunny-ears.svg',    anchor: { x: 0, y:  18 }, scale: 1.10 },
-        { id: 'wizard-hat',   name: 'Wizard Hat',    price:  75, sprite: 'assets/hats/wizard-hat.svg',    anchor: { x: 0, y:  10 }, scale: 1.15 },
-        { id: 'witch-hat',    name: 'Witch Hat',     price:  80, sprite: 'assets/hats/witch-hat.svg',     anchor: { x: 0, y:  10 }, scale: 1.15 },
-        { id: 'antlers',      name: 'Antlers',       price:  90, sprite: 'assets/hats/antlers.svg',       anchor: { x: 0, y:  18 }, scale: 1.20 },
-        { id: 'helmet',       name: 'Helmet',        price:  90, sprite: 'assets/hats/helmet.svg',        anchor: { x: 0, y:  22 }, scale: 1.05 },
-        { id: 'crown',        name: 'Crown',         price: 100, sprite: 'assets/hats/crown.svg',         anchor: { x: 0, y:  14 }, scale: 1.00 },
-        { id: 'tiara',        name: 'Tiara',         price: 100, sprite: 'assets/hats/tiara.svg',         anchor: { x: 0, y:  16 }, scale: 0.95 },
-        { id: 'snorkel-mask', name: 'Snorkel Mask',  price: 110, sprite: 'assets/hats/snorkel-mask.svg',  anchor: { x: 0, y: 110 }, scale: 1.00 },
-        { id: 'halo',         name: 'Halo',          price: 150, sprite: 'assets/hats/halo.svg',          anchor: { x: 0, y:  -8 }, scale: 1.00 }
+        { id: 'no-hat',          name: 'No Hat',          price:   0, sprite: null,              anchor: { x: 0, y:  0 }, scale: 1.00 },
+        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y: 26 }, scale: 0.65 },
+        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y: 26 }, scale: 0.65 },
+        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y: 24 }, scale: 0.70 },
+        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 0, y: 30 }, scale: 0.65 },
+        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y: 26 }, scale: 0.70 },
+        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y: 18 }, scale: 0.55 },
+        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y: 28 }, scale: 0.65 },
+        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y: 28 }, scale: 0.70 },
+        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y: 26 }, scale: 0.70 },
+        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y: 18 }, scale: 0.50 },
+        { id: 'gross-out',       name: 'Gross-Out',       price:  80, sprite: 'gross-out',       anchor: { x: 0, y: 28 }, scale: 0.70 },
+        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 55 }, scale: 0.65 },
+        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y: 24 }, scale: 0.60 },
+        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y: 32 }, scale: 0.65 },
+        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y: 28 }, scale: 0.65 },
+        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y: 28 }, scale: 0.70 }
     ];
 
     const HAT_BY_ID = {};
     HATS.forEach(h => { HAT_BY_ID[h.id] = h; });
 
-    /* Build the SVG <image> markup that places a hat sprite at the
+    /* Build the SVG markup that places a hat from the sheet at the
        correct canvas-coordinate rect. Used for both the in-stage hat
-       layer and the hat-shop preview cards (which crop to a smaller
-       viewBox but share coordinate space). Returns '' for no-hat or
-       any hat missing a sprite reference so the caller can no-op. */
+       layer and the hat-shop preview cards (which crop their outer
+       viewBox to a smaller window but share this coordinate space).
+       Returns '' for no-hat or any frame missing from HAT_FRAMES so
+       the caller can no-op. */
     function hatImageMarkup(hat) {
         if (!hat || !hat.sprite) return '';
-        const w = HAT_SPRITE_W * hat.scale;
-        const h = HAT_SPRITE_H * hat.scale;
+        const frame = HAT_FRAMES[hat.sprite];
+        if (!frame) return '';
+        const w = frame.w * hat.scale;
+        const h = frame.h * hat.scale;
         const x = HEAD_CROWN_X + hat.anchor.x - w / 2;
         const y = HEAD_CROWN_Y + hat.anchor.y - h;
-        return '<image href="' + hat.sprite + '"' +
+        return '<svg' +
             ' x="' + x.toFixed(2) + '"' +
             ' y="' + y.toFixed(2) + '"' +
             ' width="' + w.toFixed(2) + '"' +
             ' height="' + h.toFixed(2) + '"' +
+            ' viewBox="' + frame.x + ' ' + frame.y + ' ' + frame.w + ' ' + frame.h + '"' +
             ' preserveAspectRatio="xMidYMid meet"' +
-            '/>';
+            '>' +
+            '<image href="' + HAT_SHEET_URL + '"' +
+                ' x="0" y="0" width="' + HAT_SHEET_W + '" height="' + HAT_SHEET_H + '"' +
+            '/>' +
+            '</svg>';
     }
 
     /* In-game (.creature) hat layer. Updated on equip / load / surprise.

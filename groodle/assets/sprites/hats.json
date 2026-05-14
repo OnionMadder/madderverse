@@ -1,0 +1,335 @@
+{
+  "frames": {
+    "gelatinous-cube": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 216,
+        "h": 223
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 223
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 223
+      }
+    },
+    "giggle-boot": {
+      "frame": {
+        "x": 220,
+        "y": 2,
+        "w": 216,
+        "h": 201
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 201
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 201
+      }
+    },
+    "graph-paper": {
+      "frame": {
+        "x": 438,
+        "y": 2,
+        "w": 216,
+        "h": 138
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 138
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 138
+      }
+    },
+    "gross-out": {
+      "frame": {
+        "x": 656,
+        "y": 2,
+        "w": 216,
+        "h": 171
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 171
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 171
+      }
+    },
+    "haunted-house": {
+      "frame": {
+        "x": 2,
+        "y": 227,
+        "w": 216,
+        "h": 212
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 212
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 212
+      }
+    },
+    "metal-gears": {
+      "frame": {
+        "x": 220,
+        "y": 227,
+        "w": 216,
+        "h": 158
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 158
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 158
+      }
+    },
+    "rocket-ship": {
+      "frame": {
+        "x": 438,
+        "y": 227,
+        "w": 216,
+        "h": 283
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 283
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 283
+      }
+    },
+    "scanner-chic": {
+      "frame": {
+        "x": 656,
+        "y": 227,
+        "w": 216,
+        "h": 220
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 220
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 220
+      }
+    },
+    "slime-rancher": {
+      "frame": {
+        "x": 2,
+        "y": 512,
+        "w": 216,
+        "h": 137
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 137
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 137
+      }
+    },
+    "the-worminal": {
+      "frame": {
+        "x": 220,
+        "y": 512,
+        "w": 216,
+        "h": 120
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 120
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 120
+      }
+    },
+    "tower-defense": {
+      "frame": {
+        "x": 438,
+        "y": 512,
+        "w": 216,
+        "h": 170
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 170
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 170
+      }
+    },
+    "candy-bowl": {
+      "frame": {
+        "x": 656,
+        "y": 512,
+        "w": 216,
+        "h": 225
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 225
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 225
+      }
+    },
+    "circuit-board": {
+      "frame": {
+        "x": 2,
+        "y": 739,
+        "w": 216,
+        "h": 222
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 222
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 222
+      }
+    },
+    "cool-kids": {
+      "frame": {
+        "x": 220,
+        "y": 739,
+        "w": 216,
+        "h": 160
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 160
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 160
+      }
+    },
+    "friend-picker": {
+      "frame": {
+        "x": 438,
+        "y": 739,
+        "w": 216,
+        "h": 139
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 139
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 139
+      }
+    },
+    "funky-fresh": {
+      "frame": {
+        "x": 656,
+        "y": 739,
+        "w": 216,
+        "h": 196
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 196
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 196
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 874,
+      "h": 963
+    },
+    "scale": "1"
+  }
+}

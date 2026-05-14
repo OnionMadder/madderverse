@@ -136,32 +136,23 @@
             <div class="beat-bubble" id="beatBubble" aria-hidden="true"></div>
         </div>
 
-        <div class="bg-picker" id="bgPicker" aria-label="Choose background">
-            <button class="bg-thumb active" type="button" data-bg="studio" aria-label="Studio background">
-                <span class="bg-preview bg-studio"></span>
-            </button>
-            <button class="bg-thumb" type="button" data-bg="disco" aria-label="Disco background">
-                <span class="bg-preview bg-disco"></span>
-            </button>
-            <button class="bg-thumb" type="button" data-bg="outdoors" aria-label="Outdoors background">
-                <span class="bg-preview bg-outdoors"></span>
-            </button>
-            <button class="bg-thumb" type="button" data-bg="night" aria-label="Night sky background">
-                <span class="bg-preview bg-night"></span>
-            </button>
-        </div>
-
-        <div class="shelf-row" id="shelfRow">
-            <button class="btn shelf-btn" id="openAchievementsBtn" type="button">
-                <span class="shelf-icon" aria-hidden="true">🏆</span>
-                <span class="shelf-label">Achievements</span>
-            </button>
-            <button class="btn shelf-btn" id="openHatShopBtn" type="button">
-                <span class="shelf-icon" aria-hidden="true">🎩</span>
-                <span class="shelf-label">Hat Shop</span>
-            </button>
-        </div>
     </div>
+
+    <!-- Left-side HUD — fixed-position vertical strip with progression
+         entry-points (Achievements + Hat Shop). Lives outside .stage-row
+         so it floats over the page on both mobile and desktop. The
+         button IDs stay the same as the prior .shelf-row so attachHandlers
+         in game.js doesn't need a change. -->
+    <aside class="left-hud" id="leftHud" aria-label="Progression menu">
+        <button class="hud-btn" id="openAchievementsBtn" type="button">
+            <span class="hud-icon" aria-hidden="true">🏆</span>
+            <span class="hud-label">Wins</span>
+        </button>
+        <button class="hud-btn" id="openHatShopBtn" type="button">
+            <span class="hud-icon" aria-hidden="true">🎩</span>
+            <span class="hud-label">Hats</span>
+        </button>
+    </aside>
 
     <div class="panel tool-tray" id="drawPanel">
         <section class="tool-section tool-colors">
@@ -173,6 +164,35 @@
             <div class="panel-row sizes-row">
                 <div class="sizes" id="sizes" aria-label="Brush size"></div>
                 <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
+            </div>
+        </section>
+        <section class="tool-section tool-backgrounds">
+            <h3 class="tool-title">Stage</h3>
+            <div class="panel-row bg-picker" id="bgPicker" aria-label="Choose background">
+                <button class="bg-thumb active" type="button" data-bg="studio" aria-label="Studio background">
+                    <span class="bg-preview bg-studio"></span>
+                </button>
+                <button class="bg-thumb" type="button" data-bg="disco" aria-label="Disco background">
+                    <span class="bg-preview bg-disco"></span>
+                </button>
+                <button class="bg-thumb" type="button" data-bg="outdoors" aria-label="Outdoors background">
+                    <span class="bg-preview bg-outdoors"></span>
+                </button>
+                <button class="bg-thumb" type="button" data-bg="night" aria-label="Night sky background">
+                    <span class="bg-preview bg-night"></span>
+                </button>
+                <button class="bg-thumb" type="button" data-bg="sunset" aria-label="Sunset background">
+                    <span class="bg-preview bg-sunset"></span>
+                </button>
+                <button class="bg-thumb" type="button" data-bg="underwater" aria-label="Underwater background">
+                    <span class="bg-preview bg-underwater"></span>
+                </button>
+                <button class="bg-thumb" type="button" data-bg="stadium" aria-label="Stadium background">
+                    <span class="bg-preview bg-stadium"></span>
+                </button>
+                <button class="bg-thumb" type="button" data-bg="candy" aria-label="Candy background">
+                    <span class="bg-preview bg-candy"></span>
+                </button>
             </div>
         </section>
         <section class="tool-section tool-actions">

@@ -177,17 +177,18 @@ main {
     gap: 12px;
 }
 
-/* ============ BACKGROUND PICKER ============ */
+/* ============ BACKGROUND PICKER ============
+
+   Lives inside the Stage tool-section now (was a standalone dark
+   panel between the canvas and the tool tray). No more own background
+   / border / padding — those are provided by the wrapping tool-section
+   card. Just the thumb grid. */
 
 .bg-picker {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 8px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .bg-thumb {
@@ -293,6 +294,51 @@ body.dancing .stage {
         radial-gradient(circle at 88% 55%, #fff 0%, transparent 0.4%),
         radial-gradient(circle at 50% 30%, rgba(255, 255, 200, 0.9) 0%, transparent 4%),
         linear-gradient(180deg, #0a1838 0%, #1a2c5a 100%);
+}
+
+.bg-sunset {
+    /* Warm horizon-to-zenith gradient with a sun glow at the bottom-right.
+       Pink → orange → gold horizon. */
+    background:
+        radial-gradient(circle at 78% 78%, #ffd23f 0%, rgba(255, 210, 63, 0.4) 6%, transparent 14%),
+        linear-gradient(180deg, #2b1454 0%, #7209b7 22%, #ff6ec7 55%, #ff9966 78%, #ffd23f 100%);
+}
+
+.bg-underwater {
+    /* Deep blue with bubbles + a few highlight orbs near the surface. */
+    background:
+        radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.55) 0%, transparent 3%),
+        radial-gradient(circle at 62% 30%, rgba(255, 255, 255, 0.45) 0%, transparent 2.5%),
+        radial-gradient(circle at 78% 60%, rgba(135, 206, 235, 0.55) 0%, transparent 3%),
+        radial-gradient(circle at 38% 75%, rgba(255, 255, 255, 0.4) 0%, transparent 2%),
+        radial-gradient(circle at 18% 50%, rgba(0, 255, 204, 0.3) 0%, transparent 2.5%),
+        radial-gradient(ellipse 80% 30% at 50% 0%, rgba(135, 206, 235, 0.4) 0%, transparent 70%),
+        linear-gradient(180deg, #1f5f9c 0%, #143560 60%, #0a1f3a 100%);
+}
+
+.bg-stadium {
+    /* Dark concert venue with crossing spotlight beams of neon pink,
+       teal, and gold sweeping in from the corners. */
+    background:
+        linear-gradient(125deg, rgba(255, 110, 199, 0.4) 0%, transparent 38%),
+        linear-gradient(55deg,  rgba(0, 255, 204, 0.38) 0%, transparent 40%),
+        linear-gradient(95deg,  rgba(255, 210, 63, 0.22) 0%, transparent 50%),
+        radial-gradient(ellipse 60% 18% at 50% 88%, rgba(255, 110, 199, 0.28) 0%, transparent 70%),
+        linear-gradient(180deg, #0a0518 0%, #2b1454 100%);
+}
+
+.bg-candy {
+    /* Bright purple-to-pink base with a sprinkle of neon dots in the
+       brand colors (teal, pink, gold, purple). */
+    background:
+        radial-gradient(circle at 15% 22%, #ff6ec7 0%, rgba(255, 110, 199, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 78% 14%, #00ffcc 0%, rgba(0, 255, 204, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 50% 55%, #ffd23f 0%, rgba(255, 210, 63, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 28% 78%, #7209b7 0%, rgba(114, 9, 183, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 84% 65%, #ff6ec7 0%, rgba(255, 110, 199, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 62% 88%, #00ffcc 0%, rgba(0, 255, 204, 0.6) 1.5%, transparent 3%),
+        radial-gradient(circle at 12% 60%, #ffd23f 0%, rgba(255, 210, 63, 0.55) 1.5%, transparent 3%),
+        linear-gradient(165deg, #7209b7 0%, #ff6ec7 100%);
 }
 
 .creature {
@@ -419,53 +465,84 @@ body.dancing .draw-canvas {
     z-index: 5;
 }
 
-/* ============ SHELF ROW ============
+/* ============ LEFT-SIDE HUD ============
 
-   Sits between the bg-picker and the tool tray. Holds the entry-points
-   for the meta-game (Achievements + Hat Shop). Width matches the stage
-   so the row reads as a sibling of the canvas above and the tool tray
-   below — visual grouping is "what you're doing right now (canvas)" /
-   "where you're doing it (bg-picker)" / "your progression (shelf)" /
-   "your tools (tray)". Hidden during dance because both modals would
-   interrupt the music. */
+   Fixed-position vertical strip on the left edge of the viewport with
+   the progression entry-points (Achievements + Hat Shop). Replaces the
+   prior .shelf-row that sat between bg-picker and tool tray; floats
+   over the page on both phone and desktop so it doesn't compete with
+   the canvas for horizontal space. Hidden during dance because both
+   modals would interrupt the music; the dance composition reclaims the
+   left edge for the figure. */
 
-.shelf-row {
-    width: min(94vw, 380px);
+.left-hud {
+    position: fixed;
+    top: 110px;
+    left: 0;
+    z-index: 100;
     display: flex;
-    gap: 10px;
-    justify-content: stretch;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 6px;
+    background:
+        radial-gradient(ellipse 100% 60% at 0% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
+        linear-gradient(135deg, rgba(26, 15, 51, 0.88) 0%, rgba(59, 31, 107, 0.88) 100%);
+    border: 2px solid rgba(0, 255, 204, 0.45);
+    border-left: none;
+    border-radius: 0 16px 16px 0;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
-body.dancing .shelf-row { display: none; }
+body.dancing .left-hud { display: none; }
 
-.shelf-btn {
-    flex: 1;
+.hud-btn {
+    width: 56px;
     min-height: 56px;
-    display: inline-flex;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    background: rgba(0, 0, 0, 0.45);
+    gap: 2px;
+    padding: 6px 4px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(0, 255, 204, 0.4);
     color: #fff;
-    border: 2px solid rgba(0, 255, 204, 0.5);
-    box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.4),
-        inset 0 0 12px rgba(0, 255, 204, 0.08);
-    font-size: 14px;
+    font-family: var(--font-chunky);
+    font-size: 10px;
     letter-spacing: 1px;
+    font-weight: bold;
+    text-transform: uppercase;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
-.shelf-btn .shelf-icon { font-size: 22px; line-height: 1; }
-.shelf-btn .shelf-label { font-weight: bold; }
-.shelf-btn:active {
-    transform: translateY(2px);
-    box-shadow:
-        0 2px 0 rgba(0, 0, 0, 0.4),
-        inset 0 0 12px rgba(0, 255, 204, 0.08);
-}
+.hud-btn .hud-icon { font-size: 22px; line-height: 1; }
+.hud-btn .hud-label { line-height: 1; }
+.hud-btn:active { transform: scale(0.96); }
 @media (hover: hover) {
-    .shelf-btn:hover {
+    .hud-btn:hover {
         border-color: #00ffcc;
-        background: rgba(0, 255, 204, 0.12);
+        background: rgba(0, 255, 204, 0.18);
     }
+}
+
+@media (min-width: 720px) {
+    /* Desktop / tablet land: a touch bigger so the HUD reads as a real
+       sidebar widget rather than a corner badge. */
+    .left-hud {
+        top: 140px;
+        gap: 8px;
+        padding: 12px 8px;
+    }
+    .hud-btn {
+        width: 72px;
+        min-height: 72px;
+        font-size: 11px;
+        gap: 4px;
+    }
+    .hud-btn .hud-icon { font-size: 28px; }
 }
 
 /* ============ MODAL ============
