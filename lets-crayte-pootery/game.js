@@ -1,5 +1,5 @@
 /* ============================================================
-   Let's CRAYte! Poottery — main script
+   Let's CRAYte! Pootery — main script
    ============================================================
    Single IIFE. Chunk 1 covers the title screen + screen-switching
    scaffold. Chunks 2-3 (shape + decorate) bolt onto SCREENS via
