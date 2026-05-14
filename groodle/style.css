@@ -67,14 +67,19 @@ html, body {
 
 .title-overlay {
     position: fixed;
-    top: 8px;
+    top: 0;
     left: 50%;
     transform: translateX(-50%);
     z-index: 105;
-    padding: 4px 18px 8px;
-    border-radius: 0 0 18px 18px;
+    /* Sized so it sits cleanly between the back link (left, ~46px wide
+       at top: 12px) and the currency pill (right, ~80-110px wide).
+       max-width is conservative on phones so the title never grows
+       into the back/currency rectangles. */
+    max-width: calc(100vw - 200px);
+    padding: 2px 14px 6px;
+    border-radius: 0 0 16px 16px;
     background:
-        radial-gradient(ellipse 100% 100% at 50% 0%, rgba(255, 110, 199, 0.18) 0%, transparent 70%),
+        radial-gradient(ellipse 100% 100% at 50% 0%, rgba(255, 110, 199, 0.22) 0%, transparent 70%),
         rgba(26, 15, 51, 0.55);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-top: none;
@@ -82,12 +87,11 @@ html, body {
     -webkit-backdrop-filter: blur(8px);
     pointer-events: none;
     text-align: center;
-    max-width: 70vw;
 }
 .title-overlay h1 {
     margin: 0;
     font-family: var(--font-cursive);
-    font-size: 38px;
+    font-size: 30px;
     letter-spacing: 0;
     color: #00ffcc;
     line-height: 1;
@@ -108,17 +112,26 @@ html, body {
 .title-overlay .tagline {
     margin: 2px 0 0;
     font-family: var(--font-body);
-    font-size: 9px;
+    font-size: 10px;
     font-weight: bold;
     letter-spacing: 1.2px;
     text-transform: uppercase;
     color: #d6bdff;
     line-height: 1.1;
+    white-space: nowrap;
+    /* Hidden on phones — the 38-char tagline can't share a top-row
+       with the back link + currency pill on a 375-wide viewport.
+       Tablet+ has the breathing room. */
+    display: none;
+}
+@media (min-width: 480px) {
+    .title-overlay { padding: 4px 18px 8px; max-width: calc(100vw - 240px); }
+    .title-overlay h1 { font-size: 38px; }
 }
 @media (min-width: 720px) {
     .title-overlay { padding: 6px 24px 10px; }
-    .title-overlay h1 { font-size: 52px; }
-    .title-overlay .tagline { font-size: 11px; }
+    .title-overlay h1 { font-size: 48px; }
+    .title-overlay .tagline { display: block; font-size: 11px; letter-spacing: 1.4px; }
 }
 
 /* Hide title during dance so the figure has the whole frame to itself. */
@@ -540,7 +553,9 @@ body.dancing .draw-canvas {
 .modal-header h2 {
     margin: 0;
     font-family: var(--font-cursive);
-    font-size: 30px;
+    /* Match drawer-head h2 (26px) so achievements/hat-shop reads as a
+       big sibling to the drawers rather than a different component. */
+    font-size: 26px;
     color: #ff6ec7;
     line-height: 1;
     text-shadow: 0 2px 0 #1a0f33;
@@ -551,10 +566,10 @@ body.dancing .draw-canvas {
     background: rgba(255, 255, 255, 0.08);
     border: 2px solid rgba(255, 255, 255, 0.25);
     color: #fff;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
     line-height: 1;
     -webkit-tap-highlight-color: transparent;
