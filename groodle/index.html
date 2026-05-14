@@ -37,133 +37,172 @@
 </head>
 <body>
 
-<header class="top">
-    <a href="../" class="back" aria-label="Back to The Madderverse">&larr; MADDERVERSE</a>
-    <div class="currency-pill" id="currencyPill" aria-label="Your Doodles balance">
-        <span class="currency-icon" aria-hidden="true">🪙</span>
-        <span class="currency-value" id="currencyValue">0</span>
-        <span class="currency-label">Doodles</span>
-    </div>
+<!-- Top-edge overlays. All three are fixed-position so they sit on top
+     of the full-viewport stage; nothing in the layout reserves space
+     for them. -->
+<a href="../" class="back back-floating" aria-label="Back to The Madderverse">&larr;</a>
+
+<div class="title-overlay" aria-label="Groodle">
     <h1>Gr<span class="neon-pink">oo</span>dle</h1>
     <p class="tagline">He Grooves. You Doodle. Let&rsquo;s Groodle.</p>
-</header>
+</div>
 
-<main>
-    <div class="stage-row">
-        <div class="stage-wrap">
-            <div class="stage" id="stage" aria-label="Drawing stage">
-                <div class="bg-layer bg-studio" id="bgLayer"></div>
+<div class="currency-pill" id="currencyPill" aria-label="Your Doodles balance">
+    <span class="currency-icon" aria-hidden="true">🪙</span>
+    <span class="currency-value" id="currencyValue">0</span>
+    <span class="currency-label">Doodles</span>
+</div>
 
-                <div class="creature" id="creature">
-                    <!-- Fill layer: pale interior wash that becomes the
-                         "coloring page" surface. Sits UNDER the canvas
-                         (z-index 1). Also carries the clipPath def used
-                         by .draw-canvas. -->
-                    <svg class="silhouette-fill-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                        <defs>
-                            <clipPath id="bodyClip">
-                                <circle cx="200" cy="100" r="58"/>
-                                <rect x="155" y="148" width="90" height="232" rx="42"/>
-                                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
-                                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
-                                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
-                                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
-                            </clipPath>
-                        </defs>
+<!-- Stage fills the viewport. The figure inside maintains its 400x600
+     logical aspect via the .creature wrapper, centered with letterbox-
+     ing on screens that don't match 2:3. -->
+<main class="stage" id="stage" aria-label="Drawing stage">
+    <div class="bg-layer bg-studio" id="bgLayer"></div>
 
-                        <g class="silhouette-fill">
-                            <circle cx="200" cy="100" r="58"/>
-                            <rect x="155" y="148" width="90" height="232" rx="42"/>
-                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
-                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
-                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
-                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
-                        </g>
-                    </svg>
+    <div class="creature" id="creature">
+        <!-- Fill layer: pale interior wash that becomes the "coloring
+             page" surface (z-index 1). -->
+        <svg class="silhouette-fill-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <defs>
+                <clipPath id="bodyClip">
+                    <circle cx="200" cy="100" r="58"/>
+                    <rect x="155" y="148" width="90" height="232" rx="42"/>
+                    <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
+                    <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
+                    <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
+                    <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
+                </clipPath>
+            </defs>
+            <g class="silhouette-fill">
+                <circle cx="200" cy="100" r="58"/>
+                <rect x="155" y="148" width="90" height="232" rx="42"/>
+                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
+                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
+                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
+                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
+            </g>
+        </svg>
 
-                    <canvas class="draw-canvas" id="drawCanvas"></canvas>
+        <canvas class="draw-canvas" id="drawCanvas"></canvas>
 
-                    <!-- Outline layer. Rather than stroking each of the 6
-                         body shapes individually (which would show inner
-                         joint lines where head meets torso, arms meet
-                         shoulders, etc.) we use an SVG filter to render a
-                         single unified ring sitting ENTIRELY INSIDE the
-                         union of all shapes. feMorphology erode shrinks
-                         the alpha union; composite-out subtracts the
-                         eroded mask from the original to leave just the
-                         ring. Outer edge of the ring == clipPath boundary
-                         == drawable area boundary. No outer "shadow frame",
-                         no inner joint lines, single coloring-book outline. -->
-                    <svg class="silhouette-outline-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                        <defs>
-                            <filter id="innerOutlineFilter" x="-2%" y="-2%" width="104%" height="104%">
-                                <feMorphology operator="erode" radius="6" in="SourceAlpha" result="inner"/>
-                                <feComposite operator="out" in="SourceAlpha" in2="inner" result="ring"/>
-                                <feFlood flood-color="#1a0f33" result="ink"/>
-                                <feComposite operator="in" in="ink" in2="ring"/>
-                            </filter>
-                        </defs>
-                        <g class="silhouette-outline" filter="url(#innerOutlineFilter)">
-                            <circle cx="200" cy="100" r="58"/>
-                            <rect x="155" y="148" width="90" height="232" rx="42"/>
-                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
-                            <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
-                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
-                            <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
-                        </g>
-                    </svg>
+        <!-- Outline layer (z-index 3): SVG filter renders one unified
+             dark ring inside the union of the body shapes. -->
+        <svg class="silhouette-outline-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <defs>
+                <filter id="innerOutlineFilter" x="-2%" y="-2%" width="104%" height="104%">
+                    <feMorphology operator="erode" radius="6" in="SourceAlpha" result="inner"/>
+                    <feComposite operator="out" in="SourceAlpha" in2="inner" result="ring"/>
+                    <feFlood flood-color="#1a0f33" result="ink"/>
+                    <feComposite operator="in" in="ink" in2="ring"/>
+                </filter>
+            </defs>
+            <g class="silhouette-outline" filter="url(#innerOutlineFilter)">
+                <circle cx="200" cy="100" r="58"/>
+                <rect x="155" y="148" width="90" height="232" rx="42"/>
+                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(165 180) rotate(-52)"/>
+                <rect x="-18" y="-160" width="36" height="172" rx="18" transform="translate(235 180) rotate(52)"/>
+                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(180 370) rotate(-8)"/>
+                <rect x="-17" y="0" width="34" height="208" rx="17" transform="translate(220 370) rotate(8)"/>
+            </g>
+        </svg>
 
-                    <!-- Hat layer. Sits above the outline so hats land on
-                         top of the head ring (not under it). Same viewBox
-                         and aspect handling as the silhouette so hat
-                         coordinates live in the same 400×600 logical
-                         space; positions out-of-body (above head, beside
-                         head) are allowed since this SVG isn't clipped.
-                         renderEquippedHat() in game.js drops the equipped
-                         hat's SVG fragment into #hatLayerInner. -->
-                    <svg class="hat-layer" id="hatLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                        <g id="hatLayerInner"></g>
-                    </svg>
-                </div>
+        <!-- Hat layer (z-index 4): the equipped hat sprite. -->
+        <svg class="hat-layer" id="hatLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <g id="hatLayerInner"></g>
+        </svg>
 
-                <div class="stage-floor" id="stageFloor" aria-hidden="true"></div>
-            </div>
-            <div class="beat-bubble" id="beatBubble" aria-hidden="true"></div>
-        </div>
-
+        <!-- Decorative children moved INSIDE .creature so they track
+             the figure's centered 2:3 box rather than the full
+             viewport. They inherit the dance transform too, which is
+             a deliberate trade-off vs the prior independent floor
+             pulse — the visual stays coherent with the figure. -->
+        <div class="stage-floor" id="stageFloor" aria-hidden="true"></div>
+        <div class="beat-bubble" id="beatBubble" aria-hidden="true"></div>
     </div>
+</main>
 
-    <!-- Left-side HUD — fixed-position vertical strip with progression
-         entry-points (Achievements + Hat Shop). Lives outside .stage-row
-         so it floats over the page on both mobile and desktop. The
-         button IDs stay the same as the prior .shelf-row so attachHandlers
-         in game.js doesn't need a change. -->
-    <aside class="left-hud" id="leftHud" aria-label="Progression menu">
-        <button class="hud-btn" id="openAchievementsBtn" type="button">
-            <span class="hud-icon" aria-hidden="true">🏆</span>
-            <span class="hud-label">Wins</span>
-        </button>
-        <button class="hud-btn" id="openHatShopBtn" type="button">
-            <span class="hud-icon" aria-hidden="true">🎩</span>
-            <span class="hud-label">Hats</span>
-        </button>
-    </aside>
+<!-- Tool dock — fixed-position row of floating icon buttons along the
+     bottom edge of the viewport. Hidden during dance; the dance-dock
+     below takes over. Drawer icons carry data-drawer; modal icons
+     carry data-modal and are wired in attachHandlers. -->
+<nav class="tool-dock" id="toolDock" aria-label="Tools">
+    <button class="dock-btn" data-drawer="brush" type="button" aria-label="Brush">
+        <span class="dock-icon" aria-hidden="true">🎨</span>
+        <span class="dock-label">Brush</span>
+    </button>
+    <button class="dock-btn" data-drawer="stage" type="button" aria-label="Stage">
+        <span class="dock-icon" aria-hidden="true">🖼️</span>
+        <span class="dock-label">Stage</span>
+    </button>
+    <button class="dock-btn" id="openHatShopBtn" type="button" aria-label="Hats">
+        <span class="dock-icon" aria-hidden="true">🎩</span>
+        <span class="dock-label">Hats</span>
+    </button>
+    <button class="dock-btn" data-drawer="beat" type="button" aria-label="Beat">
+        <span class="dock-icon" aria-hidden="true">🎵</span>
+        <span class="dock-label">Beat</span>
+    </button>
+    <button class="dock-btn" id="openAchievementsBtn" type="button" aria-label="Wins">
+        <span class="dock-icon" aria-hidden="true">🏆</span>
+        <span class="dock-label">Wins</span>
+    </button>
+    <button class="dock-btn" data-drawer="new" type="button" aria-label="New Groodle">
+        <span class="dock-icon" aria-hidden="true">🆕</span>
+        <span class="dock-label">New</span>
+    </button>
+    <button class="dock-btn primary" id="playBtn" type="button" aria-label="Dance">
+        <span class="dock-icon" aria-hidden="true">▶</span>
+        <span class="dock-label">Dance</span>
+    </button>
+</nav>
 
-    <div class="panel tool-tray" id="drawPanel">
-        <section class="tool-section tool-colors">
-            <h3 class="tool-title">Colors</h3>
-            <div class="panel-row palette" id="palette" aria-label="Color palette"></div>
-        </section>
-        <section class="tool-section tool-brushes">
-            <h3 class="tool-title">Brushes</h3>
-            <div class="panel-row sizes-row">
-                <div class="sizes" id="sizes" aria-label="Brush size"></div>
-                <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
+<!-- Dance dock — only visible during dance. Beat icon stays accessible
+     so the kid can cycle move/beat live; STOP replaces the Dance
+     primary. -->
+<nav class="dance-dock" id="danceDock" hidden aria-label="Dance controls">
+    <button class="dock-btn" data-drawer="beat" type="button" aria-label="Beat">
+        <span class="dock-icon" aria-hidden="true">🎵</span>
+        <span class="dock-label">Beat</span>
+    </button>
+    <button class="dock-btn stop" id="stopBtn" type="button" aria-label="Stop dance">
+        <span class="dock-icon" aria-hidden="true">■</span>
+        <span class="dock-label">Stop</span>
+    </button>
+</nav>
+
+<!-- Drawer host. Contains one drawer per category. Only one drawer is
+     open at a time; openDrawer() in game.js manages the switch. The
+     backdrop dims the canvas without hiding it. -->
+<div class="drawer-host" id="drawerHost" hidden aria-hidden="true">
+    <div class="drawer-backdrop" data-drawer-close="1"></div>
+
+    <section class="drawer" id="drawerBrush" hidden role="dialog" aria-labelledby="drawerBrushTitle">
+        <header class="drawer-head">
+            <h2 id="drawerBrushTitle"><span aria-hidden="true">🎨</span> Brush</h2>
+            <button class="drawer-close" type="button" data-drawer-close="1" aria-label="Close brush drawer">✕</button>
+        </header>
+        <div class="drawer-body">
+            <div class="drawer-section">
+                <h3 class="drawer-section-label">Color</h3>
+                <div class="palette" id="palette" aria-label="Color palette"></div>
             </div>
-        </section>
-        <section class="tool-section tool-backgrounds">
-            <h3 class="tool-title">Stage</h3>
-            <div class="panel-row bg-picker" id="bgPicker" aria-label="Choose background">
+            <div class="drawer-section">
+                <h3 class="drawer-section-label">Size</h3>
+                <div class="sizes-row">
+                    <div class="sizes" id="sizes" aria-label="Brush size"></div>
+                    <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="drawer" id="drawerStage" hidden role="dialog" aria-labelledby="drawerStageTitle">
+        <header class="drawer-head">
+            <h2 id="drawerStageTitle"><span aria-hidden="true">🖼️</span> Stage</h2>
+            <button class="drawer-close" type="button" data-drawer-close="1" aria-label="Close stage drawer">✕</button>
+        </header>
+        <div class="drawer-body">
+            <div class="bg-picker" id="bgPicker" aria-label="Choose background">
                 <button class="bg-thumb active" type="button" data-bg="studio" aria-label="Studio background">
                     <span class="bg-preview bg-studio"></span>
                 </button>
@@ -189,55 +228,74 @@
                     <span class="bg-preview bg-candy"></span>
                 </button>
             </div>
-        </section>
-        <section class="tool-section tool-actions">
-            <h3 class="tool-title">Actions</h3>
-            <div class="panel-row actions">
+        </div>
+    </section>
+
+    <section class="drawer" id="drawerBeat" hidden role="dialog" aria-labelledby="drawerBeatTitle">
+        <header class="drawer-head">
+            <h2 id="drawerBeatTitle"><span aria-hidden="true">🎵</span> Beat</h2>
+            <button class="drawer-close" type="button" data-drawer-close="1" aria-label="Close beat drawer">✕</button>
+        </header>
+        <div class="drawer-body">
+            <div class="now-playing">
+                <div class="np-row">
+                    <span class="np-label">MOVE</span>
+                    <strong id="moveLabel">BOUNCE</strong>
+                    <button id="moveBtn" class="btn small" type="button">↻ NEXT</button>
+                </div>
+                <div class="np-row">
+                    <span class="np-label">BEAT</span>
+                    <strong id="beatLabel">BOOM</strong>
+                    <button id="beatBtn" class="btn small" type="button">↻ NEXT</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="drawer" id="drawerNew" hidden role="dialog" aria-labelledby="drawerNewTitle">
+        <header class="drawer-head">
+            <h2 id="drawerNewTitle"><span aria-hidden="true">🆕</span> New Groodle</h2>
+            <button class="drawer-close" type="button" data-drawer-close="1" aria-label="Close new drawer">✕</button>
+        </header>
+        <div class="drawer-body">
+            <p class="drawer-text">Start fresh or let the game fill it in for you?</p>
+            <div class="actions">
                 <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
                 <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
-                <button id="playBtn" class="btn primary" type="button">▶ DANCE</button>
             </div>
-        </section>
-    </div>
-
-    <div class="modal" id="achievementsModal" hidden aria-hidden="true" role="dialog" aria-labelledby="achievementsModalTitle">
-        <div class="modal-backdrop" data-close="1"></div>
-        <div class="modal-sheet" role="document">
-            <header class="modal-header">
-                <h2 id="achievementsModalTitle"><span aria-hidden="true">🏆</span> Achievements</h2>
-                <button class="modal-close" type="button" data-close="1" aria-label="Close achievements">✕</button>
-            </header>
-            <div class="modal-stats" id="achievementStats" aria-live="polite"></div>
-            <div class="modal-body" id="achievementsList"></div>
         </div>
-    </div>
+    </section>
+</div>
 
-    <div class="modal" id="hatShopModal" hidden aria-hidden="true" role="dialog" aria-labelledby="hatShopModalTitle">
-        <div class="modal-backdrop" data-close="1"></div>
-        <div class="modal-sheet" role="document">
-            <header class="modal-header">
-                <h2 id="hatShopModalTitle"><span aria-hidden="true">🎩</span> Hat Shop</h2>
-                <button class="modal-close" type="button" data-close="1" aria-label="Close hat shop">✕</button>
-            </header>
-            <div class="modal-stats">Balance: <span id="hatShopBalance">🪙 0</span></div>
-            <div class="modal-body hat-grid" id="hatShopGrid"></div>
-        </div>
+<!-- Full-screen modals (Achievements and Hat Shop) — kept as modals
+     because their content is too dense for a 35%-height drawer. The
+     polish commit will harmonize their styling with the drawer
+     aesthetic. -->
+<div class="modal" id="achievementsModal" hidden aria-hidden="true" role="dialog" aria-labelledby="achievementsModalTitle">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-sheet" role="document">
+        <header class="modal-header">
+            <h2 id="achievementsModalTitle"><span aria-hidden="true">🏆</span> Achievements</h2>
+            <button class="modal-close" type="button" data-close="1" aria-label="Close achievements">✕</button>
+        </header>
+        <div class="modal-stats" id="achievementStats" aria-live="polite"></div>
+        <div class="modal-body" id="achievementsList"></div>
     </div>
+</div>
 
-    <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
-
-    <div class="panel dance-panel" id="dancePanel" hidden>
-        <div class="now-playing">
-            <span class="np-row">MOVE: <strong id="moveLabel">BOUNCE</strong></span>
-            <span class="np-row">BEAT: <strong id="beatLabel">BOOM</strong></span>
-        </div>
-        <div class="panel-row actions">
-            <button id="moveBtn" class="btn" type="button">↻ MOVE</button>
-            <button id="beatBtn" class="btn" type="button">↻ BEAT</button>
-            <button id="stopBtn" class="btn primary" type="button">■ DRAW</button>
-        </div>
+<div class="modal" id="hatShopModal" hidden aria-hidden="true" role="dialog" aria-labelledby="hatShopModalTitle">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-sheet" role="document">
+        <header class="modal-header">
+            <h2 id="hatShopModalTitle"><span aria-hidden="true">🎩</span> Hat Shop</h2>
+            <button class="modal-close" type="button" data-close="1" aria-label="Close hat shop">✕</button>
+        </header>
+        <div class="modal-stats">Balance: <span id="hatShopBalance">🪙 0</span></div>
+        <div class="modal-body hat-grid" id="hatShopGrid"></div>
     </div>
-</main>
+</div>
+
+<div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
 <footer class="site-footer">
     <ul class="footer-nav">
