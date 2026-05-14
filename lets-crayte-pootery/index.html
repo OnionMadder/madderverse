@@ -46,10 +46,7 @@
 </head>
 <body class="screen-title">
 
-<header class="top">
-    <a href="../" class="back" aria-label="Back to The Madderverse">&larr; MADDERVERSE</a>
-    <span class="crt-clock" id="crtClock" aria-hidden="true">00:00:00</span>
-</header>
+<a class="madder-home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
 
 <!-- ============================================================
      SCREEN: TITLE
@@ -666,18 +663,18 @@
 
 </main>
 
-<footer class="site-footer">
-    <ul class="footer-nav">
-        <li><a href="../about.html">About</a></li>
-        <li><a href="../legal.html">Privacy &amp; Legal</a></li>
-        <li><a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar</a></li>
-    </ul>
-    <p class="footer-tagline">Free &middot; Ad-free &middot; Kid-friendly</p>
-    <p class="footer-copy">&copy; <span id="year"></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a>. All games made with care.</p>
+<footer class="site-footer-slim" aria-label="Site info">
+    <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <a href="../">The Madderverse</a>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <a href="../about.html">About</a>
 </footer>
 
 <script>
-    document.getElementById("year").textContent = new Date().getFullYear();
+    document.querySelectorAll('[data-year]').forEach(function (el) {
+        el.textContent = new Date().getFullYear();
+    });
 </script>
 <script src="game.js"></script>
 

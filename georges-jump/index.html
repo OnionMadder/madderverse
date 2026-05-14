@@ -37,14 +37,14 @@
 <div class="thumb-zone left" aria-hidden="true"></div>
 <div class="thumb-zone right" aria-hidden="true"></div>
 
-<div class="wrap">
-<header>
-<div class="title-block">
-<h1>Bagawk!</h1>
-<h2>George's Jump</h2>
-<div class="meta" id="taskDesc">Eat as much as you can!</div>
-</div>
-<div class="hud">
+<a class="madder-home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+
+<!-- Page-nav header stripped. Score/level/timer badges + control
+     buttons floated into the universal top-right cluster.
+     "Bagawk! / George's Jump" title and task-desc copy from
+     the old header are gone — page-title is implied by URL +
+     home button. -->
+<div class="madder-controls">
 <span class="badge mascot-badge" id="mascotBadge" hidden><canvas id="mascotHudCanvas" width="28" height="28" aria-label="Equipped mascot"></canvas></span>
 <span class="badge level-badge">Lv <strong id="level">1</strong> · <span id="difficulty" class="diff diff-easy">EASY</span></span>
 <span class="badge">Score: <strong id="score">0</strong></span>
@@ -59,7 +59,9 @@
 <button id="mute" class="btn btn-icon" type="button" title="Mute music (M)" aria-pressed="false">&#9834;</button>
 <button id="restart" class="btn" type="button" title="Restart (R)">Restart</button>
 </div>
-</header>
+<!-- task-desc moved here, hanging just below the home button -->
+<div class="meta" id="taskDesc" style="position:fixed;top:max(58px,calc(env(safe-area-inset-top,0px) + 58px));left:max(12px,env(safe-area-inset-left,0px));z-index:55;font-size:11px;letter-spacing:1px;color:rgba(255,255,255,0.55);pointer-events:none;">Eat as much as you can!</div>
+<div class="wrap">
 
 <div class="stage">
     <canvas id="game" width="320" height="180" aria-label="Bagawk game canvas"></canvas>

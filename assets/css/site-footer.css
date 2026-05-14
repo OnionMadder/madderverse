@@ -114,3 +114,85 @@
     .site-footer-slim { font-size: 0.62rem; gap: 0.4rem; }
     .site-footer-slim .sep { opacity: 0.3; }
 }
+
+
+/* ---------- Floating home button ----------
+   Sits in the top-left of every game page. Replaces the in-game
+   "← Madderverse" header bars. Anchored with safe-area insets so
+   it dodges notches / status bars. Same blurred-pill aesthetic
+   as the slim footer for visual consistency.                     */
+.madder-home {
+    position: fixed;
+    top:  max(12px, env(safe-area-inset-top,  0px));
+    left: max(12px, env(safe-area-inset-left, 0px));
+    z-index: 60;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(0, 255, 204, 0.35);
+    color: rgba(0, 255, 204, 0.85);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 22px;
+    line-height: 1;
+    text-decoration: none;
+    text-align: center;
+    transition: color 0.15s ease,
+                border-color 0.15s ease,
+                background 0.15s ease,
+                box-shadow 0.15s ease,
+                transform 0.08s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.madder-home:hover,
+.madder-home:focus-visible {
+    color: #ffffff;
+    border-color: #ff2e88;
+    background: rgba(0, 0, 0, 0.72);
+    box-shadow: 0 0 14px rgba(255, 46, 136, 0.4);
+    outline: none;
+}
+
+.madder-home:active {
+    transform: scale(0.93);
+}
+
+@media (max-width: 380px) {
+    .madder-home { width: 36px; height: 36px; font-size: 20px; }
+}
+
+
+/* ---------- Floating game-control cluster ----------
+   Top-right counterpart to .madder-home. A container only —
+   it positions whatever the game puts inside it (REMIX, CLEAR,
+   MUTE, etc) without overriding the game's own button styles.
+   Games can wrap their existing toolbar buttons in this and
+   reclaim the vertical space their old <header> used to eat.   */
+.madder-controls {
+    position: fixed;
+    top:   max(12px, env(safe-area-inset-top,   0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    z-index: 55;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    /* Leave room for the .madder-home pill on the left edge so
+       a long control row doesn't crash into it. */
+    max-width: calc(100vw - 80px);
+    pointer-events: none;
+}
+
+/* Direct children become interactive again. The wrapper itself
+   stays pass-through so taps on empty gaps don't block game UI
+   underneath. */
+.madder-controls > * {
+    pointer-events: auto;
+}

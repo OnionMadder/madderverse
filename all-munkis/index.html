@@ -34,28 +34,22 @@
 
 <body>
 
-    <header>
-        <div class="header-inner">
-            <div class="title-block">
-                <div class="status">System Status: Operational</div>
-                <h1>All <span class="neon-pink">Munkis</span></h1>
-                <p class="subtitle" id="subtitle">Six colors make a rainbow. Two are always left out.</p>
-            </div>
-            <div class="header-buttons">
-                <button id="storyBtn" class="btn btn-story" type="button" title="Read the lore">LORE</button>
-                <!-- Hidden until the kid trips horror mode 3 times. Lore: meet the
-                     friends Ice Munki and Moon Munki visit "across town". -->
-                <button id="madballzBtn" class="btn btn-madballz" type="button" title="Meet the Madballz" hidden>MEET THE MADBALLZ</button>
-                <!-- Only shown while we're inside the Madballz screen. -->
-                <button id="backBtn" class="btn btn-back" type="button" title="Back to the light" hidden>← BACK</button>
-                <button id="remixBtn" class="btn btn-remix" type="button">REMIX</button>
-                <button id="clearBtn" class="btn btn-clear" type="button">CLEAR</button>
-                <button id="songBtn" class="btn btn-song" type="button" aria-pressed="true" title="Toggle level song">SONG</button>
-                <button id="booBtn" class="btn btn-boo" type="button" title="Trigger jump scare">BOO!</button>
-                <button id="muteBtn" class="icon-btn" type="button" aria-label="mute"><span id="muteIcon">🔊</span></button>
-            </div>
-        </div>
-    </header>
+    <a class="madder-home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+
+    <!-- Page-nav header stripped; game controls floated into the
+         universal .madder-controls top-right cluster. The
+         status/title/subtitle copy from the old header is gone
+         — the page-title is implied by the URL + home button. -->
+    <div class="madder-controls">
+        <button id="storyBtn"    class="btn btn-story"    type="button" title="Read the lore">LORE</button>
+        <button id="madballzBtn" class="btn btn-madballz" type="button" title="Meet the Madballz" hidden>MEET THE MADBALLZ</button>
+        <button id="backBtn"     class="btn btn-back"     type="button" title="Back to the light" hidden>&larr; BACK</button>
+        <button id="remixBtn"    class="btn btn-remix"    type="button">REMIX</button>
+        <button id="clearBtn"    class="btn btn-clear"    type="button">CLEAR</button>
+        <button id="songBtn"     class="btn btn-song"     type="button" aria-pressed="true" title="Toggle level song">SONG</button>
+        <button id="booBtn"      class="btn btn-boo"      type="button" title="Trigger jump scare">BOO!</button>
+        <button id="muteBtn"     class="icon-btn"         type="button" aria-label="mute"><span id="muteIcon">🔊</span></button>
+    </div>
 
     <main>
         <div class="stage-wrap">

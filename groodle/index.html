@@ -40,7 +40,7 @@
 <!-- Top-edge overlays. All three are fixed-position so they sit on top
      of the full-viewport stage; nothing in the layout reserves space
      for them. -->
-<a href="../" class="back back-floating" aria-label="Back to The Madderverse">&larr;</a>
+<a class="madder-home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
 
 <div class="title-overlay" aria-label="Groodle">
     <h1>Gr<span class="neon-pink">oo</span>dle</h1>
@@ -289,18 +289,18 @@
 
 <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
 
-<footer class="site-footer">
-    <ul class="footer-nav">
-        <li><a href="../">Madderverse</a></li>
-        <li><a href="../about.html">About</a></li>
-        <li><a href="../legal.html">Privacy &amp; Legal</a></li>
-    </ul>
-    <p class="footer-tagline">Free &middot; Ad-free &middot; Kid-friendly</p>
-    <p class="footer-copy">&copy; <span id="year"></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a>. All games made with care.</p>
+<footer class="site-footer-slim" aria-label="Site info">
+    <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <a href="../">The Madderverse</a>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <a href="../about.html">About</a>
 </footer>
 
 <script>
-    document.getElementById("year").textContent = new Date().getFullYear();
+    document.querySelectorAll('[data-year]').forEach(function (el) {
+        el.textContent = new Date().getFullYear();
+    });
 </script>
 <script src="game.js"></script>
 
