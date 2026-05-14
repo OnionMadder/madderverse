@@ -120,7 +120,8 @@
             hasUsedEraser: false,
             hasUsedSurprise: false,
             lastVisitDate: null,
-            longestDanceSec: 0
+            longestDanceSec: 0,
+            pagesCompleted: []
         },
         hats: {
             owned: ['no-hat'],
@@ -330,7 +331,25 @@
         { id: 'color-curator',    title: 'Color Curator',    desc: 'Try 8 different colors across your drawings.', reward: 20, icon: '🎭',
           check: () => state.counters.colorsUsedEver.length >= 8 },
         { id: 'surprise-hat',     title: 'Surprise Hat',     desc: 'Discover the SURPRISE button.',        reward: 15, icon: '🎲',
-          check: () => state.counters.hasUsedSurprise }
+          check: () => state.counters.hasUsedSurprise },
+        /* Coloring-book page completions. Each unlocks the FIRST time the
+           kid hits DANCE while that page template is on the canvas; the
+           predicate reads from state.counters.pagesCompleted which is
+           appended to inside startDance(). */
+        { id: 'page-robot',       title: 'Robo-Doodler',     desc: 'Color the Robot page.',                reward: 15, icon: '🤖',
+          check: () => state.counters.pagesCompleted.indexOf('robot') !== -1 },
+        { id: 'page-princess',    title: 'Royal Crayon',     desc: 'Color the Princess page.',             reward: 15, icon: '👑',
+          check: () => state.counters.pagesCompleted.indexOf('princess') !== -1 },
+        { id: 'page-astronaut',   title: 'Space Doodler',    desc: 'Color the Astronaut page.',            reward: 15, icon: '🚀',
+          check: () => state.counters.pagesCompleted.indexOf('astronaut') !== -1 },
+        { id: 'page-clown',       title: 'Big-Top Star',     desc: 'Color the Clown page.',                reward: 15, icon: '🤡',
+          check: () => state.counters.pagesCompleted.indexOf('clown') !== -1 },
+        { id: 'page-pirate',      title: 'Yarrr-tist',       desc: 'Color the Pirate page.',               reward: 15, icon: '🏴‍☠️',
+          check: () => state.counters.pagesCompleted.indexOf('pirate') !== -1 },
+        { id: 'page-superhero',   title: 'Caped Coloring',   desc: 'Color the Superhero page.',            reward: 15, icon: '🦸',
+          check: () => state.counters.pagesCompleted.indexOf('superhero') !== -1 },
+        { id: 'page-master',      title: 'Coloring Master',  desc: 'Finish every coloring-book page.',     reward: 50, icon: '📖',
+          check: () => state.counters.pagesCompleted.length >= 6 }
     ];
 
     const ACHIEVEMENT_BY_ID = {};
@@ -807,6 +826,575 @@
         openModal(hatShopModalEl);
     }
 
+    /* ============ COLORING-BOOK PAGES ============
+
+       "Freedom inside a fence": the silhouette is the outer fence, and
+       each page draws a pre-made line-art template inside it (eyes,
+       smile, costume hints) for the kid to color in. The kid still has
+       full color/brush/eraser freedom — the template just gives them a
+       starting structure to work with.
+
+       Each page's `draw(c)` paints onto the same clipped 2D context that
+       free-drawing uses, so any strokes extending past the silhouette
+       (an oversize crown, cape edges, etc.) get cleanly trimmed by the
+       canvas clip without needing per-page coordinate fixing. Style
+       conventions: navy ink (#1a0f33), 4px lineWidth, round caps. */
+
+    const PAGES = [
+        {
+            id: 'robot',
+            label: 'Robot',
+            emoji: '🤖',
+            draw: (c) => {
+                c.save();
+                c.lineCap = 'round'; c.lineJoin = 'round';
+                c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+                /* Antenna stub (only the in-body portion survives clipping). */
+                c.beginPath(); c.moveTo(200, 50); c.lineTo(200, 42); c.stroke();
+                c.beginPath(); c.arc(200, 38, 5, 0, Math.PI * 2); c.stroke();
+                /* Square eyes with tiny pupils. */
+                c.strokeRect(174, 84, 18, 18);
+                c.strokeRect(208, 84, 18, 18);
+                c.beginPath(); c.arc(183, 93, 2, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(217, 93, 2, 0, Math.PI * 2); c.fill();
+                /* Mouth + teeth. */
+                c.strokeRect(180, 120, 40, 14);
+                c.beginPath(); c.moveTo(193, 120); c.lineTo(193, 134); c.stroke();
+                c.beginPath(); c.moveTo(207, 120); c.lineTo(207, 134); c.stroke();
+                /* Control panel with 3 buttons. */
+                c.strokeRect(168, 200, 64, 60);
+                c.beginPath(); c.arc(184, 215, 5, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(200, 215, 5, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(216, 215, 5, 0, Math.PI * 2); c.stroke();
+                /* Speaker grill. */
+                c.beginPath(); c.moveTo(180, 238); c.lineTo(220, 238); c.stroke();
+                c.beginPath(); c.moveTo(180, 246); c.lineTo(220, 246); c.stroke();
+                c.beginPath(); c.moveTo(180, 254); c.lineTo(220, 254); c.stroke();
+                c.restore();
+            }
+        },
+        {
+            id: 'princess',
+            label: 'Princess',
+            emoji: '👑',
+            draw: (c) => {
+                c.save();
+                c.lineCap = 'round'; c.lineJoin = 'round';
+                c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+                /* Tiara zigzag on forehead with a base band. */
+                c.beginPath();
+                c.moveTo(166, 65); c.lineTo(178, 50);
+                c.lineTo(190, 65); c.lineTo(200, 45);
+                c.lineTo(210, 65); c.lineTo(222, 50);
+                c.lineTo(234, 65);
+                c.stroke();
+                c.beginPath(); c.moveTo(166, 65); c.lineTo(234, 65); c.stroke();
+                /* Almond eyes. */
+                c.beginPath(); c.ellipse(184, 92, 7, 5, 0, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.ellipse(216, 92, 7, 5, 0, 0, Math.PI * 2); c.stroke();
+                /* Eyelashes. */
+                c.beginPath(); c.moveTo(178, 88); c.lineTo(174, 85); c.stroke();
+                c.beginPath(); c.moveTo(184, 86); c.lineTo(184, 82); c.stroke();
+                c.beginPath(); c.moveTo(190, 88); c.lineTo(194, 85); c.stroke();
+                c.beginPath(); c.moveTo(210, 88); c.lineTo(206, 85); c.stroke();
+                c.beginPath(); c.moveTo(216, 86); c.lineTo(216, 82); c.stroke();
+                c.beginPath(); c.moveTo(222, 88); c.lineTo(226, 85); c.stroke();
+                /* Heart-shaped lips. */
+                c.beginPath();
+                c.moveTo(192, 120);
+                c.bezierCurveTo(192, 113, 199, 113, 200, 117);
+                c.bezierCurveTo(201, 113, 208, 113, 208, 120);
+                c.bezierCurveTo(208, 127, 200, 132, 200, 132);
+                c.bezierCurveTo(200, 132, 192, 127, 192, 120);
+                c.stroke();
+                /* Rosy cheek circles. */
+                c.beginPath(); c.arc(170, 115, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(230, 115, 6, 0, Math.PI * 2); c.stroke();
+                /* Dress neckline V + bow. */
+                c.beginPath();
+                c.moveTo(170, 175); c.lineTo(200, 210); c.lineTo(230, 175);
+                c.stroke();
+                c.beginPath(); c.ellipse(195, 210, 8, 5, -0.4, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.ellipse(205, 210, 8, 5,  0.4, 0, Math.PI * 2); c.stroke();
+                /* Dress flare lines (mostly clipped to body, hint at the skirt). */
+                c.beginPath(); c.moveTo(165, 280);
+                c.bezierCurveTo(155, 320, 145, 360, 140, 400); c.stroke();
+                c.beginPath(); c.moveTo(235, 280);
+                c.bezierCurveTo(245, 320, 255, 360, 260, 400); c.stroke();
+                c.restore();
+            }
+        },
+        {
+            id: 'astronaut',
+            label: 'Astronaut',
+            emoji: '🚀',
+            draw: (c) => {
+                c.save();
+                c.lineCap = 'round'; c.lineJoin = 'round';
+                c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+                /* Visor sweep across upper face. */
+                c.beginPath();
+                c.moveTo(150, 90);
+                c.bezierCurveTo(170, 75, 230, 75, 250, 90);
+                c.stroke();
+                /* Helmet chin curve. */
+                c.beginPath();
+                c.moveTo(150, 130);
+                c.bezierCurveTo(175, 145, 225, 145, 250, 130);
+                c.stroke();
+                /* Eyes through the visor. */
+                c.beginPath(); c.arc(185, 94, 4, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(215, 94, 4, 0, Math.PI * 2); c.fill();
+                /* Suit zipper with teeth ticks. */
+                c.beginPath(); c.moveTo(200, 175); c.lineTo(200, 360); c.stroke();
+                for (let y = 185; y <= 350; y += 18) {
+                    c.beginPath(); c.moveTo(196, y); c.lineTo(204, y); c.stroke();
+                }
+                /* Mission patch + tiny star inside. */
+                c.strokeRect(168, 200, 28, 28);
+                c.beginPath();
+                c.moveTo(182, 207); c.lineTo(185, 215);
+                c.lineTo(193, 215); c.lineTo(187, 220);
+                c.lineTo(189, 228); c.lineTo(182, 223);
+                c.lineTo(175, 228); c.lineTo(177, 220);
+                c.lineTo(171, 215); c.lineTo(179, 215);
+                c.closePath(); c.stroke();
+                /* Utility belt. */
+                c.beginPath(); c.moveTo(155, 300); c.lineTo(245, 300); c.stroke();
+                c.restore();
+            }
+        },
+        {
+            id: 'clown',
+            label: 'Clown',
+            emoji: '🤡',
+            draw: (c) => {
+                c.save();
+                c.lineCap = 'round'; c.lineJoin = 'round';
+                c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+                /* Big round nose. */
+                c.beginPath(); c.arc(200, 108, 16, 0, Math.PI * 2); c.stroke();
+                /* Eye dots + surprised eyebrows. */
+                c.beginPath(); c.arc(180, 85, 5, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(220, 85, 5, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(180, 72, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+                c.beginPath(); c.arc(220, 72, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+                /* Big smile + upturned ends. */
+                c.beginPath(); c.arc(200, 125, 26, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+                c.beginPath(); c.moveTo(177, 138); c.lineTo(174, 134); c.stroke();
+                c.beginPath(); c.moveTo(223, 138); c.lineTo(226, 134); c.stroke();
+                /* Curly hair tufts hugging the head edges. */
+                c.beginPath(); c.arc(154, 95, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(160, 108, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(246, 95, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(240, 108, 6, 0, Math.PI * 2); c.stroke();
+                /* Bow tie just below chin. */
+                c.beginPath();
+                c.moveTo(200, 165);
+                c.lineTo(170, 155); c.lineTo(170, 180);
+                c.lineTo(200, 170);
+                c.lineTo(230, 180); c.lineTo(230, 155);
+                c.closePath(); c.stroke();
+                c.strokeRect(196, 162, 8, 12);
+                /* Polka dots scattered on shirt. */
+                const dots = [[175, 220], [225, 210], [195, 245], [220, 260],
+                              [170, 285], [225, 300], [195, 320]];
+                for (let i = 0; i < dots.length; i++) {
+                    c.beginPath();
+                    c.arc(dots[i][0], dots[i][1], 7, 0, Math.PI * 2);
+                    c.stroke();
+                }
+                c.restore();
+            }
+        },
+        {
+            id: 'pirate',
+            label: 'Pirate',
+            emoji: '🏴‍☠️',
+            draw: (c) => {
+                c.save();
+                c.lineCap = 'round'; c.lineJoin = 'round';
+                c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+                /* Bandana arc across top of head + base line. */
+                c.beginPath();
+                c.moveTo(155, 75);
+                c.bezierCurveTo(175, 55, 225, 55, 245, 75);
+                c.stroke();
+                c.beginPath(); c.moveTo(155, 75); c.lineTo(245, 75); c.stroke();
+                /* Bandana knot + trailing tails on the left. */
+                c.beginPath(); c.arc(150, 82, 7, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.moveTo(143, 82); c.lineTo(130, 95); c.stroke();
+                c.beginPath(); c.moveTo(145, 88); c.lineTo(132, 102); c.stroke();
+                /* Filled eyepatch + strap. */
+                c.fillRect(208, 86, 22, 18);
+                c.beginPath(); c.moveTo(208, 90); c.lineTo(180, 78); c.stroke();
+                c.beginPath(); c.moveTo(230, 95); c.lineTo(244, 88); c.stroke();
+                /* Visible eye on the other side. */
+                c.beginPath(); c.arc(180, 95, 4, 0, Math.PI * 2); c.fill();
+                /* Curly mustache. */
+                c.beginPath();
+                c.moveTo(180, 120);
+                c.bezierCurveTo(185, 117, 195, 122, 200, 125);
+                c.bezierCurveTo(205, 122, 215, 117, 220, 120);
+                c.stroke();
+                /* Beard outline. */
+                c.beginPath();
+                c.moveTo(178, 122);
+                c.bezierCurveTo(170, 135, 175, 145, 195, 150);
+                c.lineTo(205, 150);
+                c.bezierCurveTo(225, 145, 230, 135, 222, 122);
+                c.stroke();
+                /* Diagonal sash across torso. */
+                c.beginPath(); c.moveTo(160, 175); c.lineTo(240, 280); c.stroke();
+                c.beginPath(); c.moveTo(160, 195); c.lineTo(240, 300); c.stroke();
+                /* Belt + buckle. */
+                c.strokeRect(155, 300, 90, 16);
+                c.strokeRect(193, 302, 14, 12);
+                /* X marks the spot on chest. */
+                c.beginPath(); c.moveTo(178, 232); c.lineTo(202, 256); c.stroke();
+                c.beginPath(); c.moveTo(202, 232); c.lineTo(178, 256); c.stroke();
+                c.restore();
+            }
+        },
+        {
+            id: 'superhero',
+            label: 'Superhero',
+            emoji: '🦸',
+            draw: (c) => {
+                c.save();
+                c.lineCap = 'round'; c.lineJoin = 'round';
+                c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+                /* Bandit-style mask outline. */
+                c.beginPath();
+                c.moveTo(150, 78);
+                c.bezierCurveTo(170, 70, 230, 70, 250, 78);
+                c.bezierCurveTo(248, 100, 230, 108, 200, 105);
+                c.bezierCurveTo(170, 108, 152, 100, 150, 78);
+                c.closePath(); c.stroke();
+                /* Mask eye holes (white inset so the kid has a target to fill). */
+                c.fillStyle = '#fff';
+                c.beginPath(); c.ellipse(180, 90, 10, 7, 0, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.ellipse(220, 90, 10, 7, 0, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#1a0f33';
+                c.beginPath(); c.arc(182, 90, 3, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(218, 90, 3, 0, Math.PI * 2); c.fill();
+                /* Heroic grin. */
+                c.beginPath();
+                c.arc(200, 122, 14, 0.15 * Math.PI, 0.85 * Math.PI);
+                c.stroke();
+                /* Big 5-point star emblem on chest. */
+                const cx = 200, cy = 240, r1 = 28, r2 = 12;
+                c.beginPath();
+                for (let i = 0; i < 10; i++) {
+                    const a = i * Math.PI / 5 - Math.PI / 2;
+                    const rr = i % 2 === 0 ? r1 : r2;
+                    const x = cx + Math.cos(a) * rr;
+                    const y = cy + Math.sin(a) * rr;
+                    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+                }
+                c.closePath(); c.stroke();
+                /* Cape edge curves (mostly clipped, hint at the cape). */
+                c.beginPath();
+                c.moveTo(155, 175);
+                c.bezierCurveTo(135, 250, 130, 340, 140, 400);
+                c.stroke();
+                c.beginPath();
+                c.moveTo(245, 175);
+                c.bezierCurveTo(265, 250, 270, 340, 260, 400);
+                c.stroke();
+                /* Belt + buckle X. */
+                c.strokeRect(155, 295, 90, 14);
+                c.strokeRect(192, 296, 16, 12);
+                c.beginPath();
+                c.moveTo(192, 296); c.lineTo(208, 308);
+                c.moveTo(208, 296); c.lineTo(192, 308);
+                c.stroke();
+                c.restore();
+            }
+        }
+    ];
+
+    const PAGE_BY_ID = {};
+    PAGES.forEach(p => { PAGE_BY_ID[p.id] = p; });
+
+    /* In-memory only — when a kid refreshes, the page state resets to
+       blank. The persistent piece is state.counters.pagesCompleted, which
+       drives the per-page achievement unlocks. */
+    let currentPageId = null;
+    let pagesModalEl = null;
+    let pagesGridEl = null;
+
+    function applyPage(pageId) {
+        const page = PAGE_BY_ID[pageId];
+        if (!page || !ctx) return;
+        /* A page swap is a "new drawing" — wipe the canvas and reset the
+           per-drawing color tally (so Rainbow Day starts over on the new
+           page) before stamping in the template. */
+        ctx.clearRect(0, 0, STAGE_W, STAGE_H);
+        if (state) trackClearDrawing();
+        page.draw(ctx);
+        currentPageId = pageId;
+    }
+
+    function clearPageTemplate() {
+        currentPageId = null;
+        if (!ctx) return;
+        ctx.clearRect(0, 0, STAGE_W, STAGE_H);
+        if (state) trackClearDrawing();
+    }
+
+    function trackPageCompleted(pageId) {
+        if (!pageId) return;
+        if (state.counters.pagesCompleted.indexOf(pageId) !== -1) return;
+        state.counters.pagesCompleted.push(pageId);
+        saveState();
+        checkAchievements();
+    }
+
+    function buildPagesGrid() {
+        if (!pagesGridEl) return;
+        pagesGridEl.innerHTML = '';
+        /* "Blank" card first — untemplate the canvas and return to the
+           free-drawing surface. Then one card per page, with a done tag
+           when its achievement is already earned. */
+        const blank = document.createElement('button');
+        blank.type = 'button';
+        blank.className = 'page-card page-card-blank';
+        blank.innerHTML =
+            '<div class="page-emoji" aria-hidden="true">✏️</div>' +
+            '<div class="page-name">Blank</div>' +
+            '<div class="page-action">Start fresh</div>';
+        blank.addEventListener('click', () => {
+            clearPageTemplate();
+            closeModal();
+        });
+        pagesGridEl.appendChild(blank);
+
+        for (let i = 0; i < PAGES.length; i++) {
+            const page = PAGES[i];
+            const done = state.counters.pagesCompleted.indexOf(page.id) !== -1;
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'page-card' + (done ? ' done' : '');
+            card.innerHTML =
+                '<div class="page-emoji" aria-hidden="true">' + page.emoji + '</div>' +
+                '<div class="page-name">' + escapeHtml(page.label) + '</div>' +
+                '<div class="page-action">' + (done ? '✓ Done' : 'Color it') + '</div>';
+            card.addEventListener('click', () => {
+                applyPage(page.id);
+                closeModal();
+            });
+            pagesGridEl.appendChild(card);
+        }
+    }
+
+    function openPagesPicker() {
+        buildPagesGrid();
+        openModal(pagesModalEl);
+    }
+
+    /* ============ PUBLIC GALLERY (Supabase) ============
+
+       Optional feature: kids can SAVE their finished Groodle to a shared
+       public gallery hosted on Supabase. The credentials below are
+       placeholders; see groodle/SUPABASE_SETUP.md for the SQL schema +
+       Row Level Security policies that must be in place before this
+       works end-to-end. While the placeholders are unchanged, the SAVE
+       button shows a "not configured" toast and the GALLERY modal shows
+       an empty state — the rest of the game keeps working unaffected.
+
+       Compose strategy: the offscreen export canvas is painted from the
+       same primitives the game uses on screen — buildBodyPath + the
+       in-stage draw canvas + a stroked outline ring — instead of
+       serializing SVG with embedded sprite refs. This sidesteps the
+       cross-origin / blob-relative-path issues SVG serialization runs
+       into and keeps the export tiny. */
+
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    const GROODLE_BUCKET = 'groodle-art';
+    const GROODLE_TABLE = 'groodles';
+
+    let _supabaseClient = null;
+    function getSupabaseClient() {
+        if (_supabaseClient) return _supabaseClient;
+        if (typeof window.supabase === 'undefined') return null;
+        if (SUPABASE_URL === 'YOUR_SUPABASE_URL' ||
+            SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') return null;
+        _supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        return _supabaseClient;
+    }
+
+    /* ---- Kid-safe random display-name generator + profanity check ---- */
+
+    const NAME_ADJ = ['Purple', 'Sparkly', 'Mighty', 'Brave', 'Silly', 'Wiggly',
+        'Zoomy', 'Cosmic', 'Bouncy', 'Sneaky', 'Fancy', 'Rad', 'Funky', 'Loud',
+        'Tiny', 'Giant', 'Magic', 'Speedy', 'Glowing', 'Wild'];
+    const NAME_NOUN = ['Tiger', 'Otter', 'Panda', 'Dragon', 'Owl', 'Fox',
+        'Robot', 'Comet', 'Pickle', 'Noodle', 'Banana', 'Squid', 'Wizard',
+        'Ninja', 'Astronaut', 'Yeti', 'Goblin', 'Frog', 'Penguin', 'Llama'];
+
+    function randomDisplayName() {
+        const a = NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)];
+        const n = NAME_NOUN[Math.floor(Math.random() * NAME_NOUN.length)];
+        const num = Math.floor(Math.random() * 99) + 1;
+        return a + n + num;
+    }
+
+    /* Minimal client-side filter. Server-side validation in the RLS
+       insert policy is the real safety net — this only stops the most
+       obvious slips before they ever reach the database. The list is
+       intentionally short + ASCII; Supabase-side enforcement should
+       cover the variations. */
+    const BAD_WORDS = [
+        'fuck','shit','bitch','cunt','nigger','faggot','slut','whore',
+        'asshole','dick','penis','vagina','sex','porn','nazi','kill',
+        'rape','retard'
+    ];
+    function isNameClean(name) {
+        if (!name) return false;
+        const lower = name.toLowerCase();
+        for (let i = 0; i < BAD_WORDS.length; i++) {
+            if (lower.indexOf(BAD_WORDS[i]) !== -1) return false;
+        }
+        return true;
+    }
+
+    /* Render the whole creature to an offscreen 800×1200 (DPR-2) PNG.
+       Background is left transparent — the gallery card frames each
+       Groodle on its own neutral surface so background presets don't
+       compete with one another in the grid. */
+    function composeGroodleBlob() {
+        if (!ctx) return Promise.resolve(null);
+        return new Promise((resolve) => {
+            const out = document.createElement('canvas');
+            out.width = STAGE_W * 2;
+            out.height = STAGE_H * 2;
+            const c = out.getContext('2d');
+            c.scale(2, 2);
+            c.lineCap = 'round'; c.lineJoin = 'round';
+            const body = buildBodyPath();
+            /* Pale interior wash (matches .silhouette-fill rgba). */
+            c.save();
+            c.fillStyle = 'rgba(232, 232, 244, 0.94)';
+            c.fill(body);
+            c.restore();
+            /* The kid's strokes (the live canvas is already clipped to
+               the silhouette, so this drawImage doesn't paint outside). */
+            c.drawImage(canvas, 0, 0, STAGE_W, STAGE_H);
+            /* Inner outline ring — stroked along the body path. Slightly
+               wider than the on-screen filter-derived ring; close enough
+               to read as "the body outline" in a thumbnail. */
+            c.save();
+            c.strokeStyle = '#1a0f33';
+            c.lineWidth = 5;
+            c.stroke(body);
+            c.restore();
+            out.toBlob(resolve, 'image/png');
+        });
+    }
+
+    let saveModalEl = null;
+    let saveModalInputEl = null;
+    let saveModalSubmitEl = null;
+    let saveModalStatusEl = null;
+    let galleryModalEl = null;
+    let galleryGridEl = null;
+
+    function openSaveDialog() {
+        if (!saveModalEl) return;
+        const client = getSupabaseClient();
+        if (saveModalInputEl) saveModalInputEl.value = randomDisplayName();
+        if (saveModalStatusEl) {
+            saveModalStatusEl.textContent = client
+                ? 'Sign your Groodle, then tap Save.'
+                : 'Gallery is not set up yet — see SUPABASE_SETUP.md.';
+        }
+        if (saveModalSubmitEl) saveModalSubmitEl.disabled = !client;
+        openModal(saveModalEl);
+    }
+
+    async function submitGroodle() {
+        const client = getSupabaseClient();
+        if (!client) return;
+        const rawName = (saveModalInputEl && saveModalInputEl.value || '').trim();
+        const name = rawName.slice(0, 24);
+        if (!name || !isNameClean(name)) {
+            saveModalStatusEl.textContent = 'Pick a different name, please.';
+            return;
+        }
+        saveModalSubmitEl.disabled = true;
+        saveModalStatusEl.textContent = 'Saving…';
+        try {
+            const blob = await composeGroodleBlob();
+            if (!blob) throw new Error('Could not capture drawing');
+            const filename = 'groodle-' + Date.now() + '-' +
+                Math.random().toString(36).slice(2, 8) + '.png';
+            const up = await client.storage
+                .from(GROODLE_BUCKET)
+                .upload(filename, blob, { contentType: 'image/png' });
+            if (up.error) throw up.error;
+            const pub = client.storage.from(GROODLE_BUCKET).getPublicUrl(filename);
+            const ins = await client.from(GROODLE_TABLE).insert({
+                name: name,
+                image_url: pub.data.publicUrl,
+                page_id: currentPageId
+            });
+            if (ins.error) throw ins.error;
+            saveModalStatusEl.textContent = 'Saved! Find it in the Gallery.';
+            setTimeout(closeModal, 1100);
+        } catch (e) {
+            saveModalStatusEl.textContent = 'Save failed — try again later.';
+            saveModalSubmitEl.disabled = false;
+        }
+    }
+
+    async function loadRecentGroodles() {
+        const client = getSupabaseClient();
+        if (!client) return null;
+        const { data, error } = await client
+            .from(GROODLE_TABLE)
+            .select('id, name, image_url, page_id, created_at')
+            .order('created_at', { ascending: false })
+            .limit(48);
+        if (error) return null;
+        return data;
+    }
+
+    async function openGallery() {
+        if (!galleryModalEl) return;
+        openModal(galleryModalEl);
+        if (galleryGridEl) {
+            galleryGridEl.innerHTML = '<div class="gallery-empty">Loading…</div>';
+        }
+        const client = getSupabaseClient();
+        if (!client) {
+            galleryGridEl.innerHTML =
+                '<div class="gallery-empty">Gallery is not set up yet.<br>' +
+                'See <code>SUPABASE_SETUP.md</code> for instructions.</div>';
+            return;
+        }
+        const rows = await loadRecentGroodles();
+        if (!rows) {
+            galleryGridEl.innerHTML = '<div class="gallery-empty">Could not load gallery.</div>';
+            return;
+        }
+        if (rows.length === 0) {
+            galleryGridEl.innerHTML = '<div class="gallery-empty">Be the first to share a Groodle!</div>';
+            return;
+        }
+        galleryGridEl.innerHTML = '';
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const card = document.createElement('div');
+            card.className = 'gallery-card';
+            card.innerHTML =
+                '<img class="gallery-img" src="' + row.image_url + '" alt="Groodle by ' + escapeHtml(row.name) + '" loading="lazy"/>' +
+                '<div class="gallery-name">' + escapeHtml(row.name) + '</div>';
+            galleryGridEl.appendChild(card);
+        }
+    }
+
     /* ============ STATE ============ */
 
     let currentColor = '#000000';
@@ -1199,8 +1787,9 @@
                mostly-vertical drags to page scroll instead of firing
                pointer events here, so a thumb passing through the
                silhouette to scroll still works. Horizontal / diagonal
-               drags get captured for strokes. */
-            if (isPlaying) return;
+               drags get captured for strokes. Drawing remains active
+               during dance — the kid can keep editing while the
+               creature grooves. */
             try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
             /* Cache the rect once per stroke so subsequent pointermove
                events skip the getBoundingClientRect layout read. */
@@ -1235,7 +1824,7 @@
         });
 
         canvas.addEventListener('pointermove', (e) => {
-            if (!isDrawing || isPlaying) return;
+            if (!isDrawing) return;
             const p = getPos(e);
             if (isErasing) {
                 ctx.save();
@@ -1279,6 +1868,12 @@
            when the kid starts over. trackClearDrawing is a no-op for
            any other counters. */
         if (state) trackClearDrawing();
+        /* If a coloring-book page is loaded, re-stamp its template so
+           CLEAR resets to "freshly outlined" instead of fully blank. */
+        if (currentPageId) {
+            const page = PAGE_BY_ID[currentPageId];
+            if (page) page.draw(ctx);
+        }
     }
 
     /* ============ TOOLS UI ============ */
@@ -1374,6 +1969,9 @@
        silhouette clip-path takes care of trimming any overflow. */
     function drawSurprise() {
         trackSurpriseUsed();
+        /* SURPRISE explicitly nulls the active page so clearCanvas's
+           page re-stamp doesn't fight with the new artwork. */
+        currentPageId = null;
         clearCanvas();
 
         // Skin tone fill across the whole body silhouette
@@ -1431,6 +2029,25 @@
 
     /* ============ DANCE ============ */
 
+    /* Updates the playBtn so it reads as ▶ DANCE when idle and ■ STOP
+       when playing. The current dock layout uses inner spans on the
+       button, so this function updates the `.dock-label` text rather
+       than the button's textContent (which would wipe the spans). The
+       button also carries `is-stop` + `aria-pressed` for state-aware
+       CSS / a11y. */
+    function setPlayBtnState(playing) {
+        const playBtn = document.getElementById('playBtn');
+        if (!playBtn) return;
+        playBtn.classList.toggle('is-stop', playing);
+        playBtn.setAttribute('aria-pressed', playing ? 'true' : 'false');
+        const labelEl = playBtn.querySelector('.dock-label');
+        if (labelEl) {
+            labelEl.textContent = playing ? 'Stop' : 'Dance';
+        } else {
+            playBtn.textContent = playing ? '■ STOP' : '▶ DANCE';
+        }
+    }
+
     function startDance() {
         if (isPlaying) return;
         /* Pressing DANCE finishes the current drawing (commits it as a
@@ -1439,6 +2056,10 @@
            signal from the kid. */
         trackDrawingFinished();
         trackBeatExperienced(BEATS[currentBeatIdx]);
+        /* Pressing DANCE while a coloring-book page is active also counts
+           as finishing that page — unlocks its per-page achievement (and
+           the Coloring Master master achievement at the 6th completion). */
+        if (currentPageId) trackPageCompleted(currentPageId);
         ensureAudio();
         const begin = () => {
             isPlaying = true;
@@ -1448,13 +2069,14 @@
                  * dance-dock → shown
                  * title-overlay → faded
                  * currency-pill → faded
-                 * draw-canvas → pointer-events: none
-               (CSS rules in style.css under each element.) */
+               Drawing stays enabled during dance — the kid can keep
+               editing while the creature grooves. */
             document.body.classList.add('dancing');
             /* If a drawer was open when DANCE was tapped, close it so
                the dance composition is clean. The Beat drawer is still
                reachable mid-dance via the dance-dock. */
             closeDrawer();
+            setPlayBtnState(true);
             updateMoveBeatLabels();
             startAudio();
             danceStartTime = audioCtx.currentTime;
@@ -1476,6 +2098,7 @@
         }
         stopAudio();
         document.body.classList.remove('dancing');
+        setPlayBtnState(false);
         creature.style.transform = '';
         if (floorEl) {
             floorEl.style.transform = 'translateX(-50%)';
@@ -1486,6 +2109,10 @@
             bubbleEl.style.transform = '';
             bubbleEl._pulseStart = null;
         }
+    }
+
+    function togglePlay() {
+        if (isPlaying) stopDance(); else startDance();
     }
 
     function danceFrame() {
@@ -1583,6 +2210,20 @@
 
         document.getElementById('openAchievementsBtn').addEventListener('click', openAchievements);
         document.getElementById('openHatShopBtn').addEventListener('click', openHatShop);
+        const pagesBtn = document.getElementById('openPagesBtn');
+        if (pagesBtn) pagesBtn.addEventListener('click', openPagesPicker);
+        const galleryBtn = document.getElementById('openGalleryBtn');
+        if (galleryBtn) galleryBtn.addEventListener('click', openGallery);
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.addEventListener('click', openSaveDialog);
+        if (saveModalSubmitEl) {
+            saveModalSubmitEl.addEventListener('click', submitGroodle);
+        }
+        if (saveModalInputEl) {
+            saveModalInputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') submitGroodle();
+            });
+        }
 
         document.getElementById('eraserBtn').addEventListener('click', () => {
             isErasing = !isErasing;
@@ -1597,7 +2238,10 @@
             }
         });
 
-        document.getElementById('playBtn').addEventListener('click', startDance);
+        /* playBtn is a toggle: ▶ DANCE → ■ STOP. The dance-dock still
+           carries a redundant ■ STOP exit so kids who already learned that
+           path keep working. */
+        document.getElementById('playBtn').addEventListener('click', togglePlay);
         document.getElementById('stopBtn').addEventListener('click', stopDance);
 
         document.getElementById('moveBtn').addEventListener('click', () => {
@@ -1627,9 +2271,20 @@
         hatShopGridEl = document.getElementById('hatShopGrid');
         hatShopBalanceEl = document.getElementById('hatShopBalance');
         hatLayerInnerEl = document.getElementById('hatLayerInner');
+        pagesModalEl = document.getElementById('pagesModal');
+        pagesGridEl = document.getElementById('pagesGrid');
+        saveModalEl = document.getElementById('saveModal');
+        saveModalInputEl = document.getElementById('saveNameInput');
+        saveModalSubmitEl = document.getElementById('saveSubmitBtn');
+        saveModalStatusEl = document.getElementById('saveModalStatus');
+        galleryModalEl = document.getElementById('galleryModal');
+        galleryGridEl = document.getElementById('galleryGrid');
         drawerHostEl = document.getElementById('drawerHost');
         if (achievementsModalEl) attachModalDismissers(achievementsModalEl);
         if (hatShopModalEl) attachModalDismissers(hatShopModalEl);
+        if (pagesModalEl) attachModalDismissers(pagesModalEl);
+        if (saveModalEl) attachModalDismissers(saveModalEl);
+        if (galleryModalEl) attachModalDismissers(galleryModalEl);
         attachDrawerHostDismissers();
         attachDockButtons();
         renderCurrency();
