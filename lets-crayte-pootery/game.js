@@ -3443,7 +3443,13 @@
         c.addEventListener("pointermove", function (e) {
             if (!D.pointerActive) return;
             const p = decPointerPos(e);
-            if (D.tool === "brush" || D.tool === "eraser") {
+            /* Stamps fire once on pointerdown — they don't trail.
+               Every other tool (brush, eraser, spray, splatter)
+               wants continuous pointermove emission. The
+               original gate of only brush+eraser silently broke
+               spray + splatter — only the initial tap landed,
+               drag did nothing. */
+            if (D.tool !== "stamp") {
                 paintStrokeTo(p);
             }
             D.lastPaintPos = p;
