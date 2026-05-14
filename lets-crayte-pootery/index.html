@@ -73,9 +73,9 @@
                 <span class="btn-label">GALLERY</span>
                 <span class="btn-glyph" aria-hidden="true">&#9636;</span>
             </button>
-            <button class="big-btn" id="btnSettings" type="button">
-                <span class="btn-label">SETTINGS</span>
-                <span class="btn-glyph" aria-hidden="true">&#9881;</span>
+            <button class="big-btn" id="btnTrophies" type="button">
+                <span class="btn-label">TROPHIES</span>
+                <span class="btn-glyph" aria-hidden="true">&#9733;</span>
             </button>
         </div>
 
@@ -139,6 +139,12 @@
     <div class="overclocked-toast" id="overclockedToast" hidden>
         <span class="oc-glyph" aria-hidden="true">&#9889;</span>
         <span class="oc-text">MODDED RGB OVERCLOCKED&nbsp;&mdash;&nbsp;new stamp unlocked</span>
+    </div>
+
+    <!-- Day 4 chunk C: ACHIEVEMENT toast notification -->
+    <div class="ach-toast" id="achToast" hidden>
+        <span class="ach-toast-icon" id="achToastIcon" aria-hidden="true">&#9733;</span>
+        <span class="ach-toast-text" id="achToastText">ACHIEVEMENT</span>
     </div>
 
     <aside class="specs-panel" id="specsPanel" hidden>
@@ -320,6 +326,18 @@
 
     </div>
 
+</main>
+
+<!-- ============================================================
+     SCREEN: ACHIEVEMENTS  (Day 4 chunk C)
+     ============================================================ -->
+<main class="screen" id="screen-achievements" hidden>
+    <div class="screen-titlebar">
+        <button class="back-btn" id="achBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;TROPHIES&nbsp;&gt;</h2>
+        <span class="screen-status" id="achCount">0 / 0</span>
+    </div>
+    <div class="ach-grid" id="achGrid"></div>
 </main>
 
 <!-- ============================================================

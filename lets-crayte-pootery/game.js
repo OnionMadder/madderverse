@@ -428,7 +428,10 @@
     function initTitle() {
         const btnStart    = document.getElementById("btnStart");
         const btnGallery  = document.getElementById("btnGallery");
-        const btnSettings = document.getElementById("btnSettings");
+        /* Day 4 chunk C: SETTINGS button repurposed to TROPHIES
+           (achievements). Old #btnSettings markup is gone — this
+           reads #btnTrophies. */
+        const btnTrophies = document.getElementById("btnTrophies");
 
         if (btnStart) {
             btnStart.addEventListener("click", function () {
@@ -453,15 +456,21 @@
             });
         }
 
-        if (btnSettings) {
-            btnSettings.addEventListener("click", function () {
-                if (SCREENS["settings"]) {
-                    showScreen("settings");
+        if (btnTrophies) {
+            btnTrophies.addEventListener("click", function () {
+                if (SCREENS["achievements"]) {
+                    showScreen("achievements");
                 } else {
-                    flashStub(btnSettings, "COMING SOON");
+                    flashStub(btnTrophies, "NO TROPHIES YET");
                 }
             });
         }
+
+        /* Achievements screen back button */
+        const achBack = document.getElementById("achBack");
+        if (achBack) achBack.addEventListener("click", function () {
+            showScreen("title");
+        });
 
         wireSpecsPanel();
     }
@@ -723,6 +732,9 @@
             b.remove();
         });
         CLAY_TYPES.forEach(function (mat) {
+            /* Hidden clays (e.g. VOID) stay out until the
+               unlocking achievement lands. */
+            if (!isClayUnlocked(mat)) return;
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "clay-swatch";
@@ -2969,6 +2981,9 @@
             while (existing.length > 50) existing.shift();
             localStorage.setItem(key, JSON.stringify(existing));
             KILN.savedId = entry.id;
+            /* Day-4 chunk C — every new pot may complete an
+               achievement; run the check after the save lands. */
+            checkAchievements();
             return true;
         } catch (e) {
             console.warn("[CRAYte] auto-save failed", e);
@@ -4077,6 +4092,355 @@
         }
     });
 
+    /* ----- Achievements screen registration (uses helpers below) ----- */
+
+    function refreshAchievementsGrid() {
+        ensureAchievements();
+        const grid  = document.getElementById("achGrid");
+        const count = document.getElementById("achCount");
+        if (!grid) return;
+        const total = ACHIEVEMENTS.length;
+        const unlockedCount = ACH_STATE.unlocked.size;
+        if (count) count.textContent = unlockedCount + " / " + total;
+        grid.innerHTML = "";
+        for (let i = 0; i < ACHIEVEMENTS.length; i++) {
+            const a = ACHIEVEMENTS[i];
+            const ok = ACH_STATE.unlocked.has(a.id);
+            const card = document.createElement("div");
+            card.className = "ach-card" + (ok ? " is-unlocked" : " is-locked");
+            const ic = document.createElement("div");
+            ic.className = "ach-icon";
+            ic.textContent = ok ? (a.icon || "★") : "?";
+            const ttl = document.createElement("h3");
+            ttl.className = "ach-title";
+            ttl.textContent = ok ? a.title : "???";
+            const desc = document.createElement("p");
+            desc.className = "ach-desc";
+            desc.textContent = ok ? a.desc : "Locked. Keep playing.";
+            card.appendChild(ic);
+            card.appendChild(ttl);
+            card.appendChild(desc);
+            if (a.grant && ok) {
+                const tag = document.createElement("span");
+                tag.className = "ach-reward";
+                tag.textContent = a.grant.stamp
+                    ? "REWARD: " + a.grant.stamp.toUpperCase() + " STAMP"
+                    : (a.grant.unlocksClay
+                        ? "REWARD: " + a.grant.unlocksClay.toUpperCase() + " CLAY"
+                        : "");
+                if (tag.textContent) card.appendChild(tag);
+            }
+            grid.appendChild(card);
+        }
+    }
+
+    registerScreen("achievements", {
+        onEnter: function () {
+            /* Re-scan so any achievements earned offline (or via dev
+               tools) show up. */
+            checkAchievements();
+            refreshAchievementsGrid();
+            wheelHumStop();
+        }
+    });
+
+    /* ============================================================
+       ACHIEVEMENTS — Day 4 chunk C
+       ============================================================
+       Local-only meta progression. Each achievement has a check
+       function that reads gallery state + egg flags and returns
+       true once the player has earned it. Unlocked ids are
+       persisted to localStorage "crayte-achievements". Some
+       achievements unlock content (REWARDS_PACK stamps, the
+       hidden VOID clay) — see grantReward().
+       ============================================================ */
+
+    const ACH_KEY = "crayte-achievements";
+
+    const ACH_STATE = {
+        /* Set of unlocked achievement ids; hydrated from localStorage
+           on first scan. */
+        unlocked: null
+    };
+
+    /* Reward pack — grows with unlocked stamps. Hidden from the
+       decorate tabs until it has at least 1 pattern.            */
+    const REWARDS_PACK = {
+        id: "rewards",
+        label: "TROPHY",
+        glazes: ["#ffd24a", "#ff8c1a", "#ff2a8a", "#33ff66",
+                 "#f4f6ea", "#1a0e08"],
+        patterns: []
+    };
+
+    /* The secret 6th clay — locked behind MASTER_POTTER. Added to
+       CLAY_TYPES at module init; buildClayPicker hides it until
+       unlocked. */
+    const VOID_CLAY = {
+        id: "void",
+        label: "VOID",
+        flavor: "Obsidian black. Eldritch shimmer. (unlocked)",
+        unfired: ["#000000", "#0a0a16", "#1a1030", "#241540",
+                  "#100820", "#000000"],
+        swatch: "#1a1030",
+        firedTint: "rgba(180, 90, 220, 0.45)",
+        outline:   "#000000",
+        highlight: "rgba(220, 180, 255, 0.60)",
+        unlockedBy: "master_potter"
+    };
+    CLAY_TYPES.push(VOID_CLAY);
+
+    /* Hidden-until-unlocked reward stamp drawers (text via the
+       existing textStamp helper). */
+    PATTERN_DRAWERS["rookie"]  = function (ctx, x, y, r, c) {
+        textStamp(ctx, x, y, r, c, "ROOKIE");
+    };
+    PATTERN_DRAWERS["boom"]    = function (ctx, x, y, r, c) {
+        textStamp(ctx, x, y, r, c, "BOOM");
+    };
+    PATTERN_DRAWERS["toast"]   = function (ctx, x, y, r, c) {
+        textStamp(ctx, x, y, r, c, "TOAST");
+    };
+    PATTERN_DRAWERS["hoarder"] = function (ctx, x, y, r, c) {
+        textStamp(ctx, x, y, r, c, "WHO'S A HOARDER",
+                  { fontSize: 0.26 });
+    };
+    PATTERN_DRAWERS["pack-master"] = function (ctx, x, y, r, c) {
+        textStamp(ctx, x, y, r, c, "PACK MASTER");
+    };
+
+    const ACHIEVEMENTS = [
+        {
+            id: "first_pot",
+            title: "FIRST POT",
+            desc: "Fire your first pot.",
+            icon: "★",
+            grant: { stamp: "rookie" },
+            check: function (s) { return s.firedCount >= 1; }
+        },
+        {
+            id: "apprentice",
+            title: "POTTERY APPRENTICE",
+            desc: "Fire 5 pots.",
+            icon: "♦",
+            check: function (s) { return s.firedCount >= 5; }
+        },
+        {
+            id: "master_potter",
+            title: "MASTER POTTER",
+            desc: "Fire 20 pots. Unlocks the VOID clay.",
+            icon: "✪",
+            grant: { unlocksClay: "void" },
+            check: function (s) { return s.firedCount >= 20; }
+        },
+        {
+            id: "pot_hoarder",
+            title: "POT HOARDER",
+            desc: "Stuff 50 pots into the vault.",
+            icon: "▣",
+            grant: { stamp: "hoarder" },
+            check: function (s) { return s.firedCount >= 50; }
+        },
+        {
+            id: "material_master",
+            title: "MATERIAL MASTER",
+            desc: "Fire a pot with every base clay (5).",
+            icon: "◆",
+            check: function (s) {
+                /* Don't count VOID toward the requirement — it's
+                   the reward, not the prerequisite. */
+                const baseCount = CLAY_TYPES.filter(function (c) {
+                    return !c.unlockedBy;
+                }).length;
+                return s.clayTypes.size >= baseCount;
+            }
+        },
+        {
+            id: "pack_pioneer",
+            title: "PACK PIONEER",
+            desc: "Decorate with every glaze pack (6).",
+            icon: "✦",
+            grant: { stamp: "pack-master" },
+            check: function (s) { return s.packs.size >= 6; }
+        },
+        {
+            id: "exploded",
+            title: "EXPLODED!",
+            desc: "Survive an exploding pot.",
+            icon: "✸",
+            grant: { stamp: "boom" },
+            check: function (s) { return s.explodedCount >= 1; }
+        },
+        {
+            id: "demolition",
+            title: "DEMOLITION EXPERT",
+            desc: "5 exploded pots. On purpose? probably.",
+            icon: "✺",
+            check: function (s) { return s.explodedCount >= 5; }
+        },
+        {
+            id: "burnt_offering",
+            title: "BURNT OFFERING",
+            desc: "Overheat the kiln. Tap-tap-tap.",
+            icon: "🔥",
+            grant: { stamp: "toast" },
+            check: function (s) { return s.overfiredCount >= 1; }
+        },
+        {
+            id: "pingas",
+            title: "PINGAS",
+            desc: "You know what you did.",
+            icon: "ᗒ",
+            check: function () { return !!EGG.pingasUnlocked; }
+        },
+        {
+            id: "konami_master",
+            title: "KONAMI MASTER",
+            desc: "↑↑↓↓←→←→BA. Unlocks DEV_MENU.",
+            icon: "▲",
+            check: function () { return !!EGG.konamiTriggered; }
+        },
+        {
+            id: "overclocked",
+            title: "OVERCLOCKED",
+            desc: "RGB + a pixel pattern. Now you're modding.",
+            icon: "⚡",
+            check: function () { return !!EGG.overclocked; }
+        },
+        {
+            id: "all_eggs",
+            title: "ALL EGGS FOUND",
+            desc: "Trigger every easter egg.",
+            icon: "✶",
+            check: function () {
+                return EGG.pingasUnlocked && EGG.konamiTriggered &&
+                       EGG.overheatTriggered && EGG.overclocked;
+            }
+        }
+    ];
+
+    function loadAchievements() {
+        try {
+            const raw = localStorage.getItem(ACH_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            return new Set(Array.isArray(arr) ? arr : []);
+        } catch (_) { return new Set(); }
+    }
+
+    function saveAchievements() {
+        if (!ACH_STATE.unlocked) return;
+        try {
+            localStorage.setItem(ACH_KEY,
+                JSON.stringify(Array.from(ACH_STATE.unlocked)));
+        } catch (_) {}
+    }
+
+    function ensureAchievements() {
+        if (!ACH_STATE.unlocked) {
+            ACH_STATE.unlocked = loadAchievements();
+        }
+    }
+
+    function computeAchStats() {
+        const entries = loadGalleryEntries();
+        const clayTypes = new Set();
+        const packs = new Set();
+        let firedCount = 0;
+        let explodedCount = 0;
+        let overfiredCount = 0;
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            if (e.fired) firedCount++;
+            if (e.exploded) explodedCount++;
+            if (e.overfired) overfiredCount++;
+            if (e.clayTypeId) clayTypes.add(e.clayTypeId);
+            if (e.packId)     packs.add(e.packId);
+        }
+        return {
+            firedCount: firedCount,
+            explodedCount: explodedCount,
+            overfiredCount: overfiredCount,
+            clayTypes: clayTypes,
+            packs: packs
+        };
+    }
+
+    function grantReward(grant) {
+        if (!grant) return;
+        if (grant.stamp) {
+            /* Append to REWARDS_PACK if not already there */
+            if (REWARDS_PACK.patterns.indexOf(grant.stamp) < 0) {
+                REWARDS_PACK.patterns.push(grant.stamp);
+            }
+            /* Make sure the TROPHY pack is in GLAZE_PACKS once. */
+            if (GLAZE_PACKS.indexOf(REWARDS_PACK) < 0) {
+                GLAZE_PACKS.push(REWARDS_PACK);
+            }
+            /* If the decorate UI is currently mounted, rebuild
+               so the new tab/stamp shows up. */
+            if (currentScreen === "decorate" &&
+                typeof buildToolUI === "function") {
+                buildToolUI();
+            }
+        }
+        /* unlocksClay is handled by buildClayPicker filtering on
+           isClayUnlocked() — no list mutation needed here. */
+    }
+
+    function isClayUnlocked(c) {
+        if (!c.unlockedBy) return true;
+        ensureAchievements();
+        return ACH_STATE.unlocked.has(c.unlockedBy);
+    }
+
+    /* Main entry point — called from anywhere an achievement
+       might fire (after autoSaveFiredPot, on egg triggers, on
+       entering the achievements screen). Scans for newly-met
+       conditions and toasts each one.                          */
+    function checkAchievements() {
+        ensureAchievements();
+        const stats = computeAchStats();
+        for (let i = 0; i < ACHIEVEMENTS.length; i++) {
+            const a = ACHIEVEMENTS[i];
+            if (ACH_STATE.unlocked.has(a.id)) continue;
+            try {
+                if (a.check(stats)) unlockAch(a);
+            } catch (e) {
+                console.warn("[CRAYte] ach check failed: " + a.id, e);
+            }
+        }
+    }
+
+    function unlockAch(a) {
+        ACH_STATE.unlocked.add(a.id);
+        saveAchievements();
+        grantReward(a.grant);
+        toastAch(a);
+        /* Chain — a granted reward might satisfy another ach */
+        if (a.grant) checkAchievements();
+        /* Refresh the achievements screen if user is on it */
+        if (currentScreen === "achievements") refreshAchievementsGrid();
+        /* If we just unlocked VOID, rebuild the clay picker so it
+           appears (if user is on shape screen). */
+        if (a.grant && a.grant.unlocksClay) {
+            buildClayPicker();
+        }
+    }
+
+    function toastAch(a) {
+        const t = document.getElementById("achToast");
+        if (!t) return;
+        const ic = document.getElementById("achToastIcon");
+        const txt = document.getElementById("achToastText");
+        if (ic) ic.textContent = a.icon || "★";
+        if (txt) txt.textContent = "ACHIEVEMENT — " + a.title;
+        t.hidden = false;
+        const fresh = t.cloneNode(true);
+        t.parentNode.replaceChild(fresh, t);
+        setTimeout(function () { fresh.hidden = true; }, 4500);
+        kilnDing();
+    }
+
     /* ============================================================
        EASTER EGGS — chunk 8
        ============================================================
@@ -4149,6 +4513,8 @@
         sync("devSentientPot",  "sentientPot");
         sync("devOneFrameFire", "oneFrameFire");
         poot(); poot();   /* victory chord */
+        EGG.konamiTriggered = true;
+        checkAchievements();
     }
 
     function closeDevMenu() {
@@ -4225,6 +4591,7 @@
             }
         }
         poot();
+        checkAchievements();
     }
 
     /* PINGAS stamp drawer — text framed in the chunky style. */
@@ -4260,6 +4627,7 @@
             setTimeout(kilnCrackle, i * 110 + Math.random() * 80);
         }
         haptic([60, 30, 80, 30, 120]);
+        checkAchievements();
     }
 
     function clearOverheat() {
@@ -4302,6 +4670,7 @@
         showOverclockedToast();
         /* triple-ding for ceremony */
         kilnDing();
+        checkAchievements();
     }
 
     function showOverclockedToast() {
