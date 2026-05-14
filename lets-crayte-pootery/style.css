@@ -1466,7 +1466,215 @@ a:focus-visible {
     padding: 12px 10px;
 }
 
-/* ----- 12. Responsive nudges ----- */
+/* ----- 12. Easter eggs (chunk 8 — Konami dev menu, PINGAS flash, OVERCLOCKED toast) ----- */
+
+/* DEV_MENU.EXE — opens on the Konami code at the title screen */
+.dev-menu {
+    position: fixed;
+    inset: 0;
+    z-index: 250;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.dev-menu[hidden] { display: none; }
+
+.dev-frame {
+    width: min(420px, 92vw);
+    border: 2px solid var(--pink);
+    background: #051419;
+    border-radius: var(--radius-md);
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 32px rgba(255, 46, 136, 0.5);
+    overflow: hidden;
+    animation: dev-shake 0.12s steps(2) 4;
+}
+
+@keyframes dev-shake {
+    0%   { transform: translate(0, 0); }
+    25%  { transform: translate(-2px, 1px); }
+    50%  { transform: translate(2px, -1px); }
+    75%  { transform: translate(-1px, 2px); }
+    100% { transform: translate(0, 0); }
+}
+
+.dev-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(180deg, var(--pink) 0%, var(--pink-deep) 100%);
+    color: #fff;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.6px;
+    text-shadow: 1px 1px 0 #000;
+}
+
+.dev-body {
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-family: var(--font-lcd);
+    font-size: 18px;
+    color: var(--teal-dim);
+    text-shadow: 0 0 5px rgba(0, 255, 204, 0.3);
+}
+
+.dev-warn,
+.dev-foot {
+    margin: 0;
+    color: var(--pink-bright);
+    text-shadow: 0 0 6px rgba(255, 46, 136, 0.45);
+}
+
+.dev-foot {
+    color: var(--teal-dim);
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+.dev-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 4px 0;
+}
+
+.dev-toggle input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--pink);
+}
+
+.dev-toggle span {
+    flex: 1;
+}
+
+.dev-toggle em {
+    color: var(--ink-low);
+    font-style: normal;
+    font-size: 14px;
+}
+
+/* PINGAS flash overlay */
+.pingas-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    animation: pingas-flash 1.2s ease-out forwards;
+}
+
+.pingas-flash[hidden] { display: none; }
+
+@keyframes pingas-flash {
+    0%   { opacity: 0; transform: scale(0.4); }
+    20%  { opacity: 1; transform: scale(1.15); }
+    50%  { opacity: 1; transform: scale(1.0); }
+    100% { opacity: 0; transform: scale(1.4); }
+}
+
+.robotnik-silhouette {
+    width: 180px;
+    height: 216px;
+    filter: drop-shadow(0 0 18px rgba(255, 46, 136, 0.7))
+            drop-shadow(0 0 32px rgba(0, 255, 204, 0.4));
+}
+
+.pingas-text {
+    position: absolute;
+    bottom: 22%;
+    font-family: var(--font-title);
+    font-size: clamp(48px, 12vw, 96px);
+    letter-spacing: 8px;
+    color: #fff;
+    text-shadow:
+        5px 5px 0 var(--pink-deep),
+        -2px -2px 0 var(--teal),
+        0 0 24px rgba(255, 46, 136, 0.8);
+    transform: rotate(-4deg);
+}
+
+/* OVERCLOCKED toast — corner notification */
+.overclocked-toast {
+    position: fixed;
+    top: 64px;
+    right: 16px;
+    z-index: 260;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: linear-gradient(90deg,
+        rgba(255, 46, 136, 0.95),
+        rgba(0, 255, 204, 0.95));
+    background-size: 200% 100%;
+    color: #02141a;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    border-radius: var(--radius-md);
+    box-shadow:
+        0 0 0 2px #000,
+        0 0 24px rgba(255, 46, 136, 0.6),
+        0 0 32px rgba(0, 255, 204, 0.4);
+    animation:
+        oc-slide-in 0.4s ease-out both,
+        oc-rainbow  2.4s linear infinite,
+        oc-slide-out 0.5s ease-in 3.6s forwards;
+    text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.overclocked-toast[hidden] { display: none; }
+
+.oc-glyph {
+    font-size: 18px;
+    text-shadow: 0 0 6px #fff;
+}
+
+@keyframes oc-slide-in {
+    from { transform: translateX(120%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes oc-slide-out {
+    from { transform: translateX(0);    opacity: 1; }
+    to   { transform: translateX(120%); opacity: 0; }
+}
+
+@keyframes oc-rainbow {
+    from { background-position: 0%   50%; }
+    to   { background-position: 200% 50%; }
+}
+
+/* Kiln overheat glitch — shaking + RGB split filter on the canvas */
+.kiln-overheat #kilnCanvas {
+    animation: kiln-shake 0.06s steps(2) infinite;
+    filter: drop-shadow(2px 0 0 rgba(255, 0, 0, 0.6))
+            drop-shadow(-2px 0 0 rgba(0, 255, 255, 0.6));
+}
+
+@keyframes kiln-shake {
+    0%   { transform: translate(0,  0); }
+    25%  { transform: translate(-2px, 1px); }
+    50%  { transform: translate(2px, -2px); }
+    75%  { transform: translate(-1px, 2px); }
+    100% { transform: translate(1px,  0); }
+}
+
+/* ----- 13. Responsive nudges ----- */
 
 @media (max-width: 480px) {
     .title-stack { gap: 22px; }

@@ -769,6 +769,8 @@
         const ease = 1 - Math.pow(1 - SHAPE.EASE, dt / 16.67);
 
         let didShape = false;
+        const minR = EGG.infiniteClay ? 0   : SHAPE.MIN_R;
+        const maxR = EGG.infiniteClay ? 9999 : SHAPE.MAX_R;
         for (let i = 0; i < N; i++) {
             const d = i - centerIdx;
             const w = Math.exp(-d * d / sigma2);
@@ -777,7 +779,7 @@
                then we ease toward that desired over the frame. */
             const desired = clay[i].radius + (targetR - clay[i].radius) * w;
             const next = clay[i].radius + (desired - clay[i].radius) * ease;
-            const clamped = Math.max(SHAPE.MIN_R, Math.min(SHAPE.MAX_R, next));
+            const clamped = Math.max(minR, Math.min(maxR, next));
             if (Math.abs(clamped - clay[i].radius) > 0.04) didShape = true;
             clay[i].radius = clamped;
         }
@@ -875,6 +877,30 @@
             g.addColorStop(1,    "rgba(0, 0, 0, 0.12)");
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+            ctx.restore();
+        }
+
+        /* OVERFIRED — chunk-8 egg, layers a darker burnt char on
+           top of the normal fired tint. */
+        if (opts.overfired) {
+            ctx.save();
+            buildPotPath(ctx);
+            ctx.clip();
+            ctx.globalCompositeOperation = "multiply";
+            ctx.fillStyle = "rgba(60, 28, 10, 0.55)";
+            ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+            ctx.globalCompositeOperation = "source-over";
+            /* Scattered black crackle marks */
+            for (let i = 0; i < 36; i++) {
+                const px = SHAPE.centerX +
+                    (Math.random() - 0.5) * 200;
+                const py = 100 + Math.random() * 400;
+                ctx.fillStyle = "rgba(0, 0, 0, " +
+                    (0.18 + Math.random() * 0.30) + ")";
+                ctx.beginPath();
+                ctx.arc(px, py, 1 + Math.random() * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
             ctx.restore();
         }
 
@@ -1056,6 +1082,47 @@
         ctx.strokeStyle = "#1f0a02";
         ctx.lineWidth = 1.5;
         ctx.stroke();
+
+        /* SENTIENT POT — dev-menu egg. A single blinking eye on the
+           front of the pot. Tracks the centerline at the middle of
+           the pot's height. */
+        if (EGG.sentientPot) {
+            const midIdx = Math.floor(N / 2);
+            const eyeY = clay[midIdx].y;
+            const eyeR = Math.min(18, clay[midIdx].radius * 0.32);
+            const blink = (Math.sin(performance.now() / 540) > 0.94);
+            /* whites of the eye */
+            ctx.fillStyle = "#f4f6ea";
+            ctx.beginPath();
+            ctx.ellipse(cx, eyeY, eyeR * 1.4, eyeR * (blink ? 0.05 : 0.9),
+                        0, 0, Math.PI * 2);
+            ctx.fill();
+            if (!blink) {
+                /* pupil tracks pointer if shaping, else looks ahead */
+                let pupilX = cx;
+                let pupilY = eyeY;
+                if (SHAPE.pointer) {
+                    const dx = SHAPE.pointer.x - cx;
+                    const dy = SHAPE.pointer.y - eyeY;
+                    const m = Math.hypot(dx, dy);
+                    if (m > 0.01) {
+                        const off = eyeR * 0.45;
+                        pupilX = cx     + (dx / m) * off;
+                        pupilY = eyeY   + (dy / m) * off * 0.55;
+                    }
+                }
+                ctx.fillStyle = "#1a0e08";
+                ctx.beginPath();
+                ctx.arc(pupilX, pupilY, eyeR * 0.55, 0, Math.PI * 2);
+                ctx.fill();
+                /* highlight */
+                ctx.fillStyle = "#fff";
+                ctx.beginPath();
+                ctx.arc(pupilX - eyeR * 0.2, pupilY - eyeR * 0.2,
+                        eyeR * 0.18, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
     }
 
     function drawRim(ctx) {
@@ -2192,6 +2259,7 @@
             ctx.fillStyle = "#000";
         } else {
             ctx.fillStyle = currentPaintColor();
+            noteGlazeUsed(D.glaze);
         }
         ctx.beginPath();
         ctx.arc(p.x, p.y, D.size, 0, Math.PI * 2);
@@ -2234,6 +2302,8 @@
         fn(D.paintCtx, p.x, p.y, r, currentPaintColor());
         stampClick();
         haptic(15);
+        noteGlazeUsed(D.glaze);
+        notePatternUsed(D.pattern);
     }
 
     /* ----- 6E. Tool UI ----- */
@@ -2600,7 +2670,10 @@
                     ? D.paintCanvas.toDataURL("image/png")
                     : null,
                 packId: D.activePackId,
-                fired: true
+                fired: true,
+                /* Chunk-8 egg: overheated pots get an extra-crispy
+                   render in the gallery + a tag. */
+                overfired: EGG.overheatTriggered === true
             };
             existing.push(entry);
             /* Cap at 50 — keep newest. Brief calls for the "you have
@@ -3001,7 +3074,8 @@
             background:  false,
             wheel:       false,
             corners:     false,
-            fired:       KILN.fired
+            fired:       KILN.fired,
+            overfired:   EGG.overheatTriggered
         });
         ctx.restore();
 
@@ -3030,7 +3104,20 @@
             KILN.doorProgress = 1.0;
             KILN.glowIntensity = 0;
             KILN.fired = false;
+            clearOverheat();
             hideCelebrate();
+            /* 1-FRAME EXPLOSION ON FIRE (dev egg) — skip every
+               intermediate state and land at reveal next frame.
+               Plays the ding immediately for the "explosion".  */
+            if (EGG.oneFrameFire) {
+                setKilnStatus("FIRED");
+                KILN.fired = true;
+                autoSaveFiredPot();
+                kilnDing();
+                showCelebrate();
+                kilnEnter("done");
+                return;
+            }
         } else if (state === "closing") {
             setKilnStatus("DOORS CLOSING");
         } else if (state === "firing") {
@@ -3158,6 +3245,9 @@
         onLeave: function () {
             stopKilnLoop();
             hideCelebrate();
+            /* Drop the egg's overheat shake class so leaving the
+               kiln doesn't leave glitch CSS attached to <body>. */
+            document.body.classList.remove("kiln-overheat");
         }
     });
 
@@ -3277,6 +3367,16 @@
                 g.addColorStop(0.35, "rgba(255, 245, 220, 0.00)");
                 g.addColorStop(1,    "rgba(0, 0, 0, 0.12)");
                 ctx.fillStyle = g;
+                ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
+                ctx.restore();
+            }
+            /* Overfired-tag entries get the burnt char overlay too. */
+            if (entry.overfired) {
+                ctx.save();
+                buildPotPath(ctx);
+                ctx.clip();
+                ctx.globalCompositeOperation = "multiply";
+                ctx.fillStyle = "rgba(60, 28, 10, 0.55)";
                 ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
                 ctx.restore();
             }
@@ -3529,10 +3629,292 @@
         }
     });
 
+    /* ============================================================
+       EASTER EGGS — chunk 8
+       ============================================================
+       Konami code (title) -> DEV_MENU with cursed toggles.
+       Type "PINGAS" anywhere -> Robotnik flash + PINGAS stamp
+       unlocked in every pack for the rest of the session.
+       Click the kiln 10x during firing -> OVERHEATS — glitch
+       effect + the saved pot gets an "overfired" flag with an
+       extra-crispy glaze overlay.
+       Use @rgb-cycle + a GAMER pixel pattern in the same paint
+       session -> OVERCLOCKED — toast + new MODDED stamp that
+       draws a rainbow pixel-heart.
+       ============================================================ */
+
+    const EGG = {
+        infiniteClay: false,
+        sentientPot:  false,
+        oneFrameFire: false,
+        pingasUnlocked: false,
+        overclocked:    false,
+        overheatLoad:   0,    /* clicks on kiln canvas during firing */
+        overheatTriggered: false,
+        usedRgb:        false,
+        usedGamerPixel: false
+    };
+
+    const GAMER_PIXEL_PATTERNS = {
+        "pixel-heart": true,
+        "pixel-skull": true,
+        "cloud-8bit":  true
+    };
+
+    /* ----- 8X.A. Konami code (title screen) ----- */
+
+    const KONAMI_SEQ = [
+        "ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown",
+        "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight",
+        "b", "a"
+    ];
+    let konamiIdx = 0;
+
+    document.addEventListener("keydown", function (e) {
+        /* Only count while on the title screen — otherwise arrow keys
+           in inputs / other contexts would compete. */
+        if (currentScreen !== "title") { konamiIdx = 0; return; }
+        const key = (e.key.length === 1) ? e.key.toLowerCase() : e.key;
+        if (key === KONAMI_SEQ[konamiIdx]) {
+            konamiIdx++;
+            if (konamiIdx === KONAMI_SEQ.length) {
+                konamiIdx = 0;
+                openDevMenu();
+            }
+        } else {
+            /* Allow restarting from the head if the user just struck
+               the first key again. */
+            konamiIdx = (key === KONAMI_SEQ[0]) ? 1 : 0;
+        }
+    });
+
+    function openDevMenu() {
+        const panel = document.getElementById("devMenu");
+        if (!panel) return;
+        panel.hidden = false;
+        /* sync checkboxes to current flag state */
+        const sync = function (id, flag) {
+            const el = document.getElementById(id);
+            if (el) el.checked = !!EGG[flag];
+        };
+        sync("devInfiniteClay", "infiniteClay");
+        sync("devSentientPot",  "sentientPot");
+        sync("devOneFrameFire", "oneFrameFire");
+        poot(); poot();   /* victory chord */
+    }
+
+    function closeDevMenu() {
+        const panel = document.getElementById("devMenu");
+        if (panel) panel.hidden = true;
+    }
+
+    function wireDevMenu() {
+        const close = document.getElementById("devClose");
+        if (close) close.addEventListener("click", closeDevMenu);
+        const panel = document.getElementById("devMenu");
+        if (panel) panel.addEventListener("click", function (e) {
+            if (e.target === panel) closeDevMenu();
+        });
+        const ic = document.getElementById("devInfiniteClay");
+        const sp = document.getElementById("devSentientPot");
+        const of = document.getElementById("devOneFrameFire");
+        if (ic) ic.addEventListener("change", function () {
+            EGG.infiniteClay = ic.checked;
+        });
+        if (sp) sp.addEventListener("change", function () {
+            EGG.sentientPot = sp.checked;
+        });
+        if (of) of.addEventListener("change", function () {
+            EGG.oneFrameFire = of.checked;
+        });
+    }
+
+    /* ----- 8X.B. PINGAS ----- */
+
+    const PINGAS_SEQ = ["p","i","n","g","a","s"];
+    let pingasIdx = 0;
+
+    document.addEventListener("keydown", function (e) {
+        /* Don't capture when typing in the gallery name input. */
+        const t = e.target;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
+            pingasIdx = 0;
+            return;
+        }
+        const k = (e.key || "").toLowerCase();
+        if (k === PINGAS_SEQ[pingasIdx]) {
+            pingasIdx++;
+            if (pingasIdx === PINGAS_SEQ.length) {
+                pingasIdx = 0;
+                firePingas();
+            }
+        } else {
+            pingasIdx = (k === PINGAS_SEQ[0]) ? 1 : 0;
+        }
+    });
+
+    function firePingas() {
+        /* Flash overlay */
+        const flash = document.getElementById("pingasFlash");
+        if (flash) {
+            flash.hidden = false;
+            /* Restart the animation by removing+re-adding the element */
+            const fresh = flash.cloneNode(true);
+            flash.parentNode.replaceChild(fresh, flash);
+            setTimeout(function () { fresh.hidden = true; }, 1200);
+        }
+        /* Unlock the PINGAS stamp in every pack (once). */
+        if (!EGG.pingasUnlocked) {
+            EGG.pingasUnlocked = true;
+            for (let i = 0; i < GLAZE_PACKS.length; i++) {
+                if (GLAZE_PACKS[i].patterns.indexOf("pingas") < 0) {
+                    GLAZE_PACKS[i].patterns.push("pingas");
+                }
+            }
+            /* Rebuild the palette if we're already on decorate. */
+            if (currentScreen === "decorate" && typeof buildToolUI === "function") {
+                buildToolUI();
+            }
+        }
+        poot();
+    }
+
+    /* PINGAS stamp drawer — text framed in the chunky style. */
+    PATTERN_DRAWERS["pingas"] = function (ctx, x, y, r, c) {
+        textStamp(ctx, x, y, r, c, "PINGAS", { fontSize: 0.42 });
+    };
+
+    /* ----- 8X.C. Kiln overheat ----- */
+
+    function wireKilnOverheat() {
+        const c = document.getElementById("kilnCanvas");
+        if (!c) return;
+        c.addEventListener("click", function () {
+            if (KILN.state !== "firing") return;
+            if (EGG.overheatTriggered) return;
+            EGG.overheatLoad++;
+            /* Tiny visual feedback — pulse the kiln LED phase */
+            KILN.glowPhase += 4;
+            if (EGG.overheatLoad >= 10) triggerOverheat();
+        });
+    }
+
+    function triggerOverheat() {
+        EGG.overheatTriggered = true;
+        document.body.classList.add("kiln-overheat");
+        /* Longer roar + extra crackle storm */
+        kilnRoar(2.5);
+        for (let i = 0; i < 14; i++) {
+            setTimeout(kilnCrackle, i * 110 + Math.random() * 80);
+        }
+        haptic([60, 30, 80, 30, 120]);
+    }
+
+    function clearOverheat() {
+        EGG.overheatLoad = 0;
+        EGG.overheatTriggered = false;
+        document.body.classList.remove("kiln-overheat");
+    }
+
+    /* ----- 8X.D. OVERCLOCKED combo ----- */
+
+    function noteGlazeUsed(glaze) {
+        if (glaze === "@rgb-cycle") {
+            EGG.usedRgb = true;
+            checkOverclocked();
+        }
+    }
+
+    function notePatternUsed(pat) {
+        if (GAMER_PIXEL_PATTERNS[pat]) {
+            EGG.usedGamerPixel = true;
+            checkOverclocked();
+        }
+    }
+
+    function checkOverclocked() {
+        if (EGG.overclocked) return;
+        if (!(EGG.usedRgb && EGG.usedGamerPixel)) return;
+        EGG.overclocked = true;
+        /* Unlock the OVERCLOCKED stamp in MODDED */
+        for (let i = 0; i < GLAZE_PACKS.length; i++) {
+            if (GLAZE_PACKS[i].id === "modded") {
+                if (GLAZE_PACKS[i].patterns.indexOf("overclocked") < 0) {
+                    GLAZE_PACKS[i].patterns.push("overclocked");
+                }
+            }
+        }
+        if (currentScreen === "decorate" && typeof buildToolUI === "function") {
+            buildToolUI();
+        }
+        showOverclockedToast();
+        /* triple-ding for ceremony */
+        kilnDing();
+    }
+
+    function showOverclockedToast() {
+        const t = document.getElementById("overclockedToast");
+        if (!t) return;
+        t.hidden = false;
+        /* Restart the animation chain */
+        const fresh = t.cloneNode(true);
+        t.parentNode.replaceChild(fresh, t);
+        setTimeout(function () { fresh.hidden = true; }, 4500);
+    }
+
+    /* OVERCLOCKED stamp — multi-color pixel heart that captures
+       a different RGB hue per cell so each stamp is its own
+       rainbow.                                                  */
+    PATTERN_DRAWERS["overclocked"] = function (ctx, x, y, r, c) {
+        const cell = r * 0.18;
+        const grid = [
+            [0,1,1,0,1,1,0],
+            [1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1],
+            [0,1,1,1,1,1,0],
+            [0,0,1,1,1,0,0],
+            [0,0,0,1,0,0,0]
+        ];
+        const rows = grid.length;
+        const cols = grid[0].length;
+        const ox = x - (cols * cell) / 2;
+        const oy = y - (rows * cell) / 2;
+        const baseHue = (performance.now() * 0.4) % 360;
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                if (!grid[row][col]) continue;
+                const h = (baseHue + (row + col) * 25) % 360;
+                ctx.fillStyle = "hsl(" + h.toFixed(0) + ", 95%, 60%)";
+                ctx.fillRect(ox + col * cell, oy + row * cell, cell, cell);
+            }
+        }
+    };
+
+    /* ----- 8X.E. Hook noteGlazeUsed / notePatternUsed into paint -----
+       The actual hooks live inside paintDot / stampAt — they call
+       these note* functions every time a glaze or pattern is
+       actually used. The function exports here let the hooks find
+       them via closure. */
+
+    /* Override paint funcs to track usage. Re-define paintDot /
+       paintStrokeTo / stampAt isn't worth the indirection — we
+       can just wire from inside them via the closure variables.
+       But those funcs are defined above. So we add wrappers via
+       window-level interception. Cleanest: re-export the funcs
+       once they're declared elsewhere via window.CRAYte.        */
+
+    /* Helpful: small hook to ensure dev menu is wired and overheat
+       click listener is attached once. Runs from init().         */
+    function initEggs() {
+        wireDevMenu();
+        wireKilnOverheat();
+    }
+
     /* ---------- 9. INIT (must run after all registerScreen calls) ---------- */
 
     function init() {
         initTitle();
+        initEggs();
         showScreen("title");
     }
 
