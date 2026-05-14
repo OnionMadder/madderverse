@@ -361,7 +361,12 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    /* visible (not hidden) — the head-bob animation translates the head
+       upward by ~20% on each beat. If this box clipped at its edge, the
+       top of the head sprite would get cut off at the apex of the bounce.
+       .stage-slot is overflow:visible so the head can extend above the
+       slot's top edge cleanly. */
+    overflow: visible;
     min-height: 0;
     pointer-events: none;
 }
@@ -616,7 +621,9 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
+    /* visible so a chip's head-bob (if it ever animates) doesn't clip.
+       Matches .slot-icon — the head-bob lifts the sprite ~20%. */
+    overflow: visible;
     min-height: 0;
     pointer-events: none;
 }
