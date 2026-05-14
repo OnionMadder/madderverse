@@ -10,6 +10,91 @@
 (function () {
     "use strict";
 
+    /* ---------- 0a. SUPABASE BACKEND ----------
+       Public gallery + (future) pot battles live in a Supabase
+       project. The anon/publishable key below is SAFE to embed
+       in client-side code — that's its designed purpose. Row-
+       level security policies on the public_pots table control
+       what anonymous callers can actually do:
+         - SELECT  allowed (anyone can read)
+         - INSERT  allowed (anyone can submit)
+         - UPDATE  blocked
+         - DELETE  blocked
+       So a leaked key still can't vandalize.
+
+       If you ever rotate keys, update both constants below and
+       re-deploy. If supabaseEnabled() returns false (network
+       blocked, project deleted, etc.) the gallery's PUBLIC tab
+       and all submit/fetch helpers degrade silently — the rest
+       of the game keeps working offline.                       */
+
+    const SUPABASE_URL = "https://qucwhtkbnugslkgbtxwk.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_bGVCKFvYwHiiJUhen8q-4A_p6le2Jcv";
+
+    function supabaseEnabled() {
+        return !!(SUPABASE_URL && SUPABASE_KEY);
+    }
+
+    function supabaseHeaders(extra) {
+        const h = {
+            "apikey":        SUPABASE_KEY,
+            "Authorization": "Bearer " + SUPABASE_KEY
+        };
+        if (extra) for (const k in extra) h[k] = extra[k];
+        return h;
+    }
+
+    /* Fetch latest N public pots, newest first. */
+    function fetchPublicPots(limit) {
+        if (!supabaseEnabled()) return Promise.resolve([]);
+        const n = Math.max(1, Math.min(100, limit || 50));
+        const url = SUPABASE_URL +
+            "/rest/v1/public_pots?select=*&order=created_at.desc&limit=" + n;
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .catch(function (e) {
+                console.warn("[CRAYte] public fetch failed", e);
+                return [];
+            });
+    }
+
+    /* Submit one local pot to the public gallery. Returns the
+       inserted row (with .id and .created_at) on success, null
+       on failure. */
+    function submitPublicPot(entry, author) {
+        if (!supabaseEnabled()) return Promise.resolve(null);
+        const url = SUPABASE_URL + "/rest/v1/public_pots";
+        const body = {
+            name:           entry.name || "UNNAMED POT",
+            author:         (author || "anonymous").slice(0, 40),
+            pack_id:        entry.packId       || null,
+            clay_type_id:   entry.clayTypeId   || null,
+            fired:          !!entry.fired,
+            overfired:      !!entry.overfired,
+            exploded:       !!entry.exploded,
+            clay:           entry.clay         || null,
+            paint_data_url: entry.paintDataUrl || null
+        };
+        return fetch(url, {
+            method: "POST",
+            headers: supabaseHeaders({
+                "Content-Type": "application/json",
+                "Prefer":       "return=representation"
+            }),
+            body: JSON.stringify(body)
+        })
+            .then(function (r) {
+                if (!r.ok) return null;
+                return r.json().then(function (rows) {
+                    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+                });
+            })
+            .catch(function (e) {
+                console.warn("[CRAYte] public submit failed", e);
+                return null;
+            });
+    }
+
     /* ---------- 0. AUDIO BOOTSTRAP ----------
        Single shared AudioContext. Web Audio requires a user
        gesture to start; we lazy-create on the first gesture
@@ -3722,9 +3807,13 @@
        ============================================================ */
 
     const GALLERY = {
-        items: [],
+        items: [],          /* current visible list (mine OR public) */
         detailEntry: null,
-        inited: false
+        inited: false,
+        tab: "mine",        /* "mine" | "public" */
+        publicCache: null,  /* last fetched public list, cached for tab toggles */
+        publicLoading: false,
+        publicLastFetch: 0  /* timestamp — refetch if older than 60s */
     };
 
     const GALLERY_KEY  = "crayte-gallery";
@@ -3897,6 +3986,14 @@
         tag.textContent = packLabel(entry.packId);
         meta.appendChild(tag);
 
+        /* Public entries also get an author byline. */
+        if (entry._isPublic && entry.author) {
+            const by = document.createElement("span");
+            by.className = "pot-author";
+            by.textContent = "by " + entry.author;
+            meta.appendChild(by);
+        }
+
         card.appendChild(meta);
 
         card.addEventListener("click", function () { openDetail(entry); });
@@ -3909,13 +4006,47 @@
         return card;
     }
 
+    /* Normalize a row coming back from Supabase into the same
+       shape buildThumbCard / renderEntryIntoCanvas already
+       understands (snake_case -> camelCase, plus the public-flag). */
+    function normalizePublicRow(row) {
+        return {
+            id:           "public-" + row.id,
+            createdAt:    row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+            clay:         Array.isArray(row.clay) ? row.clay : [],
+            paintDataUrl: row.paint_data_url || null,
+            packId:       row.pack_id || "core",
+            clayTypeId:   row.clay_type_id || "earthenware",
+            fired:        !!row.fired,
+            overfired:    !!row.overfired,
+            exploded:     !!row.exploded,
+            name:         row.name || "",
+            author:       row.author || "anonymous",
+            _isPublic:    true,
+            _publicId:    row.id
+        };
+    }
+
     function refreshGalleryGrid() {
-        const grid = document.getElementById("galleryGrid");
-        const empty = document.getElementById("galleryEmpty");
-        const count = document.getElementById("galleryCount");
-        const banner = document.getElementById("lotOfPotsBanner");
+        const grid    = document.getElementById("galleryGrid");
+        const empty   = document.getElementById("galleryEmpty");
+        const count   = document.getElementById("galleryCount");
+        const banner  = document.getElementById("lotOfPotsBanner");
         if (!grid) return;
 
+        /* Reflect active tab on the tab buttons */
+        document.querySelectorAll(".gallery-tab[data-tab]").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.tab === GALLERY.tab);
+        });
+
+        if (GALLERY.tab === "public") {
+            renderPublicTab(grid, empty, count, banner);
+        } else {
+            renderMineTab(grid, empty, count, banner);
+        }
+    }
+
+    function renderMineTab(grid, empty, count, banner) {
         GALLERY.items = loadGalleryEntries();
         grid.innerHTML = "";
 
@@ -3933,10 +4064,62 @@
         }
         if (banner) banner.hidden = GALLERY.items.length < LOT_OF_POTS;
 
-        /* Newest first */
         const arr = GALLERY.items.slice().reverse();
         for (let i = 0; i < arr.length; i++) {
             grid.appendChild(buildThumbCard(arr[i]));
+        }
+    }
+
+    function renderPublicTab(grid, empty, count, banner) {
+        if (banner) banner.hidden = true;
+        if (empty)  empty.hidden  = true;
+        grid.innerHTML = "";
+
+        if (!supabaseEnabled()) {
+            if (count) count.textContent = "PUBLIC OFFLINE";
+            const msg = document.createElement("p");
+            msg.className = "gallery-msg";
+            msg.textContent = "Public gallery isn't configured.";
+            grid.appendChild(msg);
+            return;
+        }
+
+        const stale = (Date.now() - GALLERY.publicLastFetch) > 60000;
+        if (GALLERY.publicCache && !stale) {
+            paintPublicGrid(GALLERY.publicCache, grid, count);
+            return;
+        }
+
+        if (count) count.textContent = "FETCHING...";
+        if (GALLERY.publicLoading) return;
+        GALLERY.publicLoading = true;
+        fetchPublicPots(50).then(function (rows) {
+            GALLERY.publicLoading = false;
+            GALLERY.publicCache = rows.map(normalizePublicRow);
+            GALLERY.publicLastFetch = Date.now();
+            /* Only paint if user is still on the public tab */
+            if (currentScreen === "gallery" && GALLERY.tab === "public") {
+                paintPublicGrid(GALLERY.publicCache, grid, count);
+            }
+        });
+    }
+
+    function paintPublicGrid(items, grid, count) {
+        grid.innerHTML = "";
+        if (count) {
+            count.textContent = items.length +
+                (items.length === 1 ? " PUBLIC POT" : " PUBLIC POTS");
+        }
+        if (items.length === 0) {
+            const msg = document.createElement("p");
+            msg.className = "gallery-msg";
+            msg.textContent = "No public pots yet. Submit one!";
+            grid.appendChild(msg);
+            return;
+        }
+        GALLERY.items = items;
+        for (let i = 0; i < items.length; i++) {
+            grid.appendChild(buildThumbCard(items[i]));
         }
     }
 
@@ -3951,9 +4134,21 @@
         const pack   = document.getElementById("detailPack");
         if (!panel || !canvas) return;
 
-        if (name) name.value = entry.name || "";
-        if (date) date.textContent = formatPotDate(entry.createdAt);
+        if (name) {
+            name.value = entry.name || "";
+            /* Public entries are read-only; clear the input lock
+               on mine entries so user can rename. */
+            name.disabled = !!entry._isPublic;
+        }
+        if (date) {
+            const author = entry._isPublic && entry.author
+                ? " · by " + entry.author
+                : "";
+            date.textContent = formatPotDate(entry.createdAt) + author;
+        }
         if (pack) pack.textContent = packLabel(entry.packId);
+
+        refreshDetailSubmitButton();
 
         panel.hidden = false;
 
@@ -4044,6 +4239,7 @@
         const close = document.getElementById("detailClose");
         const del   = document.getElementById("detailDelete");
         const expt  = document.getElementById("detailExport");
+        const submit = document.getElementById("detailSubmit");
         const name  = document.getElementById("detailName");
         const panel = document.getElementById("potDetail");
 
@@ -4056,11 +4252,10 @@
             showScreen("shape");
         });
 
-        if (close) close.addEventListener("click", closeDetail);
-
-        if (del) del.addEventListener("click", deleteCurrentEntry);
-
-        if (expt) expt.addEventListener("click", exportCurrentEntry);
+        if (close)  close.addEventListener("click", closeDetail);
+        if (del)    del.addEventListener("click",   deleteCurrentEntry);
+        if (expt)   expt.addEventListener("click",  exportCurrentEntry);
+        if (submit) submit.addEventListener("click", submitCurrentToPublic);
 
         if (name) {
             name.addEventListener("change", saveDetailName);
@@ -4076,6 +4271,89 @@
         document.addEventListener("keydown", function (e) {
             if (e.key === "Escape" && panel && !panel.hidden) closeDetail();
         });
+
+        /* Gallery tabs (Day 5 chunk E — MINE / EVERYONE) */
+        document.querySelectorAll(".gallery-tab[data-tab]").forEach(function (b) {
+            b.addEventListener("click", function () {
+                if (GALLERY.tab === b.dataset.tab) return;
+                GALLERY.tab = b.dataset.tab;
+                refreshGalleryGrid();
+            });
+        });
+    }
+
+    function submitCurrentToPublic() {
+        const entry = GALLERY.detailEntry;
+        if (!entry || entry._isPublic) return;
+        if (!supabaseEnabled()) {
+            alert("Public gallery isn't configured yet.");
+            return;
+        }
+        if (entry.publicId) {
+            alert("This pot is already public.");
+            return;
+        }
+        const author = (window.prompt(
+            "Sign your pot (optional). Anyone can see this name.",
+            entry._author || ""
+        ) || "").trim() || "anonymous";
+        const btn = document.getElementById("detailSubmit");
+        if (btn) {
+            btn.disabled = true;
+            const lbl = btn.querySelector(".btn-label");
+            if (lbl) lbl.textContent = "UPLOADING...";
+        }
+        submitPublicPot(entry, author).then(function (row) {
+            if (btn) btn.disabled = false;
+            if (row && row.id) {
+                /* Mark the local entry as already submitted so the
+                   button reflects that on subsequent opens. */
+                entry.publicId = row.id;
+                entry._author = author;
+                const arr = loadGalleryEntries();
+                for (let i = 0; i < arr.length; i++) {
+                    if (arr[i].id === entry.id) {
+                        arr[i].publicId = row.id;
+                        arr[i]._author = author;
+                        break;
+                    }
+                }
+                saveGalleryEntries(arr);
+                /* Invalidate the public cache so a refresh on the
+                   PUBLIC tab shows the new pot. */
+                GALLERY.publicCache = null;
+                refreshDetailSubmitButton();
+                if (btn) {
+                    const lbl = btn.querySelector(".btn-label");
+                    if (lbl) lbl.textContent = "✓ PUBLIC";
+                }
+            } else {
+                if (btn) {
+                    const lbl = btn.querySelector(".btn-label");
+                    if (lbl) lbl.textContent = "FAILED — RETRY";
+                }
+            }
+        });
+    }
+
+    /* Update the SUBMIT button visibility / label to match the
+       current detail entry's state (local & not-yet-public => show;
+       public entry or already-submitted => hide or "ALREADY PUBLIC"). */
+    function refreshDetailSubmitButton() {
+        const submit = document.getElementById("detailSubmit");
+        const del    = document.getElementById("detailDelete");
+        const entry  = GALLERY.detailEntry;
+        if (!submit) return;
+        if (!entry || entry._isPublic) {
+            submit.hidden = true;
+            if (del) del.hidden = !!(entry && entry._isPublic);
+            return;
+        }
+        if (del) del.hidden = false;
+        submit.hidden = false;
+        submit.disabled = !!entry.publicId;
+        const lbl = submit.querySelector(".btn-label");
+        if (lbl) lbl.textContent = entry.publicId ? "✓ PUBLIC" : "SUBMIT PUBLIC";
     }
 
     registerScreen("gallery", {

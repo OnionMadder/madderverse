@@ -353,6 +353,11 @@
 
     <div class="gallery-stack">
 
+        <div class="gallery-tabs" role="tablist" aria-label="Gallery scope">
+            <button class="gallery-tab" data-tab="mine"   type="button">MINE</button>
+            <button class="gallery-tab" data-tab="public" type="button">EVERYONE</button>
+        </div>
+
         <div class="a-lot-of-pots" id="lotOfPotsBanner" hidden>
             <span class="lop-glyph" aria-hidden="true">&#x2606;</span>
             <span class="lop-text">YOU HAVE A LOT OF POTS. WE LOVE THAT FOR YOU.</span>
@@ -392,6 +397,10 @@
             <div class="detail-actions">
                 <button class="btn-control" id="detailDelete" type="button">
                     <span class="btn-label">DELETE</span>
+                </button>
+                <button class="btn-control" id="detailSubmit" type="button">
+                    <span class="btn-label">SUBMIT PUBLIC</span>
+                    <span class="btn-glyph" aria-hidden="true">&uarr;</span>
                 </button>
                 <button class="btn-control primary" id="detailExport" type="button">
                     <span class="btn-label">EXPORT PNG</span>
