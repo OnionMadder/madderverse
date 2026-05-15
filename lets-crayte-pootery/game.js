@@ -1126,19 +1126,30 @@
     /* "Poot" — short, low, farty sawtooth blip with a tiny pitch
        wobble and a band-pass to round off the buzz. Used on the
        title screen, synced to the clay-drifter animation cycle. */
+    /* Poot variants — small/medium/large picked at random so
+       repeated title-screen poots don't sound identical. Each
+       tunes start pitch, drop ratio, duration, and LFO wobble. */
+    const POOT_VARIANTS = [
+        { startF: 140, endF: 80,  dur: 0.20, wobble: 22, vol: 0.11 },   /* small */
+        { startF: 110, endF: 58,  dur: 0.28, wobble: 17, vol: 0.13 },   /* medium (classic) */
+        { startF:  82, endF: 42,  dur: 0.38, wobble: 12, vol: 0.15 },   /* large / longer */
+        { startF: 165, endF: 100, dur: 0.15, wobble: 27, vol: 0.10 }    /* squeaker */
+    ];
+
     function poot() {
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
+        const v = POOT_VARIANTS[Math.floor(Math.random() * POOT_VARIANTS.length)];
 
         const osc = ctx.createOscillator();
         osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(110, now);
-        osc.frequency.exponentialRampToValueAtTime(58, now + 0.28);
+        osc.frequency.setValueAtTime(v.startF, now);
+        osc.frequency.exponentialRampToValueAtTime(v.endF, now + v.dur);
 
         /* Pitch wobble for the comedic farty character. */
         const lfo = ctx.createOscillator();
-        lfo.frequency.value = 17;
+        lfo.frequency.value = v.wobble;
         const lfoGain = ctx.createGain();
         lfoGain.gain.value = 7;
         lfo.connect(lfoGain);
@@ -1151,17 +1162,17 @@
         bp.Q.value = 3.5;
 
         const g = ctx.createGain();
-        g.gain.setValueAtTime(0,    now);
-        g.gain.linearRampToValueAtTime(0.13, now + 0.025);
-        g.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(v.vol, now + 0.025);
+        g.gain.exponentialRampToValueAtTime(0.001, now + v.dur + 0.04);
 
         osc.connect(bp);
         bp.connect(g);
         g.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.34);
+        osc.stop(now + v.dur + 0.06);
         lfo.start(now);
-        lfo.stop(now + 0.34);
+        lfo.stop(now + v.dur + 0.06);
     }
 
     /* Wet-clay sustain — low-pass-filtered noise with an LFO
@@ -1433,13 +1444,59 @@
        second deeper layer for cartoon mouth-feel. Fires on
        actual clay deformation; throttled in applyShaping so a
        sustained drag emits one every ~90-160ms.                */
+    /* Squelch ships in 4 timbre variants randomly chosen on each
+       call so sustained shaping doesn't repeat the same beat.
+       Each variant tunes the noise sweep + decides whether to
+       layer the deep blorp. SHARP = quick high tap, WET = the
+       classic, BLORP = low blubbery, PLOP = quick wet drop. */
+    const SQUELCH_VARIANTS = ["sharp", "wet", "blorp", "plop"];
+
     function squelch() {
+        const ctx = ensureAudio();
+        if (!ctx || ctx.state !== "running") return;
+        const variant = SQUELCH_VARIANTS[
+            Math.floor(Math.random() * SQUELCH_VARIANTS.length)
+        ];
+        playSquelchVariant(variant);
+    }
+
+    function playSquelchVariant(variant) {
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
 
-        /* Layer 1: bright noise sweep — the wet "shh" attack */
-        const len1 = Math.floor(ctx.sampleRate * 0.14);
+        /* Per-variant timbre parameters. */
+        const params = (function () {
+            switch (variant) {
+                case "sharp":
+                    return {
+                        len: 0.085, startF: 720, endR: 0.40,
+                        Q: 9.5,  vol: 0.10, decay: 0.09,
+                        blorpChance: 0.10, blorpF: 180, blorpDecay: 0.06
+                    };
+                case "blorp":
+                    return {
+                        len: 0.20, startF: 320, endR: 0.20,
+                        Q: 6,    vol: 0.10, decay: 0.20,
+                        blorpChance: 0.85, blorpF: 90,  blorpDecay: 0.14
+                    };
+                case "plop":
+                    return {
+                        len: 0.10, startF: 540, endR: 0.30,
+                        Q: 7.5,  vol: 0.12, decay: 0.10,
+                        blorpChance: 0.55, blorpF: 130, blorpDecay: 0.11
+                    };
+                default:   /* "wet" — the classic */
+                    return {
+                        len: 0.14, startF: 360 + Math.random() * 460, endR: 0.28 + Math.random() * 0.32,
+                        Q: 8,    vol: 0.11, decay: 0.14,
+                        blorpChance: 0.30, blorpF: 110, blorpDecay: 0.10
+                    };
+            }
+        }());
+
+        /* Layer 1: noise sweep — the wet attack */
+        const len1 = Math.floor(ctx.sampleRate * params.len);
         const buf1 = ctx.createBuffer(1, len1, ctx.sampleRate);
         const data1 = buf1.getChannelData(0);
         for (let i = 0; i < len1; i++) {
@@ -1450,32 +1507,32 @@
         src1.buffer = buf1;
         const bp1 = ctx.createBiquadFilter();
         bp1.type = "bandpass";
-        const startF = 360 + Math.random() * 460;
-        const endF   = startF * (0.28 + Math.random() * 0.32);
+        const startF = params.startF;
+        const endF   = startF * params.endR;
         bp1.frequency.setValueAtTime(startF, now);
-        bp1.frequency.exponentialRampToValueAtTime(endF, now + 0.10);
-        bp1.Q.value = 8;
+        bp1.frequency.exponentialRampToValueAtTime(endF, now + params.decay * 0.7);
+        bp1.Q.value = params.Q;
         const g1 = ctx.createGain();
         g1.gain.setValueAtTime(0,    now);
-        g1.gain.linearRampToValueAtTime(0.11, now + 0.005);
-        g1.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+        g1.gain.linearRampToValueAtTime(params.vol, now + 0.005);
+        g1.gain.exponentialRampToValueAtTime(0.001, now + params.decay);
         src1.connect(bp1); bp1.connect(g1); g1.connect(ctx.destination);
         src1.start(now);
 
-        /* Layer 2: random ~30% of the time, deeper "blorp" body
-           below the main sweep. Adds cartoon mouth-feel. */
-        if (Math.random() < 0.30) {
+        /* Layer 2: optional deep "blorp" body */
+        if (Math.random() < params.blorpChance) {
             const osc = ctx.createOscillator();
             osc.type = "sine";
-            const f0 = 110 + Math.random() * 60;
+            const f0 = params.blorpF + Math.random() * 30;
             osc.frequency.setValueAtTime(f0, now);
-            osc.frequency.exponentialRampToValueAtTime(f0 * 0.55, now + 0.08);
+            osc.frequency.exponentialRampToValueAtTime(f0 * 0.55,
+                now + params.blorpDecay * 0.8);
             const g2 = ctx.createGain();
             g2.gain.setValueAtTime(0.06, now);
-            g2.gain.exponentialRampToValueAtTime(0.001, now + 0.10);
+            g2.gain.exponentialRampToValueAtTime(0.001, now + params.blorpDecay);
             osc.connect(g2); g2.connect(ctx.destination);
             osc.start(now);
-            osc.stop(now + 0.12);
+            osc.stop(now + params.blorpDecay + 0.02);
         }
     }
 
