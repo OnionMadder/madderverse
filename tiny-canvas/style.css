@@ -453,69 +453,91 @@ a:focus-visible {
     white-space: nowrap;
 }
 
-/* ----- 8. Draw screen ----- */
+/* ----- 8. Draw screen — full-viewport canvas ----- */
 
+/* Body gets a paper background ONLY when the draw screen is showing,
+   so the dark onioncore bg returns when the kid is on title / picker
+   / gallery / settings. */
+body.screen-draw {
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(212, 196, 152, 0.06) 0 1px,
+            transparent 1px 12px),
+        repeating-linear-gradient(90deg,
+            rgba(212, 196, 152, 0.05) 0 1px,
+            transparent 1px 12px),
+        linear-gradient(180deg, #fbfaf6 0%, #f3eedf 100%);
+}
+
+body.screen-draw::before { display: none; }   /* hide scanlines on paper */
+
+/* The draw screen is its own world — fixed inset 0, fills viewport. */
 #screen-draw {
-    padding-top: 12px;
-    padding-bottom: 30px;
-    position: relative;
-}
-
-/* Decorative sparkle dots scattered in the dark margin so the screen
-   doesn't read as "center canvas in a void." Tiny teal + pink stars
-   pinned to the screen corners. Pure CSS pseudo-elements, no DOM
-   noise, no animation cost. */
-#screen-draw::before,
-#screen-draw::after {
-    content: "";
-    position: absolute;
-    pointer-events: none;
-    z-index: 0;
-    background-image:
-        radial-gradient(circle at 20% 30%, rgba(0, 255, 204, 0.55) 0px, transparent 2px),
-        radial-gradient(circle at 65% 55%, rgba(255, 46, 136, 0.55) 0px, transparent 2px),
-        radial-gradient(circle at 35% 80%, rgba(255, 92, 171, 0.45) 0px, transparent 2px),
-        radial-gradient(circle at 85% 22%, rgba(0, 255, 204, 0.40) 0px, transparent 1.5px),
-        radial-gradient(circle at 10% 60%, rgba(255, 210, 70, 0.50) 0px, transparent 2px);
-    background-repeat: no-repeat;
-}
-#screen-draw::before {
-    top:    80px;
-    bottom: 80px;
-    left:   0;
-    width:  120px;
-    background-size: 120px 600px;
-}
-#screen-draw::after {
-    top:    80px;
-    bottom: 80px;
-    right:  0;
-    width:  120px;
-    background-size: 120px 600px;
-}
-
-/* Slim marquee strip — narrower variant of the title-screen marquee
-   for visual continuity between screens. Decorative only, no input. */
-.draw-marquee {
-    width: 100%;
-    max-width: 920px;
-    margin: 0 auto 14px;
+    position: fixed;
+    inset: 0;
+    padding: 0;
+    margin: 0;
+    max-width: none;
     overflow: hidden;
-    border-top:    1.5px solid var(--pink);
-    border-bottom: 1.5px solid var(--pink);
-    background: repeating-linear-gradient(45deg,
-        rgba(255, 46, 136, 0.10) 0 10px,
-        transparent 10px 20px);
-    padding: 4px 0;
+    min-height: 0;
+}
+
+/* Titlebar floats at the top with a backdrop-blur frosted pill so the
+   paper shows through. Same brand chrome as the other screens, just
+   rendered as a floating bar instead of a flow element. */
+#screen-draw .screen-titlebar {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(640px, calc(100vw - 24px));
+    margin: 0;
+    padding: 6px 12px;
+    border: 1px solid rgba(10, 102, 90, 0.45);
+    border-bottom: 1px solid rgba(10, 102, 90, 0.45);
+    border-radius: 16px;
+    background: rgba(251, 250, 246, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 50;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+#screen-draw .back-btn {
+    color: var(--teal-low);
+    background: rgba(0, 255, 204, 0.05);
+}
+#screen-draw .back-btn:hover,
+#screen-draw .back-btn:focus-visible {
+    color: var(--pink-deep);
+    border-color: var(--pink);
+    background: rgba(255, 46, 136, 0.06);
+}
+#screen-draw .screen-title  { color: var(--pink-deep);  }
+#screen-draw .screen-status { color: var(--teal-low);   }
+
+/* Marquee strip — slim pink-bordered ribbon sitting just below the
+   floating titlebar. Same energy as before, repositioned for the
+   floating layout. */
+.draw-marquee {
+    position: fixed;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(640px, calc(100vw - 24px));
+    overflow: hidden;
+    border: 1.5px solid var(--pink);
+    border-radius: 14px;
+    background: rgba(251, 250, 246, 0.65);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 3px 0;
     font-family: var(--font-mono);
     font-size: 9px;
     letter-spacing: 1.2px;
-    color: var(--ink);
-    box-shadow:
-        0 0 8px rgba(255, 46, 136, 0.2),
-        inset 0 0 18px rgba(0, 0, 0, 0.4);
-    position: relative;
-    z-index: 1;
+    color: var(--pink-deep);
+    box-shadow: 0 0 10px rgba(255, 46, 136, 0.18);
+    z-index: 45;
 }
 
 .draw-marquee span {
@@ -525,71 +547,198 @@ a:focus-visible {
     padding-left: 100%;
 }
 
+/* The "stack" becomes a frameless container for the fixed-position
+   canvas + line-art + onion. No layout duties. */
 .draw-stack {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    width: 100%;
-    position: relative;
-    z-index: 1;
-}
-
-.canvas-wrap {
-    position: relative;
-    /* inline-block so the wrap shrinks to the canvas's CSS-set width
-       (clamp(280, 88vw, 560)). Previously `width: fit-content` on a
-       flex container collapsed horizontally — the line-art overlay
-       (positioned with inset: 8px against this wrap) then rendered
-       at 0 width and the kid's coloring page didn't show. */
-    display: inline-block;
-    padding: 8px;
-    background: linear-gradient(180deg, #061319 0%, #03090d 100%);
-    border: 2px solid var(--teal-low);
-    border-radius: var(--radius-lg);
-    box-shadow:
-        inset 0 0 24px rgba(0, 0, 0, 0.6),
-        0 0 18px rgba(0, 255, 204, 0.08),
-        0 0 0 1px rgba(0, 0, 0, 0.6);
-    max-width: 100%;
-    line-height: 0; /* strip the inline-block baseline gap below the canvas */
-}
-
-#drawCanvas {
+    position: static;
     display: block;
-    width: clamp(280px, 88vw, 560px);
-    aspect-ratio: 1 / 1;
-    height: auto;
-    background: var(--paper);
-    border-radius: var(--radius-md);
+    width: 100%;
+    height: 100%;
+}
+
+/* Canvas IS the viewport. */
+#drawCanvas {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: transparent;
+    border-radius: 0;
     touch-action: none;
     cursor: crosshair;
     user-select: none;
     -webkit-user-select: none;
+    z-index: 5;
+    aspect-ratio: auto;        /* override the 1:1 from base styles */
+    display: block;
 }
 
-/* Line-art overlay sits ABOVE the canvas, pointer-events: none. */
+/* Line-art SVG renders centered on top of the canvas at a fixed
+   visible size. Kid sees the printed page in the middle and paper
+   extending out to all edges of the screen. */
 .line-art {
-    position: absolute;
-    top: 8px; left: 8px; right: 8px; bottom: 8px;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width:  min(82vmin, 720px);
+    height: min(82vmin, 720px);
     pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    z-index: 10;
 }
 
 .line-art svg {
-    width: 92%;
-    height: 92%;
+    width: 100%;
+    height: 100%;
     color: var(--line-ink);
-    /* Soft paper shadow so the lines look printed, not pasted. */
-    filter: drop-shadow(0 1px 0 rgba(0,0,0,0.05));
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.06));
 }
 
+/* Floating undo button — top-right of the viewport, clear of the
+   floating titlebar. */
+#screen-draw .canvas-overlay-btn {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 60;
+}
+
+/* ----- Onion mascot ----- */
+
+.onion {
+    position: fixed;
+    left: 16px;
+    bottom: 40px;
+    width: 96px;
+    height: 112px;
+    z-index: 55;
+    pointer-events: none;
+    transform-origin: 50% 100%;
+    /* Slow gentle sway when idle. */
+    animation: onion-sway 5s ease-in-out infinite;
+}
+
+.onion svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+}
+
+@keyframes onion-sway {
+    0%, 100% { transform: rotate(-2deg); }
+    50%      { transform: rotate(2deg); }
+}
+
+/* Blink via brief vertical scale on the pupils + highlights.
+   Sneaky timing makes it feel naturalistic. */
+.onion .pupil,
+.onion .highlight {
+    transform-box: fill-box;
+    transform-origin: 50% 50%;
+    animation: onion-blink 4.6s ease-in-out infinite;
+}
+
+@keyframes onion-blink {
+    0%, 94%, 100% { transform: scaleY(1); }
+    96%, 98%      { transform: scaleY(0.08); }
+}
+
+/* Pupil tracking: JS sets transform="translate(...)" on the eye groups
+   directly so we don't fight CSS animations. The blink animation
+   targets pupils + highlights individually; tracking moves the
+   parent <g>. */
+
+/* Sparkles only show during .is-saved */
+.onion .onion-sparkles { opacity: 0; transition: opacity 0.2s; }
+.onion.is-saved .onion-sparkles {
+    opacity: 1;
+    animation: onion-sparkle 0.9s ease-out;
+}
+
+@keyframes onion-sparkle {
+    0%   { opacity: 0; transform: scale(0.3); }
+    40%  { opacity: 1; transform: scale(1.15); }
+    100% { opacity: 0; transform: scale(1.4); }
+}
+
+/* Mouth state machine: all mouths exist in DOM; CSS picks which is
+   visible. idle is the default. */
+.onion .mouth         { opacity: 0; transition: opacity 0.15s; }
+.onion .mouth-idle    { opacity: 1; }
+
+.onion.is-drawing .mouth-idle    { opacity: 0; }
+.onion.is-drawing .mouth-open    { opacity: 1; }
+
+.onion.is-saved .mouth-idle      { opacity: 0; }
+.onion.is-saved .mouth-big       { opacity: 1; }
+
+.onion.is-cleared .mouth-idle    { opacity: 0; }
+.onion.is-cleared .mouth-surprise{ opacity: 1; }
+
+/* Drawing: little bouncing on top of the sway. */
+@keyframes onion-bob {
+    0%, 100% { transform: rotate(-2deg) translateY(0);   }
+    50%      { transform: rotate(2deg)  translateY(-4px); }
+}
+.onion.is-drawing {
+    animation: onion-bob 0.8s ease-in-out infinite;
+}
+
+/* Saved: little victory jump (overrides the sway). */
+@keyframes onion-jump {
+    0%   { transform: translateY(0)   rotate(0); }
+    25%  { transform: translateY(-24px) rotate(-6deg); }
+    50%  { transform: translateY(0)   rotate(4deg); }
+    75%  { transform: translateY(-10px) rotate(-3deg); }
+    100% { transform: translateY(0)   rotate(0); }
+}
+.onion.is-saved {
+    animation: onion-jump 0.9s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Cleared: brief shudder/freeze. */
+@keyframes onion-shudder {
+    0%, 100% { transform: rotate(-2deg); }
+    20%      { transform: rotate(2deg) translateX(-2px); }
+    40%      { transform: rotate(-2deg) translateX(2px); }
+    60%      { transform: rotate(2deg) translateX(-1px); }
+}
+.onion.is-cleared {
+    animation: onion-shudder 0.5s ease-in-out 2;
+}
+
+/* Reduced-motion users: kill the constant sway + bob.
+   Keep state transitions visible via opacity (mouth swaps still work). */
+@media (prefers-reduced-motion: reduce) {
+    .onion,
+    .onion.is-drawing,
+    .onion.is-saved,
+    .onion.is-cleared {
+        animation: none !important;
+    }
+    .onion .pupil,
+    .onion .highlight {
+        animation: none !important;
+    }
+}
+
+/* ----- canvas-wrap and the old border frame are GONE on the draw
+         screen since canvas now fills the viewport directly. The
+         class still exists in case other screens use it. ----- */
+
+/* .canvas-wrap is no longer used on the draw screen (canvas is now
+   fixed inset 0). Kept here for parity with any other screen that
+   might wrap a canvas (none do today). */
+.canvas-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+/* Shared floating-overlay button base — actual fixed positioning is
+   set per-screen (see #screen-draw .canvas-overlay-btn above). */
 .canvas-overlay-btn {
-    position: absolute;
-    top: 14px;
-    right: 14px;
     width: 40px;
     height: 40px;
     padding: 0;
@@ -1314,19 +1463,35 @@ a:focus-visible {
 }
 
 @media (min-width: 768px) {
-    .draw-stack {
-        flex-direction: row;
-        align-items: flex-start;
-        justify-content: center;
-        gap: 28px;
-        max-width: none;
-    }
-
+    /* Draw stack is no longer a flex layout — canvas + line-art +
+       rail are all fixed-positioned overlays. Rail becomes a
+       floating panel anchored to the right edge of the viewport. */
     .draw-side-rail {
-        width: 360px;
-        max-width: 360px;
+        position: fixed;
+        top: 112px;                /* below titlebar + marquee */
+        right: 12px;
+        bottom: 40px;              /* clear of slim footer */
+        width: 320px;
+        max-width: 320px;
         align-items: stretch;
         flex-shrink: 0;
+        overflow-y: auto;
+        z-index: 50;
+        padding: 14px;
+        background: rgba(8, 32, 40, 0.88);
+        border: 1px solid var(--teal-low);
+        border-radius: var(--radius-lg);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+        scrollbar-width: thin;
+        scrollbar-color: var(--teal-low) transparent;
+    }
+    .draw-side-rail::-webkit-scrollbar       { width: 6px; }
+    .draw-side-rail::-webkit-scrollbar-track { background: transparent; }
+    .draw-side-rail::-webkit-scrollbar-thumb {
+        background: var(--teal-low);
+        border-radius: 3px;
     }
 
     .draw-side-rail .draw-tools,

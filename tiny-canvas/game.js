@@ -15,8 +15,18 @@
 
     /* ---------- 0. CONFIG ---------- */
 
-    const STAGE_W = 800;
-    const STAGE_H = 800;
+    /* Canvas now fills the viewport — STAGE_W / STAGE_H are recomputed
+       at setupCanvas() from window.innerWidth / window.innerHeight.
+       These exports stay so the rest of the codebase can reference
+       "the canvas's logical size in CSS pixels" but they're no longer
+       constants. */
+    let STAGE_W = 800;
+    let STAGE_H = 800;
+
+    /* Long-side of the rasterized PNG produced by composePng().
+       Independent of viewport — keeps saved + autosaved files at a
+       bounded size regardless of device aspect or pixel density. */
+    const SAVE_LONG_SIDE = 1024;
 
     /* Color palette — 36 colors organized in 5 groups so kids can find
        a color by category instead of scrolling a flat row. The pink/teal
@@ -75,7 +85,9 @@
     const IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
     const FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
     const GATE_UNLOCKED_KEY  = "tinyCanvas.parentGate.unlockedUntil.v1";
-    const MAX_HISTORY        = 20;     /* undo stack depth */
+    /* History is smaller now that each snapshot is a viewport-sized
+       canvas — store as PNG dataURLs to cut RAM ~10x vs ImageData. */
+    const MAX_HISTORY        = 12;
     const SAVE_MAX           = 60;     /* gallery item cap */
     const AUTOSAVE_INTERVAL_MS = 60_000;
     const GATE_UNLOCK_MS     = 24 * 60 * 60 * 1000;  /* 24h persistent unlock */
@@ -709,8 +721,12 @@
     const ctx2d  = canvas.getContext("2d");
 
     function setupCanvas() {
-        const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 3));
+        const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
         state.dpr = dpr;
+        /* Logical canvas size = viewport size (CSS pixels). Capped at
+           2x DPR to keep backing store bounded on large laptop screens. */
+        STAGE_W = Math.max(320, window.innerWidth  || 800);
+        STAGE_H = Math.max(320, window.innerHeight || 800);
         canvas.width  = STAGE_W * dpr;
         canvas.height = STAGE_H * dpr;
         ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -731,30 +747,27 @@
         updateStatus();
     }
 
-    /* Convert a pointer event into logical canvas coords (0..STAGE_W). */
+    /* Convert a pointer event into logical canvas coords. Since the
+       canvas is fixed inset 0 and fills the viewport, clientX/Y maps
+       directly to canvas CSS coordinates. */
     function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
-        const sx = STAGE_W / rect.width;
-        const sy = STAGE_H / rect.height;
-        return {
-            x: (e.clientX - rect.left) * sx,
-            y: (e.clientY - rect.top)  * sy
-        };
+        return { x: e.clientX, y: e.clientY };
     }
 
     function pushHistory() {
         /* Snapshot before the stroke begins so undo restores the
-           pre-stroke state. Cap depth so we don't eat all the
-           memory on long sessions. */
+           pre-stroke state. Stored as compressed PNG dataURLs rather
+           than raw ImageData since the backing store is now
+           viewport-sized — ImageData would eat ~20MB per frame at
+           common laptop resolutions. */
         try {
-            const snap = ctx2d.getImageData(0, 0,
-                canvas.width, canvas.height);
+            const snap = canvas.toDataURL("image/png");
             state.history.push(snap);
             if (state.history.length > MAX_HISTORY) {
                 state.history.shift();
             }
         } catch (_) {
-            /* getImageData can throw under taint rules; ignore. */
+            /* Taint rules etc — ignore */
         }
         updateUndoButton();
     }
@@ -762,12 +775,20 @@
     function undo() {
         const snap = state.history.pop();
         if (!snap) return;
-        ctx2d.save();
-        ctx2d.setTransform(1, 0, 0, 1, 0, 0);
-        ctx2d.putImageData(snap, 0, 0);
-        ctx2d.restore();
+        const img = new Image();
+        img.onload = function () {
+            ctx2d.save();
+            ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+            ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+            ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);
+            ctx2d.restore();
+        };
+        img.onerror = function () {};
+        img.src = snap;
         updateUndoButton();
         if (state.history.length === 0) state.dirty = false;
+        markInProgressDirty();
+        triggerOnionReaction("undo");
         updateStatus();
     }
 
@@ -781,6 +802,57 @@
         }
     }
 
+    /* ---------- 4a. ONION MASCOT ----------
+       Small SVG character anchored to the bottom-left of the viewport
+       that reacts to drawing events. Eyes track the brush; mouth
+       changes per state; whole onion jumps on save, shudders on clear.
+
+       The onion has pointer-events: none so it never blocks drawing.
+       All animations honor prefers-reduced-motion in CSS. */
+
+    function setOnionState(name) {
+        const onion = $("#onion");
+        if (!onion) return;
+        onion.classList.remove("is-drawing", "is-saved",
+                               "is-cleared", "is-undo");
+        if (name) onion.classList.add("is-" + name);
+    }
+
+    let _onionRevertT = 0;
+    function triggerOnionReaction(name, ms) {
+        setOnionState(name);
+        ms = ms || (name === "saved" ? 900 :
+                    name === "cleared" ? 1000 :
+                    name === "undo" ? 400 : 600);
+        clearTimeout(_onionRevertT);
+        _onionRevertT = setTimeout(function () { setOnionState(null); }, ms);
+    }
+
+    /* Eye tracking: as the pointer moves anywhere on the viewport,
+       shift the pupils + highlights toward it. Subtle — max ~3px.
+       Uses SVG transform on the eye groups so it composes with the
+       CSS blink animation (which targets pupils + highlights). */
+    function onionTrackGaze(e) {
+        const onion = $("#onion");
+        if (!onion) return;
+        const rect = onion.getBoundingClientRect();
+        if (rect.width === 0) return;
+        const cx = rect.left + rect.width  / 2;
+        const cy = rect.top  + rect.height / 2;
+        const dx = e.clientX - cx;
+        const dy = e.clientY - cy;
+        const dist = Math.hypot(dx, dy) || 1;
+        const maxOff   = 3;
+        const distRamp = Math.min(1, dist / 220);
+        const ox = (dx / dist) * maxOff * distRamp;
+        const oy = (dy / dist) * maxOff * distRamp;
+        const t = "translate(" + ox.toFixed(2) + " " + oy.toFixed(2) + ")";
+        const eL = onion.querySelector(".onion-eye-l");
+        const eR = onion.querySelector(".onion-eye-r");
+        if (eL) eL.setAttribute("transform", t);
+        if (eR) eR.setAttribute("transform", t);
+    }
+
     /* ---------- 5. DRAWING ---------- */
 
     function attachDrawing() {
@@ -789,6 +861,9 @@
         canvas.addEventListener("pointerup",   onPointerUp);
         canvas.addEventListener("pointercancel", onPointerUp);
         canvas.addEventListener("pointerleave",  onPointerUp);
+        /* Eye tracking lives at document level so the onion looks at
+           the cursor even when it's over the tool rail or titlebar. */
+        document.addEventListener("pointermove", onionTrackGaze, { passive: true });
     }
 
     function onPointerDown(e) {
@@ -808,6 +883,7 @@
         state.dirty = true;
         updateStatus();
         markInProgressDirty();
+        setOnionState("drawing");
         if (state.currentTool === "eraser") sfxErase();
         else                                sfxTap();
     }
@@ -861,6 +937,8 @@
         /* Reset shared canvas state so the next stroke begins clean. */
         ctx2d.globalCompositeOperation = "source-over";
         ctx2d.globalAlpha = 1;
+        /* Onion goes back to idle after the stroke ends. */
+        setOnionState(null);
     }
 
     /* ---------- 6. TEMPLATE LOADING ---------- */
@@ -1243,11 +1321,13 @@
         inProgressDirty = true;
     }
 
-    function persistInProgress() {
+    async function persistInProgress() {
         if (!inProgressDirty) return;
         if (!state.templateId) return;
         try {
-            const png = canvas.toDataURL("image/png");
+            /* Use composePng so the autosaved PNG is bounded —
+               viewport canvas at native size would blow localStorage. */
+            const png = await composePng();
             const rec = {
                 templateId:   state.templateId,
                 templateName: state.templateName,
@@ -1279,12 +1359,17 @@
     function tryRestoreInProgress(templateId) {
         const rec = loadInProgressFor(templateId);
         if (!rec) return;
-        /* Paint the saved PNG onto the canvas as if it were drawn. */
+        /* Paint the saved PNG onto the canvas, scaled to fill it.
+           The saved PNG is at SAVE_LONG_SIDE / scaled-aspect; the
+           live canvas is at viewport size — drawImage handles the
+           stretch. Strokes will keep their relative position to the
+           line-art (which scales similarly). */
         const img = new Image();
         img.onload = function () {
             ctx2d.save();
-            ctx2d.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
-            ctx2d.drawImage(img, 0, 0, STAGE_W, STAGE_H);
+            ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+            ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+            ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);
             ctx2d.restore();
             state.dirty = true;
             updateStatus();
@@ -1381,34 +1466,67 @@
         }
     }
 
-    /* Composite the canvas + line-art into a single PNG dataURL so
-       saved drawings include the page outlines, not just the kid's
-       strokes. We render to an offscreen canvas at logical size. */
+    /* Composite the live canvas + line-art SVG into a fixed-size PNG
+       dataURL. With the canvas now filling the viewport, we scale to
+       a bounded SAVE_LONG_SIDE square so localStorage stays sane and
+       gallery thumbnails are consistent across devices.
+
+       Aspect is preserved by scaling so the longer viewport dimension
+       maps to SAVE_LONG_SIDE; the shorter dimension is centered with
+       paper-color fill. The line-art SVG is drawn on top at its
+       same visible proportion of the viewport so saved drawings
+       look like what the kid saw on screen. */
     function composePng() {
-        const off = document.createElement("canvas");
-        off.width  = STAGE_W;
-        off.height = STAGE_H;
-        const o = off.getContext("2d");
-        /* Paper */
-        o.fillStyle = "#fbfaf6";
-        o.fillRect(0, 0, STAGE_W, STAGE_H);
-        /* Kid's strokes */
-        o.drawImage(canvas, 0, 0, STAGE_W, STAGE_H);
-        /* Line art — render the SVG as an image */
         return new Promise(function (resolve) {
-            const overlay = $("#lineArt").innerHTML.trim();
-            if (!overlay) {
+            const cw = canvas.width;
+            const ch = canvas.height;
+            const aspect = cw / ch;
+            let outW, outH;
+            if (aspect >= 1) {
+                outW = SAVE_LONG_SIDE;
+                outH = Math.round(SAVE_LONG_SIDE / aspect);
+            } else {
+                outH = SAVE_LONG_SIDE;
+                outW = Math.round(SAVE_LONG_SIDE * aspect);
+            }
+
+            const off = document.createElement("canvas");
+            off.width = outW;
+            off.height = outH;
+            const o = off.getContext("2d");
+
+            /* Paper background */
+            o.fillStyle = "#fbfaf6";
+            o.fillRect(0, 0, outW, outH);
+
+            /* Kid's strokes — full canvas scaled to output */
+            o.drawImage(canvas, 0, 0, outW, outH);
+
+            /* Line-art overlay, scaled by the SAME ratio used for the
+               kid's strokes so the printed page lines up exactly with
+               anything the kid drew on top of them. */
+            const lineArtHost = $("#lineArt");
+            const overlaySvg  = lineArtHost && lineArtHost.querySelector("svg");
+            if (!overlaySvg) { resolve(off.toDataURL("image/png")); return; }
+
+            const svgRect    = overlaySvg.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            if (svgRect.width === 0 || canvasRect.width === 0) {
                 resolve(off.toDataURL("image/png"));
                 return;
             }
-            const blob = new Blob([overlay], { type: "image/svg+xml" });
+            const scale = outW / canvasRect.width;
+            const laX = (svgRect.left - canvasRect.left) * scale;
+            const laY = (svgRect.top  - canvasRect.top)  * scale;
+            const laW = svgRect.width  * scale;
+            const laH = svgRect.height * scale;
+
+            const blob = new Blob([overlaySvg.outerHTML],
+                                  { type: "image/svg+xml" });
             const url  = URL.createObjectURL(blob);
             const img  = new Image();
             img.onload = function () {
-                /* Match the in-page line-art positioning (92% inset). */
-                const inset = STAGE_W * 0.04;
-                const draw  = STAGE_W * 0.92;
-                o.drawImage(img, inset, inset, draw, draw);
+                o.drawImage(img, laX, laY, laW, laH);
                 URL.revokeObjectURL(url);
                 resolve(off.toDataURL("image/png"));
             };
@@ -1443,6 +1561,7 @@
         sfxSave();
         flashButton("#drawSave");
         showSavedToast();
+        triggerOnionReaction("saved");
         /* One-shot first-save celebration. Construction Paper Principle:
            a single gentle pat on the back, no streaks, never repeats. */
         if (wasEmpty && !isFirstSaveCelebrated()) {
@@ -1635,6 +1754,7 @@
             pushHistory();
             clearCanvas();
             clearInProgress();
+            triggerOnionReaction("cleared");
         });
         $("#drawSave").addEventListener("click", function () {
             saveDrawing();

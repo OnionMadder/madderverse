@@ -139,23 +139,102 @@
 
     <div class="draw-stack">
 
-        <div class="canvas-wrap">
-            <!-- The canvas the kid draws ON. Logical size 800x800;
-                 CSS scales it. Renders below the line-art overlay. -->
-            <canvas id="drawCanvas" width="800" height="800"
-                    aria-label="Coloring canvas. Drag to draw."></canvas>
+        <!-- The canvas the kid draws ON. Fills the entire viewport so
+             strokes can happen anywhere — not constrained to a small
+             centered box. Logical size matches viewport at setup time.
+             Renders below the line-art overlay. -->
+        <canvas id="drawCanvas" width="800" height="800"
+                aria-label="Coloring canvas. Drag to draw."></canvas>
 
-            <!-- Line-art SVG sits ABOVE the canvas, pointer-events: none
-                 so taps go through to the canvas. innerHTML swapped in by
-                 loadTemplate(). -->
-            <div class="line-art" id="lineArt" aria-hidden="true"></div>
+        <!-- Line-art SVG sits ABOVE the canvas at a fixed centered size,
+             pointer-events: none so taps go through to the canvas.
+             innerHTML swapped in by loadTemplate(). -->
+        <div class="line-art" id="lineArt" aria-hidden="true"></div>
 
-            <!-- Floating UNDO + CLEAR in the canvas corner. -->
-            <button class="canvas-overlay-btn" id="undoBtn" type="button"
-                    title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
-                <span aria-hidden="true">&#x21B6;</span>
-            </button>
-        </div>
+        <!-- Floating UNDO button — top-right of viewport. -->
+        <button class="canvas-overlay-btn" id="undoBtn" type="button"
+                title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+            <span aria-hidden="true">&#x21B6;</span>
+        </button>
+
+        <!-- ============================================================
+             ONION — friendly mascot who watches the kid draw.
+             - Eyes track the brush cursor
+             - Blinks idly every few seconds
+             - Mouth opens in concentration during strokes
+             - Whole onion jumps + grins + sparkles after a SAVE
+             - Looks surprised after CLEAR
+             pointer-events: none so it doesn't block drawing.
+             ============================================================ -->
+        <aside class="onion" id="onion" aria-hidden="true">
+            <svg viewBox="0 0 120 140" xmlns="http://www.w3.org/2000/svg">
+
+                <!-- Sparkles (only visible during .is-saved) -->
+                <g class="onion-sparkles">
+                    <path d="M16 26 L19 32 L25 35 L19 38 L16 44 L13 38 L7 35 L13 32 Z"   fill="#ffd23f"/>
+                    <path d="M104 36 L107 42 L113 45 L107 48 L104 54 L101 48 L95 45 L101 42 Z" fill="#ff5cab"/>
+                    <path d="M22 110 L24 114 L28 116 L24 118 L22 122 L20 118 L16 116 L20 114 Z" fill="#00ffcc"/>
+                    <path d="M100 110 L102 114 L106 116 L102 118 L100 122 L98 118 L94 116 L98 114 Z" fill="#ff2e88"/>
+                </g>
+
+                <!-- Leaves on top -->
+                <g class="onion-leaves">
+                    <path class="leaf-back"  d="M58 30 Q40 8 48 0 Q58 16 60 30 Z"
+                          fill="#7ac96b" stroke="#5ba84d" stroke-width="1.5"/>
+                    <path class="leaf-front" d="M62 30 Q82 4 76 0 Q64 12 60 30 Z"
+                          fill="#9bdb8c" stroke="#5ba84d" stroke-width="1.5"/>
+                </g>
+
+                <!-- Bulb body -->
+                <ellipse class="onion-body" cx="60" cy="82" rx="44" ry="50"
+                         fill="#fff5dc" stroke="#d9c5a0" stroke-width="2"/>
+
+                <!-- Body ridges (subtle vertical lines) -->
+                <g class="onion-ridges" stroke="#e0d2ac" stroke-width="1.5" fill="none">
+                    <path d="M28 58 Q24 80 32 116"/>
+                    <path d="M45 50 Q41 80 49 124"/>
+                    <path d="M75 50 Q79 80 71 124"/>
+                    <path d="M92 58 Q96 80 88 116"/>
+                </g>
+
+                <!-- Pink cheek dots -->
+                <ellipse class="onion-cheek" cx="42" cy="92" rx="8" ry="4.5"
+                         fill="#ff5cab" opacity="0.55"/>
+                <ellipse class="onion-cheek" cx="78" cy="92" rx="8" ry="4.5"
+                         fill="#ff5cab" opacity="0.55"/>
+
+                <!-- Eyes — pupils + highlights move via SVG transform set by JS -->
+                <g class="onion-eye-l">
+                    <circle class="pupil"     cx="46" cy="76" r="6"   fill="#1c2226"/>
+                    <circle class="highlight" cx="47" cy="74" r="1.6" fill="#fff"/>
+                </g>
+                <g class="onion-eye-r">
+                    <circle class="pupil"     cx="74" cy="76" r="6"   fill="#1c2226"/>
+                    <circle class="highlight" cx="75" cy="74" r="1.6" fill="#fff"/>
+                </g>
+
+                <!-- Mouths — only one visible at a time per state class.
+                     The default smile is "idle"; .is-drawing → open;
+                     .is-saved → big grin; .is-cleared → surprised "o". -->
+                <g class="onion-mouths">
+                    <path class="mouth mouth-idle"
+                          d="M53 100 Q60 106 67 100"
+                          stroke="#1c2226" stroke-width="2.8"
+                          fill="none" stroke-linecap="round"/>
+                    <path class="mouth mouth-open"
+                          d="M55 98 Q60 110 65 98 Z"
+                          fill="#1c2226"/>
+                    <path class="mouth mouth-big"
+                          d="M48 96 Q60 116 72 96"
+                          stroke="#1c2226" stroke-width="3"
+                          fill="none" stroke-linecap="round"/>
+                    <circle class="mouth mouth-surprise"
+                            cx="60" cy="102" r="3"
+                            fill="#1c2226"/>
+                </g>
+
+            </svg>
+        </aside>
 
         <div class="draw-side-rail">
 
