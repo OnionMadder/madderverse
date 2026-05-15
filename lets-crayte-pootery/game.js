@@ -5561,6 +5561,30 @@
             meta.appendChild(by);
         }
 
+        /* Remix credit chip -- this pot was remixed from someone
+           else's. Shows on both local entries (after the kid
+           remixed a public pot + fired) and public entries (the
+           shared copy of a remix carries lineage from
+           SUPABASE_REMIX.sql columns). */
+        const remixSource = entry.remixedFromHandle || entry.remixedFromAuthor;
+        if (remixSource) {
+            const chip = document.createElement("span");
+            chip.className = "pot-remix-chip";
+            chip.textContent = "remix ← " + (
+                entry.remixedFromHandle ? "@" + entry.remixedFromHandle
+                                        : entry.remixedFromAuthor
+            );
+            chip.title = "Remixed from " + remixSource;
+            if (entry.remixedFromHandle) {
+                chip.style.cursor = "pointer";
+                chip.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    openProfile(entry.remixedFromHandle);
+                });
+            }
+            meta.appendChild(chip);
+        }
+
         card.appendChild(meta);
 
         card.addEventListener("click", function () { openDetail(entry); });
@@ -5598,7 +5622,12 @@
             userId:       row.user_id || null,
             _profile:     row._profile || null,   /* attached by enrichWithProfiles */
             _isPublic:    true,
-            _publicId:    row.id
+            _publicId:    row.id,
+            /* Remix lineage -- only present when the row has the
+               columns + values. May be undefined on rows shared
+               before SUPABASE_REMIX.sql ran. */
+            remixedFrom:       row.remixed_from        || null,
+            remixedFromAuthor: row.remixed_from_author || null
         };
     }
 
@@ -6836,6 +6865,7 @@
         refreshDetailCopyLink();
         refreshDetailTrophyBadge();
         refreshDetailRemixButton();
+        refreshDetailRemixChip();
         setPotURLParam(entry);
 
         panel.hidden = false;
@@ -6870,6 +6900,31 @@
         const panel = document.getElementById("potDetail");
         if (panel) panel.hidden = true;
         clearPotURLParam();
+    }
+
+    /* Show / hide REMIX LINEAGE chip on the detail modal. Visible
+       on any entry (local or public) that carries remixedFrom
+       fields. Tap to jump to the source author's profile (if
+       handle is known). */
+    function refreshDetailRemixChip() {
+        const chip = document.getElementById("detailRemixChip");
+        if (!chip) return;
+        const entry = GALLERY.detailEntry;
+        const src = entry && (entry.remixedFromHandle || entry.remixedFromAuthor);
+        if (!src) {
+            chip.hidden = true;
+            return;
+        }
+        chip.hidden = false;
+        const txt = chip.querySelector(".detail-remix-text");
+        if (txt) {
+            txt.textContent = "remix ← " + (
+                entry.remixedFromHandle ? "@" + entry.remixedFromHandle
+                                        : entry.remixedFromAuthor
+            );
+        }
+        chip.dataset.handle = entry.remixedFromHandle || "";
+        chip.style.cursor = entry.remixedFromHandle ? "pointer" : "default";
     }
 
     /* Show / hide REMIX. Visible on public pots only -- you don't
@@ -7099,6 +7154,12 @@
 
         const remix = document.getElementById("detailRemix");
         if (remix) remix.addEventListener("click", startRemix);
+
+        const remixChip = document.getElementById("detailRemixChip");
+        if (remixChip) remixChip.addEventListener("click", function () {
+            const handle = remixChip.dataset.handle;
+            if (handle) openProfile(handle);
+        });
 
         wireDetailTrophyBadge();
 

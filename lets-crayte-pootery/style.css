@@ -3466,6 +3466,63 @@ a:focus-visible {
     text-overflow: ellipsis;
 }
 
+/* Remix lineage chip on the pot-detail modal — sits in the
+   bottom-left of the canvas wrap so it doesn't collide with
+   the trophy badge (top-right). Tap to jump to source profile. */
+.detail-remix-chip {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--pink-bright);
+    border-radius: 12px;
+    background: rgba(10, 8, 20, 0.85);
+    color: #ffd4e6;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.5px;
+    cursor: default;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.5),
+        0 0 10px rgba(255, 46, 136, 0.35);
+    transition: transform 0.12s ease;
+}
+.detail-remix-chip[hidden] { display: none; }
+.detail-remix-chip:hover { transform: scale(1.03); }
+
+.detail-remix-glyph {
+    font-size: 14px;
+    line-height: 1;
+    color: var(--pink-bright);
+}
+
+.detail-remix-text {
+    max-width: 160px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Gallery-thumb remix chip — small subtle line in the meta
+   stack below the pot. Lower-noise than the trophy / globe
+   corner badges since remix info is contextual, not
+   "achievement-y." */
+.pot-remix-chip {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    color: var(--pink-bright);
+    text-shadow: 0 1px 0 #000;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Profile Trophy Shelf */
 .profile-trophy-shelf {
     width: 100%;
