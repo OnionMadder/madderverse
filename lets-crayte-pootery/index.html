@@ -111,6 +111,10 @@
                 <span class="btn-label">TROPHIES</span>
                 <span class="btn-glyph" aria-hidden="true">&#9733;</span>
             </button>
+            <button class="big-btn" id="btnShop" type="button">
+                <span class="btn-label">PACK SHOP</span>
+                <span class="btn-glyph" aria-hidden="true">&#x1F6CD;</span>
+            </button>
             <button class="big-btn" id="btnAccount" type="button">
                 <span class="btn-label">SIGN IN</span>
                 <span class="btn-glyph" aria-hidden="true">&#9784;</span>
@@ -312,13 +316,12 @@
 
         <div class="decorate-tools">
 
-            <div class="tool-row pack-tabs" role="tablist" aria-label="Glaze pack">
-                <button class="pack-tab" data-pack="core"    type="button">BASIC</button>
-                <button class="pack-tab" data-pack="candy"   type="button">CANDY</button>
-                <button class="pack-tab" data-pack="plushie" type="button">PLUSH</button>
-                <button class="pack-tab" data-pack="doggo"   type="button">DOGGO</button>
-                <button class="pack-tab" data-pack="modded"  type="button">MODDED</button>
-                <button class="pack-tab" data-pack="gamer"   type="button">GAMER</button>
+            <!-- Pack tabs are rendered dynamically from GLAZE_PACKS
+                 filtered by ownership (renderPackTabs). The fallback
+                 children below are only seen if JS fails to boot. -->
+            <div class="tool-row pack-tabs" id="packTabs"
+                 role="tablist" aria-label="Glaze pack">
+                <button class="pack-tab" data-pack="core" type="button">BASIC</button>
             </div>
 
             <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
@@ -575,6 +578,26 @@
             </div>
         </div>
     </section>
+</main>
+
+<!-- ============================================================
+     SCREEN: PACK SHOP
+     ============================================================
+     All packs (free + paid + queued) shown as cards. Free are
+     marked OWNED, paid show price + BUY (currently "SOON"
+     until Stripe lands), queued show release date.
+     ============================================================ -->
+<main class="screen" id="screen-shop" hidden>
+    <div class="screen-titlebar">
+        <button class="back-btn" id="shopBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;PACK SHOP&nbsp;&gt;</h2>
+        <span class="screen-status" id="shopOwnedCount">&mdash;</span>
+    </div>
+    <p class="shop-intro">
+        New paid packs drop every week. All purchases are one-time —
+        no subscription. Free packs always included.
+    </p>
+    <div class="shop-grid" id="shopGrid"></div>
 </main>
 
 <!-- ============================================================

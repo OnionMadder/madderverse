@@ -1614,6 +1614,11 @@
             });
         }
 
+        const btnShop = document.getElementById("btnShop");
+        if (btnShop) btnShop.addEventListener("click", function () {
+            showScreen("shop");
+        });
+
         const btnAccount = document.getElementById("btnAccount");
         if (btnAccount) btnAccount.addEventListener("click", function () {
             showScreen("account");
@@ -3520,9 +3525,23 @@
        above the rows switch the active pack. The "@rgb-cycle"
        glaze id is a dynamic glaze whose color cycles through HSL
        in real time — see currentPaintColor().                   */
+    /* Pack record schema (additive over the original):
+         id         -- stable string identifier
+         label      -- display name in pickers + the shop
+         glazes     -- array of hex colors or @rgb-cycle
+         patterns   -- array of stamp ids (PATTERN_DRAWERS keys)
+         priceCents -- omit / null for free packs; integer for paid
+         description -- one-liner for the shop card
+         releaseDate -- ISO string; if in the future, the pack
+                        appears in the shop as "DROPS <date>"
+                        but isn't purchasable yet. omit = available now.
+         coverEmoji -- single emoji used as shop-card cover until
+                       real art lands. */
     const GLAZE_PACKS = [
         {
             id: "core",  label: "BASIC",
+            description: "The starter set. Sienna, terracotta, sage, ink.",
+            coverEmoji: "\u{1FAB4}",   /* potted plant */
             glazes: [
                 "#3a2218",   /* dark clay */
                 "#7a3a18",   /* sienna */
@@ -3542,6 +3561,8 @@
         },
         {
             id: "candy", label: "CANDY",
+            description: "Cherry red, blue raspberry, root beer brown.",
+            coverEmoji: "\u{1F36C}",   /* candy */
             glazes: [
                 "#d92128",   /* cherry red */
                 "#2b6fff",   /* blue raspberry */
@@ -3555,6 +3576,8 @@
         },
         {
             id: "plushie", label: "PLUSH",
+            description: "Teddy brown, pastel pink, plush textures.",
+            coverEmoji: "\u{1F9F8}",   /* teddy bear */
             glazes: [
                 "#a07050",   /* teddy brown */
                 "#ffc8e0",   /* pastel pink */
@@ -3566,6 +3589,8 @@
         },
         {
             id: "doggo", label: "DOGGO",
+            description: "Who's a good pot? Every coat color + paw stamps.",
+            coverEmoji: "\u{1F436}",   /* dog face */
             glazes: [
                 "#d9a567",   /* golden retriever */
                 "#f4f4ec",   /* dalmatian white */
@@ -3578,6 +3603,8 @@
         },
         {
             id: "modded", label: "MODDED",
+            description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
+            coverEmoji: "\u{1F5A5}",   /* desktop computer */
             glazes: [
                 "@rgb-cycle",   /* animated rainbow */
                 "#39ff14",      /* neon green */
@@ -3591,6 +3618,8 @@
         },
         {
             id: "gamer", label: "GAMER",
+            description: "CRT green, scanline gray, PRESS START.",
+            coverEmoji: "\u{1F3AE}",   /* video game */
             glazes: [
                 "#33ff66",   /* CRT green */
                 "#ff8c1a",   /* retro orange */
@@ -3600,6 +3629,60 @@
             ],
             patterns: ["pixel-heart", "controller", "game-over",
                        "pixel-skull", "cloud-8bit", "press-start"]
+        },
+
+        /* ============================================================
+           QUEUED PAID PACKS
+           ============================================================
+           These appear in the shop as "DROPS <date>" until their
+           releaseDate passes, then become purchasable. priceCents
+           drives the shop label. Glaze + pattern lists are placeholder
+           swatches -- the real art ships in the same commit as the
+           pack going live. */
+        {
+            id: "blacklight", label: "BLACKLIGHT",
+            description: "Glow-in-the-dark glazes + tape-deck stamps.",
+            coverEmoji: "\u{1F526}",   /* flashlight */
+            priceCents: 99,
+            releaseDate: "2026-05-22T17:00:00Z",
+            glazes: [
+                "#39ff14",   /* radioactive green */
+                "#00ffff",   /* uv cyan */
+                "#ff2bff",   /* highlighter pink */
+                "#ffea00",   /* highlighter yellow */
+                "#100838"    /* uv-purple black */
+            ],
+            patterns: ["dot", "star"]   /* placeholder until art lands */
+        },
+        {
+            id: "starpup", label: "STAR PUPPY",
+            description: "Cosmic dog adventures. Constellation paw prints.",
+            coverEmoji: "\u{1F436}",   /* dog face */
+            priceCents: 99,
+            releaseDate: "2026-05-29T17:00:00Z",
+            glazes: [
+                "#0a0a3c",   /* deep space */
+                "#fff",      /* star white */
+                "#ffd700",   /* star gold */
+                "#a07050",   /* puppy brown */
+                "#ff69b4"    /* nebula pink */
+            ],
+            patterns: ["paw", "star"]
+        },
+        {
+            id: "swampcore", label: "SWAMPCORE",
+            description: "Bog moss, algae bloom, mystery fog.",
+            coverEmoji: "\u{1F438}",   /* frog */
+            priceCents: 99,
+            releaseDate: "2026-06-05T17:00:00Z",
+            glazes: [
+                "#3e4a1c",   /* deep moss */
+                "#7a8f3a",   /* algae */
+                "#4a3522",   /* bog brown */
+                "#9bb05c",   /* swamp light */
+                "#c8e2a8"    /* fog */
+            ],
+            patterns: ["dot", "wave"]
         }
     ];
 
@@ -3854,10 +3937,90 @@
         }
     }
 
-    function attachPackTabs() {
-        document.querySelectorAll(".pack-tab[data-pack]").forEach(function (b) {
-            b.addEventListener("click", function () { setPack(b.dataset.pack); });
+    /* Pack ownership -- localStorage source of truth.
+       Free packs are always considered "owned" (priceCents
+       missing or 0). Paid packs require explicit purchase.
+       Eventually syncs from profiles.owned_packs when signed
+       in, but localStorage stays canonical so anonymous play
+       keeps working. */
+    const OWNED_PACKS_KEY = "crayte-owned-packs";
+
+    function loadOwnedPacks() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(OWNED_PACKS_KEY) || "[]");
+            return new Set(Array.isArray(raw) ? raw : []);
+        } catch (_) { return new Set(); }
+    }
+
+    function saveOwnedPacks(set) {
+        try {
+            localStorage.setItem(OWNED_PACKS_KEY,
+                JSON.stringify(Array.from(set)));
+        } catch (_) {}
+    }
+
+    function markPackOwned(packId) {
+        const s = loadOwnedPacks();
+        s.add(packId);
+        saveOwnedPacks(s);
+        /* If user is in decorate, refresh the tabs so the newly
+           owned pack appears immediately. */
+        if (currentScreen === "decorate") renderPackTabs();
+    }
+
+    function isPackOwned(pack) {
+        if (!pack) return false;
+        if (!pack.priceCents) return true;   /* free */
+        return loadOwnedPacks().has(pack.id);
+    }
+
+    function isPackReleased(pack) {
+        if (!pack || !pack.releaseDate) return true;
+        return new Date(pack.releaseDate).getTime() <= Date.now();
+    }
+
+    /* A pack is decorate-visible iff it's free, OR it's paid +
+       owned + released. Paid-not-owned packs live in the SHOP
+       screen only -- they don't clutter the decorate picker. */
+    function isPackUsable(pack) {
+        if (!pack) return false;
+        if (!isPackReleased(pack)) return false;
+        if (!pack.priceCents) return true;
+        return isPackOwned(pack);
+    }
+
+    /* (Re)build the decorate pack-tabs row from GLAZE_PACKS.
+       Owned + free packs only. Clicks are handled via event
+       delegation on the container so re-renders don't need
+       re-binding. */
+    function renderPackTabs() {
+        const row = document.getElementById("packTabs");
+        if (!row) return;
+        row.innerHTML = "";
+        GLAZE_PACKS.forEach(function (p) {
+            if (!isPackUsable(p)) return;
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "pack-tab";
+            btn.dataset.pack = p.id;
+            btn.textContent = p.label;
+            if (p.id === D.activePackId) btn.classList.add("active");
+            row.appendChild(btn);
         });
+    }
+
+    function attachPackTabs() {
+        const row = document.getElementById("packTabs");
+        if (!row) return;
+        /* Event delegation so dynamic re-renders don't lose handlers. */
+        if (row._delegated) return;
+        row.addEventListener("click", function (e) {
+            const tab = e.target.closest(".pack-tab[data-pack]");
+            if (!tab) return;
+            setPack(tab.dataset.pack);
+        });
+        row._delegated = true;
+        renderPackTabs();
     }
 
     function wireUndoAndRotate() {
@@ -4136,12 +4299,10 @@
     function buildToolUI() {
         const pack = activePack();
 
-        /* Pack tabs — markup is static (chunk-4 added 6 tabs to
-           index.html). Click handlers attached once via
-           attachPackTabs(); here we just toggle .active. */
-        document.querySelectorAll(".pack-tab[data-pack]").forEach(function (b) {
-            b.classList.toggle("active", b.dataset.pack === pack.id);
-        });
+        /* Pack tabs are dynamic (renderPackTabs filters by
+           ownership). The render itself toggles .active on the
+           matching tab; just call it. */
+        renderPackTabs();
 
         /* Glaze swatches */
         const gp = document.getElementById("glazePalette");
@@ -7786,6 +7947,163 @@
                tools) show up. */
             checkAchievements();
             refreshAchievementsGrid();
+            wheelHumStop();
+        }
+    });
+
+    /* ============================================================
+       PACK SHOP screen
+       ============================================================
+       Renders every pack in GLAZE_PACKS as a card. Status varies
+       by free / owned / released / queued. Tapping a paid pack
+       opens a stub "AVAILABLE SOON" alert until Stripe lands. */
+
+    function initShopScreen() {
+        const back = document.getElementById("shopBack");
+        if (back) back.addEventListener("click", function () {
+            showScreen("title");
+        });
+        const grid = document.getElementById("shopGrid");
+        /* Click delegation -- one listener handles every card. */
+        if (grid && !grid._delegated) {
+            grid.addEventListener("click", function (e) {
+                const card = e.target.closest(".shop-card[data-pack]");
+                if (!card) return;
+                handleShopCardClick(card.dataset.pack);
+            });
+            grid._delegated = true;
+        }
+    }
+
+    function refreshShopScreen() {
+        const grid  = document.getElementById("shopGrid");
+        const count = document.getElementById("shopOwnedCount");
+        if (!grid) return;
+        grid.innerHTML = "";
+
+        let ownedCount = 0;
+        GLAZE_PACKS.forEach(function (p) {
+            if (isPackOwned(p)) ownedCount++;
+        });
+        if (count) {
+            const total = GLAZE_PACKS.length;
+            count.textContent = ownedCount + " / " + total + " OWNED";
+        }
+
+        /* Sort: owned first (free + bought), then unreleased
+           paid (drops soon), then released paid (buy now). */
+        const sorted = GLAZE_PACKS.slice().sort(function (a, b) {
+            const rankA = shopSortRank(a);
+            const rankB = shopSortRank(b);
+            return rankA - rankB;
+        });
+        sorted.forEach(function (p) {
+            grid.appendChild(buildShopCard(p));
+        });
+    }
+
+    function shopSortRank(p) {
+        if (isPackOwned(p)) return 0;
+        if (!isPackReleased(p)) return 1;   /* queued / coming soon */
+        return 2;   /* paid + released + not owned -- top buy candidates */
+    }
+
+    function buildShopCard(p) {
+        const card = document.createElement("div");
+        card.className = "shop-card";
+        card.dataset.pack = p.id;
+        const owned    = isPackOwned(p);
+        const released = isPackReleased(p);
+        const free     = !p.priceCents;
+        if (owned)         card.classList.add("is-owned");
+        if (!released)     card.classList.add("is-queued");
+        if (free)          card.classList.add("is-free");
+
+        const cover = document.createElement("div");
+        cover.className = "shop-cover";
+        cover.textContent = p.coverEmoji || "\u{1FAB4}";
+        card.appendChild(cover);
+
+        const meta = document.createElement("div");
+        meta.className = "shop-meta";
+
+        const name = document.createElement("h3");
+        name.className = "shop-name";
+        name.textContent = p.label;
+        meta.appendChild(name);
+
+        const desc = document.createElement("p");
+        desc.className = "shop-desc";
+        desc.textContent = p.description || "";
+        meta.appendChild(desc);
+
+        const status = document.createElement("span");
+        status.className = "shop-status";
+        status.textContent = shopStatusText(p);
+        meta.appendChild(status);
+
+        card.appendChild(meta);
+
+        const cta = document.createElement("span");
+        cta.className = "shop-cta";
+        cta.textContent = shopCtaText(p);
+        card.appendChild(cta);
+
+        return card;
+    }
+
+    function shopStatusText(p) {
+        if (!p.priceCents) return "FREE";
+        if (isPackOwned(p)) return "OWNED";
+        if (!isPackReleased(p)) {
+            const d = new Date(p.releaseDate);
+            return "DROPS " + d.toLocaleDateString(undefined, {
+                month: "short", day: "numeric"
+            }).toUpperCase();
+        }
+        /* paid + released + not owned */
+        return "$" + (p.priceCents / 100).toFixed(2);
+    }
+
+    function shopCtaText(p) {
+        if (!p.priceCents)            return "PLAY";
+        if (isPackOwned(p))           return "PLAY";
+        if (!isPackReleased(p))       return "NOTIFY ME";
+        return "BUY";
+    }
+
+    function handleShopCardClick(packId) {
+        const p = GLAZE_PACKS.find(function (x) { return x.id === packId; });
+        if (!p) return;
+        const free   = !p.priceCents;
+        const owned  = isPackOwned(p);
+        if (free || owned) {
+            /* Jump straight into shape mode with this pack pre-selected. */
+            D.activePackId = p.id;
+            showScreen("shape");
+            return;
+        }
+        if (!isPackReleased(p)) {
+            alert(
+                p.label + " drops on " +
+                new Date(p.releaseDate).toLocaleDateString() + ".\n\n" +
+                "Turn on push notifications in your account screen to get " +
+                "a heads-up the moment it lands."
+            );
+            return;
+        }
+        /* Released + paid + not owned -- Stripe wiring TBD. */
+        alert(
+            p.label + " — $" + (p.priceCents / 100).toFixed(2) + "\n\n" +
+            "Pay-to-own packs are landing soon. " +
+            "Bookmark this and check back."
+        );
+    }
+
+    registerScreen("shop", {
+        onEnter: function () {
+            initShopScreen();
+            refreshShopScreen();
             wheelHumStop();
         }
     });
