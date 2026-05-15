@@ -19,7 +19,13 @@ body {
     background-image: url('assets/bg-img/stage.jpg');
     background-attachment: fixed;
     background-size: cover;
-    background-position: center 30%;
+    /* Pin the BOTTOM edge of the stage photo to the bottom of the
+       viewport on every device. `cover` scales the image to fill the
+       screen; `center bottom` then crops the overflow off the TOP so
+       the floor of the photo always sits exactly at the screen bottom
+       — that's the surface the Munkis stand on, so it must never drift
+       up and leave a gap below them on tall/short screens alike. */
+    background-position: center bottom;
     color: #2dd4bf;
     font-family: 'JetBrains Mono', monospace;
     overflow-x: hidden;
