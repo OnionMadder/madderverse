@@ -398,6 +398,145 @@
         return BRUSHES[state.currentTool] || BRUSHES.pen;
     }
 
+    /* ---------- 1a. CAPACITOR NATIVE BRIDGE ----------
+       Tiny Canvas runs as both a static web page (served from
+       madderverse.org/tiny-canvas/) AND a Capacitor-wrapped native
+       app on iOS + Android. The native runtime injects window.Capacitor
+       at app start; this section feature-detects it and adapts the
+       export, persistence, status bar, and splash-screen flows.
+
+       Plugins are registered in package.json and auto-linked by
+       `npx cap sync`. Each call site is guarded so the web build runs
+       the same code untouched. */
+
+    function getCapacitor() {
+        return (typeof window !== "undefined" && window.Capacitor) || null;
+    }
+
+    function isNative() {
+        const cap = getCapacitor();
+        return !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+    }
+
+    function nativePlugin(name) {
+        const cap = getCapacitor();
+        return cap && cap.Plugins && cap.Plugins[name] || null;
+    }
+
+    /* Storage keys mirrored to native Preferences. localStorage stays
+       the source of truth at runtime (synchronous reads) but writes
+       are mirrored to Preferences so the data survives app uninstall
+       on Android and webview clears on iOS. Rehydration on app start
+       reads Preferences back into localStorage. */
+    const STORAGE_KEYS_TO_MIRROR = [
+        STORAGE_KEY, SETTINGS_KEY, IN_PROGRESS_KEY, FIRST_SAVE_KEY
+    ];
+
+    async function rehydrateFromNativePrefs() {
+        const prefs = nativePlugin("Preferences");
+        if (!prefs) return;
+        for (const key of STORAGE_KEYS_TO_MIRROR) {
+            try {
+                const r = await prefs.get({ key });
+                if (r && r.value !== null && r.value !== undefined) {
+                    /* Only overwrite localStorage if the native value
+                       differs (avoids needlessly thrashing the cache). */
+                    if (localStorage.getItem(key) !== r.value) {
+                        localStorage.setItem(key, r.value);
+                    }
+                }
+            } catch (_) { /* missing key, etc — skip silently */ }
+        }
+    }
+
+    function mirrorToNativePrefs(key, value) {
+        const prefs = nativePlugin("Preferences");
+        if (!prefs) return;
+        try {
+            if (value === null || value === undefined) {
+                prefs.remove({ key });
+            } else {
+                prefs.set({ key, value: String(value) });
+            }
+        } catch (_) { /* fail silently — native is a mirror, not auth */ }
+    }
+
+    /* setStorage / removeStorage replace direct localStorage calls for
+       data we want mirrored. Sync to localStorage immediately, fire
+       Preferences write async in the background. */
+    function setStorage(key, value) {
+        try { localStorage.setItem(key, value); } catch (_) {}
+        mirrorToNativePrefs(key, value);
+    }
+    function removeStorage(key) {
+        try { localStorage.removeItem(key); } catch (_) {}
+        mirrorToNativePrefs(key, null);
+    }
+
+    async function setupStatusBar() {
+        const sb = nativePlugin("StatusBar");
+        if (!sb) return;
+        try {
+            await sb.setStyle({ style: "DARK" });
+            await sb.setBackgroundColor({ color: "#06141a" });
+            /* overlaysWebView: false in capacitor.config.json means the
+               status bar sits ABOVE the webview, not over it. We've
+               configured for that mode — don't toggle here. */
+        } catch (_) { /* StatusBar can fail on some Android builds */ }
+    }
+
+    async function hideSplashScreen() {
+        const ss = nativePlugin("SplashScreen");
+        if (!ss) return;
+        try { await ss.hide(); } catch (_) {}
+    }
+
+    /* Native export: write the PNG to the Cache directory, then open
+       the Share sheet so the user picks "Save to Photos" or "Save to
+       Files" (iOS) / "Save image" or share target (Android). This is
+       the standard iOS app pattern for "save my drawing somewhere"
+       since Capacitor core doesn't include a direct photo-library
+       writer plugin.
+
+       Returns true on success so the web fallback doesn't double-fire. */
+    async function nativeExport(rec) {
+        const fs    = nativePlugin("Filesystem");
+        const share = nativePlugin("Share");
+        if (!fs) return false;
+
+        const base64 = (rec.png || "").replace(/^data:image\/png;base64,/, "");
+        if (!base64) return false;
+
+        const safeName = (rec.name || "tiny-canvas")
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+        const fileName = safeName + "-" + formatDate(rec.date) + ".png";
+
+        try {
+            const written = await fs.writeFile({
+                path: fileName,
+                data: base64,
+                directory: "CACHE",
+                recursive: false
+            });
+            if (share) {
+                await share.share({
+                    title: "Tiny Canvas — " + (rec.name || "Drawing"),
+                    url: written.uri,
+                    dialogTitle: "Save or share your drawing"
+                });
+            }
+            return true;
+        } catch (e) {
+            /* User canceled the share sheet, or write failed.
+               Either way: return true so we don't double-fire the
+               web download. The kid sees no error; they just don't
+               get a file out — the drawing is still in the gallery. */
+            return true;
+        }
+    }
+
     /* ---------- 2. DOM HOOKS ---------- */
 
     const $  = (sel) => document.querySelector(sel);
@@ -914,7 +1053,7 @@
 
     function persistSettings() {
         try {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+            setStorage(SETTINGS_KEY, JSON.stringify(state.settings));
         } catch (_) { /* quota; non-fatal */ }
     }
 
@@ -1060,7 +1199,7 @@
                 png:          png,
                 savedAt:      new Date().toISOString()
             };
-            localStorage.setItem(IN_PROGRESS_KEY, JSON.stringify(rec));
+            setStorage(IN_PROGRESS_KEY, JSON.stringify(rec));
             inProgressDirty = false;
         } catch (_) {
             /* quota or taint — fail silently */
@@ -1068,7 +1207,7 @@
     }
 
     function clearInProgress() {
-        try { localStorage.removeItem(IN_PROGRESS_KEY); } catch (_) {}
+        removeStorage(IN_PROGRESS_KEY);
         inProgressDirty = false;
     }
 
@@ -1147,7 +1286,7 @@
         catch (_) { return false; }
     }
     function markFirstSaveCelebrated() {
-        try { localStorage.setItem(FIRST_SAVE_KEY, "1"); }
+        try { setStorage(FIRST_SAVE_KEY, "1"); }
         catch (_) {}
     }
 
@@ -1180,7 +1319,7 @@
 
     function persistGallery(items) {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+            setStorage(STORAGE_KEY, JSON.stringify(items));
         } catch (_) {
             /* Quota etc — fail silently, the kid just won't get a
                persisted record. The on-screen drawing is unaffected. */
@@ -1339,12 +1478,26 @@
 
     function exportCurrent() {
         /* Export saves a PNG to the device — gated as a "leaves the app"
-           action per Apple Kids policy. */
+           action per Apple Kids policy.
+
+           Native: writes to Filesystem.Cache + opens the Share sheet
+           so the user picks "Save to Photos" / "Save to Files".
+           Web: anchor-download fallback. */
         const id = $("#picDetail").dataset.id;
         if (!id) return;
-        parentGate("export", function () {
+        parentGate("export", async function () {
             const rec = loadGallery().find(function (r) { return r.id === id; });
             if (!rec) return;
+
+            if (isNative()) {
+                const ok = await nativeExport(rec);
+                if (ok) return;
+                /* Native plugin failed entirely (e.g. Filesystem missing).
+                   Fall through to the web anchor download as a last resort
+                   — it'll still produce a file via the Capacitor webview's
+                   download intent. */
+            }
+
             const a = document.createElement("a");
             a.href = rec.png;
             a.download = (rec.name || "tiny-canvas") + "-" + formatDate(rec.date) + ".png";
@@ -1389,7 +1542,11 @@
 
     /* ---------- 13. WIRING ---------- */
 
-    function init() {
+    async function init() {
+        /* Native rehydration must run BEFORE loadSettings/loadGallery
+           so the first localStorage reads see the canonical native
+           values, not stale web-cache values. No-op on web. */
+        await rehydrateFromNativePrefs();
         loadSettings();
         setupCanvas();
         buildPicker();
@@ -1483,6 +1640,13 @@
 
         /* Kick off auto-save once everything is wired. */
         startAutosave();
+
+        /* Native shell setup — no-op on web. Splash hide is slightly
+           delayed so the first webview frame paints before the splash
+           fades. Capacitor's capacitor.config.json launchShowDuration:
+           1200 covers the case where init takes longer than expected. */
+        setupStatusBar();
+        setTimeout(hideSplashScreen, 400);
 
         /* Resize-aware backing store: rebuild on orientation change
            so DPR-scaled strokes don't blur when the screen rotates. */
