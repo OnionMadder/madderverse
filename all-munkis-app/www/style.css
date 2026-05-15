@@ -1,0 +1,1634 @@
+@import url('assets/JetBrainsMono-VariableFont_wght.ttf');
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+}
+
+/* ====== STAGE BACKGROUND ======
+   One shared stage photo behind every screen (Bank 1 / Bank 2 / Madballz).
+   Drop a replacement at assets/bg-img/stage.jpg and the whole game retints.
+   When body.react-mode-active is set, the BG is darkened + desaturated to
+   sell the "something is wrong" mood, and the horror-munki corner sprites
+   defined further down slowly creep into view. */
+body {
+    background-color: #000;
+    background-image: url('assets/bg-img/stage.jpg');
+    background-attachment: fixed;
+    background-size: cover;
+    background-position: center 30%;
+    color: #2dd4bf;
+    font-family: 'JetBrains Mono', monospace;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    padding-left: env(safe-area-inset-left, 0);
+    padding-right: env(safe-area-inset-right, 0);
+    position: relative;
+    /* Vertical flex column so main can fill the viewport height between
+       the header and the (fixed) tray — used by the stage's flex-end
+       positioning that drops the Munkis to the BG floor. */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100dvh;
+    /* Slow filter transition gives the horror buildup time to settle in
+       rather than snapping; the 4 s ease matches the corner-Munki creep. */
+    transition: filter 4s ease-in-out;
+}
+
+/* React mode intentionally leaves the page layout + colors alone — the
+   only horror cue is the corner Ice/Moon Munkis creeping into view (see
+   the .horror-munki block below). Per design: "the layout of the screen
+   doesn't change in horror mode, just Ice and Moon Munki slowly fading
+   in and getting bigger/more defined/scarier." */
+
+/* Soft dark vignette over the BG photo so the UI chrome reads against any
+   stage art the user drops in. Always present, not tied to react mode. */
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse at 50% 60%, transparent 30%, rgba(0, 0, 0, 0.55) 100%);
+    z-index: 0;
+}
+
+/* Keep content above the fixed BG ::before vignette. */
+body > * { position: relative; z-index: 1; }
+
+/* ====== HORROR-MODE CORNER MUNKIS ======
+   Moon Munki creeps in from the lower-left corner, Ice Munki from the
+   lower-right. Anchored to the viewport bottom so their feet always touch
+   the bottom of the screen (responsive: height is capped by viewport
+   width so the sprites don't overwhelm narrow phones).
+   The reveal is intentionally slow — ~12 s of fade-in while the sprites
+   scale up and a soft blur lifts. The user should not notice them
+   arriving; they should look up and find someone already there. */
+.horror-munki {
+    position: fixed;
+    bottom: 0;
+    height: min(78vh, 70vw);
+    width: auto;
+    aspect-ratio: 432 / 988;
+    pointer-events: none;
+    z-index: 40;          /* over the stage, under modals/jumpscare/tray */
+    opacity: 0;
+    transform-origin: 50% 100%;  /* scale up from feet so they "stand up" */
+    filter: blur(8px) drop-shadow(0 12px 32px rgba(0, 0, 0, 0.7));
+    transition:
+        opacity   12s ease-in,
+        transform 12s ease-out,
+        filter    12s ease-in;
+}
+.horror-munki--moon {
+    left: 0;
+    transform: translateX(-12%) scale(0.55);
+}
+.horror-munki--ice {
+    right: 0;
+    transform: translateX( 12%) scale(0.55);
+}
+
+body.react-mode-active .horror-munki {
+    opacity: 0.96;
+    /* Final pose: sharp focus + a dim blood-red glow that says "they're
+       definitely here now." */
+    filter: blur(0) drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
+                    drop-shadow(0 0 40px rgba(255, 40, 40, 0.28));
+}
+body.react-mode-active .horror-munki--moon { transform: translateX(0) scale(1); }
+body.react-mode-active .horror-munki--ice  { transform: translateX(0) scale(1); }
+
+/* Slow ominous breathing — barely-perceptible scale pulse while visible.
+   Kicks in AFTER the entry transform finishes (~12 s) so it doesn't fight
+   the creep-in. */
+@keyframes horror-munki-breathe {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(0, -0.6%) scale(1.015); }
+}
+body.react-mode-active .horror-munki--moon { animation: horror-munki-breathe 5.2s ease-in-out 12s infinite; }
+body.react-mode-active .horror-munki--ice  { animation: horror-munki-breathe 5.6s ease-in-out 12s infinite; }
+
+/* Reduced-motion: no slow creep, no breathing — a short opacity fade so
+   the kid is still aware something's happening without the motion. */
+@media (prefers-reduced-motion: reduce) {
+    .horror-munki { transition: opacity 1.2s ease-in; transform: none !important; filter: none; }
+    .horror-munki--moon, .horror-munki--ice { animation: none !important; }
+    body.react-mode-active .horror-munki { opacity: 0.7; }
+}
+
+/* ====== HEADER ====== */
+header {
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid rgba(45, 212, 191, 0.2);
+    position: relative;
+}
+
+.header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 14px;
+}
+
+.status {
+    font-size: 10px;
+    color: #ec4899;
+    font-weight: 700;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+}
+
+h1 {
+    margin: 0;
+    font-size: clamp(26px, 5.5vw, 60px);
+    font-weight: 800;
+    font-style: italic;
+    letter-spacing: -0.03em;
+    text-transform: uppercase;
+    color: #fff;
+    line-height: 1;
+}
+
+.neon-pink {
+    color: #db2777;
+    text-shadow: 0 0 10px #db2777, 0 0 20px #db2777;
+}
+
+.subtitle {
+    margin: 8px 0 0;
+    font-size: 11px;
+    color: rgba(45, 212, 191, 0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn {
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.12em;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: transparent;
+    min-height: 44px;
+}
+
+.btn-remix {
+    border: 2px solid #db2777;
+    color: #db2777;
+    text-shadow: 0 0 8px rgba(219, 39, 119, 0.7);
+}
+.btn-remix:hover, .btn-remix:active {
+    background: #db2777;
+    color: #000;
+    text-shadow: none;
+    transform: scale(1.05);
+}
+
+.btn-clear {
+    border: 2px solid rgba(45, 212, 191, 0.55);
+    color: #2dd4bf;
+}
+.btn-clear:hover, .btn-clear:active {
+    background: rgba(45, 212, 191, 0.15);
+    color: #fff;
+    border-color: #2dd4bf;
+}
+
+/* SONG toggle — glows amber when the base song is on, dims when off. */
+.btn-song {
+    border: 2px solid #fbbf24;
+    color: #fbbf24;
+    text-shadow: 0 0 6px rgba(251, 191, 36, 0.55);
+}
+.btn-song:hover, .btn-song:active {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fff;
+}
+.btn-song.off {
+    border-color: rgba(251, 191, 36, 0.35);
+    color: rgba(251, 191, 36, 0.5);
+    text-shadow: none;
+}
+
+/* BOO! — big ominous red button that triggers the jumpscare. */
+.btn-boo {
+    border: 2px solid #ef4444;
+    color: #ef4444;
+    text-shadow: 0 0 6px rgba(239, 68, 68, 0.7);
+    font-weight: 800;
+}
+.btn-boo:hover, .btn-boo:active {
+    background: #ef4444;
+    color: #000;
+    text-shadow: none;
+    transform: scale(1.06);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.6);
+}
+
+.icon-btn {
+    width: 44px;
+    height: 44px;
+    border: 2px solid rgba(45, 212, 191, 0.6);
+    border-radius: 8px;
+    background: transparent;
+    color: #2dd4bf;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+}
+
+.icon-btn:hover { background: rgba(45, 212, 191, 0.1); }
+.icon-btn.muted { color: #db2777; border-color: #db2777; }
+
+/* ====== MAIN / STAGE ======
+   main is a vertical flex container that fills the viewport between the
+   header and the fixed tray. justify-content: flex-end pins the stage
+   to the bottom of main's content area — which lands the Munkis directly
+   above the tray, looking like they're standing on the rainbow floor of
+   the stage.jpg background photo. */
+main {
+    /* flex:1 fills the viewport height between the header and the (fixed)
+       tray, since body is now a flex column. padding-bottom reserves the
+       tray's actual height (set on --tray-h by JS) so the Munkis on stage
+       come to rest just above the tray. */
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 22px 18px calc(var(--tray-h, 240px) + 12px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 20px;
+}
+
+/* The frame is gone — no border, no backdrop blur, no dot pattern. The
+   Munkis sit directly on the BG photo's rainbow floor. .stage-wrap stays
+   in markup so the existing JS hooks (and any descendant selectors) keep
+   working, but it's now a transparent positioning shell. */
+.stage-wrap {
+    position: relative;
+}
+
+.stage {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    margin: 0 auto;
+}
+
+/* Slots are invisible grid placeholders — no border, no background, no
+   padding. The Munki standing inside is the entire visible element. Empty
+   slots reserve the grid column but render nothing so the dance row stays
+   balanced as Munkis fill in. */
+.stage-slot {
+    aspect-ratio: 5 / 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    transition: transform 0.15s, filter 0.2s;
+    cursor: pointer;
+    position: relative;
+    background: transparent;
+    border: none;
+    padding: 0;
+    overflow: visible;
+}
+
+/* Filled slots claim the whole touch gesture so a finger drag becomes a
+   drag-to-clear instead of a page scroll. Without this, on mobile the
+   browser steals the gesture for page-scroll before pointermove ever
+   reaches the JS that would have marked the gesture as a drag. Empty
+   slots are left at default so they don't interfere with anything. */
+.stage-slot.active {
+    touch-action: none;
+}
+
+/* Active slot gets a soft footlight halo under the Munki to suggest a
+   spotlight on the dance floor — no border or filled box. */
+.stage-slot.active::before {
+    content: '';
+    position: absolute;
+    bottom: 4%;
+    left: 10%;
+    right: 10%;
+    height: 18%;
+    background: radial-gradient(ellipse at 50% 100%, rgba(45, 212, 191, 0.35), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Empty slots stay in the grid (so positions don't reshuffle) but render
+   nothing — no "+" placeholder, no label. */
+.stage-slot.empty .slot-icon,
+.stage-slot.empty .slot-label {
+    visibility: hidden;
+}
+
+.slot-icon {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* visible (not hidden) — the head-bob animation translates the head
+       upward by ~20% on each beat. If this box clipped at its edge, the
+       top of the head sprite would get cut off at the apex of the bounce.
+       .stage-slot is overflow:visible so the head can extend above the
+       slot's top edge cleanly. */
+    overflow: visible;
+    min-height: 0;
+    pointer-events: none;
+}
+
+.slot-icon.slot-empty {
+    align-items: center;
+}
+
+.empty-plus {
+    font-size: 30px;
+    color: rgba(45, 212, 191, 0.32);
+    font-weight: 300;
+    line-height: 1;
+}
+
+.slot-label {
+    margin-top: 4px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: rgba(45, 212, 191, 0.75);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    text-align: center;
+    pointer-events: none;
+    /* Single-line lock with ellipsis fallback so the .slot-icon area above
+       stays a fixed height across every Munki — the sprite never gets
+       squeezed by a wrapping label. Full label is still available via the
+       slot's `title` attribute on hover. */
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+.stage-slot.empty .slot-label { color: rgba(45, 212, 191, 0.32); }
+
+/* ====== CHARACTER ART (body + head) ====== */
+/* Container is sized by the parent (.slot-icon / .chip-icon). The body and
+   head are absolutely positioned siblings so their bounce animations stay
+   independent — head bobs while body squashes/stretches. */
+.char-art {
+    position: relative;
+    height: 100%;
+    aspect-ratio: 5 / 7;
+    pointer-events: none;
+    transform-origin: 50% 100%;
+}
+
+.char-body {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 65%;
+    transform-origin: 50% 100%;
+}
+
+.char-head {
+    position: absolute;
+    top: 0;
+    left: 7%;
+    width: 86%;
+    height: 56%;
+    transform-origin: 50% 100%;
+    z-index: 2;
+}
+
+.char-body svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+}
+
+/* The head is layered: colored circle (shape) → head sprite → headphones
+   overlay. All three sibling layers share the same 100×100 footprint so the
+   headphones never shift when the sprite frame changes (e.g. when an
+   expression flip swaps the Munki's face). */
+.char-head .head-shape,
+.char-head .head-mod,
+.char-head .head-phones {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+}
+
+.char-head .head-shape {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
+    z-index: 1;
+}
+
+.char-head .head-mod {
+    z-index: 2;
+}
+
+/* Hair sits between the head sprite and the headphones — peeks out around
+   the band/earcups for that "Munki had a wild hairdo BEFORE the headphones
+   went on" look. overflow: visible lets spikes / antennae / mohawks extend
+   past the SVG box without getting clipped. */
+.char-head .char-hair {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    z-index: 2;
+    overflow: visible;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Pixel-art rendering hint so the spritesheet keeps its crisp edges when
+   scaled down to chip / slot size. */
+.char-head .head-mod image {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+.char-head .head-phones {
+    z-index: 3;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+    overflow: visible;
+}
+
+@keyframes char-body-bounce {
+    0%   { transform: scale(1, 1); }
+    18%  { transform: scale(1.14, 0.82); }  /* deeper squash on impact */
+    52%  { transform: scale(0.92, 1.12); }  /* taller stretch upward */
+    78%  { transform: scale(1.04, 0.96); }  /* small overshoot on the way down */
+    100% { transform: scale(1, 1); }
+}
+
+/* Sillier head bob: deeper dip, much taller lift, plus an overshoot wiggle
+   so the head whips a bit before settling. Range was -12%/2°, now -20%/4°
+   with a -4%/-2.5° rebound. */
+@keyframes char-head-bob {
+    0%   { transform: translateY(0) rotate(0); }
+    18%  { transform: translateY(3%)  rotate(-3deg); }
+    52%  { transform: translateY(-20%) rotate(4deg); }
+    78%  { transform: translateY(-4%) rotate(-2.5deg); }
+    100% { transform: translateY(0) rotate(0); }
+}
+
+.char-art.beat .char-body { animation: char-body-bounce 0.36s ease-out; }
+.char-art.beat .char-head { animation: char-head-bob 0.36s ease-out; }
+
+/* ====== TRAY (fixed at bottom) ====== */
+.tray-wrap {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0) + var(--mv-slim-h, 22px));
+    background: linear-gradient(to top, rgba(0,0,0,0.96) 60%, rgba(0,0,0,0.6));
+    border-top: 1px solid rgba(45, 212, 191, 0.3);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    z-index: 10;
+}
+
+.tray-hint {
+    text-align: center;
+    font-size: 10px;
+    color: rgba(45, 212, 191, 0.55);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    padding: 0 12px;
+}
+
+/* Two-row wrap layout. Drag-to-place needs touch-action:none on each chip,
+   which kills browser scrolling — so the tray must fit every chip without
+   scrolling. 7 chips wrap to ~4+3 on phones, 7-in-a-row on tablets+. */
+.tray {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 10px 8px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.tray-chip {
+    flex: 0 0 auto;
+    width: 92px;
+    height: 116px;
+    border: 2px solid rgba(45, 212, 191, 0.5);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    cursor: grab;
+    transition: transform 0.12s, box-shadow 0.2s, border-color 0.2s, opacity 0.15s;
+    touch-action: none;
+    user-select: none;
+    padding: 5px;
+}
+
+.tray-chip:hover {
+    transform: translateY(-4px);
+    border-color: #2dd4bf;
+    box-shadow: 0 0 22px rgba(45, 212, 191, 0.45);
+}
+
+.tray-chip:active,
+.tray-chip.grabbing {
+    transform: scale(0.94);
+    transition: transform 0.05s;
+    cursor: grabbing;
+    opacity: 0.55;
+}
+
+/* Floating chip clone that follows the cursor/finger during a drag from
+   the tray to the stage. Created in startTrayGhost() and removed on drop
+   or cancel. transform handles both translation and the scale-up cue. */
+.tray-chip.drag-ghost {
+    opacity: 0.92;
+    transition: none;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6),
+                0 0 24px rgba(45, 212, 191, 0.55);
+    border-color: #2dd4bf;
+    pointer-events: none;
+}
+
+/* Drop-target glow on the stage slot under the dragging pointer. */
+.stage-slot.drop-target {
+    outline: 2px dashed #2dd4bf;
+    outline-offset: -4px;
+    background: rgba(45, 212, 191, 0.18);
+    box-shadow: 0 0 24px rgba(45, 212, 191, 0.55) inset;
+}
+
+/* Lift the Munki visually while it's being dragged off the stage. If the
+   kid releases inside the stage, the class clears and it snaps back. */
+.stage-slot.dragging-off .char-art {
+    opacity: 0.55;
+    transform: translateY(-10%) scale(0.92);
+    transition: transform 0.1s, opacity 0.1s;
+}
+
+.chip-icon {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* visible so a chip's head-bob (if it ever animates) doesn't clip.
+       Matches .slot-icon — the head-bob lifts the sprite ~20%. */
+    overflow: visible;
+    min-height: 0;
+    pointer-events: none;
+}
+
+.chip-label {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fbbf24;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    /* Single-line lock with ellipsis fallback — keeps the .chip-icon
+       (sprite area) at a fixed height for every Munki. Full label
+       remains available via the chip's `title` attribute on hover. */
+    text-align: center;
+    line-height: 1.05;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+}
+
+/* (Desktop tray padding is now driven by --tray-h on main — see the main
+   rule above. No fixed override needed.) */
+
+/* ====== MOBILE TUNING ====== */
+@media (max-width: 720px) {
+    header { padding: 14px 14px 10px; }
+    .title-block { flex: 1 1 auto; }
+    .header-inner { gap: 10px; align-items: center; }
+    .header-buttons { gap: 6px; }
+    .btn { font-size: 13px; padding: 8px 12px; letter-spacing: 0.08em; min-height: 40px; }
+    .icon-btn { width: 40px; height: 40px; font-size: 18px; }
+    .subtitle { font-size: 10px; letter-spacing: 0.14em; }
+
+    main { padding: 14px 10px calc(var(--tray-h, 240px) + 10px); gap: 14px; }
+    .stage { gap: 4px; }
+    .slot-label { font-size: 9px; letter-spacing: 0.08em; margin-top: 2px; }
+
+    /* Smaller chips on phones so the 7-chip 4+3 wrap doesn't eat the stage.
+       Was 76×100 → tray rendered ~371px tall on 360-wide phones (overlapped
+       the stage). 64×84 brings tray down to ~230px and keeps tap targets
+       comfortable for kids. */
+    .tray-chip { width: 64px; height: 84px; padding: 3px; }
+    .chip-label { font-size: 9px; }
+    .tray-hint { font-size: 9px; letter-spacing: 0.12em; }
+}
+
+@media (max-width: 420px) {
+    h1 { font-size: 26px; }
+    .status { font-size: 9px; letter-spacing: 0.2em; }
+    .subtitle { font-size: 9px; }
+    main { padding: 12px 6px calc(var(--tray-h, 240px) + 8px); }
+    .stage { gap: 3px; }
+    .slot-label { font-size: 8px; }
+    /* Tiny phones (≤420 — vast majority of Android devices in market):
+       chips shrink further so 4+3 wraps in a 220-ish px tray. */
+    .tray-chip { width: 58px; height: 78px; padding: 3px; }
+    .chip-label { font-size: 8px; }
+}
+
+/* (Was: explicit padding-bottom on short phones. Now main reads --tray-h
+   on every breakpoint so the value auto-tracks the actual tray height.) */
+
+/* ====== JUMP SCARE ======
+   When body.jumpscare is set, four things happen at once:
+     1. A red radial vignette flashes across the viewport (::after on body).
+     2. The stage section shakes hard.
+     3. Active Munki characters glitch — color shift + jitter.
+     4. A giant "BOO!" overlay punches in then fades.
+   Everything is keyframe-driven so it cleanly resets when the class is
+   removed after 1.5s. The fixed tray and header are intentionally NOT
+   shaken so the kid still has something stable to look at. */
+.boo-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 800;
+    font-style: italic;
+    font-size: clamp(80px, 25vw, 280px);
+    color: #fff;
+    letter-spacing: -0.04em;
+    text-shadow:
+        0 0 30px #ff0000,
+        0 0 60px #800000,
+        4px 4px 0 #000,
+        -4px -4px 0 #000;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    transform: scale(0.4);
+    -webkit-text-stroke: 3px #000;
+}
+
+body.jumpscare .boo-overlay {
+    animation: boo-show 1.4s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+
+body.jumpscare::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(255, 0, 0, 0.5), rgba(120, 0, 0, 0.85));
+    pointer-events: none;
+    z-index: 9998;
+    animation: jumpscare-flash 1.5s ease-out forwards;
+}
+
+body.jumpscare main {
+    animation: jumpscare-shake 0.55s linear;
+}
+
+body.jumpscare .stage-slot.active .char-art {
+    animation: char-glitch 0.18s steps(2) infinite;
+}
+
+@keyframes jumpscare-flash {
+    0%   { opacity: 0; }
+    8%   { opacity: 1; }
+    20%  { opacity: 0.55; }
+    32%  { opacity: 0.95; }
+    50%  { opacity: 0.4; }
+    100% { opacity: 0; }
+}
+
+@keyframes jumpscare-shake {
+    0%, 100% { transform: translate(0, 0) rotate(0); }
+    10% { transform: translate(-9px, 5px) rotate(-0.6deg); }
+    20% { transform: translate(8px, -4px) rotate(0.6deg); }
+    30% { transform: translate(-6px, 6px) rotate(-0.4deg); }
+    40% { transform: translate(7px, -5px) rotate(0.5deg); }
+    50% { transform: translate(-8px, 3px) rotate(-0.3deg); }
+    60% { transform: translate(5px, -6px) rotate(0.4deg); }
+    70% { transform: translate(-4px, 5px) rotate(-0.2deg); }
+    80% { transform: translate(6px, -3px) rotate(0.3deg); }
+    90% { transform: translate(-3px, 4px) rotate(-0.1deg); }
+}
+
+@keyframes char-glitch {
+    0%   { filter: hue-rotate(0deg) saturate(1) brightness(1); transform: translate(0, 0); }
+    33%  { filter: hue-rotate(180deg) saturate(3) contrast(2); transform: translate(-2px, 1px) scale(1.05); }
+    66%  { filter: invert(1) saturate(2.5) brightness(1.1); transform: translate(2px, -1px) scale(0.97); }
+    100% { filter: hue-rotate(0deg) saturate(1) brightness(1); transform: translate(0, 0); }
+}
+
+@keyframes boo-show {
+    0%  { opacity: 0; transform: scale(0.4) rotate(-8deg); }
+    12% { opacity: 1; transform: scale(1.25) rotate(3deg); }
+    20% { opacity: 1; transform: scale(1.0)  rotate(-2deg); }
+    35% { opacity: 1; transform: scale(1.08) rotate(1.5deg); }
+    55% { opacity: 1; transform: scale(1.0)  rotate(-1deg); }
+    100%{ opacity: 0; transform: scale(0.85) rotate(0); }
+}
+
+/* Honour reduced-motion preferences — keep the visual punch subtle. */
+@media (prefers-reduced-motion: reduce) {
+    body.jumpscare main { animation: none; }
+    body.jumpscare .stage-slot.active .char-art { animation: none; filter: hue-rotate(180deg); }
+    body.jumpscare .boo-overlay { animation: boo-show-reduced 1.2s ease-out forwards; }
+    @keyframes boo-show-reduced {
+        0%   { opacity: 0; transform: scale(0.9); }
+        20%  { opacity: 1; transform: scale(1); }
+        80%  { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1); }
+    }
+}
+
+/* ====== STORY / MADBALLZ HEADER BUTTONS ====== */
+/* STORY — opens the lore modal. Soft lavender so it sits between the cool
+   cyan UI chrome and the warm button colors without competing. */
+.btn-story {
+    border: 2px solid #a78bfa;
+    color: #a78bfa;
+    text-shadow: 0 0 6px rgba(167, 139, 250, 0.55);
+}
+.btn-story:hover, .btn-story:active {
+    background: rgba(167, 139, 250, 0.18);
+    color: #fff;
+    border-color: #c4b5fd;
+}
+
+/* MEET THE MADBALLZ — only revealed once the kid has tripped horror mode
+   the threshold number of times. The .reveal modifier plays a one-shot
+   "look at this!" pulse the first time it appears in a session. */
+.btn-madballz {
+    border: 2px solid #ef4444;
+    color: #fca5a5;
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.06), rgba(168, 85, 247, 0.06));
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+    font-weight: 800;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
+}
+.btn-madballz:hover, .btn-madballz:active {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.28), rgba(168, 85, 247, 0.28));
+    color: #fff;
+    transform: scale(1.05);
+    box-shadow: 0 0 24px rgba(239, 68, 68, 0.6);
+}
+.btn-madballz.reveal {
+    animation: madballz-reveal 1.6s cubic-bezier(0.2, 0.85, 0.3, 1);
+}
+@keyframes madballz-reveal {
+    0%   { transform: scale(0.4) rotate(-8deg); opacity: 0; box-shadow: 0 0 0 rgba(239, 68, 68, 0); }
+    25%  { transform: scale(1.18) rotate(2deg);  opacity: 1; box-shadow: 0 0 32px rgba(239, 68, 68, 0.85); }
+    50%  { transform: scale(1.0)  rotate(-1deg); box-shadow: 0 0 16px rgba(168, 85, 247, 0.7); }
+    75%  { transform: scale(1.06) rotate(0.5deg); box-shadow: 0 0 24px rgba(239, 68, 68, 0.55); }
+    100% { transform: scale(1) rotate(0); box-shadow: 0 0 12px rgba(239, 68, 68, 0.25); }
+}
+
+/* BACK — only visible inside Madballz mode. Calm cyan to contrast the
+   red/purple Madballz palette and read as "exit door". */
+.btn-back {
+    border: 2px solid #2dd4bf;
+    color: #2dd4bf;
+    text-shadow: 0 0 6px rgba(45, 212, 191, 0.55);
+}
+.btn-back:hover, .btn-back:active {
+    background: rgba(45, 212, 191, 0.18);
+    color: #fff;
+}
+
+/* ====== ANTAGONIST + MADBALLZ CHIP/SLOT ACCENTS ====== */
+/* Ice Munki + Moon Munki tray chips wear a faint red border so the kid
+   can spot the antagonists at a glance even before reading the label. */
+.tray-chip.chip-bad {
+    border-color: rgba(239, 68, 68, 0.65);
+}
+.tray-chip.chip-bad:hover {
+    border-color: #ef4444;
+    box-shadow: 0 0 22px rgba(239, 68, 68, 0.5);
+}
+.tray-chip.chip-bad .chip-label { color: #fca5a5; }
+
+/* Once placed on stage, antagonists keep the red accent — but on the
+   frame-less stage we express it as a red footlight under the Munki
+   (overriding the default cyan halo) plus the label color. */
+.stage-slot.active.slot-bad::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(239, 68, 68, 0.5), transparent 70%);
+}
+.stage-slot.active.slot-bad .slot-label { color: rgba(252, 165, 165, 0.85); }
+
+/* ====== MADBALLZ MODE (whole-screen palette swap) ====== */
+/* Activated by adding `body.madballz-mode` when the player taps "MEET THE
+   MADBALLZ". Tints the whole screen red/violet to signal "you are in the
+   bad neighborhood now". The stage + tray + chips all retint together.
+   The body background-image is owned by --bg-madballz-normal (see the
+   per-mode BG block at the top of this file); this rule only tweaks
+   chrome colors. */
+body.madballz-mode {
+    color: #f0abfc;
+}
+body.madballz-mode header {
+    border-bottom-color: rgba(239, 68, 68, 0.32);
+}
+body.madballz-mode .status { color: #ef4444; }
+body.madballz-mode .subtitle { color: rgba(239, 68, 68, 0.7); }
+/* (Dormant: previously re-themed the .stage-wrap frame in Madballz mode.
+   The frame is gone in the redesign — Munkis stand directly on the BG.) */
+/* Madballz dance floor — recolour the active slot footlight halo to the
+   purple palette so the spotlight reads against the red/violet BG. */
+body.madballz-mode .stage-slot.active::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(168, 85, 247, 0.45), transparent 70%);
+}
+body.madballz-mode .stage-slot .slot-label { color: rgba(240, 171, 252, 0.85); }
+body.madballz-mode .tray-wrap {
+    border-top-color: rgba(168, 85, 247, 0.4);
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.96) 60%, rgba(40, 0, 40, 0.6));
+}
+body.madballz-mode .tray-hint { color: rgba(240, 171, 252, 0.65); }
+body.madballz-mode .tray-chip {
+    border-color: rgba(168, 85, 247, 0.55);
+}
+body.madballz-mode .tray-chip:hover {
+    border-color: #c084fc;
+    box-shadow: 0 0 22px rgba(168, 85, 247, 0.55);
+}
+body.madballz-mode .chip-label { color: #f0abfc; }
+
+/* ====== STORY MODAL ====== */
+.story-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: 22px;
+}
+.story-modal.open {
+    display: flex;
+    animation: story-fade-in 0.28s ease-out;
+}
+.story-card {
+    position: relative;
+    max-width: 540px;
+    width: 100%;
+    max-height: 86vh;
+    overflow-y: auto;
+    background: linear-gradient(180deg, #0b0b18, #14081a);
+    border: 1px solid rgba(167, 139, 250, 0.55);
+    box-shadow: 0 0 40px rgba(167, 139, 250, 0.35);
+    border-radius: 18px;
+    padding: 32px 26px 26px;
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.5;
+    animation: story-card-rise 0.32s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.story-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    background: transparent;
+    color: #a78bfa;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.story-close:hover { background: rgba(167, 139, 250, 0.2); color: #fff; }
+.story-read {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    background: transparent;
+    color: #a78bfa;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+}
+.story-read:hover { background: rgba(167, 139, 250, 0.2); color: #fff; }
+.story-read.speaking {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: #fca5a5;
+    color: #fff;
+}
+.story-title {
+    margin: 0 0 16px;
+    padding: 0 44px 0 96px;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 24px;
+    font-weight: 800;
+    font-style: italic;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(167, 139, 250, 0.45);
+    letter-spacing: -0.01em;
+}
+.story-body p {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: rgba(226, 232, 240, 0.92);
+}
+.story-body strong { color: #fff; }
+.story-body em { color: #fbbf24; font-style: italic; }
+.bank-switcher {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 6px 0 4px;
+    font-family: 'Fredoka', sans-serif;
+}
+/* The .bank-switcher rule above forces display:flex, beating the UA's
+   [hidden] { display:none } default, so we restore it explicitly. */
+.bank-switcher[hidden] { display: none; }
+.bank-arrow {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.bank-arrow:hover { background: rgba(255, 255, 255, 0.16); }
+.bank-arrow:disabled { opacity: 0.3; cursor: not-allowed; }
+.bank-label {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #00ffcc;
+    text-shadow: 0 0 8px rgba(0, 255, 204, 0.45);
+    min-width: 88px;
+    text-align: center;
+}
+.bank-label.bank-locked { color: #94a3b8; text-shadow: none; }
+
+.story-body .lore-bad  { color: #fca5a5; text-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+.story-body .lore-good { color: #fde68a; text-shadow: 0 0 8px rgba(0, 0, 0, 0.6), 0 0 8px rgba(167, 139, 250, 0.4); }
+.story-body .lore-mb   { color: #d8b4fe; text-shadow: 0 0 8px rgba(168, 85, 247, 0.55); }
+.story-body .story-hint {
+    margin-top: 14px !important;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(167, 139, 250, 0.35);
+    color: rgba(167, 139, 250, 0.85);
+    font-style: italic;
+}
+@keyframes story-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes story-card-rise {
+    from { transform: translateY(24px) scale(0.96); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+/* Mobile tweak — story title wraps cleanly on narrow screens. */
+@media (max-width: 480px) {
+    .story-card { padding: 26px 18px 20px; }
+    .story-title { font-size: 20px; }
+    .story-body p { font-size: 13px; }
+}
+
+/* Reduced-motion: skip the reveal pulse + modal slide. */
+@media (prefers-reduced-motion: reduce) {
+    .btn-madballz.reveal { animation: none; }
+    .story-modal.open { animation: none; }
+    .story-card { animation: none; }
+}
+
+/* ====== ICE FREEZE TO "DEATH" ======
+   When Ice Munki lands on stage, every other Munki on stage freezes.
+   The vibe is "morbidly absurd cartoon" — cyan tint, ice crystal, RIP
+   flag — never gore. The frozen Munki keeps its silhouette but reads as
+   visibly Done. Class is toggled in updateIceFreeze() in game.js. */
+.stage-slot.frozen-by-ice {
+    /* Slot itself has no frame on the frame-less stage; instead, replace
+       the active spotlight under the Munki with an icy cyan halo so the
+       footing reads cold. */
+    filter: drop-shadow(0 0 12px rgba(103, 232, 249, 0.55));
+}
+.stage-slot.frozen-by-ice::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(103, 232, 249, 0.55), transparent 70%) !important;
+}
+
+.stage-slot.frozen-by-ice .char-art {
+    filter: hue-rotate(180deg) saturate(0.32) brightness(1.32) contrast(1.12);
+    animation: ice-shiver 0.6s ease-in-out infinite !important;
+}
+
+/* Frozen Munkis don't get to dance to the beat — squashing the bounce
+   reads as "stiff, frozen solid". */
+.stage-slot.frozen-by-ice .char-art.beat .char-body,
+.stage-slot.frozen-by-ice .char-art.beat .char-head {
+    animation: none !important;
+}
+
+@keyframes ice-shiver {
+    0%, 100% { transform: translateX(0) rotate(0); }
+    25%      { transform: translateX(-0.6px) rotate(-0.6deg); }
+    75%      { transform: translateX(0.6px)  rotate(0.6deg); }
+}
+
+/* Spinning ❄ snowflake top-right of the frozen slot. */
+.stage-slot.frozen-by-ice .slot-icon::before {
+    content: '❄';
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    color: #fff;
+    font-size: 24px;
+    line-height: 1;
+    text-shadow: 0 0 10px #67e8f9, 0 0 22px rgba(103, 232, 249, 0.7);
+    animation: ice-flake-spin 3.2s linear infinite;
+    z-index: 5;
+    pointer-events: none;
+}
+
+@keyframes ice-flake-spin {
+    0%   { transform: rotate(0); opacity: 0.85; }
+    50%  { transform: rotate(180deg); opacity: 1; }
+    100% { transform: rotate(360deg); opacity: 0.85; }
+}
+
+/* Big "💀 RIP" flag rises from the body — fires once on the freeze
+   transition (CSS animation runs once when class is added). */
+.stage-slot.frozen-by-ice::after {
+    content: '💀 RIP';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: 0.12em;
+    color: #fff;
+    text-shadow:
+        0 0 10px #67e8f9,
+        2px 2px 0 #000,
+        -2px -2px 0 #000;
+    animation: rip-rise 1.3s cubic-bezier(0.2, 0.85, 0.3, 1) forwards;
+    z-index: 7;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+@keyframes rip-rise {
+    0%   { opacity: 0; transform: translate(-50%, 40%) scale(0.3) rotate(-12deg); }
+    20%  { opacity: 1; transform: translate(-50%, -10%) scale(1.3) rotate(4deg); }
+    60%  { opacity: 1; transform: translate(-50%, -25%) scale(1) rotate(-2deg); }
+    100% { opacity: 0.85; transform: translate(-50%, -28%) scale(1) rotate(0); }
+}
+
+.stage-slot.frozen-by-ice .slot-label {
+    color: #67e8f9 !important;
+    text-shadow: 0 0 6px rgba(103, 232, 249, 0.6);
+}
+
+/* Ice Munki itself wears the cold but isn't frozen — give it a frost
+   halo footlight + bluish drop-shadow so the kid sees who's doing the
+   freezing on the frame-less stage. */
+body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"]::before {
+    background: radial-gradient(ellipse at 50% 100%, rgba(103, 232, 249, 0.6), transparent 70%);
+}
+body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"] {
+    filter: drop-shadow(0 0 14px rgba(103, 232, 249, 0.55));
+    box-shadow:
+        inset 0 0 30px rgba(103, 232, 249, 0.35),
+        0 0 28px rgba(103, 232, 249, 0.45);
+    border-color: #67e8f9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .stage-slot.frozen-by-ice .char-art { animation: none !important; }
+    .stage-slot.frozen-by-ice .slot-icon::before { animation: none; }
+    .stage-slot.frozen-by-ice::after { animation: rip-rise 0.8s ease-out forwards; }
+}
+
+/* ====== MOON RULES (chaos events fired by clicks while Moon is on stage) ====== */
+body.moon-hue {
+    animation: moon-hue-shift 0.85s ease-in-out;
+}
+@keyframes moon-hue-shift {
+    0%, 100% { filter: hue-rotate(0); }
+    50%      { filter: hue-rotate(220deg) brightness(1.08); }
+}
+
+body.moon-invert {
+    animation: moon-invert-flash 0.28s steps(2);
+}
+@keyframes moon-invert-flash {
+    0%, 100% { filter: invert(0); }
+    50%      { filter: invert(1) hue-rotate(180deg); }
+}
+
+/* ====== JEALOUSY FLAVOR ======
+   The 7th-wheel chip (in the bank) and the altar chip both wear the .sulk
+   class. Idle: a slow sigh-droop. .sulk-deep (rainbow on stage is complete):
+   the lonely chip dims and droops further as if to say "they finished
+   without me". Speech bubbles pop on tap with kid-friendly jealous lines. */
+.tray-chip.sulk {
+    animation: sulk-sigh 5s ease-in-out infinite;
+}
+@keyframes sulk-sigh {
+    0%, 100% { transform: translateY(0)   rotate(0); }
+    50%      { transform: translateY(2px) rotate(-1.2deg); }
+}
+.tray-chip.sulk.sulk-deep {
+    animation: sulk-sigh-deep 4.2s ease-in-out infinite;
+    filter: saturate(0.7) brightness(0.85);
+}
+@keyframes sulk-sigh-deep {
+    0%, 100% { transform: translateY(0)   rotate(0); }
+    50%      { transform: translateY(5px) rotate(-2.4deg); }
+}
+/* Don't sulk while the kid is actively grabbing — looks broken otherwise. */
+.tray-chip.sulk.grabbing { animation: none; }
+
+/* Speech bubble — small floating chat tooltip above the chip. */
+.speech-bubble {
+    position: fixed;
+    z-index: 60;
+    transform: translate(-50%, -100%) scale(0.85);
+    background: rgba(15, 23, 42, 0.95);
+    color: #fef9c3;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 7px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(253, 230, 138, 0.4);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: 90vw;
+    text-overflow: ellipsis;
+    opacity: 0;
+    transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.speech-bubble.shown {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+}
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(15, 23, 42, 0.95);
+    border-bottom: 0;
+}
+
+/* ====== MUNKI ALTAR (Ice ↔ Moon swap chip) ======
+   Lives below the regular tray. The chip is a scaled-down clone of a
+   regular tray-chip so all the existing styling applies. Drag onto the
+   active 7th-wheel chip in the bank to swap; bank stays at 7 chips. */
+.munki-altar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 0 0;
+    margin: 0 auto;
+}
+.munki-altar[hidden] { display: none; }
+.munki-altar .altar-chip {
+    transform: scale(0.78);
+    transform-origin: top center;
+    margin: -6px 0;
+    border-color: rgba(167, 139, 250, 0.6);
+    box-shadow: 0 0 14px rgba(167, 139, 250, 0.35);
+}
+.munki-altar .altar-hint {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(196, 181, 253, 0.7);
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+    margin-top: 2px;
+}
+
+/* Highlight the bank chip that's a valid swap drop target during an
+   altar drag — mirrors the .drop-target glow on stage slots. */
+.tray-chip.swap-target {
+    border-color: #c4b5fd;
+    box-shadow: 0 0 22px rgba(167, 139, 250, 0.7);
+    animation: swap-target-pulse 0.9s ease-in-out infinite;
+}
+@keyframes swap-target-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.06); }
+}
+
+/* ====== EASTER-EGG COUNTER + MOON REVEAL ======
+   The counter chip lives top-right of the viewport. It stays hidden until
+   the kid finds their first egg, then fades in and animates each bump.
+   The hidden corner hotspots catch the 4-corners egg without leaving any
+   visible mark. The moon-reveal overlay celebrates the 5th find. */
+.egg-counter {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0) + 10px);
+    right: calc(env(safe-area-inset-right, 0) + 10px);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    color: #e9d5ff;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    box-shadow: 0 0 14px rgba(167, 139, 250, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+    pointer-events: none;
+}
+.egg-counter.shown {
+    opacity: 1;
+    transform: translateY(0);
+    /* The chip becomes a button once visible — opens the achievements panel
+       on tap. Default visibility uses pointer-events:none to ignore stray
+       taps before any unlock; .shown lifts that. */
+    pointer-events: auto;
+    cursor: pointer;
+}
+.egg-counter.shown:hover { background: rgba(15, 23, 42, 0.92); }
+.egg-counter.shown:active { transform: translateY(0) scale(0.95); }
+.egg-counter.bump {
+    animation: egg-counter-bump 0.55s ease-out;
+}
+.egg-counter.found-all {
+    color: #fde68a;
+    border-color: rgba(251, 191, 36, 0.7);
+    box-shadow: 0 0 18px rgba(251, 191, 36, 0.45);
+}
+.egg-counter[hidden] { display: none; }
+@keyframes egg-counter-bump {
+    0%   { transform: translateY(0)    scale(1); }
+    35%  { transform: translateY(-3px) scale(1.18); }
+    100% { transform: translateY(0)    scale(1); }
+}
+
+/* Corner hotspots — invisible 60×60 squares anchored to each viewport
+   corner. Sit above the page chrome so taps register even on top of the
+   header and footer. */
+.corner-egg {
+    position: fixed;
+    width: 60px;
+    height: 60px;
+    z-index: 40;
+    pointer-events: auto;
+    background: transparent;
+}
+.corner-tl { top: 0;    left: 0; }
+.corner-tr { top: 0;    right: 0; }
+.corner-br { bottom: 0; right: 0; }
+.corner-bl { bottom: 0; left: 0; }
+
+/* Moon reveal — full-screen dimmer + centered card with a big floating
+   moon glyph. open class flips opacity + scale; tapping anywhere on the
+   overlay also dismisses early (handled in JS). */
+.moon-reveal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(8, 8, 24, 0);
+    opacity: 0;
+    pointer-events: none;
+    transition: background 0.5s ease, opacity 0.5s ease;
+}
+.moon-reveal.open {
+    background: rgba(8, 8, 24, 0.82);
+    opacity: 1;
+    pointer-events: auto;
+}
+.moon-reveal-card {
+    text-align: center;
+    color: #fbeffb;
+    font-family: 'Fredoka', sans-serif;
+    transform: scale(0.7);
+    transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.moon-reveal.open .moon-reveal-card { transform: scale(1); }
+.moon-reveal-glyph {
+    font-size: 96px;
+    line-height: 1;
+    filter: drop-shadow(0 0 24px rgba(167, 139, 250, 0.8));
+    animation: moon-float 3.2s ease-in-out infinite;
+    animation-play-state: paused;
+}
+.moon-reveal.open .moon-reveal-glyph { animation-play-state: running; }
+@keyframes moon-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-10px); }
+}
+.moon-reveal-title {
+    margin-top: 18px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: #e9d5ff;
+    text-shadow: 0 0 14px rgba(167, 139, 250, 0.7);
+}
+.moon-reveal-sub {
+    margin-top: 8px;
+    font-size: 14px;
+    letter-spacing: 0.08em;
+    color: rgba(233, 213, 255, 0.78);
+}
+
+/* Tilt only the playfield — header/tray stay anchored so the kid still
+   has something stable to read. */
+body.moon-tilt main {
+    animation: moon-tilt-shake 0.7s ease-in-out;
+    transform-origin: 50% 50%;
+}
+@keyframes moon-tilt-shake {
+    0%, 100% { transform: rotate(0); }
+    25%      { transform: rotate(2.2deg); }
+    55%      { transform: rotate(-1.6deg); }
+    80%      { transform: rotate(0.8deg); }
+}
+
+.moon-rain {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9500;
+    overflow: hidden;
+}
+.moon-rain span {
+    position: absolute;
+    top: -10vh;
+    animation: moon-fall 2.8s ease-in forwards;
+    text-shadow: 0 0 16px #93c5fd;
+}
+@keyframes moon-fall {
+    0%   { transform: translateY(0) rotate(0); opacity: 0; }
+    10%  { opacity: 1; }
+    100% { transform: translateY(115vh) rotate(360deg); opacity: 0.65; }
+}
+
+/* Subtitle goes glitchy + moon-colored when the chaos message lands. */
+.moon-glitch-text {
+    color: #93c5fd !important;
+    text-shadow: 0 0 14px #fff, 0 0 26px #60a5fa;
+    animation: moon-text-flicker 0.18s steps(2) infinite;
+}
+@keyframes moon-text-flicker {
+    0%   { transform: translateX(-1px); opacity: 0.85; }
+    50%  { transform: translateX(1px);  opacity: 1; }
+    100% { transform: translateX(0);    opacity: 0.9; }
+}
+
+/* Phantom Munki briefly haunting an empty slot. */
+.moon-phantom {
+    position: absolute;
+    inset: 6px;
+    z-index: 4;
+    pointer-events: none;
+    filter: hue-rotate(220deg) brightness(1.45) drop-shadow(0 0 14px #93c5fd);
+    animation: moon-phantom-pop 0.95s ease-out forwards;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.moon-phantom .char-art {
+    width: 100%;
+    height: 100%;
+}
+@keyframes moon-phantom-pop {
+    0%   { opacity: 0; transform: scale(0.4) rotate(-12deg); }
+    30%  { opacity: 0.85; transform: scale(1.05) rotate(4deg); }
+    70%  { opacity: 0.7; transform: scale(1) rotate(-2deg); }
+    100% { opacity: 0; transform: scale(0.95) rotate(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body.moon-hue, body.moon-invert, body.moon-tilt main { animation: none; }
+    .moon-rain span { animation-duration: 1.4s; }
+    .moon-phantom { animation: moon-phantom-pop 0.6s ease-out forwards; }
+}
+
+/* ====== ACHIEVEMENT TOAST + PANEL ======
+   Toasts pop under the egg counter when a new achievement unlocks. Stack
+   when multiple unlocks fire in quick succession via --toast-stack. The
+   panel is a small dialog that opens when the counter is tapped. */
+.achievement-toast {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0) + 56px + (var(--toast-stack, 0) * 64px));
+    right: calc(env(safe-area-inset-right, 0) + 10px);
+    z-index: 55;
+    min-width: 180px;
+    max-width: 260px;
+    padding: 8px 14px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(167, 139, 250, 0.95), rgba(99, 102, 241, 0.95));
+    color: #fff;
+    font-family: 'Fredoka', sans-serif;
+    text-align: right;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 24px rgba(167, 139, 250, 0.5);
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), top 0.3s ease;
+    pointer-events: none;
+}
+.achievement-toast.shown {
+    opacity: 1;
+    transform: translateX(0);
+}
+.achievement-toast-title {
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+}
+.achievement-toast-points {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.85);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 1px;
+}
+
+.achievements-panel {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0) + 50px);
+    right: calc(env(safe-area-inset-right, 0) + 10px);
+    z-index: 60;
+    width: min(280px, calc(100vw - 20px));
+    max-height: min(360px, calc(100vh - 80px));
+    overflow-y: auto;
+    padding: 12px 14px;
+    border-radius: 16px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(167, 139, 250, 0.5);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #e9d5ff;
+    font-family: 'Fredoka', sans-serif;
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+}
+.achievements-panel.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+.achievements-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(167, 139, 250, 0.25);
+}
+.achievements-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #fde68a;
+}
+.achievements-close {
+    background: transparent;
+    border: none;
+    color: rgba(233, 213, 255, 0.7);
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.achievements-close:hover { color: #fff; }
+.achievements-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.achievement-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px;
+    border-bottom: 1px solid rgba(167, 139, 250, 0.12);
+    font-size: 13px;
+}
+.achievement-row:last-child { border-bottom: none; }
+.achievement-name {
+    color: #e9d5ff;
+    letter-spacing: 0.02em;
+}
+.achievement-points {
+    color: #fde68a;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.achievement-empty {
+    list-style: none;
+    padding: 12px 4px;
+    text-align: center;
+    color: rgba(233, 213, 255, 0.6);
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* Horror-mode corner sprites become tap-targets so 'Touch the Outsider'
+   can fire. They stay non-interactive in normal play. */
+body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }

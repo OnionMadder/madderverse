@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">All Munkis</string>
+    <string name="title_activity_main">All Munkis</string>
+    <string name="package_name">org.madderverse.allmunkis</string>
+    <string name="custom_url_scheme">org.madderverse.allmunkis</string>
+</resources>
