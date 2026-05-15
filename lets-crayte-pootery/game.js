@@ -1919,13 +1919,25 @@
         MAX_R:  128,    /* clay can't escape the canvas */
         INIT_R: 72,     /* starting cylinder radius */
 
-        /* Shaping behavior */
+        /* Shaping behavior.
+           EASE is the per-frame snap rate -- higher = clay catches
+           your finger faster, lower = more viscous + you can feel
+           it taking shape. 0.30 was Photoshop-liquify quick;
+           0.14 reads as "actual clay" without being slow enough
+           to frustrate a 5yo. */
         KERNEL_SIGMA: 2.4,   /* gaussian spread (in sample-index units) */
         KERNEL_CUT:   0.06,  /* below this weight, skip the slice */
-        EASE:         0.30,  /* per-16.67-ms ease factor */
+        EASE:         0.14,  /* per-16.67-ms ease factor */
 
-        /* Wheel */
+        /* Wheel.
+           Real pottery: the wheel slows when you press on it -- the
+           clay resists your hand + the potter eases the foot pedal.
+           We simulate that by dropping the rotation rate during
+           active sculpting, smoothed so it doesn't jerk between
+           speeds. Both numbers are tuned by feel. */
         WHEEL_RPM: 26,
+        WHEEL_SLOW_FACTOR: 0.55,   /* multiplier while finger is on clay */
+        WHEEL_BLEND:       0.06,   /* per-frame smoothing toward target speed */
 
         /* Particles */
         PART_GRAV: 0.00045,
@@ -1946,6 +1958,7 @@
 
         particles: [],
         wheelPhase: 0,
+        wheelSpeedFactor: 1.0,   /* smoothed 0..1; multiplies WHEEL_RPM */
         lastT: 0,
         rafId: null,
         running: false,
@@ -2708,8 +2721,14 @@
         const dt = Math.min(48, t - SHAPE.lastT); /* clamp dt for stability */
         SHAPE.lastT = t;
 
-        /* Wheel spin */
-        SHAPE.wheelPhase += (2 * Math.PI * SHAPE.WHEEL_RPM / 60) * (dt / 1000);
+        /* Wheel spin -- slows during active sculpting so the player
+           can see what they're doing (real-pottery behavior). The
+           smoothing prevents a jerk when the finger lands / lifts. */
+        const isShaping = !!(SHAPE.pointerActive && SHAPE.pointer && !SHAPE.clayLocked);
+        const targetFactor = isShaping ? SHAPE.WHEEL_SLOW_FACTOR : 1.0;
+        SHAPE.wheelSpeedFactor += (targetFactor - SHAPE.wheelSpeedFactor) * SHAPE.WHEEL_BLEND;
+        SHAPE.wheelPhase += (2 * Math.PI * SHAPE.WHEEL_RPM / 60) *
+                            SHAPE.wheelSpeedFactor * (dt / 1000);
         if (SHAPE.wheelPhase > Math.PI * 2) SHAPE.wheelPhase -= Math.PI * 2;
 
         /* Shaping */
@@ -9199,6 +9218,17 @@
             entryTier:         entryTier,
             tierName:          trophyNameForTier,
             TIERS:             TROPHY_TIERS
+        },
+        /* Live read-outs for tuning the shape physics. Useful in
+           the preview console; harmless in prod. */
+        _shape: {
+            get wheelSpeedFactor() { return SHAPE.wheelSpeedFactor; },
+            get pointerActive()    { return SHAPE.pointerActive; },
+            get pointer()          { return SHAPE.pointer; },
+            get running()          { return SHAPE.running; },
+            get wheelPhase()       { return SHAPE.wheelPhase; },
+            get EASE()             { return SHAPE.EASE; },
+            get WHEEL_SLOW_FACTOR() { return SHAPE.WHEEL_SLOW_FACTOR; }
         }
     };
 
