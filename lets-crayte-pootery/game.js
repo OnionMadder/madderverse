@@ -3819,7 +3819,11 @@
            { id: "rare-pepe", file: "rare-pepe.png" }
     */
     const MEGA_STAMP_FILES = [
-        // { id: "your-stamp", file: "your-stamp.png" },
+        { id: "arrows",     file: "arrows.png" },
+        { id: "hatchmark",  file: "hatchmark.png" },
+        { id: "kokopelli",  file: "kokopelli.png" },
+        { id: "mountains",  file: "mountains.png" },
+        { id: "triangles",  file: "triangles.png" }
     ];
 
     /* Image cache — populated by loadMegaStamps so the PATTERN
