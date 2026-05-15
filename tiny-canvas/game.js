@@ -943,7 +943,16 @@
 
     /* ---------- 6. TEMPLATE LOADING ---------- */
 
-    function loadTemplate(tpl) {
+    async function loadTemplate(tpl) {
+        /* Save the kid's current work to its template's in-progress
+           slot BEFORE clearing the canvas — so going BLANK → UNICORN
+           → BLANK restores the BLANK strokes. Without this the
+           previous drawing would be lost the moment you tap a
+           different page. No-op on first entry. */
+        if (state.templateId && state.dirty) {
+            markInProgressDirty();
+            await persistInProgress();
+        }
         state.templateId   = tpl.id;
         state.templateName = tpl.name;
         const overlay = $("#lineArt");
@@ -983,8 +992,8 @@
             name.textContent = tpl.name;
             card.appendChild(name);
 
-            card.addEventListener("click", function () {
-                loadTemplate(tpl);
+            card.addEventListener("click", async function () {
+                await loadTemplate(tpl);
                 showScreen("draw");
             });
             grid.appendChild(card);
@@ -1732,21 +1741,40 @@
         rebuildSizeButtons();
         refreshToolButtons();
 
-        $("#btnStart").addEventListener("click", function () {
-            showScreen("picker");
+        $("#btnStart").addEventListener("click", async function () {
+            /* START COLORING goes straight to a blank canvas instead of
+               dumping the kid into a 20-template grid. Most kids just
+               want to scribble; templates are an optional side-trip via
+               the floating PAGES button on the draw screen. */
+            const blank = (window.TINY_CANVAS_TEMPLATES || [])
+                .find(function (t) { return t.id === "blank"; });
+            if (blank) await loadTemplate(blank);
+            showScreen("draw");
         });
         $("#btnGallery").addEventListener("click", function () {
             showScreen("gallery");
         });
         $("#pickerBack").addEventListener("click", function () {
-            showScreen("title");
+            /* Picker is now reached ONLY from the draw screen via the
+               floating PAGES button. Back-from-picker returns to
+               drawing rather than punting to the title. */
+            showScreen("draw");
         });
         $("#drawBack").addEventListener("click", function () {
-            /* Going back to the picker doesn't lose in-progress —
-               the auto-save covers it. */
+            /* Save the in-progress before leaving so the kid's
+               current strokes survive going back to title and
+               coming back to draw later. */
             persistInProgress();
-            showScreen("picker");
+            showScreen("title");
         });
+        /* Floating PAGES button on the draw screen — opens the
+           template picker as an optional browse view. */
+        const pagesBtn = $("#pagesBtn");
+        if (pagesBtn) {
+            pagesBtn.addEventListener("click", function () {
+                showScreen("picker");
+            });
+        }
         $("#galleryBack").addEventListener("click", function () {
             showScreen("title");
         });
@@ -1765,8 +1793,11 @@
         $("#detailExport").addEventListener("click", exportCurrent);
         const galleryStart = $("#galleryStartBtn");
         if (galleryStart) {
-            galleryStart.addEventListener("click", function () {
-                showScreen("picker");
+            galleryStart.addEventListener("click", async function () {
+                const blank = (window.TINY_CANVAS_TEMPLATES || [])
+                    .find(function (t) { return t.id === "blank"; });
+                if (blank) await loadTemplate(blank);
+                showScreen("draw");
             });
         }
 

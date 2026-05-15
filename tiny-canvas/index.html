@@ -106,9 +106,9 @@
 <main class="screen" id="screen-picker" hidden>
 
     <div class="screen-titlebar">
-        <button class="back-btn" id="pickerBack" type="button">&larr; TITLE</button>
+        <button class="back-btn" id="pickerBack" type="button">&larr; BACK</button>
         <h2 class="screen-title">&lt;&nbsp;PICK A PAGE&nbsp;&gt;</h2>
-        <span class="screen-status" id="pickerStatus">SELECT</span>
+        <span class="screen-status" id="pickerStatus">OPTIONAL</span>
     </div>
 
     <div class="picker-grid" id="pickerGrid">
@@ -125,7 +125,7 @@
 <main class="screen" id="screen-draw" hidden>
 
     <div class="screen-titlebar">
-        <button class="back-btn" id="drawBack" type="button">&larr; PAGES</button>
+        <button class="back-btn" id="drawBack" type="button">&larr; HOME</button>
         <h2 class="screen-title" id="drawTitle">&lt;&nbsp;COLOR&nbsp;&gt;</h2>
         <span class="screen-status" id="drawStatus">UNSAVED</span>
     </div>
@@ -155,6 +155,15 @@
         <button class="canvas-overlay-btn" id="undoBtn" type="button"
                 title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
             <span aria-hidden="true">&#x21B6;</span>
+        </button>
+
+        <!-- Floating PAGES button — top-left of viewport. Optional
+             template picker; the kid lands on a blank canvas by
+             default and only opens this if they want a guided page. -->
+        <button class="canvas-overlay-btn pages-btn" id="pagesBtn" type="button"
+                title="Pick a coloring page" aria-label="Pick a coloring page">
+            <span class="pages-glyph" aria-hidden="true">&#9636;</span>
+            <span class="pages-label">PAGES</span>
         </button>
 
         <!-- ============================================================

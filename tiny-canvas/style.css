@@ -597,11 +597,63 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 
 /* Floating undo button — top-right of the viewport, clear of the
    floating titlebar. */
-#screen-draw .canvas-overlay-btn {
+#screen-draw #undoBtn {
     position: fixed;
     top: 16px;
     right: 16px;
     z-index: 60;
+}
+
+/* Floating PAGES button — top-left mirror of UNDO. Optional template
+   picker so kids who want a guided coloring page can grab one without
+   the app forcing the picker grid on every launch. Pill-shaped with
+   a tiny grid glyph + a short label so it reads at a glance. */
+#screen-draw .pages-btn {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 60;
+    width: auto;
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 20px;
+    background: rgba(12, 31, 37, 0.85);
+    border: 1px solid var(--pink-bright);
+    color: var(--pink-bright);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1;
+    text-shadow: 1px 1px 0 #000;
+}
+
+#screen-draw .pages-btn:hover,
+#screen-draw .pages-btn:focus-visible {
+    background: rgba(20, 64, 74, 0.92);
+    border-color: var(--pink);
+    color: #fff;
+    outline: none;
+    box-shadow: 0 0 14px rgba(255, 46, 136, 0.45);
+}
+
+.pages-glyph {
+    font-size: 14px;
+    line-height: 1;
+}
+
+@media (max-width: 480px) {
+    /* Compact on narrow phones — drop the label so the pill stays
+       out of the kid's drawing area. The aria-label keeps it
+       accessible. */
+    #screen-draw .pages-btn .pages-label { display: none; }
+    #screen-draw .pages-btn {
+        padding: 0;
+        width: 40px;
+        justify-content: center;
+    }
 }
 
 /* ----- Onion mascot ----- */
