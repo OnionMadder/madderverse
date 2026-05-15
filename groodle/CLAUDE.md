@@ -43,11 +43,14 @@ to `groodle/`.
 
 ```
 groodle/
-  index.html         — silhouette SVG + draw canvas + tool dock + drawers + modals
-  style.css          — full stylesheet (no build, no preprocessor)
-  game.js            — single IIFE; canvas + audio + dance + pages + gallery
-  cover.jpg          — hub-page card art
-  SUPABASE_SETUP.md  — one-shot SQL + RLS setup for the public gallery
+  index.html             — silhouette SVG + draw canvas + tool dock + drawers + modals
+  style.css              — full stylesheet (no build, no preprocessor)
+  game.js                — single IIFE; canvas + audio + dance + pages + gallery
+  cover.jpg              — hub-page card art
+  manifest.webmanifest   — PWA manifest (name, icons, theme, start_url)
+  sw.js                  — service worker (cache-first shell for offline play)
+  SUPABASE_SETUP.md      — one-shot SQL + RLS setup for the public gallery
+  PLAY_STORE_PLAN.md     — phased rollout plan to ship as a Capacitor Android app
 ```
 
 All runtime files are loaded directly by the browser. Path conventions
@@ -55,6 +58,29 @@ match the rest of the hub (relative for in-game assets, absolute for SEO
 / favicon). The Supabase JS SDK is loaded from jsDelivr in `index.html`
 and only does work once the placeholder credentials in `game.js` are
 filled in.
+
+## PWA / service worker
+
+Groodle ships as an installable PWA — manifest at `manifest.webmanifest`,
+service worker at `sw.js`. Both are referenced from `index.html` (the
+`<link rel="manifest">` tag) and `game.js` (the `serviceWorker.register`
+block at the bottom of the IIFE). The SW is registered only on `https:`
+or `localhost` so a Python `http.server` round-trip works for local
+testing.
+
+The SW uses a **cache-first** strategy for the game shell (HTML, CSS,
+JS, hat sprites, favicons, footer CSS one directory up) and bypasses
+everything cross-origin that needs live responses (`*.supabase.co`,
+`goatcounter.com`). Bump `SHELL_VERSION` in `sw.js` whenever any
+precached file changes — the `activate` handler deletes every cache
+that doesn't match the current version so stale assets can't linger.
+
+Icons in `manifest.webmanifest` currently reuse
+`../assets/favi/android-chrome-{192,512}x{192,512}.png` (the
+site-wide Madderverse logo). Both are `"purpose": "any"`; **no
+maskable variant ships yet**. Chunk 9 in `PLAY_STORE_PLAN.md` covers
+swapping to Groodle-branded icons + commissioning maskable layouts
+for Android adaptive icon shapes.
 
 **`game.js` is a single IIFE.** If you ever see `})();` appear twice in
 the file (e.g. after a sloppy paste), the whole game initializes twice

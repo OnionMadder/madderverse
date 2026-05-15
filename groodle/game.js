@@ -2349,4 +2349,22 @@
     } else {
         init();
     }
+
+    /* Service worker registration — purely a progressive enhancement.
+       The game runs fine without it; with it, the shell is cached so
+       reopens are instant and offline-capable. Registered after the
+       load event so it doesn't compete with first-paint asset fetches
+       for bandwidth on slow connections.
+
+       Skipped on file:// (no SW context) and on protocols that don't
+       support secure origins. Failures are swallowed silently — a
+       registration error must not break the game. */
+    if ('serviceWorker' in navigator &&
+        (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch(() => {
+                /* swallow — SW is optional */
+            });
+        });
+    }
 })();

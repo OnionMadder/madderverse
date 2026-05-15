@@ -23,11 +23,18 @@
     <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
-    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <!-- Groodle-specific PWA manifest (not the site-wide one) so installs
+         get the Groodle name + icon + start_url + offline-capable shell.
+         Path is relative so it resolves the same when bundled inside the
+         Capacitor app (see groodle/PLAY_STORE_PLAN.md chunk 4). -->
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
     <meta name="theme-color" content="#ff6ec7" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Groodle" />
     <meta name="application-name" content="Groodle" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

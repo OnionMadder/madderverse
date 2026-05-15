@@ -1,0 +1,29 @@
+{
+  "name": "Groodle — Scribble, Dance, Repeat",
+  "short_name": "Groodle",
+  "description": "Scribble a little character inside the silhouette and watch your doodle come alive to a beat. Free, ad-free, kid-friendly — from The Madderverse.",
+  "id": "/groodle/",
+  "scope": "./",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a0f33",
+  "theme_color": "#ff6ec7",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games", "kids", "entertainment"],
+  "icons": [
+    {
+      "src": "../assets/favi/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "../assets/favi/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
