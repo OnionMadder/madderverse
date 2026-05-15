@@ -34,15 +34,26 @@ the web. If a feature only makes sense in the app, gate it behind a
 - **Platform scope (v1)**: Android only. iOS is on hold — Apple's kid
   app + IAP rules are stricter and Capacitor handles it the same way
   whenever we're ready.
+- **App ID**: `org.madderverse.groodle` (reverse-DNS of the public
+  domain — keeps room for `org.madderverse.<other-game>` later if
+  more Madderverse games ship as apps).
+- **App display name**: "Groodle".
+- **First-release IAP catalog**: a single `studio_pack` at **$1.99**.
+  Contents proposed: 4 extra backgrounds + 2 extra moves + 2 extra
+  beats. One product on launch proves the IAP flow without splitting
+  attention; we add more packs in follow-up updates once it's
+  working.
+- **Privacy policy hosting**: extend the existing site-wide
+  `madderverse.org/legal.html` rather than create a Groodle-specific
+  page. The Play Store listing's "Privacy Policy" field points at
+  the same URL all other Madderverse games already use; the page
+  gains a new Groodle-specific section covering the public gallery,
+  IAP, and any data the app collects beyond the web version.
 
 ## Open decisions (need calls before the chunks they block)
 
 | Question | Blocks chunk | Default if I have to pick |
 |---|---|---|
-| App ID + package name | 4 | `com.madsundar.groodle` |
-| App display name | 4, 11 | "Groodle" |
-| First-release IAP catalog (which packs, what prices) | 8 | One $1.99 "Studio Pack" (4 BGs + 2 moves + 2 beats) as a proof-of-concept |
-| Privacy policy hosting | 11 | New `madderverse.org/groodle/privacy.html` page |
 | Play Console developer account | 0 | Need confirmation Kelly has one or will create |
 
 ## Chunk 0 — Logistics & prerequisites (no code yet)
@@ -53,8 +64,9 @@ Out-of-band setup that's needed before any code:
 - Install Android Studio (or just the command-line tools) — Capacitor
   needs the Android SDK to build. Java 17+ JDK.
 - Install Node.js 20+ and npm. Capacitor CLI is npm-distributed.
-- Pick app ID (default `com.madsundar.groodle`) — this is permanent
-  on Play, so confirm before chunk 4.
+- App ID is locked at `org.madderverse.groodle`. Once we publish to
+  Play it is permanent — Play will not let us change it after the
+  first release. Triple-check during chunk 4 setup.
 - Generate the upload signing keystore (one-time, kept somewhere safe;
   losing it means losing the ability to update the app). Treat like a
   password — never check in.
@@ -153,7 +165,7 @@ First sideloadable APK that runs the game offline on a real phone.
   `@capacitor/android`, `@capacitor/preferences`, `@capacitor/share`,
   `@capacitor/filesystem`, `@capacitor/app`. No build step — Capacitor
   copies the `webDir` straight into the Android assets.
-- `capacitor.config.ts` with `appId: 'com.madsundar.groodle'`,
+- `capacitor.config.ts` with `appId: 'org.madderverse.groodle'`,
   `appName: 'Groodle'`, `webDir: '../groodle'` (point at the existing
   static directory). `bundledWebRuntime: false`.
 - A pre-build step (npm script `prebuild` or a small Node script)
@@ -268,10 +280,13 @@ Wire pack ownership to real money via Google Play Billing.
   is free up to $10K/month). Alternative: pure
   `capacitor-google-play-billing` plugin if you'd rather self-host
   receipt validation.
-- Define the products in Play Console matching `PACKS[].id`:
-  `studio_pack`, `disco_pack`, `cosmic_pack`, `circus_pack`,
-  `garden_pack`. One-time non-consumable products, ~$1.99 each.
-  Optional bundle product `all_packs` at $9.99.
+- Define one product in Play Console matching the launch IAP:
+  `studio_pack` at $1.99, one-time non-consumable. The PACKS catalog
+  in chunk 6 carries the others (`disco_pack`, `cosmic_pack`,
+  `circus_pack`, `garden_pack`) as `defaultOwned: false, priceUsd:
+  null` placeholders so adding them later is a Play Console + price
+  edit, not a code change. Optional bundle `all_packs` similarly
+  stays a placeholder until we ship more packs.
 - Init the IAP SDK on app launch. On first launch and on resume,
   call `restorePurchases()` so reinstalls and device changes restore
   what the kid already owns.
@@ -319,10 +334,16 @@ The kind of stuff Play reviewers and parents notice immediately.
 
 Everything the Play Console asks for during submission.
 
-- Privacy policy page — `madderverse.org/groodle/privacy.html`
-  written for COPPA + Play Family policy. Must mention: no third-
-  party tracking, no PII collection, the public gallery and what
-  kids can/can't post, IAP, data deletion path.
+- Extend the existing `madderverse.org/legal.html` (site-wide for
+  every Madderverse game) with a new "Groodle-specific" section
+  covering: the public gallery (what kids can / can't post, how to
+  report or request takedown), the Studio Pack IAP and how to refund
+  via Google Play, anonymous device-install identifiers used only
+  for rate-limiting gallery uploads, and how to clear all local data
+  (uninstall the app or use the web game's "Clear" + browser local-
+  storage clear). The Play Console "Privacy Policy" field points at
+  `https://madderverse.org/legal.html` — same URL every other
+  Madderverse property already uses.
 - Data safety form (Play Console questionnaire) — should be mostly
   "Doesn't collect" + "Yes, kids can post user-generated content"
   + "Doesn't share data with third parties".
@@ -367,7 +388,7 @@ The Play Store presence itself.
 
 **Effort**: 1–2 sessions (assets are the bulk).
 **Deliverable**: live listing at
-`play.google.com/store/apps/details?id=com.madsundar.groodle`.
+`play.google.com/store/apps/details?id=org.madderverse.groodle`.
 **Depends on**: every prior chunk green.
 
 ## Effort summary
