@@ -938,6 +938,47 @@
 </aside>
 
 <!-- ============================================================
+     REMIX FIRST-TIME ONBOARDING MODAL
+     ============================================================
+     Surfaces ONCE per device when the user taps REMIX for the
+     first time. Reassures a 5yo: "this is X's shape, now make
+     it yours."
+     ============================================================ -->
+<aside class="remix-onboard-modal" id="remixOnboardModal" hidden>
+    <div class="remix-onboard-card">
+        <div class="remix-onboard-glyph" aria-hidden="true">&#x1F501;</div>
+        <h3 class="remix-onboard-title">YOU&rsquo;RE REMIXING!</h3>
+        <p class="remix-onboard-body">
+            This is <span class="remix-onboard-author" id="remixOnboardAuthor">a friend</span>&rsquo;s pot shape.
+            Your wheel will boot up with it ready &mdash;
+            <strong>shape it your way, then paint it.</strong>
+            The original stays where it is.
+        </p>
+        <div class="remix-onboard-canvas-wrap">
+            <canvas id="remixOnboardCanvas" width="160" height="240"
+                    aria-label="The pot you're about to remix"></canvas>
+        </div>
+        <div class="remix-onboard-actions">
+            <button class="btn-control" id="remixOnboardCancel" type="button">
+                <span class="btn-label">NEVERMIND</span>
+            </button>
+            <button class="btn-control primary" id="remixOnboardOk" type="button">
+                <span class="btn-label">LET&rsquo;S MAKE IT</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+        </div>
+    </div>
+</aside>
+
+<!-- Persistent "remixing @user" chip — visible on shape +
+     decorate screens whenever REMIX.pending is set. -->
+<div class="remix-in-progress-chip" id="remixInProgressChip" hidden
+     aria-live="polite">
+    <span class="remix-in-progress-glyph" aria-hidden="true">&#x1F501;</span>
+    <span class="remix-in-progress-text">remixing</span>
+</div>
+
+<!-- ============================================================
      SHARE COMPLETE OVERLAY
      ============================================================
      "+1 copy lifts off" — pot on the left stays put, copy on

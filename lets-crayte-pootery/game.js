@@ -1537,7 +1537,12 @@
             /* Clear any pending REMIX lineage -- if the user backs
                out to title without firing, the next fresh pot they
                make shouldn't carry stale credit. */
-            if (typeof REMIX !== "undefined") REMIX.pending = null;
+            if (typeof REMIX !== "undefined") {
+                REMIX.pending = null;
+                if (typeof refreshRemixInProgressChip === "function") {
+                    refreshRemixInProgressChip();
+                }
+            }
         },
         onLeave: function () {
             stopClock();
@@ -2781,6 +2786,12 @@
             }
             startShapeLoop();
             wheelHumStart();   /* wheel is spinning */
+            /* Show the "remixing @user" chip if this session has
+               a pending remix. Safe to call always -- no-op if
+               not remixing. */
+            if (typeof refreshRemixInProgressChip === "function") {
+                refreshRemixInProgressChip();
+            }
         },
         onLeave: function () {
             stopShapeLoop();
@@ -4725,6 +4736,9 @@
             wireZoomControls();
             startDecorateLoop();
             wheelHumStart();
+            if (typeof refreshRemixInProgressChip === "function") {
+                refreshRemixInProgressChip();
+            }
         },
         onLeave: function () {
             stopDecorateLoop();
@@ -4956,6 +4970,11 @@
                 entry.remixedFromHandle = REMIX.pending.remixedFromHandle;
                 entry.remixedFromName   = REMIX.pending.remixedFromName;
                 REMIX.pending = null;
+                /* Hide the persistent chip now that the remix is
+                   committed to a real local pot. */
+                if (typeof refreshRemixInProgressChip === "function") {
+                    refreshRemixInProgressChip();
+                }
             }
             existing.push(entry);
             /* Cap at 50 — keep newest. Brief calls for the "you have
@@ -7437,10 +7456,25 @@
        (remixedFrom / remixedFromAuthor / remixedFromHandle) so
        the credit chip can render later + the public copy of the
        remix gets a remixed_from FK on share.                   */
+    const REMIX_ONBOARD_KEY = "crayte-remix-onboard-seen";
+
     function startRemix() {
         const entry = GALLERY.detailEntry;
         if (!entry || !entry._isPublic || !Array.isArray(entry.clay)) return;
 
+        /* First time? Show the explainer first so a 5yo isn't
+           confused when the wheel boots with someone else's
+           clay shape. Then proceed to the actual remix. */
+        let seen = false;
+        try { seen = localStorage.getItem(REMIX_ONBOARD_KEY) === "yes"; } catch (_) {}
+        if (!seen) {
+            openRemixOnboardModal(entry, function () { doRemix(entry); });
+        } else {
+            doRemix(entry);
+        }
+    }
+
+    function doRemix(entry) {
         /* Stash lineage on a session global so the kiln-save path
            can write it onto the new local entry. Cleared in
            autoSaveFiredPot after consumption. */
@@ -7472,7 +7506,69 @@
             if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
             /* Re-render so the wheel reflects the new shape. */
             if (typeof renderShape === "function") renderShape();
+            /* Update the persistent in-progress chip too. */
+            refreshRemixInProgressChip();
         }, 50);
+    }
+
+    /* First-time-only modal. Renders source pot in a preview
+       canvas + a friendly explainer + a "got it" CTA. Marks
+       seen + chains to doRemix(entry). */
+    function openRemixOnboardModal(entry, onDone) {
+        const modal = document.getElementById("remixOnboardModal");
+        const ok    = document.getElementById("remixOnboardOk");
+        const cancel = document.getElementById("remixOnboardCancel");
+        const canvas = document.getElementById("remixOnboardCanvas");
+        const author = document.getElementById("remixOnboardAuthor");
+        if (!modal || !ok || !cancel) { onDone && onDone(); return; }
+
+        if (author) {
+            const handle = entry._profile && entry._profile.username;
+            author.textContent = handle ? "@" + handle
+                                        : (entry.author || "anonymous");
+        }
+        if (canvas) {
+            loadEntryPaint(entry).then(function () {
+                renderEntryIntoCanvas(canvas, entry);
+            });
+        }
+        modal.hidden = false;
+
+        const cleanup = function () {
+            modal.hidden = true;
+            ok.removeEventListener("click", onOk);
+            cancel.removeEventListener("click", onCancel);
+            modal.removeEventListener("click", onBackdrop);
+        };
+        const onOk = function () {
+            try { localStorage.setItem(REMIX_ONBOARD_KEY, "yes"); } catch (_) {}
+            cleanup();
+            onDone && onDone();
+        };
+        const onCancel = function () { cleanup(); };
+        const onBackdrop = function (e) { if (e.target === modal) cleanup(); };
+        ok.addEventListener("click", onOk);
+        cancel.addEventListener("click", onCancel);
+        modal.addEventListener("click", onBackdrop);
+    }
+
+    /* Persistent "remixing @user" chip, visible across SHAPE +
+       DECORATE while REMIX.pending is set. Disappears once the
+       pot fires (REMIX.pending consumed in autoSaveFiredPot)
+       or the user bails to title (cleared in title onEnter). */
+    function refreshRemixInProgressChip() {
+        const chip = document.getElementById("remixInProgressChip");
+        if (!chip) return;
+        const p = REMIX.pending;
+        if (!p) { chip.hidden = true; return; }
+        const text = chip.querySelector(".remix-in-progress-text");
+        if (text) {
+            text.textContent = "remixing " + (
+                p.remixedFromHandle ? "@" + p.remixedFromHandle
+                                    : p.remixedFromAuthor
+            );
+        }
+        chip.hidden = false;
     }
 
     /* Session-scoped lineage box. The kiln-save path consumes it
