@@ -1119,8 +1119,70 @@ a:focus-visible {
 }
 
 /* Floating overlay button on the canvas frame (undo lives here).
-   Sits in the top-right corner of the canvas-wrap, slightly inset. */
-.canvas-wrap { position: relative; }
+   Sits in the top-right corner of the canvas-wrap, slightly inset.
+   overflow: hidden lets the canvas zoom + pan inside the wrap
+   without spilling onto the surrounding tool rails. */
+.canvas-wrap { position: relative; overflow: hidden; }
+
+/* Zoom controls -- bottom-left of the canvas-wrap so they don't
+   collide with the UNDO button in the top-right. */
+.zoom-controls {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    z-index: 4;
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-sm);
+    background: rgba(10, 14, 18, 0.78);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.zoom-btn {
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--teal-low);
+    border-radius: 3px;
+    background: var(--bg-deep);
+    color: var(--teal);
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease,
+                background 0.12s ease;
+}
+.zoom-btn:hover:not([disabled]) {
+    transform: scale(1.06);
+    border-color: var(--teal);
+    background: rgba(0, 255, 204, 0.10);
+}
+.zoom-btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.zoom-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    padding: 0 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--ink);
+    background: var(--bg-deep);
+    border: 1px solid var(--teal-low);
+    border-radius: 3px;
+}
 
 .canvas-overlay-btn {
     position: absolute;

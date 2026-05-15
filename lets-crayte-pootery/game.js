@@ -3725,6 +3725,24 @@
         lastPaintPos: null,
         strokedThisGesture: false,
 
+        /* Zoom + pan for detail work.
+           zoom: display multiplier (1.0 = canvas at its natural CSS
+                 size; 4.0 = 4x scale on top of CSS sizing).
+           panX, panY: CSS-pixel offsets applied BEFORE the scale,
+                 because transform-origin is 0 0. Clamped so the
+                 canvas can't drift entirely off the wrap.
+           Two-finger pinch zooms; two-finger drag pans; single
+           finger still paints at any zoom level. Reset button +
+           desktop wheel-zoom round it out. */
+        zoom: 1,
+        panX: 0,
+        panY: 0,
+
+        /* Multi-touch tracking state for pinch / pan gestures.
+           pointerId -> { clientX, clientY }. */
+        activePointers: null,
+        gestureStart: null,    /* { distance, midX, midY, zoom, panX, panY } */
+
         /* Undo stack — PNG dataURL snapshots of the paint canvas
            taken at the start of each user gesture. PNG compresses
            sparse canvases extremely well so 20 levels stays under
@@ -4132,13 +4150,110 @@
         };
     }
 
+    /* ----- Zoom + pan helpers ----- */
+
+    const ZOOM_MIN = 1, ZOOM_MAX = 4;
+
+    function wireZoomControls() {
+        const inBtn  = document.getElementById("zoomInBtn");
+        const outBtn = document.getElementById("zoomOutBtn");
+        const resetBtn = document.getElementById("zoomResetBtn");
+        /* Idempotent -- attach once, reset wiring on re-entry just
+           updates the badge. */
+        if (inBtn && !inBtn._wired) {
+            inBtn.addEventListener("click", function () {
+                /* Zoom around the canvas center when invoked via
+                   button -- no focal cursor available. */
+                const r = D.canvas ? D.canvas.getBoundingClientRect() : null;
+                if (!r) return;
+                setZoom(D.zoom * 1.25,
+                        r.left + r.width / 2, r.top + r.height / 2);
+            });
+            inBtn._wired = true;
+        }
+        if (outBtn && !outBtn._wired) {
+            outBtn.addEventListener("click", function () {
+                const r = D.canvas ? D.canvas.getBoundingClientRect() : null;
+                if (!r) return;
+                setZoom(D.zoom / 1.25,
+                        r.left + r.width / 2, r.top + r.height / 2);
+            });
+            outBtn._wired = true;
+        }
+        if (resetBtn && !resetBtn._wired) {
+            resetBtn.addEventListener("click", resetZoom);
+            resetBtn._wired = true;
+        }
+        updateZoomBadge();
+    }
+
+    function applyDecorateTransform() {
+        if (!D.canvas) return;
+        D.canvas.style.transformOrigin = "0 0";
+        D.canvas.style.transform =
+            "translate(" + D.panX + "px, " + D.panY + "px) scale(" + D.zoom + ")";
+        updateZoomBadge();
+    }
+
+    /* Keep the canvas anchored so it can't drift entirely off the
+       visible wrap. Allows ~half the canvas to spill in either
+       direction so the user can comfortably edit edges. */
+    function clampPan() {
+        if (!D.canvas) return;
+        const r = D.canvas.getBoundingClientRect();
+        const wrap = D.canvas.parentElement;
+        if (!wrap) return;
+        const wr = wrap.getBoundingClientRect();
+        const maxOff = 0.5 * Math.max(r.width, r.height);
+        /* When zoom = 1 + content fits, force pan to 0. */
+        if (D.zoom <= 1.001) { D.panX = 0; D.panY = 0; return; }
+        const minX = wr.width - r.width - maxOff;
+        const maxX = maxOff;
+        const minY = wr.height - r.height - maxOff;
+        const maxY = maxOff;
+        D.panX = Math.max(minX, Math.min(maxX, D.panX));
+        D.panY = Math.max(minY, Math.min(maxY, D.panY));
+    }
+
+    function setZoom(z, focusClientX, focusClientY) {
+        const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+        if (Math.abs(next - D.zoom) < 0.001) return;
+        /* Zoom around a focal point (pinch center or cursor) so
+           the content under the focus stays put. */
+        if (focusClientX != null && D.canvas) {
+            const r = D.canvas.getBoundingClientRect();
+            /* The focus's offset from the canvas's CURRENT top-left
+               (in unscaled CSS coords) */
+            const ox = (focusClientX - r.left) / D.zoom;
+            const oy = (focusClientY - r.top)  / D.zoom;
+            const dz = next - D.zoom;
+            D.panX -= ox * dz;
+            D.panY -= oy * dz;
+        }
+        D.zoom = next;
+        clampPan();
+        applyDecorateTransform();
+    }
+
+    function resetZoom() {
+        D.zoom = 1; D.panX = 0; D.panY = 0;
+        applyDecorateTransform();
+    }
+
+    function updateZoomBadge() {
+        const badge = document.getElementById("zoomBadge");
+        if (badge) badge.textContent = Math.round(D.zoom * 100) + "%";
+        const reset = document.getElementById("zoomResetBtn");
+        if (reset) reset.disabled = (D.zoom <= 1.001 && D.panX === 0 && D.panY === 0);
+    }
+
+    /* ----- Multi-pointer attach ----- */
+
     function attachDecoratePointer() {
         const c = D.canvas;
+        D.activePointers = new Map();
 
-        c.addEventListener("pointerdown", function (e) {
-            e.preventDefault();
-            try { c.setPointerCapture(e.pointerId); } catch (_) {}
-            const p = decPointerPos(e);
+        const startPaintAt = function (p) {
             D.pointer = p;
             D.pointerActive = true;
             D.lastPaintPos = p;
@@ -4148,40 +4263,141 @@
                gesture = one undo per stroke / stamp / eraser
                action — natural Ctrl+Z behavior. */
             pushUndoSnapshot();
-            if (D.tool === "stamp") {
-                stampAt(p);
-                D.strokedThisGesture = true;
-            } else {
-                paintDot(p);
-                D.strokedThisGesture = true;
+            if (D.tool === "stamp") { stampAt(p); }
+            else                    { paintDot(p); }
+            D.strokedThisGesture = true;
+        };
+
+        const cancelPaint = function () {
+            if (!D.pointerActive) return;
+            D.pointerActive = false;
+            D.lastPaintPos = null;
+            /* The undo snapshot already landed but the gesture
+               is being interrupted by a second finger -- that's
+               fine, the snapshot still represents the pre-paint
+               state if the user undoes. */
+        };
+
+        const beginGesture = function () {
+            const pts = Array.from(D.activePointers.values());
+            if (pts.length < 2) return;
+            const a = pts[0], b = pts[1];
+            const dx = b.clientX - a.clientX;
+            const dy = b.clientY - a.clientY;
+            D.gestureStart = {
+                distance: Math.hypot(dx, dy) || 1,
+                midX:    (a.clientX + b.clientX) / 2,
+                midY:    (a.clientY + b.clientY) / 2,
+                zoom:    D.zoom,
+                panX:    D.panX,
+                panY:    D.panY
+            };
+        };
+
+        const updateGesture = function () {
+            const pts = Array.from(D.activePointers.values());
+            if (pts.length < 2 || !D.gestureStart) return;
+            const a = pts[0], b = pts[1];
+            const dx = b.clientX - a.clientX;
+            const dy = b.clientY - a.clientY;
+            const dist = Math.hypot(dx, dy) || 1;
+            const midX = (a.clientX + b.clientX) / 2;
+            const midY = (a.clientY + b.clientY) / 2;
+
+            /* Compute target zoom relative to the gesture start. */
+            const targetZoom = D.gestureStart.zoom * (dist / D.gestureStart.distance);
+            const clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, targetZoom));
+
+            /* Apply zoom around the original gesture midpoint, then
+               add the pan delta from midpoint movement. */
+            const wrap = D.canvas.parentElement;
+            const wr = wrap.getBoundingClientRect();
+            /* Convert original midpoint to canvas-local (unscaled) */
+            const startRect = {
+                /* We need the canvas position AT GESTURE START -- but
+                   it's moved since then. Reconstruct using the
+                   stored start pan/zoom: */
+                left: wr.left + D.gestureStart.panX,
+                top:  wr.top  + D.gestureStart.panY
+            };
+            const ox = (D.gestureStart.midX - startRect.left) / D.gestureStart.zoom;
+            const oy = (D.gestureStart.midY - startRect.top)  / D.gestureStart.zoom;
+
+            D.zoom = clamped;
+            D.panX = D.gestureStart.panX - ox * (clamped - D.gestureStart.zoom)
+                                         + (midX - D.gestureStart.midX);
+            D.panY = D.gestureStart.panY - oy * (clamped - D.gestureStart.zoom)
+                                         + (midY - D.gestureStart.midY);
+            clampPan();
+            applyDecorateTransform();
+        };
+
+        c.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            try { c.setPointerCapture(e.pointerId); } catch (_) {}
+            D.activePointers.set(e.pointerId,
+                { clientX: e.clientX, clientY: e.clientY });
+
+            if (D.activePointers.size === 1) {
+                startPaintAt(decPointerPos(e));
+            } else if (D.activePointers.size === 2) {
+                /* Second finger landed -- cancel paint, start
+                   pinch/pan gesture. */
+                cancelPaint();
+                beginGesture();
             }
         });
 
         c.addEventListener("pointermove", function (e) {
+            if (!D.activePointers.has(e.pointerId)) return;
+            const ref = D.activePointers.get(e.pointerId);
+            ref.clientX = e.clientX;
+            ref.clientY = e.clientY;
+
+            if (D.activePointers.size >= 2) {
+                updateGesture();
+                return;
+            }
+            /* Single-finger -- normal paint flow */
             if (!D.pointerActive) return;
             const p = decPointerPos(e);
-            /* Stamps fire once on pointerdown — they don't trail.
-               Every other tool (brush, eraser, spray, splatter)
-               wants continuous pointermove emission. The
-               original gate of only brush+eraser silently broke
-               spray + splatter — only the initial tap landed,
-               drag did nothing. */
-            if (D.tool !== "stamp") {
-                paintStrokeTo(p);
-            }
+            if (D.tool !== "stamp") paintStrokeTo(p);
             D.lastPaintPos = p;
             D.pointer = p;
         });
 
-        function endPointer(e) {
-            if (!D.pointerActive) return;
-            D.pointerActive = false;
-            D.lastPaintPos = null;
+        const endPointer = function (e) {
+            D.activePointers.delete(e.pointerId);
             try { c.releasePointerCapture(e.pointerId); } catch (_) {}
-        }
+
+            if (D.activePointers.size === 0) {
+                /* All fingers lifted */
+                if (D.pointerActive) {
+                    D.pointerActive = false;
+                    D.lastPaintPos = null;
+                }
+                D.gestureStart = null;
+            } else if (D.activePointers.size === 1 && D.gestureStart) {
+                /* Was a 2-finger gesture, now down to 1. Don't
+                   resume painting mid-stroke -- wait for full
+                   release. */
+                D.gestureStart = null;
+            } else if (D.activePointers.size >= 2) {
+                /* Re-anchor the gesture so removing one finger
+                   from a 3-finger touch doesn't cause a jump. */
+                beginGesture();
+            }
+        };
         c.addEventListener("pointerup",     endPointer);
         c.addEventListener("pointercancel", endPointer);
         c.addEventListener("pointerleave",  endPointer);
+
+        /* Desktop wheel -> zoom around cursor */
+        c.addEventListener("wheel", function (e) {
+            e.preventDefault();
+            const delta = -Math.sign(e.deltaY) * 0.18;
+            setZoom(D.zoom * (1 + delta), e.clientX, e.clientY);
+        }, { passive: false });
     }
 
     /* Spray + splat painter (Day-5 QoL chunk).
@@ -4502,6 +4718,11 @@
             } else {
                 sizeDecorateCanvas();
             }
+            /* Reset zoom on every entry so the canvas always
+               starts at 100% -- avoids confusing the next pot
+               with a half-zoomed view from a previous one. */
+            resetZoom();
+            wireZoomControls();
             startDecorateLoop();
             wheelHumStart();
         },

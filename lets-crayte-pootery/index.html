@@ -308,7 +308,7 @@
 
         <div class="canvas-wrap">
             <canvas id="decorateCanvas" width="400" height="600"
-                    aria-label="Locked pot. Drag to paint, tap to stamp."></canvas>
+                    aria-label="Locked pot. Drag to paint, tap to stamp. Pinch to zoom, two-finger drag to pan."></canvas>
             <!-- Floating UNDO button — pinned to the top-right of
                  the canvas frame. Ctrl/Cmd+Z works too. Disabled
                  when there's nothing to undo. -->
@@ -316,6 +316,26 @@
                     title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
                 <span aria-hidden="true">&#x21B6;</span>
             </button>
+
+            <!-- Zoom controls. Pinch + two-finger pan work on touch;
+                 these buttons + wheel handle desktop / non-pinch. -->
+            <div class="zoom-controls" aria-label="Zoom controls">
+                <button class="zoom-btn" id="zoomInBtn" type="button"
+                        title="Zoom in" aria-label="Zoom in">
+                    <span aria-hidden="true">+</span>
+                </button>
+                <span class="zoom-badge" id="zoomBadge"
+                      aria-live="polite">100%</span>
+                <button class="zoom-btn" id="zoomOutBtn" type="button"
+                        title="Zoom out" aria-label="Zoom out">
+                    <span aria-hidden="true">&minus;</span>
+                </button>
+                <button class="zoom-btn zoom-reset" id="zoomResetBtn"
+                        type="button" title="Reset zoom"
+                        aria-label="Reset zoom" disabled>
+                    <span aria-hidden="true">&#x2316;</span>
+                </button>
+            </div>
         </div>
 
         <!-- Side rail: on tablet+ (>=768px) sits to the right of
