@@ -1809,6 +1809,71 @@ a:focus-visible {
     height: 100%;
 }
 
+/* Pot age decay overlays. Pure CSS -- a pseudo-element layers
+   sepia + crack hatching on top of the rendered canvas.
+
+     .is-vintage  -- 7-29 days old. Subtle sepia mist + faint
+                     hairline crack across the thumb. Reads as
+                     "older pot" without making the kid think
+                     anything's wrong with it.
+     .is-cracked  -- 30+ days. Heavier sepia, visible crack
+                     lines, faint chip on the rim. Antique pot
+                     vibe -- it's been on the shelf a while. */
+
+.pot-thumb.is-vintage::after,
+.pot-thumb.is-cracked::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.pot-thumb.is-vintage::after {
+    background:
+        /* Faint hairline crack from upper-right to lower-left */
+        linear-gradient(225deg,
+            transparent 47%,
+            rgba(120, 70, 30, 0.18) 49%,
+            rgba(180, 130, 70, 0.22) 50%,
+            rgba(120, 70, 30, 0.18) 51%,
+            transparent 53%) no-repeat,
+        /* Sepia mist across the whole thumb */
+        radial-gradient(ellipse at 50% 40%,
+            rgba(255, 230, 180, 0.0) 0%,
+            rgba(180, 130, 70, 0.12) 70%,
+            rgba(80, 40, 20, 0.20) 100%);
+    mix-blend-mode: multiply;
+}
+
+.pot-thumb.is-cracked::after {
+    background:
+        /* Main crack -- diagonal */
+        linear-gradient(215deg,
+            transparent 42%,
+            rgba(40, 20, 10, 0.55) 44%,
+            rgba(200, 160, 110, 0.4) 45%,
+            rgba(40, 20, 10, 0.55) 46%,
+            transparent 48%) no-repeat,
+        /* Secondary crack -- shallower angle */
+        linear-gradient(165deg,
+            transparent 62%,
+            rgba(40, 20, 10, 0.42) 64%,
+            rgba(180, 140, 90, 0.32) 65%,
+            rgba(40, 20, 10, 0.42) 66%,
+            transparent 68%) no-repeat,
+        /* Chip on the upper-left rim */
+        radial-gradient(circle at 22% 18%,
+            rgba(60, 30, 15, 0.55) 0%,
+            rgba(60, 30, 15, 0.0) 8%),
+        /* Heavier sepia */
+        radial-gradient(ellipse at 50% 40%,
+            rgba(255, 220, 170, 0.0) 0%,
+            rgba(160, 110, 60, 0.22) 70%,
+            rgba(60, 30, 15, 0.35) 100%);
+    mix-blend-mode: multiply;
+}
+
 /* "This pot is also shared" indicator on personal-gallery
    thumbs. Subtle but always present once a pot has a publicId.
    Globe glyph inside a pink-bordered teal disc. */

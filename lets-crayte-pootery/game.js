@@ -5396,6 +5396,24 @@
 
     /* ----- 8B. Grid building ----- */
 
+    /* Pot-age decay class. Layered on top of .pot-thumb so the
+       gallery visually telegraphs how long a pot has been in the
+       collection. Reinforces the ceramic theme + makes the
+       gallery feel layered over time.
+         < 7 days   -> "" (fresh, no overlay)
+         7-29 days  -> "is-vintage" (sepia + faint crack)
+         >= 30 days -> "is-cracked" (heavier crack + chip)
+       Public-tab pots use createdAt from the server row, which
+       is the original public submission time -- so an old pot
+       in someone else's profile reads as old to everyone. */
+    function potAgeClass(createdAt) {
+        if (!createdAt) return "";
+        const days = (Date.now() - createdAt) / 86400000;
+        if (days >= 30) return "is-cracked";
+        if (days >= 7)  return "is-vintage";
+        return "";
+    }
+
     function buildThumbCard(entry) {
         /* Card is a div (not <button>) so author byline can be a
            real <button> nested inside without invalid HTML. The
@@ -5407,7 +5425,7 @@
         card.setAttribute("tabindex", "0");
 
         const thumb = document.createElement("div");
-        thumb.className = "pot-thumb";
+        thumb.className = "pot-thumb " + potAgeClass(entry.createdAt);
         const canvas = document.createElement("canvas");
         canvas.width = 200;
         canvas.height = 300;
