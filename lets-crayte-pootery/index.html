@@ -98,6 +98,10 @@
                 <span class="btn-label">TROPHIES</span>
                 <span class="btn-glyph" aria-hidden="true">&#9733;</span>
             </button>
+            <button class="big-btn" id="btnStats" type="button">
+                <span class="btn-label">STATS</span>
+                <span class="btn-glyph" aria-hidden="true">&#x1F4CA;</span>
+            </button>
             <button class="big-btn" id="btnShop" type="button">
                 <span class="btn-label">PACK SHOP</span>
                 <span class="btn-glyph" aria-hidden="true">&#x1F6CD;</span>
@@ -614,6 +618,25 @@
             </div>
         </div>
     </section>
+</main>
+
+<!-- ============================================================
+     SCREEN: STATS
+     ============================================================
+     Tile grid of computed counts. Mostly local (gallery + trophy
+     cache + egg flags); the "remixes of your pots" tile fetches
+     from Supabase if the user has any shared pots.
+     ============================================================ -->
+<main class="screen" id="screen-stats" hidden>
+    <div class="screen-titlebar">
+        <button class="back-btn" id="statsBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;POTTERY STATS&nbsp;&gt;</h2>
+        <span class="screen-status" id="statsDays">&mdash;</span>
+    </div>
+    <p class="stats-intro" id="statsIntro">
+        Pots fired, trophies won, days creating.
+    </p>
+    <div class="stats-grid" id="statsGrid"></div>
 </main>
 
 <!-- ============================================================

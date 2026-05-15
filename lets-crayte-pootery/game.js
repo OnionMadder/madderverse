@@ -1624,6 +1624,11 @@
             showScreen("shop");
         });
 
+        const btnStats = document.getElementById("btnStats");
+        if (btnStats) btnStats.addEventListener("click", function () {
+            showScreen("stats");
+        });
+
         const btnAccount = document.getElementById("btnAccount");
         if (btnAccount) btnAccount.addEventListener("click", function () {
             showScreen("account");
@@ -8445,6 +8450,170 @@
         onEnter: function () {
             initShopScreen();
             refreshShopScreen();
+            wheelHumStop();
+        }
+    });
+
+    /* ============================================================
+       STATS screen
+       ============================================================
+       Computes a tile grid of counts from local gallery + trophy
+       cache + egg flags. The "remixes of your pots" tile fetches
+       Supabase live if the user has any shared pots.            */
+
+    function initStatsScreen() {
+        const back = document.getElementById("statsBack");
+        if (back && !back._wired) {
+            back.addEventListener("click", function () {
+                showScreen("title");
+            });
+            back._wired = true;
+        }
+    }
+
+    function refreshStatsScreen() {
+        const grid = document.getElementById("statsGrid");
+        const days = document.getElementById("statsDays");
+        if (!grid) return;
+        grid.innerHTML = "";
+
+        const entries = loadGalleryEntries();
+        const stats = computeStats(entries);
+        if (days) days.textContent = stats.daysCreating > 0
+            ? stats.daysCreating + (stats.daysCreating === 1 ? " DAY" : " DAYS")
+            : "TODAY";
+
+        const tiles = [
+            { label: "POTS MADE",        val: stats.total },
+            { label: "FIRED",            val: stats.fired },
+            { label: "EXPLODED",         val: stats.exploded, dim: stats.exploded === 0 },
+            { label: "OVERFIRED",        val: stats.overfired, dim: stats.overfired === 0 },
+            { label: "SHARED PUBLIC",    val: stats.publicShared },
+            { label: "TROPHIES WON",     val: stats.trophyCount,
+              accent: stats.trophyCount > 0 ? "gold" : null },
+            { label: "REMIXED BY OTHERS", val: "—",
+              tile: "remixedByOthersTile", accent: "pink" },
+            { label: "EGGS FOUND",       val: stats.eggsFound,
+              accent: stats.eggsFound > 0 ? "pink" : null },
+            { label: "FAV CLAY",         val: stats.favClay   || "—",
+              big: false },
+            { label: "FAV PACK",         val: stats.favPack   || "—",
+              big: false }
+        ];
+        tiles.forEach(function (t) {
+            const card = document.createElement("div");
+            card.className = "stats-tile";
+            if (t.accent) card.classList.add("accent-" + t.accent);
+            if (t.dim)    card.classList.add("is-dim");
+            if (t.tile)   card.id = t.tile;
+            const valEl = document.createElement("span");
+            valEl.className = "stats-val" + (t.big === false ? " stats-val-small" : "");
+            valEl.textContent = t.val;
+            const lblEl = document.createElement("span");
+            lblEl.className = "stats-lbl";
+            lblEl.textContent = t.label;
+            card.appendChild(valEl);
+            card.appendChild(lblEl);
+            grid.appendChild(card);
+        });
+
+        /* Async fetch for remix-by-others count */
+        fetchRemixedByOthersCount().then(function (n) {
+            const tile = document.getElementById("remixedByOthersTile");
+            if (!tile) return;   /* user navigated away */
+            const valEl = tile.querySelector(".stats-val");
+            if (valEl) valEl.textContent = n;
+        });
+    }
+
+    /* Pure local-stats computation. */
+    function computeStats(entries) {
+        let fired = 0, exploded = 0, overfired = 0, publicShared = 0;
+        const clayTally = Object.create(null);
+        const packTally = Object.create(null);
+        let oldestT = Infinity;
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            if (e.fired)     fired++;
+            if (e.exploded)  exploded++;
+            if (e.overfired) overfired++;
+            if (e.publicId)  publicShared++;
+            if (e.clayTypeId) clayTally[e.clayTypeId] = (clayTally[e.clayTypeId] || 0) + 1;
+            if (e.packId)     packTally[e.packId]     = (packTally[e.packId]     || 0) + 1;
+            if (e.createdAt && e.createdAt < oldestT) oldestT = e.createdAt;
+        }
+
+        const trophyCache = trophyCacheLoad();
+        const trophyCount = Object.keys(trophyCache).length;
+
+        /* Egg flags live on the EGG state object. Count true ones. */
+        let eggsFound = 0;
+        if (typeof EGG === "object" && EGG) {
+            ["konami", "pingas", "overheatTriggered", "overclocked",
+             "sentient", "infiniteClay", "oneFrameFire"]
+                .forEach(function (k) { if (EGG[k]) eggsFound++; });
+        }
+
+        const daysCreating = oldestT === Infinity ? 0 :
+            Math.max(1, Math.ceil((Date.now() - oldestT) / 86400000));
+
+        const top = function (tally) {
+            let best = null, max = 0;
+            for (const k in tally) {
+                if (tally[k] > max) { max = tally[k]; best = k; }
+            }
+            return best;
+        };
+        const favClayId = top(clayTally);
+        const favPackId = top(packTally);
+
+        const claySwatch = favClayId
+            ? (function () {
+                for (let i = 0; i < CLAY_TYPES.length; i++) {
+                    if (CLAY_TYPES[i].id === favClayId) return CLAY_TYPES[i].label;
+                }
+                return favClayId.toUpperCase();
+              }())
+            : null;
+        const packLbl = favPackId ? packLabel(favPackId) : null;
+
+        return {
+            total:        entries.length,
+            fired:        fired,
+            exploded:     exploded,
+            overfired:    overfired,
+            publicShared: publicShared,
+            trophyCount:  trophyCount,
+            eggsFound:    eggsFound,
+            daysCreating: daysCreating,
+            favClay:      claySwatch,
+            favPack:      packLbl
+        };
+    }
+
+    /* Async — count public_pots.remixed_from IN <my publicIds>.
+       Anon-friendly: the local entries carry their own publicIds
+       so we don't need an authed query. */
+    function fetchRemixedByOthersCount() {
+        if (!supabaseEnabled()) return Promise.resolve(0);
+        const myIds = loadGalleryEntries()
+            .map(function (e) { return e.publicId; })
+            .filter(Boolean);
+        if (myIds.length === 0) return Promise.resolve(0);
+        const inClause = "(" + myIds.join(",") + ")";
+        const url = SUPABASE_URL +
+            "/rest/v1/public_pots?select=id&remixed_from=in." +
+            encodeURIComponent(inClause);
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(function (rows) { return Array.isArray(rows) ? rows.length : 0; })
+            .catch(function () { return 0; });
+    }
+
+    registerScreen("stats", {
+        onEnter: function () {
+            initStatsScreen();
+            refreshStatsScreen();
             wheelHumStop();
         }
     });
