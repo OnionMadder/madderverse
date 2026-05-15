@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" role="img" aria-label="All Munkis splash">
+    <!-- ============================================================
+         All Munkis — splash screen   *** PLACEHOLDER ***
+
+         2732×2732 square. Capacitor's CENTER_CROP scale type center-
+         crops this to any device aspect, so all critical art stays
+         inside the centred ~1600px circle. Background matches
+         capacitor.config.json SplashScreen.backgroundColor #0c0c1a
+         so the crop edges are seamless.
+
+         A stylized rainbow rising over the dark stage with the word-
+         mark — matches the in-app aesthetic. Visible PLACEHOLDER tag
+         lower-centre; remove when final art lands.
+
+         Swap spec: ../store-assets/README.md
+         ============================================================ -->
+    <defs>
+        <radialGradient id="sbg" cx="50%" cy="40%" r="75%">
+            <stop offset="0%"  stop-color="#1a1530"/>
+            <stop offset="55%" stop-color="#0c0c1a"/>
+            <stop offset="100%" stop-color="#070710"/>
+        </radialGradient>
+    </defs>
+
+    <rect width="2732" height="2732" fill="url(#sbg)"/>
+
+    <!-- Rainbow rising from the lower third -->
+    <g transform="translate(1366 1820)" fill="none" stroke-linecap="round">
+        <path d="M-940 0 A 940 940 0 0 1 940 0" stroke="#dc2626" stroke-width="78"/>
+        <path d="M-836 0 A 836 836 0 0 1 836 0" stroke="#ff9800" stroke-width="78"/>
+        <path d="M-732 0 A 732 732 0 0 1 732 0" stroke="#fbbf24" stroke-width="78"/>
+        <path d="M-628 0 A 628 628 0 0 1 628 0" stroke="#43a047" stroke-width="78"/>
+        <path d="M-524 0 A 524 524 0 0 1 524 0" stroke="#1e88e5" stroke-width="78"/>
+        <path d="M-420 0 A 420 420 0 0 1 420 0" stroke="#9c27b0" stroke-width="78"/>
+    </g>
+
+    <!-- Wordmark -->
+    <text x="1366" y="1180" text-anchor="middle"
+          font-family="'Trebuchet MS', 'Segoe UI', system-ui, sans-serif"
+          font-size="248" font-weight="800" letter-spacing="14"
+          fill="#f4f4ff">ALL</text>
+    <text x="1366" y="1420" text-anchor="middle"
+          font-family="'Trebuchet MS', 'Segoe UI', system-ui, sans-serif"
+          font-size="248" font-weight="800" letter-spacing="14"
+          fill="#ff5cab">MUNKIS</text>
+
+    <!-- Placeholder marker -->
+    <text x="1366" y="2120" text-anchor="middle"
+          font-family="monospace" font-size="58" letter-spacing="8"
+          fill="#5a5a72">— PLACEHOLDER SPLASH —</text>
+</svg>
