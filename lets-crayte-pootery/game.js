@@ -542,7 +542,11 @@
        even before the SW registration resolves.
        ============================================================ */
 
-    const PUSH_WORKER_URL = "https://push.onionmadder.rocks";
+    /* Live Cloudflare Worker (workers.dev subdomain). If the
+       push.onionmadder.rocks custom domain gets provisioned
+       later, swap this + redeploy -- the worker answers on
+       both once the custom domain is added. */
+    const PUSH_WORKER_URL = "https://madderverse-push.onionmadder.workers.dev";
 
     /* PASTE the VAPID public key here AFTER you generate it on the
        worker side. Until set, the subscribe flow short-circuits
