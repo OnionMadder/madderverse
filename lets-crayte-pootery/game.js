@@ -549,7 +549,7 @@
        with a friendly "not configured yet" message instead of
        throwing. The same key is set as VAPID_PUBLIC_KEY in the
        Cloudflare Worker secrets — they must match.            */
-    const VAPID_PUBLIC_KEY = "REPLACE_WITH_VAPID_PUBLIC_KEY";
+    const VAPID_PUBLIC_KEY = "BF7amYCYvu6JVmYOcuJM6wx6XN9CaqOGgQPDnYVc2s9GKcoDwXkoywiZLu6RbkeAnhqJRjV8JzTA6o8bMlGjK24";
 
     const PUSH_KEYS = {
         prompted:       "pootery-push-prompted",
