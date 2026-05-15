@@ -85,6 +85,16 @@
             </button>
         </div>
 
+        <!-- Settings access — small gear pill in the corner of the title
+             screen so kids don't trip into it on the main flow. Parents
+             tap it to find the settings panel. No parent gate here —
+             settings themselves aren't an external link or destructive
+             action. (External links inside settings are gated.) -->
+        <button class="settings-hook" id="settingsHook" type="button"
+                aria-label="Settings" title="Settings">
+            <span aria-hidden="true">&#9881;</span>
+        </button>
+
     </div>
 
 </main>
@@ -242,6 +252,138 @@
     </aside>
 
 </main>
+
+<!-- ============================================================
+     SCREEN: SETTINGS
+     Parent-facing toggles. Kid-readable layout but voice is
+     parent-aimed. Locale stub renders as a <select> for v1.1+.
+     ============================================================ -->
+<main class="screen" id="screen-settings" hidden>
+    <div class="screen-titlebar">
+        <button class="back-btn" id="settingsBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;SETTINGS&nbsp;&gt;</h2>
+        <span class="screen-status">v1.0</span>
+    </div>
+
+    <div class="settings-stack">
+
+        <div class="settings-card">
+            <h3 class="settings-section">DRAWING</h3>
+
+            <label class="settings-row">
+                <span class="settings-label">
+                    Brush smoothing
+                    <span class="settings-sub">Softer lines for little hands</span>
+                </span>
+                <input type="checkbox" id="setSmoothing" class="settings-toggle" />
+            </label>
+        </div>
+
+        <div class="settings-card">
+            <h3 class="settings-section">SOUND</h3>
+
+            <label class="settings-row">
+                <span class="settings-label">
+                    Sound effects
+                    <span class="settings-sub">Brush taps, save chime</span>
+                </span>
+                <input type="checkbox" id="setSfx" class="settings-toggle" />
+            </label>
+
+            <label class="settings-row settings-row-disabled">
+                <span class="settings-label">
+                    Music
+                    <span class="settings-sub">Coming in a future update</span>
+                </span>
+                <input type="checkbox" id="setMusic" class="settings-toggle" disabled />
+            </label>
+        </div>
+
+        <div class="settings-card">
+            <h3 class="settings-section">LANGUAGE</h3>
+
+            <label class="settings-row">
+                <span class="settings-label">
+                    Language
+                    <span class="settings-sub">More languages coming soon</span>
+                </span>
+                <select id="setLocale" class="settings-select">
+                    <option value="en">English</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="settings-card">
+            <h3 class="settings-section">ABOUT</h3>
+            <p class="settings-blurb">
+                Tiny Canvas is made by Mad Sundar LLC. We do not collect
+                personal information from children. There are no ads and
+                no in-app purchases.
+            </p>
+            <p class="settings-blurb settings-version">
+                Tiny Canvas v1.0
+            </p>
+        </div>
+
+    </div>
+</main>
+
+<!-- ============================================================
+     PARENT GATE
+     Fires before any external link, destructive action, or share.
+     Two-digit addition is well above an early-reader's grade level;
+     parents tap the correct answer. Unlocks for the rest of the
+     session (Apple's documented Kids-category pattern). The kid
+     can tap CANCEL to back out — that's mandatory: a gate can't
+     trap them inside an unwanted flow.
+     ============================================================ -->
+<aside class="parent-gate" id="parentGate" hidden role="dialog"
+       aria-modal="true" aria-labelledby="parentGateTitle">
+    <div class="parent-gate-card">
+        <div class="detail-titlebar">
+            <span class="detail-pack">ADULTS ONLY</span>
+            <span class="detail-date">PARENT GATE</span>
+            <button class="specs-close" id="parentGateClose" type="button" aria-label="Cancel">&#10005;</button>
+        </div>
+        <div class="parent-gate-body">
+            <h3 class="parent-gate-title" id="parentGateTitle">A grown-up tap, please</h3>
+            <p class="parent-gate-blurb">
+                This part of the app leaves Tiny Canvas. To continue,
+                a grown-up taps the correct answer below.
+            </p>
+            <p class="parent-gate-problem" id="parentGateProblem" aria-live="polite">
+                <!-- injected by JS: "What is 37 + 28?" -->
+            </p>
+            <div class="parent-gate-options" id="parentGateOptions" role="group" aria-label="Answer">
+                <!-- four buttons injected by JS -->
+            </div>
+            <p class="parent-gate-foot" id="parentGateFoot" aria-live="polite">&nbsp;</p>
+        </div>
+    </div>
+</aside>
+
+<!-- ============================================================
+     FIRST-SAVE TOAST
+     One-shot gentle pat on the back the first time a kid saves
+     a drawing. Construction Paper Principle: no streaks, no
+     prompts, no asks. Just a quiet confirmation that the gallery
+     is real. Auto-dismisses after 2.4s; never fires again.
+     ============================================================ -->
+<div class="first-save-toast" id="firstSaveToast" hidden role="status">
+    <span class="fst-glyph" aria-hidden="true">&#9733;</span>
+    <span class="fst-text">It's in your gallery now.</span>
+</div>
+
+<!-- ============================================================
+     SAVED TOAST
+     Brief "Saved" indicator after every SAVE tap (not just first).
+     Replaces the implicit "SAVED" status-line update with something
+     a kid can actually see while their attention is on the canvas.
+     ============================================================ -->
+<div class="saved-toast" id="savedToast" hidden role="status">
+    <span class="st-glyph" aria-hidden="true">&#10003;</span>
+    <span class="st-text">Saved</span>
+</div>
 
 <footer class="site-footer-slim" aria-label="Site info">
     <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>

@@ -70,9 +70,13 @@
     const BRUSH_SIZES  = [4, 10, 18, 28, 42];
     const ERASER_SIZES = [14, 28, 50];
 
-    const STORAGE_KEY = "tinyCanvas.gallery.v1";
-    const MAX_HISTORY = 20;        /* undo stack depth */
-    const SAVE_MAX    = 60;        /* gallery item cap */
+    const STORAGE_KEY        = "tinyCanvas.gallery.v1";
+    const SETTINGS_KEY       = "tinyCanvas.settings.v1";
+    const IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
+    const FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
+    const MAX_HISTORY        = 20;     /* undo stack depth */
+    const SAVE_MAX           = 60;     /* gallery item cap */
+    const AUTOSAVE_INTERVAL_MS = 60_000;
 
     /* ---------- 0a. BRUSH DEFINITIONS ----------
        Each brush implements:
@@ -343,7 +347,7 @@
     /* ---------- 1. STATE ---------- */
 
     const state = {
-        screen:        "title",                 /* title | picker | draw | gallery */
+        screen:        "title",                 /* title | picker | draw | gallery | settings */
         templateId:    null,                    /* current template */
         templateName:  "BLANK",
         currentColor:  COLOR_GROUPS.rainbow.colors[0],
@@ -352,12 +356,27 @@
         brushSize:     BRUSHES.pen.defaultSize, /* size for whichever brush is active */
         eraserSize:    BRUSHES.eraser.defaultSize,
         isDrawing:     false,
-        lastX:         0,
+        lastX:         0,                       /* raw pointer */
         lastY:         0,
+        smoothX:       0,                       /* midpoint-smoothed pen tip */
+        smoothY:       0,
         history:       [],                      /* ImageData snapshots */
         dirty:         false,
         savedId:       null,                    /* gallery record id if this drawing was saved */
-        dpr:           1
+        dpr:           1,
+        /* Parent gate is unlocked once per session per Apple's
+           documented Kids-category pattern. */
+        parentGateUnlocked: false,
+        /* Pending callback for parentGate(cb). Stored so the modal
+           knows which action to run on correct answer. */
+        parentGatePending: null,
+        /* Settings — initialized from localStorage in loadSettings(). */
+        settings: {
+            smoothing: true,    /* brush smoothing on by default — better for kids */
+            sfx:       true,    /* SFX on by default */
+            music:     false,   /* music not implemented v1; toggle disabled */
+            locale:    "en"
+        }
     };
 
     /* True if the current tool draws color (everything except eraser). */
@@ -386,10 +405,11 @@
 
     /* Screen elements */
     const screens = {
-        title:   $("#screen-title"),
-        picker:  $("#screen-picker"),
-        draw:    $("#screen-draw"),
-        gallery: $("#screen-gallery")
+        title:    $("#screen-title"),
+        picker:   $("#screen-picker"),
+        draw:     $("#screen-draw"),
+        gallery:  $("#screen-gallery"),
+        settings: $("#screen-settings")
     };
 
     /* ---------- 3. AUDIO BOOTSTRAP ----------
@@ -426,8 +446,15 @@
     document.addEventListener("pointerdown", unlockAudioOnce, true);
     document.addEventListener("keydown",     unlockAudioOnce, true);
 
+    /* Settings-gated audio: every SFX exits silently if the user has
+       turned sound off. Keeps the call sites unchanged. */
+    function audioEnabled() {
+        return state.settings.sfx;
+    }
+
     /* Soft tap — short low blip when the brush hits the page. */
     function sfxTap() {
+        if (!audioEnabled()) return;
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
@@ -445,6 +472,7 @@
 
     /* Two-note perfect-fifth bell — confirmation chime (save). */
     function sfxSave() {
+        if (!audioEnabled()) return;
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
@@ -465,6 +493,7 @@
 
     /* Soft swoosh — page change / screen transition. */
     function sfxSwoosh() {
+        if (!audioEnabled()) return;
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
@@ -489,6 +518,7 @@
 
     /* Eraser "scratch" — quick noise burst with a high-pass. */
     function sfxErase() {
+        if (!audioEnabled()) return;
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
@@ -604,14 +634,17 @@
         pushHistory();
         const p = getPos(e);
         state.isDrawing = true;
-        state.lastX = p.x;
-        state.lastY = p.y;
+        state.lastX  = p.x;
+        state.lastY  = p.y;
+        state.smoothX = p.x;
+        state.smoothY = p.y;
         const brush = currentBrush();
         const size  = activeSize();
         const color = state.currentColor;
         brush.beginStroke(ctx2d, p, size, color);
         state.dirty = true;
         updateStatus();
+        markInProgressDirty();
         if (state.currentTool === "eraser") sfxErase();
         else                                sfxTap();
     }
@@ -620,16 +653,47 @@
         if (!state.isDrawing) return;
         const p = getPos(e);
         const brush = currentBrush();
-        brush.drawSegment(ctx2d,
-            { x: state.lastX, y: state.lastY },
-            p,
-            activeSize(),
-            state.currentColor);
+        const size  = activeSize();
+        const color = state.currentColor;
+
+        if (state.settings.smoothing) {
+            /* Midpoint-quadratic smoothing: draw from the current
+               smoothed point to the midpoint of (lastRaw, currentRaw).
+               This filters out pointer jitter and produces a softer
+               line that follows the kid's intent rather than every
+               event tremor. */
+            const midX = (state.lastX + p.x) / 2;
+            const midY = (state.lastY + p.y) / 2;
+            brush.drawSegment(ctx2d,
+                { x: state.smoothX, y: state.smoothY },
+                { x: midX,          y: midY },
+                size, color);
+            state.smoothX = midX;
+            state.smoothY = midY;
+        } else {
+            brush.drawSegment(ctx2d,
+                { x: state.lastX, y: state.lastY },
+                p, size, color);
+            state.smoothX = p.x;
+            state.smoothY = p.y;
+        }
+
         state.lastX = p.x;
         state.lastY = p.y;
     }
 
     function onPointerUp() {
+        if (state.isDrawing && state.settings.smoothing) {
+            /* Finish the smoothed stroke by drawing one final segment
+               from the last smoothed point to the actual raw point.
+               Without this the smoothed line stops short of the kid's
+               finger. */
+            const brush = currentBrush();
+            brush.drawSegment(ctx2d,
+                { x: state.smoothX, y: state.smoothY },
+                { x: state.lastX,   y: state.lastY },
+                activeSize(), state.currentColor);
+        }
         state.isDrawing = false;
         /* Reset shared canvas state so the next stroke begins clean. */
         ctx2d.globalCompositeOperation = "source-over";
@@ -647,6 +711,10 @@
         clearCanvas();
         state.savedId = null;
         updateStatus();
+        /* If the kid was mid-drawing this template before (e.g. they
+           closed the app and came back), restore those strokes silently.
+           No confirm dialog — Bala's gallery is sacred + no nag. */
+        tryRestoreInProgress(tpl.id);
     }
 
     /* ---------- 7. UI BUILDERS ---------- */
@@ -827,7 +895,260 @@
         state.screen = name;
         document.body.className = "screen-" + name;
         sfxSwoosh();
-        if (name === "gallery") renderGallery();
+        if (name === "gallery")  renderGallery();
+        if (name === "settings") syncSettingsUI();
+    }
+
+    /* ---------- 8a. SETTINGS PERSISTENCE ---------- */
+
+    function loadSettings() {
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (!raw) return;
+            const obj = JSON.parse(raw);
+            if (obj && typeof obj === "object") {
+                Object.assign(state.settings, obj);
+            }
+        } catch (_) { /* fall through to defaults */ }
+    }
+
+    function persistSettings() {
+        try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
+        } catch (_) { /* quota; non-fatal */ }
+    }
+
+    function syncSettingsUI() {
+        const smoothing = $("#setSmoothing");
+        const sfx       = $("#setSfx");
+        const music     = $("#setMusic");
+        const locale    = $("#setLocale");
+        if (smoothing) smoothing.checked = !!state.settings.smoothing;
+        if (sfx)       sfx.checked       = !!state.settings.sfx;
+        if (music)     music.checked     = !!state.settings.music;
+        if (locale)    locale.value      = state.settings.locale || "en";
+    }
+
+    function attachSettingsHandlers() {
+        const smoothing = $("#setSmoothing");
+        const sfx       = $("#setSfx");
+        const locale    = $("#setLocale");
+        if (smoothing) {
+            smoothing.addEventListener("change", function () {
+                state.settings.smoothing = smoothing.checked;
+                persistSettings();
+            });
+        }
+        if (sfx) {
+            sfx.addEventListener("change", function () {
+                state.settings.sfx = sfx.checked;
+                persistSettings();
+            });
+        }
+        if (locale) {
+            locale.addEventListener("change", function () {
+                state.settings.locale = locale.value;
+                persistSettings();
+            });
+        }
+    }
+
+    /* ---------- 8b. PARENT GATE ----------
+       Apple Kids category requires that any external link, destructive
+       action, share/export, or "leaves the app" path sit behind an
+       adult-only gate. Two-digit addition is reliably above an early
+       reader's ability — the four-option layout means the parent can
+       solve it without a keyboard. Once unlocked, the gate stays open
+       for the rest of the session (matches Apple's documentation).
+       The kid can always tap CANCEL — gates can never trap. */
+
+    function parentGate(label, onPass) {
+        if (state.parentGateUnlocked) {
+            onPass();
+            return;
+        }
+        state.parentGatePending = onPass;
+        renderParentGate(label);
+        const modal = $("#parentGate");
+        modal.removeAttribute("hidden");
+    }
+
+    function renderParentGate(label) {
+        /* Two random integers in [25, 78] so the sum fits in 2 digits
+           and is reliably "too hard" for a kid who can't read yet. */
+        const a = 25 + Math.floor(Math.random() * 54);
+        const b = 25 + Math.floor(Math.random() * 54);
+        const correct = a + b;
+        $("#parentGateProblem").textContent = "What is " + a + " + " + b + "?";
+        const foot = $("#parentGateFoot");
+        foot.textContent = "";
+        foot.classList.remove("is-error");
+
+        /* Three plausible wrong answers within ±10 of the correct one
+           so the gate is real math, not a pattern-match. */
+        const wrongs = new Set();
+        while (wrongs.size < 3) {
+            const delta = (Math.random() < 0.5 ? -1 : 1) *
+                          (2 + Math.floor(Math.random() * 9));
+            const candidate = correct + delta;
+            if (candidate !== correct && candidate > 0) wrongs.add(candidate);
+        }
+        const options = [correct].concat(Array.from(wrongs));
+        /* Shuffle */
+        for (let i = options.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [options[i], options[j]] = [options[j], options[i]];
+        }
+
+        const host = $("#parentGateOptions");
+        host.innerHTML = "";
+        options.forEach(function (n) {
+            const btn = document.createElement("button");
+            btn.className = "parent-gate-option";
+            btn.type = "button";
+            btn.textContent = String(n);
+            btn.addEventListener("click", function () {
+                if (n === correct) {
+                    state.parentGateUnlocked = true;
+                    closeParentGate();
+                    const cb = state.parentGatePending;
+                    state.parentGatePending = null;
+                    if (cb) cb();
+                } else {
+                    btn.classList.add("is-wrong");
+                    setTimeout(function () {
+                        btn.classList.remove("is-wrong");
+                    }, 600);
+                    foot.textContent = "That's not it — try again.";
+                    foot.classList.add("is-error");
+                }
+            });
+            host.appendChild(btn);
+        });
+    }
+
+    function closeParentGate() {
+        $("#parentGate").setAttribute("hidden", "");
+    }
+
+    function cancelParentGate() {
+        state.parentGatePending = null;
+        closeParentGate();
+    }
+
+    /* ---------- 8c. AUTO-SAVE ----------
+       Independent of the gallery: keeps the current canvas + template
+       in localStorage so a crash or backgrounded tab doesn't lose the
+       kid's work. Auto-fires every 60s while there's something dirty
+       to save, and on visibilitychange when the kid switches apps. */
+
+    let autosaveTimer = 0;
+    let inProgressDirty = false;
+
+    function markInProgressDirty() {
+        inProgressDirty = true;
+    }
+
+    function persistInProgress() {
+        if (!inProgressDirty) return;
+        if (!state.templateId) return;
+        try {
+            const png = canvas.toDataURL("image/png");
+            const rec = {
+                templateId:   state.templateId,
+                templateName: state.templateName,
+                png:          png,
+                savedAt:      new Date().toISOString()
+            };
+            localStorage.setItem(IN_PROGRESS_KEY, JSON.stringify(rec));
+            inProgressDirty = false;
+        } catch (_) {
+            /* quota or taint — fail silently */
+        }
+    }
+
+    function clearInProgress() {
+        try { localStorage.removeItem(IN_PROGRESS_KEY); } catch (_) {}
+        inProgressDirty = false;
+    }
+
+    function loadInProgressFor(templateId) {
+        try {
+            const raw = localStorage.getItem(IN_PROGRESS_KEY);
+            if (!raw) return null;
+            const rec = JSON.parse(raw);
+            if (rec && rec.templateId === templateId && rec.png) return rec;
+        } catch (_) {}
+        return null;
+    }
+
+    function tryRestoreInProgress(templateId) {
+        const rec = loadInProgressFor(templateId);
+        if (!rec) return;
+        /* Paint the saved PNG onto the canvas as if it were drawn. */
+        const img = new Image();
+        img.onload = function () {
+            ctx2d.save();
+            ctx2d.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+            ctx2d.drawImage(img, 0, 0, STAGE_W, STAGE_H);
+            ctx2d.restore();
+            state.dirty = true;
+            updateStatus();
+        };
+        img.onerror = function () { /* corrupt rec — ignore */ };
+        img.src = rec.png;
+    }
+
+    function startAutosave() {
+        if (autosaveTimer) clearInterval(autosaveTimer);
+        autosaveTimer = setInterval(persistInProgress, AUTOSAVE_INTERVAL_MS);
+        /* Save when the tab loses visibility (kid backgrounds the app
+           or locks the device). visibilitychange fires before the
+           browser kills the page on iOS Safari. */
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "hidden") persistInProgress();
+        });
+        /* Last-chance save on close. */
+        window.addEventListener("beforeunload", persistInProgress);
+        window.addEventListener("pagehide",     persistInProgress);
+    }
+
+    /* ---------- 8d. TOASTS ---------- */
+
+    function showSavedToast() {
+        const t = $("#savedToast");
+        if (!t) return;
+        t.removeAttribute("hidden");
+        /* Force reflow so the .is-show transition fires from hidden state */
+        // eslint-disable-next-line no-unused-expressions
+        t.offsetHeight;
+        t.classList.add("is-show");
+        clearTimeout(showSavedToast._timer);
+        showSavedToast._timer = setTimeout(function () {
+            t.classList.remove("is-show");
+            setTimeout(function () { t.setAttribute("hidden", ""); }, 250);
+        }, 1400);
+    }
+
+    function showFirstSaveToast() {
+        const t = $("#firstSaveToast");
+        if (!t) return;
+        t.removeAttribute("hidden");
+        t.offsetHeight;
+        t.classList.add("is-show");
+        setTimeout(function () {
+            t.classList.remove("is-show");
+            setTimeout(function () { t.setAttribute("hidden", ""); }, 250);
+        }, 2400);
+    }
+
+    function isFirstSaveCelebrated() {
+        try { return localStorage.getItem(FIRST_SAVE_KEY) === "1"; }
+        catch (_) { return false; }
+    }
+    function markFirstSaveCelebrated() {
+        try { localStorage.setItem(FIRST_SAVE_KEY, "1"); }
+        catch (_) {}
     }
 
     /* ---------- 9. STATUS LINE ---------- */
@@ -906,6 +1227,7 @@
     }
 
     async function saveDrawing() {
+        const wasEmpty = loadGallery().length === 0;
         const png = await composePng();
         const items = loadGallery();
         const record = {
@@ -921,8 +1243,18 @@
         while (items.length > SAVE_MAX) items.pop();
         persistGallery(items);
         state.savedId = record.id;
+        /* Once a piece is saved to gallery, the in-progress slot is
+           no longer needed — kid moved on to "finished" territory. */
+        clearInProgress();
         sfxSave();
         flashButton("#drawSave");
+        showSavedToast();
+        /* One-shot first-save celebration. Construction Paper Principle:
+           a single gentle pat on the back, no streaks, never repeats. */
+        if (wasEmpty && !isFirstSaveCelebrated()) {
+            markFirstSaveCelebrated();
+            setTimeout(showFirstSaveToast, 500);
+        }
         updateStatus();
     }
 
@@ -994,25 +1326,32 @@
     }
 
     function deleteCurrent() {
+        /* Destructive — parent-gated. */
         const id = $("#picDetail").dataset.id;
         if (!id) return;
-        const items = loadGallery().filter(function (r) { return r.id !== id; });
-        persistGallery(items);
-        closeDetail();
-        renderGallery();
+        parentGate("delete", function () {
+            const items = loadGallery().filter(function (r) { return r.id !== id; });
+            persistGallery(items);
+            closeDetail();
+            renderGallery();
+        });
     }
 
     function exportCurrent() {
+        /* Export saves a PNG to the device — gated as a "leaves the app"
+           action per Apple Kids policy. */
         const id = $("#picDetail").dataset.id;
         if (!id) return;
-        const rec = loadGallery().find(function (r) { return r.id === id; });
-        if (!rec) return;
-        const a = document.createElement("a");
-        a.href = rec.png;
-        a.download = (rec.name || "tiny-canvas") + "-" + formatDate(rec.date) + ".png";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        parentGate("export", function () {
+            const rec = loadGallery().find(function (r) { return r.id === id; });
+            if (!rec) return;
+            const a = document.createElement("a");
+            a.href = rec.png;
+            a.download = (rec.name || "tiny-canvas") + "-" + formatDate(rec.date) + ".png";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
     }
 
     /* ---------- 11. PWA INSTALL PROMPT ---------- */
@@ -1051,12 +1390,14 @@
     /* ---------- 13. WIRING ---------- */
 
     function init() {
+        loadSettings();
         setupCanvas();
         buildPicker();
         buildPaletteTabs();
         buildPalette();
         attachToolHandlers();
         attachDrawing();
+        attachSettingsHandlers();
         rebuildSizeButtons();
         refreshToolButtons();
 
@@ -1070,6 +1411,9 @@
             showScreen("title");
         });
         $("#drawBack").addEventListener("click", function () {
+            /* Going back to the picker doesn't lose in-progress —
+               the auto-save covers it. */
+            persistInProgress();
             showScreen("picker");
         });
         $("#galleryBack").addEventListener("click", function () {
@@ -1078,8 +1422,7 @@
         $("#drawClear").addEventListener("click", function () {
             pushHistory();
             clearCanvas();
-            /* clearCanvas resets history; pushing one frame first
-               gives the kid a way back from an accidental tap. */
+            clearInProgress();
         });
         $("#drawSave").addEventListener("click", function () {
             saveDrawing();
@@ -1095,11 +1438,51 @@
             });
         }
 
+        /* Settings screen */
+        const settingsHook = $("#settingsHook");
+        if (settingsHook) {
+            settingsHook.addEventListener("click", function () {
+                showScreen("settings");
+            });
+        }
+        const settingsBack = $("#settingsBack");
+        if (settingsBack) {
+            settingsBack.addEventListener("click", function () {
+                showScreen("title");
+            });
+        }
+
+        /* Parent gate close button */
+        const gateClose = $("#parentGateClose");
+        if (gateClose) gateClose.addEventListener("click", cancelParentGate);
+
+        /* External links — apply parent gate. The .madder-home button
+           leaves the app for the Madderverse hub; the footer Madderverse
+           / About / Mad Sundar links all do too. Each gets an
+           interception click handler. */
+        document.querySelectorAll('.madder-home, .site-footer-slim a')
+            .forEach(function (link) {
+                link.addEventListener("click", function (e) {
+                    if (state.parentGateUnlocked) return;
+                    e.preventDefault();
+                    const href = link.getAttribute("href");
+                    const target = link.getAttribute("target");
+                    parentGate("external-link", function () {
+                        if (target) window.open(href, target);
+                        else        window.location.href = href;
+                    });
+                });
+            });
+
         /* Default tool selection. State is pre-initialized at the top
            of the IIFE; this just syncs the DOM after the builders ran. */
         refreshToolButtons();
         rebuildSizeButtons();
         refreshPaletteActive();
+        syncSettingsUI();
+
+        /* Kick off auto-save once everything is wired. */
+        startAutosave();
 
         /* Resize-aware backing store: rebuild on orientation change
            so DPR-scaled strokes don't blur when the screen rotates. */
