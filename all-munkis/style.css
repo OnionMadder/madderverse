@@ -79,27 +79,40 @@ body > * { position: relative; z-index: 1; }
    arriving; they should look up and find someone already there. */
 .horror-munki {
     position: fixed;
-    bottom: 0;
+    /* Hard-anchor to the viewport bottom on EVERY screen size. The sprite
+       art is intentionally cropped at the back/legs on the assumption it
+       always bleeds off its bottom-side corner — if it ever pulls away
+       from BOTH the bottom edge AND its side edge, the crop shows as an
+       ugly cutoff. !important defeats any inherited/utility rule (e.g.
+       `body > * { position: relative }`) that could re-anchor it. */
+    bottom: 0 !important;
     height: min(78vh, 70vw);
     width: auto;
     aspect-ratio: 432 / 988;
     pointer-events: none;
     z-index: 40;          /* over the stage, under modals/jumpscare/tray */
     opacity: 0;
-    transform-origin: 50% 100%;  /* scale up from feet so they "stand up" */
     filter: blur(8px) drop-shadow(0 12px 32px rgba(0, 0, 0, 0.7));
     transition:
         opacity   12s ease-in,
         transform 12s ease-out,
         filter    12s ease-in;
 }
+/* transform-origin is the sprite's OWN bottom-side corner so the 0.55→1
+   scale-up grows OUT of the screen corner and the anchored corner never
+   moves for the entire 12 s entrance. No translateX — any horizontal
+   offset would pull the cropped edge off its corner. */
 .horror-munki--moon {
-    left: 0;
-    transform: translateX(-12%) scale(0.55);
+    left: 0 !important;
+    right: auto !important;
+    transform-origin: 0 100%;       /* bottom-LEFT corner */
+    transform: scale(0.55);
 }
 .horror-munki--ice {
-    right: 0;
-    transform: translateX( 12%) scale(0.55);
+    right: 0 !important;
+    left: auto !important;
+    transform-origin: 100% 100%;    /* bottom-RIGHT corner */
+    transform: scale(0.55);
 }
 
 body.react-mode-active .horror-munki {
@@ -109,8 +122,8 @@ body.react-mode-active .horror-munki {
     filter: blur(0) drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
                     drop-shadow(0 0 40px rgba(255, 40, 40, 0.28));
 }
-body.react-mode-active .horror-munki--moon { transform: translateX(0) scale(1); }
-body.react-mode-active .horror-munki--ice  { transform: translateX(0) scale(1); }
+body.react-mode-active .horror-munki--moon { transform: scale(1); }
+body.react-mode-active .horror-munki--ice  { transform: scale(1); }
 
 /* Slow ominous breathing — barely-perceptible scale pulse while visible.
    Kicks in AFTER the entry transform finishes (~12 s) so it doesn't fight
