@@ -82,6 +82,74 @@
                 { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 178, ty: 370, rot: -12 },
                 { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 222, ty: 370, rot:  12 }
             ]
+        },
+        tpose: {
+            name: 'T-Pose',
+            icon: '✋',
+            origin: '50% 92%',
+            shapes: [
+                { type: 'circle', cx: 200, cy: 100, r: 58 },
+                { type: 'rect',   x: 155, y: 148, w: 90, h: 232, r: 42 },
+                /* Arms straight horizontal — rot ±90 takes the down-pointing
+                   native rect and flips it to horizontal. */
+                { type: 'rect',   x: -18, y: 0,   w: 36, h: 156, r: 18, tx: 168, ty: 180, rot: -90 },
+                { type: 'rect',   x: -18, y: 0,   w: 36, h: 156, r: 18, tx: 232, ty: 180, rot:  90 },
+                /* Legs straight (no spread). */
+                { type: 'rect',   x: -17, y: 0,   w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -4 },
+                { type: 'rect',   x: -17, y: 0,   w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   4 }
+            ]
+        },
+        wave: {
+            name: 'Waving',
+            icon: '👋',
+            origin: '50% 92%',
+            shapes: [
+                { type: 'circle', cx: 200, cy: 100, r: 58 },
+                { type: 'rect',   x: 155, y: 148, w: 90, h: 232, r: 42 },
+                /* Right arm raised in a wave (rot 165 = up-and-slightly-out
+                   from the right shoulder); left arm rests at the side. */
+                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 165, ty: 180, rot: -52 },
+                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 232, ty: 168, rot:  165 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
+                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
+            ]
+        },
+        ghost: {
+            name: 'Ghost',
+            icon: '👻',
+            origin: '50% 88%',
+            shapes: [
+                { type: 'circle', cx: 200, cy: 100, r: 58 },
+                /* Body is a single rounded slab from neck to a soft
+                   ghostly tail. Wider corner radius gives the bottom
+                   the floating-orb look. */
+                { type: 'rect',   x: 145, y: 148, w: 110, h: 360, r: 55 },
+                /* Arms float out from the sides, lower than standing
+                   and tilted further out so they read as drifting. */
+                { type: 'rect',   x: -18, y: 0,   w: 36, h: 140, r: 18, tx: 162, ty: 200, rot: -75 },
+                { type: 'rect',   x: -18, y: 0,   w: 36, h: 140, r: 18, tx: 238, ty: 200, rot:  75 }
+                /* No legs — the body slab is the whole bottom. */
+            ]
+        },
+        animal: {
+            name: 'Animal',
+            icon: '🐾',
+            origin: '50% 92%',
+            shapes: [
+                /* Horizontal critter — head on the left, body extending right,
+                   four short legs underneath. Sits low in the canvas so a
+                   kid can color a cat / dog / sheep / whatever. */
+                { type: 'circle', cx: 130, cy: 280, r: 52 },
+                /* Body — long horizontal rect. */
+                { type: 'rect',   x: 155, y: 250, w: 200, h: 110, r: 50 },
+                /* Tail — short rect tipped up off the right end. */
+                { type: 'rect',   x: -12, y: 0,   w: 24, h: 80,  r: 12, tx: 355, ty: 285, rot: 35 },
+                /* 4 legs — short rects under the body. */
+                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 175, ty: 355, rot: -3 },
+                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 225, ty: 355, rot: -3 },
+                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 290, ty: 355, rot:  3 },
+                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 335, ty: 355, rot:  3 }
+            ]
         }
     };
 
@@ -126,6 +194,10 @@
         hats: {
             owned: ['no-hat'],
             equipped: 'no-hat'
+        },
+        accessories: {
+            owned: ['no-accessory'],
+            equipped: 'no-accessory'
         },
         pose: 'standing'
     };
@@ -823,7 +895,222 @@
 
     function openHatShop() {
         buildHatShopGrid();
+        buildAccessoryShopGrid();
         openModal(hatShopModalEl);
+    }
+
+    /* ============ ACCESSORIES ============
+
+       Second wardrobe layer above hats — glasses, mustaches, capes,
+       bow ties, etc. Same buy-with-Doodles + equip flow as hats; same
+       SVG-overlay rendering pattern except each accessory is INLINE
+       SVG (no shared sprite atlas to ship). The accessory's local
+       coordinate space is centered on (0,0); render code translates
+       to the named anchor point on the figure and applies the
+       accessory's scale.
+
+       Anchors are absolute coordinates that line up with the standard
+       humanoid silhouette (standing / cheer / star / groovy / t-pose /
+       wave). For non-humanoid poses (ghost, animal) the accessory
+       still renders at the anchor coordinate but may not land on a
+       meaningful body part — accept that as v1 and revisit if it
+       comes up. */
+
+    const ACCESSORY_ANCHORS = {
+        eyes:      { x: 200, y:  92 },
+        mouth:     { x: 200, y: 122 },
+        chin:      { x: 200, y: 150 },
+        shoulders: { x: 200, y: 175 },
+        chest:     { x: 200, y: 250 }
+    };
+
+    const ACCESSORIES = [
+        { id: 'no-accessory', name: 'Nothing',          price:   0, emoji: '🚫', anchor: 'eyes',      scale: 1, svg: '' },
+        {
+            id: 'round-specs', name: 'Round Specs',     price:  20, emoji: '🤓', anchor: 'eyes',      scale: 1,
+            svg: '<g stroke="#1a0f33" stroke-width="3" fill="none">' +
+                 '<circle cx="-18" cy="0" r="13"/>' +
+                 '<circle cx="18" cy="0" r="13"/>' +
+                 '<line x1="-5" y1="0" x2="5" y2="0"/>' +
+                 '</g>'
+        },
+        {
+            id: 'star-shades', name: 'Star Shades',     price:  40, emoji: '⭐', anchor: 'eyes',      scale: 1,
+            svg: '<g fill="#ffd23f" stroke="#1a0f33" stroke-width="2.5">' +
+                 '<polygon points="-18,-12 -14,-3 -4,-3 -12,4 -8,13 -18,7 -28,13 -24,4 -32,-3 -22,-3"/>' +
+                 '<polygon points="18,-12 22,-3 32,-3 24,4 28,13 18,7 8,13 12,4 4,-3 14,-3"/>' +
+                 '<line x1="-5" y1="0" x2="5" y2="0"/>' +
+                 '</g>'
+        },
+        {
+            id: 'heart-shades', name: 'Heart Shades',   price:  40, emoji: '💖', anchor: 'eyes',      scale: 1,
+            svg: '<g fill="#ff6ec7" stroke="#1a0f33" stroke-width="2.5">' +
+                 '<path d="M -18,-6 C -22,-12 -32,-10 -32,-2 C -32,5 -18,12 -18,12 C -18,12 -4,5 -4,-2 C -4,-10 -14,-12 -18,-6 Z"/>' +
+                 '<path d="M 18,-6 C 14,-12 4,-10 4,-2 C 4,5 18,12 18,12 C 18,12 32,5 32,-2 C 32,-10 22,-12 18,-6 Z"/>' +
+                 '</g>'
+        },
+        {
+            id: 'mustache', name: 'Mustache',           price:  25, emoji: '🥸', anchor: 'mouth',     scale: 1,
+            svg: '<path d="M 0,0 C -8,-6 -22,-4 -28,2 C -22,8 -10,6 -4,3 L 0,3 C -4,3 -10,6 -22,8 ' +
+                 'M 0,0 C 8,-6 22,-4 28,2 C 22,8 10,6 4,3 L 0,3 C 4,3 10,6 22,8" ' +
+                 'fill="#3b1f6b" stroke="#1a0f33" stroke-width="2"/>'
+        },
+        {
+            id: 'bow-tie', name: 'Bow Tie',             price:  25, emoji: '🎀', anchor: 'chin',      scale: 1,
+            svg: '<g fill="#e63946" stroke="#1a0f33" stroke-width="2.5">' +
+                 '<polygon points="0,0 -24,-12 -24,12"/>' +
+                 '<polygon points="0,0 24,-12 24,12"/>' +
+                 '<rect x="-5" y="-7" width="10" height="14" rx="2"/>' +
+                 '</g>'
+        },
+        {
+            id: 'long-beard', name: 'Long Beard',       price:  35, emoji: '🧔', anchor: 'chin',      scale: 1,
+            svg: '<g fill="#6f4e37" stroke="#1a0f33" stroke-width="2.5">' +
+                 '<path d="M -28,-8 C -28,18 -16,40 0,42 C 16,40 28,18 28,-8 C 16,-2 -16,-2 -28,-8 Z"/>' +
+                 '</g>'
+        },
+        {
+            id: 'superhero-cape', name: 'Hero Cape',    price:  60, emoji: '🦸', anchor: 'shoulders', scale: 1,
+            svg: '<g fill="#e63946" stroke="#1a0f33" stroke-width="2.5" stroke-linejoin="round">' +
+                 '<path d="M -55,-10 L -85,200 L 0,170 L 85,200 L 55,-10 L 25,0 L 0,8 L -25,0 Z"/>' +
+                 '</g>'
+        },
+        {
+            id: 'fairy-wings', name: 'Fairy Wings',     price:  70, emoji: '🧚', anchor: 'shoulders', scale: 1,
+            svg: '<g fill="rgba(255, 110, 199, 0.55)" stroke="#ff6ec7" stroke-width="2.5">' +
+                 '<ellipse cx="-50" cy="0" rx="40" ry="55" transform="rotate(-25 -50 0)"/>' +
+                 '<ellipse cx="50" cy="0" rx="40" ry="55" transform="rotate(25 50 0)"/>' +
+                 '<ellipse cx="-45" cy="60" rx="32" ry="40" transform="rotate(-15 -45 60)"/>' +
+                 '<ellipse cx="45" cy="60" rx="32" ry="40" transform="rotate(15 45 60)"/>' +
+                 '</g>'
+        },
+        {
+            id: 'sheriff-badge', name: 'Sheriff Badge', price:  45, emoji: '🌟', anchor: 'chest',     scale: 1,
+            svg: '<g fill="#ffd23f" stroke="#1a0f33" stroke-width="2.5">' +
+                 '<polygon points="0,-22 5,-7 22,-7 9,3 14,18 0,9 -14,18 -9,3 -22,-7 -5,-7"/>' +
+                 '<circle cx="0" cy="0" r="4" fill="#1a0f33"/>' +
+                 '</g>'
+        }
+    ];
+
+    const ACCESSORY_BY_ID = {};
+    ACCESSORIES.forEach(a => { ACCESSORY_BY_ID[a.id] = a; });
+
+    let accessoryLayerInnerEl = null;
+    let accessoryShopGridEl = null;
+
+    function accessoryMarkup(acc) {
+        if (!acc || !acc.svg || acc.id === 'no-accessory') return '';
+        const anchor = ACCESSORY_ANCHORS[acc.anchor] || ACCESSORY_ANCHORS.eyes;
+        const s = acc.scale || 1;
+        return '<g transform="translate(' + anchor.x + ',' + anchor.y + ') scale(' + s + ')">' +
+               acc.svg +
+               '</g>';
+    }
+
+    function renderEquippedAccessory() {
+        if (!accessoryLayerInnerEl) return;
+        const acc = ACCESSORY_BY_ID[state.accessories.equipped] || ACCESSORY_BY_ID['no-accessory'];
+        accessoryLayerInnerEl.innerHTML = accessoryMarkup(acc);
+    }
+
+    function buyAccessory(id) {
+        const acc = ACCESSORY_BY_ID[id];
+        if (!acc) return;
+        const alreadyOwned = state.accessories.owned.indexOf(id) !== -1;
+        if (alreadyOwned) { equipAccessory(id); return; }
+        if (acc.price > 0 && state.doodles < acc.price) return;
+        state.doodles -= acc.price;
+        state.accessories.owned.push(id);
+        state.accessories.equipped = id;
+        saveState();
+        renderCurrency();
+        renderEquippedAccessory();
+        buildAccessoryShopGrid();
+        buildHatShopGrid();
+    }
+
+    function equipAccessory(id) {
+        if (state.accessories.owned.indexOf(id) === -1) return;
+        state.accessories.equipped = id;
+        saveState();
+        renderEquippedAccessory();
+        buildAccessoryShopGrid();
+    }
+
+    function buildAccessoryShopGrid() {
+        if (!accessoryShopGridEl) return;
+        if (hatShopBalanceEl) {
+            hatShopBalanceEl.textContent = '🪙 ' + state.doodles + ' Doodles';
+        }
+        accessoryShopGridEl.innerHTML = '';
+        for (let i = 0; i < ACCESSORIES.length; i++) {
+            const acc = ACCESSORIES[i];
+            const owned = state.accessories.owned.indexOf(acc.id) !== -1;
+            const equipped = state.accessories.equipped === acc.id;
+            const affordable = state.doodles >= acc.price;
+
+            const card = document.createElement('div');
+            card.className = 'hat-card';
+            if (equipped) card.classList.add('equipped');
+            else if (owned) card.classList.add('owned');
+            else if (!affordable && acc.price > 0) card.classList.add('locked');
+
+            /* Preview: mini-Groodle head + the accessory rendered at its
+               configured anchor. Same viewBox / wash as the hat shop so
+               the two tabs feel uniform. */
+            const previewSvg =
+                '<svg class="hat-preview" viewBox="60 -10 280 280" aria-hidden="true">' +
+                    '<circle cx="200" cy="100" r="58" fill="rgba(232, 232, 244, 0.94)" stroke="#1a0f33" stroke-width="3"/>' +
+                    accessoryMarkup(acc) +
+                '</svg>';
+
+            let actionHtml;
+            if (equipped) {
+                actionHtml = '<button class="hat-action equipped-tag" type="button" disabled>✓ Equipped</button>';
+            } else if (owned) {
+                actionHtml = '<button class="hat-action own" type="button" data-action="equip">Wear</button>';
+            } else if (acc.price === 0) {
+                actionHtml = '<button class="hat-action own" type="button" data-action="buy">Wear</button>';
+            } else if (affordable) {
+                actionHtml = '<button class="hat-action buy" type="button" data-action="buy">Buy &nbsp;' + acc.price + ' 🪙</button>';
+            } else {
+                actionHtml = '<button class="hat-action locked-tag" type="button" disabled>🔒 ' + acc.price + ' 🪙</button>';
+            }
+
+            card.innerHTML = previewSvg +
+                '<div class="hat-name">' + escapeHtml(acc.name) + '</div>' +
+                actionHtml;
+
+            const btn = card.querySelector('button[data-action]');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (btn.dataset.action === 'equip') equipAccessory(acc.id);
+                    else buyAccessory(acc.id);
+                });
+            }
+
+            accessoryShopGridEl.appendChild(card);
+        }
+    }
+
+    /* ============ WARDROBE TABS ============ */
+
+    function attachWardrobeTabs() {
+        const tabs = document.querySelectorAll('.wardrobe-tab');
+        if (!tabs.length || !hatShopGridEl || !accessoryShopGridEl) return;
+        tabs.forEach((tab) => {
+            tab.addEventListener('click', () => {
+                const target = tab.dataset.tab;
+                tabs.forEach((t) => {
+                    const active = t.dataset.tab === target;
+                    t.classList.toggle('active', active);
+                    t.setAttribute('aria-selected', active ? 'true' : 'false');
+                });
+                hatShopGridEl.hidden = (target !== 'hats');
+                accessoryShopGridEl.hidden = (target !== 'accessories');
+            });
+        });
     }
 
     /* ============ COLORING-BOOK PAGES ============
@@ -2691,6 +2978,8 @@
         hatShopGridEl = document.getElementById('hatShopGrid');
         hatShopBalanceEl = document.getElementById('hatShopBalance');
         hatLayerInnerEl = document.getElementById('hatLayerInner');
+        accessoryLayerInnerEl = document.getElementById('accessoryLayerInner');
+        accessoryShopGridEl = document.getElementById('accessoryShopGrid');
         pagesModalEl = document.getElementById('pagesModal');
         pagesGridEl = document.getElementById('pagesGrid');
         saveModalEl = document.getElementById('saveModal');
@@ -2709,6 +2998,8 @@
         attachDockButtons();
         renderCurrency();
         renderEquippedHat();
+        renderEquippedAccessory();
+        attachWardrobeTabs();
         trackVisit();
 
         /* Render the silhouette SVG for the saved pose BEFORE buildCanvas

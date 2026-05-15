@@ -108,6 +108,15 @@
             <g id="hatLayerInner"></g>
         </svg>
 
+        <!-- Accessory layer (z-index 5): equipped accessory (glasses,
+             mustache, cape, etc.). Same approach as the hat layer —
+             unclipped SVG so accessories can extend beyond the body
+             silhouette. renderEquippedAccessory() drops the chosen
+             accessory's inline-SVG markup into #accessoryLayerInner. -->
+        <svg class="accessory-layer" id="accessoryLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <g id="accessoryLayerInner"></g>
+        </svg>
+
         <!-- Decorative children moved INSIDE .creature so they track
              the figure's centered 2:3 box rather than the full
              viewport. They inherit the dance transform too, which is
@@ -304,11 +313,16 @@
     <div class="modal-backdrop" data-close="1"></div>
     <div class="modal-sheet" role="document">
         <header class="modal-header">
-            <h2 id="hatShopModalTitle"><span aria-hidden="true">🎩</span> Hat Shop</h2>
-            <button class="modal-close" type="button" data-close="1" aria-label="Close hat shop">✕</button>
+            <h2 id="hatShopModalTitle"><span aria-hidden="true">🧥</span> Wardrobe</h2>
+            <button class="modal-close" type="button" data-close="1" aria-label="Close wardrobe">✕</button>
         </header>
         <div class="modal-stats">Balance: <span id="hatShopBalance">🪙 0</span></div>
-        <div class="modal-body hat-grid" id="hatShopGrid"></div>
+        <div class="wardrobe-tabs" role="tablist" aria-label="Wardrobe sections">
+            <button class="wardrobe-tab active" type="button" role="tab" aria-selected="true" data-tab="hats">🎩 Hats</button>
+            <button class="wardrobe-tab" type="button" role="tab" aria-selected="false" data-tab="accessories">😎 Accessories</button>
+        </div>
+        <div class="modal-body hat-grid" id="hatShopGrid" role="tabpanel" aria-label="Hats"></div>
+        <div class="modal-body hat-grid" id="accessoryShopGrid" role="tabpanel" aria-label="Accessories" hidden></div>
     </div>
 </div>
 

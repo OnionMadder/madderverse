@@ -453,6 +453,20 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
     z-index: 4;
 }
 
+/* Accessory layer sits above hats (z-index 5) so glasses can ride
+   on top of a hat brim and a cape can wrap around the figure. Like
+   the hat layer, it's unclipped — accessories can extend past the
+   silhouette (capes, wings) and inherit the creature's dance
+   transform. */
+.accessory-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
 /* Pale wash inside the silhouette so the kid sees the body shape even
    before any strokes — this is the "coloring page" surface. Slight cool
    tint (vs pure white) so the figure still reads as a distinct shape on
@@ -645,6 +659,50 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
 }
 
 .modal-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* ============ WARDROBE TABS ============
+
+   Pill-shaped tab bar between the balance line and the body grid in
+   the Wardrobe modal. Each tab toggles its hat-grid / accessory-grid
+   body panel via the [hidden] attribute (see attachWardrobeTabs in
+   game.js). */
+
+.wardrobe-tabs {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+
+.wardrobe-tab {
+    flex: 0 1 auto;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    color: #d6bdff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.6px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 40px;
+    transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s;
+}
+.wardrobe-tab:active { transform: scale(0.97); }
+@media (hover: hover) {
+    .wardrobe-tab:hover {
+        background: rgba(0, 255, 204, 0.12);
+        border-color: rgba(0, 255, 204, 0.4);
+    }
+}
+.wardrobe-tab.active {
+    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #1a0f33;
+    box-shadow: 0 3px 10px rgba(255, 110, 199, 0.35);
+}
 
 /* Lock body scroll while a modal is open so swipes inside the modal
    don't accidentally scroll the page behind it. JS toggles this on
