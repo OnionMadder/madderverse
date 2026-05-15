@@ -1193,6 +1193,406 @@
         openModal(pagesModalEl);
     }
 
+    /* ============ DEFAULT GROODLES (starter library) ============
+
+       Pre-made character templates the kid can pick as a starting
+       point. Same idiom as drawSurprise() but instead of one goofy
+       random output, this is a curated library of identifiable
+       characters with matching pose + background + hat.
+
+       Each entry:
+         id     stable string, used in achievements + analytics later
+         label  display name
+         emoji  for the starter card thumbnail
+         pose   POSES key — applied before painting so the canvas clip
+                matches the new silhouette
+         bg     bg-* class suffix (studio, disco, outdoors, …)
+         hat    HATS id — equipped via equipHat()
+         color  first-pick palette color the kid lands on after the
+                starter applies (so they're already holding a
+                character-appropriate pen)
+         draw(c) paints the body / face / outfit onto the canvas
+                context (already cleared + clipped by the time it's
+                called). Coords are logical 400×600; lines outside the
+                silhouette are trimmed by the ctx.clip in buildCanvas. */
+
+    const DEFAULT_GROODLES = [
+        {
+            id: 'astronaut-bo',
+            label: 'Astronaut Bo',
+            emoji: '🚀',
+            pose: 'standing',
+            bg: 'stadium',
+            hat: 'rocket-ship',
+            color: '#1d3557',
+            draw: (c) => {
+                /* White suit base. */
+                c.fillStyle = '#ececf4';
+                c.fillRect(0, 0, STAGE_W, STAGE_H);
+                /* Navy chest panel + matching shorts band. */
+                c.fillStyle = '#1d3557';
+                c.fillRect(0, 195, STAGE_W, 70);
+                /* Visor: rounded teal band across the face. */
+                c.fillStyle = '#43aa8b';
+                c.beginPath();
+                c.roundRect ? c.roundRect(150, 80, 100, 40, 16) :
+                    (c.fillRect(150, 80, 100, 40));
+                c.fill();
+                /* Visor reflection highlight. */
+                c.fillStyle = 'rgba(255, 255, 255, 0.45)';
+                c.beginPath(); c.roundRect ? c.roundRect(158, 86, 18, 8, 4) :
+                    c.fillRect(158, 86, 18, 8); c.fill();
+                /* Smile under the visor. */
+                c.strokeStyle = '#1a0f33';
+                c.lineWidth = 4;
+                c.lineCap = 'round';
+                c.beginPath();
+                c.arc(200, 130, 14, 0.15 * Math.PI, 0.85 * Math.PI);
+                c.stroke();
+                /* Mission patch — red circle with white star on chest. */
+                c.fillStyle = '#e63946';
+                c.beginPath(); c.arc(200, 230, 18, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#fff';
+                c.font = 'bold 22px monospace';
+                c.textAlign = 'center';
+                c.textBaseline = 'middle';
+                c.fillText('★', 200, 232);
+                /* Glove cuffs at end of arms. */
+                c.fillStyle = '#e63946';
+                c.fillRect(120, 275, 30, 14);
+                c.fillRect(250, 275, 30, 14);
+                /* Boot tops at end of legs. */
+                c.fillRect(150, 530, 50, 18);
+                c.fillRect(200, 530, 50, 18);
+            }
+        },
+        {
+            id: 'rockstar-daisy',
+            label: 'Rockstar Daisy',
+            emoji: '🎸',
+            pose: 'groovy',
+            bg: 'stadium',
+            hat: 'funky-fresh',
+            color: '#e63946',
+            draw: (c) => {
+                /* Skin tone fill across the silhouette. */
+                c.fillStyle = '#f4a261';
+                c.fillRect(0, 0, STAGE_W, STAGE_H);
+                /* Leather jacket — black across the torso. */
+                c.fillStyle = '#1a0f33';
+                c.fillRect(0, 170, STAGE_W, 180);
+                /* Hot-pink jeans. */
+                c.fillStyle = '#ff6ec7';
+                c.fillRect(0, 350, STAGE_W, 220);
+                /* Tank top peek — magenta V neckline. */
+                c.fillStyle = '#e63946';
+                c.beginPath();
+                c.moveTo(175, 170);
+                c.lineTo(200, 230);
+                c.lineTo(225, 170);
+                c.closePath();
+                c.fill();
+                /* Star sunglasses. */
+                c.fillStyle = '#1a0f33';
+                for (let i = 0; i < 2; i++) {
+                    const cx = i === 0 ? 180 : 220;
+                    c.beginPath();
+                    for (let k = 0; k < 10; k++) {
+                        const a = k * Math.PI / 5 - Math.PI / 2;
+                        const rr = k % 2 === 0 ? 11 : 5;
+                        const x = cx + Math.cos(a) * rr;
+                        const y = 95 + Math.sin(a) * rr;
+                        if (k === 0) c.moveTo(x, y); else c.lineTo(x, y);
+                    }
+                    c.closePath();
+                    c.fill();
+                }
+                /* Open-mouth singing 'O'. */
+                c.fillStyle = '#1a0f33';
+                c.beginPath(); c.arc(200, 125, 8, 0, Math.PI * 2); c.fill();
+                c.fillStyle = '#e63946';
+                c.beginPath(); c.arc(200, 125, 5, 0, Math.PI * 2); c.fill();
+            }
+        },
+        {
+            id: 'disco-king',
+            label: 'Disco King',
+            emoji: '🪩',
+            pose: 'groovy',
+            bg: 'disco',
+            hat: 'cool-kids',
+            color: '#ffd23f',
+            draw: (c) => {
+                /* Sparkly gold suit. */
+                c.fillStyle = '#ffd23f';
+                c.fillRect(0, 0, STAGE_W, STAGE_H);
+                /* White lapels — diagonal triangles from neck. */
+                c.fillStyle = '#fff';
+                c.beginPath();
+                c.moveTo(175, 165);
+                c.lineTo(155, 280);
+                c.lineTo(200, 220);
+                c.closePath();
+                c.fill();
+                c.beginPath();
+                c.moveTo(225, 165);
+                c.lineTo(245, 280);
+                c.lineTo(200, 220);
+                c.closePath();
+                c.fill();
+                /* Disco-ball sequins scattered across the suit. */
+                c.fillStyle = '#fff';
+                const sequins = [[170, 200], [220, 195], [185, 250], [225, 260],
+                                 [170, 310], [220, 320], [180, 360], [215, 380],
+                                 [180, 430], [220, 440], [185, 500], [215, 520]];
+                for (let i = 0; i < sequins.length; i++) {
+                    c.beginPath();
+                    c.arc(sequins[i][0], sequins[i][1], 4, 0, Math.PI * 2);
+                    c.fill();
+                }
+                /* Confident half-smile. */
+                c.strokeStyle = '#1a0f33';
+                c.lineWidth = 4;
+                c.lineCap = 'round';
+                c.beginPath();
+                c.moveTo(180, 125);
+                c.bezierCurveTo(195, 135, 215, 135, 225, 120);
+                c.stroke();
+                /* Skin patch behind the cool-kids sunglasses (eyes go
+                   under the hat). */
+                c.fillStyle = '#f4a261';
+                c.fillRect(160, 75, 80, 25);
+            }
+        },
+        {
+            id: 'pirate-pip',
+            label: 'Pirate Pip',
+            emoji: '🏴‍☠️',
+            pose: 'standing',
+            bg: 'underwater',
+            hat: 'no-hat',
+            color: '#6f4e37',
+            draw: (c) => {
+                /* Skin tone across the figure. */
+                c.fillStyle = '#fcbf49';
+                c.fillRect(0, 0, STAGE_W, STAGE_H);
+                /* Red-and-white horizontal-stripe shirt across torso. */
+                const stripes = [[170, 30, '#e63946'], [200, 30, '#fff'],
+                                 [230, 30, '#e63946'], [260, 30, '#fff'],
+                                 [290, 30, '#e63946'], [320, 30, '#fff']];
+                for (let i = 0; i < stripes.length; i++) {
+                    c.fillStyle = stripes[i][2];
+                    c.fillRect(0, stripes[i][0], STAGE_W, stripes[i][1]);
+                }
+                /* Brown pants. */
+                c.fillStyle = '#6f4e37';
+                c.fillRect(0, 350, STAGE_W, 220);
+                /* Belt + buckle. */
+                c.fillStyle = '#1a0f33';
+                c.fillRect(0, 345, STAGE_W, 18);
+                c.fillStyle = '#ffd23f';
+                c.fillRect(190, 348, 20, 12);
+                /* Red bandana across the head. */
+                c.fillStyle = '#e63946';
+                c.fillRect(140, 50, 120, 26);
+                /* Eyepatch over the right eye + strap. */
+                c.fillStyle = '#1a0f33';
+                c.fillRect(208, 86, 22, 18);
+                c.lineWidth = 3;
+                c.strokeStyle = '#1a0f33';
+                c.beginPath();
+                c.moveTo(208, 92); c.lineTo(165, 78); c.stroke();
+                c.beginPath();
+                c.moveTo(230, 95); c.lineTo(258, 80); c.stroke();
+                /* Left eye + tiny grin. */
+                c.fillStyle = '#1a0f33';
+                c.beginPath(); c.arc(180, 95, 5, 0, Math.PI * 2); c.fill();
+                c.beginPath();
+                c.arc(200, 125, 12, 0.2 * Math.PI, 0.8 * Math.PI);
+                c.lineWidth = 4;
+                c.stroke();
+            }
+        },
+        {
+            id: 'princess-lily',
+            label: 'Princess Lily',
+            emoji: '👑',
+            pose: 'star',
+            bg: 'candy',
+            hat: 'candy-bowl',
+            color: '#ff6ec7',
+            draw: (c) => {
+                /* Soft skin fill. */
+                c.fillStyle = '#fcbf49';
+                c.fillRect(0, 0, STAGE_W, STAGE_H);
+                /* Pink ball gown across torso + legs. */
+                c.fillStyle = '#ff6ec7';
+                c.fillRect(0, 170, STAGE_W, 400);
+                /* Lighter pink dress overlay band. */
+                c.fillStyle = '#ffc1e3';
+                c.fillRect(0, 270, STAGE_W, 60);
+                /* Gold trim at the dress neckline. */
+                c.fillStyle = '#ffd23f';
+                c.beginPath();
+                c.moveTo(170, 175);
+                c.lineTo(200, 210);
+                c.lineTo(230, 175);
+                c.lineTo(230, 185);
+                c.lineTo(200, 220);
+                c.lineTo(170, 185);
+                c.closePath();
+                c.fill();
+                /* Almond eyes with eyelashes. */
+                c.fillStyle = '#1a0f33';
+                c.beginPath(); c.ellipse(184, 92, 7, 5, 0, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.ellipse(216, 92, 7, 5, 0, 0, Math.PI * 2); c.fill();
+                c.lineWidth = 2;
+                c.strokeStyle = '#1a0f33';
+                c.beginPath(); c.moveTo(178, 87); c.lineTo(174, 82); c.stroke();
+                c.beginPath(); c.moveTo(222, 87); c.lineTo(226, 82); c.stroke();
+                /* Heart-shaped lips. */
+                c.fillStyle = '#e63946';
+                c.beginPath();
+                c.moveTo(200, 122);
+                c.bezierCurveTo(192, 110, 188, 122, 200, 132);
+                c.bezierCurveTo(212, 122, 208, 110, 200, 122);
+                c.fill();
+                /* Rosy cheeks. */
+                c.fillStyle = 'rgba(230, 57, 70, 0.45)';
+                c.beginPath(); c.arc(170, 115, 8, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(230, 115, 8, 0, Math.PI * 2); c.fill();
+            }
+        },
+        {
+            id: 'robo-9000',
+            label: 'Robo-9000',
+            emoji: '🤖',
+            pose: 'standing',
+            bg: 'outdoors',
+            hat: 'circuit-board',
+            color: '#43aa8b',
+            draw: (c) => {
+                /* Metallic gray body. */
+                c.fillStyle = '#c0c5d0';
+                c.fillRect(0, 0, STAGE_W, STAGE_H);
+                /* Darker chest panel. */
+                c.fillStyle = '#5a6478';
+                c.fillRect(0, 175, STAGE_W, 130);
+                /* Belt + leg seams. */
+                c.fillStyle = '#1a0f33';
+                c.fillRect(0, 300, STAGE_W, 10);
+                c.fillRect(195, 310, 10, 220);
+                /* Square LED eyes — teal. */
+                c.fillStyle = '#43aa8b';
+                c.fillRect(174, 82, 18, 18);
+                c.fillRect(208, 82, 18, 18);
+                /* Eye glow squares (inner). */
+                c.fillStyle = '#ffffff';
+                c.fillRect(180, 88, 6, 6);
+                c.fillRect(214, 88, 6, 6);
+                /* Speaker grill / mouth — 3 horizontal lines. */
+                c.strokeStyle = '#1a0f33';
+                c.lineWidth = 3;
+                c.beginPath(); c.moveTo(180, 120); c.lineTo(220, 120); c.stroke();
+                c.beginPath(); c.moveTo(180, 128); c.lineTo(220, 128); c.stroke();
+                c.beginPath(); c.moveTo(180, 136); c.lineTo(220, 136); c.stroke();
+                /* Three control-panel buttons on chest. */
+                const btns = [['#e63946', 184], ['#ffd23f', 200], ['#43aa8b', 216]];
+                for (let i = 0; i < btns.length; i++) {
+                    c.fillStyle = btns[i][0];
+                    c.beginPath();
+                    c.arc(btns[i][1], 220, 7, 0, Math.PI * 2);
+                    c.fill();
+                }
+                /* Chest readout — small LCD rectangle. */
+                c.fillStyle = '#1a0f33';
+                c.fillRect(170, 245, 60, 24);
+                c.fillStyle = '#43aa8b';
+                c.font = 'bold 14px monospace';
+                c.textAlign = 'center';
+                c.textBaseline = 'middle';
+                c.fillText('OK', 200, 258);
+            }
+        }
+    ];
+
+    const DEFAULT_GROODLE_BY_ID = {};
+    DEFAULT_GROODLES.forEach(d => { DEFAULT_GROODLE_BY_ID[d.id] = d; });
+
+    let starterGridEl = null;
+
+    function applyDefaultGroodle(id) {
+        const seed = DEFAULT_GROODLE_BY_ID[id];
+        if (!seed) return;
+        /* Picking a starter is a "new drawing" — kill any active page
+           template and wipe the per-drawing color tally before laying
+           the new artwork in. clearCanvas() handles trackClearDrawing. */
+        currentPageId = null;
+        /* Pose change has to happen FIRST: applyPose rebuilds the
+           silhouette + canvas clip, which would clear anything painted
+           before it. After applyPose, the canvas is blank and clipped
+           to the new pose. */
+        if (seed.pose && state && state.pose !== seed.pose) {
+            applyPose(seed.pose);
+        } else {
+            /* Same pose: wipe the canvas explicitly so the starter
+               paints onto a clean surface. */
+            clearCanvas();
+        }
+        /* Background — replicates what attachBgPicker's click handler does
+           so the swap is identical to the kid tapping the bg thumb. */
+        if (seed.bg) {
+            const bgLayer = document.getElementById('bgLayer');
+            if (bgLayer) bgLayer.className = 'bg-layer bg-' + seed.bg;
+            document.querySelectorAll('.bg-thumb').forEach((b) => {
+                b.classList.toggle('active', b.dataset.bg === seed.bg);
+            });
+        }
+        /* Hat — equipHat updates state.hats.equipped + renders. Wrapped
+           in a try because some hats may not be owned yet (kid hasn't
+           bought them); equipHat already no-ops in that case. */
+        if (seed.hat && state.hats.owned.indexOf(seed.hat) !== -1) {
+            equipHat(seed.hat);
+        }
+        /* Paint the starter onto the canvas. */
+        seed.draw(ctx);
+        /* Land the kid on a character-appropriate palette color so the
+           first stroke of their own already matches the starter. */
+        if (seed.color) {
+            currentColor = seed.color;
+            isErasing = false;
+            const sw = document.querySelector('.swatch[data-color="' + seed.color + '"]');
+            document.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
+            if (sw) sw.classList.add('active');
+            const eraser = document.getElementById('eraserBtn');
+            if (eraser) eraser.classList.remove('active');
+        }
+    }
+
+    function buildStarterGrid() {
+        if (!starterGridEl) starterGridEl = document.getElementById('starterGrid');
+        if (!starterGridEl) return;
+        starterGridEl.innerHTML = '';
+        for (let i = 0; i < DEFAULT_GROODLES.length; i++) {
+            const seed = DEFAULT_GROODLES[i];
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'starter-card';
+            card.setAttribute('aria-label', 'Start with ' + seed.label);
+            card.innerHTML =
+                '<div class="starter-emoji" aria-hidden="true">' + seed.emoji + '</div>' +
+                '<div class="starter-name">' + escapeHtml(seed.label) + '</div>' +
+                '<div class="starter-action">Use this</div>';
+            card.addEventListener('click', () => {
+                applyDefaultGroodle(seed.id);
+                /* Close the New drawer so the kid lands back on the
+                   stage and can immediately tweak the starter. */
+                closeDrawer();
+            });
+            starterGridEl.appendChild(card);
+        }
+    }
+
     /* ============ PUBLIC GALLERY (Supabase) ============
 
        Optional feature: kids can SAVE their finished Groodle to a shared
@@ -1773,6 +2173,14 @@
         trackClearDrawing();
         renderPoseDom(POSES[poseId]);
         applyCanvasClip();
+        /* Keep the pose picker's active button in sync so programmatic
+           callers (default-Groodle starters, future scripted demos)
+           don't leave the UI showing the wrong pose. The picker's own
+           click handler still flips the active class redundantly, which
+           is harmless. */
+        document.querySelectorAll('.pose-btn').forEach((b) => {
+            b.classList.toggle('active', b.dataset.pose === poseId);
+        });
     }
 
     /* Convert pointer event coords to logical canvas coords (0..400, 0..600).
@@ -2313,6 +2721,7 @@
         buildSizes();
         attachBgPicker();
         buildPosePicker();
+        buildStarterGrid();
         attachHandlers();
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');

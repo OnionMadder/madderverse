@@ -1365,6 +1365,71 @@ body:not(.dancing) .dance-dock { display: none; }
     color: #fff;
 }
 
+/* ============ STARTER GRID (Default Groodles in the New drawer) ============
+
+   3-up grid that fits comfortably inside the drawer body without making
+   the kid scroll. Same card visual idiom as .page-card but a touch
+   denser since there are 6 of them. */
+
+.starter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+@media (min-width: 480px) {
+    .starter-grid { grid-template-columns: repeat(6, 1fr); }
+}
+
+.starter-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 6px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 2px solid rgba(0, 255, 204, 0.35);
+    border-radius: 14px;
+    color: #fff;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s, transform 0.08s;
+    -webkit-tap-highlight-color: transparent;
+}
+.starter-card:active { transform: scale(0.96); }
+@media (hover: hover) {
+    .starter-card:hover {
+        border-color: #ff6ec7;
+        background: rgba(255, 110, 199, 0.12);
+    }
+}
+
+.starter-emoji {
+    font-size: 30px;
+    line-height: 1;
+}
+.starter-name {
+    font-weight: bold;
+    font-size: 11px;
+    line-height: 1.15;
+    letter-spacing: 0.3px;
+    min-height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.starter-action {
+    font-size: 9px;
+    font-weight: bold;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: rgba(0, 255, 204, 0.18);
+    color: #d6bdff;
+    border: 1px solid rgba(0, 255, 204, 0.35);
+}
+
 /* ============ SAVE DIALOG ============
 
    Narrower than the achievement / hat / pages modals (single-column

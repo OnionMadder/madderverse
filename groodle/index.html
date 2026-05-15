@@ -270,7 +270,11 @@
             <button class="drawer-close" type="button" data-drawer-close="1" aria-label="Close new drawer">✕</button>
         </header>
         <div class="drawer-body">
-            <p class="drawer-text">Start fresh or let the game fill it in for you?</p>
+            <p class="drawer-text">Tap a starter or roll your own.</p>
+            <div class="starter-grid" id="starterGrid" aria-label="Default Groodles">
+                <!-- Populated by buildStarterGrid() from DEFAULT_GROODLES in game.js. -->
+            </div>
+            <p class="drawer-section-label">Roll your own</p>
             <div class="actions">
                 <button id="randomBtn" class="btn" type="button">🎲 SURPRISE</button>
                 <button id="clearBtn" class="btn" type="button">🗑 CLEAR</button>
