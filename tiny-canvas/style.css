@@ -458,6 +458,71 @@ a:focus-visible {
 #screen-draw {
     padding-top: 12px;
     padding-bottom: 30px;
+    position: relative;
+}
+
+/* Decorative sparkle dots scattered in the dark margin so the screen
+   doesn't read as "center canvas in a void." Tiny teal + pink stars
+   pinned to the screen corners. Pure CSS pseudo-elements, no DOM
+   noise, no animation cost. */
+#screen-draw::before,
+#screen-draw::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+        radial-gradient(circle at 20% 30%, rgba(0, 255, 204, 0.55) 0px, transparent 2px),
+        radial-gradient(circle at 65% 55%, rgba(255, 46, 136, 0.55) 0px, transparent 2px),
+        radial-gradient(circle at 35% 80%, rgba(255, 92, 171, 0.45) 0px, transparent 2px),
+        radial-gradient(circle at 85% 22%, rgba(0, 255, 204, 0.40) 0px, transparent 1.5px),
+        radial-gradient(circle at 10% 60%, rgba(255, 210, 70, 0.50) 0px, transparent 2px);
+    background-repeat: no-repeat;
+}
+#screen-draw::before {
+    top:    80px;
+    bottom: 80px;
+    left:   0;
+    width:  120px;
+    background-size: 120px 600px;
+}
+#screen-draw::after {
+    top:    80px;
+    bottom: 80px;
+    right:  0;
+    width:  120px;
+    background-size: 120px 600px;
+}
+
+/* Slim marquee strip — narrower variant of the title-screen marquee
+   for visual continuity between screens. Decorative only, no input. */
+.draw-marquee {
+    width: 100%;
+    max-width: 920px;
+    margin: 0 auto 14px;
+    overflow: hidden;
+    border-top:    1.5px solid var(--pink);
+    border-bottom: 1.5px solid var(--pink);
+    background: repeating-linear-gradient(45deg,
+        rgba(255, 46, 136, 0.10) 0 10px,
+        transparent 10px 20px);
+    padding: 4px 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.2px;
+    color: var(--ink);
+    box-shadow:
+        0 0 8px rgba(255, 46, 136, 0.2),
+        inset 0 0 18px rgba(0, 0, 0, 0.4);
+    position: relative;
+    z-index: 1;
+}
+
+.draw-marquee span {
+    display: inline-block;
+    white-space: nowrap;
+    animation: marquee 42s linear infinite;
+    padding-left: 100%;
 }
 
 .draw-stack {
@@ -466,6 +531,8 @@ a:focus-visible {
     align-items: center;
     gap: 14px;
     width: 100%;
+    position: relative;
+    z-index: 1;
 }
 
 .canvas-wrap {
@@ -612,40 +679,51 @@ a:focus-visible {
     text-shadow: 0 0 4px rgba(0, 255, 204, 0.3);
 }
 
-/* Tool row: 7 buttons (6 brushes + eraser). Wraps to 2-3 rows on
-   narrow phones, single row on tablet+. The grid keeps button widths
-   consistent regardless of label length. */
+/* Tool row: 6 brush cards in a 3-column grid; eraser spans the
+   full width below as its own visually distinct row. Each button
+   is a vertical mini-card with an SVG icon on top and a small
+   label underneath — readable at any rail width, never truncates. */
 .tool-modes {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 6px;
-}
-
-@media (min-width: 720px) {
-    .tool-modes {
-        grid-template-columns: repeat(7, minmax(0, 1fr));
-    }
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
 }
 
 .tool-btn {
-    padding: 12px 4px;
+    padding: 10px 4px 8px;
     font-family: var(--font-mono);
-    font-size: 10px;
+    font-size: 9px;
     letter-spacing: 1.2px;
     background: var(--bg-panel);
     color: var(--ink);
     border: 1px solid var(--teal-low);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius-md);
     transition: background 0.12s ease,
                 color 0.12s ease,
                 border-color 0.12s ease,
                 box-shadow 0.12s ease,
                 transform 0.06s ease;
     text-shadow: 1px 1px 0 #000;
-    text-align: center;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Vertical card layout: icon on top, label below. */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 64px;
+}
+
+.tool-icon {
+    width: 26px;
+    height: 26px;
+    color: var(--teal);
+    transition: color 0.12s ease;
+    /* drop-shadow lifts the icon slightly off the card background */
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.4));
+}
+
+.tool-label {
+    line-height: 1;
 }
 
 .tool-btn:hover,
@@ -666,12 +744,27 @@ a:focus-visible {
         0 0 12px rgba(255, 46, 136, 0.5);
 }
 
-/* Eraser is visually distinct from the 6 brushes — teal outline so
-   "destructive" reads at a glance. Active state still goes pink. */
+.tool-btn.active .tool-icon {
+    color: #fff;
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
+}
+
+/* Eraser is visually distinct from the 6 brushes — spans the full
+   width below the brush grid, gets a teal outline so "destructive"
+   reads at a glance. Active state still goes pink. */
 .tool-btn.tool-eraser {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    min-height: 44px;
+    padding: 8px 14px;
+    gap: 10px;
     border-color: var(--teal);
     background: linear-gradient(180deg, #0d2a32 0%, #07181e 100%);
     color: var(--teal);
+}
+.tool-btn.tool-eraser .tool-icon {
+    width: 22px;
+    height: 22px;
 }
 .tool-btn.tool-eraser:hover,
 .tool-btn.tool-eraser:focus-visible {
@@ -1614,7 +1707,8 @@ a:focus-visible {
 
 @media (prefers-reduced-motion: reduce) {
     .big-title,
-    .marquee-tape span {
+    .marquee-tape span,
+    .draw-marquee span {
         animation: none;
     }
 }
