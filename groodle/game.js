@@ -1411,6 +1411,13 @@
        frame and shows up under DevTools profiling on slower phones. */
     let floorEl = null;
     let bubbleEl = null;
+    /* The dance dock (the floating bottom bar with the STOP button) ships
+       with the `hidden` attribute on its HTML so it doesn't flash on
+       first paint. CSS `[hidden] { display: none !important }` keeps it
+       hidden — startDance/stopDance toggle this flag so the dock can
+       appear during dance. Looked up once at init to avoid an extra DOM
+       query each time the kid taps Dance. */
+    let danceDockEl = null;
     /* Canvas bounding rect is cached for the duration of a stroke. Reading
        getBoundingClientRect on every pointermove forces a layout pass; the
        rect can only change on scroll/resize/zoom, and a pointer capture
@@ -2072,6 +2079,10 @@
                Drawing stays enabled during dance — the kid can keep
                editing while the creature grooves. */
             document.body.classList.add('dancing');
+            /* The dance dock carries the `hidden` attribute so it doesn't
+               flash on first paint; flip it off here so the STOP button
+               is reachable. stopDance restores the flag. */
+            if (danceDockEl) danceDockEl.hidden = false;
             /* If a drawer was open when DANCE was tapped, close it so
                the dance composition is clean. The Beat drawer is still
                reachable mid-dance via the dance-dock. */
@@ -2098,6 +2109,7 @@
         }
         stopAudio();
         document.body.classList.remove('dancing');
+        if (danceDockEl) danceDockEl.hidden = true;
         setPlayBtnState(false);
         creature.style.transform = '';
         if (floorEl) {
@@ -2305,6 +2317,7 @@
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');
         bubbleEl = document.getElementById('beatBubble');
+        danceDockEl = document.getElementById('danceDock');
 
         /* Defensive: if a returning user is on a release where the
            achievement catalog grew, retroactively unlock anything their
