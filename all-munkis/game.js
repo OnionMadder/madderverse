@@ -997,11 +997,22 @@
     // sheet — preserveAspectRatio scales the cropped frame into .head-mod
     // (which fills the head circle area). 'munki' is the dynamic default-heads
     // sheet (`{expr}-{color}` frames); 'mb' is the static Madballz sheet.
+    // 1px crop inset on every frame. The sheets pack frames on a 200px
+    // (munki) / 1082px (mb) pitch with only a 2px transparent gutter
+    // between them. When the browser scales the full sheet and clips via
+    // viewBox, bilinear sampling at the viewBox EDGE pulls in fractions
+    // of the neighbouring frame ("tiny bits of neighbouring heads"). A
+    // 1px inset keeps the sampled region strictly inside the gutter so
+    // the neighbour can never bleed in. The head art has transparent
+    // padding inside the frame, so shaving 1px is invisible on the Munki.
+    const FRAME_BLEED_INSET = 1;
     function headModArt(frameName, sheetName) {
         const sheet = SHEETS[sheetName || 'munki'];
         const f = sheet && sheet.frames[frameName];
         if (!f) return '';
-        return `<svg class="head-mod" viewBox="${f.x} ${f.y} ${f.w} ${f.h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
+        const b = FRAME_BLEED_INSET;
+        const vx = f.x + b, vy = f.y + b, vw = f.w - 2 * b, vh = f.h - 2 * b;
+        return `<svg class="head-mod" viewBox="${vx} ${vy} ${vw} ${vh}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
             + `<image href="${sheet.src}" x="0" y="0" width="${sheet.sheetW}" height="${sheet.sheetH}"/>`
             + `</svg>`;
     }
@@ -2876,14 +2887,20 @@
         if (!creepSheet) return;
         const f = creepSheet.frames[vi % creepSheet.frames.length];
         if (!f) return;
-        // Scale so the variant's longest side fills SIZE_PX.
-        const scale = CREEP.SIZE_PX / Math.max(f.w, f.h);
+        // Same 1px crop inset as the head sheets — flying-creeps.png also
+        // packs variants on a 2px gutter, so without the inset a scaled
+        // background-position can bleed the neighbouring variant in at the
+        // edges. Inset the source rect by FRAME_BLEED_INSET on every side.
+        const b = FRAME_BLEED_INSET;
+        const ix = f.x + b, iy = f.y + b, iw = f.w - 2 * b, ih = f.h - 2 * b;
+        // Scale so the variant's longest (inset) side fills SIZE_PX.
+        const scale = CREEP.SIZE_PX / Math.max(iw, ih);
         child.style.backgroundSize =
             `${creepSheet.sheetW * scale}px ${creepSheet.sheetH * scale}px`;
         child.style.backgroundPosition =
-            `${-f.x * scale}px ${-f.y * scale}px`;
-        child.style.width  = `${f.w * scale}px`;
-        child.style.height = `${f.h * scale}px`;
+            `${-ix * scale}px ${-iy * scale}px`;
+        child.style.width  = `${iw * scale}px`;
+        child.style.height = `${ih * scale}px`;
     }
 
     function creepPlaceholderMarkup() {
