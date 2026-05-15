@@ -1653,14 +1653,16 @@
         loadFeaturedStrip();
     }
 
-    /* Featured-pots strip on the title screen. Fetches up to 6
-       recent public pots, picks 2 at random, renders them as
-       clickable thumbs that open the pot-detail modal. Hidden if
-       the fetch returns nothing -- no empty space reservation.   */
+    /* Featured-pots strip on the title screen. The strip itself
+       is always visible (skeleton placeholders pre-rendered in
+       index.html occupy the space at page load -- no layout
+       shift when real cards swap in). On fetch failure or empty
+       DB, the skeleton placeholders stay -- low-key acceptable.
+       Lives BELOW the menu so a delayed fetch can't push the
+       primary navigation off-screen. */
     function loadFeaturedStrip() {
-        const strip = document.getElementById("featuredStrip");
-        const row   = document.getElementById("featuredRow");
-        if (!strip || !row || !supabaseEnabled()) return;
+        const row = document.getElementById("featuredRow");
+        if (!row || !supabaseEnabled()) return;
         if (typeof fetchPublicPots !== "function") return;
 
         fetchPublicPots(6).then(function (rows) {
@@ -1676,8 +1678,7 @@
             picks.forEach(function (raw) {
                 row.appendChild(buildFeaturedCard(raw));
             });
-            strip.hidden = false;
-        }).catch(function () { /* silent */ });
+        }).catch(function () { /* silent -- skeletons stay */ });
     }
 
     function buildFeaturedCard(raw) {

@@ -85,19 +85,6 @@
             <span class="dtb-cta">TAP TO POT &rarr;</span>
         </button>
 
-        <!-- Featured pots strip — 2 random recent public pots.
-             Discovery without leaving the title. Hidden until
-             the async fetch resolves so we don't reserve empty
-             space that pops in later. -->
-        <section class="featured-strip" id="featuredStrip" hidden
-                 aria-label="Featured pots from everyone">
-            <h3 class="featured-head">
-                <span class="featured-eyebrow">FRESH FROM</span>
-                <span class="featured-emph">EVERYONE</span>
-            </h3>
-            <div class="featured-row" id="featuredRow"></div>
-        </section>
-
         <div class="menu-buttons">
             <button class="big-btn primary" id="btnStart" type="button">
                 <span class="btn-label">START SHAPING</span>
@@ -127,6 +114,35 @@
                 <span class="btn-glyph" aria-hidden="true">&darr;</span>
             </button>
         </div>
+
+        <!-- Featured pots strip — small "discovery hub" below the
+             primary menu so it doesn't compete for screen real
+             estate. Pre-rendered skeleton placeholders occupy the
+             space at page load; real cards swap in once the
+             async fetch lands. No layout shift. -->
+        <section class="featured-strip" id="featuredStrip"
+                 aria-label="Featured pots from everyone">
+            <h3 class="featured-head">
+                <span class="featured-eyebrow">FRESH FROM</span>
+                <span class="featured-emph">EVERYONE</span>
+            </h3>
+            <div class="featured-row" id="featuredRow">
+                <div class="featured-card featured-skeleton" aria-hidden="true">
+                    <div class="featured-thumb"></div>
+                    <div class="featured-meta">
+                        <span class="featured-name skeleton-line"></span>
+                        <span class="featured-by skeleton-line"></span>
+                    </div>
+                </div>
+                <div class="featured-card featured-skeleton" aria-hidden="true">
+                    <div class="featured-thumb"></div>
+                    <div class="featured-meta">
+                        <span class="featured-name skeleton-line"></span>
+                        <span class="featured-by skeleton-line"></span>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         <!-- Drifting clay particle. Pure CSS animation, doesn't tax JS. -->
         <div class="clay-drifter" aria-hidden="true"></div>
