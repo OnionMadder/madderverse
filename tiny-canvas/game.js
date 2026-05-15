@@ -74,9 +74,11 @@
     const SETTINGS_KEY       = "tinyCanvas.settings.v1";
     const IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
     const FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
+    const GATE_UNLOCKED_KEY  = "tinyCanvas.parentGate.unlockedUntil.v1";
     const MAX_HISTORY        = 20;     /* undo stack depth */
     const SAVE_MAX           = 60;     /* gallery item cap */
     const AUTOSAVE_INTERVAL_MS = 60_000;
+    const GATE_UNLOCK_MS     = 24 * 60 * 60 * 1000;  /* 24h persistent unlock */
 
     /* ---------- 0a. BRUSH DEFINITIONS ----------
        Each brush implements:
@@ -421,6 +423,28 @@
     function nativePlugin(name) {
         const cap = getCapacitor();
         return cap && cap.Plugins && cap.Plugins[name] || null;
+    }
+
+    /* True when the page is running as a wrapped app (Capacitor) OR
+       as an installed PWA in standalone mode (iOS Add to Home Screen,
+       Android PWA install). The parent gate only enforces in this
+       context — the regular web at madderverse.org/tiny-canvas/ has
+       a browser address bar, the back button, and is just a website
+       you visit. Gating navigation there is friction without
+       compliance value. */
+    function isStandaloneOrNative() {
+        if (isNative()) return true;
+        try {
+            if (window.matchMedia &&
+                window.matchMedia("(display-mode: standalone)").matches) {
+                return true;
+            }
+            if (typeof navigator !== "undefined" &&
+                navigator.standalone === true) {
+                return true;
+            }
+        } catch (_) {}
+        return false;
     }
 
     /* Storage keys mirrored to native Preferences. localStorage stays
@@ -1093,19 +1117,51 @@
     }
 
     /* ---------- 8b. PARENT GATE ----------
-       Apple Kids category requires that any external link, destructive
-       action, share/export, or "leaves the app" path sit behind an
-       adult-only gate. Two-digit addition is reliably above an early
-       reader's ability — the four-option layout means the parent can
-       solve it without a keyboard. Once unlocked, the gate stays open
-       for the rest of the session (matches Apple's documentation).
-       The kid can always tap CANCEL — gates can never trap. */
+       Apple Kids category and Google's Designed for Families both
+       require external links, destructive actions, and share/export
+       to sit behind an adult-only gate in the installed app context.
+       Implementation choices, all on purpose:
+
+       1. Plain web (not installed as PWA, not Capacitor) short-circuits
+          past the gate entirely. madderverse.org/tiny-canvas/ in a
+          browser tab has a back button and address bar — it's a
+          website you visit, not an installed kids app. Gating
+          navigation there is friction without a compliance reason.
+
+       2. Single-digit addition (4..18 sum) with 3 options. Above an
+          early-reader's grade level, low enough that adults don't
+          curse at their own app. Distractors are within ±3 of the
+          correct answer so it's still real math, not a pattern match.
+
+       3. Unlock persists 24h via localStorage. Within Apple's
+          "designated area" pattern but doesn't re-pester the parent
+          every reload. */
+
+    function isGateUnlocked() {
+        if (state.parentGateUnlocked) return true;
+        try {
+            const until = parseInt(
+                localStorage.getItem(GATE_UNLOCKED_KEY) || "0", 10);
+            if (until > Date.now()) {
+                state.parentGateUnlocked = true;
+                return true;
+            }
+        } catch (_) {}
+        return false;
+    }
+
+    function setGateUnlocked() {
+        state.parentGateUnlocked = true;
+        try {
+            setStorage(GATE_UNLOCKED_KEY,
+                       String(Date.now() + GATE_UNLOCK_MS));
+        } catch (_) {}
+    }
 
     function parentGate(label, onPass) {
-        if (state.parentGateUnlocked) {
-            onPass();
-            return;
-        }
+        /* No-op on plain web — the address bar IS the safety net. */
+        if (!isStandaloneOrNative()) { onPass(); return; }
+        if (isGateUnlocked())        { onPass(); return; }
         state.parentGatePending = onPass;
         renderParentGate(label);
         const modal = $("#parentGate");
@@ -1113,27 +1169,26 @@
     }
 
     function renderParentGate(label) {
-        /* Two random integers in [25, 78] so the sum fits in 2 digits
-           and is reliably "too hard" for a kid who can't read yet. */
-        const a = 25 + Math.floor(Math.random() * 54);
-        const b = 25 + Math.floor(Math.random() * 54);
+        /* Single-digit addition; sums in [4, 18]. Beyond an early
+           reader without being a brain-teaser. */
+        const a = 2 + Math.floor(Math.random() * 7);   /* 2..8 */
+        const b = 2 + Math.floor(Math.random() * 7);   /* 2..8 */
         const correct = a + b;
         $("#parentGateProblem").textContent = "What is " + a + " + " + b + "?";
         const foot = $("#parentGateFoot");
         foot.textContent = "";
         foot.classList.remove("is-error");
 
-        /* Three plausible wrong answers within ±10 of the correct one
-           so the gate is real math, not a pattern-match. */
+        /* Two plausible wrong answers within ±3 — real math, not a
+           pattern match, but adults solve it instantly. */
         const wrongs = new Set();
-        while (wrongs.size < 3) {
+        while (wrongs.size < 2) {
             const delta = (Math.random() < 0.5 ? -1 : 1) *
-                          (2 + Math.floor(Math.random() * 9));
+                          (1 + Math.floor(Math.random() * 3));
             const candidate = correct + delta;
             if (candidate !== correct && candidate > 0) wrongs.add(candidate);
         }
         const options = [correct].concat(Array.from(wrongs));
-        /* Shuffle */
         for (let i = options.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [options[i], options[j]] = [options[j], options[i]];
@@ -1148,7 +1203,7 @@
             btn.textContent = String(n);
             btn.addEventListener("click", function () {
                 if (n === correct) {
-                    state.parentGateUnlocked = true;
+                    setGateUnlocked();
                     closeParentGate();
                     const cb = state.parentGatePending;
                     state.parentGatePending = null;
@@ -1616,14 +1671,20 @@
         /* External links — apply parent gate. The .madder-home button
            leaves the app for the Madderverse hub; the footer Madderverse
            / About / Mad Sundar links all do too. Each gets an
-           interception click handler. */
+           interception click handler. parentGate() itself short-circuits
+           on plain web (just navigates) and uses the 24h-persisted unlock
+           on native/PWA-standalone. */
         document.querySelectorAll('.madder-home, .site-footer-slim a')
             .forEach(function (link) {
                 link.addEventListener("click", function (e) {
-                    if (state.parentGateUnlocked) return;
-                    e.preventDefault();
                     const href = link.getAttribute("href");
                     const target = link.getAttribute("target");
+                    /* If gate would be a no-op (web context or already
+                       unlocked), let the browser handle the click
+                       natively — preserves middle-click open-in-tab,
+                       cmd-click, etc. */
+                    if (!isStandaloneOrNative() || isGateUnlocked()) return;
+                    e.preventDefault();
                     parentGate("external-link", function () {
                         if (target) window.open(href, target);
                         else        window.location.href = href;
