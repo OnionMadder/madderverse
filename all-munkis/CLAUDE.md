@@ -6,6 +6,16 @@ Sprunki-style drag-and-drop music game inside the Madderverse hub.
 ad-free / kid-friendly branding). This file captures only what's specific to
 `all-munkis/`.
 
+## Dual Row Stage origin (v1.1 feature)
+
+Discovered by accident during a two-monitor debug session — two
+independent browser instances of the game running offset by a few
+seconds produced clean polyphonic harmony, because each tab's
+`AudioContext` has its own crystal clock and the Tale of Two Clocks
+scheduling pattern keeps both deterministic loops drift-free. The Dual
+Row Stage feature (front row + offset back row, single tab, two
+simultaneous groups of Munkis) reproduces this intentionally.
+
 ## What it is
 
 - 5-slot stage × 22-mod tray. **Tap** a tray chip to teleport its Munki onto
@@ -135,6 +145,23 @@ all-munkis/
 | **JUMP SCARE** | `triggerJumpScare()` toggles `body.jumpscare` for 1.5s + `playJumpScareSound()` (distorted shriek + sub thud) |
 | **HEADER BUTTONS** | `attachHeaderHandlers()` wires REMIX, CLEAR, SONG, BOO!, mute |
 | **INIT** | `assignRandomHair()` → build → render → attach handlers |
+
+## Audio engine notes
+
+**Reusable audio generator (cross-game intent):** This Web Audio
+engine — single `AudioContext` + Tale of Two Clocks lookahead
+scheduler + per-voice `play(when, step)` functions + master gain →
+`DynamicsCompressor` → destination + optional Tone.js ambient layer —
+is intended to be extracted into a shared library at
+`madderverse/lib/audio/` for use across the rest of the rhythm-based
+madderverse games (Pootery, Cookie Cache, Groodle, Tiny Canvas,
+future). All Munkis is the prototype; treat the engine code (the
+`ensureAudio()` + `schedule()` + `scheduleStep()` + voice-helper range,
+roughly `game.js:159-285`) as the canonical implementation that future
+extraction will pull from. Don't break the architectural patterns —
+lazy single-context init, sample-accurate `when`-scheduled voices,
+the look-ahead `setTimeout` only queueing (never gating) note onset —
+in ways that would complicate that future extraction.
 
 ## The character data shape
 
