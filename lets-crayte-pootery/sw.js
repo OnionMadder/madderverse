@@ -21,7 +21,7 @@
      current version.
    ============================================================ */
 
-const CACHE_VERSION = "pootery-v3";
+const CACHE_VERSION = "pootery-v4";
 const SCOPE = "/lets-crayte-pootery/";
 
 const PRECACHE_URLS = [
@@ -72,28 +72,25 @@ self.addEventListener("fetch", function (event) {
     if (url.origin !== self.location.origin) return;
     if (req.method !== "GET") return;
 
-    /* HTML / page navigations -> network-first. */
-    if (req.mode === "navigate" || req.destination === "document") {
-        event.respondWith(
-            fetch(req)
-                .then(function (res) {
-                    /* Update cache silently in the background. */
-                    const copy = res.clone();
-                    caches.open(CACHE_VERSION).then(function (c) {
-                        c.put(req, copy);
-                    });
-                    return res;
-                })
-                .catch(function () { return caches.match(req); })
-        );
-        return;
-    }
+    /* Network-first for EVERYTHING same-origin (HTML, game.js,
+       style.css, icons, manifest).
 
-    /* Static assets -> cache-first with background refresh. */
+       Why not cache-first for "static" assets: this app ships
+       multiple times a day and game.js / style.css change every
+       ship. Cache-first served the stale copy and only refreshed
+       the cache for the NEXT load, so every device ran one
+       version behind permanently -- the "only works with
+       DevTools open" bug (DevTools bypasses the SW). Network-
+       first means: online users always get the just-shipped
+       code; the cache is purely the offline safety net so the
+       PWA still launches on a plane.
+
+       The tiny per-request latency of waiting for the network is
+       negligible against a GH Pages CDN, and far cheaper than
+       shipping fixes nobody receives. */
     event.respondWith(
-        caches.match(req).then(function (cached) {
-            const networkFetch = fetch(req).then(function (res) {
-                /* Only cache OK same-origin GETs. */
+        fetch(req)
+            .then(function (res) {
                 if (res && res.ok && res.type === "basic") {
                     const copy = res.clone();
                     caches.open(CACHE_VERSION).then(function (c) {
@@ -101,9 +98,22 @@ self.addEventListener("fetch", function (event) {
                     });
                 }
                 return res;
-            }).catch(function () { return cached; });
-            return cached || networkFetch;
-        })
+            })
+            .catch(function () {
+                /* Offline / network failure -> serve last-known
+                   cached copy. For navigations with no cached
+                   match, fall back to the cached app shell so
+                   the PWA still boots. */
+                return caches.match(req).then(function (cached) {
+                    if (cached) return cached;
+                    if (req.mode === "navigate" ||
+                        req.destination === "document") {
+                        return caches.match(SCOPE) ||
+                               caches.match(SCOPE + "index.html");
+                    }
+                    return Response.error();
+                });
+            })
     );
 });
 
