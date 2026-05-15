@@ -665,7 +665,11 @@ main {
     .stage { gap: 4px; }
     .slot-label { font-size: 9px; letter-spacing: 0.08em; margin-top: 2px; }
 
-    .tray-chip { width: 76px; height: 100px; padding: 4px; }
+    /* Smaller chips on phones so the 7-chip 4+3 wrap doesn't eat the stage.
+       Was 76×100 → tray rendered ~371px tall on 360-wide phones (overlapped
+       the stage). 64×84 brings tray down to ~230px and keeps tap targets
+       comfortable for kids. */
+    .tray-chip { width: 64px; height: 84px; padding: 3px; }
     .chip-label { font-size: 9px; }
     .tray-hint { font-size: 9px; letter-spacing: 0.12em; }
 }
@@ -677,7 +681,9 @@ main {
     main { padding: 12px 6px calc(var(--tray-h, 240px) + 8px); }
     .stage { gap: 3px; }
     .slot-label { font-size: 8px; }
-    .tray-chip { width: 70px; height: 92px; }
+    /* Tiny phones (≤420 — vast majority of Android devices in market):
+       chips shrink further so 4+3 wraps in a 220-ish px tray. */
+    .tray-chip { width: 58px; height: 78px; padding: 3px; }
     .chip-label { font-size: 8px; }
 }
 

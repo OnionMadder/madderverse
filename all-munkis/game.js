@@ -2652,21 +2652,64 @@
     // The fixed-position tray-wrap wraps onto 2 rows on phones and 1 row on
     // tablets+. main reads --tray-h to size its padding-bottom so the stage
     // always sits just above the tray no matter which layout is active.
-    // ResizeObserver re-measures on orientation change + viewport resize +
-    // first paint after the tray fonts/sprites load.
+    // Re-measures on every event that could change the wrap state, with a
+    // double-RAF after each so the value reflects the post-layout height
+    // (not the mid-resize transient).
     function watchTrayHeight() {
         const tray = document.querySelector('.tray-wrap');
         if (!tray) return;
+        let pending = false;
         const apply = () => {
             const h = Math.ceil(tray.getBoundingClientRect().height);
             document.documentElement.style.setProperty('--tray-h', `${h}px`);
+            pending = false;
         };
-        apply();
+        const schedule = () => {
+            if (pending) return;
+            pending = true;
+            // Double-RAF: first frame queues, second frame runs AFTER the
+            // browser has laid out any wrap changes. Without this the
+            // ResizeObserver sometimes fires mid-reflow and reads a stale
+            // height (e.g. on a viewport resize that wraps the chips).
+            requestAnimationFrame(() => requestAnimationFrame(apply));
+        };
+        schedule();
         if ('ResizeObserver' in window) {
-            new ResizeObserver(apply).observe(tray);
+            new ResizeObserver(schedule).observe(tray);
         }
-        window.addEventListener('resize', apply);
-        window.addEventListener('orientationchange', apply);
+        window.addEventListener('resize', schedule);
+        window.addEventListener('orientationchange', schedule);
+        // Re-measure after fonts load — chip-label height can shift slightly
+        // once 'Fredoka' swaps in, which nudges tray height.
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(schedule).catch(() => {});
+        }
+    }
+
+    // ---------- AUDIO BACKGROUNDING ----------
+    // When the page is hidden (Android home button, screen lock, tab switch),
+    // suspend the audio context and pause the scheduler. Without this the
+    // setTimeout-driven scheduler keeps firing while the OS has the audio
+    // context suspended; events queue up and play back loudly when the user
+    // returns, plus battery is wasted. Resume on visibility return.
+    function watchVisibility() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                isPlaying = false;
+                if (schedTimer) { clearTimeout(schedTimer); schedTimer = null; }
+                if (audioCtx && audioCtx.state === 'running') {
+                    audioCtx.suspend().catch(() => {});
+                }
+            } else {
+                // Resume only if the user had audio going before backgrounding.
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume().catch(() => {});
+                    isPlaying = true;
+                    nextStepTime = audioCtx.currentTime + 0.08;
+                    schedule();
+                }
+            }
+        });
     }
 
     // ---------- INIT ----------
@@ -2686,6 +2729,7 @@
         attachOutsiderTapDetector();
         attachCounterPanelToggle();
         watchTrayHeight();
+        watchVisibility();
         updateTrayHint();
         // If Moon is unlocked, surface the altar chip so the kid can swap.
         renderMunkiAltar();
