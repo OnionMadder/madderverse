@@ -1,0 +1,35 @@
+{
+    "appId": "org.madderverse.tinycanvas",
+    "appName": "Tiny Canvas",
+    "webDir": ".",
+    "bundledWebRuntime": false,
+    "server": {
+        "androidScheme": "https"
+    },
+    "plugins": {
+        "SplashScreen": {
+            "launchShowDuration": 1200,
+            "launchAutoHide": true,
+            "backgroundColor": "#06141a",
+            "androidSplashResourceName": "splash",
+            "androidScaleType": "CENTER_CROP",
+            "showSpinner": false,
+            "splashFullScreen": true,
+            "splashImmersive": true
+        },
+        "StatusBar": {
+            "style": "DARK",
+            "backgroundColor": "#06141a",
+            "overlaysWebView": false
+        }
+    },
+    "ios": {
+        "contentInset": "always",
+        "limitsNavigationsToAppBoundDomains": true
+    },
+    "android": {
+        "allowMixedContent": false,
+        "captureInput": true,
+        "webContentsDebuggingEnabled": false
+    }
+}

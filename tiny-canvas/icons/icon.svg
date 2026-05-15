@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <!-- Onioncore tile background -->
+    <rect width="512" height="512" rx="96" fill="#06141a"/>
+    <rect width="512" height="512" rx="96" fill="url(#bgGrad)" opacity="0.55"/>
+
+    <!-- The "paper" frame -->
+    <rect x="96" y="112" width="320" height="320" rx="20"
+          fill="#fbfaf6" stroke="#0a665a" stroke-width="6"/>
+
+    <!-- A tiny smiley sun on the page -->
+    <circle cx="256" cy="260" r="78" fill="none" stroke="#1c2226" stroke-width="10"/>
+    <circle cx="232" cy="248" r="7" fill="#1c2226"/>
+    <circle cx="280" cy="248" r="7" fill="#1c2226"/>
+    <path d="M222 282 Q256 312 290 282" fill="none" stroke="#1c2226"
+          stroke-width="10" stroke-linecap="round"/>
+
+    <!-- Pink stroke across the page — a kid's mark -->
+    <path d="M134 384 Q200 354 268 380 T386 366"
+          fill="none" stroke="#ff2e88" stroke-width="22" stroke-linecap="round"/>
+
+    <!-- Defs -->
+    <defs>
+        <radialGradient id="bgGrad" cx="50%" cy="0%" r="80%">
+            <stop offset="0%"  stop-color="#00ffcc" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#06141a" stop-opacity="0"/>
+        </radialGradient>
+    </defs>
+</svg>

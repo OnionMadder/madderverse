@@ -1,0 +1,20 @@
+{
+    "name": "Tiny Canvas",
+    "short_name": "Tiny Canvas",
+    "description": "A polished kids coloring app from The Madderverse. Pick a page, color it in, save it.",
+    "start_url": "./",
+    "scope": "./",
+    "display": "standalone",
+    "orientation": "portrait",
+    "background_color": "#06141a",
+    "theme_color": "#ff2e88",
+    "categories": ["entertainment", "kids", "art"],
+    "icons": [
+        {
+            "src": "icons/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        }
+    ]
+}

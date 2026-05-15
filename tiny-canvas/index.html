@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Tiny Canvas</title>
+    <link rel="canonical" href="https://madderverse.org/tiny-canvas/" />
+    <meta property="og:url" content="https://madderverse.org/tiny-canvas/" />
+    <meta name="twitter:url" content="https://madderverse.org/tiny-canvas/" />
+    <meta name="title" content="Tiny Canvas — A Polished Coloring App for Kids. From The Madderverse." />
+    <meta name="description" content="Pick a page, color it in, save it. A clean, ad-free coloring app for kids on iOS, Android, and the web. From The Madderverse." />
+    <meta name="keywords" content="tiny canvas, coloring app, kids coloring, drawing app, indie kids app, ad-free, The Madderverse, Onion Madder, Mad Sundar LLC" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Tiny Canvas — A Polished Coloring App for Kids" />
+    <meta property="og:description" content="Pick a page, color it in, save it. From The Madderverse." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tiny Canvas — A Polished Coloring App for Kids" />
+    <meta name="twitter:description" content="Pick a page, color it in, save it." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#ff2e88" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Tiny Canvas" />
+    <meta name="application-name" content="Tiny Canvas" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body class="screen-title">
+
+<a class="madder-home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+
+<!-- ============================================================
+     SCREEN: TITLE
+     ============================================================ -->
+<main class="screen" id="screen-title">
+
+    <div class="title-stack">
+
+        <div class="marquee-tape" aria-hidden="true">
+            <span>&#9650; PICK A PAGE &nbsp;&middot;&nbsp; COLOR IT IN &nbsp;&middot;&nbsp; SAVE IT &nbsp;&middot;&nbsp; STAY IN THE LINES &nbsp;&middot;&nbsp; OR DON'T &nbsp;&middot;&nbsp; PICK A PAGE &nbsp;&middot;&nbsp; COLOR IT IN &nbsp;&middot;&nbsp; SAVE IT &nbsp;&middot;&nbsp;</span>
+        </div>
+
+        <h1 class="big-title" aria-label="Tiny Canvas">
+            <span class="line-1">Tiny</span>
+            <span class="line-2">Canvas</span>
+        </h1>
+
+        <p class="cursed-sub">
+            <span class="lcd-frame"><span class="lcd-pre">&gt;</span> A coloring app, basically_</span>
+        </p>
+
+        <div class="menu-buttons">
+            <button class="big-btn primary" id="btnStart" type="button">
+                <span class="btn-label">START COLORING</span>
+                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+            </button>
+            <button class="big-btn" id="btnGallery" type="button">
+                <span class="btn-label">GALLERY</span>
+                <span class="btn-glyph" aria-hidden="true">&#9636;</span>
+            </button>
+            <button class="big-btn install" id="btnInstall" type="button" hidden>
+                <span class="btn-label">INSTALL APP</span>
+                <span class="btn-glyph" aria-hidden="true">&darr;</span>
+            </button>
+        </div>
+
+    </div>
+
+</main>
+
+<!-- ============================================================
+     SCREEN: PICKER
+     Pick a template (line-art page) or BLANK.
+     ============================================================ -->
+<main class="screen" id="screen-picker" hidden>
+
+    <div class="screen-titlebar">
+        <button class="back-btn" id="pickerBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;PICK A PAGE&nbsp;&gt;</h2>
+        <span class="screen-status" id="pickerStatus">SELECT</span>
+    </div>
+
+    <div class="picker-grid" id="pickerGrid">
+        <!-- Template cards injected by buildPicker(). Each is a .pick-card
+             containing a 1:1 thumbnail of the line-art at low contrast. -->
+    </div>
+
+</main>
+
+<!-- ============================================================
+     SCREEN: DRAW
+     Canvas + tools (same drawer pattern as Pootery's DECORATE).
+     ============================================================ -->
+<main class="screen" id="screen-draw" hidden>
+
+    <div class="screen-titlebar">
+        <button class="back-btn" id="drawBack" type="button">&larr; PAGES</button>
+        <h2 class="screen-title" id="drawTitle">&lt;&nbsp;COLOR&nbsp;&gt;</h2>
+        <span class="screen-status" id="drawStatus">UNSAVED</span>
+    </div>
+
+    <div class="draw-stack">
+
+        <div class="canvas-wrap">
+            <!-- The canvas the kid draws ON. Logical size 800x800;
+                 CSS scales it. Renders below the line-art overlay. -->
+            <canvas id="drawCanvas" width="800" height="800"
+                    aria-label="Coloring canvas. Drag to draw."></canvas>
+
+            <!-- Line-art SVG sits ABOVE the canvas, pointer-events: none
+                 so taps go through to the canvas. innerHTML swapped in by
+                 loadTemplate(). -->
+            <div class="line-art" id="lineArt" aria-hidden="true"></div>
+
+            <!-- Floating UNDO + CLEAR in the canvas corner. -->
+            <button class="canvas-overlay-btn" id="undoBtn" type="button"
+                    title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+                <span aria-hidden="true">&#x21B6;</span>
+            </button>
+        </div>
+
+        <div class="draw-side-rail">
+
+            <button class="drawer-handle" type="button"
+                    aria-expanded="false" aria-label="Show tools">
+                <span class="drawer-pull" aria-hidden="true">&#9650;</span>
+                <span class="drawer-label">TOOLS</span>
+            </button>
+
+            <div class="draw-tools">
+
+                <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
+                    <button class="tool-btn" data-tool="brush"  type="button">BRUSH</button>
+                    <button class="tool-btn" data-tool="eraser" type="button">ERASE</button>
+                </div>
+
+                <div class="tool-row size-row">
+                    <span class="row-label">SIZE</span>
+                    <button class="size-btn" data-size="8"  type="button" aria-label="Thin">
+                        <span class="size-dot s-thin"></span>
+                    </button>
+                    <button class="size-btn" data-size="18" type="button" aria-label="Medium">
+                        <span class="size-dot s-med"></span>
+                    </button>
+                    <button class="size-btn" data-size="32" type="button" aria-label="Thick">
+                        <span class="size-dot s-thick"></span>
+                    </button>
+                </div>
+
+                <div class="tool-row palette-row">
+                    <span class="row-label">COLOR</span>
+                    <div class="palette color-palette" id="colorPalette" role="listbox" aria-label="Brush colors"></div>
+                </div>
+
+            </div>
+
+            <div class="draw-controls">
+                <button class="btn-control" id="drawClear" type="button">
+                    <span class="btn-label">CLEAR</span>
+                </button>
+                <button class="btn-control primary" id="drawSave" type="button">
+                    <span class="btn-label">SAVE</span>
+                    <span class="btn-glyph" aria-hidden="true">&#10003;</span>
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+
+</main>
+
+<!-- ============================================================
+     SCREEN: GALLERY
+     ============================================================ -->
+<main class="screen" id="screen-gallery" hidden>
+
+    <div class="screen-titlebar">
+        <button class="back-btn" id="galleryBack" type="button">&larr; TITLE</button>
+        <h2 class="screen-title">&lt;&nbsp;YOUR DRAWINGS&nbsp;&gt;</h2>
+        <span class="screen-status" id="galleryCount">0</span>
+    </div>
+
+    <div class="gallery-grid" id="galleryGrid"></div>
+
+    <div class="gallery-empty" id="galleryEmpty" hidden>
+        <div class="empty-glyph" aria-hidden="true">&#x2317;</div>
+        <h3 class="empty-title">NOTHING HERE YET</h3>
+        <p class="empty-sub">Pick a page. Color it. Come back.</p>
+        <button class="big-btn primary" id="galleryStartBtn" type="button">
+            <span class="btn-label">START COLORING</span>
+            <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+        </button>
+    </div>
+
+    <!-- Detail modal — opens when a thumbnail is tapped -->
+    <aside class="pic-detail" id="picDetail" hidden>
+        <div class="pic-detail-card">
+            <div class="detail-titlebar">
+                <span class="detail-pack" id="detailTemplate">BLANK</span>
+                <span class="detail-date" id="detailDate"></span>
+                <button class="specs-close" id="detailClose" type="button" aria-label="Close">&#10005;</button>
+            </div>
+            <div class="detail-canvas-wrap">
+                <img id="detailImg" alt="Drawing preview" />
+            </div>
+            <div class="detail-actions">
+                <button class="btn-control" id="detailDelete" type="button">
+                    <span class="btn-label">DELETE</span>
+                </button>
+                <button class="btn-control primary" id="detailExport" type="button">
+                    <span class="btn-label">EXPORT PNG</span>
+                    <span class="btn-glyph" aria-hidden="true">&darr;</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+</main>
+
+<footer class="site-footer-slim" aria-label="Site info">
+    <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <a href="../">The Madderverse</a>
+    <span class="sep" aria-hidden="true">&middot;</span>
+    <a href="../about.html">About</a>
+</footer>
+
+<script>
+    document.querySelectorAll('[data-year]').forEach(function (el) {
+        el.textContent = new Date().getFullYear();
+    });
+</script>
+<script src="templates.js"></script>
+<script src="game.js"></script>
+
+</body>
+</html>
