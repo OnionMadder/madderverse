@@ -1639,13 +1639,14 @@ body.moon-tilt main {
    can fire. They stay non-interactive in normal play. */
 body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
 
-/* ====== THE SPOOK ======
-   Ambient ghost that drifts across the stage on a timer. Positioned by
-   JS via transform: translate(); fixed to the viewport so its proximity
-   math (getBoundingClientRect centers) matches what the kid sees. Sits
-   above the stage + Munkis, below the tray/controls (z from SPOOK.Z_INDEX,
-   set inline). Not interactive in v1. */
-.spook {
+/* ====== FLYING CREEPS ======
+   Ambient creature that drifts across the stage on a timer (one at a
+   time, random variant per appearance). Positioned by JS via transform:
+   translate(); fixed to the viewport so its proximity math
+   (getBoundingClientRect centers) matches what the kid sees. Sits above
+   the stage + Munkis, below the tray/controls (z from CREEP.Z_INDEX, set
+   inline). Not interactive in v1. */
+.flying-creep {
     position: fixed;
     top: 0;
     left: 0;
@@ -1655,13 +1656,14 @@ body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
     opacity: 0;
     transition: opacity 0.6s ease-in;
 }
-.spook.spook-in { opacity: 0.9; }
-.spook[hidden] { display: none; }
+.flying-creep.flying-creep-in { opacity: 0.9; }
+.flying-creep[hidden] { display: none; }
 
-/* Real-sprite frame layer — JS swaps background-position per frame once
-   assets/sprites/spook.png + spook.json are dropped in. Until then the
-   .spook holds the inline placeholder SVG instead and this is unused. */
-.spook .spook-frame {
+/* Variant layer — JS locks background-position to ONE variant for the
+   whole appearance once assets/sprites/flying-creeps.{png,json} is
+   dropped in. Until then .flying-creep holds the inline placeholder SVG
+   instead and this rule is unused. */
+.flying-creep .flying-creep-frame {
     width: 100%;
     height: 100%;
     background-repeat: no-repeat;
@@ -1670,9 +1672,9 @@ body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
 }
 
 /* PLACEHOLDER tag riding the corner of the placeholder ghost so it's
-   obvious the final art hasn't landed yet. Removed automatically once
-   the real sprite sheet loads (placeholder markup isn't rendered then). */
-.spook .spook-ph {
+   obvious the final art hasn't landed yet. Gone automatically once the
+   real sheet loads (placeholder markup isn't rendered then). */
+.flying-creep .flying-creep-ph {
     position: absolute;
     left: 50%;
     bottom: -14px;
@@ -1687,27 +1689,28 @@ body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
     white-space: nowrap;
 }
 
-/* Munki flinch while the Spook is too close. Targets the inner .char-art
-   so it STACKS on top of the slot's other states (sulk, react-mode
-   expression cycling) instead of replacing them — the shake is a
-   transform on .char-art, the wide-eyed pop is a quick filter flash. */
-.stage-slot.spooked .char-art {
-    animation: spook-flinch 0.1s steps(2) infinite;
+/* Munki flinch while a Flying Creep is too close. Targets the inner
+   .char-art so it STACKS on top of the slot's other states (sulk,
+   react-mode expression cycling) instead of replacing them — the shake
+   is a transform on .char-art, the wide-eyed pop is a quick filter
+   flash on .char-head. */
+.stage-slot.creep-scared .char-art {
+    animation: creep-flinch 0.1s steps(2) infinite;
 }
-.stage-slot.spooked .char-head {
+.stage-slot.creep-scared .char-head {
     filter: brightness(1.35) saturate(1.2) contrast(1.15);
     transition: filter 0.12s ease-out;
 }
-.stage-slot:not(.spooked) .char-head {
+.stage-slot:not(.creep-scared) .char-head {
     transition: filter 0.2s ease-in;   /* fade the startled look back out */
 }
-@keyframes spook-flinch {
+@keyframes creep-flinch {
     0%   { transform: translateX(-3px) rotate(-1deg); }
     100% { transform: translateX( 3px) rotate( 1deg); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .spook { transition: opacity 0.6s ease-in; }
-    .stage-slot.spooked .char-art { animation: none; }
+    .flying-creep { transition: opacity 0.6s ease-in; }
+    .stage-slot.creep-scared .char-art { animation: none; }
     /* Keep the brightness flash — it's a non-motion "startled" cue. */
 }

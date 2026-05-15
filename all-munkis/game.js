@@ -17,14 +17,21 @@
     const MADBALLZ_ENABLED = false;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
-    // ---------- SPOOK CONFIG (all tunable, all in one place) ----------
-    // The Spook is an ambient threat: it drifts across the stage on a
-    // timer, scares nearby Munkis, and — if it scares enough of them —
+    // ---------- FLYING CREEP CONFIG (all tunable, all in one place) ----
+    // A Flying Creep is an ambient threat: ONE drifts across the stage on
+    // a timer, scares nearby Munkis, and — if it scares enough of them —
     // trips the same 12s slow-creep horror visual that an Ice/Moon drop
-    // does. The kid can't touch it (v1 is hands-off). Tweak the numbers
-    // here; nothing else in the Spook code hard-codes these.
-    const SPOOK = {
+    // does. The kid can't touch it (v1 is hands-off). Each appearance
+    // randomly picks one of VARIANT_COUNT visually-distinct creep designs
+    // from the sprite sheet (mechanically identical). Only one is ever on
+    // screen at a time. Tweak the numbers here; nothing else hard-codes.
+    const CREEP = {
         ENABLED:            true,
+        // How many distinct creep designs the sheet is expected to hold.
+        // The actual count comes from the loaded sheet's frame list at
+        // runtime; this is the design target + the "All Creeps
+        // Encountered" achievement goal when no sheet is present yet.
+        VARIANT_COUNT:      12,
         // Spawn timing — a fresh appearance is scheduled this many ms
         // after the previous one ends (uniform random in [MIN, MAX]).
         SPAWN_MIN_MS:       30000,
@@ -39,8 +46,8 @@
         SPEED_MAX_PXPS:     50,
         WAVE_AMP_PX:        46,      // sine-wave excursion amplitude
         WAVE_PERIOD_MS:     2600,    // sine-wave period
-        SIZE_PX:            128,     // rendered spook box (square)
-        // Proximity (CSS px, spook-center to Munki-center). Hysteresis:
+        SIZE_PX:            128,     // rendered creep box (square)
+        // Proximity (CSS px, creep-center to Munki-center). Hysteresis:
         // scares while CLOSE, only decays once clearly FAR — the gap
         // between the two stops fear flickering at the boundary.
         CLOSE_PX:           80,
@@ -84,8 +91,8 @@
     // Horror mode (body.react-mode-active) has TWO independent sources that
     // are OR'd together by syncHorrorMode():
     //   beatReacting    — Ice/Moon adjacency dwell (set by tickReactState)
-    //   fearHorrorActive — the Spook scared the Munkis enough (set by the
-    //                      Spook system). Either one alone lights the same
+    //   fearHorrorActive — a Flying Creep scared the Munkis enough (set by
+    //                      the Flying Creep system). Either alone lights the
     //                      12s slow-creep corner-sprite visual.
     let beatReacting = false;
     let fearHorrorActive = false;
@@ -120,8 +127,9 @@
         { id: 'band20',        name: '20 Bands',           points: 3 },
         { id: 'coldSnap',      name: 'Cold Snap',          points: 1 },
         { id: 'touchOutsider', name: 'Touch the Outsider', points: 3 },
-        // ----- Spook feature -----
-        { id: 'spookmaster',   name: 'Spookmaster',        points: 2 }
+        // ----- Flying Creeps feature -----
+        { id: 'creepWhisperer', name: 'Creep Whisperer',     points: 2 },
+        { id: 'allCreeps',      name: 'All Creeps Encountered', points: 3 }
     ];
     const ACHIEVEMENT_BY_ID = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
     // The first 5 ids — kept around so existing detector code that refers
@@ -1198,9 +1206,9 @@
     }
 
     // Single owner of body.react-mode-active + the sub-bass drone. Horror
-    // is on if EITHER the beat-driven Ice/Moon adjacency OR the Spook's
+    // is on if EITHER the beat-driven Ice/Moon adjacency OR the Flying
     // fear accumulation says so. Called from tickReactState (every beat)
-    // and from the Spook fear logic (on its threshold transitions), so it
+    // and from the Flying Creep fear logic (on threshold transitions) so it
     // engages promptly regardless of which source fires.
     function syncHorrorMode() {
         const on = beatReacting || fearHorrorActive;
@@ -2773,35 +2781,71 @@
         });
     }
 
-    // ---------- THE SPOOK ----------
-    // An ambient ghost that drifts across the stage on a timer. Munkis it
-    // gets close to flinch (CSS .spooked, compounds with the jealous-sulk)
-    // and accumulate `fear`. When the total fear across on-stage Munkis
-    // crosses SPOOK.HORROR_TRIGGER_SUM, horror mode trips via the shared
-    // syncHorrorMode() path (same 12s creep as an Ice/Moon drop) and the
-    // hidden Spookmaster achievement unlocks. Not interactive in v1.
+    // ---------- FLYING CREEPS ----------
+    // An ambient creature that drifts across the stage on a timer. ONE at a
+    // time. Each appearance randomly picks one of the sheet's visually
+    // distinct variants (target: CREEP.VARIANT_COUNT, currently 12) — they
+    // are mechanically identical, just different art. Munkis a Creep gets
+    // close to flinch (CSS .creep-scared, compounds with the jealous-sulk)
+    // and accumulate `fear`. When total fear across on-stage Munkis crosses
+    // CREEP.HORROR_TRIGGER_SUM, horror mode trips via the shared
+    // syncHorrorMode() path (same 12s creep-in as an Ice/Moon drop) and the
+    // hidden "Creep Whisperer" achievement unlocks. Seeing every variant at
+    // least once (across sessions) unlocks "All Creeps Encountered". Not
+    // interactive in v1.
     //
-    // Sprite: assets/sprites/spook.png + spook.json (TexturePacker-style
-    // frames, same shape as mb-heads.json). Until the real art lands the
-    // entity renders a clearly-marked PLACEHOLDER ghost SVG. See
-    // assets/sprites/SPOOK_README.md for the sheet spec.
-    const spookFear = new Map();   // slotIndex -> 0..100
-    let spookEl = null;            // the floating DOM element
-    let spookActive = false;       // currently drifting across?
-    let spookSheet = null;         // {src, frameW, frameH, frames:[...]} or null
-    let spookSpawnTimer = null;
-    let spookRAF = null;
-    let spookState = null;         // { x, y, vx, baseY, tStart, stayMs, dir }
-    let spookPaused = false;       // mirrors page-visibility (battery)
-    let spookLastTs = 0;
+    // Sprite: assets/sprites/flying-creeps.png + flying-creeps.json
+    // (TexturePacker hash, same shape as mb-heads.json — 12 frames = 12
+    // VARIANTS, not animation frames). Until the real art lands the entity
+    // renders a clearly-marked PLACEHOLDER ghost SVG and variant tracking
+    // is inert (you can't "encounter all creeps" with no sheet). See
+    // assets/sprites/FLYING_CREEPS_README.md for the full sheet spec.
+    const CREEPS_SEEN_KEY = 'all-munkis-creeps-seen-v1';
+    const creepFear = new Map();   // slotIndex -> 0..100
+    let creepEl = null;            // the floating DOM element
+    let creepActive = false;       // currently drifting across?
+    let creepSheet = null;         // {src, sheetW, sheetH, frames:[...]} or null
+    let creepSpawnTimer = null;
+    let creepRAF = null;
+    let creepState = null;         // { x, y, vx, baseY, tStart, stayMs, variant }
+    let creepPaused = false;       // mirrors page-visibility (battery)
+    let creepLastTs = 0;
+    const creepsSeen = new Set();  // variant indices seen across all sessions
 
     function rand(min, max) { return min + Math.random() * (max - min); }
 
+    function loadCreepsSeen() {
+        try {
+            const raw = localStorage.getItem(CREEPS_SEEN_KEY);
+            if (!raw) return;
+            const arr = JSON.parse(raw);
+            if (Array.isArray(arr)) arr.forEach(n => creepsSeen.add(n | 0));
+        } catch (_) { /* ignore */ }
+    }
+    function saveCreepsSeen() {
+        try {
+            localStorage.setItem(CREEPS_SEEN_KEY, JSON.stringify([...creepsSeen]));
+        } catch (_) { /* ignore */ }
+    }
+    // Record a freshly-spawned variant; grant "All Creeps Encountered" once
+    // every variant in the loaded sheet has been seen at least once. Only
+    // meaningful with a real sheet (the placeholder has no variants).
+    function markCreepSeen(variant) {
+        if (variant < 0) return;
+        if (creepsSeen.has(variant)) return;
+        creepsSeen.add(variant);
+        saveCreepsSeen();
+        const total = creepSheet ? creepSheet.frames.length : 0;
+        if (total > 0 && creepsSeen.size >= total) {
+            grantAchievement('allCreeps');
+        }
+    }
+
     // Try to load the real sprite sheet. Resolves to a sheet descriptor or
     // null (→ placeholder). Never rejects — a missing sheet is expected
-    // until the art is dropped in.
-    function loadSpookSheet() {
-        return fetch('assets/sprites/spook.json')
+    // until the art is dropped in. Each frame is a distinct VARIANT.
+    function loadCreepSheet() {
+        return fetch('assets/sprites/flying-creeps.json')
             .then(r => (r.ok ? r.json() : null))
             .then(json => {
                 if (!json || !json.frames) return null;
@@ -2814,10 +2858,9 @@
                 const meta = json.meta || {};
                 const size = meta.size || {};
                 return {
-                    src: 'assets/sprites/spook.png',
-                    fps: meta.fps || 8,
-                    // Natural sheet pixel size — needed to scale one frame
-                    // into the SIZE_PX box. Fall back to bounding the
+                    src: 'assets/sprites/flying-creeps.png',
+                    // Natural sheet pixel size — needed to scale one variant
+                    // frame into the SIZE_PX box. Fall back to bounding the
                     // frame rects if meta.size is absent.
                     sheetW: size.w || Math.max(...frames.map(f => f.x + f.w)),
                     sheetH: size.h || Math.max(...frames.map(f => f.y + f.h)),
@@ -2827,83 +2870,96 @@
             .catch(() => null);
     }
 
-    // Position the .spook-frame child onto frame index `fi` of the sheet.
-    function paintSpookFrame(child, fi) {
-        if (!spookSheet) return;
-        const f = spookSheet.frames[fi % spookSheet.frames.length];
+    // Paint the .flying-creep-frame child to show VARIANT `vi` (static for
+    // the whole appearance — frames are variants, not an animation cycle).
+    function paintCreepVariant(child, vi) {
+        if (!creepSheet) return;
+        const f = creepSheet.frames[vi % creepSheet.frames.length];
         if (!f) return;
-        // Scale so the frame's longest side fills SIZE_PX.
-        const scale = SPOOK.SIZE_PX / Math.max(f.w, f.h);
+        // Scale so the variant's longest side fills SIZE_PX.
+        const scale = CREEP.SIZE_PX / Math.max(f.w, f.h);
         child.style.backgroundSize =
-            `${spookSheet.sheetW * scale}px ${spookSheet.sheetH * scale}px`;
+            `${creepSheet.sheetW * scale}px ${creepSheet.sheetH * scale}px`;
         child.style.backgroundPosition =
             `${-f.x * scale}px ${-f.y * scale}px`;
         child.style.width  = `${f.w * scale}px`;
         child.style.height = `${f.h * scale}px`;
     }
 
-    function spookPlaceholderMarkup() {
+    function creepPlaceholderMarkup() {
         // Translucent drifting ghost + a tiny PLACEHOLDER tag so it's
-        // obvious this isn't the final art.
+        // obvious this isn't the final art. Replaced automatically the
+        // moment assets/sprites/flying-creeps.{png,json} is dropped in.
         return ''
             + '<svg viewBox="0 0 100 120" width="100%" height="100%" '
             + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
-            +   '<defs><radialGradient id="spk" cx="50%" cy="40%" r="60%">'
+            +   '<defs><radialGradient id="crp" cx="50%" cy="40%" r="60%">'
             +     '<stop offset="0%" stop-color="#eaf6ff" stop-opacity="0.92"/>'
             +     '<stop offset="100%" stop-color="#9fb6d6" stop-opacity="0.55"/>'
             +   '</radialGradient></defs>'
             +   '<path d="M50 6 C26 6 14 26 14 50 L14 104 '
             +     'Q22 96 30 104 Q38 112 46 104 Q54 96 62 104 '
             +     'Q70 112 78 104 L86 104 86 50 C86 26 74 6 50 6 Z" '
-            +     'fill="url(#spk)" stroke="#dfeaf7" stroke-width="2"/>'
+            +     'fill="url(#crp)" stroke="#dfeaf7" stroke-width="2"/>'
             +   '<circle cx="38" cy="48" r="6.5" fill="#1a2330"/>'
             +   '<circle cx="62" cy="48" r="6.5" fill="#1a2330"/>'
             +   '<path d="M40 70 Q50 80 60 70" fill="none" '
             +     'stroke="#1a2330" stroke-width="3" stroke-linecap="round"/>'
             + '</svg>'
-            + '<span class="spook-ph">PLACEHOLDER</span>';
+            + '<span class="flying-creep-ph">PLACEHOLDER</span>';
     }
 
-    function buildSpookEl() {
-        if (spookEl) return spookEl;
-        spookEl = document.createElement('div');
-        spookEl.className = 'spook';
-        spookEl.setAttribute('aria-hidden', 'true');
-        spookEl.style.width = SPOOK.SIZE_PX + 'px';
-        spookEl.style.height = SPOOK.SIZE_PX + 'px';
-        spookEl.style.zIndex = String(SPOOK.Z_INDEX);
-        if (spookSheet) {
-            // Real sheet: a child that we move the background of per frame.
+    function buildCreepEl() {
+        if (creepEl) return creepEl;
+        creepEl = document.createElement('div');
+        creepEl.className = 'flying-creep';
+        creepEl.setAttribute('aria-hidden', 'true');
+        creepEl.style.width = CREEP.SIZE_PX + 'px';
+        creepEl.style.height = CREEP.SIZE_PX + 'px';
+        creepEl.style.zIndex = String(CREEP.Z_INDEX);
+        if (creepSheet) {
+            // Real sheet: a child whose background we lock to one variant.
             const f = document.createElement('div');
-            f.className = 'spook-frame';
-            f.style.backgroundImage = `url('${spookSheet.src}')`;
-            spookEl.appendChild(f);
+            f.className = 'flying-creep-frame';
+            f.style.backgroundImage = `url('${creepSheet.src}')`;
+            creepEl.appendChild(f);
         } else {
-            spookEl.innerHTML = spookPlaceholderMarkup();
+            creepEl.innerHTML = creepPlaceholderMarkup();
         }
-        spookEl.hidden = true;
-        document.body.appendChild(spookEl);
-        return spookEl;
+        creepEl.hidden = true;
+        document.body.appendChild(creepEl);
+        return creepEl;
     }
 
-    function scheduleSpookSpawn(first) {
-        if (!SPOOK.ENABLED) return;
-        clearTimeout(spookSpawnTimer);
-        const lo = first ? SPOOK.FIRST_SPAWN_MIN_MS : SPOOK.SPAWN_MIN_MS;
-        const hi = first ? SPOOK.FIRST_SPAWN_MAX_MS : SPOOK.SPAWN_MAX_MS;
-        spookSpawnTimer = setTimeout(spawnSpook, rand(lo, hi));
+    function scheduleCreepSpawn(first) {
+        if (!CREEP.ENABLED) return;
+        clearTimeout(creepSpawnTimer);
+        const lo = first ? CREEP.FIRST_SPAWN_MIN_MS : CREEP.SPAWN_MIN_MS;
+        const hi = first ? CREEP.FIRST_SPAWN_MAX_MS : CREEP.SPAWN_MAX_MS;
+        creepSpawnTimer = setTimeout(spawnCreep, rand(lo, hi));
     }
 
-    function spawnSpook() {
-        if (!SPOOK.ENABLED || spookActive || spookPaused) {
-            scheduleSpookSpawn(false);
+    function spawnCreep() {
+        // Only ONE Flying Creep on screen at a time.
+        if (!CREEP.ENABLED || creepActive || creepPaused) {
+            scheduleCreepSpawn(false);
             return;
         }
-        buildSpookEl();
+        buildCreepEl();
+        // Pick a variant uniformly from the loaded sheet (−1 = placeholder,
+        // which has no variants and never counts toward "All Creeps").
+        const variant = creepSheet
+            ? Math.floor(Math.random() * creepSheet.frames.length)
+            : -1;
+        if (creepSheet) {
+            const child = creepEl.querySelector('.flying-creep-frame');
+            if (child) paintCreepVariant(child, variant);
+            markCreepSeen(variant);
+        }
         const vw = window.innerWidth, vh = window.innerHeight;
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
-        const speed = rand(SPOOK.SPEED_MIN_PXPS, SPOOK.SPEED_MAX_PXPS);
-        const size = SPOOK.SIZE_PX;
+        const speed = rand(CREEP.SPEED_MIN_PXPS, CREEP.SPEED_MAX_PXPS);
+        const size = CREEP.SIZE_PX;
         // Cross roughly the vertical middle band of the viewport so the
         // path overlaps where Munkis stand near the bottom-ish stage.
         const midY = vh * rand(0.32, 0.6);
@@ -2911,31 +2967,31 @@
         if (edge === 'left')  { x = -size;       y = midY; vx =  speed; }
         else if (edge === 'right') { x = vw;     y = midY; vx = -speed; }
         else { /* top */      x = vw * rand(0.2, 0.8); y = -size; vx = (Math.random() < 0.5 ? -1 : 1) * speed * 0.5; vy = speed; }
-        spookState = {
-            x, y, vx, vy, baseY: y, edge,
+        creepState = {
+            x, y, vx, vy, baseY: y, edge, variant,
             tStart: performance.now(),
-            stayMs: rand(SPOOK.STAY_MIN_MS, SPOOK.STAY_MAX_MS),
+            stayMs: rand(CREEP.STAY_MIN_MS, CREEP.STAY_MAX_MS),
             leaving: false
         };
-        spookActive = true;
-        spookEl.hidden = false;
-        spookEl.classList.add('spook-in');
-        spookLastTs = performance.now();
-        if (!spookRAF) spookRAF = requestAnimationFrame(spookTick);
+        creepActive = true;
+        creepEl.hidden = false;
+        creepEl.classList.add('flying-creep-in');
+        creepLastTs = performance.now();
+        if (!creepRAF) creepRAF = requestAnimationFrame(creepTick);
     }
 
-    function endSpook() {
-        spookActive = false;
-        spookState = null;
-        if (spookEl) {
-            spookEl.hidden = true;
-            spookEl.classList.remove('spook-in');
+    function endCreep() {
+        creepActive = false;
+        creepState = null;
+        if (creepEl) {
+            creepEl.hidden = true;
+            creepEl.classList.remove('flying-creep-in');
         }
         // Clear any lingering flinch.
-        document.querySelectorAll('.stage-slot.spooked')
-            .forEach(s => s.classList.remove('spooked'));
-        if (spookRAF) { cancelAnimationFrame(spookRAF); spookRAF = null; }
-        scheduleSpookSpawn(false);
+        document.querySelectorAll('.stage-slot.creep-scared')
+            .forEach(s => s.classList.remove('creep-scared'));
+        if (creepRAF) { cancelAnimationFrame(creepRAF); creepRAF = null; }
+        scheduleCreepSpawn(false);
     }
 
     function slotCenters() {
@@ -2950,63 +3006,56 @@
         return out;
     }
 
-    function spookTick(ts) {
-        if (!spookActive || !spookState) { spookRAF = null; return; }
-        if (spookPaused) { spookRAF = requestAnimationFrame(spookTick); spookLastTs = ts; return; }
-        const dt = Math.min(0.05, (ts - spookLastTs) / 1000) || 0;
-        spookLastTs = ts;
-        const st = spookState;
+    function creepTick(ts) {
+        if (!creepActive || !creepState) { creepRAF = null; return; }
+        if (creepPaused) { creepRAF = requestAnimationFrame(creepTick); creepLastTs = ts; return; }
+        const dt = Math.min(0.05, (ts - creepLastTs) / 1000) || 0;
+        creepLastTs = ts;
+        const st = creepState;
         const elapsed = ts - st.tStart;
 
         // Motion: constant drift + gentle sine bob around the entry axis.
         st.x += st.vx * dt;
         st.y += (st.vy || 0) * dt;
-        const wave = Math.sin((elapsed / SPOOK.WAVE_PERIOD_MS) * Math.PI * 2)
-                   * SPOOK.WAVE_AMP_PX;
+        const wave = Math.sin((elapsed / CREEP.WAVE_PERIOD_MS) * Math.PI * 2)
+                   * CREEP.WAVE_AMP_PX;
         const drawY = (st.edge === 'top' ? st.y : st.baseY + wave);
-        spookEl.style.transform = `translate(${st.x}px, ${drawY}px)`;
-
-        // Real-sheet frame animation (no-op while on the placeholder SVG).
-        if (spookSheet) {
-            const child = spookEl.querySelector('.spook-frame');
-            if (child) {
-                const fi = Math.floor(elapsed / 1000 * spookSheet.fps);
-                paintSpookFrame(child, fi);
-            }
-        }
+        creepEl.style.transform = `translate(${st.x}px, ${drawY}px)`;
+        // Variant art is painted once at spawn (static — frames are
+        // variants, not an animation cycle), so nothing to update here.
 
         // Proximity → flinch + fear, with CLOSE/FAR hysteresis.
-        const sr = spookEl.getBoundingClientRect();
+        const sr = creepEl.getBoundingClientRect();
         const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
         const live = new Set();
         slotCenters().forEach(({ i, el, cx, cy }) => {
             live.add(i);
             const d = Math.hypot(scx - cx, scy - cy);
-            const cur = spookFear.get(i) || 0;
-            if (d <= SPOOK.CLOSE_PX) {
-                el.classList.add('spooked');
-                spookFear.set(i, Math.min(SPOOK.FEAR_MAX,
-                    cur + SPOOK.FEAR_GAIN_PER_S * dt));
+            const cur = creepFear.get(i) || 0;
+            if (d <= CREEP.CLOSE_PX) {
+                el.classList.add('creep-scared');
+                creepFear.set(i, Math.min(CREEP.FEAR_MAX,
+                    cur + CREEP.FEAR_GAIN_PER_S * dt));
             } else {
-                if (d >= SPOOK.FAR_PX) el.classList.remove('spooked');
-                if (d >= SPOOK.FAR_PX) {
-                    spookFear.set(i, Math.max(0,
-                        cur - SPOOK.FEAR_DECAY_PER_S * dt));
+                if (d >= CREEP.FAR_PX) el.classList.remove('creep-scared');
+                if (d >= CREEP.FAR_PX) {
+                    creepFear.set(i, Math.max(0,
+                        cur - CREEP.FEAR_DECAY_PER_S * dt));
                 }
                 // Between CLOSE and FAR: hold (hysteresis, no flicker).
             }
         });
         // Drop fear for slots that emptied / changed under us.
-        [...spookFear.keys()].forEach(i => { if (!live.has(i)) spookFear.delete(i); });
+        [...creepFear.keys()].forEach(i => { if (!live.has(i)) creepFear.delete(i); });
 
         // Fear → horror, with its own trigger/release hysteresis.
         let sum = 0;
-        spookFear.forEach(v => { sum += v; });
-        if (!fearHorrorActive && sum >= SPOOK.HORROR_TRIGGER_SUM) {
+        creepFear.forEach(v => { sum += v; });
+        if (!fearHorrorActive && sum >= CREEP.HORROR_TRIGGER_SUM) {
             fearHorrorActive = true;
             syncHorrorMode();
-            grantAchievement('spookmaster');
-        } else if (fearHorrorActive && sum <= SPOOK.HORROR_RELEASE_SUM) {
+            grantAchievement('creepWhisperer');
+        } else if (fearHorrorActive && sum <= CREEP.HORROR_RELEASE_SUM) {
             fearHorrorActive = false;
             syncHorrorMode();
         }
@@ -3014,27 +3063,28 @@
         // Lifetime: after stayMs, head for the opposite edge; despawn once
         // fully off any viewport edge.
         if (!st.leaving && elapsed > st.stayMs) st.leaving = true;
-        const off = st.x < -SPOOK.SIZE_PX * 1.5 || st.x > window.innerWidth + SPOOK.SIZE_PX * 1.5
-                 || drawY > window.innerHeight + SPOOK.SIZE_PX * 1.5;
-        if (st.leaving && off) { endSpook(); return; }
+        const off = st.x < -CREEP.SIZE_PX * 1.5 || st.x > window.innerWidth + CREEP.SIZE_PX * 1.5
+                 || drawY > window.innerHeight + CREEP.SIZE_PX * 1.5;
+        if (st.leaving && off) { endCreep(); return; }
         // Safety cap: never linger more than 2× the intended stay.
-        if (elapsed > st.stayMs * 2 + 4000) { endSpook(); return; }
+        if (elapsed > st.stayMs * 2 + 4000) { endCreep(); return; }
 
-        spookRAF = requestAnimationFrame(spookTick);
+        creepRAF = requestAnimationFrame(creepTick);
     }
 
-    function startSpookSystem() {
-        if (!SPOOK.ENABLED) return;
-        loadSpookSheet().then(sheet => { spookSheet = sheet; });
-        scheduleSpookSpawn(true);
+    function startCreepSystem() {
+        if (!CREEP.ENABLED) return;
+        loadCreepsSeen();
+        loadCreepSheet().then(sheet => { creepSheet = sheet; });
+        scheduleCreepSpawn(true);
         // Pause drift + spawn while the app is backgrounded (battery; also
         // avoids a fear blast when the kid returns). Reuses the same
         // visibility signal watchVisibility() listens to.
         document.addEventListener('visibilitychange', () => {
-            spookPaused = document.hidden;
-            if (!document.hidden && spookActive && !spookRAF) {
-                spookLastTs = performance.now();
-                spookRAF = requestAnimationFrame(spookTick);
+            creepPaused = document.hidden;
+            if (!document.hidden && creepActive && !creepRAF) {
+                creepLastTs = performance.now();
+                creepRAF = requestAnimationFrame(creepTick);
             }
         });
     }
@@ -3057,7 +3107,7 @@
         attachCounterPanelToggle();
         watchTrayHeight();
         watchVisibility();
-        startSpookSystem();
+        startCreepSystem();
         updateTrayHint();
         // If Moon is unlocked, surface the altar chip so the kid can swap.
         renderMunkiAltar();
