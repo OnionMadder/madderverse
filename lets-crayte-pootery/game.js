@@ -8113,12 +8113,38 @@
         const ic = document.getElementById("achToastIcon");
         const txt = document.getElementById("achToastText");
         if (ic) ic.textContent = a.icon || "★";
-        if (txt) txt.textContent = "ACHIEVEMENT — " + a.title;
+        /* Title only -- the "ACHIEVEMENT UNLOCKED" eyebrow is
+           static in the markup. */
+        if (txt) txt.textContent = a.title;
         t.hidden = false;
+        /* clone+replace restarts the animation when a second
+           unlock fires before the first slides out. */
         const fresh = t.cloneNode(true);
         t.parentNode.replaceChild(fresh, t);
-        setTimeout(function () { fresh.hidden = true; }, 4500);
-        kilnDing();
+        setTimeout(function () { fresh.hidden = true; }, 4800);
+        playAchFanfare();
+    }
+
+    /* Three-note arpeggio in C major — bright, kid-friendly,
+       distinguishable from the trophy fanfare (which is longer
+       and heavier). ~0.6s total. */
+    function playAchFanfare() {
+        const ctx = typeof ensureAudio === "function" ? ensureAudio() : null;
+        if (!ctx) return;
+        const t0 = ctx.currentTime;
+        [523.25, 659.25, 783.99].forEach(function (freq, i) {
+            const osc = ctx.createOscillator();
+            const g   = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.value = freq;
+            const offset = i * 0.10;
+            g.gain.setValueAtTime(0, t0 + offset);
+            g.gain.linearRampToValueAtTime(0.14, t0 + offset + 0.015);
+            g.gain.exponentialRampToValueAtTime(0.001, t0 + offset + 0.32);
+            osc.connect(g).connect(ctx.destination);
+            osc.start(t0 + offset);
+            osc.stop(t0 + offset + 0.35);
+        });
     }
 
     /* ============================================================
