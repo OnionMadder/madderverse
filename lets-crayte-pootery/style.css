@@ -387,6 +387,113 @@ a:focus-visible {
     text-shadow: 0 0 6px rgba(0, 255, 204, 0.4);
 }
 
+/* Featured-pots strip — 2 random recent public pots beneath
+   the daily theme banner. Discovery without leaving title. */
+.featured-strip {
+    width: 100%;
+    max-width: 520px;
+    margin: 6px auto 0;
+    padding: 10px 12px 12px;
+    border: 1px dashed var(--teal-low);
+    border-radius: var(--radius-md);
+    background: rgba(0, 0, 0, 0.18);
+    animation: featured-fade-in 0.5s ease-out;
+}
+.featured-strip[hidden] { display: none; }
+
+@keyframes featured-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.featured-head {
+    margin: 0 0 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    line-height: 1;
+}
+.featured-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--ink-dim);
+}
+.featured-emph {
+    font-family: var(--font-title, var(--font-mono));
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    color: var(--teal);
+    text-shadow: 0 0 8px rgba(0, 255, 204, 0.45);
+}
+
+.featured-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.featured-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-sm);
+    background: var(--bg-deep);
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease,
+                box-shadow 0.12s ease;
+}
+.featured-card:hover,
+.featured-card:focus-visible {
+    transform: translateY(-2px);
+    border-color: var(--pink-bright);
+    box-shadow: 0 6px 20px rgba(255, 46, 136, 0.3);
+    outline: none;
+}
+
+.featured-thumb {
+    aspect-ratio: 400 / 600;
+    background: #06141a;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+.featured-thumb canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.featured-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    align-items: center;
+    text-align: center;
+    line-height: 1.2;
+}
+.featured-name {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--ink);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.featured-by {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--pink-bright);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 @keyframes daily-pulse {
     0%, 100% { box-shadow: 0 0 0 1px #000, 0 0 14px rgba(255, 46, 136, 0.30); }
     50%      { box-shadow: 0 0 0 1px #000, 0 0 22px rgba(255, 46, 136, 0.55); }

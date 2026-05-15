@@ -85,6 +85,19 @@
             <span class="dtb-cta">TAP TO POT &rarr;</span>
         </button>
 
+        <!-- Featured pots strip — 2 random recent public pots.
+             Discovery without leaving the title. Hidden until
+             the async fetch resolves so we don't reserve empty
+             space that pops in later. -->
+        <section class="featured-strip" id="featuredStrip" hidden
+                 aria-label="Featured pots from everyone">
+            <h3 class="featured-head">
+                <span class="featured-eyebrow">FRESH FROM</span>
+                <span class="featured-emph">EVERYONE</span>
+            </h3>
+            <div class="featured-row" id="featuredRow"></div>
+        </section>
+
         <div class="menu-buttons">
             <button class="big-btn primary" id="btnStart" type="button">
                 <span class="btn-label">START SHAPING</span>

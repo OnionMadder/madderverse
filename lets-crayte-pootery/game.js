@@ -1601,6 +1601,81 @@
 
         wireSpecsPanel();
         wireInstallButton();
+        loadFeaturedStrip();
+    }
+
+    /* Featured-pots strip on the title screen. Fetches up to 6
+       recent public pots, picks 2 at random, renders them as
+       clickable thumbs that open the pot-detail modal. Hidden if
+       the fetch returns nothing -- no empty space reservation.   */
+    function loadFeaturedStrip() {
+        const strip = document.getElementById("featuredStrip");
+        const row   = document.getElementById("featuredRow");
+        if (!strip || !row || !supabaseEnabled()) return;
+        if (typeof fetchPublicPots !== "function") return;
+
+        fetchPublicPots(6).then(function (rows) {
+            if (!rows || rows.length === 0) return;
+            /* Shuffle + take the first 2 so reloads feel fresh. */
+            const shuffled = rows.slice();
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const tmp = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = tmp;
+            }
+            const picks = shuffled.slice(0, 2);
+            row.innerHTML = "";
+            picks.forEach(function (raw) {
+                row.appendChild(buildFeaturedCard(raw));
+            });
+            strip.hidden = false;
+        }).catch(function () { /* silent */ });
+    }
+
+    function buildFeaturedCard(raw) {
+        const entry = normalizePublicRow(raw);
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "featured-card";
+
+        const thumb = document.createElement("div");
+        thumb.className = "featured-thumb";
+        const canvas = document.createElement("canvas");
+        canvas.width  = 200;
+        canvas.height = 300;
+        thumb.appendChild(canvas);
+        card.appendChild(thumb);
+
+        const meta = document.createElement("div");
+        meta.className = "featured-meta";
+        const name = document.createElement("span");
+        name.className = "featured-name";
+        name.textContent = entry.name || "UNNAMED";
+        meta.appendChild(name);
+
+        const profile = raw._profile;
+        const by = document.createElement("span");
+        by.className = "featured-by";
+        by.textContent = profile && profile.username
+            ? "@" + profile.username
+            : "by " + (raw.author || "anonymous");
+        meta.appendChild(by);
+
+        card.appendChild(meta);
+
+        card.addEventListener("click", function () {
+            /* Land on gallery -> EVERYONE (data-tab="public" --
+               the label is "EVERYONE" but the internal key is
+               "public") so the modal close drops into the public
+               grid rather than dead-ending on title. */
+            GALLERY.tab = "public";
+            showScreen("gallery");
+            setTimeout(function () { openDetail(entry); }, 200);
+        });
+
+        loadEntryPaint(entry).then(function () {
+            renderEntryIntoCanvas(canvas, entry);
+        });
+        return card;
     }
 
     /* Temporary "feature not built yet" feedback. Swaps the button
@@ -7797,9 +7872,10 @@
             const handle = params.get("profile");
 
             if (potId) {
-                /* Land on gallery → EVERYONE so closing the modal
-                   reveals the public grid (encourages browsing). */
-                GALLERY.tab = "everyone";
+                /* Land on gallery → EVERYONE (internal key "public",
+                   UI label "EVERYONE") so closing the modal reveals
+                   the public grid (encourages browsing). */
+                GALLERY.tab = "public";
                 showScreen("gallery");
                 fetchPublicPotById(potId).then(function (row) {
                     if (!row) {
