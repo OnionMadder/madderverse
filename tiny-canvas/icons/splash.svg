@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" role="img" aria-label="Tiny Canvas">
+    <!-- ============================================================
+         Tiny Canvas — splash screen master (2732×2732)
+         Square because the splash is center-cropped to whatever
+         device aspect (portrait/landscape, phone/tablet). Same
+         construction-paper-on-onioncore aesthetic as the icon, but
+         the smiley-sun page is bigger, the wordmark sits below in
+         Bungee teal, and we leave generous bleed margin around the
+         paper card so center-crop on tall phones still looks right.
+
+         Background-color in capacitor.config.json is #06141a so any
+         crop-fill area matches the icon's tile.
+         ============================================================ -->
+
+    <defs>
+        <radialGradient id="bgGrad" cx="50%" cy="40%" r="80%">
+            <stop offset="0%"  stop-color="#0e2c34"/>
+            <stop offset="55%" stop-color="#06141a"/>
+            <stop offset="100%" stop-color="#04101a"/>
+        </radialGradient>
+
+        <pattern id="scanlines" width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="8" fill="transparent"/>
+            <line x1="0" y1="0" x2="8" y2="0"
+                  stroke="rgba(255,255,255,0.02)" stroke-width="2"/>
+        </pattern>
+
+        <pattern id="paperGrain" width="14" height="14" patternUnits="userSpaceOnUse">
+            <rect width="14" height="14" fill="#fbfaf6"/>
+            <circle cx="3" cy="4" r="0.8" fill="#eee6d6" opacity="0.55"/>
+            <circle cx="10" cy="10" r="0.7" fill="#eee6d6" opacity="0.5"/>
+            <circle cx="8" cy="3" r="0.5" fill="#eee6d6" opacity="0.4"/>
+        </pattern>
+
+        <filter id="paperShadow" x="-15%" y="-15%" width="130%" height="130%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="32"/>
+            <feOffset dx="0" dy="32" result="blurred"/>
+            <feComponentTransfer><feFuncA type="linear" slope="0.65"/></feComponentTransfer>
+            <feMerge>
+                <feMergeNode/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- 1. Background tile -->
+    <rect width="2732" height="2732" fill="url(#bgGrad)"/>
+    <rect width="2732" height="2732" fill="url(#scanlines)"/>
+
+    <!-- 2. Construction-paper card, hand-torn edge.
+         Centered horizontally, biased slightly up so there's room
+         for the wordmark below. Card is ~1500px wide on a 2732
+         canvas — leaves comfortable margin on every device aspect. -->
+    <g filter="url(#paperShadow)">
+        <path
+            d="M620 660
+               C660 648, 770 654, 880 652
+               C1020 650, 1180 656, 1320 652
+               C1480 648, 1640 658, 1800 652
+               C1960 646, 2080 658, 2110 678
+               C2140 730, 2128 850, 2132 970
+               C2136 1100, 2120 1240, 2128 1360
+               C2136 1490, 2120 1640, 2128 1760
+               C2132 1880, 2120 2000, 2106 2040
+               C2050 2068, 1880 2080, 1730 2086
+               C1560 2092, 1380 2080, 1220 2086
+               C1060 2092, 880 2080, 720 2086
+               C580 2092, 440 2080, 388 2060
+               C354 1990, 360 1870, 354 1740
+               C346 1610, 360 1470, 354 1340
+               C346 1210, 360 1070, 354 940
+               C354 850, 350 770, 360 720
+               C376 690, 540 668, 620 660 Z"
+            fill="url(#paperGrain)"
+            stroke="#d9d2c0"
+            stroke-width="6"
+            stroke-linejoin="round"/>
+    </g>
+
+    <!-- 3. The smiley-sun "drawing" inside the paper card -->
+    <g transform="translate(1366 1280)">
+        <!-- Sun body -->
+        <circle cx="0" cy="0" r="380"
+                fill="none" stroke="#1c2226" stroke-width="30"
+                stroke-linecap="round"/>
+        <!-- Sun rays -->
+        <g stroke="#1c2226" stroke-width="30" stroke-linecap="round" fill="none">
+            <line x1="0"    y1="-470" x2="0"    y2="-560"/>
+            <line x1="0"    y1="470"  x2="0"    y2="560"/>
+            <line x1="-470" y1="0"    x2="-560" y2="0"/>
+            <line x1="470"  y1="0"    x2="560"  y2="0"/>
+            <line x1="-332" y1="-332" x2="-396" y2="-396"/>
+            <line x1="332"  y1="332"  x2="396"  y2="396"/>
+            <line x1="-332" y1="332"  x2="-396" y2="396"/>
+            <line x1="332"  y1="-332" x2="396"  y2="-396"/>
+        </g>
+        <!-- Eyes -->
+        <circle cx="-136" cy="-70" r="32" fill="#1c2226"/>
+        <circle cx="136"  cy="-70" r="32" fill="#1c2226"/>
+        <!-- Smile -->
+        <path d="M-170 116 Q0 260 170 116"
+              fill="none" stroke="#1c2226" stroke-width="30"
+              stroke-linecap="round"/>
+        <!-- Rosy cheeks -->
+        <circle cx="-248" cy="70" r="52" fill="#ff5cab" opacity="0.88"/>
+        <circle cx="248"  cy="70" r="52" fill="#ff5cab" opacity="0.88"/>
+    </g>
+
+    <!-- 4. Hot-pink crayon scribble — the kid's mark across the paper -->
+    <path d="M530 1820
+             Q780 1740 1030 1810
+             T1530 1820
+             Q1780 1830 2030 1770"
+          fill="none" stroke="#ff2e88" stroke-width="80"
+          stroke-linecap="round" opacity="0.92"/>
+
+    <!-- 5. Teal accent scribble -->
+    <path d="M1980 820 Q2090 920 2030 1040"
+          fill="none" stroke="#00ffcc" stroke-width="34"
+          stroke-linecap="round" opacity="0.85"/>
+
+    <!-- 6. Decorative stars in the dark margin (outside the paper) -->
+    <g fill="#00ffcc" opacity="0.95">
+        <g transform="translate(540 740)">
+            <path d="M0 -56 L15 -18 L56 -14 L23 12 L34 54 L0 30 L-34 54 L-23 12 L-56 -14 L-15 -18 Z"/>
+        </g>
+        <g transform="translate(2210 460) scale(0.7)">
+            <path d="M0 -56 L15 -18 L56 -14 L23 12 L34 54 L0 30 L-34 54 L-23 12 L-56 -14 L-15 -18 Z"/>
+        </g>
+        <g transform="translate(420 2120) scale(0.6)" fill="#ff5cab">
+            <path d="M0 -56 L15 -18 L56 -14 L23 12 L34 54 L0 30 L-34 54 L-23 12 L-56 -14 L-15 -18 Z"/>
+        </g>
+        <g transform="translate(2280 2240) scale(0.8)" fill="#ff5cab">
+            <path d="M0 -56 L15 -18 L56 -14 L23 12 L34 54 L0 30 L-34 54 L-23 12 L-56 -14 L-15 -18 Z"/>
+        </g>
+    </g>
+
+    <!-- 7. Wordmark: "tiny CANVAS" in Bungee.
+         "tiny" is small and pink-bright sitting above; "CANVAS" is
+         the load-bearing display word in canon teal with the
+         layered drop-shadow + highlight pattern from DESIGN.md.
+         Font is Bungee with a system-ui fallback so it survives the
+         splash being rasterized before Bungee loads. -->
+    <g text-anchor="middle">
+        <text x="1366" y="2310"
+              font-family="Bungee, Impact, sans-serif"
+              font-size="98"
+              fill="#ff5cab"
+              letter-spacing="3"
+              style="text-transform: uppercase">
+            tiny
+        </text>
+        <!-- CANVAS — main wordmark, layered shadow + highlight -->
+        <text x="1366" y="2480"
+              font-family="Bungee, Impact, sans-serif"
+              font-size="280"
+              letter-spacing="10"
+              fill="#00ffcc"
+              style="text-transform: uppercase;
+                     paint-order: stroke;
+                     stroke: #ffffff;
+                     stroke-width: 4">
+            <tspan dx="0" dy="0">CANVAS</tspan>
+        </text>
+        <!-- Drop-shadow CANVAS (rendered behind via order, but SVG
+             paints in source order so this needs to come BEFORE the
+             main text. Re-ordering: put this above the main text in
+             the source code.) -->
+    </g>
+
+    <!-- Studio mark at the very bottom -->
+    <text x="1366" y="2620"
+          text-anchor="middle"
+          font-family="VT323, 'Courier New', monospace"
+          font-size="48"
+          fill="#4dd9b8"
+          letter-spacing="3">
+        FROM THE MADDERVERSE
+    </text>
+
+</svg>

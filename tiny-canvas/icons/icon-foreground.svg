@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Tiny Canvas adaptive icon foreground">
+    <!-- ============================================================
+         Android adaptive-icon FOREGROUND layer.
+         Spec: 432×432 final viewport, but rendered at 108x108 dp
+         where the SAFE ZONE is the inner 66×66 dp circle (~61% of
+         the full canvas). We design at 1024×1024 and let the build
+         tool scale; the art inside must fit inside the centered
+         circle of diameter ~624px on this canvas so any mask shape
+         (circle / squircle / teardrop / pill) shows the same image.
+
+         Background of the adaptive icon = solid #06141a (set in
+         capacitor.config.json + Android resource). This file is
+         JUST the foreground art with NO opaque background — so the
+         system fill shows through behind it.
+         ============================================================ -->
+
+    <defs>
+        <pattern id="paperGrain" width="12" height="12" patternUnits="userSpaceOnUse">
+            <rect width="12" height="12" fill="#fbfaf6"/>
+            <circle cx="3" cy="4" r="0.6" fill="#eee6d6" opacity="0.5"/>
+            <circle cx="9" cy="9" r="0.5" fill="#eee6d6" opacity="0.45"/>
+        </pattern>
+    </defs>
+
+    <!-- Safe-zone circle = inner 61% radius. Everything below must
+         fit inside (200..824 box) for all Android mask shapes to
+         render the icon without clipping it. -->
+
+    <!-- Paper card — shrunk so it fits inside the safe zone. Hand-torn
+         edges retained, slightly more contained than the master icon. -->
+    <g transform="translate(0 -10)">
+        <path
+            d="M216 250
+               C238 244, 290 248, 340 246
+               C400 244, 470 250, 540 246
+               C610 242, 690 250, 750 244
+               C788 240, 806 244, 812 256
+               C820 290, 814 360, 816 430
+               C818 500, 810 580, 814 650
+               C816 720, 810 790, 800 808
+               C770 818, 700 822, 640 824
+               C560 826, 480 822, 400 824
+               C320 826, 240 822, 222 814
+               C212 778, 216 720, 212 650
+               C208 580, 216 500, 212 430
+               C208 360, 216 280, 212 256
+               C212 252, 214 250, 216 250 Z"
+            fill="url(#paperGrain)"
+            stroke="#d9d2c0"
+            stroke-width="3"
+            stroke-linejoin="round"/>
+    </g>
+
+    <!-- Smiley-sun drawing centered in the safe zone -->
+    <g transform="translate(512 480)">
+        <circle cx="0" cy="0" r="138"
+                fill="none" stroke="#1c2226" stroke-width="12"
+                stroke-linecap="round"/>
+        <g stroke="#1c2226" stroke-width="12" stroke-linecap="round" fill="none">
+            <line x1="0"    y1="-172" x2="0"    y2="-208"/>
+            <line x1="0"    y1="172"  x2="0"    y2="208"/>
+            <line x1="-172" y1="0"    x2="-208" y2="0"/>
+            <line x1="172"  y1="0"    x2="208"  y2="0"/>
+            <line x1="-122" y1="-122" x2="-148" y2="-148"/>
+            <line x1="122"  y1="122"  x2="148"  y2="148"/>
+            <line x1="-122" y1="122"  x2="-148" y2="148"/>
+            <line x1="122"  y1="-122" x2="148"  y2="-148"/>
+        </g>
+        <circle cx="-48" cy="-22" r="12" fill="#1c2226"/>
+        <circle cx="48"  cy="-22" r="12" fill="#1c2226"/>
+        <path d="M-58 40 Q0 92 58 40"
+              fill="none" stroke="#1c2226" stroke-width="12"
+              stroke-linecap="round"/>
+        <circle cx="-90" cy="22" r="18" fill="#ff5cab" opacity="0.85"/>
+        <circle cx="90"  cy="22" r="18" fill="#ff5cab" opacity="0.85"/>
+    </g>
+
+    <!-- Hot-pink crayon scribble inside the paper card -->
+    <path d="M260 740
+             Q360 700 460 720
+             T660 730
+             Q720 740 770 720"
+          fill="none" stroke="#ff2e88" stroke-width="28"
+          stroke-linecap="round" opacity="0.92"/>
+
+</svg>
