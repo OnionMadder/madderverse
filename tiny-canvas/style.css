@@ -470,9 +470,12 @@ a:focus-visible {
 
 .canvas-wrap {
     position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    /* inline-block so the wrap shrinks to the canvas's CSS-set width
+       (clamp(280, 88vw, 560)). Previously `width: fit-content` on a
+       flex container collapsed horizontally — the line-art overlay
+       (positioned with inset: 8px against this wrap) then rendered
+       at 0 width and the kid's coloring page didn't show. */
+    display: inline-block;
     padding: 8px;
     background: linear-gradient(180deg, #061319 0%, #03090d 100%);
     border: 2px solid var(--teal-low);
@@ -481,8 +484,8 @@ a:focus-visible {
         inset 0 0 24px rgba(0, 0, 0, 0.6),
         0 0 18px rgba(0, 255, 204, 0.08),
         0 0 0 1px rgba(0, 0, 0, 0.6);
-    width: fit-content;
     max-width: 100%;
+    line-height: 0; /* strip the inline-block baseline gap below the canvas */
 }
 
 #drawCanvas {
