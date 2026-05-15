@@ -50,17 +50,17 @@ the web. If a feature only makes sense in the app, gate it behind a
   gains a new Groodle-specific section covering the public gallery,
   IAP, and any data the app collects beyond the web version.
 
-## Open decisions (need calls before the chunks they block)
+## Open decisions
 
-| Question | Blocks chunk | Default if I have to pick |
-|---|---|---|
-| Play Console developer account | 0 | Need confirmation Kelly has one or will create |
+None — all strategic calls resolved. Play Console developer account
+confirmed; app ID, IAP catalog, and privacy hosting locked above.
 
 ## Chunk 0 — Logistics & prerequisites (no code yet)
 
 Out-of-band setup that's needed before any code:
 
-- Confirm Kelly has a Google Play Console account ($25 one-time).
+- Play Console developer account: confirmed (Kelly already paid the
+  $25 one-time fee and has access).
 - Install Android Studio (or just the command-line tools) — Capacitor
   needs the Android SDK to build. Java 17+ JDK.
 - Install Node.js 20+ and npm. Capacitor CLI is npm-distributed.
