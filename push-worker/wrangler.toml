@@ -38,8 +38,8 @@ workers_dev = false
 # returned id here. Also create --preview for `wrangler dev`.
 [[kv_namespaces]]
 binding = "SUBSCRIPTIONS"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_KV_NAMESPACE_PREVIEW_ID"
+id = "d0d6b4b6cfe345f38802dea52ef07af6"
+preview_id = "19984f2596a74f339f91c4adc3740da9"
 
 # Non-secret config. Bump CORS_ALLOW_ORIGINS if you host another
 # Madderverse property that needs to subscribe.
