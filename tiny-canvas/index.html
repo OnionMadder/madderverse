@@ -151,6 +151,34 @@
              innerHTML swapped in by loadTemplate(). -->
         <div class="line-art" id="lineArt" aria-hidden="true"></div>
 
+        <!-- ============================================================
+             IDLE SCRIBBLE
+             Pootery has a spinning blob of clay; Tiny Canvas's
+             equivalent kinetic centerpiece is a colored scribble that
+             draws itself in the middle of the page, three shapes
+             cycling, each in a canon color. Pure CSS animation.
+
+             Visible only when:
+               - Template is BLANK (templates already give the page
+                 visual interest; we don't double up)
+               - Canvas has no strokes yet (kid hasn't drawn anything)
+
+             Fades out the moment the kid taps to draw; comes back
+             after CLEAR.
+             ============================================================ -->
+        <svg class="idle-scribble" id="idleScribble" viewBox="0 0 400 300"
+             aria-hidden="true">
+            <!-- Heart -->
+            <path class="scribble" id="scribbleHeart"
+                  d="M 200 110 C 178 78, 130 78, 130 130 C 130 180, 200 220, 200 230 C 200 220, 270 180, 270 130 C 270 78, 222 78, 200 110 Z" />
+            <!-- Star -->
+            <path class="scribble" id="scribbleStar"
+                  d="M 200 70 L 218 124 L 275 124 L 230 158 L 248 215 L 200 182 L 152 215 L 170 158 L 125 124 L 182 124 Z" />
+            <!-- Squiggle -->
+            <path class="scribble" id="scribbleSquiggle"
+                  d="M 60 165 C 100 95, 160 230, 200 165 S 300 95, 340 165" />
+        </svg>
+
         <!-- Floating UNDO button — top-right of viewport. -->
         <button class="canvas-overlay-btn" id="undoBtn" type="button"
                 title="Undo (Ctrl+Z)" aria-label="Undo" disabled>

@@ -588,6 +588,71 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     z-index: 10;
 }
 
+/* Idle scribble — kinetic centerpiece. Three brand-color paths
+   each draw themselves over 12 seconds, offset by 4s so at any
+   moment one shape is "writing" and the others rest at zero
+   opacity. Reduced-motion users get a static heart instead. */
+.idle-scribble {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width:  min(56vmin, 460px);
+    height: auto;
+    pointer-events: none;
+    z-index: 8;          /* between canvas (5) and line-art (10) */
+    transition: opacity 0.4s ease-out;
+}
+
+.idle-scribble.is-hidden {
+    opacity: 0;
+}
+
+.idle-scribble .scribble {
+    fill: none;
+    stroke-width: 14;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 1300;
+    stroke-dashoffset: 1300;
+    opacity: 0;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.08));
+}
+
+#scribbleHeart {
+    stroke: #ff2e88;
+    animation: idle-scribble-cycle 12s ease-in-out infinite 0s;
+}
+#scribbleStar {
+    stroke: #ffd23f;
+    animation: idle-scribble-cycle 12s ease-in-out infinite 4s;
+}
+#scribbleSquiggle {
+    stroke: #00ffcc;
+    animation: idle-scribble-cycle 12s ease-in-out infinite 8s;
+}
+
+@keyframes idle-scribble-cycle {
+    0%   { stroke-dashoffset: 1300; opacity: 0; }
+    5%   { opacity: 1; }
+    25%  { stroke-dashoffset: 0;    opacity: 1; }   /* fully drawn */
+    33%  { opacity: 1; }                            /* hold */
+    40%  { opacity: 0; }                            /* fade out */
+    100% { stroke-dashoffset: 0;    opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    /* Show only the heart, statically drawn at full opacity. No
+       cycling motion. Still functions as a "draw here" hint. */
+    .idle-scribble .scribble {
+        animation: none !important;
+        stroke-dashoffset: 0;
+    }
+    #scribbleHeart    { opacity: 0.7; }
+    #scribbleStar     { display: none; }
+    #scribbleSquiggle { display: none; }
+}
+
 .line-art svg {
     width: 100%;
     height: 100%;

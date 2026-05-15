@@ -802,6 +802,25 @@
         }
     }
 
+    /* ---------- 4. IDLE SCRIBBLE ----------
+       Kinetic centerpiece visible on a fresh blank canvas — Tiny
+       Canvas's answer to Pootery's spinning clay. Fades out the
+       moment the kid makes a stroke; comes back after CLEAR.
+       Only renders on the BLANK template (other templates have
+       their own line-art as the centerpiece). */
+
+    function maybeShowIdleScribble() {
+        const el = $("#idleScribble");
+        if (!el) return;
+        const shouldShow = state.templateId === "blank" && !state.dirty;
+        el.classList.toggle("is-hidden", !shouldShow);
+    }
+
+    function hideIdleScribble() {
+        const el = $("#idleScribble");
+        if (el) el.classList.add("is-hidden");
+    }
+
     /* ---------- 4a. ONION MASCOT ----------
        Small SVG character anchored to the bottom-left of the viewport
        that reacts to drawing events. Eyes track the brush; mouth
@@ -883,6 +902,7 @@
         state.dirty = true;
         updateStatus();
         markInProgressDirty();
+        hideIdleScribble();
         setOnionState("drawing");
         if (state.currentTool === "eraser") sfxErase();
         else                                sfxTap();
@@ -965,6 +985,10 @@
            closed the app and came back), restore those strokes silently.
            No confirm dialog — Bala's gallery is sacred + no nag. */
         tryRestoreInProgress(tpl.id);
+        /* Reveal the idle scribble if we landed on a fresh BLANK
+           with no strokes; hide it otherwise (template is loaded
+           or restore brought back existing strokes). */
+        maybeShowIdleScribble();
     }
 
     /* ---------- 7. UI BUILDERS ---------- */
@@ -1783,6 +1807,9 @@
             clearCanvas();
             clearInProgress();
             triggerOnionReaction("cleared");
+            /* Bring the idle scribble back if we're on BLANK — the
+               kid just got back to a fresh page. */
+            maybeShowIdleScribble();
         });
         $("#drawSave").addEventListener("click", function () {
             saveDrawing();
