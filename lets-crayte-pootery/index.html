@@ -723,6 +723,15 @@
                 <input class="detail-name-input" id="detailName" type="text"
                        maxlength="40" placeholder="UNNAMED POT" />
             </label>
+
+            <!-- "X people remixed this" strip — only shows on
+                 public pots that have been remixed at least once. -->
+            <section class="detail-remixes" id="detailRemixes" hidden>
+                <h4 class="detail-remixes-head">
+                    <span id="detailRemixesCount">0</span> remixed this
+                </h4>
+                <div class="detail-remixes-row" id="detailRemixesRow"></div>
+            </section>
             <div class="detail-actions">
                 <button class="btn-control" id="detailDelete" type="button">
                     <span class="btn-label">DELETE</span>

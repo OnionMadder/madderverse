@@ -3523,6 +3523,73 @@ a:focus-visible {
     white-space: nowrap;
 }
 
+/* "X people remixed this" strip — appears on the pot-detail
+   modal for public pots that have at least one remix. Hidden
+   when count = 0 so the modal doesn't grow without payoff. */
+.detail-remixes {
+    margin: 6px 14px 10px;
+    padding: 8px 10px 10px;
+    border: 1px dashed var(--pink-bright);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 46, 136, 0.06);
+}
+.detail-remixes[hidden] { display: none; }
+
+.detail-remixes-head {
+    margin: 0 0 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--pink-bright);
+    text-shadow: 0 0 6px rgba(255, 46, 136, 0.35);
+}
+.detail-remixes-head #detailRemixesCount {
+    font-family: var(--font-title, var(--font-mono));
+    font-size: 14px;
+    color: #ffd4e6;
+    margin-right: 4px;
+}
+
+.detail-remixes-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.detail-remix-thumb {
+    flex: 0 0 auto;
+    width: 76px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 5px;
+    border: 1px solid var(--pink-bright);
+    border-radius: var(--radius-sm);
+    background: var(--bg-deep);
+    cursor: pointer;
+    transition: transform 0.12s ease;
+}
+.detail-remix-thumb:hover { transform: translateY(-2px); }
+
+.detail-remix-thumb canvas {
+    width: 66px;
+    height: 99px;
+    background: #06141a;
+    border-radius: 2px;
+}
+
+.detail-remix-thumb-by {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: #ffd4e6;
+    max-width: 66px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* Profile Trophy Shelf */
 .profile-trophy-shelf {
     width: 100%;

@@ -6866,6 +6866,7 @@
         refreshDetailTrophyBadge();
         refreshDetailRemixButton();
         refreshDetailRemixChip();
+        refreshDetailRemixesStrip();
         setPotURLParam(entry);
 
         panel.hidden = false;
@@ -6900,6 +6901,92 @@
         const panel = document.getElementById("potDetail");
         if (panel) panel.hidden = true;
         clearPotURLParam();
+    }
+
+    /* "X people remixed this" strip on the pot-detail modal.
+       Only renders on PUBLIC pots that have one or more remixes
+       in the database. Hidden + early-out for local entries and
+       for public pots with no remixes (or before SUPABASE_REMIX.sql
+       has run -- the fetch just returns empty in that case).   */
+    function refreshDetailRemixesStrip() {
+        const strip = document.getElementById("detailRemixes");
+        const row   = document.getElementById("detailRemixesRow");
+        const count = document.getElementById("detailRemixesCount");
+        if (!strip || !row) return;
+        /* Reset to hidden by default; the async fetch reveals
+           it if there are remixes. */
+        strip.hidden = true;
+        row.innerHTML = "";
+
+        const entry = GALLERY.detailEntry;
+        if (!entry || !entry._isPublic || !entry._publicId) return;
+        if (!supabaseEnabled()) return;
+
+        /* Capture the id at fetch-time so a late response on
+           a stale modal doesn't paint into a different pot. */
+        const myId = entry._publicId;
+
+        fetchRemixesOf(myId).then(function (rows) {
+            /* Bail if the modal moved on or this isn't the entry
+               we kicked off the fetch for. */
+            const current = GALLERY.detailEntry;
+            if (!current || current._publicId !== myId) return;
+            if (!rows || rows.length === 0) return;
+
+            if (count) count.textContent = rows.length;
+            /* Show up to 6 thumbs -- past that, the strip starts
+               feeling like a feed and we want it scoped. */
+            const picks = rows.slice(0, 6);
+            picks.forEach(function (raw) {
+                row.appendChild(buildRemixThumbCard(raw));
+            });
+            strip.hidden = false;
+        });
+    }
+
+    /* Fetch public_pots WHERE remixed_from = <id>. Tolerant of
+       the column not existing (returns empty if Supabase rejects
+       the filter). */
+    function fetchRemixesOf(publicId) {
+        if (!supabaseEnabled() || !publicId) return Promise.resolve([]);
+        const url = SUPABASE_URL +
+            "/rest/v1/public_pots?select=*&order=created_at.desc&limit=12" +
+            "&remixed_from=eq." + encodeURIComponent(publicId);
+        return fetch(url, { headers: supabaseHeaders() })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(enrichWithProfiles)
+            .catch(function () { return []; });
+    }
+
+    function buildRemixThumbCard(raw) {
+        const entry = normalizePublicRow(raw);
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "detail-remix-thumb";
+
+        const canvas = document.createElement("canvas");
+        canvas.width  = 100;
+        canvas.height = 150;
+        card.appendChild(canvas);
+
+        const by = document.createElement("span");
+        by.className = "detail-remix-thumb-by";
+        const profile = raw._profile;
+        by.textContent = profile && profile.username
+            ? "@" + profile.username
+            : raw.author || "anonymous";
+        card.appendChild(by);
+
+        card.addEventListener("click", function () {
+            /* Re-open detail on the clicked remix -- replaces
+               current detail in place. */
+            openDetail(entry);
+        });
+
+        loadEntryPaint(entry).then(function () {
+            renderEntryIntoCanvas(canvas, entry);
+        });
+        return card;
     }
 
     /* Show / hide REMIX LINEAGE chip on the detail modal. Visible
