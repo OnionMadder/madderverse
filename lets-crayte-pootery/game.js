@@ -381,6 +381,23 @@
                leave this NULL — same RLS behavior as before. */
             user_id:        currentUserId()
         };
+        /* Remix lineage -- only include the keys if the entry
+           actually carries them. PostgREST drops unknown columns
+           gracefully when the request body omits them, but
+           explicitly sending nulls when SUPABASE_REMIX.sql hasn't
+           run yet would 400. */
+        if (entry.remixedFrom) {
+            body.remixed_from        = entry.remixedFrom;
+            body.remixed_from_author = entry.remixedFromAuthor || "anonymous";
+        }
+        return submitWithRemixFallback(url, body);
+    }
+
+    /* POST + on a 400 that smells like "remixed_from column not
+       found" (Supabase project hasn't run SUPABASE_REMIX.sql
+       yet), retry without the lineage fields. Lets remix ship
+       client-side before the SQL migration is applied. */
+    function submitWithRemixFallback(url, body) {
         return fetch(url, {
             method: "POST",
             headers: supabaseHeaders({
@@ -390,10 +407,33 @@
             body: JSON.stringify(body)
         })
             .then(function (r) {
-                if (!r.ok) return null;
-                return r.json().then(function (rows) {
-                    return Array.isArray(rows) && rows[0] ? rows[0] : null;
-                });
+                if (r.ok) {
+                    return r.json().then(function (rows) {
+                        return Array.isArray(rows) && rows[0] ? rows[0] : null;
+                    });
+                }
+                /* 400 may be "remixed_from column missing" before
+                   the SQL migration runs. Strip + retry once. */
+                if ((r.status === 400 || r.status === 404) &&
+                    (body.remixed_from || body.remixed_from_author)) {
+                    const stripped = Object.assign({}, body);
+                    delete stripped.remixed_from;
+                    delete stripped.remixed_from_author;
+                    return fetch(url, {
+                        method: "POST",
+                        headers: supabaseHeaders({
+                            "Content-Type": "application/json",
+                            "Prefer":       "return=representation"
+                        }),
+                        body: JSON.stringify(stripped)
+                    }).then(function (r2) {
+                        if (!r2.ok) return null;
+                        return r2.json().then(function (rows) {
+                            return Array.isArray(rows) && rows[0] ? rows[0] : null;
+                        });
+                    });
+                }
+                return null;
             })
             .catch(function (e) {
                 console.warn("[CRAYte] public submit failed", e);
@@ -1494,6 +1534,10 @@
             startClock();
             startTitlePoot();
             wheelHumStop();   /* wheel only hums when it's spinning */
+            /* Clear any pending REMIX lineage -- if the user backs
+               out to title without firing, the next fresh pot they
+               make shouldn't carry stale credit. */
+            if (typeof REMIX !== "undefined") REMIX.pending = null;
         },
         onLeave: function () {
             stopClock();
@@ -4497,6 +4541,16 @@
                    trophies rather than thrown out. */
                 exploded: KILN.exploded === true
             };
+            /* If this firing was started via REMIX, bake the
+               lineage in. Cleared after consumption so a follow-up
+               un-remixed firing doesn't get the stale credit. */
+            if (REMIX.pending) {
+                entry.remixedFrom       = REMIX.pending.remixedFrom;
+                entry.remixedFromAuthor = REMIX.pending.remixedFromAuthor;
+                entry.remixedFromHandle = REMIX.pending.remixedFromHandle;
+                entry.remixedFromName   = REMIX.pending.remixedFromName;
+                REMIX.pending = null;
+            }
             existing.push(entry);
             /* Cap at 50 — keep newest. Brief calls for the "you have
                a lot of pots" celebration screen at ~50.            */
@@ -6781,6 +6835,7 @@
         refreshDetailUnshareButton();
         refreshDetailCopyLink();
         refreshDetailTrophyBadge();
+        refreshDetailRemixButton();
         setPotURLParam(entry);
 
         panel.hidden = false;
@@ -6816,6 +6871,66 @@
         if (panel) panel.hidden = true;
         clearPotURLParam();
     }
+
+    /* Show / hide REMIX. Visible on public pots only -- you don't
+       remix your own local pot (just open it from MINE and keep
+       shaping) and you can't remix a draft. */
+    function refreshDetailRemixButton() {
+        const btn = document.getElementById("detailRemix");
+        if (!btn) return;
+        const entry = GALLERY.detailEntry;
+        const canRemix = !!(entry && entry._isPublic && Array.isArray(entry.clay));
+        btn.hidden = !canRemix;
+    }
+
+    /* Clone the public pot's clay silhouette into a fresh shape
+       session. Paint is NOT copied -- that's the canvas the
+       remixer paints on. The new local entry carries lineage
+       (remixedFrom / remixedFromAuthor / remixedFromHandle) so
+       the credit chip can render later + the public copy of the
+       remix gets a remixed_from FK on share.                   */
+    function startRemix() {
+        const entry = GALLERY.detailEntry;
+        if (!entry || !entry._isPublic || !Array.isArray(entry.clay)) return;
+
+        /* Stash lineage on a session global so the kiln-save path
+           can write it onto the new local entry. Cleared in
+           autoSaveFiredPot after consumption. */
+        REMIX.pending = {
+            remixedFrom:       entry._publicId || null,
+            remixedFromAuthor: entry.author || "anonymous",
+            remixedFromHandle: (entry._profile && entry._profile.username) || null,
+            /* Snapshot the source pot's name + thumbnail so the
+               credit chip has data even if the FK target is gone
+               or offline. */
+            remixedFromName:   entry.name || ""
+        };
+
+        /* Drop into shape mode with the cloned clay. Deep-copy
+           so the user's morphs don't mutate the public entry
+           we still have a reference to. */
+        const cloned = entry.clay.map(function (c) {
+            return { y: c.y, radius: c.radius };
+        });
+
+        closeDetail();
+        showScreen("shape");
+        /* Wait a tick so SHAPE's onEnter resets clay first, then
+           overwrite with the clone. */
+        setTimeout(function () {
+            SHAPE.clay = cloned;
+            /* Match the source's clay type so the remix starts
+               with the same material vibe. */
+            if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
+            /* Re-render so the wheel reflects the new shape. */
+            if (typeof renderShape === "function") renderShape();
+        }, 50);
+    }
+
+    /* Session-scoped lineage box. The kiln-save path consumes it
+       and clears it; closing without firing also clears it on
+       returning to title. */
+    const REMIX = { pending: null };
 
     /* Show/hide the COPY LINK button. Only public pots have a
        shareable URL — locals and unsubmitted drafts don't.       */
@@ -6981,6 +7096,9 @@
 
         const copyLink = document.getElementById("detailCopyLink");
         if (copyLink) copyLink.addEventListener("click", copyDetailLink);
+
+        const remix = document.getElementById("detailRemix");
+        if (remix) remix.addEventListener("click", startRemix);
 
         wireDetailTrophyBadge();
 
