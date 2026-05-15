@@ -17,6 +17,47 @@
     const MADBALLZ_ENABLED = false;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
+    // ---------- SPOOK CONFIG (all tunable, all in one place) ----------
+    // The Spook is an ambient threat: it drifts across the stage on a
+    // timer, scares nearby Munkis, and — if it scares enough of them —
+    // trips the same 12s slow-creep horror visual that an Ice/Moon drop
+    // does. The kid can't touch it (v1 is hands-off). Tweak the numbers
+    // here; nothing else in the Spook code hard-codes these.
+    const SPOOK = {
+        ENABLED:            true,
+        // Spawn timing — a fresh appearance is scheduled this many ms
+        // after the previous one ends (uniform random in [MIN, MAX]).
+        SPAWN_MIN_MS:       30000,
+        SPAWN_MAX_MS:       90000,
+        FIRST_SPAWN_MIN_MS: 20000,   // grace before the very first one
+        FIRST_SPAWN_MAX_MS: 45000,
+        // How long it stays on screen before drifting off (ms).
+        STAY_MIN_MS:        10000,
+        STAY_MAX_MS:        15000,
+        // Drift motion.
+        SPEED_MIN_PXPS:     30,      // horizontal/vertical px per second
+        SPEED_MAX_PXPS:     50,
+        WAVE_AMP_PX:        46,      // sine-wave excursion amplitude
+        WAVE_PERIOD_MS:     2600,    // sine-wave period
+        SIZE_PX:            128,     // rendered spook box (square)
+        // Proximity (CSS px, spook-center to Munki-center). Hysteresis:
+        // scares while CLOSE, only decays once clearly FAR — the gap
+        // between the two stops fear flickering at the boundary.
+        CLOSE_PX:           80,
+        FAR_PX:             120,
+        // Fear per Munki: 0..100. Gains while close, decays while far.
+        FEAR_MAX:           100,
+        FEAR_GAIN_PER_S:    5,
+        FEAR_DECAY_PER_S:   1,
+        // Sum of all on-stage Munki fear that trips horror, and the
+        // lower level it must fall back below before horror releases
+        // (hysteresis so it doesn't strobe at the threshold).
+        HORROR_TRIGGER_SUM: 150,
+        HORROR_RELEASE_SUM: 60,
+        // z-index: above the stage BG + Munkis, below the tray/controls.
+        Z_INDEX:            42
+    };
+
     // ---------- AUDIO ENGINE ----------
     let audioCtx = null;
     let masterGain = null;
@@ -40,6 +81,14 @@
     let toneDrone = null;     // Oscillator — low rumble that swells during react mode
     let toneDroneGain = null; // Drone's gain envelope (ramps on react in/out)
     let anyWasReacting = false; // edge-detect react mode transitions for the drone
+    // Horror mode (body.react-mode-active) has TWO independent sources that
+    // are OR'd together by syncHorrorMode():
+    //   beatReacting    — Ice/Moon adjacency dwell (set by tickReactState)
+    //   fearHorrorActive — the Spook scared the Munkis enough (set by the
+    //                      Spook system). Either one alone lights the same
+    //                      12s slow-creep corner-sprite visual.
+    let beatReacting = false;
+    let fearHorrorActive = false;
 
     let horrorTriggers = 0;
     let activeBankIndex = 0;
@@ -70,7 +119,9 @@
         { id: 'band10',        name: '10 Bands',           points: 2 },
         { id: 'band20',        name: '20 Bands',           points: 3 },
         { id: 'coldSnap',      name: 'Cold Snap',          points: 1 },
-        { id: 'touchOutsider', name: 'Touch the Outsider', points: 3 }
+        { id: 'touchOutsider', name: 'Touch the Outsider', points: 3 },
+        // ----- Spook feature -----
+        { id: 'spookmaster',   name: 'Spookmaster',        points: 2 }
     ];
     const ACHIEVEMENT_BY_ID = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
     // The first 5 ids — kept around so existing detector code that refers
@@ -1141,13 +1192,23 @@
                 toRender.add(i); // expression cycles every beat
             }
         }
-        document.body.classList.toggle('react-mode-active', anyReacting);
-        // Drone fires the sub-bass swell on transitions in/out of react mode.
-        if (anyReacting !== anyWasReacting) {
-            setReactDrone(anyReacting);
-            anyWasReacting = anyReacting;
-        }
+        beatReacting = anyReacting;
+        syncHorrorMode();
         toRender.forEach(i => renderSlot(i));
+    }
+
+    // Single owner of body.react-mode-active + the sub-bass drone. Horror
+    // is on if EITHER the beat-driven Ice/Moon adjacency OR the Spook's
+    // fear accumulation says so. Called from tickReactState (every beat)
+    // and from the Spook fear logic (on its threshold transitions), so it
+    // engages promptly regardless of which source fires.
+    function syncHorrorMode() {
+        const on = beatReacting || fearHorrorActive;
+        document.body.classList.toggle('react-mode-active', on);
+        if (on !== anyWasReacting) {
+            setReactDrone(on);
+            anyWasReacting = on;
+        }
     }
 
     // headArt composes the head layers (shape circle → sprite → hair → cans).
@@ -2712,6 +2773,272 @@
         });
     }
 
+    // ---------- THE SPOOK ----------
+    // An ambient ghost that drifts across the stage on a timer. Munkis it
+    // gets close to flinch (CSS .spooked, compounds with the jealous-sulk)
+    // and accumulate `fear`. When the total fear across on-stage Munkis
+    // crosses SPOOK.HORROR_TRIGGER_SUM, horror mode trips via the shared
+    // syncHorrorMode() path (same 12s creep as an Ice/Moon drop) and the
+    // hidden Spookmaster achievement unlocks. Not interactive in v1.
+    //
+    // Sprite: assets/sprites/spook.png + spook.json (TexturePacker-style
+    // frames, same shape as mb-heads.json). Until the real art lands the
+    // entity renders a clearly-marked PLACEHOLDER ghost SVG. See
+    // assets/sprites/SPOOK_README.md for the sheet spec.
+    const spookFear = new Map();   // slotIndex -> 0..100
+    let spookEl = null;            // the floating DOM element
+    let spookActive = false;       // currently drifting across?
+    let spookSheet = null;         // {src, frameW, frameH, frames:[...]} or null
+    let spookSpawnTimer = null;
+    let spookRAF = null;
+    let spookState = null;         // { x, y, vx, baseY, tStart, stayMs, dir }
+    let spookPaused = false;       // mirrors page-visibility (battery)
+    let spookLastTs = 0;
+
+    function rand(min, max) { return min + Math.random() * (max - min); }
+
+    // Try to load the real sprite sheet. Resolves to a sheet descriptor or
+    // null (→ placeholder). Never rejects — a missing sheet is expected
+    // until the art is dropped in.
+    function loadSpookSheet() {
+        return fetch('assets/sprites/spook.json')
+            .then(r => (r.ok ? r.json() : null))
+            .then(json => {
+                if (!json || !json.frames) return null;
+                // Accept either an array or the TexturePacker object map
+                // (same shape as mb-heads.json: frames[name].frame{x,y,w,h}).
+                const frames = Array.isArray(json.frames)
+                    ? json.frames.map(f => f.frame || f)
+                    : Object.values(json.frames).map(f => f.frame || f);
+                if (!frames.length) return null;
+                const meta = json.meta || {};
+                const size = meta.size || {};
+                return {
+                    src: 'assets/sprites/spook.png',
+                    fps: meta.fps || 8,
+                    // Natural sheet pixel size — needed to scale one frame
+                    // into the SIZE_PX box. Fall back to bounding the
+                    // frame rects if meta.size is absent.
+                    sheetW: size.w || Math.max(...frames.map(f => f.x + f.w)),
+                    sheetH: size.h || Math.max(...frames.map(f => f.y + f.h)),
+                    frames
+                };
+            })
+            .catch(() => null);
+    }
+
+    // Position the .spook-frame child onto frame index `fi` of the sheet.
+    function paintSpookFrame(child, fi) {
+        if (!spookSheet) return;
+        const f = spookSheet.frames[fi % spookSheet.frames.length];
+        if (!f) return;
+        // Scale so the frame's longest side fills SIZE_PX.
+        const scale = SPOOK.SIZE_PX / Math.max(f.w, f.h);
+        child.style.backgroundSize =
+            `${spookSheet.sheetW * scale}px ${spookSheet.sheetH * scale}px`;
+        child.style.backgroundPosition =
+            `${-f.x * scale}px ${-f.y * scale}px`;
+        child.style.width  = `${f.w * scale}px`;
+        child.style.height = `${f.h * scale}px`;
+    }
+
+    function spookPlaceholderMarkup() {
+        // Translucent drifting ghost + a tiny PLACEHOLDER tag so it's
+        // obvious this isn't the final art.
+        return ''
+            + '<svg viewBox="0 0 100 120" width="100%" height="100%" '
+            + 'xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+            +   '<defs><radialGradient id="spk" cx="50%" cy="40%" r="60%">'
+            +     '<stop offset="0%" stop-color="#eaf6ff" stop-opacity="0.92"/>'
+            +     '<stop offset="100%" stop-color="#9fb6d6" stop-opacity="0.55"/>'
+            +   '</radialGradient></defs>'
+            +   '<path d="M50 6 C26 6 14 26 14 50 L14 104 '
+            +     'Q22 96 30 104 Q38 112 46 104 Q54 96 62 104 '
+            +     'Q70 112 78 104 L86 104 86 50 C86 26 74 6 50 6 Z" '
+            +     'fill="url(#spk)" stroke="#dfeaf7" stroke-width="2"/>'
+            +   '<circle cx="38" cy="48" r="6.5" fill="#1a2330"/>'
+            +   '<circle cx="62" cy="48" r="6.5" fill="#1a2330"/>'
+            +   '<path d="M40 70 Q50 80 60 70" fill="none" '
+            +     'stroke="#1a2330" stroke-width="3" stroke-linecap="round"/>'
+            + '</svg>'
+            + '<span class="spook-ph">PLACEHOLDER</span>';
+    }
+
+    function buildSpookEl() {
+        if (spookEl) return spookEl;
+        spookEl = document.createElement('div');
+        spookEl.className = 'spook';
+        spookEl.setAttribute('aria-hidden', 'true');
+        spookEl.style.width = SPOOK.SIZE_PX + 'px';
+        spookEl.style.height = SPOOK.SIZE_PX + 'px';
+        spookEl.style.zIndex = String(SPOOK.Z_INDEX);
+        if (spookSheet) {
+            // Real sheet: a child that we move the background of per frame.
+            const f = document.createElement('div');
+            f.className = 'spook-frame';
+            f.style.backgroundImage = `url('${spookSheet.src}')`;
+            spookEl.appendChild(f);
+        } else {
+            spookEl.innerHTML = spookPlaceholderMarkup();
+        }
+        spookEl.hidden = true;
+        document.body.appendChild(spookEl);
+        return spookEl;
+    }
+
+    function scheduleSpookSpawn(first) {
+        if (!SPOOK.ENABLED) return;
+        clearTimeout(spookSpawnTimer);
+        const lo = first ? SPOOK.FIRST_SPAWN_MIN_MS : SPOOK.SPAWN_MIN_MS;
+        const hi = first ? SPOOK.FIRST_SPAWN_MAX_MS : SPOOK.SPAWN_MAX_MS;
+        spookSpawnTimer = setTimeout(spawnSpook, rand(lo, hi));
+    }
+
+    function spawnSpook() {
+        if (!SPOOK.ENABLED || spookActive || spookPaused) {
+            scheduleSpookSpawn(false);
+            return;
+        }
+        buildSpookEl();
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
+        const speed = rand(SPOOK.SPEED_MIN_PXPS, SPOOK.SPEED_MAX_PXPS);
+        const size = SPOOK.SIZE_PX;
+        // Cross roughly the vertical middle band of the viewport so the
+        // path overlaps where Munkis stand near the bottom-ish stage.
+        const midY = vh * rand(0.32, 0.6);
+        let x, y, vx, vy = 0;
+        if (edge === 'left')  { x = -size;       y = midY; vx =  speed; }
+        else if (edge === 'right') { x = vw;     y = midY; vx = -speed; }
+        else { /* top */      x = vw * rand(0.2, 0.8); y = -size; vx = (Math.random() < 0.5 ? -1 : 1) * speed * 0.5; vy = speed; }
+        spookState = {
+            x, y, vx, vy, baseY: y, edge,
+            tStart: performance.now(),
+            stayMs: rand(SPOOK.STAY_MIN_MS, SPOOK.STAY_MAX_MS),
+            leaving: false
+        };
+        spookActive = true;
+        spookEl.hidden = false;
+        spookEl.classList.add('spook-in');
+        spookLastTs = performance.now();
+        if (!spookRAF) spookRAF = requestAnimationFrame(spookTick);
+    }
+
+    function endSpook() {
+        spookActive = false;
+        spookState = null;
+        if (spookEl) {
+            spookEl.hidden = true;
+            spookEl.classList.remove('spook-in');
+        }
+        // Clear any lingering flinch.
+        document.querySelectorAll('.stage-slot.spooked')
+            .forEach(s => s.classList.remove('spooked'));
+        if (spookRAF) { cancelAnimationFrame(spookRAF); spookRAF = null; }
+        scheduleSpookSpawn(false);
+    }
+
+    function slotCenters() {
+        // Center point of every ACTIVE (occupied) stage slot, keyed by idx.
+        const out = [];
+        document.querySelectorAll('.stage-slot.active').forEach(el => {
+            const i = parseInt(el.dataset.index, 10);
+            if (Number.isNaN(i)) return;
+            const r = el.getBoundingClientRect();
+            out.push({ i, el, cx: r.left + r.width / 2, cy: r.top + r.height / 2 });
+        });
+        return out;
+    }
+
+    function spookTick(ts) {
+        if (!spookActive || !spookState) { spookRAF = null; return; }
+        if (spookPaused) { spookRAF = requestAnimationFrame(spookTick); spookLastTs = ts; return; }
+        const dt = Math.min(0.05, (ts - spookLastTs) / 1000) || 0;
+        spookLastTs = ts;
+        const st = spookState;
+        const elapsed = ts - st.tStart;
+
+        // Motion: constant drift + gentle sine bob around the entry axis.
+        st.x += st.vx * dt;
+        st.y += (st.vy || 0) * dt;
+        const wave = Math.sin((elapsed / SPOOK.WAVE_PERIOD_MS) * Math.PI * 2)
+                   * SPOOK.WAVE_AMP_PX;
+        const drawY = (st.edge === 'top' ? st.y : st.baseY + wave);
+        spookEl.style.transform = `translate(${st.x}px, ${drawY}px)`;
+
+        // Real-sheet frame animation (no-op while on the placeholder SVG).
+        if (spookSheet) {
+            const child = spookEl.querySelector('.spook-frame');
+            if (child) {
+                const fi = Math.floor(elapsed / 1000 * spookSheet.fps);
+                paintSpookFrame(child, fi);
+            }
+        }
+
+        // Proximity → flinch + fear, with CLOSE/FAR hysteresis.
+        const sr = spookEl.getBoundingClientRect();
+        const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
+        const live = new Set();
+        slotCenters().forEach(({ i, el, cx, cy }) => {
+            live.add(i);
+            const d = Math.hypot(scx - cx, scy - cy);
+            const cur = spookFear.get(i) || 0;
+            if (d <= SPOOK.CLOSE_PX) {
+                el.classList.add('spooked');
+                spookFear.set(i, Math.min(SPOOK.FEAR_MAX,
+                    cur + SPOOK.FEAR_GAIN_PER_S * dt));
+            } else {
+                if (d >= SPOOK.FAR_PX) el.classList.remove('spooked');
+                if (d >= SPOOK.FAR_PX) {
+                    spookFear.set(i, Math.max(0,
+                        cur - SPOOK.FEAR_DECAY_PER_S * dt));
+                }
+                // Between CLOSE and FAR: hold (hysteresis, no flicker).
+            }
+        });
+        // Drop fear for slots that emptied / changed under us.
+        [...spookFear.keys()].forEach(i => { if (!live.has(i)) spookFear.delete(i); });
+
+        // Fear → horror, with its own trigger/release hysteresis.
+        let sum = 0;
+        spookFear.forEach(v => { sum += v; });
+        if (!fearHorrorActive && sum >= SPOOK.HORROR_TRIGGER_SUM) {
+            fearHorrorActive = true;
+            syncHorrorMode();
+            grantAchievement('spookmaster');
+        } else if (fearHorrorActive && sum <= SPOOK.HORROR_RELEASE_SUM) {
+            fearHorrorActive = false;
+            syncHorrorMode();
+        }
+
+        // Lifetime: after stayMs, head for the opposite edge; despawn once
+        // fully off any viewport edge.
+        if (!st.leaving && elapsed > st.stayMs) st.leaving = true;
+        const off = st.x < -SPOOK.SIZE_PX * 1.5 || st.x > window.innerWidth + SPOOK.SIZE_PX * 1.5
+                 || drawY > window.innerHeight + SPOOK.SIZE_PX * 1.5;
+        if (st.leaving && off) { endSpook(); return; }
+        // Safety cap: never linger more than 2× the intended stay.
+        if (elapsed > st.stayMs * 2 + 4000) { endSpook(); return; }
+
+        spookRAF = requestAnimationFrame(spookTick);
+    }
+
+    function startSpookSystem() {
+        if (!SPOOK.ENABLED) return;
+        loadSpookSheet().then(sheet => { spookSheet = sheet; });
+        scheduleSpookSpawn(true);
+        // Pause drift + spawn while the app is backgrounded (battery; also
+        // avoids a fear blast when the kid returns). Reuses the same
+        // visibility signal watchVisibility() listens to.
+        document.addEventListener('visibilitychange', () => {
+            spookPaused = document.hidden;
+            if (!document.hidden && spookActive && !spookRAF) {
+                spookLastTs = performance.now();
+                spookRAF = requestAnimationFrame(spookTick);
+            }
+        });
+    }
+
     // ---------- INIT ----------
     function init() {
         loadProgress();
@@ -2730,6 +3057,7 @@
         attachCounterPanelToggle();
         watchTrayHeight();
         watchVisibility();
+        startSpookSystem();
         updateTrayHint();
         // If Moon is unlocked, surface the altar chip so the kid can swap.
         renderMunkiAltar();

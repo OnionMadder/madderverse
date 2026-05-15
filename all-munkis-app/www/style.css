@@ -1632,3 +1632,76 @@ body.moon-tilt main {
 /* Horror-mode corner sprites become tap-targets so 'Touch the Outsider'
    can fire. They stay non-interactive in normal play. */
 body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
+
+/* ====== THE SPOOK ======
+   Ambient ghost that drifts across the stage on a timer. Positioned by
+   JS via transform: translate(); fixed to the viewport so its proximity
+   math (getBoundingClientRect centers) matches what the kid sees. Sits
+   above the stage + Munkis, below the tray/controls (z from SPOOK.Z_INDEX,
+   set inline). Not interactive in v1. */
+.spook {
+    position: fixed;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    will-change: transform;
+    filter: drop-shadow(0 6px 18px rgba(120, 160, 220, 0.35));
+    opacity: 0;
+    transition: opacity 0.6s ease-in;
+}
+.spook.spook-in { opacity: 0.9; }
+.spook[hidden] { display: none; }
+
+/* Real-sprite frame layer — JS swaps background-position per frame once
+   assets/sprites/spook.png + spook.json are dropped in. Until then the
+   .spook holds the inline placeholder SVG instead and this is unused. */
+.spook .spook-frame {
+    width: 100%;
+    height: 100%;
+    background-repeat: no-repeat;
+    background-size: auto 100%;
+    image-rendering: -webkit-optimize-contrast;
+}
+
+/* PLACEHOLDER tag riding the corner of the placeholder ghost so it's
+   obvious the final art hasn't landed yet. Removed automatically once
+   the real sprite sheet loads (placeholder markup isn't rendered then). */
+.spook .spook-ph {
+    position: absolute;
+    left: 50%;
+    bottom: -14px;
+    transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: #cfe0f5;
+    background: rgba(20, 28, 44, 0.7);
+    padding: 1px 6px;
+    border-radius: 6px;
+    white-space: nowrap;
+}
+
+/* Munki flinch while the Spook is too close. Targets the inner .char-art
+   so it STACKS on top of the slot's other states (sulk, react-mode
+   expression cycling) instead of replacing them — the shake is a
+   transform on .char-art, the wide-eyed pop is a quick filter flash. */
+.stage-slot.spooked .char-art {
+    animation: spook-flinch 0.1s steps(2) infinite;
+}
+.stage-slot.spooked .char-head {
+    filter: brightness(1.35) saturate(1.2) contrast(1.15);
+    transition: filter 0.12s ease-out;
+}
+.stage-slot:not(.spooked) .char-head {
+    transition: filter 0.2s ease-in;   /* fade the startled look back out */
+}
+@keyframes spook-flinch {
+    0%   { transform: translateX(-3px) rotate(-1deg); }
+    100% { transform: translateX( 3px) rotate( 1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .spook { transition: opacity 0.6s ease-in; }
+    .stage-slot.spooked .char-art { animation: none; }
+    /* Keep the brightness flash — it's a non-motion "startled" cue. */
+}
