@@ -623,6 +623,45 @@
         });
     }
 
+    /* The dock is icon-only. Desktop gets the label tooltip via CSS
+       :hover; touch devices have no hover, so a long-press (~450 ms
+       hold without moving) reveals the label by toggling .show-tip.
+       The tooltip clears on release / cancel / drag so it never
+       lingers. The button's click still fires on release — holding to
+       peek at the label and then triggering the action is acceptable
+       (and discoverable) for a kids' app; gating the click would add
+       a surprising "nothing happened" failure mode. */
+    function attachDockTooltips() {
+        const HOLD_MS = 450;
+        document.querySelectorAll('.dock-btn').forEach((btn) => {
+            let timer = null;
+            let startX = 0, startY = 0;
+            const clear = () => {
+                if (timer) { clearTimeout(timer); timer = null; }
+                btn.classList.remove('show-tip');
+            };
+            btn.addEventListener('pointerdown', (e) => {
+                startX = e.clientX;
+                startY = e.clientY;
+                timer = setTimeout(() => {
+                    btn.classList.add('show-tip');
+                }, HOLD_MS);
+            });
+            btn.addEventListener('pointermove', (e) => {
+                /* A real long-press holds still. If the finger travels
+                   more than a few px it's a scroll / drag — cancel so
+                   the tooltip doesn't pop mid-gesture. */
+                if (Math.abs(e.clientX - startX) > 8 ||
+                    Math.abs(e.clientY - startY) > 8) {
+                    clear();
+                }
+            });
+            btn.addEventListener('pointerup', clear);
+            btn.addEventListener('pointercancel', clear);
+            btn.addEventListener('pointerleave', clear);
+        });
+    }
+
     /* ============ ACHIEVEMENT BOARD ============ */
 
     let achievementsModalEl = null;
@@ -2996,6 +3035,7 @@
         if (galleryModalEl) attachModalDismissers(galleryModalEl);
         attachDrawerHostDismissers();
         attachDockButtons();
+        attachDockTooltips();
         renderCurrency();
         renderEquippedHat();
         renderEquippedAccessory();

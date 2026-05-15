@@ -1167,8 +1167,73 @@ body:not(.dancing) .dance-dock { display: none; }
     -webkit-tap-highlight-color: transparent;
     transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
-.dock-btn .dock-icon { font-size: 22px; line-height: 1; }
-.dock-btn .dock-label { line-height: 1; }
+/* Dock buttons are now icon-only. The icon is a custom inline SVG
+   sized here (not an emoji font-size). position: relative anchors
+   the .dock-label tooltip. */
+.dock-btn { position: relative; }
+.dock-btn .dock-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.dock-btn .dock-icon svg {
+    width: 26px;
+    height: 26px;
+    display: block;
+}
+
+/* .dock-label is no longer an inline caption — it floats above the
+   button as a tooltip pill. Hidden by default; revealed on hover
+   (desktop) or a long-press (.show-tip added by attachDockTooltips
+   in game.js for touch). aria-label on the button keeps screen
+   readers covered regardless. */
+.dock-btn .dock-label {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(26, 15, 51, 0.97);
+    border: 1.5px solid rgba(0, 255, 204, 0.55);
+    color: #fff;
+    font-family: var(--font-chunky);
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    line-height: 1;
+    padding: 5px 10px;
+    border-radius: 9px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 200;
+}
+.dock-btn .dock-label::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(0, 255, 204, 0.55);
+}
+@media (hover: hover) {
+    .dock-btn:hover .dock-label {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+.dock-btn.show-tip .dock-label {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+    .dock-btn .dock-label { transition: opacity 0.12s ease; }
+}
 .dock-btn:active { transform: scale(0.94); }
 .dock-btn.active {
     border-color: #ff6ec7;
@@ -1206,11 +1271,10 @@ body:not(.dancing) .dance-dock { display: none; }
     }
     .dock-btn {
         flex: 0 0 auto;
-        min-width: 84px;
-        min-height: 72px;
-        font-size: 11px;
+        min-width: 72px;
+        min-height: 64px;
     }
-    .dock-btn .dock-icon { font-size: 28px; }
+    .dock-btn .dock-icon svg { width: 30px; height: 30px; }
 }
 
 /* ---- Drawer host: fixed full-viewport overlay that's hidden when
