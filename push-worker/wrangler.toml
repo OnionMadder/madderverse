@@ -22,7 +22,7 @@ name = "madderverse-push"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
-workers_dev = false
+workers_dev = true
 
 # Custom domain is provisioned via the dashboard (Custom Domains),
 # not via routes, so DNS + TLS cert get handled automatically. If
