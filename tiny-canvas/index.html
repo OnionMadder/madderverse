@@ -151,21 +151,25 @@
             <div class="draw-tools">
 
                 <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
-                    <button class="tool-btn" data-tool="brush"  type="button">BRUSH</button>
-                    <button class="tool-btn" data-tool="eraser" type="button">ERASE</button>
+                    <button class="tool-btn" data-tool="pen"     type="button">PEN</button>
+                    <button class="tool-btn" data-tool="marker"  type="button">MARKER</button>
+                    <button class="tool-btn" data-tool="crayon"  type="button">CRAYON</button>
+                    <button class="tool-btn" data-tool="pencil"  type="button">PENCIL</button>
+                    <button class="tool-btn" data-tool="paint"   type="button">PAINT</button>
+                    <button class="tool-btn" data-tool="glitter" type="button">GLITTER</button>
+                    <button class="tool-btn tool-eraser" data-tool="eraser" type="button">ERASE</button>
                 </div>
 
                 <div class="tool-row size-row">
                     <span class="row-label">SIZE</span>
-                    <button class="size-btn" data-size="8"  type="button" aria-label="Thin">
-                        <span class="size-dot s-thin"></span>
-                    </button>
-                    <button class="size-btn" data-size="18" type="button" aria-label="Medium">
-                        <span class="size-dot s-med"></span>
-                    </button>
-                    <button class="size-btn" data-size="32" type="button" aria-label="Thick">
-                        <span class="size-dot s-thick"></span>
-                    </button>
+                    <!-- Size buttons injected by rebuildSizeButtons() each
+                         time the tool changes (brush: 5 sizes, eraser: 3). -->
+                    <div class="size-host" id="sizeRow"></div>
+                </div>
+
+                <div class="tool-row palette-tabs-row" role="tablist" aria-label="Color group">
+                    <!-- Group tabs injected by buildPaletteTabs(). -->
+                    <div class="palette-tabs-host" id="paletteTabs"></div>
                 </div>
 
                 <div class="tool-row palette-row">

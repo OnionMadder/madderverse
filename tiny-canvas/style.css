@@ -609,14 +609,26 @@ a:focus-visible {
     text-shadow: 0 0 4px rgba(0, 255, 204, 0.3);
 }
 
-.tool-modes { gap: 6px; }
+/* Tool row: 7 buttons (6 brushes + eraser). Wraps to 2-3 rows on
+   narrow phones, single row on tablet+. The grid keeps button widths
+   consistent regardless of label length. */
+.tool-modes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+}
+
+@media (min-width: 720px) {
+    .tool-modes {
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+}
 
 .tool-btn {
-    flex: 1;
-    padding: 12px 6px;
+    padding: 12px 4px;
     font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 1.6px;
+    font-size: 10px;
+    letter-spacing: 1.2px;
     background: var(--bg-panel);
     color: var(--ink);
     border: 1px solid var(--teal-low);
@@ -627,6 +639,10 @@ a:focus-visible {
                 box-shadow 0.12s ease,
                 transform 0.06s ease;
     text-shadow: 1px 1px 0 #000;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tool-btn:hover,
@@ -647,6 +663,35 @@ a:focus-visible {
         0 0 12px rgba(255, 46, 136, 0.5);
 }
 
+/* Eraser is visually distinct from the 6 brushes — teal outline so
+   "destructive" reads at a glance. Active state still goes pink. */
+.tool-btn.tool-eraser {
+    border-color: var(--teal);
+    background: linear-gradient(180deg, #0d2a32 0%, #07181e 100%);
+    color: var(--teal);
+}
+.tool-btn.tool-eraser:hover,
+.tool-btn.tool-eraser:focus-visible {
+    border-color: var(--pink);
+    color: var(--pink-bright);
+    background: linear-gradient(180deg, #14404a 0%, #0a2030 100%);
+}
+.tool-btn.tool-eraser.active {
+    background: linear-gradient(180deg, #ff3d96 0%, #b81866 100%);
+    color: #fff;
+    border-color: var(--pink-bright);
+}
+
+/* Dynamic size-row host — JS injects 3 or 5 buttons depending on
+   the active tool. Flex so they line up evenly. */
+.size-host {
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
 .size-btn {
     width: 40px;
     height: 40px;
@@ -656,6 +701,7 @@ a:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 auto;
     transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.06s ease;
 }
 
@@ -674,15 +720,70 @@ a:focus-visible {
         0 0 10px rgba(255, 46, 136, 0.5);
 }
 
+/* Size dots are sized inline by JS based on the brush size value so
+   the visual scale matches the numeric scale. */
 .size-dot {
     display: block;
     background: var(--ink);
     border-radius: 50%;
 }
 
-.size-dot.s-thin  { width: 7px;  height: 7px; }
-.size-dot.s-med   { width: 16px; height: 16px; }
-.size-dot.s-thick { width: 26px; height: 26px; }
+/* Palette tabs — 5 group switchers (RAINBOW / PASTELS / NEONS / EARTH
+   / METALLIC). Matches DESIGN.md §6.3 .pack-tab pattern. */
+.palette-tabs-row {
+    padding-bottom: 0;
+    margin-bottom: -2px;
+}
+
+.palette-tabs-host {
+    flex: 1;
+    display: flex;
+    gap: 4px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed var(--teal-low);
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+}
+.palette-tabs-host::-webkit-scrollbar { display: none; }
+
+.palette-tab {
+    flex: 1 0 auto;
+    padding: 6px 8px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.3px;
+    background: var(--bg-deep);
+    color: var(--teal-dim);
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-sm);
+    transition: background 0.12s ease,
+                color 0.12s ease,
+                border-color 0.12s ease,
+                box-shadow 0.12s ease,
+                transform 0.06s ease;
+    text-shadow: 1px 1px 0 #000;
+    white-space: nowrap;
+}
+
+.palette-tab:hover,
+.palette-tab:focus-visible {
+    color: var(--teal);
+    border-color: var(--teal);
+    background: rgba(0, 255, 204, 0.06);
+    outline: none;
+}
+
+.palette-tab:active { transform: translateY(1px); }
+
+.palette-tab.active {
+    background: linear-gradient(180deg, #ff3d96 0%, #b81866 100%);
+    color: #fff;
+    border-color: var(--pink-bright);
+    box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 0.20),
+        0 0 12px rgba(255, 46, 136, 0.55);
+}
 
 .palette-row { align-items: flex-start; }
 .palette-row .row-label { padding-top: 8px; }
@@ -1148,9 +1249,11 @@ a:focus-visible {
     .canvas-wrap { padding: 5px; border-width: 2px; }
     .draw-tools { padding: 10px 8px; gap: 8px; }
     .row-label { font-size: 9px; min-width: 44px; }
-    .tool-btn { font-size: 10px; padding: 10px 4px; letter-spacing: 1.2px; }
+    .tool-btn { font-size: 9px; padding: 9px 3px; letter-spacing: 1px; }
+    .tool-modes { gap: 4px; }
     .size-btn { width: 36px; height: 36px; }
-    .size-dot.s-thick { width: 22px; height: 22px; }
+    .size-host { gap: 6px; }
+    .palette-tab { font-size: 8px; padding: 5px 6px; letter-spacing: 1px; }
     .swatch { width: 30px; height: 30px; }
 }
 
