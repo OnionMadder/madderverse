@@ -6300,15 +6300,39 @@
             voteBtn.className = "battle-vote-btn";
             const alreadyVoted = myVotes.has(raw.id);
             if (alreadyVoted) voteBtn.classList.add("voted");
-            voteBtn.textContent = alreadyVoted ? "VOTED" : "VOTE";
+            /* Heart glyph -- empty pre-vote, filled post-vote.
+               Reads at a glance for a 5yo without needing literacy. */
+            voteBtn.innerHTML = alreadyVoted
+                ? "<span class='vote-heart' aria-hidden='true'>&#10084;</span>" +
+                  "<span class='vote-label'>VOTED</span>"
+                : "<span class='vote-heart' aria-hidden='true'>&#9825;</span>" +
+                  "<span class='vote-label'>VOTE</span>";
+            voteBtn.setAttribute("aria-label",
+                alreadyVoted ? "You voted for this pot" : "Vote for this pot");
             voteBtn.disabled = expired || alreadyVoted;
             voteBtn.addEventListener("click", function (e) {
                 e.stopPropagation();
-                handleVoteClick(raw.id, voteBtn, count);
+                handleVoteClick(raw.id, voteBtn, count, card);
             });
             voteRow.appendChild(voteBtn);
 
             card.appendChild(voteRow);
+
+            /* Whole-card tap also fires a vote (when not already
+               voted + not expired). Kid-accessible -- they can
+               just tap the pot they like. The vote button stays
+               for adult muscle-memory + screen readers.        */
+            if (!alreadyVoted && !expired) {
+                card.classList.add("is-votable");
+                card.addEventListener("click", function (e) {
+                    /* If the tap originated on the author link
+                       (clickable byline) or the vote button itself,
+                       let those handlers run instead. */
+                    if (e.target.closest(".pot-author-link")) return;
+                    if (e.target.closest(".battle-vote-btn")) return;
+                    handleVoteClick(raw.id, voteBtn, count, card);
+                });
+            }
 
             loadEntryPaint(entry).then(function () {
                 renderEntryIntoCanvas(canvas, entry);
@@ -6360,22 +6384,71 @@
         }
     }
 
-    function handleVoteClick(entryId, btn, countEl) {
+    function handleVoteClick(entryId, btn, countEl, card) {
+        if (btn.disabled) return;
         btn.disabled = true;
-        btn.textContent = "...";
+        const heart = btn.querySelector(".vote-heart");
+        const label = btn.querySelector(".vote-label");
+        if (label) label.textContent = "...";
         voteForEntry(entryId).then(function (res) {
             if (res.ok || res.duplicate) {
                 rememberMyVote(entryId);
                 btn.classList.add("voted");
-                btn.textContent = "VOTED";
+                if (heart)  heart.innerHTML = "&#10084;";   /* filled heart */
+                if (label)  label.textContent = "VOTED";
+                btn.setAttribute("aria-label", "You voted for this pot");
+                if (card) card.classList.remove("is-votable");
                 if (res.ok && countEl) {
+                    /* Increment + pop animation. */
                     countEl.textContent =
                         (parseInt(countEl.textContent, 10) + 1);
+                    countEl.classList.remove("is-popped");
+                    /* Force reflow so the class re-add restarts the anim. */
+                    void countEl.offsetWidth;
+                    countEl.classList.add("is-popped");
+                    /* +1 confetti float on the card. */
+                    if (card) spawnVoteFloat(card);
                 }
+                playVoteChime();
             } else {
                 btn.disabled = false;
-                btn.textContent = "RETRY";
+                if (heart) heart.innerHTML = "&#9825;";
+                if (label) label.textContent = "RETRY";
             }
+        });
+    }
+
+    /* Drift a small "+1 ♥" element up from the bottom of the
+       battle entry card. Pure DOM + CSS animation; self-cleans. */
+    function spawnVoteFloat(card) {
+        if (!card) return;
+        const f = document.createElement("span");
+        f.className = "vote-float";
+        f.innerHTML = "+1&nbsp;&#10084;";
+        card.appendChild(f);
+        setTimeout(function () {
+            if (f.parentNode) f.parentNode.removeChild(f);
+        }, 1100);
+    }
+
+    /* Soft synthesized chime on vote -- short major-third blip
+       so it feels rewarding without being startling. */
+    function playVoteChime() {
+        const ctx = typeof ensureAudio === "function" ? ensureAudio() : null;
+        if (!ctx) return;
+        const t0 = ctx.currentTime;
+        [659.25, 783.99].forEach(function (freq, i) {
+            const osc = ctx.createOscillator();
+            const g   = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.value = freq;
+            const offset = i * 0.06;
+            g.gain.setValueAtTime(0, t0 + offset);
+            g.gain.linearRampToValueAtTime(0.10, t0 + offset + 0.015);
+            g.gain.exponentialRampToValueAtTime(0.001, t0 + offset + 0.22);
+            osc.connect(g).connect(ctx.destination);
+            osc.start(t0 + offset);
+            osc.stop(t0 + offset + 0.25);
         });
     }
 
