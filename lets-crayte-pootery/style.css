@@ -786,7 +786,13 @@ a:focus-visible {
     outline: none;
 }
 
-.screen-title {
+/* Scoped to the screen-titlebar h2 -- without this scope, the
+   selector also matched <body class="screen-title">, which
+   applied overflow:hidden + white-space:nowrap to the whole
+   page on the title screen. Long-standing class-name collision
+   that only surfaced once the title got tall enough to need
+   scrolling (featured strip + PACK SHOP button). */
+.screen-titlebar .screen-title {
     margin: 0;
     font-family: var(--font-title);
     color: var(--pink-bright);
