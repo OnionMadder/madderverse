@@ -199,6 +199,43 @@ Treat `flying-creeps.{png,json}` as a deliberately divergent asset
 (like the Capacitor native bridge in the app's `game.js`): a blind
 "sync web → app" must not reintroduce the itch art onto Play.
 
+## Future modes (planned, v1.2+)
+
+**Round Robin Mode** — single stage. Munkis enter one at a time, each
+on the next configurable interval (default: every 4 beats or 1
+measure). Build to full 6-Munki chorus, hold for some duration, then
+peel away in reverse or freeze on the full mix. Visual: stage fills
+from left to right as voices stack, audio layers cumulatively per the
+existing engine. Single AudioContext, no offset between voices — they
+all share the same hardware clock, just enter at different `step`
+indices.
+
+**Hambone Mode** — Munkis are assigned one of two roles when placed:
+**Lead** (plays on the beat, beats 1 and 3) or **Answer** (plays on
+the off-beat, beats 2 and 4, or syncopated "&" positions). Mixing
+leads and answers creates call-and-response polyrhythmic feel
+automatically. Optional global toggle for **triplet/shuffle feel**
+that retimes eighth notes from straight to long-short for the
+gospel/country lope.
+
+Visual differentiation: Lead Munkis stand tall and steady; Answer
+Munkis sway side-to-side, the rhythmic geometry literally visible on
+stage. Subtle hand-clap synth (oscillator + filtered noise burst, no
+samples) on the Answer beats. The role assignment is a runtime
+property set on drop, not part of the Munki identity — same Munki
+sprite can be Lead or Answer depending on stage role.
+
+Combination: a **Hambone Round** preset cycles through Round Robin
+entry order while alternating Lead/Answer role assignment as new
+voices join. Builds a complete polyrhythmic small-choir texture as
+the stage fills.
+
+**Architectural notes:** Both modes are step-pattern + timing +
+role-assignment features layered on top of the existing audio engine.
+Audio engine architecture (Tale of Two Clocks, single AudioContext,
+per-Munki play() functions, master gain → compressor) stays exactly
+as-is. These modes are mode switches, not engine rewrites.
+
 ## The character data shape
 
 ```js
