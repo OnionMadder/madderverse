@@ -1575,6 +1575,32 @@
                 called). Coords are logical 400×600; lines outside the
                 silhouette are trimmed by the ctx.clip in buildCanvas. */
 
+    /* Shared body landmarks for the prefab artwork (DEFAULT_GROODLES +
+       drawSurprise). The figure outline is generated from SK + the
+       standing skeleton; these anchors describe WHERE on that outline
+       faces / costumes should land so the prefabs track the frame
+       instead of hard-coding coordinates tuned to an older shape.
+       If the frame changes again, retune here once — not in every
+       prefab. (Costume bands are full-width fillRects; the canvas clip
+       trims them to whatever pose silhouette is active, so only their
+       vertical extents matter.) */
+    const BODY = {
+        cx: 200,
+        headCy: 92, headR: 58, headTop: 34,
+        eyeY: 86, eyeDX: 18,          // eyes at cx ± eyeDX
+        browY: 68,
+        mouthY: 110,
+        cheekY: 114, cheekDX: 30,
+        hairTipY: 28, hairBaseY: 56,  // crown tuft band
+        neckY: 150,
+        shirtTop: 158, shirtBot: 392, // torso band
+        chestY: 234,                  // logo / badge / button cluster
+        waistY: 384,
+        pantsTop: 374, pantsBot: 600, // legs band
+        bootY: 532,
+        handY: 344                    // standing hand height
+    };
+
     const DEFAULT_GROODLES = [
         {
             id: 'astronaut-bo',
@@ -1588,41 +1614,42 @@
                 /* White suit base. */
                 c.fillStyle = '#ececf4';
                 c.fillRect(0, 0, STAGE_W, STAGE_H);
-                /* Navy chest panel + matching shorts band. */
+                /* Navy chest panel. */
                 c.fillStyle = '#1d3557';
-                c.fillRect(0, 195, STAGE_W, 70);
-                /* Visor: rounded teal band across the face. */
+                c.fillRect(0, BODY.shirtTop + 40, STAGE_W, 80);
+                /* Visor: rounded teal band across the eyes. */
                 c.fillStyle = '#43aa8b';
                 c.beginPath();
-                c.roundRect ? c.roundRect(150, 80, 100, 40, 16) :
-                    (c.fillRect(150, 80, 100, 40));
+                const vy = BODY.eyeY - 18;
+                c.roundRect ? c.roundRect(150, vy, 100, 40, 16) :
+                    (c.fillRect(150, vy, 100, 40));
                 c.fill();
                 /* Visor reflection highlight. */
                 c.fillStyle = 'rgba(255, 255, 255, 0.45)';
-                c.beginPath(); c.roundRect ? c.roundRect(158, 86, 18, 8, 4) :
-                    c.fillRect(158, 86, 18, 8); c.fill();
-                /* Smile under the visor. */
+                c.beginPath(); c.roundRect ? c.roundRect(158, vy + 6, 18, 8, 4) :
+                    c.fillRect(158, vy + 6, 18, 8); c.fill();
+                /* Smile just under the visor. */
                 c.strokeStyle = '#1a0f33';
                 c.lineWidth = 4;
                 c.lineCap = 'round';
                 c.beginPath();
-                c.arc(200, 130, 14, 0.15 * Math.PI, 0.85 * Math.PI);
+                c.arc(BODY.cx, BODY.mouthY + 6, 13, 0.15 * Math.PI, 0.85 * Math.PI);
                 c.stroke();
                 /* Mission patch — red circle with white star on chest. */
                 c.fillStyle = '#e63946';
-                c.beginPath(); c.arc(200, 230, 18, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(BODY.cx, BODY.chestY, 18, 0, Math.PI * 2); c.fill();
                 c.fillStyle = '#fff';
                 c.font = 'bold 22px monospace';
                 c.textAlign = 'center';
                 c.textBaseline = 'middle';
-                c.fillText('★', 200, 232);
-                /* Glove cuffs at end of arms. */
+                c.fillText('★', BODY.cx, BODY.chestY + 2);
+                /* Glove cuffs at the hands (standing arms hang ~hip level). */
                 c.fillStyle = '#e63946';
-                c.fillRect(120, 275, 30, 14);
-                c.fillRect(250, 275, 30, 14);
-                /* Boot tops at end of legs. */
-                c.fillRect(150, 530, 50, 18);
-                c.fillRect(200, 530, 50, 18);
+                c.fillRect(132, BODY.handY - 6, 34, 15);
+                c.fillRect(234, BODY.handY - 6, 34, 15);
+                /* Boot tops at the feet. */
+                c.fillRect(146, BODY.bootY, 46, 18);
+                c.fillRect(208, BODY.bootY, 46, 18);
             }
         },
         {
@@ -1639,28 +1666,28 @@
                 c.fillRect(0, 0, STAGE_W, STAGE_H);
                 /* Leather jacket — black across the torso. */
                 c.fillStyle = '#1a0f33';
-                c.fillRect(0, 170, STAGE_W, 180);
+                c.fillRect(0, BODY.shirtTop, STAGE_W, BODY.waistY - BODY.shirtTop);
                 /* Hot-pink jeans. */
                 c.fillStyle = '#ff6ec7';
-                c.fillRect(0, 350, STAGE_W, 220);
+                c.fillRect(0, BODY.waistY - 8, STAGE_W, BODY.pantsBot);
                 /* Tank top peek — magenta V neckline. */
                 c.fillStyle = '#e63946';
                 c.beginPath();
-                c.moveTo(175, 170);
-                c.lineTo(200, 230);
-                c.lineTo(225, 170);
+                c.moveTo(BODY.cx - 25, BODY.shirtTop);
+                c.lineTo(BODY.cx, BODY.shirtTop + 64);
+                c.lineTo(BODY.cx + 25, BODY.shirtTop);
                 c.closePath();
                 c.fill();
-                /* Star sunglasses. */
+                /* Star sunglasses over the eyes. */
                 c.fillStyle = '#1a0f33';
                 for (let i = 0; i < 2; i++) {
-                    const cx = i === 0 ? 180 : 220;
+                    const cx = BODY.cx + (i === 0 ? -BODY.eyeDX : BODY.eyeDX);
                     c.beginPath();
                     for (let k = 0; k < 10; k++) {
                         const a = k * Math.PI / 5 - Math.PI / 2;
                         const rr = k % 2 === 0 ? 11 : 5;
                         const x = cx + Math.cos(a) * rr;
-                        const y = 95 + Math.sin(a) * rr;
+                        const y = BODY.eyeY + Math.sin(a) * rr;
                         if (k === 0) c.moveTo(x, y); else c.lineTo(x, y);
                     }
                     c.closePath();
@@ -1668,9 +1695,9 @@
                 }
                 /* Open-mouth singing 'O'. */
                 c.fillStyle = '#1a0f33';
-                c.beginPath(); c.arc(200, 125, 8, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(BODY.cx, BODY.mouthY, 8, 0, Math.PI * 2); c.fill();
                 c.fillStyle = '#e63946';
-                c.beginPath(); c.arc(200, 125, 5, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(BODY.cx, BODY.mouthY, 5, 0, Math.PI * 2); c.fill();
             }
         },
         {
@@ -1685,28 +1712,28 @@
                 /* Sparkly gold suit. */
                 c.fillStyle = '#ffd23f';
                 c.fillRect(0, 0, STAGE_W, STAGE_H);
-                /* White lapels — diagonal triangles from neck. */
+                /* White lapels — diagonal triangles from the neck. */
                 c.fillStyle = '#fff';
+                const lT = BODY.shirtTop + 6, lB = lT + 120;
                 c.beginPath();
-                c.moveTo(175, 165);
-                c.lineTo(155, 280);
-                c.lineTo(200, 220);
+                c.moveTo(BODY.cx - 25, lT);
+                c.lineTo(BODY.cx - 45, lB);
+                c.lineTo(BODY.cx, lT + 56);
                 c.closePath();
                 c.fill();
                 c.beginPath();
-                c.moveTo(225, 165);
-                c.lineTo(245, 280);
-                c.lineTo(200, 220);
+                c.moveTo(BODY.cx + 25, lT);
+                c.lineTo(BODY.cx + 45, lB);
+                c.lineTo(BODY.cx, lT + 56);
                 c.closePath();
                 c.fill();
-                /* Disco-ball sequins scattered across the suit. */
+                /* Disco-ball sequins scattered down the suit. */
                 c.fillStyle = '#fff';
-                const sequins = [[170, 200], [220, 195], [185, 250], [225, 260],
-                                 [170, 310], [220, 320], [180, 360], [215, 380],
-                                 [180, 430], [220, 440], [185, 500], [215, 520]];
-                for (let i = 0; i < sequins.length; i++) {
+                for (let i = 0; i < 14; i++) {
+                    const sy = BODY.shirtTop + 30 + i * 34;
+                    const sx = BODY.cx + (i % 2 === 0 ? -22 : 22) + (i % 3 - 1) * 6;
                     c.beginPath();
-                    c.arc(sequins[i][0], sequins[i][1], 4, 0, Math.PI * 2);
+                    c.arc(sx, sy, 4, 0, Math.PI * 2);
                     c.fill();
                 }
                 /* Confident half-smile. */
@@ -1714,13 +1741,15 @@
                 c.lineWidth = 4;
                 c.lineCap = 'round';
                 c.beginPath();
-                c.moveTo(180, 125);
-                c.bezierCurveTo(195, 135, 215, 135, 225, 120);
+                c.moveTo(BODY.cx - 20, BODY.mouthY);
+                c.bezierCurveTo(BODY.cx - 5, BODY.mouthY + 10,
+                                BODY.cx + 15, BODY.mouthY + 10,
+                                BODY.cx + 25, BODY.mouthY - 5);
                 c.stroke();
-                /* Skin patch behind the cool-kids sunglasses (eyes go
-                   under the hat). */
+                /* Skin patch behind the cool-kids sunglasses (eyes are
+                   hidden under the hat + shades). */
                 c.fillStyle = '#f4a261';
-                c.fillRect(160, 75, 80, 25);
+                c.fillRect(BODY.cx - 40, BODY.eyeY - 14, 80, 26);
             }
         },
         {
@@ -1735,39 +1764,37 @@
                 /* Skin tone across the figure. */
                 c.fillStyle = '#fcbf49';
                 c.fillRect(0, 0, STAGE_W, STAGE_H);
-                /* Red-and-white horizontal-stripe shirt across torso. */
-                const stripes = [[170, 30, '#e63946'], [200, 30, '#fff'],
-                                 [230, 30, '#e63946'], [260, 30, '#fff'],
-                                 [290, 30, '#e63946'], [320, 30, '#fff']];
-                for (let i = 0; i < stripes.length; i++) {
-                    c.fillStyle = stripes[i][2];
-                    c.fillRect(0, stripes[i][0], STAGE_W, stripes[i][1]);
+                /* Red-and-white horizontal-stripe shirt across the torso. */
+                const stripeH = (BODY.waistY - BODY.shirtTop) / 6;
+                for (let i = 0; i < 6; i++) {
+                    c.fillStyle = (i % 2 === 0) ? '#e63946' : '#fff';
+                    c.fillRect(0, BODY.shirtTop + i * stripeH, STAGE_W, stripeH + 1);
                 }
                 /* Brown pants. */
                 c.fillStyle = '#6f4e37';
-                c.fillRect(0, 350, STAGE_W, 220);
+                c.fillRect(0, BODY.waistY, STAGE_W, BODY.pantsBot);
                 /* Belt + buckle. */
                 c.fillStyle = '#1a0f33';
-                c.fillRect(0, 345, STAGE_W, 18);
+                c.fillRect(0, BODY.waistY - 6, STAGE_W, 18);
                 c.fillStyle = '#ffd23f';
-                c.fillRect(190, 348, 20, 12);
-                /* Red bandana across the head. */
+                c.fillRect(BODY.cx - 10, BODY.waistY - 3, 20, 12);
+                /* Red bandana across the head crown. */
                 c.fillStyle = '#e63946';
-                c.fillRect(140, 50, 120, 26);
+                c.fillRect(142, BODY.headTop + 12, 116, 26);
                 /* Eyepatch over the right eye + strap. */
                 c.fillStyle = '#1a0f33';
-                c.fillRect(208, 86, 22, 18);
+                c.fillRect(BODY.cx + 8, BODY.eyeY - 9, 24, 19);
                 c.lineWidth = 3;
                 c.strokeStyle = '#1a0f33';
                 c.beginPath();
-                c.moveTo(208, 92); c.lineTo(165, 78); c.stroke();
+                c.moveTo(BODY.cx + 8, BODY.eyeY - 3); c.lineTo(165, BODY.eyeY - 12); c.stroke();
                 c.beginPath();
-                c.moveTo(230, 95); c.lineTo(258, 80); c.stroke();
+                c.moveTo(BODY.cx + 32, BODY.eyeY); c.lineTo(258, BODY.eyeY - 10); c.stroke();
                 /* Left eye + tiny grin. */
                 c.fillStyle = '#1a0f33';
-                c.beginPath(); c.arc(180, 95, 5, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(BODY.cx - BODY.eyeDX, BODY.eyeY, 5, 0, Math.PI * 2); c.fill();
                 c.beginPath();
-                c.arc(200, 125, 12, 0.2 * Math.PI, 0.8 * Math.PI);
+                c.arc(BODY.cx, BODY.mouthY + 4, 12, 0.2 * Math.PI, 0.8 * Math.PI);
                 c.lineWidth = 4;
                 c.stroke();
             }
@@ -1786,40 +1813,42 @@
                 c.fillRect(0, 0, STAGE_W, STAGE_H);
                 /* Pink ball gown across torso + legs. */
                 c.fillStyle = '#ff6ec7';
-                c.fillRect(0, 170, STAGE_W, 400);
-                /* Lighter pink dress overlay band. */
+                c.fillRect(0, BODY.shirtTop, STAGE_W, BODY.pantsBot);
+                /* Lighter pink dress overlay band at the waist. */
                 c.fillStyle = '#ffc1e3';
-                c.fillRect(0, 270, STAGE_W, 60);
+                c.fillRect(0, BODY.chestY + 30, STAGE_W, 64);
                 /* Gold trim at the dress neckline. */
                 c.fillStyle = '#ffd23f';
+                const nT = BODY.shirtTop;
                 c.beginPath();
-                c.moveTo(170, 175);
-                c.lineTo(200, 210);
-                c.lineTo(230, 175);
-                c.lineTo(230, 185);
-                c.lineTo(200, 220);
-                c.lineTo(170, 185);
+                c.moveTo(BODY.cx - 30, nT);
+                c.lineTo(BODY.cx, nT + 36);
+                c.lineTo(BODY.cx + 30, nT);
+                c.lineTo(BODY.cx + 30, nT + 10);
+                c.lineTo(BODY.cx, nT + 46);
+                c.lineTo(BODY.cx - 30, nT + 10);
                 c.closePath();
                 c.fill();
                 /* Almond eyes with eyelashes. */
                 c.fillStyle = '#1a0f33';
-                c.beginPath(); c.ellipse(184, 92, 7, 5, 0, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.ellipse(216, 92, 7, 5, 0, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.ellipse(BODY.cx - BODY.eyeDX, BODY.eyeY, 7, 5, 0, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.ellipse(BODY.cx + BODY.eyeDX, BODY.eyeY, 7, 5, 0, 0, Math.PI * 2); c.fill();
                 c.lineWidth = 2;
                 c.strokeStyle = '#1a0f33';
-                c.beginPath(); c.moveTo(178, 87); c.lineTo(174, 82); c.stroke();
-                c.beginPath(); c.moveTo(222, 87); c.lineTo(226, 82); c.stroke();
+                c.beginPath(); c.moveTo(BODY.cx - BODY.eyeDX - 6, BODY.eyeY - 5); c.lineTo(BODY.cx - BODY.eyeDX - 10, BODY.eyeY - 10); c.stroke();
+                c.beginPath(); c.moveTo(BODY.cx + BODY.eyeDX + 6, BODY.eyeY - 5); c.lineTo(BODY.cx + BODY.eyeDX + 10, BODY.eyeY - 10); c.stroke();
                 /* Heart-shaped lips. */
                 c.fillStyle = '#e63946';
+                const my = BODY.mouthY;
                 c.beginPath();
-                c.moveTo(200, 122);
-                c.bezierCurveTo(192, 110, 188, 122, 200, 132);
-                c.bezierCurveTo(212, 122, 208, 110, 200, 122);
+                c.moveTo(BODY.cx, my);
+                c.bezierCurveTo(BODY.cx - 8, my - 12, BODY.cx - 12, my, BODY.cx, my + 10);
+                c.bezierCurveTo(BODY.cx + 12, my, BODY.cx + 8, my - 12, BODY.cx, my);
                 c.fill();
                 /* Rosy cheeks. */
                 c.fillStyle = 'rgba(230, 57, 70, 0.45)';
-                c.beginPath(); c.arc(170, 115, 8, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(230, 115, 8, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(BODY.cx - BODY.cheekDX, BODY.cheekY, 8, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(BODY.cx + BODY.cheekDX, BODY.cheekY, 8, 0, Math.PI * 2); c.fill();
             }
         },
         {
@@ -1836,41 +1865,43 @@
                 c.fillRect(0, 0, STAGE_W, STAGE_H);
                 /* Darker chest panel. */
                 c.fillStyle = '#5a6478';
-                c.fillRect(0, 175, STAGE_W, 130);
-                /* Belt + leg seams. */
+                c.fillRect(0, BODY.shirtTop + 10, STAGE_W, 150);
+                /* Waist belt. No center leg-seam any more — the legs are
+                   two separate shapes now, so a center bar would float
+                   in the gap between them. */
                 c.fillStyle = '#1a0f33';
-                c.fillRect(0, 300, STAGE_W, 10);
-                c.fillRect(195, 310, 10, 220);
+                c.fillRect(0, BODY.waistY - 4, STAGE_W, 12);
                 /* Square LED eyes — teal. */
                 c.fillStyle = '#43aa8b';
-                c.fillRect(174, 82, 18, 18);
-                c.fillRect(208, 82, 18, 18);
+                c.fillRect(BODY.cx - BODY.eyeDX - 9, BODY.eyeY - 9, 18, 18);
+                c.fillRect(BODY.cx + BODY.eyeDX - 9, BODY.eyeY - 9, 18, 18);
                 /* Eye glow squares (inner). */
                 c.fillStyle = '#ffffff';
-                c.fillRect(180, 88, 6, 6);
-                c.fillRect(214, 88, 6, 6);
+                c.fillRect(BODY.cx - BODY.eyeDX - 3, BODY.eyeY - 3, 6, 6);
+                c.fillRect(BODY.cx + BODY.eyeDX - 3, BODY.eyeY - 3, 6, 6);
                 /* Speaker grill / mouth — 3 horizontal lines. */
                 c.strokeStyle = '#1a0f33';
                 c.lineWidth = 3;
-                c.beginPath(); c.moveTo(180, 120); c.lineTo(220, 120); c.stroke();
-                c.beginPath(); c.moveTo(180, 128); c.lineTo(220, 128); c.stroke();
-                c.beginPath(); c.moveTo(180, 136); c.lineTo(220, 136); c.stroke();
-                /* Three control-panel buttons on chest. */
-                const btns = [['#e63946', 184], ['#ffd23f', 200], ['#43aa8b', 216]];
+                for (let i = 0; i < 3; i++) {
+                    const gy = BODY.mouthY + i * 8;
+                    c.beginPath(); c.moveTo(BODY.cx - 20, gy); c.lineTo(BODY.cx + 20, gy); c.stroke();
+                }
+                /* Three control-panel buttons on the chest. */
+                const btns = [['#e63946', -16], ['#ffd23f', 0], ['#43aa8b', 16]];
                 for (let i = 0; i < btns.length; i++) {
                     c.fillStyle = btns[i][0];
                     c.beginPath();
-                    c.arc(btns[i][1], 220, 7, 0, Math.PI * 2);
+                    c.arc(BODY.cx + btns[i][1], BODY.chestY - 14, 7, 0, Math.PI * 2);
                     c.fill();
                 }
                 /* Chest readout — small LCD rectangle. */
                 c.fillStyle = '#1a0f33';
-                c.fillRect(170, 245, 60, 24);
+                c.fillRect(BODY.cx - 30, BODY.chestY + 6, 60, 24);
                 c.fillStyle = '#43aa8b';
                 c.font = 'bold 14px monospace';
                 c.textAlign = 'center';
                 c.textBaseline = 'middle';
-                c.fillText('OK', 200, 258);
+                c.fillText('OK', BODY.cx, BODY.chestY + 19);
             }
         }
     ];
@@ -2700,48 +2731,48 @@
 
         // Shirt: green band over the torso
         ctx.fillStyle = '#43aa8b';
-        ctx.fillRect(0, 175, STAGE_W, 175);
+        ctx.fillRect(0, BODY.shirtTop, STAGE_W, BODY.shirtBot - BODY.shirtTop);
 
         // Pants
         ctx.fillStyle = '#1d3557';
-        ctx.fillRect(0, 350, STAGE_W, 220);
+        ctx.fillRect(0, BODY.waistY, STAGE_W, BODY.pantsBot);
 
         // Shirt logo: white badge with red star on chest
         ctx.fillStyle = '#fff';
         ctx.beginPath();
-        ctx.arc(200, 240, 22, 0, Math.PI * 2);
+        ctx.arc(BODY.cx, BODY.chestY, 22, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#e63946';
         ctx.font = 'bold 32px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('â˜…', 200, 242);
+        ctx.fillText('★', BODY.cx, BODY.chestY + 2);
 
         // Eyes
         ctx.fillStyle = '#1a0f33';
-        ctx.beginPath(); ctx.arc(180, 95, 7, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(220, 95, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(BODY.cx - BODY.eyeDX, BODY.eyeY, 7, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(BODY.cx + BODY.eyeDX, BODY.eyeY, 7, 0, Math.PI * 2); ctx.fill();
 
         // Smile
         ctx.lineWidth = 5;
         ctx.strokeStyle = '#1a0f33';
         ctx.beginPath();
-        ctx.arc(200, 113, 18, 0.2 * Math.PI, 0.8 * Math.PI);
+        ctx.arc(BODY.cx, BODY.mouthY, 18, 0.2 * Math.PI, 0.8 * Math.PI);
         ctx.stroke();
 
         // Cheeks
         ctx.fillStyle = 'rgba(230, 57, 70, 0.55)';
-        ctx.beginPath(); ctx.arc(168, 118, 8, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(232, 118, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(BODY.cx - BODY.cheekDX, BODY.cheekY, 8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(BODY.cx + BODY.cheekDX, BODY.cheekY, 8, 0, Math.PI * 2); ctx.fill();
 
         // Hair tufts on top of head
         ctx.fillStyle = '#7209b7';
         for (let i = 0; i < 5; i++) {
-            const x = 162 + i * 19;
+            const x = BODY.cx - 38 + i * 19;
             ctx.beginPath();
-            ctx.moveTo(x, 60);
-            ctx.lineTo(x + 8, 38);
-            ctx.lineTo(x + 16, 60);
+            ctx.moveTo(x, BODY.hairBaseY);
+            ctx.lineTo(x + 8, BODY.hairTipY);
+            ctx.lineTo(x + 16, BODY.hairBaseY);
             ctx.closePath();
             ctx.fill();
         }
