@@ -210,7 +210,7 @@ existing engine. Single AudioContext, no offset between voices — they
 all share the same hardware clock, just enter at different `step`
 indices.
 
-**Hambone Mode** — Munkis are assigned one of two roles when placed:
+**Hamboning Mode** — Munkis are assigned one of two roles when placed:
 **Lead** (plays on the beat, beats 1 and 3) or **Answer** (plays on
 the off-beat, beats 2 and 4, or syncopated "&" positions). Mixing
 leads and answers creates call-and-response polyrhythmic feel
@@ -225,7 +225,7 @@ samples) on the Answer beats. The role assignment is a runtime
 property set on drop, not part of the Munki identity — same Munki
 sprite can be Lead or Answer depending on stage role.
 
-Combination: a **Hambone Round** preset cycles through Round Robin
+Combination: a **Hamboning Round** preset cycles through Round Robin
 entry order while alternating Lead/Answer role assignment as new
 voices join. Builds a complete polyrhythmic small-choir texture as
 the stage fills.
