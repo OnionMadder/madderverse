@@ -57,8 +57,11 @@
 
     const POSES = {
         standing: { name: 'Standing', icon: '🧍', origin: '50% 92%',
-            skeleton: hum({ x: 116, y: 376 }, { x: 284, y: 376 },
-                          { x: 150, y: 566 }, { x: 250, y: 566 }) },
+            /* Hands hang close to the body (just outside the torso, ~hip
+               level) so the arms read as relaxed at the sides — far-out
+               low hands made the whole figure a bottom-heavy pear. */
+            skeleton: hum({ x: 152, y: 346 }, { x: 248, y: 346 },
+                          { x: 164, y: 566 }, { x: 236, y: 566 }) },
         cheer: { name: 'Cheering', icon: '🙌', origin: '50% 92%',
             skeleton: hum({ x: 122, y: 70 }, { x: 278, y: 70 },
                           { x: 176, y: 566 }, { x: 224, y: 566 }) },
