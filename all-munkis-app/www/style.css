@@ -581,6 +581,7 @@ main {
 }
 
 .tray-chip {
+    position: relative;          /* containing block for the .chip-swap badge */
     flex: 0 0 auto;
     width: 92px;
     height: 116px;
@@ -1281,46 +1282,49 @@ body.moon-invert {
     border-bottom: 0;
 }
 
-/* ====== MUNKI ALTAR (Ice ↔ Moon swap chip) ======
-   Lives below the regular tray. The chip is a scaled-down clone of a
-   regular tray-chip so all the existing styling applies. Drag onto the
-   active 7th-wheel chip in the bank to swap; bank stays at 7 chips. */
-.munki-altar {
-    /* Horizontal 'swap' pill. Was a vertical column whose lone shrunk
-       chip read as a layout accident (a chip that wrapped off the bank
-       and dangled). Now: chip + label side by side as a deliberate
-       secondary control, a hairline divider setting it apart from the
-       bank row, footprint kept short so phones don't get tray overlap. */
-    display: flex;
-    flex-direction: row;
+/* ====== MUNKI ALTAR — RETIRED ======
+   The Ice <-> Moon swap is now a tap-to-swap badge on the 7th-wheel
+   bank chip (.chip-swap, below). The old #munkiAltar element is kept
+   in the DOM but always hidden, so the bank is a single clean 7-chip
+   row with no dangling extra chip. (.swap-target / .altar-* rules
+   further down are now dead CSS, left in place — zero risk.) */
+.munki-altar { display: none !important; }
+
+/* Tap-to-swap badge on the 7th-wheel chip — added by renderTray only
+   after Moon unlocks. Compact modern pill in a cold FNAF purple, not a
+   childish emoji. Tapping it swaps which evil rides the bank slot. */
+.chip-swap {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    margin: 6px auto 0;
-    padding: 8px 14px 0;
-    border-top: 1px solid rgba(167, 139, 250, 0.22);
-    max-width: 340px;
-}
-.munki-altar[hidden] { display: none; }
-.munki-altar .altar-chip {
-    transform: scale(0.78);
-    transform-origin: center;
-    /* scale() leaves the layout box full-size; pull the empty bleed in
-       evenly so the pill stays tight (no lopsided top-only margin). */
-    margin: -13px -10px;
-    border-color: rgba(167, 139, 250, 0.6);
-    box-shadow: 0 0 16px rgba(167, 139, 250, 0.42);
-}
-.munki-altar .altar-hint {
+    gap: 3px;
+    padding: 2px 7px;
     font-family: 'Fredoka', sans-serif;
-    font-size: 10px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: rgba(196, 181, 253, 0.78);
-    text-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
-    max-width: 132px;
-    line-height: 1.45;
-    text-align: left;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: #ddd6fe;
+    background: rgba(76, 29, 149, 0.5);
+    border: 1px solid rgba(167, 139, 250, 0.65);
+    border-radius: 999px;
+    cursor: pointer;
+    z-index: 6;
+    line-height: 1;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    box-shadow: 0 0 10px rgba(167, 139, 250, 0.4);
+    touch-action: manipulation;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+.chip-swap:hover  { background: rgba(109, 40, 217, 0.72); border-color: #c4b5fd; }
+.chip-swap:active { transform: scale(0.92); }
+.chip-swap-arrow  { font-size: 11px; font-weight: 400; }
+/* Small phone chips: drop the word, the arrow alone reads. */
+@media (max-width: 480px) {
+    .chip-swap     { padding: 3px 5px; top: 3px; right: 3px; gap: 0; }
+    .chip-swap-txt { display: none; }
 }
 
 /* Highlight the bank chip that's a valid swap drop target during an

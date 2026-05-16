@@ -1306,9 +1306,21 @@
             const isSulker = !isMadballzMode && id === seventhWheel;
             const expr = isSulker ? 3 : undefined;
             if (isSulker) el.classList.add('sulk');
+            // Post-Moon-unlock the 7th-wheel chip carries a tap-to-swap
+            // badge (Ice <-> Moon). Replaces the old drag-an-altar-chip
+            // mechanic so the bank stays a single 7-chip row with no
+            // dangling extra chip. ⇄ is a typographic arrow, not emoji.
+            const swapBadge = (isSulker && moonUnlocked)
+                ? `<button class="chip-swap" type="button"
+                          aria-label="Swap to ${CHARACTERS[altWheel()].label} Munki"
+                          title="Tap to swap Ice / Moon">`
+                  + `<span class="chip-swap-arrow" aria-hidden="true">⇄</span>`
+                  + `<span class="chip-swap-txt">SWAP</span></button>`
+                : '';
             el.innerHTML = `
                 <div class="chip-icon">${characterArt(id, undefined, expr)}</div>
                 <div class="chip-label">${ch.label}</div>
+                ${swapBadge}
             `;
             tray.appendChild(el);
         });
@@ -1480,6 +1492,9 @@
         document.querySelectorAll('.tray-chip').forEach(chip => {
             chip.addEventListener('pointerdown', e => {
                 if (e.button !== undefined && e.button !== 0) return; // left/touch only
+                // The tap-to-swap badge handles its own click — never let
+                // a pointerdown on it start a drag or capture the pointer.
+                if (e.target.closest && e.target.closest('.chip-swap')) return;
                 e.preventDefault();
                 ensureAudio();
                 try { chip.setPointerCapture(e.pointerId); } catch (_) {}
@@ -1544,6 +1559,18 @@
                 document.querySelectorAll('.stage-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
                 clearTrayGhost();
             });
+            // Tap-to-swap badge (only on the 7th-wheel chip post-unlock).
+            // Its own click swaps Ice<->Moon; stopPropagation keeps it from
+            // bubbling into the chip's drag / jealousy-tap logic.
+            const swapBtn = chip.querySelector('.chip-swap');
+            if (swapBtn) {
+                swapBtn.addEventListener('click', ev => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    ensureAudio();
+                    swapSeventhWheel();
+                });
+            }
         });
     }
 
@@ -2262,6 +2289,10 @@
         // defaults to 'ice' so the existing bank layout is unchanged on
         // first unlock; the kid earns Moon's presence by swapping.
         renderMunkiAltar();
+        // Re-render the bank so the 7th-wheel chip gets its tap-to-swap
+        // badge the instant Moon unlocks (no reload needed).
+        renderTray();
+        attachTrayHandlers();
         bumpEggCounter(); // flip "5/5" → "FOUND"
         showMoonReveal();
     }
@@ -2544,28 +2575,15 @@
     // to swap which evil rides that slot. Drop anywhere else snaps back.
     // The bank itself stays at 7 chips, preserving the rainbow-with-one-evil
     // visual the redesign asked for.
+    // RETIRED. The Ice<->Moon swap is now a tap-to-swap badge on the
+    // 7th-wheel bank chip (see the .chip-swap branch in renderTray and
+    // its click handler in attachTrayHandlers). The old #munkiAltar
+    // element is kept in the DOM but always hidden+empty so the bank is
+    // a single 7-chip row with no dangling extra chip. attachAltarHandlers()
+    // below is dead code, intentionally left in place (zero-risk, unused).
     function renderMunkiAltar() {
         const altar = document.getElementById('munkiAltar');
-        if (!altar) return;
-        if (!moonUnlocked) {
-            altar.hidden = true;
-            altar.innerHTML = '';
-            return;
-        }
-        altar.hidden = false;
-        const altId = altWheel();
-        const ch = CHARACTERS[altId];
-        // Mirror the regular tray-chip markup so the visual stays consistent.
-        // The altar chip is by definition the OTHER lonely Munki — gets the
-        // sad expression and .sulk class just like the bank's 7th wheel.
-        altar.innerHTML = `
-            <div class="altar-chip tray-chip altar-chip-alt sulk" data-char="${altId}" title="${ch.label}">
-                <div class="chip-icon">${characterArt(altId, undefined, 3)}</div>
-                <div class="chip-label">${ch.label}</div>
-            </div>
-            <div class="altar-hint">drag to swap</div>
-        `;
-        attachAltarHandlers();
+        if (altar) { altar.hidden = true; altar.innerHTML = ''; }
     }
 
     function attachAltarHandlers() {
