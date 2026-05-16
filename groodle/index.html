@@ -65,6 +65,12 @@
     <span class="currency-label">Doodles</span>
 </div>
 
+<!-- Face-zoom toggle: magnifies the head so little hands can draw the
+     face. Floating (sibling of the other overlays, NOT inside the stage)
+     so the zoom transform on #creature never scales the button itself.
+     Hidden during dance. -->
+<button class="face-zoom-btn" id="faceZoomBtn" type="button" aria-label="Zoom to face" title="Zoom to face">🔍</button>
+
 <!-- Stage fills the viewport. The figure inside maintains its 400x600
      logical aspect via the .creature wrapper, centered with letterbox-
      ing on screens that don't match 2:3. -->

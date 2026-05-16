@@ -2428,6 +2428,15 @@
        appear during dance. Looked up once at init to avoid an extra DOM
        query each time the kid taps Dance. */
     let danceDockEl = null;
+    /* Face-zoom: a focused "draw the face big" mode. Magnifies #creature
+       about the head so little hands can do fine detail; getPos() keys
+       off the live canvas rect so the zoom (a uniform translate+scale)
+       needs no pointer-math change. Mutually exclusive with dance (both
+       drive creature.style.transform). */
+    let stageEl = null;
+    let faceZoomBtnEl = null;
+    let faceZoomed = false;
+    const FACE_ZOOM_SCALE = 2.45;
     /* Canvas bounding rect is cached for the duration of a stroke. Reading
        getBoundingClientRect on every pointermove forces a layout pass; the
        rect can only change on scroll/resize/zoom, and a pointer capture
@@ -2663,6 +2672,10 @@
         /* Keep the static-pattern window in lockstep with the pose
            (new silhouette + matching transform-origin). */
         syncPatternWindow();
+        /* renderPoseDom just reset transform-origin to the pose's
+           foot-plant value — if we're face-zoomed, re-assert the zoom
+           transform so a pose swap doesn't silently un-zoom. */
+        if (faceZoomed) applyFaceZoomTransform();
     }
 
     /* ============ FILL PATTERNS ============
@@ -3157,6 +3170,9 @@
 
     function startDance() {
         if (isPlaying) return;
+        /* Dance and face-zoom both own creature.style.transform — never
+           both at once. Pressing DANCE always drops back to full view. */
+        exitFaceZoom();
         /* Pressing DANCE finishes the current drawing (commits it as a
            groodle). drawingsFinished and First/Five Groodle hinge on this
            — it's the only moment in the game with a clear "I'm done"
@@ -3223,6 +3239,83 @@
             bubbleEl.style.transform = '';
             bubbleEl._pulseStart = null;
         }
+    }
+
+    /* ---- Face-zoom mode ----
+
+       Magnify #creature about the head so the kid can draw fine facial
+       detail. The maths: measure the *resting* canvas rect (the canvas
+       maps logical 0..400 / 0..600 across its box), pin transform-origin
+       to the face row, scale by FACE_ZOOM_SCALE, then translateY so the
+       face lands at a comfortable spot above the dock. getPos() reads
+       the live (post-transform) canvas rect proportionally, so strokes
+       still map to the same logical coords — zoom out and the detail is
+       exactly where it was drawn on the face. */
+    function applyFaceZoomTransform() {
+        if (!faceZoomed || !creature || !canvas) return;
+        creature.style.transform = '';            // measure resting layout
+        const cr = canvas.getBoundingClientRect();
+        const host = stageEl || creature.parentElement;
+        const st = host.getBoundingClientRect();
+        /* Anchor a touch below head centre so the whole face + chin sit
+           in frame, not just the eyes. */
+        const faceFracY = (BODY.headCy + BODY.headR * 0.28) / STAGE_H;
+        const faceScreenY = cr.top + faceFracY * cr.height;
+        const targetY = st.top + st.height * 0.47; // comfy, clears the dock
+        const dy = targetY - faceScreenY;
+        const origin = '50% ' + (faceFracY * 100).toFixed(2) + '%';
+        const tf = 'translateY(' + dy.toFixed(1) + 'px) scale(' + FACE_ZOOM_SCALE + ')';
+        creature.style.transformOrigin = origin;
+        creature.style.transform = tf;
+        /* Keep an active static-pattern layer pixel-aligned — identical
+           box, so the identical transform/origin keeps it registered. */
+        if (patternLayerEl && !patternLayerEl.hasAttribute('hidden')) {
+            patternLayerEl.style.transformOrigin = origin;
+            patternLayerEl.style.transform = tf;
+        }
+        cachedRect = null;                         // getPos re-measures
+    }
+
+    function enterFaceZoom() {
+        if (faceZoomed) return;
+        if (isPlaying) stopDance();                // never zoom while dancing
+        closeDrawer();                             // clean, full-frame face
+        faceZoomed = true;
+        document.body.classList.add('face-zoomed');
+        if (faceZoomBtnEl) {
+            faceZoomBtnEl.textContent = '🔙';
+            faceZoomBtnEl.setAttribute('aria-label', 'Zoom back out');
+            faceZoomBtnEl.classList.add('active');
+        }
+        applyFaceZoomTransform();
+        window.addEventListener('resize', applyFaceZoomTransform);
+    }
+
+    function exitFaceZoom() {
+        if (!faceZoomed) return;
+        faceZoomed = false;
+        document.body.classList.remove('face-zoomed');
+        window.removeEventListener('resize', applyFaceZoomTransform);
+        if (faceZoomBtnEl) {
+            faceZoomBtnEl.textContent = '🔍';
+            faceZoomBtnEl.setAttribute('aria-label', 'Zoom to face');
+            faceZoomBtnEl.classList.remove('active');
+        }
+        if (creature) {
+            creature.style.transform = '';
+            const pose = getCurrentPose();
+            creature.style.transformOrigin = (pose && pose.origin) || '50% 92%';
+        }
+        if (patternLayerEl) {
+            patternLayerEl.style.transform = '';
+            patternLayerEl.style.transformOrigin = '';
+        }
+        if (patternWinPathEl) patternWinPathEl.style.transform = '';
+        cachedRect = null;
+    }
+
+    function toggleFaceZoom() {
+        if (faceZoomed) exitFaceZoom(); else enterFaceZoom();
     }
 
     function togglePlay() {
@@ -3391,6 +3484,13 @@
            path keep working. */
         document.getElementById('playBtn').addEventListener('click', togglePlay);
         document.getElementById('stopBtn').addEventListener('click', stopDance);
+
+        /* Face-zoom toggle (floating magnifier). */
+        stageEl = document.getElementById('stage');
+        faceZoomBtnEl = document.getElementById('faceZoomBtn');
+        if (faceZoomBtnEl) {
+            faceZoomBtnEl.addEventListener('click', toggleFaceZoom);
+        }
 
         document.getElementById('moveBtn').addEventListener('click', () => {
             currentMoveIdx = (currentMoveIdx + 1) % MOVES.length;
