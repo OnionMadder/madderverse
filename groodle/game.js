@@ -2675,7 +2675,11 @@
         syncPatternWindow();
         patternFillEl.setAttribute('fill', 'url(#pat-' + id + ')');
         patternWinPathEl.style.transform = creature ? creature.style.transform : '';
-        patternLayerEl.hidden = false;
+        /* removeAttribute (not .hidden=false): #patternLayer is an SVG
+           element, where the `hidden` IDL setter does NOT reflect to
+           the content attribute, so [hidden]{display:none} would stay
+           and the layer would never show. */
+        patternLayerEl.removeAttribute('hidden');
         document.body.classList.add('has-pattern');
         currentPattern = id;
         if (patternPickerEl) {
@@ -2687,7 +2691,7 @@
 
     function clearPattern() {
         currentPattern = null;
-        if (patternLayerEl) patternLayerEl.hidden = true;
+        if (patternLayerEl) patternLayerEl.setAttribute('hidden', '');
         if (patternFillEl) patternFillEl.setAttribute('fill', 'none');
         document.body.classList.remove('has-pattern');
         if (patternPickerEl) {
@@ -3197,7 +3201,7 @@
         let ty = 0, rot = 0, sx = 1, sy = 1, tx = 0;
 
         if (move === 'BOUNCE') {
-            ty = -hop * 58 + antic * 12;
+            ty = -hop * 46 + antic * 10;
             sy = 1 + hop * 0.13 - gsq * 0.22;
             sx = 1 - hop * 0.09 + gsq * 0.22;
             rot = Math.sin(beats * Math.PI) * 2;
@@ -3219,7 +3223,7 @@
                spin/turn (figure goes edge-on at mid-beat then back). */
             if (barBeat === 3) sx *= Math.cos(ph * Math.PI * 2);
         } else if (move === 'PARTY') {
-            ty = -hop * 72;
+            ty = -hop * 56;
             sy = 1 + hop * 0.17 - gsq * 0.28;
             sx = 1 - hop * 0.13 + gsq * 0.28;
             rot = Math.sin(beats * Math.PI * 2) * 11;

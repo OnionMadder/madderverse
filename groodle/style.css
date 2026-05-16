@@ -311,8 +311,13 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
     position: absolute;
     top: 0; right: 0; bottom: 0; left: 0;
     margin: auto;
-    width: min(100vw, calc(100dvh * 2 / 3));
-    height: min(100dvh, calc(100vw * 3 / 2));
+    /* 0.88 of the largest fitting 2:3 box leaves ~6% slack top+bottom
+       so the pumped dance jump (PARTY translateY) doesn't shove the
+       head past the viewport top (.stage is overflow:hidden). The
+       pattern layer uses the IDENTICAL formula so the static-pattern
+       window stays pixel-aligned with the body. */
+    width: calc(min(100vw, 100dvh * 2 / 3) * 0.88);
+    height: calc(min(100dvh, 100vw * 3 / 2) * 0.88);
     z-index: 2;
 }
 
@@ -475,11 +480,17 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
    dance frame, and transform-box:view-box + a JS-synced
    transform-origin make that transform resolve identically to the
    body's, so the pattern reads as seen-through-a-dancing-body. */
-.pattern-layer {
+/* MUST occupy the exact same centred 2:3 box as .creature (NOT the
+   full viewport) — otherwise the SVG viewBox maps to a different
+   rect than the body and the pattern lands off the figure. Same
+   sizing formula as `.stage > .creature` (kept in lockstep with the
+   shared 0.88 jump-headroom scale below). */
+.stage > .pattern-layer {
     position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
+    top: 0; right: 0; bottom: 0; left: 0;
+    margin: auto;
+    width: calc(min(100vw, 100dvh * 2 / 3) * 0.88);
+    height: calc(min(100dvh, 100vw * 3 / 2) * 0.88);
     pointer-events: none;
     z-index: 1;
 }
