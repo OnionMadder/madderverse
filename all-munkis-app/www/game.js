@@ -31,7 +31,7 @@
         // The actual count comes from the loaded sheet's frame list at
         // runtime; this is the design target + the "All Creeps
         // Encountered" achievement goal when no sheet is present yet.
-        VARIANT_COUNT:      12,
+        VARIANT_COUNT:      6,
         // Spawn timing — a fresh appearance is scheduled this many ms
         // after the previous one ends (uniform random in [MIN, MAX]).
         SPAWN_MIN_MS:       30000,

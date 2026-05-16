@@ -61,97 +61,91 @@ build inherits it. If the new PNG's dimensions/grid differ from the
 old sheet, the `.json` MUST be rewritten to match the new frame rects
 (wrong coords → variants crop wrong).
 
-> **Status (2026-05-15):** `flying-creeps.{png,json}` currently still
-> holds the *meta* art (now also preserved as `itch-creeps.*`). The
-> kid-clean STANDARD sheet is being generated; once it's dropped in as
-> `flying-creeps.{png,json}` (web + app), `itch-creeps.*` remains the
-> itch-only swap-in. Until then the meta sheet renders everywhere — do
-> not ship a non-itch build in that state.
+> **Status (2026-05-15):** SHIPPED. `flying-creeps.{png,json}` is the
+> real 6-variant STANDARD sheet (3248×1738, 3×2 grid, one Creep per
+> Rainbow Munki colour). The meta art is preserved as `itch-creeps.*`
+> for the itch-only swap. This is the v1.0 art.
 
-## 12 VARIANTS, not animation frames
+## Official lore (canon — standard builds)
 
-Each frame in the sheet is a **distinct creep design** (a variant), not
-a frame of a flap animation. On every appearance the game picks **one**
-variant uniformly at random and renders it **statically** for that
-whole pass. Target count: **12** (`CREEP.VARIANT_COUNT` in `game.js`).
-The actual count used at runtime is however many frames the loaded JSON
-has — 12 is the design goal and the "All Creeps Encountered"
-achievement target.
+The Flying Creeps **are the Rainbow Munkis**. Long ago the evil
+Munkis — **Ice** and **Moon** — cursed Red, Orange, Yellow, Green,
+Blue, and Purple out of jealousy, twisting each into a winged,
+sorrowful **Flying Creep** and casting them out. Now they're doomed
+to drift back to the stage forever — not to rejoin the rainbow, but
+to ruin the performance they can never be part of again. Six Munkis,
+six curses, six Creeps. This is the official story in every standard
+build (web + Play); the lore modal in `index.html` tells it.
+
+**itch.io is the exception.** There the Creeps are the game's real
+"AI slop" haters'-comments reincarnated (the `itch-creeps.*` swap) —
+the original meta joke, kept where the comments were actually made.
+
+## 6 VARIANTS, not animation frames
+
+Each frame is a **distinct creep design** (a variant), not a flap-
+animation frame. On every appearance the game picks **one** variant
+uniformly at random and renders it **statically** for that whole
+pass. Shipped count: **6** (`CREEP.VARIANT_COUNT` in `game.js`), one
+per rainbow colour. Runtime uses however many frames the loaded JSON
+actually has; 6 is also the "All Creeps Encountered" target.
 
 (If a future sheet bakes a per-variant flap animation, that's a v1.1
-concern — v1 is static-per-variant. The render path would need a small
-change to cycle a sub-range of frames per variant; not done now.)
+concern — v1 is static-per-variant.)
 
-## flying-creeps.json format
+## flying-creeps.json format (as shipped)
 
-Exactly the shape of the existing `mb-heads.json` / `default-heads.json`
-in this folder (TexturePacker → JSON (Hash)). An object map is
-preferred for parity; a plain array of frames is also accepted.
+TexturePacker → JSON (Hash), same shape as `mb-heads.json`. The
+shipped sheet is a **3-column × 2-row grid** in a **3248×1738**
+image; frames named by colour so the JSON is self-documenting:
 
 ```json
 {
   "frames": {
-    "creep-01": { "frame": { "x": 0,   "y": 0,   "w": 256, "h": 256 } },
-    "creep-02": { "frame": { "x": 256, "y": 0,   "w": 256, "h": 256 } },
-    "creep-03": { "frame": { "x": 512, "y": 0,   "w": 256, "h": 256 } },
-    "creep-04": { "frame": { "x": 768, "y": 0,   "w": 256, "h": 256 } },
-    "creep-05": { "frame": { "x": 0,   "y": 256, "w": 256, "h": 256 } },
-    "creep-06": { "frame": { "x": 256, "y": 256, "w": 256, "h": 256 } },
-    "creep-07": { "frame": { "x": 512, "y": 256, "w": 256, "h": 256 } },
-    "creep-08": { "frame": { "x": 768, "y": 256, "w": 256, "h": 256 } },
-    "creep-09": { "frame": { "x": 0,   "y": 512, "w": 256, "h": 256 } },
-    "creep-10": { "frame": { "x": 256, "y": 512, "w": 256, "h": 256 } },
-    "creep-11": { "frame": { "x": 512, "y": 512, "w": 256, "h": 256 } },
-    "creep-12": { "frame": { "x": 768, "y": 512, "w": 256, "h": 256 } }
+    "creep-yellow": { "frame": { "x": 0,    "y": 0,   "w": 1082, "h": 869 } },
+    "creep-orange": { "frame": { "x": 1083, "y": 0,   "w": 1082, "h": 869 } },
+    "creep-purple": { "frame": { "x": 2166, "y": 0,   "w": 1082, "h": 869 } },
+    "creep-red":    { "frame": { "x": 0,    "y": 869, "w": 1082, "h": 869 } },
+    "creep-blue":   { "frame": { "x": 1083, "y": 869, "w": 1082, "h": 869 } },
+    "creep-green":  { "frame": { "x": 2166, "y": 869, "w": 1082, "h": 869 } }
   },
-  "meta": {
-    "image": "flying-creeps.png",
-    "size": { "w": 1024, "h": 768 }
-  }
+  "meta": { "image": "flying-creeps.png", "size": { "w": 3248, "h": 1738 } }
 }
 ```
 
-That example is a **4-column × 3-row grid of 256×256 cells** in a
-1024×768 sheet — the recommended clean layout for 12 variants. Any
-layout works as long as every variant's `frame.x/y/w/h` is correct;
-the grid is just the easiest to author and to hand-write JSON for.
+Row 0 = yellow / orange / purple; row 1 = red / blue / green (matches
+the sheet left→right, top→bottom).
 
 ### Field requirements
 
 | Field | Required | Notes |
 |---|---|---|
-| `frames[*].frame.x/y/w/h` | **yes** | Pixel rect of each variant in `flying-creeps.png`. |
-| `meta.size.w/h` | recommended | Natural pixel size of the whole sheet. If omitted it's inferred by bounding the frame rects (works, but explicit is safer). |
-| `meta.image` | optional | Ignored — the loader always uses `flying-creeps.png` next to this JSON. |
-| `meta.fps` | ignored | Variants are static; there is no animation cycle in v1. |
+| `frames[*].frame.x/y/w/h` | **yes** | Pixel rect of each variant. |
+| `meta.size.w/h` | recommended | Sheet pixel size; inferred from frame rects if absent. |
+| `meta.image` | optional | Ignored — loader always uses `flying-creeps.png`. |
+| `meta.fps` | ignored | Variants are static; no animation cycle in v1. |
 
-### Layout options for 12 variants
+### Replacing the sheet later
 
-| Sheet | Grid | Cell |
-|---|---|---|
-| 1024×768 | 4 × 3 | 256×256 *(recommended)* |
-| 1536×512 | 6 × 2 | 256×256 |
-| 3072×256 | 12 × 1 | 256×256 (horizontal strip) |
-| 1080×810 | 4 × 3 | 270×270 |
+Any layout works as long as every variant's `frame.x/y/w/h` is
+correct and the count matches `CREEP.VARIANT_COUNT`. Drop the new
+`flying-creeps.{png,json}` into BOTH `all-munkis/assets/sprites/` and
+`all-munkis-app/www/assets/sprites/`, then `npx cap sync android`.
+Keep `itch-creeps.*` (web source only) as the itch swap.
 
-Pick whatever the art was authored at; just make the JSON rects match.
+### Art guidance (matches the shipped look)
 
-### Art guidance (matches the in-game look)
-
-- **12 distinct creeps.** Variety is the point — different silhouettes,
-  colors, expressions. They share no mechanics, only vibe.
-- **Per-variant canvas:** consistent w/h across all 12 keeps scaling
-  uniform. Square (e.g. 256×256) is easiest; the engine scales the
-  longest side to `CREEP.SIZE_PX` (128px default, tunable in `game.js`
-  → `CREEP`).
-- **Transparency:** PNG with alpha — each creep drifts over the dark
-  stage photo; soft translucent edges read best.
-- **Palette:** cool pale blues/whites read "creepy" against the warm
-  rainbow Munkis without clashing. Your call.
+- **One Creep per rainbow colour** — each is its colour's Munki,
+  cursed and winged (the lore made literal): yellow=fairy wings,
+  orange=moth, purple=shadow, red=demon, blue=feathered, green=bat.
+- **Per-variant canvas:** consistent w/h keeps scaling uniform; the
+  engine scales the longest side to `CREEP.SIZE_PX` (128px, tunable).
+- **Transparency:** PNG with alpha; soft edges read best over the
+  dark stage photo.
 - **Mood:** unsettling-but-cute. Kids' game — playful threat, not
-  nightmare fuel. Pairs with the gentle 12s horror creep, doesn't
-  out-scare it.
-- **Anchor:** art centered in each cell; the engine centers the frame
+  nightmare fuel. Pairs with the gentle 12-second horror creep,
+  doesn't out-scare it.
+- **Anchor:** art centred in each cell; the engine centres the frame
   box, so consistent in-cell placement keeps drift smooth.
 
 ## Behavior already wired (no art needed)

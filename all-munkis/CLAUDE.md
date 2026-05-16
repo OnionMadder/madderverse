@@ -172,10 +172,18 @@ mode at threshold. Its art is a **hot-swappable sprite sheet** —
 json}`; with no valid sheet it falls back to a clearly-marked
 placeholder ghost. Zero code coupling to the art.
 
-The concept was born from rude "AI slop" comments on the itch.io
-release — the haters' comments reincarnated as the things that haunt
-the game. That meta version is a deliberate easter egg but is
-**itch.io-only**; it's unsuitable for a kid-clean Play / web listing.
+**Official lore (canon — standard builds):** the Flying Creeps *are
+the Rainbow Munkis*. Ice and Moon, out of jealousy, cursed Red,
+Orange, Yellow, Green, Blue, and Purple — twisting each into a winged
+Flying Creep and casting them out, doomed to drift back forever to
+ruin the performance they can never rejoin. Six Munkis → six Creeps,
+one per colour (the shipped sheet is a 6-variant 3×2 grid). The
+`index.html` lore modal ("THE RAINBOW & THE CURSED MUNKIS") tells it.
+
+The concept was *originally* born from rude "AI slop" comments on the
+itch.io release — the haters' comments reincarnated. That meta version
+is now **itch.io-only** (the curse story above is canon everywhere
+else); it's unsuitable for a kid-clean Play / web listing.
 Convention (full spec in
 [`assets/sprites/FLYING_CREEPS_README.md`](assets/sprites/FLYING_CREEPS_README.md)):
 

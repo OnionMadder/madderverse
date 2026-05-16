@@ -103,18 +103,52 @@ async function captureProfile(browser, profile) {
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(outDir, "02-rainbow.png") });
 
-    /* ---- 03: HORROR MODE — rainbow still on stage from 02 (no reload
-       between), trip body.react-mode-active so the corner Ice/Moon
-       sprites are in their final anchored pose. Transitions are frozen
-       by the injected style, so the class flip jumps straight to full
-       opacity + scale(1) at the bottom corners. Distinct, on-brand,
-       kid-safe, and doesn't depend on any creep sprite sheet. ---- */
-    await page.evaluate(() => {
+    /* ---- 03: a FLYING CREEP over the rainbow (the signature feature)
+       + horror mode. Rainbow still on stage from 02 (no reload). Inject
+       a real creep variant from the shipped clean sheet, scaled exactly
+       like paintCreepVariant(), flinch two Munkis, and trip horror so
+       the corner Ice/Moon sprites are in their final anchored pose
+       (transitions frozen → instant full opacity/scale). ---- */
+    await page.evaluate(async () => {
+        let bgCss = "";
+        try {
+            const j = await fetch("assets/sprites/flying-creeps.json").then(r => r.json());
+            const fr = Array.isArray(j.frames)
+                ? j.frames.map(f => f.frame || f)
+                : Object.values(j.frames).map(f => f.frame || f);
+            const sz = (j.meta && j.meta.size) || {};
+            const sw = sz.w || Math.max(...fr.map(f => f.x + f.w));
+            const sh = sz.h || Math.max(...fr.map(f => f.y + f.h));
+            // variant 3 = creep-red (dramatic demon-wing) in the shipped order
+            const f = fr[3] || fr[0], B = 1, iw = f.w - 2 * B, ih = f.h - 2 * B;
+            const sc = 128 / Math.max(iw, ih);
+            bgCss = `background-image:url('assets/sprites/flying-creeps.png');`
+                  + `background-repeat:no-repeat;`
+                  + `background-size:${sw * sc}px ${sh * sc}px;`
+                  + `background-position:${-(f.x + B) * sc}px ${-(f.y + B) * sc}px;`
+                  + `width:${iw * sc}px;height:${ih * sc}px;`;
+        } catch (_) {}
+        const creep = document.createElement("div");
+        creep.className = "flying-creep flying-creep-in";
+        creep.style.cssText =
+            "width:128px;height:128px;z-index:42;left:0;top:0;" +
+            "transform:translate(" + (window.innerWidth * 0.40) + "px," +
+            (window.innerHeight * 0.44) + "px);";
+        const inner = document.createElement("div");
+        inner.className = "flying-creep-frame";
+        inner.style.cssText = bgCss;
+        creep.appendChild(inner);
+        document.body.appendChild(creep);
+        document.querySelectorAll('.stage-slot[data-index="2"], .stage-slot[data-index="3"]')
+            .forEach(s => s.classList.add("creep-scared"));
         document.body.classList.add("react-mode-active");
     });
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: path.join(outDir, "03-horror.png") });
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: path.join(outDir, "03-flying-creep.png") });
     await page.evaluate(() => {
+        document.querySelector(".flying-creep")?.remove();
+        document.querySelectorAll(".stage-slot.creep-scared")
+            .forEach(s => s.classList.remove("creep-scared"));
         document.body.classList.remove("react-mode-active");
     });
 
