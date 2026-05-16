@@ -103,35 +103,32 @@ async function captureProfile(browser, profile) {
     await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(outDir, "02-rainbow.png") });
 
-    /* ---- 03: a Munki mid-drag (ghost + drop-target glow) ---- */
+    /* ---- 03: HORROR MODE — rainbow still on stage from 02 (no reload
+       between), trip body.react-mode-active so the corner Ice/Moon
+       sprites are in their final anchored pose. Transitions are frozen
+       by the injected style, so the class flip jumps straight to full
+       opacity + scale(1) at the bottom corners. Distinct, on-brand,
+       kid-safe, and doesn't depend on any creep sprite sheet. ---- */
     await page.evaluate(() => {
-        const slot0 = document.querySelector('.stage-slot[data-index="0"]');
-        const s = slot0.getBoundingClientRect();
-        window.__fire(slot0, "pointerdown", s.left + s.width / 2, s.top + s.height / 2, 700);
-        window.__fire(slot0, "pointermove", s.left + s.width / 2, s.top - 60, 700);
-        window.__fire(slot0, "pointermove", s.left + s.width / 2, s.top - 90, 700);
-        /* leave the pointer "down" so the drag ghost is on-screen */
+        document.body.classList.add("react-mode-active");
     });
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(outDir, "03-drag.png") });
-    /* release so state is clean for the next shot */
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: path.join(outDir, "03-horror.png") });
     await page.evaluate(() => {
-        const slot0 = document.querySelector('.stage-slot[data-index="0"]');
-        const s = slot0.getBoundingClientRect();
-        window.__fire(slot0, "pointerup", s.left + s.width / 2, s.top - 90, 700);
+        document.body.classList.remove("react-mode-active");
     });
 
-    /* ---- 04: achievements panel open ---- */
+    /* ---- 04: achievements panel open, WITH the rainbow still on
+       stage behind it (seed → reload → re-place rainbow → open panel,
+       so the shot reads as in-game rather than an empty stage). ---- */
     await page.evaluate(() => {
-        /* Seed a few unlocked achievements + reveal the counter so the
-           panel has content. Mirrors the real storage schema. */
         const rec = {
             horrorTriggers: 1, madballzUnlocked: false,
             achievements: {
-                solidSquad:   { unlocked_at: "2026-05-14T12:00:00.000Z", points_awarded: 1 },
-                patternMaker: { unlocked_at: "2026-05-14T12:01:00.000Z", points_awarded: 2 },
-                band3:        { unlocked_at: "2026-05-14T12:02:00.000Z", points_awarded: 1 },
-                coldSnap:     { unlocked_at: "2026-05-14T12:03:00.000Z", points_awarded: 1 }
+                solidSquad:    { unlocked_at: "2026-05-14T12:00:00.000Z", points_awarded: 1 },
+                patternMaker:  { unlocked_at: "2026-05-14T12:01:00.000Z", points_awarded: 2 },
+                band3:         { unlocked_at: "2026-05-14T12:02:00.000Z", points_awarded: 1 },
+                creepWhisperer:{ unlocked_at: "2026-05-14T12:03:00.000Z", points_awarded: 2 }
             },
             moonUnlocked: false, bandCount: 4, seventhWheel: "ice",
             activeBankIndex: 0, unlockedBanks: [true]
@@ -141,13 +138,18 @@ async function captureProfile(browser, profile) {
     await page.reload({ waitUntil: "networkidle" });
     await page.addStyleTag({ content:
         "*,*::before,*::after{animation-play-state:paused!important;transition:none!important;}" });
-    await page.waitForSelector("#eggCounter");
-    await page.waitForTimeout(200);
+    await page.waitForSelector("#tray .tray-chip");
+    await page.waitForTimeout(250);
+    await page.evaluate(() => {
+        ["red", "orange", "yellow", "green", "blue", "purple"]
+            .forEach((c, i) => window.__place(c, i, 600 + i));
+    });
+    await page.waitForTimeout(300);
     await page.evaluate(() => {
         const c = document.getElementById("eggCounter");
-        c.hidden = false; c.classList.add("shown"); c.click();
+        if (c) { c.hidden = false; c.classList.add("shown"); c.click(); }
     });
-    await page.waitForTimeout(250);
+    await page.waitForTimeout(300);
     await page.screenshot({ path: path.join(outDir, "04-achievements.png") });
 
     await ctx.close();

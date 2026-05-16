@@ -2,29 +2,71 @@
 
 The **Flying Creep** entity (an ambient creature that drifts across the
 stage and scares the Munkis) is **fully implemented and ships in v1.0**.
-Until the real art is dropped here it renders a clearly-marked
-**PLACEHOLDER** ghost SVG — the feature works completely with the
-placeholder; only the visuals are pending.
+With no valid sheet present it renders a clearly-marked **PLACEHOLDER**
+ghost SVG — the feature works completely with the placeholder; only
+the visuals are pending.
 
-To replace the placeholder with the real art, drop **two files** into
-this folder (`all-munkis/assets/sprites/`):
+## Two sheets — STANDARD vs ITCH-EXCLUSIVE
+
+The Flying Creeps concept was born from rude "AI slop" comments on the
+itch.io release — the haters' comments reincarnated as the things that
+haunt the game. That meta version is a deliberate easter egg, but it's
+**itch.io-only**: the social-media-screenshot art doesn't fit a
+kid-clean Play / web listing (it openly flags AI-generated assets and
+reads as out-of-context UI on the Designed-for-Families track).
+
+So there are **two sheets**, by naming convention:
+
+| File | Role | Ships in |
+|---|---|---|
+| `flying-creeps.{png,json}` | **STANDARD** sheet — kid-clean creep art | **Every standard release**: madderverse.org web **and** the Google Play app. The single default. |
+| `itch-creeps.{png,json}`  | **ITCH-EXCLUSIVE** — the haters'-comment meta creeps | **itch.io builds only**, swapped in at package time. |
+
+`game.js` is never aware of `itch-creeps.*` — `loadCreepSheet()` only
+ever reads `flying-creeps.{png,json}`. The itch flavour is purely a
+**build-time asset swap**, zero code change:
+
+> **Packaging the itch.io build (manual step):** from a clean checkout,
+> before zipping the itch release, in `all-munkis/assets/sprites/`:
+> ```
+> cp itch-creeps.png  flying-creeps.png
+> cp itch-creeps.json flying-creeps.json
+> ```
+> Zip + upload to itch. Do **not** commit that swap — `flying-creeps.*`
+> in git is always the STANDARD sheet. (Web/Play deploys must never get
+> the itch art.)
+
+### Divergence rule (don't let a sync clobber this)
+
+`flying-creeps.{png,json}` is a deliberately divergent asset, like the
+Capacitor native bridge in `game.js`. The STANDARD sheet is identical
+across `all-munkis/` and `all-munkis-app/www/`. **`itch-creeps.*`
+lives only in `all-munkis/assets/sprites/`** (the web source the itch
+build is cut from) — it must never be copied into
+`all-munkis-app/www/` (Play has no business carrying the itch art).
+
+## Dropping / replacing the STANDARD sheet
+
+Drop **two files** into BOTH
+`all-munkis/assets/sprites/` and `all-munkis-app/www/assets/sprites/`:
 
 ```
-flying-creeps.png      the sprite sheet (one image, all 12 variants)
+flying-creeps.png      the sprite sheet (one image, all N variants)
 flying-creeps.json     frame coordinates (TexturePacker JSON Hash)
 ```
 
-That's it — `loadCreepSheet()` in `game.js` auto-detects them on the
-next load; no code change. Then re-sync into `all-munkis-app/` per
-that folder's README so the Android build inherits it
-(`cp` the two files into `all-munkis-app/www/assets/sprites/`, then
-`npx cap sync android`).
+`loadCreepSheet()` auto-detects them on next load — no code change.
+After updating the app copy: `npx cap sync android` so the Android
+build inherits it. If the new PNG's dimensions/grid differ from the
+old sheet, the `.json` MUST be rewritten to match the new frame rects
+(wrong coords → variants crop wrong).
 
-> **Heads-up (2026-05-15):** the sheet is **not in the repo yet**. The
-> only recent uploads in `all-munkis/assets/` are social-media
-> screenshots (`Polish_*.png`), not sprites. v1.0 ships tonight with
-> the placeholder; drop the real `flying-creeps.{png,json}` here
-> whenever it's ready and it lights up with zero code change.
+> **Status (2026-05-15):** `flying-creeps.{png,json}` currently still
+> holds the *meta* art (now also preserved as `itch-creeps.*`). The
+> kid-clean STANDARD sheet is being generated; once it's dropped in as
+> `flying-creeps.{png,json}` (web + app), `itch-creeps.*` remains the
+> itch-only swap-in. Until then the meta sheet renders everywhere — do
+> not ship a non-itch build in that state.
 
 ## 12 VARIANTS, not animation frames
 

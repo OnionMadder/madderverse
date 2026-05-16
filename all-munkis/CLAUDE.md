@@ -163,6 +163,34 @@ lazy single-context init, sample-accurate `when`-scheduled voices,
 the look-ahead `setTimeout` only queueing (never gating) note onset —
 in ways that would complicate that future extraction.
 
+## Flying Creeps — standard vs itch-exclusive sheet
+
+The Flying Creep is an ambient creature that drifts across the stage,
+scares nearby Munkis (per-Munki `fear`), and trips the shared horror
+mode at threshold. Its art is a **hot-swappable sprite sheet** —
+`loadCreepSheet()` only ever reads `assets/sprites/flying-creeps.{png,
+json}`; with no valid sheet it falls back to a clearly-marked
+placeholder ghost. Zero code coupling to the art.
+
+The concept was born from rude "AI slop" comments on the itch.io
+release — the haters' comments reincarnated as the things that haunt
+the game. That meta version is a deliberate easter egg but is
+**itch.io-only**; it's unsuitable for a kid-clean Play / web listing.
+Convention (full spec in
+[`assets/sprites/FLYING_CREEPS_README.md`](assets/sprites/FLYING_CREEPS_README.md)):
+
+- **`flying-creeps.{png,json}`** = the STANDARD kid-clean sheet —
+  ships in *every* standard release (madderverse.org **and** the
+  Play app). Identical across `all-munkis/` and `all-munkis-app/www/`.
+- **`itch-creeps.{png,json}`** = the itch-exclusive meta sheet — lives
+  ONLY in `all-munkis/assets/sprites/`, swapped over `flying-creeps.*`
+  at itch-package time as a documented manual build step. Never
+  committed as `flying-creeps.*`; never copied into `all-munkis-app/`.
+
+Treat `flying-creeps.{png,json}` as a deliberately divergent asset
+(like the Capacitor native bridge in the app's `game.js`): a blind
+"sync web → app" must not reintroduce the itch art onto Play.
+
 ## The character data shape
 
 ```js
