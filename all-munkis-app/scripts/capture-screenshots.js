@@ -38,7 +38,10 @@ const APP  = HOST + "/www/";
 
 const PROFILES = [
     /* Google Play — phone (REQUIRED: min 2, up to 8) */
-    { label: "android-phone",        w: 412,  h: 915,  dpr: 2.5 },
+    /* 432x768 @2.5 = 1080x1920 — exact 9:16. Google Play rejects phone
+       screenshots taller than 2:1; the old 412x915@2.5 (1030x2288 =
+       2.22:1) was over that cap. 1080x1920 is the canonical safe size. */
+    { label: "android-phone",        w: 432,  h: 768,  dpr: 2.5 },
     /* Google Play — 7-inch tablet (Designed for Families) */
     { label: "android-7in-tablet",   w: 600,  h: 960,  dpr: 2   },
     /* Google Play — 10-inch tablet (Designed for Families) */
