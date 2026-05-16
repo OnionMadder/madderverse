@@ -320,6 +320,31 @@ characters live in `assets/bg-img/bg-munkis.png` (frames `bg-moon` and
 `bg-ice`); to swap those, keep the file at the same path and update the
 SVG `viewBox` attributes in `index.html` to match the new frame coords.
 
+> **🛑 CANONICAL `stage.jpg` — do not let this revert (it has, repeatedly).**
+> The correct background is the **clean empty haunted-theater plate**:
+> the rainbow on a cracked stage, empty red velvet seats, no baked-in
+> HUD/characters/UI. As of this note its identity is **MD5
+> `832AB7D508E8…`, 90,478 bytes**. A *wrong* busy variant with baked-in
+> "LIVES 5/6", a shadow audience and a grid UI (MD5 `0324F8F9EBF5…`,
+> 92,897 bytes) has overwritten it more than once — **never ship that
+> one.**
+>
+> Rules to keep us on the same page:
+> 1. **Two tracked copies must stay byte-identical:**
+>    `all-munkis/assets/bg-img/stage.jpg` (web) **and**
+>    `all-munkis-app/www/assets/bg-img/stage.jpg` (app source for
+>    `npx cap sync`). Replace **both** or neither.
+> 2. **Git/the build worktree is the source of truth — not a local
+>    checkout.** Editing only a separate working copy does nothing:
+>    builds, `cap sync`, the AAB, and the GitHub Pages deploy all come
+>    from what's **committed**. A replacement isn't "done" until it's
+>    committed to `main` in both paths above.
+> 3. After replacing, `npx cap sync android` (refreshes the gitignored
+>    `android/.../assets/public` copy) and rebuild the AAB, or the app
+>    keeps the old art even though the web copy is right.
+> 4. If unsure which file is live, open both and eyeball them — the
+>    correct one has **no text or characters baked into the image.**
+
 ### Tweak the expression rules
 - Edit `expressionForSlot(slotIndex)`. Keep the contract: returns 1..5.
   `headArt` slots the result into the frame name `${expr}-${letter}`.
