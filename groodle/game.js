@@ -1490,46 +1490,92 @@
     const PAGE_BY_ID = {};
     PAGES.forEach(p => { PAGE_BY_ID[p.id] = p; });
 
-    /* In-memory only — when a kid refreshes, the page state resets to
-       blank. The persistent piece is state.counters.pagesCompleted, which
-       drives the per-page achievement unlocks. */
-    let currentPageId = null;
+    /* In-memory only — resets to blank on refresh. The persistent
+       piece is state.counters.pagesCompleted (kept that field name
+       for save-compat), which the page-* achievements read. Only the
+       6 ids that have a page-* achievement (robot/princess/astronaut/
+       clown/pirate/superhero) unlock anything; rockstar/disco track
+       harmlessly. restampOutline holds the current character's outline
+       fn so CLEAR keeps a "colour it yourself" template on screen;
+       it's null in coloured / blank mode (CLEAR there = blank). */
+    let currentCharacterId = null;
+    let restampOutline = null;
     let pagesModalEl = null;
     let pagesGridEl = null;
 
-    function applyPage(pageId) {
-        const page = PAGE_BY_ID[pageId];
-        if (!page || !ctx) return;
-        /* A page swap is a "new drawing" — wipe the canvas and reset the
-           per-drawing color tally (so Rainbow Day starts over on the new
-           page) before stamping in the template. */
+    /* Shared "make it the new drawing" reset — wipe canvas + the
+       per-drawing colour tally so Rainbow Day starts over. */
+    function freshCanvasForCharacter() {
         ctx.clearRect(0, 0, STAGE_W, STAGE_H);
         if (state) trackClearDrawing();
-        page.draw(ctx);
-        currentPageId = pageId;
     }
 
-    function clearPageTemplate() {
-        currentPageId = null;
+    function applyOutline(ch) {
+        freshCanvasForCharacter();
+        ch.outline(ctx);
+        currentCharacterId = ch.id;
+        restampOutline = ch.outline;
+    }
+
+    /* Coloured-for-you: pose/bg/hat/colour like the old prefab path,
+       then paint the filled art. No restamp (CLEAR = blank). */
+    function applyFilled(ch) {
+        const seed = ch.filled;
+        currentCharacterId = ch.id;
+        restampOutline = null;
+        if (seed.pose && state && state.pose !== seed.pose) {
+            applyPose(seed.pose);
+        } else {
+            freshCanvasForCharacter();
+        }
+        if (seed.bg) {
+            const bgLayer = document.getElementById('bgLayer');
+            if (bgLayer) bgLayer.className = 'bg-layer bg-' + seed.bg;
+            document.querySelectorAll('.bg-thumb').forEach((b) => {
+                b.classList.toggle('active', b.dataset.bg === seed.bg);
+            });
+        }
+        if (seed.hat && state.hats.owned.indexOf(seed.hat) !== -1) {
+            equipHat(seed.hat);
+        }
+        seed.draw(ctx);
+        if (seed.color) {
+            currentColor = seed.color;
+            isErasing = false;
+            document.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
+            const sw = document.querySelector('.swatch[data-color="' + seed.color + '"]');
+            if (sw) sw.classList.add('active');
+            const eraser = document.getElementById('eraserBtn');
+            if (eraser) eraser.classList.remove('active');
+        }
+    }
+
+    function applyCharacter(id, colored) {
+        const ch = CHARACTER_BY_ID[id];
+        if (!ch || !ctx) return;
+        if (colored) applyFilled(ch); else applyOutline(ch);
+    }
+
+    function clearCharacterTemplate() {
+        currentCharacterId = null;
+        restampOutline = null;
         if (!ctx) return;
         ctx.clearRect(0, 0, STAGE_W, STAGE_H);
         if (state) trackClearDrawing();
     }
 
-    function trackPageCompleted(pageId) {
-        if (!pageId) return;
-        if (state.counters.pagesCompleted.indexOf(pageId) !== -1) return;
-        state.counters.pagesCompleted.push(pageId);
+    function trackCharacterCompleted(id) {
+        if (!id) return;
+        if (state.counters.pagesCompleted.indexOf(id) !== -1) return;
+        state.counters.pagesCompleted.push(id);
         saveState();
         checkAchievements();
     }
 
-    function buildPagesGrid() {
+    function buildCharacterGrid() {
         if (!pagesGridEl) return;
         pagesGridEl.innerHTML = '';
-        /* "Blank" card first — untemplate the canvas and return to the
-           free-drawing surface. Then one card per page, with a done tag
-           when its achievement is already earned. */
+        /* Blank card — back to a free-drawing surface. */
         const blank = document.createElement('button');
         blank.type = 'button';
         blank.className = 'page-card page-card-blank';
@@ -1538,31 +1584,43 @@
             '<div class="page-name">Blank</div>' +
             '<div class="page-action">Start fresh</div>';
         blank.addEventListener('click', () => {
-            clearPageTemplate();
+            clearCharacterTemplate();
             closeModal();
         });
         pagesGridEl.appendChild(blank);
 
-        for (let i = 0; i < PAGES.length; i++) {
-            const page = PAGES[i];
-            const done = state.counters.pagesCompleted.indexOf(page.id) !== -1;
+        /* One card per character. Tapping the card = colour-it-yourself
+           outline; the 🎨 sub-button = colour-it-for-me filled. The 🎨
+           is a real <button> nested in the card; stopPropagation keeps
+           the card's outline handler from also firing. */
+        for (let i = 0; i < CHARACTERS.length; i++) {
+            const ch = CHARACTERS[i];
+            const done = state.counters.pagesCompleted.indexOf(ch.id) !== -1;
             const card = document.createElement('button');
             card.type = 'button';
             card.className = 'page-card' + (done ? ' done' : '');
+            card.setAttribute('aria-label', 'Colour in ' + ch.label);
             card.innerHTML =
-                '<div class="page-emoji" aria-hidden="true">' + page.emoji + '</div>' +
-                '<div class="page-name">' + escapeHtml(page.label) + '</div>' +
-                '<div class="page-action">' + (done ? '✓ Done' : 'Color it') + '</div>';
+                '<button class="char-fill-btn" type="button" title="Colour it for me" aria-label="Colour ' + ch.label + ' for me">🎨</button>' +
+                '<div class="page-emoji" aria-hidden="true">' + ch.emoji + '</div>' +
+                '<div class="page-name">' + escapeHtml(ch.label) + '</div>' +
+                '<div class="page-action">' + (done ? '✓ Done' : 'Colour it') + '</div>';
             card.addEventListener('click', () => {
-                applyPage(page.id);
+                applyCharacter(ch.id, false);
+                closeModal();
+            });
+            const fillBtn = card.querySelector('.char-fill-btn');
+            fillBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                applyCharacter(ch.id, true);
                 closeModal();
             });
             pagesGridEl.appendChild(card);
         }
     }
 
-    function openPagesPicker() {
-        buildPagesGrid();
+    function openCharacterPicker() {
+        buildCharacterGrid();
         openModal(pagesModalEl);
     }
 
@@ -1923,79 +1981,161 @@
     const DEFAULT_GROODLE_BY_ID = {};
     DEFAULT_GROODLES.forEach(d => { DEFAULT_GROODLE_BY_ID[d.id] = d; });
 
-    let starterGridEl = null;
+    /* ============ CHARACTERS (unified tray) ============
 
-    function applyDefaultGroodle(id) {
-        const seed = DEFAULT_GROODLE_BY_ID[id];
-        if (!seed) return;
-        /* Picking a starter is a "new drawing" — kill any active page
-           template and wipe the per-drawing color tally before laying
-           the new artwork in. clearCanvas() handles trackClearDrawing. */
-        currentPageId = null;
-        /* Pose change has to happen FIRST: applyPose rebuilds the
-           silhouette + canvas clip, which would clear anything painted
-           before it. After applyPose, the canvas is blank and clipped
-           to the new pose. */
-        if (seed.pose && state && state.pose !== seed.pose) {
-            applyPose(seed.pose);
-        } else {
-            /* Same pose: wipe the canvas explicitly so the starter
-               paints onto a clean surface. */
-            clearCanvas();
-        }
-        /* Background — replicates what attachBgPicker's click handler does
-           so the swap is identical to the kid tapping the bg thumb. */
-        if (seed.bg) {
-            const bgLayer = document.getElementById('bgLayer');
-            if (bgLayer) bgLayer.className = 'bg-layer bg-' + seed.bg;
-            document.querySelectorAll('.bg-thumb').forEach((b) => {
-                b.classList.toggle('active', b.dataset.bg === seed.bg);
-            });
-        }
-        /* Hat — equipHat updates state.hats.equipped + renders. Wrapped
-           in a try because some hats may not be owned yet (kid hasn't
-           bought them); equipHat already no-ops in that case. */
-        if (seed.hat && state.hats.owned.indexOf(seed.hat) !== -1) {
-            equipHat(seed.hat);
-        }
-        /* Paint the starter onto the canvas. */
-        seed.draw(ctx);
-        /* Land the kid on a character-appropriate palette color so the
-           first stroke of their own already matches the starter. */
-        if (seed.color) {
-            currentColor = seed.color;
-            isErasing = false;
-            const sw = document.querySelector('.swatch[data-color="' + seed.color + '"]');
-            document.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
-            if (sw) sw.classList.add('active');
-            const eraser = document.getElementById('eraserBtn');
-            if (eraser) eraser.classList.remove('active');
-        }
+       One roster, one picker. Each character has BOTH an `outline`
+       (navy line-art the kid colors in — the old "page") and a
+       `filled` (pre-coloured + pose/bg/hat — the old "prefab
+       Groodle"). The picker shows one card per character: tapping it
+       loads the colour-it-yourself outline; the card's 🎨 button
+       loads the done-for-you version. This collapses the old separate
+       Pages modal + New-drawer starter grid into a single mental
+       model ("pick a character, optionally have it coloured for you").
+
+       4 characters reuse the existing page outline + prefab fill
+       as-is; clown/superhero gain a compact `filled`, rockstar/disco
+       gain a compact `outline`, so every card supports both modes and
+       no prior content is lost. Completion (DANCE while a character is
+       loaded) still keys off the same ids the page-* achievements
+       check, so the achievement catalog is unchanged. */
+
+    const OUTLINE = {};
+    PAGES.forEach(p => { OUTLINE[p.id] = p.draw; });
+
+    function strokeKit(c) {
+        c.save();
+        c.lineCap = 'round'; c.lineJoin = 'round';
+        c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+        return BODY;
     }
 
-    function buildStarterGrid() {
-        if (!starterGridEl) starterGridEl = document.getElementById('starterGrid');
-        if (!starterGridEl) return;
-        starterGridEl.innerHTML = '';
-        for (let i = 0; i < DEFAULT_GROODLES.length; i++) {
-            const seed = DEFAULT_GROODLES[i];
-            const card = document.createElement('button');
-            card.type = 'button';
-            card.className = 'starter-card';
-            card.setAttribute('aria-label', 'Start with ' + seed.label);
-            card.innerHTML =
-                '<div class="starter-emoji" aria-hidden="true">' + seed.emoji + '</div>' +
-                '<div class="starter-name">' + escapeHtml(seed.label) + '</div>' +
-                '<div class="starter-action">Use this</div>';
-            card.addEventListener('click', () => {
-                applyDefaultGroodle(seed.id);
-                /* Close the New drawer so the kid lands back on the
-                   stage and can immediately tweak the starter. */
-                closeDrawer();
-            });
-            starterGridEl.appendChild(card);
+    /* --- compact missing halves --- */
+
+    function clownFilled(c) {
+        c.fillStyle = '#fcbf49'; c.fillRect(0, 0, STAGE_W, STAGE_H);
+        c.fillStyle = '#43aa8b'; c.fillRect(0, BODY.shirtTop, STAGE_W, BODY.waistY - BODY.shirtTop);
+        c.fillStyle = '#ff6ec7'; c.fillRect(0, BODY.waistY - 6, STAGE_W, BODY.pantsBot);
+        /* polka dots */
+        c.fillStyle = '#fff';
+        for (let i = 0; i < 7; i++) {
+            const dy = BODY.shirtTop + 28 + i * 22;
+            const dx = BODY.cx + (i % 2 ? 22 : -22) + (i % 3 - 1) * 8;
+            c.beginPath(); c.arc(dx, dy, 7, 0, Math.PI * 2); c.fill();
         }
+        /* red nose, eyes, big smile */
+        c.fillStyle = '#e63946';
+        c.beginPath(); c.arc(BODY.cx, BODY.mouthY - 4, 14, 0, Math.PI * 2); c.fill();
+        c.fillStyle = '#1a0f33';
+        c.beginPath(); c.arc(BODY.cx - BODY.eyeDX, BODY.eyeY, 5, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.arc(BODY.cx + BODY.eyeDX, BODY.eyeY, 5, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#e63946'; c.lineWidth = 5; c.lineCap = 'round';
+        c.beginPath(); c.arc(BODY.cx, BODY.mouthY + 12, 24, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
     }
+
+    function superheroFilled(c) {
+        c.fillStyle = '#43aa8b'; c.fillRect(0, 0, STAGE_W, STAGE_H);
+        c.fillStyle = '#1d3557'; c.fillRect(0, BODY.waistY - 6, STAGE_W, BODY.pantsBot);
+        c.fillStyle = '#ffd23f'; c.fillRect(0, BODY.waistY - 8, STAGE_W, 16);
+        /* chest star */
+        c.fillStyle = '#ffd23f';
+        c.beginPath();
+        for (let i = 0; i < 10; i++) {
+            const a = i * Math.PI / 5 - Math.PI / 2;
+            const rr = i % 2 === 0 ? 26 : 11;
+            const x = BODY.cx + Math.cos(a) * rr, y = BODY.chestY + Math.sin(a) * rr;
+            if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+        }
+        c.closePath(); c.fill();
+        /* mask + eyes + grin */
+        c.fillStyle = '#1a0f33';
+        c.fillRect(BODY.cx - 38, BODY.eyeY - 12, 76, 22);
+        c.fillStyle = '#fff';
+        c.beginPath(); c.ellipse(BODY.cx - BODY.eyeDX, BODY.eyeY, 8, 6, 0, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.ellipse(BODY.cx + BODY.eyeDX, BODY.eyeY, 8, 6, 0, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.lineCap = 'round';
+        c.beginPath(); c.arc(BODY.cx, BODY.mouthY + 6, 13, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+    }
+
+    function rockstarOutline(c) {
+        const B = strokeKit(c);
+        /* spiky hair */
+        c.beginPath();
+        for (let i = 0; i <= 6; i++) {
+            const x = B.cx - 36 + i * 12;
+            c.moveTo(x, B.headTop + 22); c.lineTo(x + 4, B.headTop + 2);
+        }
+        c.stroke();
+        /* star shades */
+        for (let s = 0; s < 2; s++) {
+            const sx = B.cx + (s ? B.eyeDX : -B.eyeDX);
+            c.beginPath();
+            for (let k = 0; k < 10; k++) {
+                const a = k * Math.PI / 5 - Math.PI / 2;
+                const rr = k % 2 === 0 ? 10 : 4;
+                const x = sx + Math.cos(a) * rr, y = B.eyeY + Math.sin(a) * rr;
+                if (k === 0) c.moveTo(x, y); else c.lineTo(x, y);
+            }
+            c.closePath(); c.stroke();
+        }
+        /* open singing mouth + jacket lapels */
+        c.beginPath(); c.arc(B.cx, B.mouthY, 7, 0, Math.PI * 2); c.stroke();
+        c.beginPath();
+        c.moveTo(B.cx - 26, B.shirtTop); c.lineTo(B.cx, B.shirtTop + 56); c.lineTo(B.cx + 26, B.shirtTop);
+        c.stroke();
+        c.strokeRect(B.cx - 45, B.waistY - 8, 90, 16);
+        c.restore();
+    }
+
+    function discoOutline(c) {
+        const B = strokeKit(c);
+        /* lapels + sequin dots */
+        c.beginPath();
+        c.moveTo(B.cx - 26, B.shirtTop); c.lineTo(B.cx - 44, B.chestY); c.lineTo(B.cx, B.shirtTop + 54);
+        c.moveTo(B.cx + 26, B.shirtTop); c.lineTo(B.cx + 44, B.chestY); c.lineTo(B.cx, B.shirtTop + 54);
+        c.stroke();
+        for (let i = 0; i < 10; i++) {
+            const sy = B.shirtTop + 30 + i * 30;
+            const sx = B.cx + (i % 2 ? 20 : -20);
+            c.beginPath(); c.arc(sx, sy, 4, 0, Math.PI * 2); c.stroke();
+        }
+        /* shades + half-smile */
+        c.fillRect(B.cx - 32, B.eyeY - 8, 64, 16);
+        c.beginPath();
+        c.moveTo(B.cx - 18, B.mouthY);
+        c.bezierCurveTo(B.cx - 4, B.mouthY + 9, B.cx + 14, B.mouthY + 9, B.cx + 22, B.mouthY - 5);
+        c.stroke();
+        c.restore();
+    }
+
+    const CHARACTERS = [
+        { id: 'robot',     label: 'Robot',     emoji: '🤖',
+          outline: OUTLINE.robot,     filled: DEFAULT_GROODLE_BY_ID['robo-9000'] },
+        { id: 'princess',  label: 'Princess',  emoji: '👑',
+          outline: OUTLINE.princess,  filled: DEFAULT_GROODLE_BY_ID['princess-lily'] },
+        { id: 'astronaut', label: 'Astronaut', emoji: '🚀',
+          outline: OUTLINE.astronaut, filled: DEFAULT_GROODLE_BY_ID['astronaut-bo'] },
+        { id: 'pirate',    label: 'Pirate',    emoji: '🏴‍☠️',
+          outline: OUTLINE.pirate,    filled: DEFAULT_GROODLE_BY_ID['pirate-pip'] },
+        { id: 'clown',     label: 'Clown',     emoji: '🤡',
+          outline: OUTLINE.clown,
+          filled: { draw: clownFilled, pose: 'standing', bg: 'candy', hat: 'no-hat', color: '#e63946' } },
+        { id: 'superhero', label: 'Superhero', emoji: '🦸',
+          outline: OUTLINE.superhero,
+          filled: { draw: superheroFilled, pose: 'cheer', bg: 'stadium', hat: 'no-hat', color: '#ffd23f' } },
+        { id: 'rockstar',  label: 'Rockstar',  emoji: '🎸',
+          outline: rockstarOutline,
+          filled: DEFAULT_GROODLE_BY_ID['rockstar-daisy'] },
+        { id: 'disco',     label: 'Disco King', emoji: '🪩',
+          outline: discoOutline,
+          filled: DEFAULT_GROODLE_BY_ID['disco-king'] }
+    ];
+    const CHARACTER_BY_ID = {};
+    CHARACTERS.forEach(ch => { CHARACTER_BY_ID[ch.id] = ch; });
+
+    /* (The old applyDefaultGroodle / buildStarterGrid lived here. The
+       prefab "starter" path is now folded into the unified CHARACTERS
+       picker — applyFilled() above does the pose/bg/hat/colour+paint;
+       DEFAULT_GROODLES is still the art source via CHARACTER.filled.) */
 
     /* ============ PUBLIC GALLERY (Supabase) ============
 
@@ -2142,7 +2282,7 @@
             const ins = await client.from(GROODLE_TABLE).insert({
                 name: name,
                 image_url: pub.data.publicUrl,
-                page_id: currentPageId
+                page_id: currentCharacterId
             });
             if (ins.error) throw ins.error;
             saveModalStatusEl.textContent = 'Saved! Find it in the Gallery.';
@@ -2633,12 +2773,10 @@
            when the kid starts over. trackClearDrawing is a no-op for
            any other counters. */
         if (state) trackClearDrawing();
-        /* If a coloring-book page is loaded, re-stamp its template so
-           CLEAR resets to "freshly outlined" instead of fully blank. */
-        if (currentPageId) {
-            const page = PAGE_BY_ID[currentPageId];
-            if (page) page.draw(ctx);
-        }
+        /* If a colour-it-yourself character outline is loaded, re-stamp
+           it so CLEAR resets to "freshly outlined" instead of fully
+           blank. (Coloured-for-you + blank modes have no restamp.) */
+        if (restampOutline) restampOutline(ctx);
     }
 
     /* ============ TOOLS UI ============ */
@@ -2734,9 +2872,10 @@
        silhouette clip-path takes care of trimming any overflow. */
     function drawSurprise() {
         trackSurpriseUsed();
-        /* SURPRISE explicitly nulls the active page so clearCanvas's
-           page re-stamp doesn't fight with the new artwork. */
-        currentPageId = null;
+        /* SURPRISE explicitly clears the active character so
+           clearCanvas's outline re-stamp doesn't fight the new art. */
+        currentCharacterId = null;
+        restampOutline = null;
         clearCanvas();
 
         // Skin tone fill across the whole body silhouette
@@ -2821,10 +2960,10 @@
            signal from the kid. */
         trackDrawingFinished();
         trackBeatExperienced(BEATS[currentBeatIdx]);
-        /* Pressing DANCE while a coloring-book page is active also counts
-           as finishing that page — unlocks its per-page achievement (and
-           the Coloring Master master achievement at the 6th completion). */
-        if (currentPageId) trackPageCompleted(currentPageId);
+        /* Pressing DANCE while a character is loaded (outline OR
+           coloured-for-you) counts as finishing it — unlocks its
+           page-* achievement + Coloring Master at the 6th. */
+        if (currentCharacterId) trackCharacterCompleted(currentCharacterId);
         ensureAudio();
         const begin = () => {
             isPlaying = true;
@@ -3003,7 +3142,7 @@
         document.getElementById('openAchievementsBtn').addEventListener('click', openAchievements);
         document.getElementById('openHatShopBtn').addEventListener('click', openHatShop);
         const pagesBtn = document.getElementById('openPagesBtn');
-        if (pagesBtn) pagesBtn.addEventListener('click', openPagesPicker);
+        if (pagesBtn) pagesBtn.addEventListener('click', openCharacterPicker);
         const galleryBtn = document.getElementById('openGalleryBtn');
         if (galleryBtn) galleryBtn.addEventListener('click', openGallery);
         const saveBtn = document.getElementById('saveBtn');
@@ -3098,7 +3237,6 @@
         buildSizes();
         attachBgPicker();
         buildPosePicker();
-        buildStarterGrid();
         attachHandlers();
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');
