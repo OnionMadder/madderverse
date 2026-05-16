@@ -34,33 +34,36 @@
         VARIANT_COUNT:      6,
         // Spawn timing — a fresh appearance is scheduled this many ms
         // after the previous one ends (uniform random in [MIN, MAX]).
-        SPAWN_MIN_MS:       30000,
-        SPAWN_MAX_MS:       90000,
-        FIRST_SPAWN_MIN_MS: 20000,   // grace before the very first one
-        FIRST_SPAWN_MAX_MS: 45000,
-        // How long it stays on screen before drifting off (ms).
+        // AGGRO TUNING: comes sooner, far more often, scares from a
+        // wider radius, ramps fear fast so horror trips readily.
+        SPAWN_MIN_MS:       12000,
+        SPAWN_MAX_MS:       40000,
+        FIRST_SPAWN_MIN_MS: 7000,    // grace before the very first one
+        FIRST_SPAWN_MAX_MS: 16000,
+        // STAY_* are now UNUSED — the Creep persists until it drifts
+        // fully off-screen (see creepTick); kept for reference only.
         STAY_MIN_MS:        10000,
         STAY_MAX_MS:        15000,
         // Drift motion.
-        SPEED_MIN_PXPS:     30,      // horizontal/vertical px per second
-        SPEED_MAX_PXPS:     50,
-        WAVE_AMP_PX:        46,      // sine-wave excursion amplitude
-        WAVE_PERIOD_MS:     2600,    // sine-wave period
+        SPEED_MIN_PXPS:     34,      // horizontal/vertical px per second
+        SPEED_MAX_PXPS:     58,
+        WAVE_AMP_PX:        62,      // sine-wave excursion amplitude
+        WAVE_PERIOD_MS:     2200,    // sine-wave period
         SIZE_PX:            128,     // rendered creep box (square)
         // Proximity (CSS px, creep-center to Munki-center). Hysteresis:
         // scares while CLOSE, only decays once clearly FAR — the gap
         // between the two stops fear flickering at the boundary.
-        CLOSE_PX:           80,
-        FAR_PX:             120,
+        CLOSE_PX:           104,
+        FAR_PX:             150,
         // Fear per Munki: 0..100. Gains while close, decays while far.
         FEAR_MAX:           100,
-        FEAR_GAIN_PER_S:    5,
+        FEAR_GAIN_PER_S:    9,
         FEAR_DECAY_PER_S:   1,
         // Sum of all on-stage Munki fear that trips horror, and the
         // lower level it must fall back below before horror releases
         // (hysteresis so it doesn't strobe at the threshold).
-        HORROR_TRIGGER_SUM: 150,
-        HORROR_RELEASE_SUM: 60,
+        HORROR_TRIGGER_SUM: 105,
+        HORROR_RELEASE_SUM: 45,
         // z-index: above the stage BG + Munkis, below the tray/controls.
         Z_INDEX:            42
     };
@@ -2567,23 +2570,23 @@
         });
     }
 
-    // 5–6 lines per evil, picked at random on each tap. Kept short + warm
-    // — sad-but-cute, not bleak. Ice leans cold/lonely, Moon leans dark/
-    // wishful. The user's brief said don't overdo it.
+    // Terse, cold, FNAF-quiet. The "left out" loneliness is still here
+    // but it reads as a threat now, not sad-but-cute. No emoji, lower-
+    // case kept only for an unsettling flat affect.
     const JEALOUS_QUOTES = {
         ice: [
-            "why don't they ever pick me?",
-            "i'm not THAT cold...",
-            "brrrr. just me again.",
-            "i'd be a beautiful 7th color.",
-            "it's lonely on the side."
+            "you never pick me.",
+            "you'll be cold too. soon.",
+            "i don't forget the warm ones.",
+            "i was a color once.",
+            "stay. it's freezing out here."
         ],
         moon: [
-            "i see you up there...",
-            "maybe next time?",
-            "i light up at night, you know.",
-            "save a slot for me?",
-            "don't forget about me."
+            "i see you. always.",
+            "you'll make room for me.",
+            "i'm closer than you think.",
+            "don't look away.",
+            "you should have picked me."
         ]
     };
 

@@ -1096,11 +1096,12 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     .story-card { animation: none; }
 }
 
-/* ====== ICE FREEZE TO "DEATH" ======
-   When Ice Munki lands on stage, every other Munki on stage freezes.
-   The vibe is "morbidly absurd cartoon" — cyan tint, ice crystal, RIP
-   flag — never gore. The frozen Munki keeps its silhouette but reads as
-   visibly Done. Class is toggled in updateIceFreeze() in game.js. */
+/* ====== ICE FREEZE (cold / FNAF — no cartoon RIP) ======
+   When Ice Munki lands on stage, every other Munki freezes. The vibe
+   is cold dread, NOT a morbidly-cute gag: the Munki goes rigid +
+   drained (desaturated, darker), trembles, and frost cracks silently
+   encase the slot. No "RIP" text, no spinning emoji, no comic bounce.
+   Class is toggled in updateIceFreeze() in game.js. */
 .stage-slot.frozen-by-ice {
     /* Slot itself has no frame on the frame-less stage; instead, replace
        the active spotlight under the Munki with an icy cyan halo so the
@@ -1112,7 +1113,7 @@ body.madballz-mode .chip-label { color: #f0abfc; }
 }
 
 .stage-slot.frozen-by-ice .char-art {
-    filter: hue-rotate(180deg) saturate(0.32) brightness(1.32) contrast(1.12);
+    filter: hue-rotate(178deg) saturate(0.22) brightness(0.82) contrast(1.18);
     animation: ice-shiver 0.6s ease-in-out infinite !important;
 }
 
@@ -1129,56 +1130,41 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     75%      { transform: translateX(0.6px)  rotate(0.6deg); }
 }
 
-/* Spinning ❄ snowflake top-right of the frozen slot. */
+/* Static frost shard at the corner — a sharp drawn ice crystal, NOT a
+   spinning cartoon snowflake glyph. No emoji, no animation. */
 .stage-slot.frozen-by-ice .slot-icon::before {
-    content: '❄';
+    content: '';
     position: absolute;
-    top: 4px;
+    top: 5px;
     right: 6px;
-    color: #fff;
-    font-size: 24px;
-    line-height: 1;
-    text-shadow: 0 0 10px #67e8f9, 0 0 22px rgba(103, 232, 249, 0.7);
-    animation: ice-flake-spin 3.2s linear infinite;
+    width: 13px;
+    height: 17px;
+    background: linear-gradient(150deg, #fff 0%, #a5f3fc 45%, rgba(103, 232, 249, 0.25) 100%);
+    clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%);
+    filter: drop-shadow(0 0 6px rgba(103, 232, 249, 0.85));
+    opacity: 0.9;
     z-index: 5;
     pointer-events: none;
 }
 
-@keyframes ice-flake-spin {
-    0%   { transform: rotate(0); opacity: 0.85; }
-    50%  { transform: rotate(180deg); opacity: 1; }
-    100% { transform: rotate(360deg); opacity: 0.85; }
-}
-
-/* Big "💀 RIP" flag rises from the body — fires once on the freeze
-   transition (CSS animation runs once when class is added). */
+/* Frost silently encases the slot — thin cracks + a cold dark vignette
+   fade in ONCE. No text, no comic bounce; just cold dread. */
 .stage-slot.frozen-by-ice::after {
-    content: '💀 RIP';
+    content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-family: 'Fredoka', sans-serif;
-    font-weight: 800;
-    font-size: 20px;
-    letter-spacing: 0.12em;
-    color: #fff;
-    text-shadow:
-        0 0 10px #67e8f9,
-        2px 2px 0 #000,
-        -2px -2px 0 #000;
-    animation: rip-rise 1.3s cubic-bezier(0.2, 0.85, 0.3, 1) forwards;
+    inset: 0;
+    background:
+        linear-gradient(118deg, transparent 45%, rgba(224, 252, 255, 0.6) 47%, transparent 49%),
+        linear-gradient(204deg, transparent 58%, rgba(165, 243, 252, 0.5) 60%, transparent 62%),
+        linear-gradient(70deg,  transparent 70%, rgba(224, 252, 255, 0.42) 72%, transparent 74%),
+        radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(6, 18, 28, 0.46) 100%);
+    opacity: 0;
+    animation: ice-encase 0.55s ease-out forwards;
     z-index: 7;
     pointer-events: none;
-    white-space: nowrap;
 }
 
-@keyframes rip-rise {
-    0%   { opacity: 0; transform: translate(-50%, 40%) scale(0.3) rotate(-12deg); }
-    20%  { opacity: 1; transform: translate(-50%, -10%) scale(1.3) rotate(4deg); }
-    60%  { opacity: 1; transform: translate(-50%, -25%) scale(1) rotate(-2deg); }
-    100% { opacity: 0.85; transform: translate(-50%, -28%) scale(1) rotate(0); }
-}
+@keyframes ice-encase { from { opacity: 0; } to { opacity: 0.92; } }
 
 .stage-slot.frozen-by-ice .slot-label {
     color: #67e8f9 !important;
@@ -1202,7 +1188,7 @@ body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"] {
 @media (prefers-reduced-motion: reduce) {
     .stage-slot.frozen-by-ice .char-art { animation: none !important; }
     .stage-slot.frozen-by-ice .slot-icon::before { animation: none; }
-    .stage-slot.frozen-by-ice::after { animation: rip-rise 0.8s ease-out forwards; }
+    .stage-slot.frozen-by-ice::after { animation: none; opacity: 0.92; }
 }
 
 /* ====== MOON RULES (chaos events fired by clicks while Moon is on stage) ====== */
