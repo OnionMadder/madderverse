@@ -76,6 +76,12 @@ npm install                 # Node deps (Capacitor + plugins)
 npx cap sync android        # copies www/ into android/
 ```
 
+- [ ] **Step 1A (do this BEFORE opening Android Studio):** confirm
+      `targetSdkVersion` in `android/variables.gradle` matches Play
+      Console's **current** minimum (as of 2026-05: **API 35**). Play
+      rejects any build below it. If you bump it, you MUST re-run
+      `npx cap sync android` and rebuild the AAB. See the appendix
+      "Common Play Console rejections + fixes" for the exact fix.
 - [ ] `npm install` completes with no errors.
 - [ ] `npx cap sync android` ends with "Sync finished" and lists 4
       plugins (preferences, share, status-bar, splash-screen) with
@@ -345,3 +351,75 @@ npx cap open android              # open Android Studio to build the AAB
 keytool -genkey -v -keystore all-munkis-release.keystore \
         -alias all-munkis -keyalg RSA -keysize 2048 -validity 10000
 ```
+
+---
+
+## Appendix — Common Play Console rejections + fixes
+
+First-time Capacitor → Play submissions reliably hit a few of these.
+None are signing problems; the keystore/upload-key setup (§0, §4, §5)
+is unaffected by anything here.
+
+### "Target API level N required (your build targets M)"
+
+Play raises the minimum `targetSdk` ~yearly; builds below it are hard-
+rejected. **Fix (the whole fix is two lines + a sync + a rebuild):**
+
+1. Edit `android/variables.gradle`:
+   ```
+   compileSdkVersion = <an SDK platform you have installed, >= N>
+   targetSdkVersion  = N
+   ```
+   `compileSdk` does **not** have to equal `targetSdk` — it only has to
+   be an SDK platform actually installed under
+   `…/Android/Sdk/platforms/` and `>= targetSdk`. Play enforces
+   **only** `targetSdk`. (Check installed platforms with
+   `ls "$ANDROID_HOME/platforms"`; if none `>= N`, install one via
+   `sdkmanager "platforms;android-N"` or Android Studio's SDK Manager.)
+2. `npx cap sync android`
+3. Rebuild the AAB (`cd android && ./gradlew :app:bundleRelease`).
+4. Bump `versionCode` first (see next item) — the rejected upload
+   already burned the old one.
+
+### "Version code N has already been used"
+
+`versionCode` (in `android/app/build.gradle` → `defaultConfig`) is a
+monotonic integer Play uses to order updates. **It can never be reused
+— not even if the upload was rejected, discarded, or deleted from a
+draft.** Every upload attempt permanently retires that integer.
+**Fix:** increment `versionCode` (e.g. `1` → `2`), rebuild the AAB,
+re-upload. `versionName` (the human string, e.g. `"1.0"`) is unrelated
+and can stay the same across many `versionCode` bumps.
+
+### "App contains references to private/restricted APIs" / non-SDK API warnings
+
+Usually a **false positive** from a Capacitor/Cordova plugin or the
+WebView, surfaced in the **Pre-launch report**, not a hard block for
+internal testing. Don't refactor blindly. Check Play Console →
+Pre-launch report for the exact API + caller. If it's plugin code (not
+ours) and the app runs, it's almost always safe to proceed; revisit
+only if Play escalates it to a policy rejection.
+
+### "Missing privacy policy" / "You must provide a privacy policy URL"
+
+This is a **store-listing form** field, **not** a build problem. Do
+not rebuild. Play Console → Policy → App content → Privacy policy:
+paste `https://madderverse.org/all-munkis/legal/privacy.html` (and see
+§2 — confirm the page actually loads first; reviewers click it).
+
+### "Release not available to any testers" (warning, not error)
+
+Non-blocking. Internal testing just needs a tester list: Play Console
+→ Testing → Internal testing → **Testers** tab → add an email list
+(your own email is fine) and use the opt-in link to install.
+
+### "No deobfuscation file was uploaded" (warning, not error)
+
+Ignore. We ship with `minifyEnabled false` (no R8/proguard), so there
+are no obfuscated stack traces to map. Permanently harmless.
+
+### "App not compliant with Play's 16 KB native page size" / 64-bit / etc.
+
+A pure Capacitor WebView app ships no custom native `.so` libraries,
+so these generally don't apply. If Play flags it, it's about a plugin;
+check which `.so` is named in the message before changing anything.

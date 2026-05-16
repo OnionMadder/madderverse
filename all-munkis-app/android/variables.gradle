@@ -1,7 +1,13 @@
 ext {
     minSdkVersion = 22
-    compileSdkVersion = 34
-    targetSdkVersion = 34
+    // Play requires targetSdk >= 35 (API 35 / Android 15). compileSdk
+    // only needs to be an SDK platform installed locally that is >=
+    // targetSdk; 36 is installed here (35 is not), and Play does NOT
+    // enforce compileSdk — only targetSdk. Do not lower targetSdk below
+    // Play's current minimum (see CHECKLIST.md "Common Play Console
+    // rejections + fixes").
+    compileSdkVersion = 36
+    targetSdkVersion = 35
     androidxActivityVersion = '1.8.0'
     androidxAppCompatVersion = '1.6.1'
     androidxCoordinatorLayoutVersion = '1.2.0'
