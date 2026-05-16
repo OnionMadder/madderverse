@@ -1006,6 +1006,19 @@
     // the neighbour can never bleed in. The head art has transparent
     // padding inside the frame, so shaving 1px is invisible on the Munki.
     const FRAME_BLEED_INSET = 1;
+    // Flying Creeps need a MUCH larger inset than the head sheets. The
+    // creep sheet is 3248×1738 with 1082×869 frames packed on a 1px
+    // horizontal gutter and a ZERO-px vertical gutter (row 0 ends at
+    // y=869, row 1 starts at y=869 — touching). paintCreepVariant scales
+    // a frame down to CREEP.SIZE_PX (128) via CSS background-size — a
+    // ~8.4× downscale — so a 1px source inset becomes ~0.12 *display*
+    // px, far below the ~4px bilinear sampling reach of that downscale,
+    // and the neighbouring creep bleeds in at the touching edge. 8 source
+    // px (~0.7% per side, invisible on the centred creature art) clears
+    // the sampling window with margin. Heads use SVG viewBox cropping on
+    // a smaller, lightly-scaled sheet, so 1px stays correct for them —
+    // do NOT raise FRAME_BLEED_INSET to "fix" creeps.
+    const CREEP_BLEED_INSET = 8;
     function headModArt(frameName, sheetName) {
         const sheet = SHEETS[sheetName || 'munki'];
         const f = sheet && sheet.frames[frameName];
@@ -2891,7 +2904,7 @@
         // packs variants on a 2px gutter, so without the inset a scaled
         // background-position can bleed the neighbouring variant in at the
         // edges. Inset the source rect by FRAME_BLEED_INSET on every side.
-        const b = FRAME_BLEED_INSET;
+        const b = CREEP_BLEED_INSET;
         const ix = f.x + b, iy = f.y + b, iw = f.w - 2 * b, ih = f.h - 2 * b;
         // Scale so the variant's longest (inset) side fills SIZE_PX.
         const scale = CREEP.SIZE_PX / Math.max(iw, ih);
