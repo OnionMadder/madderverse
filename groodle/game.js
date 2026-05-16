@@ -3200,32 +3200,41 @@
 
         let ty = 0, rot = 0, sx = 1, sy = 1, tx = 0;
 
+        /* Headroom budget: the figure's head art starts only ~5.7% down
+           its own viewBox and the .creature box is ~0.85 of the viewport,
+           so the dance's UPWARD components must stay small or the head
+           clips out the overflow:hidden stage top. The big head-lifter is
+           the hop scale-STRETCH (sy>1), magnified ~0.86×boxHeight because
+           transform-origin sits near the feet — so the hop stretch is
+           trimmed hardest. Rotation, side-step (tx) and the landing
+           squash (gsq, which moves the head DOWN) keep full energy so the
+           dance still reads big. */
         if (move === 'BOUNCE') {
-            ty = -hop * 46 + antic * 10;
-            sy = 1 + hop * 0.13 - gsq * 0.22;
-            sx = 1 - hop * 0.09 + gsq * 0.22;
+            ty = -hop * 32 + antic * 8;
+            sy = 1 + hop * 0.05 - gsq * 0.22;
+            sx = 1 - hop * 0.04 + gsq * 0.22;
             rot = Math.sin(beats * Math.PI) * 2;
         } else if (move === 'TWIST') {
             const swiv = Math.sin(beats * Math.PI);     // hip swivel, 2-beat period
             rot = swiv * 16;
             tx = swiv * 8;
-            ty = -hop * 22;
-            sy = 1 + hop * 0.06 - gsq * 0.12;
-            sx = 1 - hop * 0.04 + gsq * 0.12;
+            ty = -hop * 16;
+            sy = 1 + hop * 0.03 - gsq * 0.12;
+            sx = 1 - hop * 0.02 + gsq * 0.12;
         } else if (move === 'DISCO') {
             const step = Math.sin(beats * Math.PI / 2); // slow 4-beat side-step
             tx = step * 30;
             rot = step * 11;
-            ty = -hop * 34;
-            sy = 1 + hop * 0.11 - gsq * 0.17;
-            sx = 1 - hop * 0.08 + gsq * 0.17;
+            ty = -hop * 24;
+            sy = 1 + hop * 0.045 - gsq * 0.17;
+            sx = 1 - hop * 0.035 + gsq * 0.17;
             /* every 4th beat: a quick scaleX flip-and-back reads as a
                spin/turn (figure goes edge-on at mid-beat then back). */
             if (barBeat === 3) sx *= Math.cos(ph * Math.PI * 2);
         } else if (move === 'PARTY') {
-            ty = -hop * 56;
-            sy = 1 + hop * 0.17 - gsq * 0.28;
-            sx = 1 - hop * 0.13 + gsq * 0.28;
+            ty = -hop * 34;
+            sy = 1 + hop * 0.05 - gsq * 0.28;
+            sx = 1 - hop * 0.05 + gsq * 0.28;
             rot = Math.sin(beats * Math.PI * 2) * 11;
             tx = Math.sin(beats * Math.PI) * 16;
             /* every 4th beat: a full cartwheel spin around the feet */

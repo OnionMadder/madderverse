@@ -311,13 +311,16 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
     position: absolute;
     top: 0; right: 0; bottom: 0; left: 0;
     margin: auto;
-    /* 0.88 of the largest fitting 2:3 box leaves ~6% slack top+bottom
-       so the pumped dance jump (PARTY translateY) doesn't shove the
-       head past the viewport top (.stage is overflow:hidden). The
-       pattern layer uses the IDENTICAL formula so the static-pattern
+    /* 0.85 of the largest fitting 2:3 box leaves ~7.5% slack top+bottom.
+       The figure's head art starts only ~5.7% down its own viewBox, so
+       headroom is tight: the dance jump's upward components (translateY
+       AND the hop scale-stretch about the near-feet origin) are trimmed
+       in applyMove() so even the wildest PARTY peak clears the viewport
+       top on viewports down to ~500px tall (.stage is overflow:hidden).
+       The pattern layer uses the IDENTICAL formula so the static-pattern
        window stays pixel-aligned with the body. */
-    width: calc(min(100vw, 100dvh * 2 / 3) * 0.88);
-    height: calc(min(100dvh, 100vw * 3 / 2) * 0.88);
+    width: calc(min(100vw, 100dvh * 2 / 3) * 0.85);
+    height: calc(min(100dvh, 100vw * 3 / 2) * 0.85);
     z-index: 2;
 }
 
@@ -484,13 +487,13 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
    full viewport) — otherwise the SVG viewBox maps to a different
    rect than the body and the pattern lands off the figure. Same
    sizing formula as `.stage > .creature` (kept in lockstep with the
-   shared 0.88 jump-headroom scale below). */
+   shared 0.85 jump-headroom scale below). */
 .stage > .pattern-layer {
     position: absolute;
     top: 0; right: 0; bottom: 0; left: 0;
     margin: auto;
-    width: calc(min(100vw, 100dvh * 2 / 3) * 0.88);
-    height: calc(min(100dvh, 100vw * 3 / 2) * 0.88);
+    width: calc(min(100vw, 100dvh * 2 / 3) * 0.85);
+    height: calc(min(100dvh, 100vw * 3 / 2) * 0.85);
     pointer-events: none;
     z-index: 1;
 }
