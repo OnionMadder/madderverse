@@ -467,6 +467,27 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
     z-index: 5;
 }
 
+/* Static fill-pattern layer. Stage-level (NOT inside .creature) so
+   the pattern field never inherits the dance transform — it stays
+   locked to the stage. z-index 1: above the bg, below .creature, so
+   the kid's strokes paint over it. #patternWinPath is the moving
+   window: it gets the SAME CSS transform string as .creature each
+   dance frame, and transform-box:view-box + a JS-synced
+   transform-origin make that transform resolve identically to the
+   body's, so the pattern reads as seen-through-a-dancing-body. */
+.pattern-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+#patternWinPath {
+    transform-box: view-box;
+    transform-origin: 50% 92%;
+}
+
 /* Pale wash inside the silhouette so the kid sees the body shape even
    before any strokes — this is the "coloring page" surface. Slight cool
    tint (vs pure white) so the figure still reads as a distinct shape on
@@ -475,6 +496,52 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
    essentially white because the tint is so subtle. */
 .silhouette-fill > * {
     fill: rgba(232, 232, 244, 0.94);
+}
+
+/* When a pattern is active the pale wash would hide it (the wash is
+   inside .creature, z above the pattern layer). Make it transparent
+   so the static pattern shows through as the body's backdrop; the
+   kid still draws on top normally. */
+body.has-pattern .silhouette-fill > * {
+    fill: transparent;
+}
+
+/* Pattern picker — swatch row in the Brush drawer. Each swatch is a
+   mini SVG tiled with that pattern; "None" (∅) clears it. */
+.pattern-picker {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.pattern-swatch {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    transition: border-color 0.12s, transform 0.08s;
+}
+.pattern-swatch svg { display: block; width: 100%; height: 100%; }
+.pattern-swatch:active { transform: scale(0.92); }
+.pattern-swatch.active {
+    border-color: #00ffcc;
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+}
+.pattern-none {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #d6bdff;
+    font-size: 20px;
+    line-height: 1;
+}
+@media (hover: hover) {
+    .pattern-swatch:hover { border-color: rgba(0, 255, 204, 0.6); }
 }
 
 /* Outline shapes provide the SourceAlpha that the
@@ -1182,6 +1249,39 @@ body:not(.dancing) .dance-dock { display: none; }
     display: block;
 }
 
+/* Neon-glow icons. The SVGs paint with currentColor, so tinting is
+   just `color` + a layered drop-shadow glow (teal core, faint pink
+   halo) — no per-icon edits, fully themeable. Scoped to exclude the
+   primary (Dance) + stop buttons, which sit on bright gradients and
+   keep their dark/white glyphs for contrast. */
+.dock-btn:not(.primary):not(.stop) .dock-icon svg {
+    color: #00ffcc;
+    filter:
+        drop-shadow(0 0 3px rgba(0, 255, 204, 0.55))
+        drop-shadow(0 0 7px rgba(255, 110, 199, 0.22));
+    transition: color 0.15s, filter 0.15s;
+}
+/* Open-drawer / selected state: glyph flips to neon pink. */
+.dock-btn.active:not(.primary):not(.stop) .dock-icon svg {
+    color: #ff6ec7;
+    filter: drop-shadow(0 0 5px rgba(255, 110, 199, 0.7));
+}
+@media (hover: hover) {
+    .dock-btn:not(.primary):not(.stop):hover .dock-icon svg {
+        filter:
+            drop-shadow(0 0 5px rgba(0, 255, 204, 0.85))
+            drop-shadow(0 0 11px rgba(255, 110, 199, 0.35));
+    }
+}
+/* Dance icon: subtle white edge so the dark glyph stays crisp on the
+   bright pink→gold→teal gradient. */
+.dock-btn.primary .dock-icon svg {
+    filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.55));
+}
+@media (prefers-reduced-motion: reduce) {
+    .dock-btn .dock-icon svg { transition: none; }
+}
+
 /* .dock-label is no longer an inline caption — it floats above the
    button as a tooltip pill. Hidden by default; revealed on hover
    (desktop) or a long-press (.show-tip added by attachDockTooltips
@@ -1424,6 +1524,7 @@ body:not(.dancing) .dance-dock { display: none; }
 }
 
 .page-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -1439,6 +1540,34 @@ body:not(.dancing) .dance-dock { display: none; }
     -webkit-tap-highlight-color: transparent;
 }
 .page-card:active { transform: scale(0.97); }
+
+/* "Colour it for me" corner button on each character card. Tapping
+   it loads the pre-coloured version; tapping anywhere else on the
+   card loads the colour-it-yourself outline. Sized to clear the 44px
+   touch-target floor. */
+.char-fill-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    line-height: 1;
+    border-radius: 9px;
+    border: 1.5px solid rgba(255, 110, 199, 0.55);
+    background: rgba(26, 15, 51, 0.9);
+    cursor: pointer;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s, transform 0.08s;
+}
+.char-fill-btn:active { transform: scale(0.9); }
+@media (hover: hover) {
+    .char-fill-btn:hover { background: rgba(255, 110, 199, 0.35); }
+}
 .page-card.done {
     border-color: rgba(0, 255, 204, 0.6);
     background:

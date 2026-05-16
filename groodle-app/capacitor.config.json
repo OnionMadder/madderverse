@@ -1,0 +1,8 @@
+{
+  "appId": "org.madderverse.groodle",
+  "appName": "Groodle",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#1a0f33"
+  }
+}
