@@ -138,20 +138,78 @@
                ' Z';
     }
 
-    /* A "blob limb": a chain of overlapping circles from (ax,ay) to
-       (bx,by), radius ar→br (tapered if they differ). Union of the
-       circles is a smooth tube with rounded ends — no arc flags
-       anywhere. Spacing ≤ ~0.6·r keeps the union scallop-free. */
-    function blobLimb(ax, ay, bx, by, ar, br) {
-        if (br == null) br = ar;
-        const len = Math.hypot(bx - ax, by - ay);
-        const steps = Math.max(2, Math.ceil(len / (Math.min(ar, br) * 0.6)));
-        let d = '';
-        for (let i = 0; i <= steps; i++) {
-            const t = i / steps;
-            d += circleBezier(ax + (bx - ax) * t, ay + (by - ay) * t, ar + (br - ar) * t) + ' ';
+    /* A circular arc as a chain of ≤90° cubic béziers, from angle a0 to
+       a1 (radians, signed — negative sweeps go the other way). No SVG
+       `A` command, so it parses identically in Path2D and every SVG
+       renderer. Caller has already emitted the path point at a0. */
+    function arcBezier(cx, cy, r, a0, a1) {
+        const f = (n) => n.toFixed(2);
+        const total = a1 - a0;
+        const n = Math.max(1, Math.ceil(Math.abs(total) / (Math.PI / 2)));
+        const step = total / n;
+        const h = r * (4 / 3) * Math.tan(step / 4);   // signed handle length
+        let out = '';
+        for (let i = 0; i < n; i++) {
+            const aA = a0 + step * i, aB = a0 + step * (i + 1);
+            const x0 = cx + r * Math.cos(aA), y0 = cy + r * Math.sin(aA);
+            const x1 = cx + r * Math.cos(aB), y1 = cy + r * Math.sin(aB);
+            const c1x = x0 - h * Math.sin(aA), c1y = y0 + h * Math.cos(aA);
+            const c2x = x1 + h * Math.sin(aB), c2y = y1 - h * Math.cos(aB);
+            out += 'C ' + f(c1x) + ' ' + f(c1y) + ' ' + f(c2x) + ' ' + f(c2y) +
+                   ' ' + f(x1) + ' ' + f(y1) + ' ';
         }
-        return d;
+        return out;
+    }
+
+    /* Pick the end angle so the DIRECTED sweep s→e' (e' = e ± 2π)
+       actually passes through angle m — the direction the rounded cap
+       must bulge. Of the two arcs from s to e (the forward/CCW one and
+       the backward/CW one), return whichever contains m. Robust for
+       every axis orientation (the old version only tested one side and
+       silently inverted caps on vertical capsules). */
+    function sweepThrough(s, e, m) {
+        const TAU = 2 * Math.PI;
+        const norm = (a) => { a %= TAU; return a < 0 ? a + TAU : a; };
+        const fwd = norm(e - s);            // forward sweep amount [0,2π)
+        const mOff = norm(m - s);           // where m sits from s, forward
+        return (mOff <= fwd) ? (s + fwd) : (s + fwd - TAU);
+    }
+
+    /* A smooth tapered CAPSULE: the exact convex hull of a circle of
+       radius `ra` at A and `rb` at B — two straight outer-tangent
+       lines + a rounded cap arc at each end. Unlike the old circle-
+       chain "blob" this has a perfectly clean edge (no scallops) and
+       genuine rounded hand/foot tips. Wound clockwise to match
+       circleBezier so a nonzero-fill union of these pieces is one
+       seamless solid (overlaps melt; gaps — e.g. between the legs —
+       stay open). */
+    function capsule(ax, ay, bx, by, ra, rb) {
+        if (rb == null) rb = ra;
+        const dx = bx - ax, dy = by - ay;
+        const d = Math.hypot(dx, dy) || 1e-6;
+        const ux = dx / d, uy = dy / d;            // axis A→B
+        let mu = (rb - ra) / d;
+        if (mu > 0.999) mu = 0.999; else if (mu < -0.999) mu = -0.999;
+        const mp = Math.sqrt(1 - mu * mu);
+        const nx = -uy, ny = ux;                   // unit normal (left of axis)
+        // outward normals to the two tangent lines (sides R and L)
+        const gRx = mu * ux - mp * nx, gRy = mu * uy - mp * ny;
+        const gLx = mu * ux + mp * nx, gLy = mu * uy + mp * ny;
+        const f = (n) => n.toFixed(2);
+        // tangent contact points
+        const ARx = ax + ra * gRx, ARy = ay + ra * gRy;
+        const BRx = bx + rb * gRx, BRy = by + rb * gRy;
+        const BLx = bx + rb * gLx, BLy = by + rb * gLy;
+        const ALx = ax + ra * gLx, ALy = ay + ra * gLy;
+        const aR = Math.atan2(gRy, gRx), aL = Math.atan2(gLy, gLx);
+        const tip = Math.atan2(uy, ux);            // B-cap bulges this way
+        const root = tip + Math.PI;                // A-cap bulges this way
+        return 'M ' + f(ARx) + ' ' + f(ARy) + ' ' +
+               'L ' + f(BRx) + ' ' + f(BRy) + ' ' +
+               arcBezier(bx, by, rb, aR, sweepThrough(aR, aL, tip)) +
+               'L ' + f(ALx) + ' ' + f(ALy) + ' ' +
+               arcBezier(ax, ay, ra, aL, sweepThrough(aL, aR, root)) +
+               'Z ';
     }
 
     function groodleBodyPath(sk) {
@@ -163,25 +221,33 @@
         /* Head — one circle. */
         const head = circleBezier(h.x, h.y, h.r);
 
-        /* Torso — a tapered circle column from just under the head to
-           the hip line; slightly wider at the chest than the hips so
-           it reads as a body, not a tube. The top circles overlap the
-           head (no neck seam); the bottom overlaps the leg roots. */
-        const torso = blobLimb(cx, shY - 6, cx, hipY + 6, shHW * 0.92, hipHW * 1.04);
+        /* Neck — a short capsule bridging the chin to the shoulder line
+           so the head reads as attached, not a ball balanced on a tube.
+           Roots up inside the head and down inside the torso. */
+        const neck = capsule(h.x, h.y + h.r * 0.52, cx, shY + 6,
+                             h.r * 0.46, shHW * 0.60);
+
+        /* Torso — two stacked capsules through a slightly pinched waist
+           so the body has a shape (rounded shoulders → waist → rounded
+           hips) instead of being a straight tube. */
+        const waistY = (shY + hipY) / 2;
+        const waistHW = Math.min(shHW, hipHW) * 0.86;
+        const torsoTop = capsule(cx, shY - 4, cx, waistY, shHW * 0.96, waistHW);
+        const torsoBot = capsule(cx, waistY, cx, hipY + 4, waistHW, hipHW * 1.02);
 
         /* Arms root inside the torso so the shoulder is a seamless
-           blend, then taper slightly out to the hands. */
-        const armR = blobLimb(cx + shHW * 0.42, shY + 8, sk.handR.x, sk.handR.y, aw * 1.05, aw * 0.82);
-        const armL = blobLimb(cx - shHW * 0.42, shY + 8, sk.handL.x, sk.handL.y, aw * 1.05, aw * 0.82);
+           blend, then taper to a rounded hand. */
+        const armR = capsule(cx + shHW * 0.40, shY + 10, sk.handR.x, sk.handR.y, aw * 1.14, aw * 0.80);
+        const armL = capsule(cx - shHW * 0.40, shY + 10, sk.handL.x, sk.handL.y, aw * 1.14, aw * 0.80);
 
         /* Legs root up inside the torso (above the hip line, no hip
            seam); they spread to the feet so below the torso the two
-           chains separate into distinct legs with real daylight
+           capsules separate into distinct legs with real daylight
            between them. */
-        const legR = blobLimb(cx + hipHW * 0.4, hipY - 30, sk.footR.x, sk.footR.y, lw * 1.05, lw * 0.9);
-        const legL = blobLimb(cx - hipHW * 0.4, hipY - 30, sk.footL.x, sk.footL.y, lw * 1.05, lw * 0.9);
+        const legR = capsule(cx + hipHW * 0.38, hipY - 28, sk.footR.x, sk.footR.y, lw * 1.12, lw * 0.92);
+        const legL = capsule(cx - hipHW * 0.38, hipY - 28, sk.footL.x, sk.footL.y, lw * 1.12, lw * 0.92);
 
-        return head + ' ' + torso + armR + armL + legR + legL;
+        return head + ' ' + neck + torsoTop + torsoBot + armR + armL + legR + legL;
     }
 
     function posePathD(pose) {

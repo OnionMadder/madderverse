@@ -235,17 +235,53 @@ to the logical `400×600` space so JS only ever thinks in those units.
 3. Cycle buttons in `dancePanel` cycle through the arrays automatically.
 
 ### Swap or add a silhouette pose
-This is bigger — it touches **four** copies of the same shapes that must
-stay in lockstep:
-- `.silhouette-fill > g` in `index.html` (the pale wash)
-- `.silhouette-outline > g` in `index.html` (input to the outline filter)
-- `<clipPath id="bodyClip">` in `index.html` (legacy SVG clip-path)
-- `BODY_SHAPES` array in `game.js` (the canvas-level clip — this is the
-  one that actually decides where strokes can be drawn)
 
-All four must contain the **same shapes** or the visible body and the
-drawable area will disagree. There's no pose abstraction today — see
-TODO 1 below for what a real pose system would look like.
+> NOTE: parts of this doc still describe an older model where the body
+> was a `BODY_SHAPES` rect array duplicated into 3 SVG copies in
+> `index.html`. That is gone. There is now ONE source of truth: the
+> `POSES` map + the path generators in `game.js`. `posePathD(pose)`
+> resolves a pose to a single SVG path `d` string, and every consumer
+> (canvas clip via `buildBodyPath()` → `new Path2D`, the injected SVG
+> fill/outline groups, the static-pattern window, the gallery export)
+> reads from it. Change the pose, every consumer updates for free.
+
+Each entry in `POSES` is either:
+
+- **Skeleton-driven** — `skeleton: hum(handL, handR, footL, footR)`.
+  `groodleBodyPath()` builds the body from shared `SK` proportions +
+  those four limb tips: a head circle + a neck + a waisted two-part
+  torso + four tapered `capsule()` limbs, concatenated into one
+  nonzero-fill path (overlaps melt into a seamless solid; gaps — e.g.
+  between the legs — stay open). To add a skeleton pose, add one line
+  to `POSES` with the four limb-tip coords; nothing else.
+- **Hand-drawn** — `path: 'M … Z'`. The generator is bypassed entirely
+  (this is how Ghost and Animal work). This is how you ship custom
+  art: replace any pose's `skeleton:` with a `path:` string.
+
+To hand-draw / replace a pose silhouette:
+
+1. Open `groodle/pose-template.svg` in any vector editor (Figma /
+   Illustrator / Inkscape) or trace a paper drawing. It has the
+   `viewBox 0 0 400 600`, the head/shoulder/waist/hip/foot anchor
+   guides, and the live verified Standing body embedded as a
+   reshapeable reference.
+2. Produce **one closed filled path** (Union any pieces). M/L/C/Q/Z
+   only — no `A` arcs (renderers flatten them inconsistently; the
+   generator avoids them deliberately, see `arcBezier`), no strokes,
+   no transforms, no groups.
+3. Put the `d` string on that pose as `path:` (drop the `skeleton:`).
+4. Bump `SHELL_VERSION` in `sw.js` (game.js changed → precache stale).
+5. Verify geometry, not screenshots: in the preview, click the pose
+   then `document.querySelector('.silhouette-fill path').isPointInFill`
+   a battery of points — every body part IN, sky/sides OUT, the gap
+   between spread legs OUT. (A bad arc/winding shows up as holes or
+   runaway fill; this is exactly how the `capsule()` generator was
+   validated.)
+
+Keep the figure within the template's anchor envelope or the prefab
+faces / clothing / coloring-book pages (which position art via the
+`BODY` anchor object) will not line up. A wholesale re-proportion
+means retuning `BODY` (and each pose's `origin` for foot-planting).
 
 ## Adding a new coloring-book page
 
