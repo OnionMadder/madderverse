@@ -2193,7 +2193,9 @@
         const lbl = btn.querySelector('.story-read-lbl');
         const ico = btn.querySelector('.story-read-ico');
         if (lbl) lbl.textContent = speaking ? 'Stop' : 'Read';
-        if (ico) ico.textContent = speaking ? '⏹' : '🔊';
+        if (ico) ico.innerHTML = speaking
+            ? `<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>`
+            : `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>`;
     }
 
     // ---------- ACHIEVEMENT GRANT / UI ----------
@@ -2809,7 +2811,9 @@
             isMuted = !isMuted;
             if (masterGain) masterGain.gain.value = isMuted ? 0 : 0.55;
             muteBtn.classList.toggle('muted', isMuted);
-            muteIcon.textContent = isMuted ? '🔇' : '🔊';
+            muteIcon.innerHTML = isMuted
+                ? `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="16" y1="9" x2="22" y2="15"/><line x1="22" y1="9" x2="16" y2="15"/></svg>`
+                : `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>`;
         });
     }
 
