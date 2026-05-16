@@ -1,0 +1,25 @@
+{
+  "name": "groodle-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Capacitor 6 Android shell for Groodle (the static game in ../groodle). The web build stays the source of truth; `npm run prebuild` snapshots it into ./www with offline-safe relative paths, then Capacitor bundles www into the APK.",
+  "type": "module",
+  "scripts": {
+    "prebuild": "node scripts/prebuild.mjs",
+    "sync": "npm run prebuild && cap sync android",
+    "open": "npm run sync && cap open android",
+    "icons": "capacitor-assets generate --android --assetPath assets"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/preferences": "^6.0.3",
+    "@capacitor/share": "^6.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.2.0"
+  }
+}

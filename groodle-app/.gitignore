@@ -1,0 +1,22 @@
+# deps
+node_modules/
+
+# generated snapshot of ../groodle (rebuilt by `npm run prebuild`)
+www/
+
+# Capacitor / Android build artifacts
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/app/debug/
+android/local.properties
+android/.idea/
+android/captures/
+*.iml
+*.keystore
+*.jks
+
+# misc
+.DS_Store
+*.log
