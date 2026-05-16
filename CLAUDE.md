@@ -51,3 +51,39 @@ Other top-level entries:
 ## Commit style
 
 `git log` shows many commits of the form "Add files via upload" (GitHub web UI uploads) interleaved with descriptive messages like "Gazonionaire: ship sprite atlases, Win95 UI, fuel system, competitors". When committing through Claude Code, prefer the descriptive form: short imperative subject, mention the affected game directory by name when the change is scoped to one game.
+
+---
+
+## Let's CRAYte! Pootery — Android App Rollout
+
+**Status:** Ready to build and sign for Google Play upload.
+
+**What's done:**
+- Web app fully functional (shape, decorate, kiln, gallery, battles, profiles, auth, achievements)
+- Capacitor project set up at `pootery-app/` with Android platform added
+- Web assets copied to `pootery-app/www/`
+- Release keystore generated at `pootery-app/android/app/pootery-release.keystore`
+
+**Keystore details (safe to keep here):**
+- **File location:** `pootery-app/android/app/pootery-release.keystore`
+- **Store password:** `pootery_2026_release`
+- **Key alias:** `pootery`
+- **Key password:** `pootery_2026_release` (PKCS12 stores use same password for both)
+- **Validity:** 10,000 days
+- **DN:** CN=Pootery, OU=Mad Sundar LLC, O=Mad Sundar LLC, L=Minneapolis, ST=Minnesota, C=US
+
+**App config:**
+- **Package ID:** `org.madderverse.pootery`
+- **App Name:** Let's CRAYte! Pootery
+- **Min SDK:** (Capacitor default, check `android/app/build.gradle`)
+
+**Next steps:**
+1. Run `cd pootery-app/android && ./gradlew bundleRelease` with signing flags to generate signed AAB
+2. Verify the AAB in `pootery-app/android/app/build/outputs/bundle/release/`
+3. Upload AAB to Google Play Console
+4. Google Play will extract public cert from the signature for future uploads
+
+**Notes:**
+- The old `lets-crayte-pootery-app` folder was zipped as `lets-crayte-pootery.zip` on Desktop; recovered and used to populate `pootery-app/www/`
+- User had previous failed attempt with Google Play (deleted from Console); this is a fresh upload
+- No waiting on Google cert—we generate our own, sign with it, and upload to Console
