@@ -1208,27 +1208,30 @@
                 c.save();
                 c.lineCap = 'round'; c.lineJoin = 'round';
                 c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
-                /* Antenna stub (only the in-body portion survives clipping). */
-                c.beginPath(); c.moveTo(200, 50); c.lineTo(200, 42); c.stroke();
-                c.beginPath(); c.arc(200, 38, 5, 0, Math.PI * 2); c.stroke();
+                const cx = BODY.cx, ey = BODY.eyeY, edx = BODY.eyeDX, my = BODY.mouthY;
+                /* Antenna stub (the bulb sits above the head and is
+                   trimmed by the clip — only the in-body part shows). */
+                c.beginPath(); c.moveTo(cx, BODY.headTop + 16); c.lineTo(cx, BODY.headTop + 6); c.stroke();
+                c.beginPath(); c.arc(cx, BODY.headTop + 1, 5, 0, Math.PI * 2); c.stroke();
                 /* Square eyes with tiny pupils. */
-                c.strokeRect(174, 84, 18, 18);
-                c.strokeRect(208, 84, 18, 18);
-                c.beginPath(); c.arc(183, 93, 2, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(217, 93, 2, 0, Math.PI * 2); c.fill();
+                c.strokeRect(cx - edx - 9, ey - 9, 18, 18);
+                c.strokeRect(cx + edx - 9, ey - 9, 18, 18);
+                c.beginPath(); c.arc(cx - edx, ey, 2, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx + edx, ey, 2, 0, Math.PI * 2); c.fill();
                 /* Mouth + teeth. */
-                c.strokeRect(180, 120, 40, 14);
-                c.beginPath(); c.moveTo(193, 120); c.lineTo(193, 134); c.stroke();
-                c.beginPath(); c.moveTo(207, 120); c.lineTo(207, 134); c.stroke();
-                /* Control panel with 3 buttons. */
-                c.strokeRect(168, 200, 64, 60);
-                c.beginPath(); c.arc(184, 215, 5, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.arc(200, 215, 5, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.arc(216, 215, 5, 0, Math.PI * 2); c.stroke();
+                c.strokeRect(cx - 20, my + 4, 40, 14);
+                c.beginPath(); c.moveTo(cx - 7, my + 4); c.lineTo(cx - 7, my + 18); c.stroke();
+                c.beginPath(); c.moveTo(cx + 7, my + 4); c.lineTo(cx + 7, my + 18); c.stroke();
+                /* Control panel with 3 buttons, centred on the chest. */
+                c.strokeRect(cx - 32, BODY.chestY - 30, 64, 60);
+                c.beginPath(); c.arc(cx - 16, BODY.chestY - 15, 5, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx, BODY.chestY - 15, 5, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx + 16, BODY.chestY - 15, 5, 0, Math.PI * 2); c.stroke();
                 /* Speaker grill. */
-                c.beginPath(); c.moveTo(180, 238); c.lineTo(220, 238); c.stroke();
-                c.beginPath(); c.moveTo(180, 246); c.lineTo(220, 246); c.stroke();
-                c.beginPath(); c.moveTo(180, 254); c.lineTo(220, 254); c.stroke();
+                for (let i = 0; i < 3; i++) {
+                    const gy = BODY.chestY + 8 + i * 8;
+                    c.beginPath(); c.moveTo(cx - 20, gy); c.lineTo(cx + 20, gy); c.stroke();
+                }
                 c.restore();
             }
         },
@@ -1240,46 +1243,51 @@
                 c.save();
                 c.lineCap = 'round'; c.lineJoin = 'round';
                 c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
-                /* Tiara zigzag on forehead with a base band. */
+                const cx = BODY.cx, ey = BODY.eyeY, edx = BODY.eyeDX, my = BODY.mouthY;
+                /* Tiara zigzag on the forehead with a base band. */
+                const tB = BODY.headTop + 30, tT = BODY.headTop + 12;
                 c.beginPath();
-                c.moveTo(166, 65); c.lineTo(178, 50);
-                c.lineTo(190, 65); c.lineTo(200, 45);
-                c.lineTo(210, 65); c.lineTo(222, 50);
-                c.lineTo(234, 65);
+                c.moveTo(cx - 34, tB); c.lineTo(cx - 22, tT);
+                c.lineTo(cx - 10, tB); c.lineTo(cx, tT - 4);
+                c.lineTo(cx + 10, tB); c.lineTo(cx + 22, tT);
+                c.lineTo(cx + 34, tB);
                 c.stroke();
-                c.beginPath(); c.moveTo(166, 65); c.lineTo(234, 65); c.stroke();
+                c.beginPath(); c.moveTo(cx - 34, tB); c.lineTo(cx + 34, tB); c.stroke();
                 /* Almond eyes. */
-                c.beginPath(); c.ellipse(184, 92, 7, 5, 0, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.ellipse(216, 92, 7, 5, 0, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.ellipse(cx - edx, ey, 7, 5, 0, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.ellipse(cx + edx, ey, 7, 5, 0, 0, Math.PI * 2); c.stroke();
                 /* Eyelashes. */
-                c.beginPath(); c.moveTo(178, 88); c.lineTo(174, 85); c.stroke();
-                c.beginPath(); c.moveTo(184, 86); c.lineTo(184, 82); c.stroke();
-                c.beginPath(); c.moveTo(190, 88); c.lineTo(194, 85); c.stroke();
-                c.beginPath(); c.moveTo(210, 88); c.lineTo(206, 85); c.stroke();
-                c.beginPath(); c.moveTo(216, 86); c.lineTo(216, 82); c.stroke();
-                c.beginPath(); c.moveTo(222, 88); c.lineTo(226, 85); c.stroke();
+                c.beginPath(); c.moveTo(cx - edx - 6, ey - 4); c.lineTo(cx - edx - 10, ey - 7); c.stroke();
+                c.beginPath(); c.moveTo(cx - edx, ey - 6); c.lineTo(cx - edx, ey - 10); c.stroke();
+                c.beginPath(); c.moveTo(cx - edx + 6, ey - 4); c.lineTo(cx - edx + 10, ey - 7); c.stroke();
+                c.beginPath(); c.moveTo(cx + edx - 6, ey - 4); c.lineTo(cx + edx - 10, ey - 7); c.stroke();
+                c.beginPath(); c.moveTo(cx + edx, ey - 6); c.lineTo(cx + edx, ey - 10); c.stroke();
+                c.beginPath(); c.moveTo(cx + edx + 6, ey - 4); c.lineTo(cx + edx + 10, ey - 7); c.stroke();
                 /* Heart-shaped lips. */
                 c.beginPath();
-                c.moveTo(192, 120);
-                c.bezierCurveTo(192, 113, 199, 113, 200, 117);
-                c.bezierCurveTo(201, 113, 208, 113, 208, 120);
-                c.bezierCurveTo(208, 127, 200, 132, 200, 132);
-                c.bezierCurveTo(200, 132, 192, 127, 192, 120);
+                c.moveTo(cx - 8, my - 2);
+                c.bezierCurveTo(cx - 8, my - 9, cx - 1, my - 9, cx, my - 5);
+                c.bezierCurveTo(cx + 1, my - 9, cx + 8, my - 9, cx + 8, my - 2);
+                c.bezierCurveTo(cx + 8, my + 5, cx, my + 10, cx, my + 10);
+                c.bezierCurveTo(cx, my + 10, cx - 8, my + 5, cx - 8, my - 2);
                 c.stroke();
                 /* Rosy cheek circles. */
-                c.beginPath(); c.arc(170, 115, 6, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.arc(230, 115, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx - BODY.cheekDX, BODY.cheekY, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx + BODY.cheekDX, BODY.cheekY, 6, 0, Math.PI * 2); c.stroke();
                 /* Dress neckline V + bow. */
+                const nT = BODY.shirtTop;
                 c.beginPath();
-                c.moveTo(170, 175); c.lineTo(200, 210); c.lineTo(230, 175);
+                c.moveTo(cx - 30, nT); c.lineTo(cx, nT + 50); c.lineTo(cx + 30, nT);
                 c.stroke();
-                c.beginPath(); c.ellipse(195, 210, 8, 5, -0.4, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.ellipse(205, 210, 8, 5,  0.4, 0, Math.PI * 2); c.stroke();
-                /* Dress flare lines (mostly clipped to body, hint at the skirt). */
-                c.beginPath(); c.moveTo(165, 280);
-                c.bezierCurveTo(155, 320, 145, 360, 140, 400); c.stroke();
-                c.beginPath(); c.moveTo(235, 280);
-                c.bezierCurveTo(245, 320, 255, 360, 260, 400); c.stroke();
+                c.beginPath(); c.ellipse(cx - 7, nT + 50, 8, 5, -0.4, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.ellipse(cx + 7, nT + 50, 8, 5,  0.4, 0, Math.PI * 2); c.stroke();
+                /* Dress flare lines (mostly clipped, hint at the skirt). */
+                c.beginPath(); c.moveTo(cx - 35, BODY.chestY + 40);
+                c.bezierCurveTo(cx - 45, BODY.waistY - 30, cx - 55, BODY.waistY + 20, cx - 60, BODY.pantsTop + 30);
+                c.stroke();
+                c.beginPath(); c.moveTo(cx + 35, BODY.chestY + 40);
+                c.bezierCurveTo(cx + 45, BODY.waistY - 30, cx + 55, BODY.waistY + 20, cx + 60, BODY.pantsTop + 30);
+                c.stroke();
                 c.restore();
             }
         },
@@ -1291,35 +1299,38 @@
                 c.save();
                 c.lineCap = 'round'; c.lineJoin = 'round';
                 c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
-                /* Visor sweep across upper face. */
+                const cx = BODY.cx, ey = BODY.eyeY, my = BODY.mouthY;
+                /* Visor sweep across the upper face. */
                 c.beginPath();
-                c.moveTo(150, 90);
-                c.bezierCurveTo(170, 75, 230, 75, 250, 90);
+                c.moveTo(150, ey + 2);
+                c.bezierCurveTo(170, BODY.browY, 230, BODY.browY, 250, ey + 2);
                 c.stroke();
                 /* Helmet chin curve. */
                 c.beginPath();
-                c.moveTo(150, 130);
-                c.bezierCurveTo(175, 145, 225, 145, 250, 130);
+                c.moveTo(150, my + 20);
+                c.bezierCurveTo(175, my + 36, 225, my + 36, 250, my + 20);
                 c.stroke();
                 /* Eyes through the visor. */
-                c.beginPath(); c.arc(185, 94, 4, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(215, 94, 4, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx - 15, ey + 6, 4, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx + 15, ey + 6, 4, 0, Math.PI * 2); c.fill();
                 /* Suit zipper with teeth ticks. */
-                c.beginPath(); c.moveTo(200, 175); c.lineTo(200, 360); c.stroke();
-                for (let y = 185; y <= 350; y += 18) {
-                    c.beginPath(); c.moveTo(196, y); c.lineTo(204, y); c.stroke();
+                c.beginPath(); c.moveTo(cx, BODY.shirtTop); c.lineTo(cx, BODY.waistY); c.stroke();
+                for (let y = BODY.shirtTop + 12; y <= BODY.waistY - 8; y += 18) {
+                    c.beginPath(); c.moveTo(cx - 4, y); c.lineTo(cx + 4, y); c.stroke();
                 }
-                /* Mission patch + tiny star inside. */
-                c.strokeRect(168, 200, 28, 28);
+                /* Mission patch + tiny star inside, on the chest. */
+                const pX = cx - 30, pY = BODY.chestY - 14;
+                c.strokeRect(pX, pY, 28, 28);
                 c.beginPath();
-                c.moveTo(182, 207); c.lineTo(185, 215);
-                c.lineTo(193, 215); c.lineTo(187, 220);
-                c.lineTo(189, 228); c.lineTo(182, 223);
-                c.lineTo(175, 228); c.lineTo(177, 220);
-                c.lineTo(171, 215); c.lineTo(179, 215);
+                c.moveTo(pX + 14, pY + 5);
+                c.lineTo(pX + 17, pY + 13); c.lineTo(pX + 25, pY + 13);
+                c.lineTo(pX + 19, pY + 18); c.lineTo(pX + 21, pY + 26);
+                c.lineTo(pX + 14, pY + 21); c.lineTo(pX + 7, pY + 26);
+                c.lineTo(pX + 9, pY + 18); c.lineTo(pX + 3, pY + 13);
+                c.lineTo(pX + 11, pY + 13);
                 c.closePath(); c.stroke();
                 /* Utility belt. */
-                c.beginPath(); c.moveTo(155, 300); c.lineTo(245, 300); c.stroke();
+                c.beginPath(); c.moveTo(cx - 45, BODY.waistY); c.lineTo(cx + 45, BODY.waistY); c.stroke();
                 c.restore();
             }
         },
@@ -1331,37 +1342,37 @@
                 c.save();
                 c.lineCap = 'round'; c.lineJoin = 'round';
                 c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
+                const cx = BODY.cx, ey = BODY.eyeY, edx = BODY.eyeDX, my = BODY.mouthY;
                 /* Big round nose. */
-                c.beginPath(); c.arc(200, 108, 16, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx, my - 4, 16, 0, Math.PI * 2); c.stroke();
                 /* Eye dots + surprised eyebrows. */
-                c.beginPath(); c.arc(180, 85, 5, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(220, 85, 5, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(180, 72, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
-                c.beginPath(); c.arc(220, 72, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+                c.beginPath(); c.arc(cx - edx - 2, ey - 1, 5, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx + edx + 2, ey - 1, 5, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx - edx - 2, ey - 14, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
+                c.beginPath(); c.arc(cx + edx + 2, ey - 14, 10, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
                 /* Big smile + upturned ends. */
-                c.beginPath(); c.arc(200, 125, 26, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
-                c.beginPath(); c.moveTo(177, 138); c.lineTo(174, 134); c.stroke();
-                c.beginPath(); c.moveTo(223, 138); c.lineTo(226, 134); c.stroke();
+                c.beginPath(); c.arc(cx, my + 14, 26, 0.15 * Math.PI, 0.85 * Math.PI); c.stroke();
+                c.beginPath(); c.moveTo(cx - 23, my + 27); c.lineTo(cx - 26, my + 23); c.stroke();
+                c.beginPath(); c.moveTo(cx + 23, my + 27); c.lineTo(cx + 26, my + 23); c.stroke();
                 /* Curly hair tufts hugging the head edges. */
-                c.beginPath(); c.arc(154, 95, 6, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.arc(160, 108, 6, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.arc(246, 95, 6, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.arc(240, 108, 6, 0, Math.PI * 2); c.stroke();
-                /* Bow tie just below chin. */
+                c.beginPath(); c.arc(cx - 46, BODY.headCy + 2, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx - 40, BODY.headCy + 16, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx + 46, BODY.headCy + 2, 6, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.arc(cx + 40, BODY.headCy + 16, 6, 0, Math.PI * 2); c.stroke();
+                /* Bow tie just below the chin. */
+                const bY = BODY.neckY + 8;
                 c.beginPath();
-                c.moveTo(200, 165);
-                c.lineTo(170, 155); c.lineTo(170, 180);
-                c.lineTo(200, 170);
-                c.lineTo(230, 180); c.lineTo(230, 155);
+                c.moveTo(cx, bY);
+                c.lineTo(cx - 30, bY - 10); c.lineTo(cx - 30, bY + 15);
+                c.lineTo(cx, bY + 5);
+                c.lineTo(cx + 30, bY + 15); c.lineTo(cx + 30, bY - 10);
                 c.closePath(); c.stroke();
-                c.strokeRect(196, 162, 8, 12);
-                /* Polka dots scattered on shirt. */
-                const dots = [[175, 220], [225, 210], [195, 245], [220, 260],
-                              [170, 285], [225, 300], [195, 320]];
-                for (let i = 0; i < dots.length; i++) {
-                    c.beginPath();
-                    c.arc(dots[i][0], dots[i][1], 7, 0, Math.PI * 2);
-                    c.stroke();
+                c.strokeRect(cx - 4, bY - 3, 8, 12);
+                /* Polka dots scattered on the shirt. */
+                for (let i = 0; i < 7; i++) {
+                    const dy = BODY.shirtTop + 30 + i * 22;
+                    const dx = cx + (i % 2 === 0 ? -22 : 22) + (i % 3 - 1) * 8;
+                    c.beginPath(); c.arc(dx, dy, 7, 0, Math.PI * 2); c.stroke();
                 }
                 c.restore();
             }
@@ -1374,44 +1385,46 @@
                 c.save();
                 c.lineCap = 'round'; c.lineJoin = 'round';
                 c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
-                /* Bandana arc across top of head + base line. */
+                const cx = BODY.cx, ey = BODY.eyeY, edx = BODY.eyeDX, my = BODY.mouthY;
+                /* Bandana arc across the head + base line. */
+                const bY = BODY.headTop + 36;
                 c.beginPath();
-                c.moveTo(155, 75);
-                c.bezierCurveTo(175, 55, 225, 55, 245, 75);
+                c.moveTo(cx - 45, bY);
+                c.bezierCurveTo(cx - 25, bY - 20, cx + 25, bY - 20, cx + 45, bY);
                 c.stroke();
-                c.beginPath(); c.moveTo(155, 75); c.lineTo(245, 75); c.stroke();
+                c.beginPath(); c.moveTo(cx - 45, bY); c.lineTo(cx + 45, bY); c.stroke();
                 /* Bandana knot + trailing tails on the left. */
-                c.beginPath(); c.arc(150, 82, 7, 0, Math.PI * 2); c.stroke();
-                c.beginPath(); c.moveTo(143, 82); c.lineTo(130, 95); c.stroke();
-                c.beginPath(); c.moveTo(145, 88); c.lineTo(132, 102); c.stroke();
-                /* Filled eyepatch + strap. */
-                c.fillRect(208, 86, 22, 18);
-                c.beginPath(); c.moveTo(208, 90); c.lineTo(180, 78); c.stroke();
-                c.beginPath(); c.moveTo(230, 95); c.lineTo(244, 88); c.stroke();
+                c.beginPath(); c.arc(cx - 50, bY + 7, 7, 0, Math.PI * 2); c.stroke();
+                c.beginPath(); c.moveTo(cx - 57, bY + 7); c.lineTo(cx - 70, bY + 20); c.stroke();
+                c.beginPath(); c.moveTo(cx - 55, bY + 13); c.lineTo(cx - 68, bY + 27); c.stroke();
+                /* Filled eyepatch over the right eye + strap. */
+                c.fillRect(cx + edx - 10, ey - 9, 22, 18);
+                c.beginPath(); c.moveTo(cx + edx - 10, ey - 5); c.lineTo(cx - edx, ey - 8); c.stroke();
+                c.beginPath(); c.moveTo(cx + edx + 12, ey); c.lineTo(cx + 44, ey - 7); c.stroke();
                 /* Visible eye on the other side. */
-                c.beginPath(); c.arc(180, 95, 4, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx - edx, ey, 4, 0, Math.PI * 2); c.fill();
                 /* Curly mustache. */
                 c.beginPath();
-                c.moveTo(180, 120);
-                c.bezierCurveTo(185, 117, 195, 122, 200, 125);
-                c.bezierCurveTo(205, 122, 215, 117, 220, 120);
+                c.moveTo(cx - 20, my);
+                c.bezierCurveTo(cx - 15, my - 3, cx - 5, my + 2, cx, my + 5);
+                c.bezierCurveTo(cx + 5, my + 2, cx + 15, my - 3, cx + 20, my);
                 c.stroke();
                 /* Beard outline. */
                 c.beginPath();
-                c.moveTo(178, 122);
-                c.bezierCurveTo(170, 135, 175, 145, 195, 150);
-                c.lineTo(205, 150);
-                c.bezierCurveTo(225, 145, 230, 135, 222, 122);
+                c.moveTo(cx - 22, my + 2);
+                c.bezierCurveTo(cx - 30, my + 15, cx - 25, my + 25, cx - 5, my + 30);
+                c.lineTo(cx + 5, my + 30);
+                c.bezierCurveTo(cx + 25, my + 25, cx + 30, my + 15, cx + 22, my + 2);
                 c.stroke();
-                /* Diagonal sash across torso. */
-                c.beginPath(); c.moveTo(160, 175); c.lineTo(240, 280); c.stroke();
-                c.beginPath(); c.moveTo(160, 195); c.lineTo(240, 300); c.stroke();
+                /* Diagonal sash across the torso. */
+                c.beginPath(); c.moveTo(cx - 40, BODY.shirtTop); c.lineTo(cx + 40, BODY.chestY + 20); c.stroke();
+                c.beginPath(); c.moveTo(cx - 40, BODY.shirtTop + 20); c.lineTo(cx + 40, BODY.chestY + 40); c.stroke();
                 /* Belt + buckle. */
-                c.strokeRect(155, 300, 90, 16);
-                c.strokeRect(193, 302, 14, 12);
-                /* X marks the spot on chest. */
-                c.beginPath(); c.moveTo(178, 232); c.lineTo(202, 256); c.stroke();
-                c.beginPath(); c.moveTo(202, 232); c.lineTo(178, 256); c.stroke();
+                c.strokeRect(cx - 45, BODY.waistY - 8, 90, 16);
+                c.strokeRect(cx - 7, BODY.waistY - 6, 14, 12);
+                /* X marks the spot on the chest. */
+                c.beginPath(); c.moveTo(cx - 22, BODY.chestY - 12); c.lineTo(cx + 2, BODY.chestY + 12); c.stroke();
+                c.beginPath(); c.moveTo(cx + 2, BODY.chestY - 12); c.lineTo(cx - 22, BODY.chestY + 12); c.stroke();
                 c.restore();
             }
         },
@@ -1423,26 +1436,27 @@
                 c.save();
                 c.lineCap = 'round'; c.lineJoin = 'round';
                 c.strokeStyle = '#1a0f33'; c.lineWidth = 4; c.fillStyle = '#1a0f33';
-                /* Bandit-style mask outline. */
+                const cx = BODY.cx, ey = BODY.eyeY, edx = BODY.eyeDX, my = BODY.mouthY;
+                /* Bandit-style mask outline across the eyes. */
                 c.beginPath();
-                c.moveTo(150, 78);
-                c.bezierCurveTo(170, 70, 230, 70, 250, 78);
-                c.bezierCurveTo(248, 100, 230, 108, 200, 105);
-                c.bezierCurveTo(170, 108, 152, 100, 150, 78);
+                c.moveTo(cx - 50, ey - 8);
+                c.bezierCurveTo(cx - 30, ey - 16, cx + 30, ey - 16, cx + 50, ey - 8);
+                c.bezierCurveTo(cx + 48, ey + 14, cx + 30, ey + 22, cx, ey + 19);
+                c.bezierCurveTo(cx - 30, ey + 22, cx - 48, ey + 14, cx - 50, ey - 8);
                 c.closePath(); c.stroke();
-                /* Mask eye holes (white inset so the kid has a target to fill). */
+                /* Mask eye holes (white inset = a target for the kid). */
                 c.fillStyle = '#fff';
-                c.beginPath(); c.ellipse(180, 90, 10, 7, 0, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.ellipse(220, 90, 10, 7, 0, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.ellipse(cx - edx, ey + 4, 10, 7, 0, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.ellipse(cx + edx, ey + 4, 10, 7, 0, 0, Math.PI * 2); c.fill();
                 c.fillStyle = '#1a0f33';
-                c.beginPath(); c.arc(182, 90, 3, 0, Math.PI * 2); c.fill();
-                c.beginPath(); c.arc(218, 90, 3, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx - edx + 2, ey + 4, 3, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.arc(cx + edx - 2, ey + 4, 3, 0, Math.PI * 2); c.fill();
                 /* Heroic grin. */
                 c.beginPath();
-                c.arc(200, 122, 14, 0.15 * Math.PI, 0.85 * Math.PI);
+                c.arc(cx, my + 6, 14, 0.15 * Math.PI, 0.85 * Math.PI);
                 c.stroke();
-                /* Big 5-point star emblem on chest. */
-                const cx = 200, cy = 240, r1 = 28, r2 = 12;
+                /* Big 5-point star emblem on the chest. */
+                const cy = BODY.chestY, r1 = 28, r2 = 12;
                 c.beginPath();
                 for (let i = 0; i < 10; i++) {
                     const a = i * Math.PI / 5 - Math.PI / 2;
@@ -1454,19 +1468,19 @@
                 c.closePath(); c.stroke();
                 /* Cape edge curves (mostly clipped, hint at the cape). */
                 c.beginPath();
-                c.moveTo(155, 175);
-                c.bezierCurveTo(135, 250, 130, 340, 140, 400);
+                c.moveTo(cx - 45, BODY.shirtTop);
+                c.bezierCurveTo(cx - 65, BODY.chestY, cx - 70, BODY.waistY + 40, cx - 60, BODY.pantsTop + 30);
                 c.stroke();
                 c.beginPath();
-                c.moveTo(245, 175);
-                c.bezierCurveTo(265, 250, 270, 340, 260, 400);
+                c.moveTo(cx + 45, BODY.shirtTop);
+                c.bezierCurveTo(cx + 65, BODY.chestY, cx + 70, BODY.waistY + 40, cx + 60, BODY.pantsTop + 30);
                 c.stroke();
                 /* Belt + buckle X. */
-                c.strokeRect(155, 295, 90, 14);
-                c.strokeRect(192, 296, 16, 12);
+                c.strokeRect(cx - 45, BODY.waistY - 8, 90, 14);
+                c.strokeRect(cx - 8, BODY.waistY - 7, 16, 12);
                 c.beginPath();
-                c.moveTo(192, 296); c.lineTo(208, 308);
-                c.moveTo(208, 296); c.lineTo(192, 308);
+                c.moveTo(cx - 8, BODY.waistY - 7); c.lineTo(cx + 8, BODY.waistY + 5);
+                c.moveTo(cx + 8, BODY.waistY - 7); c.lineTo(cx - 8, BODY.waistY + 5);
                 c.stroke();
                 c.restore();
             }
