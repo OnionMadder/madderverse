@@ -14,147 +14,177 @@
     ];
     const SIZES = [4, 12, 22];
 
-    /* Poses are the data behind the silhouette: a list of shape records
-       (circle or transformed roundrect) that get unioned into a Path2D
-       and rendered into the three SVG groups in index.html (clipPath,
-       silhouette-fill, silhouette-outline) at init / on pose change.
+    /* Poses drive the silhouette. Humanoid poses carry a `skeleton`
+       (a handful of joint coordinates) that groodleBodyPath() turns
+       into ONE smooth closed outline — no primitive union, so there
+       are no concave hip/shoulder seams: the figure reads as a single
+       intentional gingerbread-person shape. Non-humanoid poses
+       (ghost, animal) carry a hand-authored `path` d-string instead.
 
-       Adding a pose is a matter of dropping a new entry into POSES —
-       the silhouette renderer and the canvas clip both read from the
-       currently-selected pose's shapes. Picker buttons are generated
-       from this dict so the UI auto-grows. */
+       posePathD(pose) resolves either form to a single SVG path
+       string in the logical 400x600 space; the canvas clip
+       (buildBodyPath) and the three SVG groups (clipPath / fill /
+       outline) both consume that one string, so the visible body and
+       the paintable area can never drift apart.
+
+       Adding a humanoid pose = one skeleton entry. The dance is a
+       transform on the .creature wrapper and is independent of how
+       the body is built (rigid-body only; true limb articulation is
+       a post-launch v2 — see PLAY_STORE_PLAN.md). */
+
+    const SK = {
+        /* Shared body proportions so every humanoid pose stays on-model.
+           hw = half-width at that joint line; armW/legW = limb radius. */
+        head:  { x: 200, y: 92, r: 58 },
+        shoulderY: 188, shoulderHW: 56,
+        hipY: 392, hipHW: 44,
+        armW: 22, legW: 24
+    };
+
+    function hum(handL, handR, footL, footR, extra) {
+        /* Build a humanoid skeleton from just the 4 limb tips; the
+           torso/head proportions come from SK so poses stay consistent. */
+        const s = {
+            head: SK.head,
+            shoulderY: SK.shoulderY, shoulderHW: SK.shoulderHW,
+            hipY: SK.hipY, hipHW: SK.hipHW,
+            armW: SK.armW, legW: SK.legW,
+            handL: handL, handR: handR, footL: footL, footR: footR
+        };
+        if (extra) for (const k in extra) s[k] = extra[k];
+        return s;
+    }
+
     const POSES = {
-        standing: {
-            name: 'Standing',
-            icon: '🧍',
-            origin: '50% 92%',
-            shapes: [
-                { type: 'circle', cx: 200, cy: 100, r: 58 },
-                { type: 'rect',   x: 155, y: 148,  w: 90, h: 232, r: 42 },
-                { type: 'rect',   x: -18, y: -160, w: 36, h: 172, r: 18, tx: 165, ty: 180, rot: -52 },
-                { type: 'rect',   x: -18, y: -160, w: 36, h: 172, r: 18, tx: 235, ty: 180, rot:  52 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
-            ]
-        },
-        cheer: {
-            name: 'Cheering',
-            icon: '🙌',
-            origin: '50% 92%',
-            shapes: [
-                { type: 'circle', cx: 200, cy: 100, r: 58 },
-                { type: 'rect',   x: 155, y: 148,  w: 90, h: 232, r: 42 },
-                /* Arms point up-and-out: native rect extends downward from
-                   the shoulder origin, rot 150° / -150° flips it so the
-                   tip lands above the head. */
-                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 168, ty: 168, rot:  150 },
-                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 232, ty: 168, rot: -150 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
-            ]
-        },
-        star: {
-            name: 'Star',
-            icon: '⭐',
-            origin: '50% 90%',
-            shapes: [
-                { type: 'circle', cx: 200, cy: 100, r: 58 },
-                { type: 'rect',   x: 155, y: 148,  w: 90, h: 208, r: 42 },
-                /* Jumping-jack: arms horizontal-and-slightly-raised, legs
-                   spread wide. */
-                { type: 'rect',   x: -18, y: 0,    w: 36, h: 158, r: 18, tx: 168, ty: 180, rot:  108 },
-                { type: 'rect',   x: -18, y: 0,    w: 36, h: 158, r: 18, tx: 232, ty: 180, rot: -108 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 196, r: 17, tx: 172, ty: 352, rot: -28 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 196, r: 17, tx: 228, ty: 352, rot:  28 }
-            ]
-        },
-        groovy: {
-            name: 'Groovy',
-            icon: '💃',
-            origin: '50% 92%',
-            shapes: [
-                { type: 'circle', cx: 200, cy: 100, r: 58 },
-                { type: 'rect',   x: 155, y: 148,  w: 90, h: 232, r: 42 },
-                /* One arm raised (left), one extended down-and-out (right)
-                   — classic disco-point pose. */
-                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 168, ty: 168, rot:  155 },
-                { type: 'rect',   x: -18, y: -160, w: 36, h: 172, r: 18, tx: 235, ty: 180, rot:   62 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 178, ty: 370, rot: -12 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 222, ty: 370, rot:  12 }
-            ]
-        },
-        tpose: {
-            name: 'T-Pose',
-            icon: '✋',
-            origin: '50% 92%',
-            shapes: [
-                { type: 'circle', cx: 200, cy: 100, r: 58 },
-                { type: 'rect',   x: 155, y: 148, w: 90, h: 232, r: 42 },
-                /* Arms straight horizontal — rot ±90 takes the down-pointing
-                   native rect and flips it to horizontal. */
-                { type: 'rect',   x: -18, y: 0,   w: 36, h: 156, r: 18, tx: 168, ty: 180, rot: -90 },
-                { type: 'rect',   x: -18, y: 0,   w: 36, h: 156, r: 18, tx: 232, ty: 180, rot:  90 },
-                /* Legs straight (no spread). */
-                { type: 'rect',   x: -17, y: 0,   w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -4 },
-                { type: 'rect',   x: -17, y: 0,   w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   4 }
-            ]
-        },
-        wave: {
-            name: 'Waving',
-            icon: '👋',
-            origin: '50% 92%',
-            shapes: [
-                { type: 'circle', cx: 200, cy: 100, r: 58 },
-                { type: 'rect',   x: 155, y: 148, w: 90, h: 232, r: 42 },
-                /* Right arm raised in a wave (rot 165 = up-and-slightly-out
-                   from the right shoulder); left arm rests at the side. */
-                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 165, ty: 180, rot: -52 },
-                { type: 'rect',   x: -18, y: 0,    w: 36, h: 168, r: 18, tx: 232, ty: 168, rot:  165 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 180, ty: 370, rot:  -8 },
-                { type: 'rect',   x: -17, y: 0,    w: 34, h: 208, r: 17, tx: 220, ty: 370, rot:   8 }
-            ]
-        },
-        ghost: {
-            name: 'Ghost',
-            icon: '👻',
-            origin: '50% 88%',
-            shapes: [
-                { type: 'circle', cx: 200, cy: 100, r: 58 },
-                /* Body is a single rounded slab from neck to a soft
-                   ghostly tail. Wider corner radius gives the bottom
-                   the floating-orb look. */
-                { type: 'rect',   x: 145, y: 148, w: 110, h: 360, r: 55 },
-                /* Arms float out from the sides, lower than standing
-                   and tilted further out so they read as drifting. */
-                { type: 'rect',   x: -18, y: 0,   w: 36, h: 140, r: 18, tx: 162, ty: 200, rot: -75 },
-                { type: 'rect',   x: -18, y: 0,   w: 36, h: 140, r: 18, tx: 238, ty: 200, rot:  75 }
-                /* No legs — the body slab is the whole bottom. */
-            ]
-        },
-        animal: {
-            name: 'Animal',
-            icon: '🐾',
-            origin: '50% 92%',
-            shapes: [
-                /* Horizontal critter — head on the left, body extending right,
-                   four short legs underneath. Sits low in the canvas so a
-                   kid can color a cat / dog / sheep / whatever. */
-                { type: 'circle', cx: 130, cy: 280, r: 52 },
-                /* Body — long horizontal rect. */
-                { type: 'rect',   x: 155, y: 250, w: 200, h: 110, r: 50 },
-                /* Tail — short rect tipped up off the right end. */
-                { type: 'rect',   x: -12, y: 0,   w: 24, h: 80,  r: 12, tx: 355, ty: 285, rot: 35 },
-                /* 4 legs — short rects under the body. */
-                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 175, ty: 355, rot: -3 },
-                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 225, ty: 355, rot: -3 },
-                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 290, ty: 355, rot:  3 },
-                { type: 'rect',   x: -14, y: 0,   w: 28, h: 90,  r: 14, tx: 335, ty: 355, rot:  3 }
-            ]
-        }
+        standing: { name: 'Standing', icon: '🧍', origin: '50% 92%',
+            skeleton: hum({ x: 116, y: 376 }, { x: 284, y: 376 },
+                          { x: 150, y: 566 }, { x: 250, y: 566 }) },
+        cheer: { name: 'Cheering', icon: '🙌', origin: '50% 92%',
+            skeleton: hum({ x: 122, y: 70 }, { x: 278, y: 70 },
+                          { x: 176, y: 566 }, { x: 224, y: 566 }) },
+        star: { name: 'Star', icon: '⭐', origin: '50% 90%',
+            skeleton: hum({ x: 92, y: 150 }, { x: 308, y: 150 },
+                          { x: 138, y: 556 }, { x: 262, y: 556 }) },
+        groovy: { name: 'Groovy', icon: '💃', origin: '50% 92%',
+            skeleton: hum({ x: 120, y: 78 }, { x: 286, y: 330 },
+                          { x: 168, y: 566 }, { x: 232, y: 560 }) },
+        tpose: { name: 'T-Pose', icon: '✋', origin: '50% 92%',
+            skeleton: hum({ x: 86, y: 196 }, { x: 314, y: 196 },
+                          { x: 182, y: 566 }, { x: 218, y: 566 }) },
+        wave: { name: 'Waving', icon: '👋', origin: '50% 92%',
+            skeleton: hum({ x: 120, y: 372 }, { x: 286, y: 70 },
+                          { x: 176, y: 566 }, { x: 224, y: 566 }) },
+        ghost: { name: 'Ghost', icon: '👻', origin: '50% 88%',
+            /* Bell-shaped body with a 3-bump wavy hem + two stubby
+               drifting arms. One closed path, hand-authored. */
+            path: 'M 200 38 C 132 38 110 96 110 168 L 110 470 ' +
+                  'C 110 470 96 452 78 460 C 70 388 70 320 78 268 ' +
+                  'C 60 286 60 360 64 470 ' +
+                  'L 64 506 C 64 506 96 486 116 506 ' +
+                  'C 140 530 162 530 186 506 C 200 492 200 492 214 506 ' +
+                  'C 238 530 260 530 284 506 C 304 486 336 506 336 506 ' +
+                  'L 336 470 C 340 360 340 286 322 268 ' +
+                  'C 330 320 330 388 322 460 C 304 452 290 470 290 470 ' +
+                  'L 290 168 C 290 96 268 38 200 38 Z' },
+        animal: { name: 'Animal', icon: '🐾', origin: '50% 92%',
+            /* Horizontal critter: round head left, loaf body, perky
+               tail, 4 stubby legs. One closed path, hand-authored. */
+            path: 'M 96 250 C 70 250 60 282 66 306 ' +
+                  'C 50 318 48 348 64 360 C 58 392 70 430 92 430 ' +
+                  'L 108 430 C 122 430 128 408 128 392 ' +
+                  'C 150 398 176 398 196 392 L 196 432 ' +
+                  'C 196 446 220 446 220 432 L 220 386 ' +
+                  'C 250 392 286 392 312 380 L 312 430 ' +
+                  'C 312 444 336 444 336 430 L 336 366 ' +
+                  'C 356 356 372 332 372 300 ' +
+                  'C 392 290 398 268 392 256 C 404 240 396 214 380 212 ' +
+                  'C 360 184 300 176 250 192 ' +
+                  'C 210 178 150 196 122 226 ' +
+                  'C 110 232 102 240 96 250 Z' }
     };
 
     function getCurrentPose() {
         return POSES[(state && state.pose) || 'standing'] || POSES.standing;
+    }
+
+    /* ---- Single-path body generator ----
+
+       The body is a COMPOUND path: a head circle + a fat torso
+       capsule + four limb capsules, concatenated into one `d` string.
+       Each sub-part is wound the same way, so nonzero-fill unions them
+       into one solid shape — overlapping parts have no internal seam
+       (the limb capsule roots sit UP INSIDE the torso, so there's no
+       hip/shoulder notch) and the space between the legs is simply
+       outside every sub-part, so two distinct legs always read. This
+       is robust where a single Catmull-Rom perimeter was not: a spline
+       can't carve the concave crotch without overshooting and fusing
+       the legs. The SVG outline filter rasterises the union's alpha
+       into one ring, so the compound path still outlines as one body. */
+
+    /* A circle as four cubic béziers (kappa method). Zero arc-flag
+       ambiguity and no diameter-degeneracy — deterministic in every
+       renderer, which hand-rolled SVG `A` arcs were not. */
+    const KAPPA = 0.5522847498307936;
+    function circleBezier(cx, cy, r) {
+        const k = r * KAPPA, f = (n) => n.toFixed(2);
+        return 'M ' + f(cx + r) + ' ' + f(cy) +
+               ' C ' + f(cx + r) + ' ' + f(cy + k) + ' ' + f(cx + k) + ' ' + f(cy + r) + ' ' + f(cx) + ' ' + f(cy + r) +
+               ' C ' + f(cx - k) + ' ' + f(cy + r) + ' ' + f(cx - r) + ' ' + f(cy + k) + ' ' + f(cx - r) + ' ' + f(cy) +
+               ' C ' + f(cx - r) + ' ' + f(cy - k) + ' ' + f(cx - k) + ' ' + f(cy - r) + ' ' + f(cx) + ' ' + f(cy - r) +
+               ' C ' + f(cx + k) + ' ' + f(cy - r) + ' ' + f(cx + r) + ' ' + f(cy - k) + ' ' + f(cx + r) + ' ' + f(cy) +
+               ' Z';
+    }
+
+    /* A "blob limb": a chain of overlapping circles from (ax,ay) to
+       (bx,by), radius ar→br (tapered if they differ). Union of the
+       circles is a smooth tube with rounded ends — no arc flags
+       anywhere. Spacing ≤ ~0.6·r keeps the union scallop-free. */
+    function blobLimb(ax, ay, bx, by, ar, br) {
+        if (br == null) br = ar;
+        const len = Math.hypot(bx - ax, by - ay);
+        const steps = Math.max(2, Math.ceil(len / (Math.min(ar, br) * 0.6)));
+        let d = '';
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            d += circleBezier(ax + (bx - ax) * t, ay + (by - ay) * t, ar + (br - ar) * t) + ' ';
+        }
+        return d;
+    }
+
+    function groodleBodyPath(sk) {
+        const h = sk.head, cx = h.x;
+        const shY = sk.shoulderY, shHW = sk.shoulderHW;
+        const hipY = sk.hipY, hipHW = sk.hipHW;
+        const aw = sk.armW, lw = sk.legW;
+
+        /* Head — one circle. */
+        const head = circleBezier(h.x, h.y, h.r);
+
+        /* Torso — a tapered circle column from just under the head to
+           the hip line; slightly wider at the chest than the hips so
+           it reads as a body, not a tube. The top circles overlap the
+           head (no neck seam); the bottom overlaps the leg roots. */
+        const torso = blobLimb(cx, shY - 6, cx, hipY + 6, shHW * 0.92, hipHW * 1.04);
+
+        /* Arms root inside the torso so the shoulder is a seamless
+           blend, then taper slightly out to the hands. */
+        const armR = blobLimb(cx + shHW * 0.42, shY + 8, sk.handR.x, sk.handR.y, aw * 1.05, aw * 0.82);
+        const armL = blobLimb(cx - shHW * 0.42, shY + 8, sk.handL.x, sk.handL.y, aw * 1.05, aw * 0.82);
+
+        /* Legs root up inside the torso (above the hip line, no hip
+           seam); they spread to the feet so below the torso the two
+           chains separate into distinct legs with real daylight
+           between them. */
+        const legR = blobLimb(cx + hipHW * 0.4, hipY - 30, sk.footR.x, sk.footR.y, lw * 1.05, lw * 0.9);
+        const legL = blobLimb(cx - hipHW * 0.4, hipY - 30, sk.footL.x, sk.footL.y, lw * 1.05, lw * 0.9);
+
+        return head + ' ' + torso + armR + armL + legR + legL;
+    }
+
+    function posePathD(pose) {
+        if (pose.path) return pose.path;
+        if (pose.skeleton) return groodleBodyPath(pose.skeleton);
+        return '';
     }
 
     const TEMPO = 112;
@@ -2342,76 +2372,22 @@
     /* Add a rounded rectangle subpath. Equivalent to SVG <rect rx="r"> and
        to CanvasRenderingContext2D.roundRect, but hand-rolled so we don't
        depend on roundRect (still missing in some older mobile Safaris). */
-    function addRoundRect(path, x, y, w, h, r) {
-        r = Math.min(r, w / 2, h / 2);
-        path.moveTo(x + r, y);
-        path.lineTo(x + w - r, y);
-        path.arcTo(x + w, y, x + w, y + r, r);
-        path.lineTo(x + w, y + h - r);
-        path.arcTo(x + w, y + h, x + w - r, y + h, r);
-        path.lineTo(x + r, y + h);
-        path.arcTo(x, y + h, x, y + h - r, r);
-        path.lineTo(x, y + r);
-        path.arcTo(x, y, x + r, y, r);
-        path.closePath();
-    }
-
-    /* Build the union-of-shapes silhouette as one Path2D, in the canvas's
-       logical 400x600 coordinate system. Each shape's transform mirrors
-       the SVG: SVG "translate(tx ty) rotate(rot)" means rotate-about-origin
-       first, THEN translate — which is exactly the matrix you get by
-       calling translateSelf followed by rotateSelf on an identity DOMMatrix
-       (post-multiplication: M = T * R, applied as M*p = T*(R*p)).
-
-       Pulls shapes from the currently-selected pose so a pose change
-       re-clips the canvas to the new figure outline. */
+    /* Build the silhouette as ONE Path2D for the canvas clip, in the
+       logical 400x600 coordinate system. posePathD resolves the
+       current pose to a single SVG path d-string (generated from a
+       skeleton for humanoid poses, hand-authored for ghost/animal);
+       Path2D(d) parses it directly. A pose change re-clips the canvas
+       to the new outline. Same string feeds the SVG groups below, so
+       the paintable area and the visible body are guaranteed identical. */
     function buildBodyPath() {
-        const path = new Path2D();
-        const shapes = getCurrentPose().shapes;
-        for (let i = 0; i < shapes.length; i++) {
-            const s = shapes[i];
-            const sub = new Path2D();
-            if (s.type === 'circle') {
-                sub.arc(s.cx, s.cy, s.r, 0, Math.PI * 2);
-            } else if (s.type === 'rect') {
-                addRoundRect(sub, s.x, s.y, s.w, s.h, s.r || 0);
-            }
-            if (s.tx != null || s.ty != null || s.rot != null) {
-                const m = new DOMMatrix();
-                if (s.tx || s.ty) m.translateSelf(s.tx || 0, s.ty || 0);
-                if (s.rot) m.rotateSelf(s.rot);
-                path.addPath(sub, m);
-            } else {
-                path.addPath(sub);
-            }
-        }
-        return path;
+        return new Path2D(posePathD(getCurrentPose()));
     }
 
-    /* SVG-string version of the same shape data — drops into the three
-       <g> / <clipPath> groups inside the silhouette layers on init and
-       on every pose change. The transform attribute mirrors what
-       buildBodyPath's DOMMatrix does (translate then rotate, applied
-       right-to-left). */
-    function shapeToSvgString(s) {
-        if (s.type === 'circle') {
-            return '<circle cx="' + s.cx + '" cy="' + s.cy + '" r="' + s.r + '"/>';
-        }
-        if (s.type === 'rect') {
-            const rx = s.r != null ? ' rx="' + s.r + '"' : '';
-            let xform = '';
-            if (s.tx || s.ty || s.rot) {
-                xform = ' transform="translate(' + (s.tx || 0) + ' ' + (s.ty || 0) +
-                        ') rotate(' + (s.rot || 0) + ')"';
-            }
-            return '<rect x="' + s.x + '" y="' + s.y + '" width="' + s.w +
-                   '" height="' + s.h + '"' + rx + xform + '/>';
-        }
-        return '';
-    }
-
+    /* SVG version of the same single path — drops into the three
+       <g> / <clipPath> groups inside the silhouette layers on init
+       and on every pose change. */
     function renderPoseSvg(pose) {
-        return pose.shapes.map(shapeToSvgString).join('');
+        return '<path d="' + posePathD(pose) + '"/>';
     }
 
     /* Updates the three silhouette groups (clipPath / fill / outline)
@@ -2872,42 +2848,62 @@
     /* The whole creature transforms as a single sprite â€” translate /
        squash / sway. transform-origin is the floor (50% 92%) so the
        feet stay planted while the body bobs above. */
+    /* Rigid-body dance (the whole creature — silhouette + the kid's
+       drawing + hat — transforms as one sprite; transform-origin is
+       the feet so squash/spin pivot off the floor). True per-limb
+       articulation is a post-launch v2 — see PLAY_STORE_PLAN.md.
+
+       The juice comes from three classic animation principles applied
+       to the wrapper transform:
+         * a snappy hop ARC (sin, not |sin|, so the figure spends real
+           time airborne instead of vibrating),
+         * ANTICIPATION — a crouch + widen just before each launch,
+         * SQUASH & STRETCH — stretch tall at the apex, splat wide on
+           the landing/anticipation, roughly volume-preserving so it
+           reads as weight, not scaling. */
     function applyMove(move, beats) {
-        const beatPhase = (beats % 1) * Math.PI * 2;
-        const halfPhase = ((beats / 2) % 1) * Math.PI * 2;
-        const bouncePulse = Math.abs(Math.sin(beatPhase));
+        const ph = beats - Math.floor(beats);          // 0..1 within the beat
+        const barBeat = Math.floor(beats) % 4;          // which beat of 4
+        const hop = Math.sin(Math.PI * ph);             // 0→1→0 jump arc
+        /* anticipation: ramp 0→1 over the last 18% of the beat */
+        const antic = ph > 0.82 ? (ph - 0.82) / 0.18 : 0;
+        /* landing impact: strong spike right at ground contact */
+        const land = Math.pow(Math.max(0, 1 - ph * 6), 2);
+        /* combined ground-squash amount (0 mid-air, 1 splatted) */
+        const gsq = Math.max(antic * 0.75, land);
 
         let ty = 0, rot = 0, sx = 1, sy = 1, tx = 0;
 
-        /* Motion magnitudes roughly doubled vs the prior compact-stage
-           values. The full-viewport figure is ~50% larger in absolute
-           px on a phone, so the old 14 px bounce was reading as ~2 %
-           of figure height. Pumping these up plus dropping the CSS
-           transition smoother gives motion that's actually visible at
-           an arm's-length viewing distance. */
         if (move === 'BOUNCE') {
-            ty = -bouncePulse * 32;
-            sy = 1 - bouncePulse * 0.12;
-            sx = 1 + bouncePulse * 0.12;
+            ty = -hop * 58 + antic * 12;
+            sy = 1 + hop * 0.13 - gsq * 0.22;
+            sx = 1 - hop * 0.09 + gsq * 0.22;
+            rot = Math.sin(beats * Math.PI) * 2;
         } else if (move === 'TWIST') {
-            rot = Math.sin(halfPhase) * 14;
-            ty = -bouncePulse * 18;
-            sy = 1 - bouncePulse * 0.08;
+            const swiv = Math.sin(beats * Math.PI);     // hip swivel, 2-beat period
+            rot = swiv * 16;
+            tx = swiv * 8;
+            ty = -hop * 22;
+            sy = 1 + hop * 0.06 - gsq * 0.12;
+            sx = 1 - hop * 0.04 + gsq * 0.12;
         } else if (move === 'DISCO') {
-            const swing = Math.sin(beatPhase);
-            rot = swing * 18;
-            ty = -bouncePulse * 26;
-            sy = 1 - bouncePulse * 0.14;
-            sx = 1 + bouncePulse * 0.14;
-            tx = swing * 10;
+            const step = Math.sin(beats * Math.PI / 2); // slow 4-beat side-step
+            tx = step * 30;
+            rot = step * 11;
+            ty = -hop * 34;
+            sy = 1 + hop * 0.11 - gsq * 0.17;
+            sx = 1 - hop * 0.08 + gsq * 0.17;
+            /* every 4th beat: a quick scaleX flip-and-back reads as a
+               spin/turn (figure goes edge-on at mid-beat then back). */
+            if (barBeat === 3) sx *= Math.cos(ph * Math.PI * 2);
         } else if (move === 'PARTY') {
-            const swing = Math.sin(beatPhase);
-            const flap = Math.sin(beatPhase * 2);
-            rot = swing * 22 + flap * 8;
-            ty = -bouncePulse * 44;
-            sy = 1 - bouncePulse * 0.22;
-            sx = 1 + bouncePulse * 0.22;
-            tx = swing * 18;
+            ty = -hop * 72;
+            sy = 1 + hop * 0.17 - gsq * 0.28;
+            sx = 1 - hop * 0.13 + gsq * 0.28;
+            rot = Math.sin(beats * Math.PI * 2) * 11;
+            tx = Math.sin(beats * Math.PI) * 16;
+            /* every 4th beat: a full cartwheel spin around the feet */
+            if (barBeat === 3) rot += ph * 360;
         }
 
         const parts = [];
@@ -2918,9 +2914,11 @@
         creature.style.transform = parts.join(' ');
 
         if (floorEl) {
-            const sc = 1 - bouncePulse * 0.18;
-            floorEl.style.transform = 'translateX(-50%) scaleX(' + sc + ')';
-            floorEl.style.opacity = String(0.55 + bouncePulse * 0.35);
+            /* Shadow shrinks + fades as the figure leaves the ground,
+               darkens + spreads on the squashed landing. */
+            const sc = 1 - hop * 0.34 + gsq * 0.10;
+            floorEl.style.transform = 'translateX(-50%) scaleX(' + sc.toFixed(3) + ')';
+            floorEl.style.opacity = (0.34 + (1 - hop) * 0.5).toFixed(3);
         }
 
         if (bubbleEl && bubbleEl._pulseStart != null) {
@@ -3043,9 +3041,9 @@
         trackVisit();
 
         /* Render the silhouette SVG for the saved pose BEFORE buildCanvas
-           runs — buildCanvas reads getCurrentPose().shapes for its clip,
-           so the canvas-level drawable area lines up with what the kid
-           sees onscreen. */
+           runs — buildCanvas reads posePathD(getCurrentPose()) for its
+           clip, so the canvas-level drawable area lines up with what the
+           kid sees onscreen. */
         renderPoseDom(getCurrentPose());
         buildCanvas();
         buildPalette();
