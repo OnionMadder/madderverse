@@ -1834,14 +1834,35 @@
         updateIceFreeze();
     }
 
+    // Moon-chaos rain. Each particle is a real moon sprite cropped from
+    // sky-items.png (one of 8 variants; comets excluded). NO emoji. If
+    // the sheet hasn't loaded yet, fall back to a drawn glowing orb —
+    // still never a 🌙. Reuses the existing `.moon-rain span` fall anim.
+    const SKY_RAIN_INSET = 3; // px shaved per side (sheet has a ~2px gutter)
     function moonRain() {
         const layer = document.createElement('div');
         layer.className = 'moon-rain';
+        const sheet = skyItemsSheet;
         for (let i = 0; i < 14; i++) {
             const m = document.createElement('span');
-            m.textContent = '🌙';
+            const size = 22 + Math.random() * 34; // rendered px, longest side
+            if (sheet && sheet.moons.length) {
+                const f = sheet.moons[(Math.random() * sheet.moons.length) | 0];
+                const b = SKY_RAIN_INSET;
+                const iw = f.w - 2 * b, ih = f.h - 2 * b;
+                const sc = size / Math.max(iw, ih);
+                m.style.cssText =
+                    `background-image:url('${sheet.src}');background-repeat:no-repeat;` +
+                    `background-size:${sheet.sheetW * sc}px ${sheet.sheetH * sc}px;` +
+                    `background-position:${-(f.x + b) * sc}px ${-(f.y + b) * sc}px;` +
+                    `width:${iw * sc}px;height:${ih * sc}px;`;
+            } else {
+                m.style.cssText =
+                    `width:${size}px;height:${size}px;border-radius:50%;` +
+                    `background:radial-gradient(circle at 38% 36%,#dbeafe,#1e293b 72%);` +
+                    `box-shadow:0 0 10px rgba(147,197,253,0.7);`;
+            }
             m.style.left = (Math.random() * 100) + 'vw';
-            m.style.fontSize = (16 + Math.random() * 36) + 'px';
             m.style.animationDelay = (Math.random() * 0.5) + 's';
             m.style.animationDuration = (2 + Math.random() * 1.6) + 's';
             layer.appendChild(m);
@@ -2253,7 +2274,7 @@
             return tb.localeCompare(ta);
         });
         const headline = moonUnlocked
-            ? `🌙 MOON UNLOCKED · ${pts} pts`
+            ? `MOON MUNKI AWAKENED · ${pts} MOON POINTS`
             : `${pts}/${MOON_UNLOCK_THRESHOLD} moon points`;
         const items = unlockedDefs.length
             ? unlockedDefs.map(a => `
@@ -2851,6 +2872,11 @@
     let creepEl = null;            // the floating DOM element
     let creepActive = false;       // currently drifting across?
     let creepSheet = null;         // {src, sheetW, sheetH, frames:[...]} or null
+    // Moon-chaos rain art: 8 moon variants cropped from sky-items.png.
+    // The 4 comet-* frames in that sheet are deliberately ignored here
+    // (reserved for v1.1). null until loaded — moonRain falls back to a
+    // drawn glowing orb, never an emoji.
+    let skyItemsSheet = null;      // {src, sheetW, sheetH, moons:[{x,y,w,h}]}
     let creepSpawnTimer = null;
     let creepRAF = null;
     let creepState = null;         // { x, y, vx, baseY, tStart, stayMs, variant }
@@ -2911,6 +2937,35 @@
                     sheetW: size.w || Math.max(...frames.map(f => f.x + f.w)),
                     sheetH: size.h || Math.max(...frames.map(f => f.y + f.h)),
                     frames
+                };
+            })
+            .catch(() => null);
+    }
+
+    // Loads sky-items.{png,json} for the moon-chaos rain. Same
+    // TexturePacker-hash shape as flying-creeps.json. Returns ONLY the 8
+    // moon frames — any frame whose name contains "comet" is skipped
+    // (the 4 large comets are reserved for v1.1). null if absent.
+    function loadSkyItemsSheet() {
+        return fetch('assets/sprites/sky-items.json')
+            .then(r => (r.ok ? r.json() : null))
+            .then(json => {
+                if (!json || !json.frames) return null;
+                const moons = Object.keys(json.frames)
+                    .filter(name => !/comet/i.test(name))
+                    .map(name => {
+                        const e = json.frames[name];
+                        return (e && e.frame) ? e.frame : e;
+                    })
+                    .filter(f => f && f.w && f.h);
+                if (!moons.length) return null;
+                const meta = json.meta || {};
+                const size = meta.size || {};
+                return {
+                    src: 'assets/sprites/sky-items.png',
+                    sheetW: size.w || Math.max(...moons.map(f => f.x + f.w)),
+                    sheetH: size.h || Math.max(...moons.map(f => f.y + f.h)),
+                    moons
                 };
             })
             .catch(() => null);
@@ -3128,6 +3183,7 @@
         if (!CREEP.ENABLED) return;
         loadCreepsSeen();
         loadCreepSheet().then(sheet => { creepSheet = sheet; });
+        loadSkyItemsSheet().then(s => { skyItemsSheet = s; });
         scheduleCreepSpawn(true);
         // Pause drift + spawn while the app is backgrounded (battery; also
         // avoids a fear blast when the kid returns). Reuses the same

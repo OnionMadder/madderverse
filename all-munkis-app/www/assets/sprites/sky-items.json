@@ -1,0 +1,255 @@
+{
+  "frames": {
+    "moon-violet": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 216,
+        "h": 228
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 228
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 228
+      }
+    },
+    "moon-orange": {
+      "frame": {
+        "x": 652,
+        "y": 2,
+        "w": 216,
+        "h": 229
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 229
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 229
+      }
+    },
+    "moon-pink": {
+      "frame": {
+        "x": 1302,
+        "y": 2,
+        "w": 216,
+        "h": 229
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 229
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 229
+      }
+    },
+    "moon-red": {
+      "frame": {
+        "x": 1952,
+        "y": 2,
+        "w": 216,
+        "h": 228
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 228
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 228
+      }
+    },
+    "moon-yellow": {
+      "frame": {
+        "x": 2,
+        "y": 233,
+        "w": 216,
+        "h": 229
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 229
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 229
+      }
+    },
+    "moon-cyan": {
+      "frame": {
+        "x": 652,
+        "y": 233,
+        "w": 216,
+        "h": 230
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 230
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 230
+      }
+    },
+    "moon-blue": {
+      "frame": {
+        "x": 1302,
+        "y": 233,
+        "w": 216,
+        "h": 230
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 230
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 230
+      }
+    },
+    "moon-green": {
+      "frame": {
+        "x": 1952,
+        "y": 233,
+        "w": 216,
+        "h": 229
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 229
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 229
+      }
+    },
+    "comet-yellow": {
+      "frame": {
+        "x": 2,
+        "y": 465,
+        "w": 648,
+        "h": 621
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 648,
+        "h": 621
+      },
+      "sourceSize": {
+        "w": 648,
+        "h": 621
+      }
+    },
+    "comet-blue": {
+      "frame": {
+        "x": 652,
+        "y": 465,
+        "w": 648,
+        "h": 620
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 648,
+        "h": 620
+      },
+      "sourceSize": {
+        "w": 648,
+        "h": 620
+      }
+    },
+    "comet-purple": {
+      "frame": {
+        "x": 1302,
+        "y": 465,
+        "w": 648,
+        "h": 615
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 648,
+        "h": 615
+      },
+      "sourceSize": {
+        "w": 648,
+        "h": 615
+      }
+    },
+    "comet-red": {
+      "frame": {
+        "x": 1952,
+        "y": 465,
+        "w": 648,
+        "h": 615
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 648,
+        "h": 615
+      },
+      "sourceSize": {
+        "w": 648,
+        "h": 615
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2602,
+      "h": 1088
+    },
+    "scale": "1"
+  }
+}
