@@ -1182,6 +1182,39 @@ body:not(.dancing) .dance-dock { display: none; }
     display: block;
 }
 
+/* Neon-glow icons. The SVGs paint with currentColor, so tinting is
+   just `color` + a layered drop-shadow glow (teal core, faint pink
+   halo) — no per-icon edits, fully themeable. Scoped to exclude the
+   primary (Dance) + stop buttons, which sit on bright gradients and
+   keep their dark/white glyphs for contrast. */
+.dock-btn:not(.primary):not(.stop) .dock-icon svg {
+    color: #00ffcc;
+    filter:
+        drop-shadow(0 0 3px rgba(0, 255, 204, 0.55))
+        drop-shadow(0 0 7px rgba(255, 110, 199, 0.22));
+    transition: color 0.15s, filter 0.15s;
+}
+/* Open-drawer / selected state: glyph flips to neon pink. */
+.dock-btn.active:not(.primary):not(.stop) .dock-icon svg {
+    color: #ff6ec7;
+    filter: drop-shadow(0 0 5px rgba(255, 110, 199, 0.7));
+}
+@media (hover: hover) {
+    .dock-btn:not(.primary):not(.stop):hover .dock-icon svg {
+        filter:
+            drop-shadow(0 0 5px rgba(0, 255, 204, 0.85))
+            drop-shadow(0 0 11px rgba(255, 110, 199, 0.35));
+    }
+}
+/* Dance icon: subtle white edge so the dark glyph stays crisp on the
+   bright pink→gold→teal gradient. */
+.dock-btn.primary .dock-icon svg {
+    filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.55));
+}
+@media (prefers-reduced-motion: reduce) {
+    .dock-btn .dock-icon svg { transition: none; }
+}
+
 /* .dock-label is no longer an inline caption — it floats above the
    button as a tooltip pill. Hidden by default; revealed on hover
    (desktop) or a long-press (.show-tip added by attachDockTooltips
