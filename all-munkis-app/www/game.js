@@ -96,6 +96,11 @@
     //                      12s slow-creep corner-sprite visual.
     let beatReacting = false;
     let fearHorrorActive = false;
+    // True whenever horror mode (body.react-mode-active) is on, from
+    // EITHER source. While on, every on-stage non-evil Munki cycles its
+    // head 1→5 (staggered per slot), not just the Ice/Moon-adjacent one.
+    let horrorActive = false;
+    let horrorStartBeat = 0;
 
     let horrorTriggers = 0;
     let activeBankIndex = 0;
@@ -1162,8 +1167,18 @@
         if (isJumpScareActive) return 2;
         const id = slots[slotIndex];
         if (!id) return 1;
+        const isEvil = (id === 'ice' || id === 'moon');
+        // A Creep within CLOSE_PX → snap to shocked (2). Most urgent
+        // read; the .creep-scared shake compounds on top of this.
+        if (!isEvil && creepScaredSlots.has(slotIndex)) return 2;
         const r = reactStartBeat.get(slotIndex);
         if (r !== undefined) return ((beatCounter - r) % 5) + 1;
+        // Horror mode: EVERY on-stage non-evil Munki cycles 1→5, offset
+        // by slot so the dread ripples across the stage rather than all
+        // flipping in lockstep.
+        if (horrorActive && !isEvil) {
+            return (((beatCounter - horrorStartBeat) + slotIndex) % 5) + 1;
+        }
         const t = placedAt.get(slotIndex);
         if (t !== undefined && (performance.now() - t) < PLACED_SHOCK_MS) return 2;
         const m = manualExpression.get(slotIndex);
@@ -1227,6 +1242,15 @@
         }
         beatReacting = anyReacting;
         syncHorrorMode();
+        // While horror is on, every occupied non-evil slot is cycling its
+        // expression (see expressionForSlot) — re-render them all each
+        // beat so the sprites actually advance, not just the dwell ones.
+        if (horrorActive) {
+            for (let i = 0; i < NUM_SLOTS; i++) {
+                const sid = slots[i];
+                if (sid && sid !== 'ice' && sid !== 'moon') toRender.add(i);
+            }
+        }
         toRender.forEach(i => renderSlot(i));
     }
 
@@ -1238,6 +1262,8 @@
     function syncHorrorMode() {
         const on = beatReacting || fearHorrorActive;
         document.body.classList.toggle('react-mode-active', on);
+        if (on && !horrorActive) horrorStartBeat = beatCounter; // clean cycle start
+        horrorActive = on;
         if (on !== anyWasReacting) {
             setReactDrone(on);
             anyWasReacting = on;
@@ -2869,6 +2895,9 @@
     // assets/sprites/FLYING_CREEPS_README.md for the full sheet spec.
     const CREEPS_SEEN_KEY = 'all-munkis-creeps-seen-v1';
     const creepFear = new Map();   // slotIndex -> 0..100
+    // Slots a Creep is currently CLOSE to — drives the shocked-face fear
+    // expression (expressionForSlot), not just the .creep-scared shake.
+    const creepScaredSlots = new Set();
     let creepEl = null;            // the floating DOM element
     let creepActive = false;       // currently drifting across?
     let creepSheet = null;         // {src, sheetW, sheetH, frames:[...]} or null
@@ -3094,9 +3123,12 @@
             creepEl.hidden = true;
             creepEl.classList.remove('flying-creep-in');
         }
-        // Clear any lingering flinch.
+        // Clear any lingering flinch + scared-face state.
         document.querySelectorAll('.stage-slot.creep-scared')
             .forEach(s => s.classList.remove('creep-scared'));
+        const wasScared = [...creepScaredSlots];
+        creepScaredSlots.clear();
+        wasScared.forEach(i => renderSlot(i));
         if (creepRAF) { cancelAnimationFrame(creepRAF); creepRAF = null; }
         scheduleCreepSpawn(false);
     }
@@ -3141,11 +3173,13 @@
             const cur = creepFear.get(i) || 0;
             if (d <= CREEP.CLOSE_PX) {
                 el.classList.add('creep-scared');
+                if (!creepScaredSlots.has(i)) { creepScaredSlots.add(i); renderSlot(i); }
                 creepFear.set(i, Math.min(CREEP.FEAR_MAX,
                     cur + CREEP.FEAR_GAIN_PER_S * dt));
             } else {
-                if (d >= CREEP.FAR_PX) el.classList.remove('creep-scared');
                 if (d >= CREEP.FAR_PX) {
+                    el.classList.remove('creep-scared');
+                    if (creepScaredSlots.delete(i)) renderSlot(i);
                     creepFear.set(i, Math.max(0,
                         cur - CREEP.FEAR_DECAY_PER_S * dt));
                 }
@@ -3167,14 +3201,14 @@
             syncHorrorMode();
         }
 
-        // Lifetime: after stayMs, head for the opposite edge; despawn once
-        // fully off any viewport edge.
-        if (!st.leaving && elapsed > st.stayMs) st.leaving = true;
+        // Lifetime: the Creep drifts on its constant-velocity path and
+        // ONLY despawns once it has fully left the viewport — it never
+        // vanishes mid-stage on a timer. (90s watchdog is pure insurance
+        // against a stuck state; a normal crossing is ~20–35s.)
         const off = st.x < -CREEP.SIZE_PX * 1.5 || st.x > window.innerWidth + CREEP.SIZE_PX * 1.5
                  || drawY > window.innerHeight + CREEP.SIZE_PX * 1.5;
-        if (st.leaving && off) { endCreep(); return; }
-        // Safety cap: never linger more than 2× the intended stay.
-        if (elapsed > st.stayMs * 2 + 4000) { endCreep(); return; }
+        if (off) { endCreep(); return; }
+        if (elapsed > 90000) { endCreep(); return; }
 
         creepRAF = requestAnimationFrame(creepTick);
     }
