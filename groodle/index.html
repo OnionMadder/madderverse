@@ -71,6 +71,23 @@
 <main class="stage" id="stage" aria-label="Drawing stage">
     <div class="bg-layer bg-studio" id="bgLayer"></div>
 
+    <!-- Static fill-pattern layer (Rocko's-Modern-Life style: the
+         pattern stays locked to the stage while the body dances).
+         Sits BELOW .creature (z-index 1) so the kid's strokes paint
+         over it. The full-stage <rect> is filled with the chosen
+         pattern in user space (so the texture never moves); it's
+         clipped by #patternWinPath — a copy of the body silhouette
+         that gets the SAME CSS transform as .creature each dance
+         frame, so the body acts as a moving window onto the fixed
+         pattern field. Hidden until a pattern is picked. -->
+    <svg class="pattern-layer" id="patternLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true" hidden>
+        <defs id="patternDefs"></defs>
+        <clipPath id="patternWin">
+            <path id="patternWinPath" d=""/>
+        </clipPath>
+        <rect id="patternFill" x="0" y="0" width="400" height="600" clip-path="url(#patternWin)" fill="none"/>
+    </svg>
+
     <div class="creature" id="creature">
         <!-- Fill layer: pale interior wash that becomes the "coloring
              page" surface (z-index 1). -->
@@ -206,6 +223,10 @@
                     <div class="sizes" id="sizes" aria-label="Brush size"></div>
                     <button id="eraserBtn" class="btn small" type="button" aria-label="Eraser">🧽 ERASE</button>
                 </div>
+            </div>
+            <div class="drawer-section">
+                <h3 class="drawer-section-label">Pattern fill</h3>
+                <div class="pattern-picker" id="patternPicker" aria-label="Body fill pattern"></div>
             </div>
         </div>
     </section>

@@ -2594,6 +2594,139 @@
         if (creature && pose.origin) {
             creature.style.transformOrigin = pose.origin;
         }
+        /* Keep the static-pattern window in lockstep with the pose
+           (new silhouette + matching transform-origin). */
+        syncPatternWindow();
+    }
+
+    /* ============ FILL PATTERNS ============
+
+       "Rocko's Modern Life" static fill: the body shows a repeating
+       pattern that stays LOCKED to the stage while the figure dances
+       (the form moves, the texture doesn't). Implementation: a
+       stage-level <rect> filled with the pattern in user space (so
+       the texture never moves), clipped by #patternWinPath — a copy
+       of the body silhouette that gets the SAME CSS transform string
+       as .creature every dance frame, so the body reads as a moving
+       window onto a fixed pattern field. It's an underlay: z below
+       .creature, the pale wash goes transparent (body.has-pattern),
+       and the kid's freehand strokes paint over it normally. */
+
+    const PATTERNS = [
+        { id: 'dots',    label: 'Dots',    size: 30, ground: '#fff7e6', ink: '#1a0f33',
+          tile: (s, g, k) => '<circle cx="' + (s/2) + '" cy="' + (s/2) + '" r="' + (s*0.18) + '" fill="' + k + '"/>' },
+        { id: 'stripes', label: 'Stripes', size: 26, ground: '#fff7e6', ink: '#ff6ec7',
+          tile: (s, g, k) => '<path d="M0 ' + s + ' L' + s + ' 0 M-' + s + ' ' + s + ' L' + s + ' -' + s + ' M0 ' + (2*s) + ' L' + (2*s) + ' 0" stroke="' + k + '" stroke-width="' + (s*0.42) + '"/>' },
+        { id: 'check',   label: 'Checker', size: 34, ground: '#fff7e6', ink: '#00b894',
+          tile: (s, g, k) => '<rect width="' + (s/2) + '" height="' + (s/2) + '" fill="' + k + '"/><rect x="' + (s/2) + '" y="' + (s/2) + '" width="' + (s/2) + '" height="' + (s/2) + '" fill="' + k + '"/>' },
+        { id: 'zigzag',  label: 'Zigzag',  size: 32, ground: '#1a0f33', ink: '#ffd23f',
+          tile: (s, g, k) => '<path d="M0 ' + (s*0.7) + ' L' + (s/2) + ' ' + (s*0.3) + ' L' + s + ' ' + (s*0.7) + '" fill="none" stroke="' + k + '" stroke-width="' + (s*0.18) + '" stroke-linejoin="round"/>' },
+        { id: 'scales',  label: 'Scales',  size: 30, ground: '#e7d6ff', ink: '#7209b7',
+          tile: (s, g, k) => '<path d="M0 ' + s + ' A ' + (s/2) + ' ' + (s/2) + ' 0 0 1 ' + s + ' ' + s + ' M-' + (s/2) + ' ' + s + ' A ' + (s/2) + ' ' + (s/2) + ' 0 0 1 ' + (s/2) + ' ' + s + ' M' + (s/2) + ' ' + s + ' A ' + (s/2) + ' ' + (s/2) + ' 0 0 1 ' + (s*1.5) + ' ' + s + '" fill="none" stroke="' + k + '" stroke-width="' + (s*0.12) + '"/>' },
+        { id: 'stars',   label: 'Stars',   size: 36, ground: '#fff7e6', ink: '#1a0f33',
+          tile: (s, g, k) => { const cx=s/2, cy=s/2, r1=s*0.32, r2=s*0.14; let p=''; for (let i=0;i<10;i++){ const a=i*Math.PI/5 - Math.PI/2; const rr=i%2===0?r1:r2; p += (i?'L':'M') + (cx+Math.cos(a)*rr).toFixed(1) + ' ' + (cy+Math.sin(a)*rr).toFixed(1) + ' '; } return '<path d="' + p + 'Z" fill="' + k + '"/>'; } },
+        { id: 'grid',    label: 'Grid',    size: 28, ground: '#fff7e6', ink: '#1a0f33',
+          tile: (s, g, k) => '<path d="M0 0 H' + s + ' M0 0 V' + s + '" stroke="' + k + '" stroke-width="' + (s*0.09) + '"/>' },
+        { id: 'waves',   label: 'Waves',   size: 34, ground: '#fff7e6', ink: '#00b894',
+          tile: (s, g, k) => '<path d="M0 ' + (s/2) + ' Q ' + (s/4) + ' ' + (s*0.18) + ' ' + (s/2) + ' ' + (s/2) + ' T ' + s + ' ' + (s/2) + '" fill="none" stroke="' + k + '" stroke-width="' + (s*0.14) + '"/>' }
+    ];
+
+    let currentPattern = null;
+    let patternLayerEl = null, patternDefsEl = null, patternFillEl = null,
+        patternWinPathEl = null, patternPickerEl = null;
+    let patternDefsBuilt = false;
+
+    function patternMarkup(p) {
+        return '<pattern id="pat-' + p.id + '" patternUnits="userSpaceOnUse" ' +
+               'width="' + p.size + '" height="' + p.size + '">' +
+               '<rect width="' + p.size + '" height="' + p.size + '" fill="' + p.ground + '"/>' +
+               p.tile(p.size, p.ground, p.ink) +
+               '</pattern>';
+    }
+
+    function buildPatternDefs() {
+        if (patternDefsBuilt || !patternDefsEl) return;
+        patternDefsEl.innerHTML = PATTERNS.map(patternMarkup).join('');
+        patternDefsBuilt = true;
+    }
+
+    /* Point the window at the current pose's silhouette + mirror its
+       transform-origin so the per-frame CSS transform resolves the
+       same way it does on .creature. */
+    function syncPatternWindow() {
+        if (!patternWinPathEl) return;
+        patternWinPathEl.setAttribute('d', posePathD(getCurrentPose()));
+        const o = (getCurrentPose().origin) || '50% 92%';
+        patternWinPathEl.style.transformOrigin = o;
+    }
+
+    /* Called every dance frame: the window tracks the body by reusing
+       the EXACT transform string applied to .creature (same units,
+       same origin via transform-box:view-box) — no matrix math. */
+    function syncPatternDanceTransform() {
+        if (!currentPattern || !patternWinPathEl || !creature) return;
+        patternWinPathEl.style.transform = creature.style.transform;
+    }
+
+    function setPattern(id) {
+        const p = PATTERNS.find((x) => x.id === id);
+        if (!p || !patternLayerEl) return;
+        buildPatternDefs();
+        syncPatternWindow();
+        patternFillEl.setAttribute('fill', 'url(#pat-' + id + ')');
+        patternWinPathEl.style.transform = creature ? creature.style.transform : '';
+        patternLayerEl.hidden = false;
+        document.body.classList.add('has-pattern');
+        currentPattern = id;
+        if (patternPickerEl) {
+            patternPickerEl.querySelectorAll('.pattern-swatch').forEach((b) => {
+                b.classList.toggle('active', b.dataset.pattern === id);
+            });
+        }
+    }
+
+    function clearPattern() {
+        currentPattern = null;
+        if (patternLayerEl) patternLayerEl.hidden = true;
+        if (patternFillEl) patternFillEl.setAttribute('fill', 'none');
+        document.body.classList.remove('has-pattern');
+        if (patternPickerEl) {
+            patternPickerEl.querySelectorAll('.pattern-swatch').forEach((b) => {
+                b.classList.toggle('active', b.dataset.pattern === '');
+            });
+        }
+    }
+
+    function buildPatternPicker() {
+        if (!patternPickerEl) return;
+        patternPickerEl.innerHTML = '';
+        /* "None" first. */
+        const none = document.createElement('button');
+        none.type = 'button';
+        none.className = 'pattern-swatch pattern-none active';
+        none.dataset.pattern = '';
+        none.setAttribute('aria-label', 'No fill pattern');
+        none.textContent = '∅';
+        none.addEventListener('click', clearPattern);
+        patternPickerEl.appendChild(none);
+
+        for (let i = 0; i < PATTERNS.length; i++) {
+            const p = PATTERNS[i];
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'pattern-swatch';
+            b.dataset.pattern = p.id;
+            b.setAttribute('aria-label', p.label + ' fill pattern');
+            b.title = p.label;
+            /* Mini preview: a 36px SVG tiled with the same pattern. */
+            b.innerHTML =
+                '<svg viewBox="0 0 36 36" aria-hidden="true">' +
+                    '<defs>' + patternMarkup(p) + '</defs>' +
+                    '<rect width="36" height="36" rx="6" fill="url(#pat-' + p.id + ')"/>' +
+                '</svg>';
+            b.addEventListener('click', () => setPattern(p.id));
+            patternPickerEl.appendChild(b);
+        }
     }
 
     /* Tracks whether the context has a save() pushed for the current
@@ -3009,6 +3142,8 @@
         if (danceDockEl) danceDockEl.hidden = true;
         setPlayBtnState(false);
         creature.style.transform = '';
+        /* Snap the static-pattern window back to the resting body. */
+        if (patternWinPathEl) patternWinPathEl.style.transform = '';
         if (floorEl) {
             floorEl.style.transform = 'translateX(-50%)';
             floorEl.style.opacity = '';
@@ -3099,6 +3234,9 @@
         if (rot) parts.push('rotate(' + rot.toFixed(2) + 'deg)');
         if (sx !== 1 || sy !== 1) parts.push('scale(' + sx.toFixed(3) + ', ' + sy.toFixed(3) + ')');
         creature.style.transform = parts.join(' ');
+        /* Static-pattern window tracks the body by reusing this exact
+           transform string (see syncPatternDanceTransform). */
+        syncPatternDanceTransform();
 
         if (floorEl) {
             /* Shadow shrinks + fades as the figure leaves the ground,
@@ -3203,6 +3341,11 @@
         hatShopBalanceEl = document.getElementById('hatShopBalance');
         hatLayerInnerEl = document.getElementById('hatLayerInner');
         accessoryLayerInnerEl = document.getElementById('accessoryLayerInner');
+        patternLayerEl = document.getElementById('patternLayer');
+        patternDefsEl = document.getElementById('patternDefs');
+        patternFillEl = document.getElementById('patternFill');
+        patternWinPathEl = document.getElementById('patternWinPath');
+        patternPickerEl = document.getElementById('patternPicker');
         accessoryShopGridEl = document.getElementById('accessoryShopGrid');
         pagesModalEl = document.getElementById('pagesModal');
         pagesGridEl = document.getElementById('pagesGrid');
@@ -3237,6 +3380,8 @@
         buildSizes();
         attachBgPicker();
         buildPosePicker();
+        buildPatternDefs();
+        buildPatternPicker();
         attachHandlers();
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');
