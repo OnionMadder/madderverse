@@ -544,10 +544,16 @@ main {
     right: 0;
     bottom: 0;
     padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0) + var(--mv-slim-h, 22px));
-    background: linear-gradient(to top, rgba(0,0,0,0.96) 60%, rgba(0,0,0,0.6));
-    border-top: 1px solid rgba(45, 212, 191, 0.3);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    /* Frosted glass: the haunted-theatre stage shows softly through —
+       modern, and it deepens the horror mood instead of slapping a flat
+       near-opaque black slab over it. The blur+saturate carries the look
+       now that the panel itself is mostly transparent. */
+    background: linear-gradient(to top, rgba(6, 8, 16, 0.46), rgba(6, 8, 16, 0.28));
+    border-top: 1px solid rgba(45, 212, 191, 0.26);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 -12px 34px rgba(0, 0, 0, 0.42);
+    backdrop-filter: blur(22px) saturate(1.3);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3);
     z-index: 10;
 }
 
@@ -1280,30 +1286,41 @@ body.moon-invert {
    regular tray-chip so all the existing styling applies. Drag onto the
    active 7th-wheel chip in the bank to swap; bank stays at 7 chips. */
 .munki-altar {
+    /* Horizontal 'swap' pill. Was a vertical column whose lone shrunk
+       chip read as a layout accident (a chip that wrapped off the bank
+       and dangled). Now: chip + label side by side as a deliberate
+       secondary control, a hairline divider setting it apart from the
+       bank row, footprint kept short so phones don't get tray overlap. */
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 4px 0 0;
-    margin: 0 auto;
+    gap: 8px;
+    margin: 6px auto 0;
+    padding: 8px 14px 0;
+    border-top: 1px solid rgba(167, 139, 250, 0.22);
+    max-width: 340px;
 }
 .munki-altar[hidden] { display: none; }
 .munki-altar .altar-chip {
     transform: scale(0.78);
-    transform-origin: top center;
-    margin: -6px 0;
+    transform-origin: center;
+    /* scale() leaves the layout box full-size; pull the empty bleed in
+       evenly so the pill stays tight (no lopsided top-only margin). */
+    margin: -13px -10px;
     border-color: rgba(167, 139, 250, 0.6);
-    box-shadow: 0 0 14px rgba(167, 139, 250, 0.35);
+    box-shadow: 0 0 16px rgba(167, 139, 250, 0.42);
 }
 .munki-altar .altar-hint {
     font-family: 'Fredoka', sans-serif;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: rgba(196, 181, 253, 0.7);
+    color: rgba(196, 181, 253, 0.78);
     text-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
-    margin-top: 2px;
+    max-width: 132px;
+    line-height: 1.45;
+    text-align: left;
 }
 
 /* Highlight the bank chip that's a valid swap drop target during an
