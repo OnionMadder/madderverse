@@ -23,6 +23,17 @@
      envelope. (Want a totally different body? That's fine too — tell
      me and I'll retune the BODY anchor numbers in game.js to match.)
 
+  DESIGN CONTRACT — keep the weird, keep these THREE (a cute chibi
+  redraw was tried and rejected for breaking them):
+   a. TALL torso — long shoulder→hip run so the shirt / belt / pants
+      bands each get clear vertical space (a short round body smears
+      them together).
+   b. DISTINCT arms — hands sit OUTSIDE the torso so each arm reads as
+      its own limb (don't let arms melt into the body slab).
+   c. SMALL head — sized for the hats (head radius ~58 here). Don't
+      enlarge it without also retuning every HATS entry in game.js.
+     Lanky-and-slightly-off is the character, not a flaw to fix.
+
   HOW TO HAND IT BACK
   Open in Figma / Illustrator / Inkscape (or trace a paper drawing),
   reshape the pale reference body (or draw your own on the DRAW HERE

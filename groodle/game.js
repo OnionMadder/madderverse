@@ -34,19 +34,11 @@
 
     const SK = {
         /* Shared body proportions so every humanoid pose stays on-model.
-           hw = half-width at that joint line; armW/legW = limb radius.
-
-           CHILD-FRIENDLY (chibi) proportions: a big head, almost no
-           neck, a short round torso and short chunky limbs — ~3 heads
-           tall (a toddler), not the ~6-heads lanky adult this was.
-           MUST stay numerically consistent with the BODY anchor object
-           below (SK drives the clip silhouette; BODY tells the prefab
-           faces / clothing / coloring pages where that same head &
-           torso are — they describe one figure from two angles). */
-        head:  { x: 200, y: 116, r: 84 },
-        shoulderY: 206, shoulderHW: 58,
-        hipY: 360, hipHW: 56,
-        armW: 27, legW: 33
+           hw = half-width at that joint line; armW/legW = limb radius. */
+        head:  { x: 200, y: 92, r: 58 },
+        shoulderY: 188, shoulderHW: 56,
+        hipY: 392, hipHW: 44,
+        armW: 22, legW: 24
     };
 
     function hum(handL, handR, footL, footR, extra) {
@@ -64,35 +56,27 @@
     }
 
     const POSES = {
-        /* Chibi limb tips. RULE: the head spans x≈116..284 and the
-           torso ~x142..258, so a raised/extended arm only reads as a
-           distinct limb if the hand clears that — keep |hand.x-200|
-           large (≥~95) on any non-relaxed arm. Feet on a ~y556 floor
-           (origin ~92% of the 600 box ≈ that floor → feet plant). */
         standing: { name: 'Standing', icon: '🧍', origin: '50% 92%',
-            /* Short arms down-and-out (poke past the wide torso); feet
-               in a wide confident "A" so two chunky legs read instead
-               of merging into one stalk. */
-            skeleton: hum({ x: 122, y: 330 }, { x: 278, y: 330 },
-                          { x: 142, y: 556 }, { x: 258, y: 556 }) },
+            /* Hands hang close to the body (just outside the torso, ~hip
+               level) so the arms read as relaxed at the sides — far-out
+               low hands made the whole figure a bottom-heavy pear. */
+            skeleton: hum({ x: 152, y: 346 }, { x: 248, y: 346 },
+                          { x: 164, y: 566 }, { x: 236, y: 566 }) },
         cheer: { name: 'Cheering', icon: '🙌', origin: '50% 92%',
-            /* Wide "Y" — arms up AND out, flanking the head. */
-            skeleton: hum({ x: 74, y: 120 }, { x: 326, y: 120 },
-                          { x: 144, y: 556 }, { x: 256, y: 556 }) },
+            skeleton: hum({ x: 122, y: 70 }, { x: 278, y: 70 },
+                          { x: 176, y: 566 }, { x: 224, y: 566 }) },
         star: { name: 'Star', icon: '⭐', origin: '50% 90%',
-            skeleton: hum({ x: 84, y: 150 }, { x: 316, y: 150 },
-                          { x: 124, y: 548 }, { x: 276, y: 548 }) },
+            skeleton: hum({ x: 92, y: 150 }, { x: 308, y: 150 },
+                          { x: 138, y: 556 }, { x: 262, y: 556 }) },
         groovy: { name: 'Groovy', icon: '💃', origin: '50% 92%',
-            /* One arm up-out, one arm out — asymmetric dance shape. */
-            skeleton: hum({ x: 84, y: 150 }, { x: 300, y: 290 },
-                          { x: 150, y: 556 }, { x: 252, y: 548 }) },
+            skeleton: hum({ x: 120, y: 78 }, { x: 286, y: 330 },
+                          { x: 168, y: 566 }, { x: 232, y: 560 }) },
         tpose: { name: 'T-Pose', icon: '✋', origin: '50% 92%',
-            skeleton: hum({ x: 74, y: 206 }, { x: 326, y: 206 },
-                          { x: 150, y: 556 }, { x: 250, y: 556 }) },
+            skeleton: hum({ x: 86, y: 196 }, { x: 314, y: 196 },
+                          { x: 182, y: 566 }, { x: 218, y: 566 }) },
         wave: { name: 'Waving', icon: '👋', origin: '50% 92%',
-            /* One arm relaxed down-out, one up-out waving high. */
-            skeleton: hum({ x: 124, y: 330 }, { x: 316, y: 110 },
-                          { x: 146, y: 556 }, { x: 254, y: 556 }) },
+            skeleton: hum({ x: 120, y: 372 }, { x: 286, y: 70 },
+                          { x: 176, y: 566 }, { x: 224, y: 566 }) },
         ghost: { name: 'Ghost', icon: '👻', origin: '50% 88%',
             /* Bell-shaped body with a 3-bump wavy hem + two stubby
                drifting arms. One closed path, hand-authored. */
@@ -237,11 +221,11 @@
         /* Head — one circle. */
         const head = circleBezier(h.x, h.y, h.r);
 
-        /* Neck — a SHORT, WIDE blend (chibi stub neck): starts low on
-           the head and flares almost the full shoulder width so the big
-           head sits right on the body instead of on a thin column. */
-        const neck = capsule(h.x, h.y + h.r * 0.78, cx, shY + 10,
-                             h.r * 0.62, shHW * 0.92);
+        /* Neck — a short capsule bridging the chin to the shoulder line
+           so the head reads as attached, not a ball balanced on a tube.
+           Roots up inside the head and down inside the torso. */
+        const neck = capsule(h.x, h.y + h.r * 0.52, cx, shY + 6,
+                             h.r * 0.46, shHW * 0.60);
 
         /* Torso — two stacked capsules through a slightly pinched waist
            so the body has a shape (rounded shoulders → waist → rounded
@@ -1738,26 +1722,21 @@
        prefab. (Costume bands are full-width fillRects; the canvas clip
        trims them to whatever pose silhouette is active, so only their
        vertical extents matter.) */
-    /* Chibi anchors — kept numerically consistent with SK above (same
-       head circle, same shoulder/hip lines). Face features sit on the
-       now-big head (y32..200, centre 116); costume bands span the now-
-       short torso (~206..360). Retune here AND SK together or the clip
-       silhouette and the painted art drift apart. */
     const BODY = {
         cx: 200,
-        headCy: 116, headR: 84, headTop: 32,
-        eyeY: 132, eyeDX: 26,         // big eyes, just below head centre
-        browY: 104,
-        mouthY: 166,
-        cheekY: 158, cheekDX: 46,
-        hairTipY: 18, hairBaseY: 52,  // crown tuft band
-        neckY: 206,
-        shirtTop: 198, shirtBot: 372, // torso band
-        chestY: 268,                  // logo / badge / button cluster
-        waistY: 348,
-        pantsTop: 340, pantsBot: 600, // legs band
-        bootY: 520,
-        handY: 326                    // standing hand height
+        headCy: 92, headR: 58, headTop: 34,
+        eyeY: 86, eyeDX: 18,          // eyes at cx ± eyeDX
+        browY: 68,
+        mouthY: 110,
+        cheekY: 114, cheekDX: 30,
+        hairTipY: 28, hairBaseY: 56,  // crown tuft band
+        neckY: 150,
+        shirtTop: 158, shirtBot: 392, // torso band
+        chestY: 234,                  // logo / badge / button cluster
+        waistY: 384,
+        pantsTop: 374, pantsBot: 600, // legs band
+        bootY: 532,
+        handY: 344                    // standing hand height
     };
 
     const DEFAULT_GROODLES = [

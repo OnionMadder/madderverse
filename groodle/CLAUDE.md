@@ -283,6 +283,31 @@ faces / clothing / coloring-book pages (which position art via the
 `BODY` anchor object) will not line up. A wholesale re-proportion
 means retuning `BODY` (and each pose's `origin` for foot-planting).
 
+### Design contract — don't sand off the weird
+
+Groodle is a **lanky, slightly-off humanoid on purpose** (the "Baldi
+weirdo" look). That oddness is the character — do not "fix" it into a
+cute mascot. A chibi re-proportion was tried (git `335bbe9`) and
+**rejected**: it was less appealing AND it broke three things the
+lanky build gets right. Any new proportions / custom art MUST keep
+all three:
+
+1. **A tall torso with delineable bands.** Shirt / belt / pants are
+   full-width `fillRect`s keyed off `BODY.shirtTop/shirtBot/waistY/
+   pantsTop` and trimmed by the clip. A long torso gives each band
+   clear vertical real-estate; a short round body smears them
+   together. Keep the shoulder→hip run long.
+2. **Arms distinctly separate from the torso.** The standing hands
+   must sit *outside* the torso silhouette so an arm reads as its own
+   limb (the chibi melted the arms into a slab — the cardinal sin).
+3. **A head sized for the hats.** `HATS` anchors/scales are tuned to
+   `head.r ≈ 58`. Grow the head and every hat floats off or shrinks
+   wrong. Resize the head only if you also retune every `HATS` entry.
+
+Until bespoke custom assets land, the skeleton-driven lanky build at
+git `c6ab9f8` is the intended Groodle. "Intentionally kinda weird" is
+the brief, not a defect.
+
 ## Adding a new coloring-book page
 
 1. Append an entry to `PAGES` in `game.js` — `{ id, label, emoji,
