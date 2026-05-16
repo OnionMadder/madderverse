@@ -44,7 +44,6 @@
         <button id="remixBtn"    class="btn btn-remix"    type="button">REMIX</button>
         <button id="clearBtn"    class="btn btn-clear"    type="button">CLEAR</button>
         <button id="songBtn"     class="btn btn-song"     type="button" aria-pressed="true" title="Toggle level song">SONG</button>
-        <button id="booBtn"      class="btn btn-boo"      type="button" title="Trigger jump scare">BOO!</button>
         <button id="muteBtn"     class="icon-btn"         type="button" aria-label="mute"><span id="muteIcon">🔊</span></button>
     </div>
 
@@ -68,8 +67,10 @@
         <div id="munkiAltar" class="munki-altar" aria-label="swap altar" hidden></div>
     </div>
 
-    <!-- Full-screen "BOO!" text that flashes during a jump scare. -->
-    <div id="booOverlay" class="boo-overlay" aria-hidden="true">BOO!</div>
+    <!-- (Childish full-screen "BOO!" overlay removed. The FNAF jump scare
+         — red flash + screen shake + sprite glitch + shriek — still fires
+         automatically when Ice/Moon lands on the stage; it just no longer
+         shouts a cartoon "BOO!".) -->
 
     <!-- Egg counter chip. Hidden by default; revealed on first achievement.
          Tap to open the achievements panel listing every unlocked entry. -->

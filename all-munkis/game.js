@@ -1001,11 +1001,12 @@
     // (munki) / 1082px (mb) pitch with only a 2px transparent gutter
     // between them. When the browser scales the full sheet and clips via
     // viewBox, bilinear sampling at the viewBox EDGE pulls in fractions
-    // of the neighbouring frame ("tiny bits of neighbouring heads"). A
-    // 1px inset keeps the sampled region strictly inside the gutter so
-    // the neighbour can never bleed in. The head art has transparent
-    // padding inside the frame, so shaving 1px is invisible on the Munki.
-    const FRAME_BLEED_INSET = 1;
+    // of the neighbouring frame ("tiny bits of neighbouring heads"). The
+    // head sheet only has a 2px gutter between 198px frames; at the
+    // display downscale a 1px inset still left a sliver of the neighbour
+    // bleeding in. 3px clears the sampling window with margin and is
+    // invisible — the head art has transparent padding inside the frame.
+    const FRAME_BLEED_INSET = 3;
     // Flying Creeps need a MUCH larger inset than the head sheets. The
     // creep sheet is 3248×1738 with 1082×869 frames packed on a 1px
     // horizontal gutter and a ZERO-px vertical gutter (row 0 ends at
@@ -2744,10 +2745,8 @@
             });
         }
 
-        const booBtn = document.getElementById('booBtn');
-        if (booBtn) {
-            booBtn.addEventListener('click', triggerJumpScare);
-        }
+        // (Manual BOO! button removed — childish. triggerJumpScare still
+        // auto-fires on an Ice/Moon stage drop as the FNAF scare.)
 
         const muteBtn = document.getElementById('muteBtn');
         const muteIcon = document.getElementById('muteIcon');

@@ -1346,7 +1346,10 @@ body.moon-invert {
    visible mark. The moon-reveal overlay celebrates the 5th find. */
 .egg-counter {
     position: fixed;
-    top: calc(env(safe-area-inset-top, 0) + 10px);
+    /* Sits BELOW the .madder-controls cluster (fixed top-right, wraps to
+       up to ~2 rows on phones). 92px clears a wrapped row so the moon-
+       points chip never hides behind BOO/SONG/mute. */
+    top: calc(env(safe-area-inset-top, 0) + 92px);
     right: calc(env(safe-area-inset-right, 0) + 10px);
     z-index: 50;
     display: flex;
