@@ -108,6 +108,15 @@
             <g id="hatLayerInner"></g>
         </svg>
 
+        <!-- Accessory layer (z-index 5): equipped accessory (glasses,
+             mustache, cape, etc.). Same approach as the hat layer —
+             unclipped SVG so accessories can extend beyond the body
+             silhouette. renderEquippedAccessory() drops the chosen
+             accessory's inline-SVG markup into #accessoryLayerInner. -->
+        <svg class="accessory-layer" id="accessoryLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <g id="accessoryLayerInner"></g>
+        </svg>
+
         <!-- Decorative children moved INSIDE .creature so they track
              the figure's centered 2:3 box rather than the full
              viewport. They inherit the dance transform too, which is
@@ -124,39 +133,39 @@
      carry data-modal and are wired in attachHandlers. -->
 <nav class="tool-dock" id="toolDock" aria-label="Tools">
     <button class="dock-btn" data-drawer="brush" type="button" aria-label="Brush">
-        <span class="dock-icon" aria-hidden="true">🎨</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M17.7 3.3a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1l-9 9-3-3z" fill="currentColor"/><path d="M7.5 12.5 11 16c0 2.5-2 4.5-6.5 5 .5-4.5 1.5-7 3-8.5z" fill="currentColor"/></svg></span>
         <span class="dock-label">Brush</span>
     </button>
     <button class="dock-btn" data-drawer="stage" type="button" aria-label="Stage">
-        <span class="dock-icon" aria-hidden="true">🖼️</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="17" cy="7" r="3.1" fill="currentColor"/><path d="M2 20.5 9 11l4 5 3.2-3.8L22 20.5Z" fill="currentColor"/></svg></span>
         <span class="dock-label">Stage</span>
     </button>
-    <button class="dock-btn" id="openHatShopBtn" type="button" aria-label="Hats">
-        <span class="dock-icon" aria-hidden="true">🎩</span>
-        <span class="dock-label">Hats</span>
+    <button class="dock-btn" id="openHatShopBtn" type="button" aria-label="Wardrobe">
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7.5C12 5 13.6 3.8 15 4.4c1 .5 1 1.6 0 2"/><path d="M12 7.5 4.2 14.2c-.8.7-.3 2 .8 2h14c1.1 0 1.6-1.3.8-2L12 7.5Z"/></svg></span>
+        <span class="dock-label">Wardrobe</span>
     </button>
     <button class="dock-btn" data-drawer="beat" type="button" aria-label="Beat">
-        <span class="dock-icon" aria-hidden="true">🎵</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 4.5 20 2.5v3.4L9 7.9z" fill="currentColor"/><rect x="7.4" y="7" width="1.8" height="10" fill="currentColor"/><rect x="18.2" y="5" width="1.8" height="9.5" fill="currentColor"/><circle cx="6" cy="17.5" r="3.1" fill="currentColor"/><circle cx="16.8" cy="15" r="3.1" fill="currentColor"/></svg></span>
         <span class="dock-label">Beat</span>
     </button>
     <button class="dock-btn" id="openAchievementsBtn" type="button" aria-label="Wins">
-        <span class="dock-icon" aria-hidden="true">🏆</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.5H4.5a1.8 1.8 0 0 0 0 3.6H6"/><path d="M17 5.5h2.5a1.8 1.8 0 0 1 0 3.6H18"/><path d="M12 14v3.5"/><path d="M8.5 21h7l-1-3.5h-5z"/></svg></span>
         <span class="dock-label">Wins</span>
     </button>
     <button class="dock-btn" id="openPagesBtn" type="button" aria-label="Pages">
-        <span class="dock-icon" aria-hidden="true">📖</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="9.5" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11c0-1.4 8-1.4 8 0v7c0 1.6-8 1.6-8 0z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.6 13.6c1.3.8 2.9.8 3.9 0" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M7.6 16c1.3.8 2.9.8 3.9 0" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.65"/><path d="M15.6 20.6 20.5 15.7l2 2-4.9 4.9-2.6.6z" fill="currentColor"/></svg></span>
         <span class="dock-label">Pages</span>
     </button>
     <button class="dock-btn" id="openGalleryBtn" type="button" aria-label="Gallery">
-        <span class="dock-icon" aria-hidden="true">🖼️</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="9" r="2" fill="currentColor"/><path d="M5 17.5l4.5-5 3 3 3.5-4 4 6z" fill="currentColor"/></svg></span>
         <span class="dock-label">Gallery</span>
     </button>
     <button class="dock-btn" data-drawer="new" type="button" aria-label="New Groodle">
-        <span class="dock-icon" aria-hidden="true">🆕</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 2.5 13 9l6.5 2-6.5 2-2 6.5-2-6.5L2.5 11 9 9z"/><path d="M19 3 20 5.6 22.6 6.6 20 7.6 19 10.3 18 7.6 15.4 6.6 18 5.6z"/></svg></span>
         <span class="dock-label">New</span>
     </button>
     <button class="dock-btn primary" id="playBtn" type="button" aria-label="Dance">
-        <span class="dock-icon" aria-hidden="true">▶</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4.6" r="2.4" fill="currentColor" stroke="none"/><path d="M13 7.2c-.8 2.4-.2 4 .4 5.6"/><path d="M13.4 12.8 9 21M13.4 12.8l3.6 5.2"/><path d="M13 9 8 6.8M13 9.4l5 1.6"/></svg></span>
         <span class="dock-label">Dance</span>
     </button>
 </nav>
@@ -166,11 +175,11 @@
      primary. -->
 <nav class="dance-dock" id="danceDock" hidden aria-label="Dance controls">
     <button class="dock-btn" data-drawer="beat" type="button" aria-label="Beat">
-        <span class="dock-icon" aria-hidden="true">🎵</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 4.5 20 2.5v3.4L9 7.9z" fill="currentColor"/><rect x="7.4" y="7" width="1.8" height="10" fill="currentColor"/><rect x="18.2" y="5" width="1.8" height="9.5" fill="currentColor"/><circle cx="6" cy="17.5" r="3.1" fill="currentColor"/><circle cx="16.8" cy="15" r="3.1" fill="currentColor"/></svg></span>
         <span class="dock-label">Beat</span>
     </button>
     <button class="dock-btn stop" id="stopBtn" type="button" aria-label="Stop dance">
-        <span class="dock-icon" aria-hidden="true">■</span>
+        <span class="dock-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3.5" fill="currentColor"/></svg></span>
         <span class="dock-label">Stop</span>
     </button>
 </nav>
@@ -304,11 +313,16 @@
     <div class="modal-backdrop" data-close="1"></div>
     <div class="modal-sheet" role="document">
         <header class="modal-header">
-            <h2 id="hatShopModalTitle"><span aria-hidden="true">🎩</span> Hat Shop</h2>
-            <button class="modal-close" type="button" data-close="1" aria-label="Close hat shop">✕</button>
+            <h2 id="hatShopModalTitle"><span aria-hidden="true">🧥</span> Wardrobe</h2>
+            <button class="modal-close" type="button" data-close="1" aria-label="Close wardrobe">✕</button>
         </header>
         <div class="modal-stats">Balance: <span id="hatShopBalance">🪙 0</span></div>
-        <div class="modal-body hat-grid" id="hatShopGrid"></div>
+        <div class="wardrobe-tabs" role="tablist" aria-label="Wardrobe sections">
+            <button class="wardrobe-tab active" type="button" role="tab" aria-selected="true" data-tab="hats">🎩 Hats</button>
+            <button class="wardrobe-tab" type="button" role="tab" aria-selected="false" data-tab="accessories">😎 Accessories</button>
+        </div>
+        <div class="modal-body hat-grid" id="hatShopGrid" role="tabpanel" aria-label="Hats"></div>
+        <div class="modal-body hat-grid" id="accessoryShopGrid" role="tabpanel" aria-label="Accessories" hidden></div>
     </div>
 </div>
 

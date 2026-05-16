@@ -453,6 +453,20 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
     z-index: 4;
 }
 
+/* Accessory layer sits above hats (z-index 5) so glasses can ride
+   on top of a hat brim and a cape can wrap around the figure. Like
+   the hat layer, it's unclipped — accessories can extend past the
+   silhouette (capes, wings) and inherit the creature's dance
+   transform. */
+.accessory-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+}
+
 /* Pale wash inside the silhouette so the kid sees the body shape even
    before any strokes — this is the "coloring page" surface. Slight cool
    tint (vs pure white) so the figure still reads as a distinct shape on
@@ -645,6 +659,50 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
 }
 
 .modal-body { display: flex; flex-direction: column; gap: 10px; }
+
+/* ============ WARDROBE TABS ============
+
+   Pill-shaped tab bar between the balance line and the body grid in
+   the Wardrobe modal. Each tab toggles its hat-grid / accessory-grid
+   body panel via the [hidden] attribute (see attachWardrobeTabs in
+   game.js). */
+
+.wardrobe-tabs {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 14px;
+}
+
+.wardrobe-tab {
+    flex: 0 1 auto;
+    padding: 8px 18px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    color: #d6bdff;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.6px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 40px;
+    transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.08s;
+}
+.wardrobe-tab:active { transform: scale(0.97); }
+@media (hover: hover) {
+    .wardrobe-tab:hover {
+        background: rgba(0, 255, 204, 0.12);
+        border-color: rgba(0, 255, 204, 0.4);
+    }
+}
+.wardrobe-tab.active {
+    background: linear-gradient(135deg, #ff6ec7 0%, #00ffcc 100%);
+    border-color: rgba(255, 255, 255, 0.5);
+    color: #1a0f33;
+    box-shadow: 0 3px 10px rgba(255, 110, 199, 0.35);
+}
 
 /* Lock body scroll while a modal is open so swipes inside the modal
    don't accidentally scroll the page behind it. JS toggles this on
@@ -1109,8 +1167,73 @@ body:not(.dancing) .dance-dock { display: none; }
     -webkit-tap-highlight-color: transparent;
     transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
-.dock-btn .dock-icon { font-size: 22px; line-height: 1; }
-.dock-btn .dock-label { line-height: 1; }
+/* Dock buttons are now icon-only. The icon is a custom inline SVG
+   sized here (not an emoji font-size). position: relative anchors
+   the .dock-label tooltip. */
+.dock-btn { position: relative; }
+.dock-btn .dock-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.dock-btn .dock-icon svg {
+    width: 26px;
+    height: 26px;
+    display: block;
+}
+
+/* .dock-label is no longer an inline caption — it floats above the
+   button as a tooltip pill. Hidden by default; revealed on hover
+   (desktop) or a long-press (.show-tip added by attachDockTooltips
+   in game.js for touch). aria-label on the button keeps screen
+   readers covered regardless. */
+.dock-btn .dock-label {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(26, 15, 51, 0.97);
+    border: 1.5px solid rgba(0, 255, 204, 0.55);
+    color: #fff;
+    font-family: var(--font-chunky);
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    line-height: 1;
+    padding: 5px 10px;
+    border-radius: 9px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.12s ease, transform 0.12s ease;
+    z-index: 200;
+}
+.dock-btn .dock-label::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(0, 255, 204, 0.55);
+}
+@media (hover: hover) {
+    .dock-btn:hover .dock-label {
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+.dock-btn.show-tip .dock-label {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+    .dock-btn .dock-label { transition: opacity 0.12s ease; }
+}
 .dock-btn:active { transform: scale(0.94); }
 .dock-btn.active {
     border-color: #ff6ec7;
@@ -1148,11 +1271,10 @@ body:not(.dancing) .dance-dock { display: none; }
     }
     .dock-btn {
         flex: 0 0 auto;
-        min-width: 84px;
-        min-height: 72px;
-        font-size: 11px;
+        min-width: 72px;
+        min-height: 64px;
     }
-    .dock-btn .dock-icon { font-size: 28px; }
+    .dock-btn .dock-icon svg { width: 30px; height: 30px; }
 }
 
 /* ---- Drawer host: fixed full-viewport overlay that's hidden when
