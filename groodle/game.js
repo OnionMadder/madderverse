@@ -2388,6 +2388,10 @@
     async function openGallery() {
         if (!galleryModalEl) return;
         openModal(galleryModalEl);
+        /* Web (public) path keeps the public copy explicitly, so the two
+           paths stay self-consistent if a context ever toggles. */
+        const gs = document.getElementById('galleryStats');
+        if (gs) gs.textContent = 'Latest Groodles from around the world';
         if (galleryGridEl) {
             galleryGridEl.innerHTML = '<div class="gallery-empty">Loading…</div>';
         }
@@ -2417,6 +2421,161 @@
                 '<div class="gallery-name">' + escapeHtml(row.name) + '</div>';
             galleryGridEl.appendChild(card);
         }
+    }
+
+    /* ============ LOCAL (ON-DEVICE) GALLERY ============
+
+       Play Store age-rating safety: the Capacitor app must have NO
+       user-content sharing / network gallery (that forces a higher age
+       band + COPPA scrutiny). So in the native app, SAVE writes the
+       composed PNG to on-device IndexedDB and the Gallery reads it back
+       — nothing ever leaves the device, no accounts, no other users.
+       On the plain web build the existing Supabase path above is left
+       intact (kept for a possible future website-only public gallery).
+
+       isNativeApp() is checked at click time (not load) so the
+       __groodleForceLocal QA seam can exercise the local path in a
+       desktop browser / headless Chrome where Capacitor is absent. */
+    function isNativeApp() {
+        if (window.__groodleForceLocal) return true;
+        return !!(window.Capacitor &&
+                  typeof window.Capacitor.isNativePlatform === 'function' &&
+                  window.Capacitor.isNativePlatform());
+    }
+
+    const IDB_NAME = 'groodle-gallery';
+    const IDB_STORE = 'creations';
+
+    function idbOpen() {
+        return new Promise(function (res, rej) {
+            let r;
+            try { r = indexedDB.open(IDB_NAME, 1); } catch (e) { rej(e); return; }
+            r.onupgradeneeded = function () {
+                const db = r.result;
+                if (!db.objectStoreNames.contains(IDB_STORE)) {
+                    db.createObjectStore(IDB_STORE, { keyPath: 'id', autoIncrement: true });
+                }
+            };
+            r.onsuccess = function () { res(r.result); };
+            r.onerror = function () { rej(r.error); };
+        });
+    }
+
+    function idbTx(mode, fn) {
+        return idbOpen().then(function (db) {
+            return new Promise(function (res, rej) {
+                const tx = db.transaction(IDB_STORE, mode);
+                const store = tx.objectStore(IDB_STORE);
+                let out;
+                Promise.resolve(fn(store)).then(function (v) { out = v; });
+                tx.oncomplete = function () { res(out); };
+                tx.onerror = function () { rej(tx.error); };
+                tx.onabort = function () { rej(tx.error); };
+            });
+        });
+    }
+
+    function idbSaveGroodle(blob) {
+        return idbTx('readwrite', function (store) {
+            return new Promise(function (res) {
+                const req = store.add({ blob: blob, createdAt: Date.now() });
+                req.onsuccess = function () { res(req.result); };
+            });
+        });
+    }
+
+    function idbAllGroodles() {
+        return idbTx('readonly', function (store) {
+            return new Promise(function (res) {
+                const req = store.getAll();
+                req.onsuccess = function () {
+                    res((req.result || []).sort(function (a, b) { return b.createdAt - a.createdAt; }));
+                };
+            });
+        });
+    }
+
+    function idbDeleteGroodle(id) {
+        return idbTx('readwrite', function (store) { store.delete(id); });
+    }
+
+    /* Tiny transient toast (no public name dialog in app mode — SAVE is
+       one tap → confirmation). */
+    function flashToast(msg) {
+        let t = document.getElementById('groodleToast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'groodleToast';
+            t.className = 'groodle-toast';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(t._hideTimer);
+        t._hideTimer = setTimeout(function () { t.classList.remove('show'); }, 1600);
+    }
+
+    function saveGroodleLocal() {
+        composeGroodleBlob().then(function (blob) {
+            if (!blob) { flashToast('Could not save — try again.'); return; }
+            return idbSaveGroodle(blob).then(function () {
+                flashToast('Saved to your gallery! 🎨');
+            });
+        }).catch(function () { flashToast('Could not save — try again.'); });
+    }
+
+    function openLocalGallery() {
+        if (!galleryModalEl) return;
+        openModal(galleryModalEl);
+        /* Private, on-device wording — never "around the world" (that
+           implies the very public/social feature we're avoiding for the
+           age rating). */
+        const gs = document.getElementById('galleryStats');
+        if (gs) gs.textContent = 'Your Groodles — saved on this device';
+        if (galleryGridEl) galleryGridEl.innerHTML = '<div class="gallery-empty">Loading…</div>';
+        idbAllGroodles().then(function (items) {
+            if (!galleryGridEl) return;
+            if (!items.length) {
+                galleryGridEl.innerHTML =
+                    '<div class="gallery-empty">No Groodles yet!<br>' +
+                    'Make one, then tap 💾 Save.</div>';
+                return;
+            }
+            galleryGridEl.innerHTML = '';
+            items.forEach(function (it) {
+                const url = URL.createObjectURL(it.blob);
+                const card = document.createElement('div');
+                card.className = 'gallery-card';
+                card.innerHTML =
+                    '<img class="gallery-img" src="' + url + '" alt="Your Groodle" loading="lazy"/>' +
+                    '<button class="gallery-del" type="button" aria-label="Delete this Groodle">🗑️</button>';
+                const del = card.querySelector('.gallery-del');
+                del.addEventListener('click', function () {
+                    /* Two-tap confirm so a kid can't wipe it by accident. */
+                    if (del._armed) {
+                        idbDeleteGroodle(it.id).then(function () {
+                            URL.revokeObjectURL(url);
+                            openLocalGallery();
+                        });
+                        return;
+                    }
+                    del._armed = true;
+                    del.textContent = 'Delete?';
+                    del.classList.add('confirm');
+                    setTimeout(function () {
+                        if (del._armed) {
+                            del._armed = false;
+                            del.textContent = '🗑️';
+                            del.classList.remove('confirm');
+                        }
+                    }, 2500);
+                });
+                galleryGridEl.appendChild(card);
+            });
+        }).catch(function () {
+            if (galleryGridEl) galleryGridEl.innerHTML =
+                '<div class="gallery-empty">Could not load your gallery.</div>';
+        });
     }
 
     /* ============ STATE ============ */
@@ -3651,10 +3810,17 @@
         document.getElementById('openHatShopBtn').addEventListener('click', openHatShop);
         const pagesBtn = document.getElementById('openPagesBtn');
         if (pagesBtn) pagesBtn.addEventListener('click', openCharacterPicker);
+        /* Native app → on-device local gallery (no network/UGC, keeps
+           the Play Store age band low). Web → existing Supabase path,
+           preserved for a possible future website-only public gallery. */
         const galleryBtn = document.getElementById('openGalleryBtn');
-        if (galleryBtn) galleryBtn.addEventListener('click', openGallery);
+        if (galleryBtn) galleryBtn.addEventListener('click', function () {
+            if (isNativeApp()) openLocalGallery(); else openGallery();
+        });
         const saveBtn = document.getElementById('saveBtn');
-        if (saveBtn) saveBtn.addEventListener('click', openSaveDialog);
+        if (saveBtn) saveBtn.addEventListener('click', function () {
+            if (isNativeApp()) saveGroodleLocal(); else openSaveDialog();
+        });
         if (saveModalSubmitEl) {
             saveModalSubmitEl.addEventListener('click', submitGroodle);
         }
