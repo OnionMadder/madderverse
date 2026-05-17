@@ -1,6 +1,7 @@
 /* Munki Madness — Chunk 1
-   Isometric marble maze. The marble IS a curled-up Munki (cross-pollinates
-   with All Munkis). Matter.js does the physics in a top-down plane (no
+   Isometric marble maze. The marble is a "Munkable" — a curled-up Munki
+   (cross-pollinates with All Munkis). Matter.js does the physics in a
+   top-down plane (no
    constant gravity — tilt/touch apply forces); the iso projection is a
    render-only affine transform. Audio is 100% Web Audio synthesis and is
    written against the master-gain -> compressor -> destination pattern so
@@ -136,7 +137,7 @@
     if (howText) {
       howText.textContent =
         controlMode === "touch" ? "Drag anywhere on screen to roll." :
-        controlMode === "tilt"  ? "Tilt your device to roll the Munki." :
+        controlMode === "tilt"  ? "Tilt your device to roll the Munkable." :
         "Tilt your device or drag on screen to roll.";
     }
   }
@@ -298,50 +299,50 @@
         var im = new Image();
         im.onload = function () { ok++; done(); };
         im.onerror = done;
-        im.src = base + "munki-curl-" + idx + ".png";
+        im.src = base + "munkable-curl-" + idx + ".png";
         Sprites.curl[idx - 1] = im;
       })(i);
     }
     var b = new Image();
     b.onload = function () { ok++; done(); };
     b.onerror = done;
-    b.src = base + "munki-ball.png";
+    b.src = base + "munkable-ball.png";
     Sprites.ball = b;
   }
   loadSprites();
 
   // ---------------------------------------------------------------------
-  // Munki — the player marble's animation state machine.
-  //   STANDING -> CURLING -> ROLLED -> UNCURLING
+  // Munkable — the player marble (a curled-up Munki). Animation state
+  // machine: STANDING -> CURLING -> ROLLED -> UNCURLING.
   // Curl/uncurl play frames 1..5 over ~400ms at level start/end. While
   // ROLLED the sprite spins to match the physics velocity vector.
   // ---------------------------------------------------------------------
-  function Munki() {
+  function Munkable() {
     this.state = "STANDING";
     this.animT = 0;            // 0..1 progress through curl/uncurl
     this.spin = 0;             // accumulated roll angle (rad)
     this.popT = 0;             // placeholder curl-pop timer (s)
   }
-  Munki.ANIM_DUR = 0.4;        // seconds for a full curl / uncurl
-  Munki.prototype.beginCurl = function () {
+  Munkable.ANIM_DUR = 0.4;     // seconds for a full curl / uncurl
+  Munkable.prototype.beginCurl = function () {
     this.state = "CURLING"; this.animT = 0; this.popT = 0;
   };
-  Munki.prototype.beginUncurl = function () {
+  Munkable.prototype.beginUncurl = function () {
     this.state = "UNCURLING"; this.animT = 0;
   };
-  Munki.prototype.update = function (dt, speed) {
+  Munkable.prototype.update = function (dt, speed) {
     if (this.state === "CURLING") {
-      this.animT += dt / Munki.ANIM_DUR;
+      this.animT += dt / Munkable.ANIM_DUR;
       this.popT += dt;
       if (this.animT >= 1) { this.animT = 1; this.state = "ROLLED"; }
     } else if (this.state === "UNCURLING") {
-      this.animT += dt / Munki.ANIM_DUR;
+      this.animT += dt / Munkable.ANIM_DUR;
       if (this.animT >= 1) { this.animT = 1; this.state = "STANDING"; }
     } else if (this.state === "ROLLED") {
       this.spin += speed * dt * 2.4;
     }
   };
-  Munki.prototype.frameIndex = function () {
+  Munkable.prototype.frameIndex = function () {
     if (this.state === "CURLING")  return Math.min(4, Math.floor(this.animT * 5));
     if (this.state === "UNCURLING") return Math.min(4, Math.floor((1 - this.animT) * 5));
     if (this.state === "ROLLED")   return 4;
@@ -363,7 +364,7 @@
   var tileW = 64, tileH = 32, OX = 0, OY = 0;
 
   var phase = "menu";   // menu | intro | play | falling | won
-  var munki = new Munki();
+  var munkable = new Munkable();
   var attempts = 0;
   var levelTime = 0;    // seconds this attempt
   var timerRunning = false;
@@ -499,8 +500,8 @@
     levelTime = 0;
     timerRunning = false;
     elTimer.textContent = "0.0";
-    munki = new Munki();
-    munki.beginCurl();              // curl-up intro every spawn
+    munkable = new Munkable();
+    munkable.beginCurl();              // curl-up intro every spawn
     phase = "intro";
     if (!initial) {
       attempts++;
@@ -667,7 +668,7 @@
   function winLevel() {
     phase = "won";
     timerRunning = false;
-    munki.beginUncurl();
+    munkable.beginUncurl();
     Sound.chime();
     var b = getBest(levelIndex);
     var isBest = (b == null || levelTime < b);
@@ -781,21 +782,21 @@
     // placeholder "curl pop" during the intro: scale 1.0 -> 0.6 w/ bounce
     var rpx = tileW * MARBLE_R;
     var scale = 1;
-    if (munki.state === "CURLING") {
-      var k = munki.animT;
+    if (munkable.state === "CURLING") {
+      var k = munkable.animT;
       scale = 1 - 0.4 * k + 0.08 * Math.sin(k * Math.PI * 3) * (1 - k);
-    } else if (munki.state === "UNCURLING") {
-      scale = 0.6 + 0.4 * munki.animT;
+    } else if (munkable.state === "UNCURLING") {
+      scale = 0.6 + 0.4 * munkable.animT;
     }
     if (phase === "falling") scale *= fallScale;
     var R = rpx * scale;
 
     if (USE_SPRITES && Sprites.ready) {
-      var img = (munki.state === "ROLLED") ? Sprites.ball
-                                           : Sprites.curl[munki.frameIndex()];
+      var img = (munkable.state === "ROLLED") ? Sprites.ball
+                                           : Sprites.curl[munkable.frameIndex()];
       ctx.save();
       ctx.translate(p.x, p.y);
-      if (munki.state === "ROLLED") ctx.rotate(munki.spin * 0.5);
+      if (munkable.state === "ROLLED") ctx.rotate(munkable.spin * 0.5);
       ctx.drawImage(img, -R, -R, R * 2, R * 2);
       ctx.restore();
       return;
@@ -816,7 +817,7 @@
     // seam line rotates with accumulated spin
     ctx.save();
     ctx.translate(p.x, p.y);
-    ctx.rotate(munki.spin * 0.5);
+    ctx.rotate(munkable.spin * 0.5);
     ctx.strokeStyle = "rgba(60,25,0,0.55)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -842,19 +843,19 @@
     lastTS = ts;
 
     if (phase === "intro") {
-      munki.update(dt, 0);
-      if (munki.state === "ROLLED") phase = "play";
+      munkable.update(dt, 0);
+      if (munkable.state === "ROLLED") phase = "play";
     } else if (phase === "play") {
       applyControl();
       Engine.update(engine, dt * 1000);
-      munki.update(dt, marble.speed);
+      munkable.update(dt, marble.speed);
       Sound.roll(marble.speed);
     } else if (phase === "falling") {
       Sound.roll(0);
-      munki.update(dt, 0);
+      munkable.update(dt, 0);
     } else if (phase === "won") {
       Sound.roll(0);
-      munki.update(dt, 0);
+      munkable.update(dt, 0);
     } else {
       Sound.roll(0);
     }
