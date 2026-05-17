@@ -308,6 +308,16 @@ Until bespoke custom assets land, the skeleton-driven lanky build at
 git `c6ab9f8` is the intended Groodle. "Intentionally kinda weird" is
 the brief, not a defect.
 
+### Placeholders only until launch
+
+Per a standing user directive: **every visual asset is a placeholder**
+until the user gives the word at final launch — the silhouette, the
+face-parts bank, hats, accessories, backgrounds, icons, cover art. Use
+the **simplest** form, don't polish or art-direct fidelity, and don't
+proactively "improve" existing placeholder art. Spend effort on
+structure / behaviour / clean drop-in points instead; the user supplies
+the real assets at launch. Only lift this when the user says so.
+
 ## Adding a new coloring-book page
 
 1. Append an entry to `PAGES` in `game.js` — `{ id, label, emoji,
