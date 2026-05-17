@@ -3237,7 +3237,7 @@
         const b = CREEP_BLEED_INSET;
         const ix = f.x + b, iy = f.y + b, iw = f.w - 2 * b, ih = f.h - 2 * b;
         // Scale so the variant's longest (inset) side fills SIZE_PX.
-        const scale = CREEP.SIZE_PX / Math.max(iw, ih);
+        const scale = creepSizePx() / Math.max(iw, ih);
         child.style.backgroundSize =
             `${creepSheet.sheetW * scale}px ${creepSheet.sheetH * scale}px`;
         child.style.backgroundPosition =
@@ -3269,13 +3269,27 @@
             + '<span class="flying-creep-ph">PLACEHOLDER</span>';
     }
 
+    // Responsive creep size. Fixed px (CREEP.SIZE_PX 128) read as a tiny
+    // gnat on a big desktop viewport but BIGGER THAN A MUNKI on a phone.
+    // Scale to the viewport's short side (~14 vmin), clamped
+    // [58, CREEP.SIZE_PX]: desktop caps at 128 (the "perfect gnat"),
+    // phones land ~55-62 px (smaller than a Munki), tablets ~100.
+    // Recomputed per use so it also tracks orientation changes.
+    // (Future madderverse/lib/audio sibling lib: creature/sprite sizes
+    // should be vmin-based, never raw px — this is the lesson.)
+    function creepSizePx() {
+        const vmin = Math.min(window.innerWidth, window.innerHeight);
+        return Math.round(Math.max(58, Math.min(CREEP.SIZE_PX, vmin * 0.14)));
+    }
+
     function buildCreepEl() {
         if (creepEl) return creepEl;
         creepEl = document.createElement('div');
         creepEl.className = 'flying-creep';
         creepEl.setAttribute('aria-hidden', 'true');
-        creepEl.style.width = CREEP.SIZE_PX + 'px';
-        creepEl.style.height = CREEP.SIZE_PX + 'px';
+        const csz = creepSizePx();
+        creepEl.style.width = csz + 'px';
+        creepEl.style.height = csz + 'px';
         creepEl.style.zIndex = String(CREEP.Z_INDEX);
         if (creepSheet) {
             // Real sheet: a child whose background we lock to one variant.
@@ -3319,7 +3333,7 @@
         const vw = window.innerWidth, vh = window.innerHeight;
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
         const speed = rand(CREEP.SPEED_MIN_PXPS, CREEP.SPEED_MAX_PXPS);
-        const size = CREEP.SIZE_PX;
+        const size = creepSizePx();
         // Cross roughly the vertical middle band of the viewport so the
         // path overlaps where Munkis stand near the bottom-ish stage.
         const midY = vh * rand(0.32, 0.6);
@@ -3429,8 +3443,9 @@
         // ONLY despawns once it has fully left the viewport — it never
         // vanishes mid-stage on a timer. (90s watchdog is pure insurance
         // against a stuck state; a normal crossing is ~20–35s.)
-        const off = st.x < -CREEP.SIZE_PX * 1.5 || st.x > window.innerWidth + CREEP.SIZE_PX * 1.5
-                 || drawY > window.innerHeight + CREEP.SIZE_PX * 1.5;
+        const csz = creepSizePx();
+        const off = st.x < -csz * 1.5 || st.x > window.innerWidth + csz * 1.5
+                 || drawY > window.innerHeight + csz * 1.5;
         if (off) { endCreep(); return; }
         if (elapsed > 90000) { endCreep(); return; }
 
