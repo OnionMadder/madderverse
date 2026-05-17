@@ -48,6 +48,24 @@ body {
     transition: filter 4s ease-in-out;
 }
 
+/* ====== PHONE-PORTRAIT STAGE ART ======
+   The shared stage.jpg is a LANDSCAPE plate. On a narrow portrait PHONE,
+   `background-size: cover` zooms it so hard that the rainbow floor (the
+   surface the Munkis stand on) and the side boxes get cropped away — the
+   scene reads as a flat smear. So on phone-portrait only, swap to an
+   art-directed 9:16 portrait crop (assets/bg-img/stage-portrait.png,
+   432×768).
+   Gate is deliberately `max-width: 600px` AND `orientation: portrait`:
+   - phones in portrait are ~360–430 CSS px wide  → MATCH (get portrait art)
+   - tablets in portrait are ≥768 CSS px wide     → NO match (keep stage.jpg)
+   - any landscape (phone or tablet or desktop)    → NO match (keep stage.jpg)
+   Tablets and desktop are intentionally untouched per the art-direction
+   decision. If stage-portrait.png is ever missing the rule simply has no
+   image to load and the existing #000 background-color shows — no break. */
+@media (orientation: portrait) and (max-width: 600px) {
+    body { background-image: url('assets/bg-img/stage-portrait.png'); }
+}
+
 /* React mode intentionally leaves the page layout + colors alone — the
    only horror cue is the corner Ice/Moon Munkis creeping into view (see
    the .horror-munki block below). Per design: "the layout of the screen

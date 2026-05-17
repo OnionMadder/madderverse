@@ -399,6 +399,24 @@ characters live in `assets/bg-img/bg-munkis.png` (frames `bg-moon` and
 `bg-ice`); to swap those, keep the file at the same path and update the
 SVG `viewBox` attributes in `index.html` to match the new frame coords.
 
+**Phone-portrait gets a separate art-directed plate.** `stage.jpg` is a
+LANDSCAPE photo; on a narrow portrait phone `cover` zooms it so hard the
+rainbow floor crops away. So there is a second file
+`assets/bg-img/stage-portrait.png` — a 9:16 portrait crop (shipped
+432×768). `style.css` swaps to it **only** under
+`@media (orientation: portrait) and (max-width: 600px)` — i.e.
+phones-in-portrait only. **Tablets (≥768 CSS px even in portrait) and all
+landscape/desktop keep `stage.jpg` untouched** — this exclusion is a
+deliberate art-direction decision, do not widen the breakpoint without
+re-checking tablets. Same two-copy rule as `stage.jpg`:
+`all-munkis/assets/bg-img/stage-portrait.png` **and**
+`all-munkis-app/www/assets/bg-img/stage-portrait.png` must stay
+byte-identical (replace both or neither). The horror-mode watcher
+eye-pairs have a matching `EYE_PAIRS_PORTRAIT` coordinate set in
+`game.js`, gated on the *same* media query (`portraitMQ`) so the eyes
+always land against whichever plate is showing; if you re-crop the
+portrait art, retune `EYE_PAIRS_PORTRAIT` to the new composition.
+
 > **🛑 CANONICAL `stage.jpg` — do not let this revert (it has, repeatedly).**
 > The correct background is the **clean empty haunted-theater plate**:
 > the rainbow on a cracked stage, empty red velvet seats, no baked-in

@@ -3490,6 +3490,35 @@
         { x: 69, y: 58 }, // seat shadows, right
         { x: 50, y: 66 }  // deep centre seats
     ];
+    // Phone-portrait re-frames the theatre TALLER + NARROWER (the 9:16
+    // assets/bg-img/stage-portrait.png crop, 432×768), so the landscape
+    // coords above land in the wrong spots there. This set is mapped
+    // against the portrait crop instead: x pulled inward (less horizontal
+    // room), y spread over a longer vertical run — balconies high, doorway
+    // mid, seat-shadow depths pushed low. Gated on the SAME media query as
+    // the CSS background swap, so the eyes always agree with whichever
+    // stage plate is on screen. All values are % of viewport — tune freely
+    // against the real portrait art (these are first-pass placements at
+    // the doorway / balcony boxes / side boxes / deep-seat shadows of the
+    // taller crop).
+    const EYE_PAIRS_PORTRAIT = [
+        { x: 50, y: 30 }, // back-centre doorway (high in the tall crop)
+        { x: 24, y: 16 }, // upper-left balcony box
+        { x: 76, y: 16 }, // upper-right balcony box
+        { x: 14, y: 34 }, // left side box
+        { x: 86, y: 34 }, // right side box
+        { x: 30, y: 56 }, // seat shadows, left
+        { x: 70, y: 57 }, // seat shadows, right
+        { x: 50, y: 74 }  // deep centre seats (low — long vertical run)
+    ];
+    // Identical gate to the CSS portrait background swap in style.css —
+    // keep these two in lockstep so the eye layout always matches the
+    // stage plate that's actually showing.
+    const portraitMQ = window.matchMedia &&
+        window.matchMedia('(orientation: portrait) and (max-width: 600px)');
+    function activeEyePairs() {
+        return (portraitMQ && portraitMQ.matches) ? EYE_PAIRS_PORTRAIT : EYE_PAIRS;
+    }
     function buildHorrorOverlay() {
         if (document.getElementById('horror-overlay')) return;
         const root = document.createElement('div');
@@ -3497,14 +3526,15 @@
         root.setAttribute('aria-hidden', 'true');
         const dim = document.createElement('div'); dim.className = 'bg-dim';
         const eyes = document.createElement('div'); eyes.className = 'eyes-container';
-        EYE_PAIRS.forEach((p, i) => {
+        const set = activeEyePairs();
+        set.forEach((p, i) => {
             const pair = document.createElement('div');
             pair.className = 'eye-pair';
             pair.style.left = p.x + '%';
             pair.style.top  = p.y + '%';
             // Stagger fade-in across the 12 s creep (not all at once).
             pair.style.transitionDelay =
-                (i * (10 / EYE_PAIRS.length)).toFixed(2) + 's';
+                (i * (10 / set.length)).toFixed(2) + 's';
             for (let e = 0; e < 2; e++) {
                 const eye = document.createElement('span');
                 eye.className = 'eye';
@@ -3520,6 +3550,21 @@
         root.appendChild(eyes);
         root.appendChild(vig);
         document.body.appendChild(root);
+        // If the viewport crosses the phone-portrait threshold (rotate /
+        // resize), re-place the existing pairs to match the stage plate
+        // CSS just swapped to. Cheap — only moves the divs, no rebuild.
+        if (portraitMQ) {
+            const reflow = () => {
+                const next = activeEyePairs();
+                eyes.querySelectorAll('.eye-pair').forEach((el, i) => {
+                    const p = next[i] || next[next.length - 1];
+                    el.style.left = p.x + '%';
+                    el.style.top  = p.y + '%';
+                });
+            };
+            if (portraitMQ.addEventListener) portraitMQ.addEventListener('change', reflow);
+            else if (portraitMQ.addListener) portraitMQ.addListener(reflow);
+        }
     }
 
     function init() {
