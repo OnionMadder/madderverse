@@ -6,15 +6,50 @@ Sprunki-style drag-and-drop music game inside the Madderverse hub.
 ad-free / kid-friendly branding). This file captures only what's specific to
 `all-munkis/`.
 
-## Dual Row Stage origin (v1.1 feature)
+## Bala's Song Layering (v1.1 harmonization feature)
 
 Discovered by accident during a two-monitor debug session — two
-independent browser instances of the game running offset by a few
-seconds produced clean polyphonic harmony, because each tab's
-`AudioContext` has its own crystal clock and the Tale of Two Clocks
-scheduling pattern keeps both deterministic loops drift-free. The Dual
-Row Stage feature (front row + offset back row, single tab, two
-simultaneous groups of Munkis) reproduces this intentionally.
+independent browser tabs of the game running offset by a second
+produced clean polyphonic harmony.
+
+**Dual Row Stage was DROPPED.** Playtesting showed a geometric
+second row of Munki slots did *not* reproduce the magic — the
+harmony does **not** come from layered per-Munki voices at offset.
+It comes specifically from **Bala's Song** (the Tone.js ambient bed —
+PolySynth pad + FMSynth bell + MetalSynth hat through reverb/delay)
+playing **doubled with an offset**, which is exactly what the two
+browser tabs did. The stage stays at **6 slots, single row** — no
+back row, no extra geometry.
+
+**Bala's Song Layering** reproduces it intentionally and scientifically
+tuned. Implementation (see `BALA_LAYER` config + `buildToneLayer` +
+`TONE_LAYER.play` in `game.js`, shipped commit `9037367`):
+
+- The per-Munki `play()` voices and the **original** Tone ambient
+  layer are completely unchanged — not the source of the magic.
+- A **second parallel clone** of the pad/bell/hat is built strictly
+  *after* the original (try-wrapped so a failure can never break v1.0
+  audio), through its **own** longer/wetter reverb bus, routed to the
+  same `masterGain` → compressor.
+- `TONE_LAYER.play` mirrors the exact original triggers `OFFSET_S`
+  later onto the clone.
+- The clone is detuned `DETUNE_CENTS` flat, reverb `decay`/`wet`
+  raised (`REVERB_DECAY`/`REVERB_WET`), and voice attack +
+  `ATTACK_EXTRA_S` so it blooms *under* the original, not competing.
+- **Gated on Munki count:** engages only while ≥ `MIN_MUNKIS` (3)
+  are on the stage; fewer = layering off.
+- All knobs live in the tunable `BALA_LAYER` constant at the top of
+  the audio section — A/B freely.
+- Visual tell: `body.bala-layered` fades in a faint cool bloom over
+  the stage (`.stage-wrap::after`, 2.6 s). Deliberately barely-there,
+  emergent not announced. **No emoji/icon** — the UI is emoji-free
+  post-FNAF, so the bg-shift option was chosen over a "✨" icon.
+- The old Two-Part Harmony idea is repurposed as the hidden
+  achievement **Trio Threshold** (1 pt), granted the first time the
+  layer engages.
+
+Do not reintroduce a Dual Row / second slot row. The harmonization
+feature is audio-only.
 
 ## What it is
 
