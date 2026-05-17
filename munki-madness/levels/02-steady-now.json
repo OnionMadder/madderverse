@@ -1,5 +1,6 @@
 {
   "name": "Steady Now",
+  "fill": "floor",
   "grid": { "w": 10, "h": 8 },
   "target_time_ms": 22000,
   "tiles": [

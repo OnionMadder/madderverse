@@ -35,6 +35,20 @@ substep as `drag^(dt*60)`).
 Higher drag = retains more velocity (0.99 ice glides far; 0.78 gravel
 bites). grip multiplies control acceleration on that surface.
 
+## Elevation (v1.1)
+
+Every tile has an integer `height` (default 0), rendered raised in the
+iso projection. The Munkable has a plane `mh`. **It cannot cross between
+tiles of different height — that edge is an invisible wall — unless a
+ramp or spring bridges them.** All other tile types work at any height
+(a hole at height 2 still kills, a bumper at height 1 still redirects).
+
+- **Ramp** — `direction` (N|S|E|W) + `height_delta` (e.g. +1/-1).
+  Smoothly transitions the Munkable between `height` and
+  `height+height_delta`; rendered as an iso slope with an up-arrow.
+- **Spring** — `height_delta` (e.g. +2). Stepping on it launches the
+  Munkable up by N levels (visual arc ~0.45s) + a "boing" SFX.
+
 ## Traps (3 types)
 
 - **Hole** — kill tile. When the Munkable's *center* crosses a hole:
@@ -77,36 +91,50 @@ A visible clock counts **up** during play. Bonus star if under
 - **Drag-anywhere** — default on desktop, fallback on tilt-less devices
 - **Keyboard arrows/WASD (+gamepad)** — always-on desktop convenience
 - **Toggle** cycles: Tilt-only / Drag-only / Both-active
+- **Tilt indicator** (always-on, bottom-right): live gamma/beta in
+  degrees (0.1° precision) + a dial dot showing direction/magnitude vs
+  the calibrated zero. Tap cycles BOTH → NUMBERS_ONLY → VISUAL_ONLY
+  (persisted in localStorage `mm.tiltUI`).
 
-## Grid: variable per level
+## Grid: variable per level, sparse
 
-Each level JSON sets `grid: { w, h }`. 8x8 (tutorial) up to 32x32 (deep).
-Rendering scales to viewport. Board edge is implicitly a hard wall.
+Each level JSON sets `grid: { w, h }` — **default 24x24**, valid up to
+32x32. The tile map is **sparse**: a cell with no tile is a *gap* —
+visually empty and impassable (acts like a wall). Levels can be
+L-shaped, plus-shaped, multi-island, irregular. Optional top-level
+`"fill": "floor"` pre-paints the whole w×h rectangle (convenience for
+rectangular levels); omit it for irregular shapes. Board edge / any gap
+is implicitly a hard wall. Rendering scales to the level's tile bounds.
 
-## Level JSON schema (v1.0)
+## Level JSON schema (v1.1)
 
 ```json
 {
-  "name": "First Roll",
-  "grid": { "w": 8, "h": 7 },
+  "name": "Ramp Up",
+  "grid": { "w": 24, "h": 24 },
+  "fill": "floor",
   "target_time_ms": 20000,
   "tiles": [
     { "x": 1, "y": 1, "type": "spawn" },
-    { "x": 6, "y": 5, "type": "goal" },
+    { "x": 6, "y": 5, "type": "goal", "height": 1 },
     { "x": 3, "y": 3, "type": "hole" },
     { "x": 2, "y": 4, "type": "bumper", "direction": "E" },
     { "x": 5, "y": 2, "type": "spinner", "rotation": "CW90" },
+    { "x": 4, "y": 5, "type": "ramp", "direction": "E", "height_delta": 1 },
+    { "x": 8, "y": 5, "type": "spring", "height_delta": 2 },
     { "x": 4, "y": 1, "type": "gravel" },
     { "x": 1, "y": 5, "type": "ice" },
-    { "x": 3, "y": 1, "type": "wall" }
+    { "x": 3, "y": 1, "type": "wall", "height": 1 }
   ]
 }
 ```
 
 Tile types: `floor` `gravel` `ice` `wall` `hole` `bumper`(+`direction`)
-`spinner`(+`rotation`) `spawn` `goal`. **Cells not listed default to
-`floor`.** Exactly one `spawn` and one `goal` per level. `spawn`/`goal`
-roll like floor (visual-only special). `wall` is impassable.
+`spinner`(+`rotation`) `ramp`(+`direction`,`height_delta`)
+`spring`(+`height_delta`) `spawn` `goal`. Any tile may carry `height`
+(int, default 0). With `fill`, unlisted cells default to that type;
+without `fill`, unlisted cells are gaps. Exactly one `spawn` and one
+`goal` per level. `spawn`/`goal` roll like floor. `wall`/gap impassable.
 
 ## Audio (Web Audio synthesis only)
 
@@ -116,6 +144,7 @@ roll like floor (visual-only special). `wall` is impassable.
 - Hole scream: descending saw ~600→80Hz with wobble.
 - Bumper thunk: low percussive pop on contact.
 - Spinner whoosh: rising swirl on contact.
+- Spring boing: rising triangle sproing with a tail.
 - Goal chime: C-E-G sine arpeggio ~200ms.
 - **BG music slot**: empty; reserved for the harmonized Bala's Song once
   `madderverse/lib/audio/` is extracted.

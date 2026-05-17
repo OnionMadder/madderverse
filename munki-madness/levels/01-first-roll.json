@@ -1,5 +1,6 @@
 {
   "name": "First Roll",
+  "fill": "floor",
   "grid": { "w": 8, "h": 7 },
   "target_time_ms": 15000,
   "tiles": [

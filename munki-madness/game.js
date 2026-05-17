@@ -27,6 +27,8 @@
   var CANVAS = 640;          // internal canvas resolution (square)
   var MARGIN = 56;           // px breathing room around the board
   var WALL_H = 0.55;         // wall block height in world (tile) units
+  var HEIGHT_UNIT = 0.5;     // world-z rise per elevation level
+  var SPRING_ARC = 0.45;     // spring launch visual-arc duration (s)
   var MARBLE_R = 0.30;       // Munkable radius (tiles)
 
   // ---- Physics knobs — see PHYSICS_SPEC.md (LOCKED v1.0) ----
@@ -74,7 +76,7 @@
   // FALLBACK keeps the game playable if the fetch fails (file:// etc).
   // Same v1.0 schema as the bundled levels/*.json.
   var FALLBACK_LEVELS = [
-    { name: "First Roll", grid: { w: 8, h: 7 }, target_time_ms: 18000,
+    { name: "First Roll", grid: { w: 8, h: 7 }, fill: "floor", target_time_ms: 18000,
       tiles: [ { x:1,y:1,type:"spawn" }, { x:6,y:5,type:"goal" },
                { x:3,y:3,type:"hole" }, { x:5,y:2,type:"bumper",direction:"S" },
                { x:2,y:4,type:"spinner",rotation:"CW90" } ] }
@@ -87,33 +89,56 @@
            d === "W" ? { x:-1,y:0 } : { x:1,y:0 };           // E default
   }
 
-  // Parse the v1.0 object-tile schema into the internal model:
-  //   { name, target_ms, w, h, cells[r][c]={type,dir,rot}, spawn, goal }
-  // Cells not listed default to floor (see PHYSICS_SPEC.md).
+  // Parse the v1.0 object-tile schema into the internal model. The map is
+  // SPARSE: tmap["x,y"] -> tile, or undefined = a gap (impassable, like a
+  // wall). Optional "fill" pre-paints the whole w*h with one type (a
+  // convenience for rectangular levels); omit it for irregular shapes.
+  // Tile fields: { x,y,type,height, dir,dirName, rot,rotName, hd }.
+  //   ramp:   direction + height_delta (hd)   spring: height_delta (hd)
+  // See munki-madness/PHYSICS_SPEC.md.
+  function mkCell(t) {
+    var cell = { type: t.type, height: t.height || 0 };
+    if (t.type === "bumper") { cell.dir = dirVec(t.direction || "E"); cell.dirName = t.direction || "E"; }
+    if (t.type === "spinner") { cell.rot = (t.rotation === "CCW90") ? -1 : 1; cell.rotName = t.rotation || "CW90"; }
+    if (t.type === "ramp") {
+      cell.dir = dirVec(t.direction || "E"); cell.dirName = t.direction || "E";
+      cell.hd = (t.height_delta == null) ? 1 : t.height_delta;
+    }
+    if (t.type === "spring") cell.hd = (t.height_delta == null) ? 2 : t.height_delta;
+    return cell;
+  }
   function normalizeLevel(o) {
-    var w = (o.grid && o.grid.w) || 8, h = (o.grid && o.grid.h) || 8;
-    var cells = [];
-    for (var r = 0; r < h; r++) {
-      var row = [];
-      for (var c = 0; c < w; c++) row.push({ type: "floor" });
-      cells.push(row);
+    var w = (o.grid && o.grid.w) || 24, h = (o.grid && o.grid.h) || 24;
+    var tmap = {}, list = o.tiles || [];
+    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, maxH = 0;
+    function put(x, y, cell) {
+      tmap[x + "," + y] = cell;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if ((cell.height || 0) > maxH) maxH = cell.height || 0;
+    }
+    if (o.fill) {
+      for (var yy = 0; yy < h; yy++)
+        for (var xx = 0; xx < w; xx++) put(xx, yy, { type: o.fill, height: 0 });
     }
     var spawn = { x: 1, y: 1 }, goal = { x: w - 2, y: h - 2 };
-    var list = o.tiles || [];
     for (var i = 0; i < list.length; i++) {
       var t = list[i];
-      if (t.x < 0 || t.y < 0 || t.x >= w || t.y >= h) continue;
-      if (t.type === "spawn") { spawn = { x: t.x, y: t.y }; cells[t.y][t.x] = { type: "floor" }; continue; }
-      var cell = { type: t.type };
-      if (t.type === "bumper")  cell.dir = dirVec(t.direction || "E"), cell.dirName = t.direction || "E";
-      if (t.type === "spinner") cell.rot = (t.rotation === "CCW90") ? -1 : 1, cell.rotName = t.rotation || "CW90";
+      if (t.x == null || t.y == null) continue;
+      if (t.type === "spawn") {
+        spawn = { x: t.x, y: t.y };
+        put(t.x, t.y, { type: "floor", height: t.height || 0 });
+        continue;
+      }
       if (t.type === "goal") goal = { x: t.x, y: t.y };
-      cells[t.y][t.x] = cell;
+      put(t.x, t.y, mkCell(t));
     }
+    if (minX > maxX) { minX = 0; maxX = w - 1; minY = 0; maxY = h - 1; }
     return {
       name: o.title || o.name || "Untitled",
       target_ms: o.target_time_ms || 30000,
-      w: w, h: h, cells: cells, spawn: spawn, goal: goal
+      w: w, h: h, tmap: tmap, spawn: spawn, goal: goal,
+      bx: minX, by: minY, ex: maxX, ey: maxY, maxH: maxH
     };
   }
 
@@ -345,12 +370,28 @@
       src.start(t); src.stop(t + dur + 0.02);
     }
 
+    // Spring boing: quick upward pitch sproing (triangle) with a tail.
+    function boing() {
+      if (!ready || muted) return;
+      var t = actx.currentTime;
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(160, t);
+      o.frequency.exponentialRampToValueAtTime(680, t + 0.12);
+      o.frequency.exponentialRampToValueAtTime(420, t + 0.30);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.32, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + 0.36);
+    }
+
     function setMuted(m) { muted = m; if (m && rollGain) rollGain.gain.value = 0; }
     function isMuted() { return muted; }
 
     return { resume: resume, roll: roll, squeak: squeak,
              scream: scream, chime: chime, thunk: thunk, whoosh: whoosh,
-             setMuted: setMuted, isMuted: isMuted };
+             boing: boing, setMuted: setMuted, isMuted: isMuted };
   })();
 
   muteBtn.addEventListener("click", function () {
@@ -433,12 +474,15 @@
   // Game state
   // ---------------------------------------------------------------------
   var levelIndex = 0;
-  var cells = [], cols = 0, rows = 0;     // cells[r][c] = {type,dir,rot,...}
+  var tmap = {}, cols = 0, rows = 0;      // sparse: tmap["x,y"]={type,...}
+  var lvBounds = { bx: 0, by: 0, ex: 0, ey: 0, maxH: 0 };
   var targetMs = 30000;                   // 3-star time target for level
-  var lastCellKey = "";                   // for fire-once bumper/spinner
+  var lastCellKey = "";                   // for fire-once bumper/spinner/spring
   var bumperFlash = {};                   // "c,r" -> flash timer (s)
   // Munkable state — plain object, world units. vx/vy in tiles/s.
-  var marble = { x: 1.5, y: 1.5, vx: 0, vy: 0, speed: 0 };
+  // mh = current plane (integer height); zv = visual world-z; zArc =
+  // transient spring-launch hop added on top of zv.
+  var marble = { x: 1.5, y: 1.5, vx: 0, vy: 0, speed: 0, mh: 0, zv: 0, zArc: 0, arcT: 0 };
   var startTile = { x: 1.5, y: 1.5 }, goalTile = { x: 0, y: 0 };
   var tileW = 64, tileH = 32, OX = 0, OY = 0;
 
@@ -497,46 +541,64 @@
   }
 
   function fitProjection() {
-    // base tile size, then auto-scale the board to fit the canvas
+    // Fit to the level's actual tile bounds (sparse / irregular shapes),
+    // leaving headroom for the tallest tile + its skirt.
+    var b = lvBounds;
+    var x0 = b.bx, y0 = b.by, x1 = b.ex + 1, y1 = b.ey + 1;
+    var topZ = (b.maxH + 1) * HEIGHT_UNIT;     // tallest extent upward
+    function bbox() {
+      var corners = [[x0,y0],[x1,y0],[x0,y1],[x1,y1]];
+      var mnX=1e9,mxX=-1e9,mnY=1e9,mxY=-1e9;
+      for (var i=0;i<4;i++){
+        var p = projRaw(corners[i][0], corners[i][1], 0);
+        mnX=Math.min(mnX,p.x); mxX=Math.max(mxX,p.x);
+        mnY=Math.min(mnY,p.y); mxY=Math.max(mxY,p.y);
+      }
+      mnY -= topZ * tileH;                     // raised tiles go up
+      return { mnX:mnX, mxX:mxX, mnY:mnY, mxY:mxY };
+    }
     tileW = 64; tileH = 32;
-    var corners = [[0,0],[cols,0],[0,rows],[cols,rows]];
-    var minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
-    for (var i=0;i<corners.length;i++){
-      var p = projRaw(corners[i][0], corners[i][1], 0);
-      minX=Math.min(minX,p.x); maxX=Math.max(maxX,p.x);
-      minY=Math.min(minY,p.y); maxY=Math.max(maxY,p.y);
-    }
-    minY -= WALL_H * tileH;            // walls extend upward
-    var bw = maxX - minX, bh = maxY - minY;
-    var s = Math.min((CANVAS - 2*MARGIN) / bw, (CANVAS - 2*MARGIN) / bh);
+    var a = bbox();
+    var s = Math.min((CANVAS - 2*MARGIN) / (a.mxX - a.mnX),
+                     (CANVAS - 2*MARGIN) / (a.mxY - a.mnY));
     tileW *= s; tileH *= s;
-    // recompute bbox at scaled size, then center it
-    minX=1e9;maxX=-1e9;minY=1e9;maxY=-1e9;
-    for (i=0;i<corners.length;i++){
-      var q = projRaw(corners[i][0], corners[i][1], 0);
-      minX=Math.min(minX,q.x); maxX=Math.max(maxX,q.x);
-      minY=Math.min(minY,q.y); maxY=Math.max(maxY,q.y);
-    }
-    minY -= WALL_H * tileH;
-    OX = CANVAS/2 - (minX + maxX)/2;
-    OY = CANVAS/2 - (minY + maxY)/2;
+    var z = bbox();
+    OX = CANVAS/2 - (z.mnX + z.mxX)/2;
+    OY = CANVAS/2 - (z.mnY + z.mxY)/2;
   }
 
   // ---------------------------------------------------------------------
   // Level loading
   // ---------------------------------------------------------------------
-  var WALL_CELL = { type: "wall" };
-  function cellAt(c, r) {
-    if (r < 0 || c < 0 || r >= rows || c >= cols) return WALL_CELL;  // edge = hard wall
-    return cells[r][c];
-  }
-  function isWall(c, r) { return cellAt(c, r).type === "wall"; }
-  function isHole(c, r) { return cellAt(c, r).type === "hole"; }
+  function cellAt(c, r) { return tmap[c + "," + r] || null; }   // null = gap
+  function isHole(c, r) { var t = cellAt(c, r); return !!t && t.type === "hole"; }
   function surfaceOf(c, r) {
-    var t = cellAt(c, r).type;
-    if (t === "gravel") return "gravel";
-    if (t === "ice") return "ice";
-    return "floor";   // floor/goal/bumper/spinner all roll like floor
+    var t = cellAt(c, r);
+    if (!t) return "floor";
+    if (t.type === "gravel") return "gravel";
+    if (t.type === "ice") return "ice";
+    return "floor";   // floor/goal/bumper/spinner/ramp/spring roll like floor
+  }
+  // Solid (invisible wall) for the marble at its current plane mh:
+  // gaps & walls always solid; other tiles solid if on a different
+  // height plane — UNLESS it's a ramp/spring bridging to that plane.
+  function blocked(c, r) {
+    var t = cellAt(c, r);
+    if (!t) return true;                       // gap / off-map
+    if (t.type === "wall") return true;
+    if (t.type === "ramp")
+      return !(marble.mh === t.height || marble.mh === t.height + t.hd);
+    if (t.type === "spring")
+      return !(marble.mh === t.height || marble.mh === t.height + t.hd);
+    return t.height !== marble.mh;             // plain plane mismatch = wall
+  }
+  // Ramp progress 0..1 along its uphill direction within the tile.
+  function rampProgress(cell, c, r) {
+    var fx = marble.x - c, fy = marble.y - r;  // 0..1 within the tile
+    var d = cell.dir;
+    var p = (d.x !== 0) ? (d.x > 0 ? fx : 1 - fx)
+                        : (d.y > 0 ? fy : 1 - fy);
+    return clamp(p, 0, 1);
   }
 
   // spec: a catalog index (number) OR a level object (editor test-play)
@@ -550,9 +612,12 @@
       levelIndex = ((spec % LEVELS.length) + LEVELS.length) % LEVELS.length;
       lv = LEVELS[levelIndex];
     }
-    cols = lv.w; rows = lv.h; cells = lv.cells;
+    cols = lv.w; rows = lv.h; tmap = lv.tmap;
+    lvBounds = { bx: lv.bx, by: lv.by, ex: lv.ex, ey: lv.ey, maxH: lv.maxH };
     targetMs = lv.target_ms;
     startTile = { x: lv.spawn.x + 0.5, y: lv.spawn.y + 0.5 };
+    var sct = tmap[lv.spawn.x + "," + lv.spawn.y];
+    startTile.h = sct ? (sct.height || 0) : 0;
     goalTile = { x: lv.goal.x, y: lv.goal.y };
     lastCellKey = ""; bumperFlash = {};
 
@@ -567,6 +632,9 @@
   function resetAttempt(initial) {
     marble.x = startTile.x; marble.y = startTile.y;
     marble.vx = 0; marble.vy = 0; marble.speed = 0;
+    marble.mh = startTile.h || 0;
+    marble.zv = marble.mh * HEIGHT_UNIT;
+    marble.zArc = 0; marble.arcT = 0;
     fallZ = 0; fallVZ = 0; fallScale = 1; fallT = 0;
     lastCellKey = "";
     levelTime = 0;
@@ -740,11 +808,6 @@
   // A cell is solid if it's a wall OR off the board. Holes are NOT solid
   // (the Munkable rolls into them — that's the fall). Floor/ice/gravel/
   // goal/spawn are passable.
-  function solidAt(c, r) {
-    if (r < 0 || c < 0 || r >= rows || c >= cols) return true;  // off-board
-    return cells[r][c].type === "wall";
-  }
-
   // Resolve circle-vs-solid-tile overlaps by minimum translation, and
   // cancel the inward velocity (slide along walls, small bounce). Called
   // after every micro-step so a fast Munkable can never pass a wall.
@@ -756,7 +819,7 @@
       var r0 = Math.floor(marble.y - R) - 1, r1 = Math.floor(marble.y + R) + 1;
       for (var rr = r0; rr <= r1; rr++) {
         for (var cc = c0; cc <= c1; cc++) {
-          if (!solidAt(cc, rr)) continue;
+          if (!blocked(cc, rr)) continue;
           var qx = clamp(marble.x, cc, cc + 1);   // closest pt on tile AABB
           var qy = clamp(marble.y, rr, rr + 1);
           var dx = marble.x - qx, dy = marble.y - qy;
@@ -827,15 +890,34 @@
         levelTime += dt;
         elTimer.textContent = levelTime.toFixed(1);
       }
-      // decay bumper flashes
       for (var key in bumperFlash) {
         bumperFlash[key] -= dt;
         if (bumperFlash[key] <= 0) delete bumperFlash[key];
       }
 
-      // fire bumper / spinner once per tile entry
+      // ---- elevation: where is the Munkable's plane + visual z? ----
+      var planeZ = marble.mh * HEIGHT_UNIT;
+      if (cell && cell.type === "ramp") {
+        var p = rampProgress(cell, cc, rr);
+        // bridge low (cell.height) <-> high (cell.height + hd)
+        marble.mh = (p >= 0.5) ? (cell.height + cell.hd) : cell.height;
+        planeZ = (cell.height + cell.hd * p) * HEIGHT_UNIT;
+      } else if (cell) {
+        marble.mh = cell.height;
+        planeZ = cell.height * HEIGHT_UNIT;
+      }
+      // spring-launch hop decays out
+      if (marble.arcT > 0) {
+        marble.arcT -= dt;
+        var ap = clamp(marble.arcT / SPRING_ARC, 0, 1);
+        marble.zArc = Math.sin(ap * Math.PI) * 0.9;     // up then down
+        if (marble.arcT <= 0) marble.zArc = 0;
+      }
+      marble.zv = planeZ + marble.zArc;
+
+      // fire bumper / spinner / spring once per tile entry
       var ck = cc + "," + rr;
-      if (ck !== lastCellKey) {
+      if (cell && ck !== lastCellKey) {
         lastCellKey = ck;
         if (cell.type === "bumper" && cell.dir) {
           marble.vx += cell.dir.x * BUMPER_FORCE;
@@ -848,10 +930,14 @@
           var nvy = (rot === 1) ?  marble.vx : -marble.vx;
           marble.vx = nvx; marble.vy = nvy;
           Sound.whoosh();
+        } else if (cell.type === "spring") {
+          marble.mh = cell.height + cell.hd;   // launched to the new plane
+          marble.arcT = SPRING_ARC;
+          Sound.boing();
         }
       }
 
-      if (cell.type === "hole") {
+      if (cell && cell.type === "hole") {
         beginFall();
       } else if (cc === goalTile.x && rr === goalTile.y) {
         winLevel();
@@ -963,9 +1049,9 @@
   }
 
   // Arrow pointing along a world direction, drawn in screen space.
-  function drawArrow(cx, cy, cen, dirName) {
+  function drawArrow(cx, cy, cen, dirName, z) {
     var v = dirVec(dirName);
-    var t = project(cx + 0.5 + v.x * 0.4, cy + 0.5 + v.y * 0.4, 0);
+    var t = project(cx + 0.5 + v.x * 0.4, cy + 0.5 + v.y * 0.4, z || 0);
     var ang = Math.atan2(t.y - cen.y, t.x - cen.x);
     var L = tileW * 0.22;
     ctx.save();
@@ -997,99 +1083,156 @@
     ctx.restore();
   }
 
+  // vertical skirt (two visible iso faces) from world-z zb up to zt
+  function drawSkirt(c, r, zb, zt) {
+    var hw = tileW / 2, hh = tileH / 2;
+    var b = project(c + 0.5, r + 0.5, zb);
+    var t = project(c + 0.5, r + 0.5, zt);
+    ctx.fillStyle = "#1f1338";
+    ctx.beginPath();
+    ctx.moveTo(b.x - hw, b.y); ctx.lineTo(b.x, b.y + hh);
+    ctx.lineTo(t.x, t.y + hh); ctx.lineTo(t.x - hw, t.y);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "#2c1c4d";
+    ctx.beginPath();
+    ctx.moveTo(b.x + hw, b.y); ctx.lineTo(b.x, b.y + hh);
+    ctx.lineTo(t.x, t.y + hh); ctx.lineTo(t.x + hw, t.y);
+    ctx.closePath(); ctx.fill();
+  }
+
   function drawBoard() {
     var hw = tileW / 2, hh = tileH / 2, now = performance.now();
-    for (var sum = 0; sum <= cols + rows; sum++) {
-      for (var r = 0; r < rows; r++) {
-        var c = sum - r;
-        if (c < 0 || c >= cols) continue;
-        var cell = cells[r][c], type = cell.type;
-        var cen = project(c + 0.5, r + 0.5, 0);
+    // sparse painter's order: far (small x+y) first, lower height first
+    var keys = Object.keys(tmap);
+    keys.sort(function (A, B) {
+      var a = A.split(","), bb = B.split(",");
+      var ka = (+a[0] + +a[1]) * 100 + (tmap[A].height || 0);
+      var kb = (+bb[0] + +bb[1]) * 100 + (tmap[B].height || 0);
+      return ka - kb;
+    });
 
-        if (type === "wall") {
-          var top = project(c + 0.5, r + 0.5, WALL_H);
-          ctx.fillStyle = "#1f1338";
-          ctx.beginPath();
-          ctx.moveTo(cen.x - hw, cen.y); ctx.lineTo(cen.x, cen.y + hh);
-          ctx.lineTo(top.x, top.y + hh); ctx.lineTo(top.x - hw, top.y);
-          ctx.closePath(); ctx.fill();
-          ctx.fillStyle = "#2c1c4d";
-          ctx.beginPath();
-          ctx.moveTo(cen.x + hw, cen.y); ctx.lineTo(cen.x, cen.y + hh);
-          ctx.lineTo(top.x, top.y + hh); ctx.lineTo(top.x + hw, top.y);
-          ctx.closePath(); ctx.fill();
-          ctx.fillStyle = "#4a3270";
-          diamond(top.x, top.y, hw, hh); ctx.fill();
-          ctx.strokeStyle = "rgba(255,255,255,0.07)"; ctx.stroke();
-          continue;
+    for (var ki = 0; ki < keys.length; ki++) {
+      var kk = keys[ki].split(",");
+      var c = +kk[0], r = +kk[1];
+      var cell = tmap[keys[ki]], type = cell.type;
+      var hgt = cell.height || 0;
+      var topZ = hgt * HEIGHT_UNIT;
+      var cen = project(c + 0.5, r + 0.5, topZ);
+
+      // skirt for any raised tile (and wall block sides)
+      var skirtTop = (type === "wall") ? topZ + WALL_H : topZ;
+      if (hgt > 0 || type === "wall") drawSkirt(c, r, 0, skirtTop);
+
+      if (type === "wall") {
+        var wtop = project(c + 0.5, r + 0.5, topZ + WALL_H);
+        ctx.fillStyle = "#4a3270";
+        diamond(wtop.x, wtop.y, hw, hh); ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.07)"; ctx.stroke();
+        continue;
+      }
+
+      if (type === "ramp") {
+        // sloped quad: low edge at hgt, high edge at hgt+hd along dir
+        var d = cell.dir, loZ = topZ, hiZ = (hgt + cell.hd) * HEIGHT_UNIT;
+        function cz(cx, cy) {            // corner z by position along dir
+          var u = (d.x !== 0) ? (d.x > 0 ? cx - c : 1 - (cx - c))
+                              : (d.y > 0 ? cy - r : 1 - (cy - r));
+          return loZ + (hiZ - loZ) * u;
         }
+        var P = [
+          project(c,   r,   cz(c, r)),
+          project(c+1, r,   cz(c+1, r)),
+          project(c+1, r+1, cz(c+1, r+1)),
+          project(c,   r+1, cz(c, r+1))
+        ];
+        ctx.beginPath();
+        ctx.moveTo(P[0].x, P[0].y);
+        for (var pi = 1; pi < 4; pi++) ctx.lineTo(P[pi].x, P[pi].y);
+        ctx.closePath();
+        ctx.fillStyle = "#5a4488"; ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.12)"; ctx.lineWidth = 1; ctx.stroke();
+        var hc = project(c + 0.5, r + 0.5, (loZ + hiZ) / 2);
+        drawArrow(c, r, hc, cell.dirName || "E", (cell.height + cell.hd / 2));
+        continue;
+      }
 
-        if (type === "hole") {
-          diamond(cen.x, cen.y, hw, hh);
-          ctx.fillStyle = "#150b25"; ctx.fill();
-          ctx.save();
-          diamond(cen.x, cen.y + hh * 0.16, hw * 0.66, hh * 0.66);
-          ctx.fillStyle = "#05030a"; ctx.fill();
-          ctx.restore();
-          diamond(cen.x, cen.y, hw, hh);
-          ctx.strokeStyle = "rgba(0,0,0,0.65)"; ctx.lineWidth = 2; ctx.stroke();
-          continue;
-        }
-
+      if (type === "hole") {
         diamond(cen.x, cen.y, hw, hh);
-        ctx.fillStyle = tileColor(type); ctx.fill();
-        ctx.strokeStyle = "rgba(0,0,0,0.28)"; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = "#150b25"; ctx.fill();
+        ctx.save();
+        diamond(cen.x, cen.y + hh * 0.16, hw * 0.66, hh * 0.66);
+        ctx.fillStyle = "#05030a"; ctx.fill();
+        ctx.restore();
+        diamond(cen.x, cen.y, hw, hh);
+        ctx.strokeStyle = "rgba(0,0,0,0.65)"; ctx.lineWidth = 2; ctx.stroke();
+        continue;
+      }
 
-        if (type === "gravel") {
-          ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.28)";
-          for (var k = 0; k < 7; k++) {
-            var a = ((c * 13 + r * 29 + k * 47) % 100) / 100;
-            var b = ((c * 7 + r * 17 + k * 31) % 100) / 100;
-            ctx.beginPath();
-            ctx.arc(cen.x + (a - 0.5) * hw, cen.y + (b - 0.5) * hh, 1.4, 0, 6.28);
-            ctx.fill();
-          }
-          ctx.restore();
-        } else if (type === "ice") {
-          ctx.save();
-          ctx.globalAlpha = 0.20 + 0.18 * (0.5 + 0.5 * Math.sin(now / 320 + (c + r)));
-          diamond(cen.x, cen.y, hw * 0.6, hh * 0.6);
-          ctx.fillStyle = "#e7faff"; ctx.fill();
-          ctx.restore();
-        } else if (type === "goal") {
-          ctx.save();
-          ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now / 240);
-          diamond(cen.x, cen.y, hw * 0.62, hh * 0.62);
-          ctx.fillStyle = "#fff2c0"; ctx.fill();
-          ctx.restore();
-        } else if (type === "bumper") {
-          var fk = c + "," + r, fl = bumperFlash[fk];
-          if (fl) {
-            ctx.save();
-            ctx.globalAlpha = Math.min(0.6, fl / 0.18 * 0.6);
-            diamond(cen.x, cen.y, hw, hh);
-            ctx.fillStyle = "#ffe0bf"; ctx.fill();
-            ctx.restore();
-          }
-          drawArrow(c, r, cen, cell.dirName || "E");
-        } else if (type === "spinner") {
-          drawSwirl(cen, cell.rot || 1);
+      diamond(cen.x, cen.y, hw, hh);
+      ctx.fillStyle = tileColor(type); ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.28)"; ctx.lineWidth = 1; ctx.stroke();
+
+      if (type === "gravel") {
+        ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.28)";
+        for (var k = 0; k < 7; k++) {
+          var aa = ((c * 13 + r * 29 + k * 47) % 100) / 100;
+          var bb2 = ((c * 7 + r * 17 + k * 31) % 100) / 100;
+          ctx.beginPath();
+          ctx.arc(cen.x + (aa - 0.5) * hw, cen.y + (bb2 - 0.5) * hh, 1.4, 0, 6.28);
+          ctx.fill();
         }
+        ctx.restore();
+      } else if (type === "ice") {
+        ctx.save();
+        ctx.globalAlpha = 0.20 + 0.18 * (0.5 + 0.5 * Math.sin(now / 320 + (c + r)));
+        diamond(cen.x, cen.y, hw * 0.6, hh * 0.6);
+        ctx.fillStyle = "#e7faff"; ctx.fill();
+        ctx.restore();
+      } else if (type === "goal") {
+        ctx.save();
+        ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now / 240);
+        diamond(cen.x, cen.y, hw * 0.62, hh * 0.62);
+        ctx.fillStyle = "#fff2c0"; ctx.fill();
+        ctx.restore();
+      } else if (type === "bumper") {
+        var fl = bumperFlash[keys[ki]];
+        if (fl) {
+          ctx.save();
+          ctx.globalAlpha = Math.min(0.6, fl / 0.18 * 0.6);
+          diamond(cen.x, cen.y, hw, hh);
+          ctx.fillStyle = "#ffe0bf"; ctx.fill();
+          ctx.restore();
+        }
+        drawArrow(c, r, cen, cell.dirName || "E", hgt * HEIGHT_UNIT);
+      } else if (type === "spinner") {
+        drawSwirl(cen, cell.rot || 1);
+      } else if (type === "spring") {
+        ctx.save();
+        ctx.strokeStyle = "#9ff0d6"; ctx.lineWidth = 2.5;
+        for (var sgi = 0; sgi < 3; sgi++) {
+          var off = (sgi - 1) * hh * 0.26;
+          ctx.beginPath();
+          ctx.moveTo(cen.x - hw * 0.28, cen.y + off + hh * 0.12);
+          ctx.lineTo(cen.x, cen.y + off - hh * 0.12);
+          ctx.lineTo(cen.x + hw * 0.28, cen.y + off + hh * 0.12);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     }
   }
 
   function drawMarble() {
     if (!marble) return;
-    var z = (phase === "falling") ? fallZ : 0;
+    var z = marble.zv + ((phase === "falling") ? fallZ : 0);
     var p = project(marble.x, marble.y, z);
 
-    // shadow on the floor (skip while falling)
+    // shadow sits on the Munkable's current plane (skip while falling)
     if (phase !== "falling") {
       ctx.save();
       ctx.globalAlpha = 0.30;
       ctx.fillStyle = "#000";
-      var fp = project(marble.x, marble.y, 0);
+      var fp = project(marble.x, marble.y, marble.mh * HEIGHT_UNIT);
       ctx.beginPath();
       ctx.ellipse(fp.x, fp.y + tileH * 0.10, tileW * MARBLE_R * 0.95,
                   tileH * MARBLE_R * 0.95, 0, 0, Math.PI * 2);
@@ -1172,6 +1315,7 @@
 
   function render() {
     ctx.clearRect(0, 0, CANVAS, CANVAS);
+    TiltUI.update();
     if (cols === 0) return;
     drawBoard();
     drawMarble();
@@ -1273,6 +1417,72 @@
       loadCatalog().then(function () { loadLevel(obj); });
     }
   };
+
+  // ---------------------------------------------------------------------
+  // Tilt indicator (always on). Numbers (gamma/beta, 0.1° precision) +
+  // a dial dot showing direction/magnitude vs the calibrated zero. Tap
+  // to cycle BOTH -> NUMBERS_ONLY -> VISUAL_ONLY; persisted.
+  // ---------------------------------------------------------------------
+  var TiltUI = (function () {
+    var modes = ["BOTH", "NUMBERS_ONLY", "VISUAL_ONLY"], mode = "BOTH";
+    try { var m = localStorage.getItem("mm.tiltUI"); if (m && modes.indexOf(m) >= 0) mode = m; } catch (e) {}
+    var box, numEl, cvs, cx2, built = false;
+    function apply() {
+      if (!built) return;
+      cvs.style.display = (mode === "NUMBERS_ONLY") ? "none" : "block";
+      numEl.style.display = (mode === "VISUAL_ONLY") ? "none" : "block";
+    }
+    function cycle() {
+      mode = modes[(modes.indexOf(mode) + 1) % modes.length];
+      try { localStorage.setItem("mm.tiltUI", mode); } catch (e) {}
+      apply();
+    }
+    function build() {
+      if (built || !document.body) return;
+      built = true;
+      box = document.createElement("div");
+      box.setAttribute("style",
+        "position:fixed;right:10px;bottom:10px;z-index:60;display:flex;" +
+        "align-items:center;gap:8px;background:rgba(20,11,38,0.78);" +
+        "border:1px solid #3a2a5c;border-radius:10px;padding:7px 9px;" +
+        "color:#f3ecff;font:12px monospace;cursor:pointer;user-select:none;");
+      box.title = "Tap to cycle tilt display";
+      cvs = document.createElement("canvas");
+      cvs.width = 52; cvs.height = 52;
+      cvs.setAttribute("style", "width:52px;height:52px;");
+      cx2 = cvs.getContext("2d");
+      numEl = document.createElement("div");
+      numEl.setAttribute("style", "line-height:1.35;min-width:74px;");
+      box.appendChild(cvs); box.appendChild(numEl);
+      box.addEventListener("click", cycle);
+      document.body.appendChild(box);
+      apply();
+    }
+    function update() {
+      if (!built) { build(); return; }
+      var g = tilt.raw.gamma, b = tilt.raw.beta;
+      if (mode !== "VISUAL_ONLY") {
+        numEl.innerHTML =
+          '<span style="color:#ffd76b">&gamma;</span> ' + (g >= 0 ? "+" : "") + g.toFixed(1) + "&deg;<br>" +
+          '<span style="color:#7df0c8">&beta;</span> ' + (b >= 0 ? "+" : "") + b.toFixed(1) + "&deg;";
+      }
+      if (mode !== "NUMBERS_ONLY") {
+        var bg = tilt.base ? tilt.base.gamma : 0, bb = tilt.base ? tilt.base.beta : 0;
+        var R = 23, X = 26, Y = 26;
+        cx2.clearRect(0, 0, 52, 52);
+        cx2.strokeStyle = "rgba(255,255,255,0.22)";
+        cx2.beginPath(); cx2.arc(X, Y, R, 0, 6.283); cx2.stroke();
+        cx2.strokeStyle = "rgba(255,255,255,0.13)";
+        cx2.beginPath();
+        cx2.moveTo(X - R, Y); cx2.lineTo(X + R, Y);
+        cx2.moveTo(X, Y - R); cx2.lineTo(X, Y + R); cx2.stroke();
+        var nx = clamp((g - bg) / 30, -1, 1), ny = clamp((b - bb) / 30, -1, 1);
+        cx2.fillStyle = "#ffd76b";
+        cx2.beginPath(); cx2.arc(X + nx * R, Y + ny * R, 5, 0, 6.283); cx2.fill();
+      }
+    }
+    return { update: update };
+  })();
 
   // ---------------------------------------------------------------------
   // Live-tune panel (dev) — ?tune=1. Drag sliders mid-play to dial feel;

@@ -1,5 +1,6 @@
 {
   "name": "Slick & Sticky",
+  "fill": "floor",
   "grid": { "w": 12, "h": 10 },
   "target_time_ms": 32000,
   "tiles": [
