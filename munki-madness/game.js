@@ -36,8 +36,8 @@
   // Per-surface air friction applied to the marble each step.
   var SURFACE_DRAG = { floor: 0.085, slow: 0.150, ice: 0.012 };
 
-  var FORCE = 0.00016;       // peak control force (full input)
-  var MAX_SPEED = 5;         // hard cap so it can't careen off-screen
+  var FORCE = 0.00012;       // peak control force (full input) — feel knob
+  var MAX_SPEED = 3.2;       // speed cap — feel knob; lower = tamer/less clip
   var FIXED_DT = 1 / 120;    // physics substep (s) — prevents wall tunneling
   var MAX_SUBSTEPS = 8;      // cap substeps per frame (no spiral of death)
   var TILT_FULL = 38;        // degrees of tilt that = full force
@@ -697,6 +697,28 @@
     }
     applyControl();
     Engine.update(engine, FIXED_DT * 1000);
+    containMarble();
+  }
+
+  // Hard positional containment — the Munkable physically cannot leave
+  // the board no matter how fast it is or what it tunnelled through.
+  // Runs every substep, after integration. Interior holes/goal are
+  // unaffected (this only clamps the outer board rectangle).
+  function containMarble() {
+    var lo = MARBLE_R, hiX = cols - MARBLE_R, hiY = rows - MARBLE_R;
+    var p = marble.position, v = marble.velocity;
+    var nx = p.x, ny = p.y, hitX = false, hitY = false;
+    if (nx < lo) { nx = lo; hitX = true; }
+    else if (nx > hiX) { nx = hiX; hitX = true; }
+    if (ny < lo) { ny = lo; hitY = true; }
+    else if (ny > hiY) { ny = hiY; hitY = true; }
+    if (hitX || hitY) {
+      Body.setPosition(marble, { x: nx, y: ny });
+      Body.setVelocity(marble, {
+        x: hitX ? 0 : v.x,
+        y: hitY ? 0 : v.y
+      });
+    }
   }
 
   function worldStep(dt) {
