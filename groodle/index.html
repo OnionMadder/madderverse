@@ -126,6 +126,16 @@
             <g class="silhouette-outline" filter="url(#innerOutlineFilter)"></g>
         </svg>
 
+        <!-- Face-parts layer (z ~3.5): stamped cartoon parts — the
+             "I can't draw" bank. Above the outline, below hats so a
+             hat still covers the hair. The SVG itself is click-through
+             (pointer-events:none); only placed .face-part groups are
+             grabbable for drag-to-nudge, so freehand drawing passes
+             straight through everywhere else. -->
+        <svg class="face-parts-layer" id="facePartsLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <g id="facePartsInner"></g>
+        </svg>
+
         <!-- Hat layer (z-index 4): the equipped hat sprite. -->
         <svg class="hat-layer" id="hatLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
             <g id="hatLayerInner"></g>
@@ -222,6 +232,11 @@
             <div class="drawer-section">
                 <h3 class="drawer-section-label">Color</h3>
                 <div class="palette" id="palette" aria-label="Color palette"></div>
+            </div>
+            <div class="drawer-section">
+                <h3 class="drawer-section-label">Add a face</h3>
+                <div class="face-bank" id="faceBank" aria-label="Face parts bank"></div>
+                <p class="face-bank-hint">Can&rsquo;t draw a face? Tap a part &mdash; it lands in the right spot. Drag it to nudge.</p>
             </div>
             <div class="drawer-section">
                 <h3 class="drawer-section-label">Size</h3>

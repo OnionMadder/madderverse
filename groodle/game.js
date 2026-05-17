@@ -298,6 +298,17 @@
             owned: ['no-accessory'],
             equipped: 'no-accessory'
         },
+        /* Face-parts bank — the "I can't draw" safety net. Each category
+           is an object (NOT null) so mergeDefaults deep-merges old saves
+           cleanly. id '' = none; dx/dy = the kid's drag-nudge from the
+           anchor in logical 400x600 units. */
+        face: {
+            hair:  { id: '', dx: 0, dy: 0 },
+            brows: { id: '', dx: 0, dy: 0 },
+            eyes:  { id: '', dx: 0, dy: 0 },
+            nose:  { id: '', dx: 0, dy: 0 },
+            mouth: { id: '', dx: 0, dy: 0 }
+        },
         pose: 'standing'
     };
 
@@ -1619,6 +1630,9 @@
     function applyCharacter(id, colored) {
         const ch = CHARACTER_BY_ID[id];
         if (!ch || !ctx) return;
+        /* Prefab characters paint a face onto the canvas — drop any
+           stamped SVG face parts so the two don't double up. */
+        clearFaceParts();
         if (colored) applyFilled(ch); else applyOutline(ch);
     }
 
@@ -2780,6 +2794,188 @@
         }
     }
 
+    /* ============ FACE-PARTS BANK ============
+
+       The "I can't draw" safety net. A bank of pre-made cartoon parts
+       (hair / brows / eyes / nose / mouth). Tapping one drops it at the
+       correct face anchor (foolproof); each placed part is a draggable
+       SVG object the kid can nudge. Rendered into #facePartsInner — an
+       SVG layer INSIDE #creature, so parts inherit the pose / dance /
+       face-zoom transforms for free, exactly like the hat/accessory
+       layers. Anchors key off BODY so they track the figure. Not in the
+       gallery PNG yet (consistent: hats/accessories aren't either). */
+    let facePartsInnerEl = null;
+    let faceBankEl = null;
+
+    const FACE_CATS = ['hair', 'brows', 'eyes', 'nose', 'mouth'];
+    const FACE_LABEL = { hair: 'Hair', brows: 'Brows', eyes: 'Eyes', nose: 'Nose', mouth: 'Mouth' };
+
+    /* Per-category grab box (logical units, centred on the part) — kept
+       tight so the stacked face anchors don't all grab each other; the
+       later-rendered part wins where they still overlap. */
+    const FACE_HIT = {
+        hair:  { x: -52, y: -32, w: 104, h: 50 },
+        brows: { x: -30, y: -12, w: 60, h: 24 },
+        eyes:  { x: -32, y: -16, w: 64, h: 32 },
+        nose:  { x: -12, y: -12, w: 24, h: 26 },
+        mouth: { x: -22, y: -14, w: 44, h: 30 }
+    };
+
+    function faceAnchor(cat) {
+        const cx = BODY.cx;
+        if (cat === 'hair')  return { x: cx, y: BODY.headTop + 4 };
+        if (cat === 'brows') return { x: cx, y: BODY.browY };
+        if (cat === 'eyes')  return { x: cx, y: BODY.eyeY };
+        if (cat === 'nose')  return { x: cx, y: (BODY.eyeY + BODY.mouthY) / 2 };
+        if (cat === 'mouth') return { x: cx, y: BODY.mouthY };
+        return { x: cx, y: BODY.headCy };
+    }
+
+    /* Parts are authored centred on (0,0) in logical units; the wrapper
+       <g> translates them to the anchor (+ the kid's drag nudge). */
+    const FACE_PARTS = {
+        hair: [
+            { id: 'tuft',   svg: '<path d="M -42 8 Q -32 -24 -16 4 Q -5 -28 6 4 Q 17 -26 30 4 Q 41 -18 44 10 Z" fill="#5b3a29"/>' },
+            { id: 'spikes', svg: '<path d="M -44 10 L -34 -24 L -22 6 L -11 -28 L 2 6 L 14 -25 L 26 6 L 36 -22 L 46 10 Z" fill="#5b3a29"/>' },
+            { id: 'curls',  svg: '<g fill="#5b3a29"><circle cx="-36" cy="-2" r="13"/><circle cx="-13" cy="-13" r="15"/><circle cx="13" cy="-13" r="15"/><circle cx="36" cy="-2" r="13"/></g>' },
+            { id: 'swoop',  svg: '<path d="M -46 12 Q -54 -28 -8 -24 Q 34 -22 46 8 Q 30 -8 4 -6 Q -22 -4 -46 12 Z" fill="#5b3a29"/>' }
+        ],
+        brows: [
+            { id: 'flat',   svg: '<g stroke="#1a0f33" stroke-width="4" stroke-linecap="round"><line x1="-27" y1="0" x2="-9" y2="0"/><line x1="9" y1="0" x2="27" y2="0"/></g>' },
+            { id: 'raised', svg: '<g fill="none" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"><path d="M -27 3 Q -18 -7 -9 3"/><path d="M 9 3 Q 18 -7 27 3"/></g>' },
+            { id: 'angry',  svg: '<g stroke="#1a0f33" stroke-width="4" stroke-linecap="round"><line x1="-27" y1="-4" x2="-9" y2="5"/><line x1="9" y1="5" x2="27" y2="-4"/></g>' }
+        ],
+        eyes: [
+            { id: 'dots',   svg: '<g fill="#1a0f33"><circle cx="-18" cy="0" r="6"/><circle cx="18" cy="0" r="6"/></g>' },
+            { id: 'big',    svg: '<g><circle cx="-18" cy="0" r="11" fill="#fff" stroke="#1a0f33" stroke-width="2.5"/><circle cx="18" cy="0" r="11" fill="#fff" stroke="#1a0f33" stroke-width="2.5"/><circle cx="-15" cy="2" r="4.5" fill="#1a0f33"/><circle cx="21" cy="2" r="4.5" fill="#1a0f33"/></g>' },
+            { id: 'happy',  svg: '<g fill="none" stroke="#1a0f33" stroke-width="3.5" stroke-linecap="round"><path d="M -26 2 Q -18 -8 -10 2"/><path d="M 10 2 Q 18 -8 26 2"/></g>' },
+            { id: 'sleepy', svg: '<g fill="none" stroke="#1a0f33" stroke-width="3.5" stroke-linecap="round"><path d="M -26 0 Q -18 6 -10 0"/><path d="M 10 0 Q 18 6 26 0"/></g>' },
+            { id: 'wink',   svg: '<g fill="none" stroke="#1a0f33" stroke-width="3.5" stroke-linecap="round"><circle cx="-18" cy="0" r="6" fill="#1a0f33"/><path d="M 10 0 Q 18 6 26 0"/></g>' }
+        ],
+        nose: [
+            { id: 'dot',    svg: '<circle cx="0" cy="0" r="3.6" fill="#1a0f33"/>' },
+            { id: 'button', svg: '<ellipse cx="0" cy="0" rx="6" ry="4.6" fill="#1a0f33"/>' },
+            { id: 'L',      svg: '<path d="M 0 -8 L 0 6 L 7 6" fill="none" stroke="#1a0f33" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' }
+        ],
+        mouth: [
+            { id: 'smile',   svg: '<path d="M -16 0 Q 0 16 16 0" fill="none" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"/>' },
+            { id: 'grin',    svg: '<g><path d="M -18 -3 Q 0 21 18 -3 Z" fill="#1a0f33"/><path d="M -12 1 Q 0 8 12 1" fill="none" stroke="#fff" stroke-width="3"/></g>' },
+            { id: 'o',       svg: '<circle cx="0" cy="2" r="9" fill="#1a0f33"/>' },
+            { id: 'tongue',  svg: '<g><path d="M -16 -1 Q 0 15 16 -1" fill="none" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"/><ellipse cx="3" cy="9" rx="6" ry="7" fill="#e8607a"/></g>' },
+            { id: 'neutral', svg: '<line x1="-14" y1="0" x2="14" y2="0" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"/>' }
+        ]
+    };
+
+    function facePartGroup(cat) {
+        const sel = state && state.face && state.face[cat];
+        if (!sel || !sel.id) return '';
+        const opt = (FACE_PARTS[cat] || []).filter(function (o) { return o.id === sel.id; })[0];
+        if (!opt) return '';
+        const a = faceAnchor(cat);
+        const tx = (a.x + (sel.dx || 0)).toFixed(1);
+        const ty = (a.y + (sel.dy || 0)).toFixed(1);
+        const h = FACE_HIT[cat];
+        return '<g class="face-part" data-cat="' + cat + '" transform="translate(' + tx + ',' + ty + ')">' +
+               '<rect class="fp-hit" x="' + h.x + '" y="' + h.y + '" width="' + h.w + '" height="' + h.h + '"/>' +
+               opt.svg + '</g>';
+    }
+
+    function renderFaceParts() {
+        if (!facePartsInnerEl || !state) return;
+        /* Render order = FACE_CATS order; mouth last so it sits topmost
+           where the tight grab boxes still overlap. */
+        facePartsInnerEl.innerHTML = FACE_CATS.map(facePartGroup).join('');
+    }
+
+    function setFacePart(cat, id) {
+        if (!state.face[cat]) state.face[cat] = { id: '', dx: 0, dy: 0 };
+        state.face[cat].id = id;
+        state.face[cat].dx = 0;          // re-pick always re-centres —
+        state.face[cat].dy = 0;          // that's the safety net
+        saveState();
+        renderFaceParts();
+        buildFaceBank();
+    }
+
+    function clearFaceParts() {
+        if (!state || !state.face) return;
+        let any = false;
+        FACE_CATS.forEach(function (c) {
+            if (state.face[c] && state.face[c].id) { state.face[c] = { id: '', dx: 0, dy: 0 }; any = true; }
+        });
+        if (any) { saveState(); renderFaceParts(); buildFaceBank(); }
+    }
+
+    /* Drag-to-nudge. Screen→logical scale comes from the layer's live
+       on-screen box (reflects pose/zoom/dance, same trick getPos uses
+       for the canvas), so a nudge tracks the finger at any zoom. */
+    function attachFaceDrag() {
+        if (!facePartsInnerEl) return;
+        let cat = null, gEl = null, sx = 0, sy = 0, bx = 0, by = 0, scale = 1;
+        facePartsInnerEl.addEventListener('pointerdown', function (e) {
+            const g = e.target.closest ? e.target.closest('.face-part') : null;
+            if (!g || !state.face) return;
+            cat = g.getAttribute('data-cat');
+            const sel = state.face[cat];
+            if (!sel) { cat = null; return; }
+            gEl = g;
+            const svg = facePartsInnerEl.ownerSVGElement || facePartsInnerEl.parentNode;
+            const r = svg.getBoundingClientRect();
+            scale = Math.min(r.width / STAGE_W, r.height / STAGE_H) || 1;
+            sx = e.clientX; sy = e.clientY; bx = sel.dx || 0; by = sel.dy || 0;
+            try { g.setPointerCapture(e.pointerId); } catch (err) {}
+            e.preventDefault(); e.stopPropagation();
+        });
+        facePartsInnerEl.addEventListener('pointermove', function (e) {
+            if (!cat || !gEl) return;
+            const sel = state.face[cat];
+            sel.dx = bx + (e.clientX - sx) / scale;
+            sel.dy = by + (e.clientY - sy) / scale;
+            const a = faceAnchor(cat);
+            gEl.setAttribute('transform', 'translate(' + (a.x + sel.dx).toFixed(1) + ',' + (a.y + sel.dy).toFixed(1) + ')');
+            e.preventDefault();
+        });
+        const end = function () {
+            if (!cat) return;
+            cat = null; gEl = null;
+            saveState();
+        };
+        facePartsInnerEl.addEventListener('pointerup', end);
+        facePartsInnerEl.addEventListener('pointercancel', end);
+    }
+
+    function faceSwatchSvg(svg) {
+        return '<svg viewBox="-52 -34 104 68" aria-hidden="true">' + svg + '</svg>';
+    }
+
+    function buildFaceBank() {
+        if (!faceBankEl || !state) return;
+        let html = '';
+        FACE_CATS.forEach(function (cat) {
+            const sel = state.face[cat] || { id: '' };
+            html += '<div class="face-row"><span class="face-row-label">' + FACE_LABEL[cat] + '</span>' +
+                    '<div class="face-opts">' +
+                    '<button type="button" class="face-opt face-none' + (!sel.id ? ' active' : '') +
+                        '" data-cat="' + cat + '" data-id="" aria-label="No ' + FACE_LABEL[cat] + '">∅</button>';
+            FACE_PARTS[cat].forEach(function (o) {
+                html += '<button type="button" class="face-opt' + (sel.id === o.id ? ' active' : '') +
+                        '" data-cat="' + cat + '" data-id="' + o.id + '" aria-label="' + FACE_LABEL[cat] + ' ' + o.id + '">' +
+                        faceSwatchSvg(o.svg) + '</button>';
+            });
+            html += '</div></div>';
+        });
+        faceBankEl.innerHTML = html;
+    }
+
+    function attachFaceBank() {
+        if (!faceBankEl) return;
+        faceBankEl.addEventListener('click', function (e) {
+            const b = e.target.closest ? e.target.closest('.face-opt') : null;
+            if (!b) return;
+            setFacePart(b.getAttribute('data-cat'), b.getAttribute('data-id'));
+        });
+    }
+
     function buildPatternPicker() {
         if (!patternPickerEl) return;
         patternPickerEl.innerHTML = '';
@@ -3092,6 +3288,8 @@
            clearCanvas's outline re-stamp doesn't fight the new art. */
         currentCharacterId = null;
         restampOutline = null;
+        /* SURPRISE paints its own face — clear stamped SVG face parts. */
+        clearFaceParts();
         clearCanvas();
 
         // Skin tone fill across the whole body silhouette
@@ -3525,6 +3723,8 @@
         patternFillEl = document.getElementById('patternFill');
         patternWinPathEl = document.getElementById('patternWinPath');
         patternPickerEl = document.getElementById('patternPicker');
+        facePartsInnerEl = document.getElementById('facePartsInner');
+        faceBankEl = document.getElementById('faceBank');
         accessoryShopGridEl = document.getElementById('accessoryShopGrid');
         pagesModalEl = document.getElementById('pagesModal');
         pagesGridEl = document.getElementById('pagesGrid');
@@ -3561,6 +3761,10 @@
         buildPosePicker();
         buildPatternDefs();
         buildPatternPicker();
+        buildFaceBank();
+        attachFaceBank();
+        renderFaceParts();
+        attachFaceDrag();
         attachHandlers();
         updateMoveBeatLabels();
         floorEl = document.getElementById('stageFloor');

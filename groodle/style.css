@@ -516,6 +516,78 @@ body.dancing .face-zoom-btn { display: none; }
     z-index: 5;
 }
 
+/* Face-parts layer: above the outline ring, below hats. Click-through
+   (pointer-events:none) so freehand drawing passes straight through;
+   only placed parts re-enable events so they can be dragged. Sits
+   after .silhouette-outline-layer in the DOM so it paints above it at
+   the shared z-index 3, while the hat layer (z4) still covers hair. */
+.face-parts-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 3;
+}
+.face-parts-layer .face-part { pointer-events: auto; cursor: grab; }
+.face-parts-layer .face-part:active { cursor: grabbing; }
+/* Transparent (not none) so the grab box is hit-testable. */
+.face-parts-layer .fp-hit { fill: transparent; }
+
+/* Face-parts bank — one row per category in the Brush drawer. */
+.face-bank { display: flex; flex-direction: column; gap: 10px; }
+.face-row { display: flex; align-items: center; gap: 8px; }
+.face-row-label {
+    flex: 0 0 46px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #d6bdff;
+}
+.face-opts {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+}
+.face-opt {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.92);
+    cursor: pointer;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+}
+.face-opt svg { display: block; width: 100%; height: 100%; }
+.face-opt:active { transform: scale(0.92); }
+.face-opt.active {
+    border-color: #00ffcc;
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.5);
+}
+.face-none {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    color: #d6bdff;
+    font-size: 20px;
+    line-height: 1;
+}
+@media (hover: hover) {
+    .face-opt:hover { border-color: rgba(0, 255, 204, 0.6); }
+}
+.face-bank-hint {
+    margin: 2px 0 0;
+    font-size: 11px;
+    color: rgba(214, 189, 255, 0.75);
+    line-height: 1.3;
+}
+
 /* Static fill-pattern layer. Stage-level (NOT inside .creature) so
    the pattern field never inherits the dance transform — it stays
    locked to the stage. z-index 1: above the bg, below .creature, so
