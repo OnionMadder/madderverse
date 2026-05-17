@@ -34,9 +34,10 @@
   var MARBLE_R = 0.30;       // marble radius in world units (1 = one tile)
 
   // Per-surface air friction applied to the marble each step.
-  var SURFACE_DRAG = { floor: 0.060, slow: 0.150, ice: 0.012 };
+  var SURFACE_DRAG = { floor: 0.085, slow: 0.150, ice: 0.012 };
 
-  var FORCE = 0.00026;       // peak control force (full tilt / max drag)
+  var FORCE = 0.00016;       // peak control force (full input)
+  var MAX_SPEED = 5;         // hard cap so it can't careen off-screen
   var TILT_FULL = 38;        // degrees of tilt that = full force
   var DRAG_FULL = 90;        // px of drag that = full force
   var WALL_BONK_MIN = 1.4;   // min impact speed to trigger a squeak
@@ -133,17 +134,19 @@
   // Control mode
   // ---------------------------------------------------------------------
   var isTouchDevice = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
-  var CONTROL_MODES = ["tilt", "touch", "hybrid"];
-  var controlMode = isTouchDevice ? "tilt" : "touch";
+  var CONTROL_MODES = ["keyboard", "tilt", "touch", "hybrid"];
+  // Desktop defaults to keyboard (arrows/WASD/gamepad); mobile to tilt.
+  var controlMode = isTouchDevice ? "tilt" : "keyboard";
 
   function refreshCtrlLabel() {
     var label = controlMode.charAt(0).toUpperCase() + controlMode.slice(1);
     if (ctrlLabel) ctrlLabel.textContent = label;
     if (howText) {
       howText.textContent =
+        controlMode === "keyboard" ? "Arrow keys or WASD to roll — or a game controller." :
         controlMode === "touch" ? "Drag anywhere on screen to roll." :
         controlMode === "tilt"  ? "Tilt your device to roll the Munkable." :
-        "Tilt your device or drag on screen to roll.";
+        "Keys, tilt, drag or controller — whatever you've got.";
     }
   }
   refreshCtrlLabel();
@@ -585,15 +588,48 @@
     if (k === "m") muteBtn.click();
   });
 
+  // Keyboard steering (arrows + WASD). e.code = layout-independent.
+  var keys = Object.create(null);
+  var MOVE_CODES = {
+    ArrowUp:1, ArrowDown:1, ArrowLeft:1, ArrowRight:1,
+    KeyW:1, KeyA:1, KeyS:1, KeyD:1
+  };
+  function setKey(e, down) {
+    if (!MOVE_CODES[e.code]) return;
+    keys[e.code] = down;
+    if (e.cancelable) e.preventDefault();   // stop arrow-key page scroll
+  }
+  window.addEventListener("keydown", function (e) { setKey(e, true); });
+  window.addEventListener("keyup", function (e) { setKey(e, false); });
+
   // ---------------------------------------------------------------------
   // Control force -> world (screen-space push, mapped through inverse iso)
   // ---------------------------------------------------------------------
   function applyControl() {
     if (phase !== "play") return;
     var sx = 0, sy = 0;
+    var useKeys = (controlMode === "keyboard" || controlMode === "hybrid");
     var useTilt = (controlMode === "tilt" || controlMode === "hybrid") && tilt.on;
     var useDrag = (controlMode === "touch" || controlMode === "hybrid") && dragging;
 
+    if (useKeys) {
+      if (keys.ArrowUp    || keys.KeyW) sy -= 1;   // screen-up
+      if (keys.ArrowDown  || keys.KeyS) sy += 1;
+      if (keys.ArrowLeft  || keys.KeyA) sx -= 1;
+      if (keys.ArrowRight || keys.KeyD) sx += 1;
+      var pads = navigator.getGamepads ? navigator.getGamepads() : null;
+      var gp = pads && (pads[0] || pads[1] || pads[2] || pads[3]);
+      if (gp) {
+        var ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+        if (Math.abs(ax) > 0.18) sx += ax;          // left stick
+        if (Math.abs(ay) > 0.18) sy += ay;
+        var b = gp.buttons;
+        if (b[12] && b[12].pressed) sy -= 1;         // d-pad
+        if (b[13] && b[13].pressed) sy += 1;
+        if (b[14] && b[14].pressed) sx -= 1;
+        if (b[15] && b[15].pressed) sx += 1;
+      }
+    }
     if (useTilt) {
       sx += clamp(tilt.gamma / TILT_FULL, -1, 1);
       sy += clamp(tilt.beta  / TILT_FULL, -1, 1);
@@ -643,6 +679,14 @@
       var ch = tileAt(cc, rr);
 
       marble.frictionAir = SURFACE_DRAG[surfaceOf(ch)];
+
+      if (marble.speed > MAX_SPEED) {           // hard anti-careen cap
+        var sc = MAX_SPEED / marble.speed;
+        Body.setVelocity(marble, {
+          x: marble.velocity.x * sc,
+          y: marble.velocity.y * sc
+        });
+      }
 
       if (!timerRunning && marble.speed > 0.05) {
         timerRunning = true;
