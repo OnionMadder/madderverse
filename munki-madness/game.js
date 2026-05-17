@@ -1274,6 +1274,88 @@
     }
   };
 
+  // ---------------------------------------------------------------------
+  // Live-tune panel (dev) — ?tune=1. Drag sliders mid-play to dial feel;
+  // values apply instantly (the engine reads these vars every tick).
+  // "Copy values" copies a paste-ready block to hand back for committing.
+  // ---------------------------------------------------------------------
+  (function buildTunePanel() {
+    var on = false;
+    try { on = /[?&]tune=1(?:&|$)/.test(location.search); } catch (e) {}
+    if (!on) return;
+
+    var SPECS = [
+      { k: "ACCEL",        min: 4,    max: 24,    step: 0.5,
+        get: function () { return ACCEL; },        set: function (v) { ACCEL = v; } },
+      { k: "MAX_SPEED",    min: 2,    max: 12,    step: 0.5,
+        get: function () { return MAX_SPEED; },    set: function (v) { MAX_SPEED = v; } },
+      { k: "WALL_BOUNCE",  min: 0,    max: 0.9,   step: 0.05,
+        get: function () { return WALL_BOUNCE; },  set: function (v) { WALL_BOUNCE = v; } },
+      { k: "TILT_FORCE_MULTIPLIER", min: 0.4, max: 3, step: 0.1,
+        get: function () { return TILT_FORCE_MULTIPLIER; }, set: function (v) { TILT_FORCE_MULTIPLIER = v; } },
+      { k: "floor.drag",   min: 0.80, max: 0.99,  step: 0.005,
+        get: function () { return SURFACE.floor.drag; },  set: function (v) { SURFACE.floor.drag = v; } },
+      { k: "gravel.drag",  min: 0.60, max: 0.95,  step: 0.005,
+        get: function () { return SURFACE.gravel.drag; }, set: function (v) { SURFACE.gravel.drag = v; } },
+      { k: "ice.drag",     min: 0.93, max: 0.999, step: 0.002,
+        get: function () { return SURFACE.ice.drag; },    set: function (v) { SURFACE.ice.drag = v; } },
+      { k: "ice.grip",     min: 0.05, max: 1,     step: 0.05,
+        get: function () { return SURFACE.ice.grip; },    set: function (v) { SURFACE.ice.grip = v; } }
+    ];
+
+    var box = document.createElement("div");
+    box.setAttribute("style",
+      "position:fixed;left:8px;bottom:8px;z-index:9998;width:248px;" +
+      "background:rgba(14,7,32,0.92);border:1px solid #3a2a5c;border-radius:10px;" +
+      "padding:10px 12px;color:#f3ecff;font:12px monospace;");
+    var title = document.createElement("div");
+    title.textContent = "LIVE TUNE  (?tune=1)";
+    title.setAttribute("style", "color:#ffd76b;font-weight:700;margin-bottom:6px;");
+    box.appendChild(title);
+
+    SPECS.forEach(function (s) {
+      var row = document.createElement("div");
+      row.setAttribute("style", "margin:5px 0;");
+      var lab = document.createElement("div");
+      var val = document.createElement("span");
+      val.setAttribute("style", "color:#7df0c8;");
+      function setLabel() { val.textContent = (+s.get()).toFixed(3).replace(/\.?0+$/, ""); }
+      lab.textContent = s.k + " = "; lab.appendChild(val);
+      var rng = document.createElement("input");
+      rng.type = "range"; rng.min = s.min; rng.max = s.max; rng.step = s.step;
+      rng.value = s.get();
+      rng.setAttribute("style", "width:100%;");
+      rng.addEventListener("input", function () { s.set(parseFloat(rng.value)); setLabel(); });
+      setLabel();
+      row.appendChild(lab); row.appendChild(rng);
+      box.appendChild(row);
+    });
+
+    var copy = document.createElement("button");
+    copy.textContent = "Copy values";
+    copy.setAttribute("style",
+      "margin-top:8px;width:100%;background:#3c2464;color:#f3ecff;" +
+      "border:1px solid #5a3286;border-radius:6px;padding:7px;font:inherit;cursor:pointer;");
+    copy.addEventListener("click", function () {
+      var txt = "ACCEL=" + ACCEL + "  MAX_SPEED=" + MAX_SPEED +
+                "  WALL_BOUNCE=" + WALL_BOUNCE +
+                "  TILT_FORCE_MULTIPLIER=" + TILT_FORCE_MULTIPLIER +
+                "  SURFACE.floor.drag=" + SURFACE.floor.drag +
+                "  SURFACE.gravel.drag=" + SURFACE.gravel.drag +
+                "  SURFACE.ice.drag=" + SURFACE.ice.drag +
+                "  SURFACE.ice.grip=" + SURFACE.ice.grip;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(
+          function () { copy.textContent = "Copied ✓"; setTimeout(function () { copy.textContent = "Copy values"; }, 1200); },
+          function () { window.prompt("Tell Claude these values:", txt); });
+      } else { window.prompt("Tell Claude these values:", txt); }
+    });
+    box.appendChild(copy);
+
+    if (document.body) document.body.appendChild(box);
+    else document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(box); });
+  })();
+
   // first paint of the menu (board hidden behind overlay)
   requestAnimationFrame(frame);
 })();
