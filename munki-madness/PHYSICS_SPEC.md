@@ -9,7 +9,7 @@ Tunable constants at the top of `game.js`:
 
 | Constant | v1.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `8` | input push force (deliberately slow accel; halved from old 16) |
+| `ACCEL` | `14` | input push force (heavy but responsive; between old snappy 16 and the too-slow 8) |
 | `MAX_SPEED` | `6` | top speed (tiles/s), unchanged |
 | `WALL_BOUNCE` | `0.4` | wall restitution — satisfying pinball bonk recovery |
 | `FRICTION_FLOOR` | `0.92` | default per-frame (@60fps) velocity multiplier |

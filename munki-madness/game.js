@@ -30,7 +30,7 @@
   var MARBLE_R = 0.30;       // Munkable radius (tiles)
 
   // ---- Physics knobs — see PHYSICS_SPEC.md (LOCKED v1.0) ----
-  var ACCEL = 8;             // input push (deliberately slow accel)
+  var ACCEL = 14;            // input push — responsive but still heavy
   var MAX_SPEED = 6;         // top speed (tiles/s)
   var WALL_BOUNCE = 0.4;     // wall restitution — pinball bonk
   var FRICTION_FLOOR = 0.92; // default per-frame@60 velocity multiplier
