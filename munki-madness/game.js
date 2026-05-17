@@ -38,6 +38,8 @@
 
   var FORCE = 0.00016;       // peak control force (full input)
   var MAX_SPEED = 5;         // hard cap so it can't careen off-screen
+  var FIXED_DT = 1 / 120;    // physics substep (s) — prevents wall tunneling
+  var MAX_SUBSTEPS = 8;      // cap substeps per frame (no spiral of death)
   var TILT_FULL = 38;        // degrees of tilt that = full force
   var DRAG_FULL = 90;        // px of drag that = full force
   var WALL_BONK_MIN = 1.4;   // min impact speed to trigger a squeak
@@ -494,6 +496,17 @@
       }
     }
 
+    // Thick outer boundary ring — belt-and-suspenders so a Munkable can
+    // never actually leave the board even if it clips a 1-thick tile wall.
+    var T = 4;
+    var bound = [
+      Bodies.rectangle(cols / 2, -T / 2, cols + 2 * T, T, { isStatic: true, label: "wall" }),
+      Bodies.rectangle(cols / 2, rows + T / 2, cols + 2 * T, T, { isStatic: true, label: "wall" }),
+      Bodies.rectangle(-T / 2, rows / 2, T, rows + 2 * T, { isStatic: true, label: "wall" }),
+      Bodies.rectangle(cols + T / 2, rows / 2, T, rows + 2 * T, { isStatic: true, label: "wall" })
+    ];
+    for (var bi = 0; bi < bound.length; bi++) { walls.push(bound[bi]); World.add(engine.world, bound[bi]); }
+
     marble = Bodies.circle(startTile.x, startTile.y, MARBLE_R, {
       restitution: 0.34,
       friction: 0.02,
@@ -672,21 +685,25 @@
   // ---------------------------------------------------------------------
   // Per-step world logic: surface drag, hole/goal checks
   // ---------------------------------------------------------------------
+  // One fixed physics substep: surface drag + speed cap (BEFORE integrate,
+  // so a fast Munkable can't tunnel through a 1-unit wall) + control + step.
+  function physicsTick() {
+    var cc = Math.floor(marble.position.x);
+    var rr = Math.floor(marble.position.y);
+    marble.frictionAir = SURFACE_DRAG[surfaceOf(tileAt(cc, rr))];
+    if (marble.speed > MAX_SPEED) {
+      var sc = MAX_SPEED / marble.speed;
+      Body.setVelocity(marble, { x: marble.velocity.x * sc, y: marble.velocity.y * sc });
+    }
+    applyControl();
+    Engine.update(engine, FIXED_DT * 1000);
+  }
+
   function worldStep(dt) {
     if (phase === "play") {
       var cc = Math.floor(marble.position.x);
       var rr = Math.floor(marble.position.y);
       var ch = tileAt(cc, rr);
-
-      marble.frictionAir = SURFACE_DRAG[surfaceOf(ch)];
-
-      if (marble.speed > MAX_SPEED) {           // hard anti-careen cap
-        var sc = MAX_SPEED / marble.speed;
-        Body.setVelocity(marble, {
-          x: marble.velocity.x * sc,
-          y: marble.velocity.y * sc
-        });
-      }
 
       if (!timerRunning && marble.speed > 0.05) {
         timerRunning = true;
@@ -924,8 +941,8 @@
       munkable.update(dt, 0);
       if (munkable.state === "ROLLED") phase = "play";
     } else if (phase === "play") {
-      applyControl();
-      Engine.update(engine, dt * 1000);
+      var steps = Math.max(1, Math.min(MAX_SUBSTEPS, Math.round(dt / FIXED_DT)));
+      for (var s = 0; s < steps && phase === "play"; s++) physicsTick();
       munkable.update(dt, marble.speed);
       Sound.roll(marble.speed);
     } else if (phase === "falling") {
