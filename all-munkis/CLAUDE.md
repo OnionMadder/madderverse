@@ -6,50 +6,56 @@ Sprunki-style drag-and-drop music game inside the Madderverse hub.
 ad-free / kid-friendly branding). This file captures only what's specific to
 `all-munkis/`.
 
-## Bala's Song Layering (v1.1 harmonization feature)
+## Dual Band Mode (v1.1 harmonization feature — LOCKED design)
 
-Discovered by accident during a two-monitor debug session — two
-independent browser tabs of the game running offset by a second
-produced clean polyphonic harmony.
+Origin: discovered by accident — two independent browser tabs of the
+game running offset by a second produced clean polyphonic harmony,
+because each tab is its own audio engine on the shared hardware clock.
 
-**Dual Row Stage was DROPPED.** Playtesting showed a geometric
-second row of Munki slots did *not* reproduce the magic — the
-harmony does **not** come from layered per-Munki voices at offset.
-It comes specifically from **Bala's Song** (the Tone.js ambient bed —
-PolySynth pad + FMSynth bell + MetalSynth hat through reverb/delay)
-playing **doubled with an offset**, which is exactly what the two
-browser tabs did. The stage stays at **6 slots, single row** — no
-back row, no extra geometry.
+**Design history (so nobody re-litigates it):**
+- v1.1 was first frozen as a geometric "Dual Row Stage" (front/back
+  slot rows). Playtest: didn't reproduce the magic.
+- An emergent auto-layering ("Bala's Song Layering", commit
+  `9037367`: a single parallel Tone clone auto-engaging at ≥3 Munkis)
+  was built, then **REVERTED** — the player wants to *perform* the
+  layering, not have the game do it automatically.
+- **Final locked design: Dual Band Mode.** Two player-controlled
+  independent bands; the player times them to compose the layering.
 
-**Bala's Song Layering** reproduces it intentionally and scientifically
-tuned. Implementation (see `BALA_LAYER` config + `buildToneLayer` +
-`TONE_LAYER.play` in `game.js`, shipped commit `9037367`):
+**What Dual Band Mode is:**
+- A **toggled mode** entered via a button (same pattern as the
+  dormant Madballz mode — a mode switch, not the default). The normal
+  single-row 6-slot stage and the v1.0 audio path stay **untouched**.
+- In the mode the stage is **two rows of 3 slots** (Row A, Row B) —
+  6 Munkis total, split into two bands. No bigger geometry.
+- **Each row is a fully independent band:**
+  1. Its **own Bala's Song** — its own Tone ambient instrument
+     instances (pad/bell/hat) through its own reverb/delay bus.
+  2. Its **own oscillators** for its Munki voices (per-Munki `play()`
+     already mints fresh oscillators per call; in this mode each
+     row's voices are driven by that row's loop and routed through
+     that row's gain).
+  3. Its **own loop clock / scheduler phase** (independent
+     `currentStep`/`currentBar`/`nextStepTime`). The offset between
+     the two bands = *whenever the player toggled each one on*.
+- **Per-row on/off toggle controls the row's WHOLE band** (its Bala's
+  Song *and* its Munki voices), implemented as a per-row `GainNode`
+  between that row's output and the shared `masterGain`. Toggle =
+  mute/unmute the entire band.
+- The **player performs the layering** by timing the two toggles.
+  The game never auto-layers. This is the two-tab magic made
+  playable and composable.
+- Both rows still converge at the single shared `masterGain` →
+  `DynamicsCompressor` → destination. One `AudioContext`; the
+  compressor gluing both bands is exactly what made the accidental
+  two-tab version cohere — keep that convergence.
 
-- The per-Munki `play()` voices and the **original** Tone ambient
-  layer are completely unchanged — not the source of the magic.
-- A **second parallel clone** of the pad/bell/hat is built strictly
-  *after* the original (try-wrapped so a failure can never break v1.0
-  audio), through its **own** longer/wetter reverb bus, routed to the
-  same `masterGain` → compressor.
-- `TONE_LAYER.play` mirrors the exact original triggers `OFFSET_S`
-  later onto the clone.
-- The clone is detuned `DETUNE_CENTS` flat, reverb `decay`/`wet`
-  raised (`REVERB_DECAY`/`REVERB_WET`), and voice attack +
-  `ATTACK_EXTRA_S` so it blooms *under* the original, not competing.
-- **Gated on Munki count:** engages only while ≥ `MIN_MUNKIS` (3)
-  are on the stage; fewer = layering off.
-- All knobs live in the tunable `BALA_LAYER` constant at the top of
-  the audio section — A/B freely.
-- Visual tell: `body.bala-layered` fades in a faint cool bloom over
-  the stage (`.stage-wrap::after`, 2.6 s). Deliberately barely-there,
-  emergent not announced. **No emoji/icon** — the UI is emoji-free
-  post-FNAF, so the bg-shift option was chosen over a "✨" icon.
-- The old Two-Part Harmony idea is repurposed as the hidden
-  achievement **Trio Threshold** (1 pt), granted the first time the
-  layer engages.
-
-Do not reintroduce a Dual Row / second slot row. The harmonization
-feature is audio-only.
+**Hard rules:**
+- The single-row default mode + the v1.0 audio engine (per-Munki
+  `play()`, the original Tone layer, scheduler, compressor) must stay
+  byte-unchanged — Dual Band Mode is a separate mode/code path.
+- Do not re-add the emergent auto-layering — the player drives it.
+- v1.0 remains recoverable via tag `all-munkis-v1.0`; v1.1 on `main`.
 
 ## What it is
 
