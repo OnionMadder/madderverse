@@ -209,13 +209,32 @@
             audioCtx = new Ctx();
             masterGain = audioCtx.createGain();
             masterGain.gain.value = isMuted ? 0 : 0.55;
+            // Mobile audio hygiene Fix 3 — master lowpass BEFORE the
+            // compressor. Tiny phone speakers can't cleanly reproduce
+            // >~14 kHz; that energy comes back as "static-y residue"
+            // over long sessions. Musically inaudible (Bala's Song's
+            // top partials sit well below 14 kHz) but phones sound
+            // dramatically cleaner. (Future madderverse/lib/audio/:
+            // keep this node — it's a speaker-protection stage, not an
+            // EQ choice.)
+            const masterLP = audioCtx.createBiquadFilter();
+            masterLP.type = 'lowpass';
+            masterLP.frequency.value = 14000;
+            masterLP.Q.value = 0.7;
             const comp = audioCtx.createDynamicsCompressor();
-            comp.threshold.value = -10;
-            comp.knee.value = 8;
+            // Mobile audio hygiene Fix 5 — tightened from desktop-loose
+            // (was -10 / 8 / 6 / 0.004 / 0.15) toward mobile-safe so no
+            // peak above ~-3 dBFS reaches small speakers. ratio stays 6
+            // (already >= the 4 floor — more peak control, not less).
+            // This only tames transients/peaks; it does NOT recolor the
+            // tone — Bala's Song character is preserved.
+            comp.threshold.value = -14;
+            comp.knee.value = 10;
             comp.ratio.value = 6;
-            comp.attack.value = 0.004;
-            comp.release.value = 0.15;
-            masterGain.connect(comp).connect(audioCtx.destination);
+            comp.attack.value = 0.003;
+            comp.release.value = 0.25;
+            // Chain: masterGain -> 14 kHz LP -> compressor -> destination.
+            masterGain.connect(masterLP).connect(comp).connect(audioCtx.destination);
             buildToneLayer(); // no-op if Tone.js isn't loaded
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -276,7 +295,12 @@
         // MetalSynth hi-hat — direct to masterGain (no reverb wash) so the
         // off-beat tick stays tight against the kid's drum-mods.
         toneHat = new Tone.MetalSynth({
-            envelope: { attack: 0.001, decay: 0.05, release: 0.02 },
+            // Mobile audio hygiene Fix 1 (Tone layer) — release 0.02 ->
+            // 0.08: a 20 ms metallic-synth release snaps closed hard
+            // enough to click on phone speakers. 80 ms is still a tight
+            // tick against the kid's drum-mods but ends cleanly. (Pad
+            // release 1.4 s / bell 0.7 s are already soft — left as-is.)
+            envelope: { attack: 0.001, decay: 0.05, release: 0.08 },
             harmonicity: 5.1, modulationIndex: 32, resonance: 4200, octaves: 1.5,
             volume: -32
         });
@@ -3052,6 +3076,19 @@
                     nextStepTime = audioCtx.currentTime + 0.08;
                     schedule();
                 }
+            }
+        });
+        // Mobile audio hygiene Fix 4 — release the AudioContext on
+        // navigation so the OS audio path is torn down cleanly instead
+        // of leaving the mobile DSP half-open across a session +
+        // navigation (a known Android "static residue" cause).
+        // suspend/resume on background is already handled by the
+        // visibilitychange listener above (kept — it also pauses the
+        // scheduler, which the naive spec snippet does not). Guarded so
+        // it never close()s a missing or already-closed context.
+        window.addEventListener('beforeunload', () => {
+            if (audioCtx && audioCtx.state !== 'closed') {
+                audioCtx.close().catch(() => {});
             }
         });
     }
