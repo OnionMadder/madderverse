@@ -9,10 +9,10 @@ Tunable constants at the top of `game.js`:
 
 | Constant | v1.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `14` | input push force (heavy but responsive; between old snappy 16 and the too-slow 8) |
+| `ACCEL` | `10` | input push force (slow-starting heavy ball; pushed around by bumpers, not instantly re-controllable) |
 | `MAX_SPEED` | `6` | top speed (tiles/s), unchanged |
 | `WALL_BOUNCE` | `0.4` | wall restitution — satisfying pinball bonk recovery |
-| `FRICTION_FLOOR` | `0.92` | default per-frame (@60fps) velocity multiplier |
+| `FRICTION_FLOOR` | `0.88` | per-frame@60 velocity multiplier — decays to a controlled stop in ~1s of no input |
 | `BUMPER_FORCE` | `4` | instantaneous velocity-add a bumper imparts |
 | `GRAVITY` | `0` | no gravity in v1 (flat plane); reserved for Endeavor |
 

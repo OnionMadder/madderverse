@@ -32,10 +32,10 @@
   var MARBLE_R = 0.30;       // Munkable radius (tiles)
 
   // ---- Physics knobs — see PHYSICS_SPEC.md (LOCKED v1.0) ----
-  var ACCEL = 14;            // input push — responsive but still heavy
+  var ACCEL = 10;            // input push — slow-starting heavy ball
   var MAX_SPEED = 6;         // top speed (tiles/s)
   var WALL_BOUNCE = 0.4;     // wall restitution — pinball bonk
-  var FRICTION_FLOOR = 0.92; // default per-frame@60 velocity multiplier
+  var FRICTION_FLOOR = 0.88; // per-frame@60 vel multiplier (decays to a stop)
   var BUMPER_FORCE = 4;      // instantaneous velocity-add from a bumper
   var GRAVITY = 0;           // no gravity in v1 (reserved for Endeavor)
   var WALL_BONK_MIN = 1.6;   // min normal speed (tiles/s) to squeak
@@ -618,7 +618,8 @@
     startTile = { x: lv.spawn.x + 0.5, y: lv.spawn.y + 0.5 };
     var sct = tmap[lv.spawn.x + "," + lv.spawn.y];
     startTile.h = sct ? (sct.height || 0) : 0;
-    goalTile = { x: lv.goal.x, y: lv.goal.y };
+    var gct = tmap[lv.goal.x + "," + lv.goal.y];
+    goalTile = { x: lv.goal.x, y: lv.goal.y, h: gct ? (gct.height || 0) : 0 };
     lastCellKey = ""; bumperFlash = {};
 
     fitProjection();
@@ -902,6 +903,10 @@
         // bridge low (cell.height) <-> high (cell.height + hd)
         marble.mh = (p >= 0.5) ? (cell.height + cell.hd) : cell.height;
         planeZ = (cell.height + cell.hd * p) * HEIGHT_UNIT;
+      } else if (cell && cell.type === "spring") {
+        // plane is governed by the launch — do NOT reset it to the
+        // spring's base height or the Munkable can never leave upward.
+        planeZ = marble.mh * HEIGHT_UNIT;
       } else if (cell) {
         marble.mh = cell.height;
         planeZ = cell.height * HEIGHT_UNIT;
@@ -939,7 +944,8 @@
 
       if (cell && cell.type === "hole") {
         beginFall();
-      } else if (cc === goalTile.x && rr === goalTile.y) {
+      } else if (cc === goalTile.x && rr === goalTile.y &&
+                 marble.mh === goalTile.h) {       // must be on the goal's plane
         winLevel();
       }
     } else if (phase === "falling") {
