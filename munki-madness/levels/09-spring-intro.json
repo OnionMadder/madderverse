@@ -1,0 +1,136 @@
+{
+  "name": "Spring Intro",
+  "grid": {
+    "w": 14,
+    "h": 10
+  },
+  "fill": "floor",
+  "target_time_ms": 22000,
+  "tiles": [
+    {
+      "x": 1,
+      "y": 5,
+      "type": "spawn"
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 9,
+      "y": 4,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 10,
+      "y": 4,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 11,
+      "y": 4,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 12,
+      "y": 4,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 10,
+      "y": 5,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 12,
+      "y": 5,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 7,
+      "y": 6,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 9,
+      "y": 6,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 10,
+      "y": 6,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 11,
+      "y": 6,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 12,
+      "y": 6,
+      "type": "floor",
+      "height": 2
+    },
+    {
+      "x": 11,
+      "y": 5,
+      "type": "goal",
+      "height": 2
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "type": "spring",
+      "height_delta": 2
+    }
+  ]
+}

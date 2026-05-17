@@ -1,0 +1,101 @@
+{
+  "name": "Gravel Pacing",
+  "grid": {
+    "w": 12,
+    "h": 8
+  },
+  "fill": "floor",
+  "target_time_ms": 18000,
+  "tiles": [
+    {
+      "x": 1,
+      "y": 1,
+      "type": "spawn"
+    },
+    {
+      "x": 10,
+      "y": 6,
+      "type": "goal"
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 8,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 9,
+      "y": 3,
+      "type": "gravel"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "type": "gravel"
+    },
+    {
+      "x": 9,
+      "y": 5,
+      "type": "gravel"
+    }
+  ]
+}

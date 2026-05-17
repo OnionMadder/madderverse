@@ -1,0 +1,21 @@
+{
+  "name": "Tutorial",
+  "grid": {
+    "w": 10,
+    "h": 8
+  },
+  "fill": "floor",
+  "target_time_ms": 10000,
+  "tiles": [
+    {
+      "x": 1,
+      "y": 1,
+      "type": "spawn"
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "type": "goal"
+    }
+  ]
+}
