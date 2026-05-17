@@ -48,7 +48,12 @@
 
   var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // cap substeps per frame (no spiral of death)
-  var TILT_FULL = 38;        // degrees of tilt that = full force
+  // ---- Tilt control (see report) — calibrated, retuned for heavy ball ----
+  var TILT_FULL = 15;             // deg of tilt PAST the recentred zero = full
+  var TILT_FORCE_MULTIPLIER = 1.2;// extra tilt gain — feel knob
+  var TILT_DEADZONE = 2.5;        // deg of slack around zero (anti-jitter)
+  var TILT_FLIP_X = 1;            // set -1 if left/right feels inverted
+  var TILT_FLIP_Y = 1;            // set -1 if forward/back feels inverted
   var DRAG_FULL = 90;        // px of drag that = full force
 
   // SPRITE-SWAP: flip to true once the curl frames + ball PNG are dropped
@@ -160,6 +165,8 @@
   var endTries = document.getElementById("endTries");
   var endBest = document.getElementById("endBest");
   var endStars = document.getElementById("endStars");
+  var recenterBtn = document.getElementById("recenterBtn");
+  var dbgBtn = document.getElementById("dbgBtn");
   var fallFlash = document.getElementById("fallFlash");
 
   // ---------------------------------------------------------------------
@@ -444,7 +451,12 @@
   var timerRunning = false;
   var fallZ = 0, fallVZ = 0, fallScale = 1, fallT = 0;
   var dragVec = { x: 0, y: 0 }, dragging = false;
-  var tilt = { gamma: 0, beta: 0, on: false };
+  // raw = latest sensor reading; base = calibrated "held" zero-point;
+  // on = at least one event received; perm = iOS permission state.
+  var tilt = { raw: { gamma: 0, beta: 0 }, base: null, on: false, perm: "n/a" };
+  var debugOn = false;
+  try { debugOn = /[?&]debug=1(?:&|$)/.test(location.search); } catch (e) {}
+  var dbg = { sx: 0, sy: 0, dg: 0, db: 0 };
   var lastTS = 0;
 
   // ---------------------------------------------------------------------
@@ -574,18 +586,41 @@
   // ---------------------------------------------------------------------
   function onOrient(e) {
     if (e.gamma == null && e.beta == null) return;
-    tilt.gamma = e.gamma || 0;
-    tilt.beta = e.beta || 0;
+    tilt.raw.gamma = e.gamma || 0;
+    tilt.raw.beta = e.beta || 0;
+    if (!tilt.base) {                       // auto-zero on the first reading
+      tilt.base = { gamma: tilt.raw.gamma, beta: tilt.raw.beta };
+    }
     tilt.on = true;
   }
+  // Snapshot "however the phone is being held right now" as neutral.
+  function recenter() {
+    tilt.base = { gamma: tilt.raw.gamma, beta: tilt.raw.beta };
+  }
+  function applyDeadzone(v, dz) {           // soft knee: small tilts -> 0
+    if (v > dz) return v - dz;
+    if (v < -dz) return v + dz;
+    return 0;
+  }
+
+  var tiltListening = false;
   function requestTilt() {
-    if (typeof DeviceOrientationEvent === "undefined") return;
-    if (typeof DeviceOrientationEvent.requestPermission === "function") {
-      DeviceOrientationEvent.requestPermission().then(function (st) {
-        if (st === "granted") window.addEventListener("deviceorientation", onOrient);
-      }).catch(function () {});
-    } else {
+    if (typeof DeviceOrientationEvent === "undefined") { tilt.perm = "unsupported"; return; }
+    function listen() {
+      if (tiltListening) return;
+      tiltListening = true;
       window.addEventListener("deviceorientation", onOrient);
+    }
+    if (typeof DeviceOrientationEvent.requestPermission === "function") {
+      tilt.perm = "asking";
+      DeviceOrientationEvent.requestPermission().then(function (st) {
+        tilt.perm = st;
+        if (st === "granted") listen();
+        try { localStorage.setItem("mm.motionAsked", "1"); } catch (e) {}
+      }).catch(function (err) { tilt.perm = "error"; });
+    } else {
+      tilt.perm = "granted";              // Android / desktop: no prompt
+      listen();
     }
   }
 
@@ -674,8 +709,13 @@
       }
     }
     if (useTilt) {
-      sx += clamp(tilt.gamma / TILT_FULL, -1, 1);
-      sy += clamp(tilt.beta  / TILT_FULL, -1, 1);
+      var bg = tilt.base ? tilt.base.gamma : 0;
+      var bb = tilt.base ? tilt.base.beta : 0;
+      var dg = applyDeadzone(tilt.raw.gamma - bg, TILT_DEADZONE);
+      var db = applyDeadzone(tilt.raw.beta  - bb, TILT_DEADZONE);
+      dbg.dg = dg; dbg.db = db;
+      sx += clamp(dg / TILT_FULL * TILT_FORCE_MULTIPLIER, -1, 1) * TILT_FLIP_X;
+      sy += clamp(db / TILT_FULL * TILT_FORCE_MULTIPLIER, -1, 1) * TILT_FLIP_Y;
     }
     if (useDrag) {
       var dx = clamp(dragVec.x / DRAG_FULL, -1, 1);
@@ -683,6 +723,7 @@
       sx += dx; sy += dy;
     }
     sx = clamp(sx, -1, 1); sy = clamp(sy, -1, 1);
+    dbg.sx = sx; dbg.sy = sy;
     if (sx === 0 && sy === 0) return ZERO_ACCEL;
 
     var w = screenVecToWorld(sx, sy);
@@ -1108,11 +1149,33 @@
     ctx.restore();
   }
 
+  function drawDebug() {
+    var L = [
+      "TILT DEBUG  (?debug=1)",
+      "mode=" + controlMode + "  perm=" + tilt.perm + "  on=" + tilt.on,
+      "raw  g=" + tilt.raw.gamma.toFixed(1) + "  b=" + tilt.raw.beta.toFixed(1),
+      "base " + (tilt.base ? ("g=" + tilt.base.gamma.toFixed(1) + " b=" + tilt.base.beta.toFixed(1)) : "(not set)"),
+      "delta dg=" + dbg.dg.toFixed(1) + "  db=" + dbg.db.toFixed(1),
+      "input sx=" + dbg.sx.toFixed(2) + "  sy=" + dbg.sy.toFixed(2),
+      "marble v=(" + marble.vx.toFixed(2) + "," + marble.vy.toFixed(2) + ")  spd=" + marble.speed.toFixed(2),
+      "TILT_FULL=" + TILT_FULL + "  MULT=" + TILT_FORCE_MULTIPLIER + "  DZ=" + TILT_DEADZONE + "  ACCEL=" + ACCEL
+    ];
+    ctx.save();
+    ctx.font = "13px monospace";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "rgba(0,0,0,0.62)";
+    ctx.fillRect(8, 8, 320, L.length * 18 + 12);
+    ctx.fillStyle = "#7df0c8";
+    for (var i = 0; i < L.length; i++) ctx.fillText(L[i], 16, 16 + i * 18);
+    ctx.restore();
+  }
+
   function render() {
     ctx.clearRect(0, 0, CANVAS, CANVAS);
     if (cols === 0) return;
     drawBoard();
     drawMarble();
+    if (debugOn) drawDebug();
   }
 
   // ---------------------------------------------------------------------
@@ -1151,7 +1214,10 @@
   // ---------------------------------------------------------------------
   startBtn.addEventListener("click", function () {
     Sound.resume();
-    if (controlMode === "tilt" || controlMode === "hybrid") requestTilt();
+    // Always request from this user gesture (iOS needs it; harmless
+    // elsewhere) so tilt works immediately and after toggling modes.
+    requestTilt();
+    tilt.base = null;                 // re-zero to however it's held now
     startBtn.disabled = true;
     loadCatalog().then(function () {
       startBtn.disabled = false;
@@ -1170,6 +1236,17 @@
     attempts = 0; elAttempts.textContent = "0";
   });
   restartBtn.addEventListener("click", restartLevel);
+
+  if (recenterBtn) recenterBtn.addEventListener("click", function () {
+    requestTilt();                       // ensure iOS permission (gesture)
+    recenter();
+    recenterBtn.textContent = "✓";
+    setTimeout(function () { recenterBtn.innerHTML = "&#127919;"; }, 800);
+  });
+  if (dbgBtn) dbgBtn.addEventListener("click", function () {
+    debugOn = !debugOn;
+    dbgBtn.setAttribute("aria-pressed", String(debugOn));
+  });
 
   // ---------------------------------------------------------------------
   // Editor bridge (chunk 3). editor.js is only loaded behind the dev gate
