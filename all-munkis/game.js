@@ -3414,12 +3414,68 @@
     }
 
     // ---------- INIT ----------
+    // ---------- HORROR-MODE OVERLAY (v1.1 visual) ----------
+    // Three layered atmosphere effects, ALL pure-CSS keyed off the
+    // existing `body.react-mode-active` (no redundant second class — that
+    // class is already toggled exactly on horror enter/exit and drives
+    // the 12 s corner-Munki creep, so these ramp in lockstep with it):
+    //   .bg-dim        — darkens the scene (z 0, below Munkis/tray)
+    //   .eyes-container — watcher eye-pairs (z 0, below Munkis)
+    //   .red-vignette  — red edge tint + slow pulse (z 8, above Munkis,
+    //                    below tray/moon-fall/UI)
+    // JS only builds the DOM once + seeds eye positions; CSS does all
+    // transitions/animations. Eye pair positions are % of the viewport
+    // (responsive) — tweak freely; mapped to the haunted-theatre plate's
+    // doorway / balcony boxes / side boxes / seat-shadow depths.
+    const EYE_PAIRS = [
+        { x: 50, y: 40 }, // back-centre doorway
+        { x: 16, y: 21 }, // upper-left balcony box
+        { x: 84, y: 21 }, // upper-right balcony box
+        { x: 7,  y: 39 }, // left side box
+        { x: 93, y: 39 }, // right side box
+        { x: 31, y: 57 }, // seat shadows, left
+        { x: 69, y: 58 }, // seat shadows, right
+        { x: 50, y: 66 }  // deep centre seats
+    ];
+    function buildHorrorOverlay() {
+        if (document.getElementById('horror-overlay')) return;
+        const root = document.createElement('div');
+        root.id = 'horror-overlay';
+        root.setAttribute('aria-hidden', 'true');
+        const dim = document.createElement('div'); dim.className = 'bg-dim';
+        const eyes = document.createElement('div'); eyes.className = 'eyes-container';
+        EYE_PAIRS.forEach((p, i) => {
+            const pair = document.createElement('div');
+            pair.className = 'eye-pair';
+            pair.style.left = p.x + '%';
+            pair.style.top  = p.y + '%';
+            // Stagger fade-in across the 12 s creep (not all at once).
+            pair.style.transitionDelay =
+                (i * (10 / EYE_PAIRS.length)).toFixed(2) + 's';
+            for (let e = 0; e < 2; e++) {
+                const eye = document.createElement('span');
+                eye.className = 'eye';
+                // Occasional desynced blink: random long period + offset.
+                eye.style.animationDelay    = (2 + Math.random() * 13).toFixed(2) + 's';
+                eye.style.animationDuration = (8 + Math.random() * 7).toFixed(2) + 's';
+                pair.appendChild(eye);
+            }
+            eyes.appendChild(pair);
+        });
+        const vig = document.createElement('div'); vig.className = 'red-vignette';
+        root.appendChild(dim);
+        root.appendChild(eyes);
+        root.appendChild(vig);
+        document.body.appendChild(root);
+    }
+
     function init() {
         loadProgress();
         // Make sure the 7th slot reflects the persisted seventhWheel (ice
         // by default, moon if the kid swapped) before the first renderTray.
         syncBankWithSeventhWheel();
         buildStage();
+        buildHorrorOverlay();
         renderTray();
         renderAllSlots();
         attachTrayHandlers();

@@ -1596,6 +1596,92 @@ body.moon-tilt main {
     }
 }
 
+/* ====== HORROR-MODE OVERLAY (v1.1) ======
+   Keyed off the EXISTING body.react-mode-active (same class that drives
+   the 12 s corner-Munki creep — these ramp in lockstep). #horror-overlay
+   is a non-positioned group that MUST NOT form a stacking context, so
+   its fixed children resolve z-index against the root. Built by
+   buildHorrorOverlay() in game.js. */
+#horror-overlay { position: static; z-index: auto; }
+
+/* (1) BG dimming — z 0: above the BG/body::before, BELOW the stage
+   Munkis (z 1) and the tray (z 10), so the scene darkens but the
+   Munkis + UI stay bright in front. Ramp IN 12 s, OUT 2 s. */
+#horror-overlay .bg-dim {
+    position: fixed; inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 2s ease;
+}
+body.react-mode-active #horror-overlay .bg-dim {
+    opacity: 0.5;
+    transition: opacity 12s ease;
+}
+
+/* (2) Watching eye-pairs — same z 0, painted ABOVE .bg-dim (DOM order),
+   still below the Munkis. Each pair fades in with a per-pair inline
+   transition-delay staggered across the creep; each eye blinks
+   occasionally (long random period set inline). */
+#horror-overlay .eyes-container {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+#horror-overlay .eye-pair {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    gap: 7px;
+    opacity: 0;
+    transition: opacity 3.5s ease;
+}
+body.react-mode-active #horror-overlay .eye-pair { opacity: 1; }
+#horror-overlay .eye {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%,
+        #fff 0%, #ffd2d2 28%, rgba(200, 30, 40, 0.9) 55%, transparent 75%);
+    filter: drop-shadow(0 0 5px rgba(255, 40, 40, 0.85))
+            drop-shadow(0 0 9px rgba(150, 0, 0, 0.55));
+    animation-name: eye-blink;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+}
+@keyframes eye-blink {
+    0%, 95%, 100% { opacity: 1;    transform: scaleY(1); }
+    97.5%         { opacity: 0.05; transform: scaleY(0.08); }
+}
+
+/* (3) Red vignette — z 8: ABOVE eyes/dim/Munkis, BELOW moon-fall (z 9)
+   + tray (z 10) so it never obscures the tools. Ramp IN 12 s, then a
+   slow "still alive" pulse; ramp OUT 2 s. pointer-events:none. */
+#horror-overlay .red-vignette {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 8;
+    background: radial-gradient(circle at center,
+        transparent 38%, rgba(180, 0, 30, 0.5) 100%);
+    opacity: 0;
+    transition: opacity 2s ease;
+}
+body.react-mode-active #horror-overlay .red-vignette {
+    opacity: 0.7;
+    transition: opacity 12s ease;
+    animation: red-vig-pulse 4s ease-in-out 12s infinite;
+}
+@keyframes red-vig-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 0.8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #horror-overlay .eye { animation: none; }
+    body.react-mode-active #horror-overlay .red-vignette { animation: none; }
+}
+
 /* Subtitle goes glitchy + moon-colored when the chaos message lands. */
 .moon-glitch-text {
     color: #93c5fd !important;
