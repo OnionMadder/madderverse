@@ -1555,6 +1555,47 @@ body.moon-tilt main {
     100% { transform: translateY(115vh) rotate(360deg); opacity: 0.65; }
 }
 
+/* ====== FALLING MOON SPRITES (v1.1 atmospheric horror) ======
+   Distinct from .moon-rain above (the brief Moon-chaos splash at
+   z 9500). This is sustained background precipitation while Moon-
+   horror is fully engaged: ABOVE the stage/Munkis (z 1) but BELOW
+   the tray/UI (tray-wrap z 10). Container is built/torn down in JS
+   (startMoonFall/stopMoonFall); each sprite's left / --amp /
+   animation-duration are set inline per-sprite. */
+.moon-fall {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9;
+    overflow: hidden;
+    transition: opacity 2.5s ease;
+}
+.moon-fall.fading { opacity: 0; }
+.moon-fall span {
+    position: absolute;
+    top: -12vh;
+    will-change: transform, opacity;
+    animation-name: moon-drift;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+@keyframes moon-drift {
+    0%   { transform: translate(0, -12vh);                          opacity: 0; }
+    8%   {                                                          opacity: 0.85; }
+    25%  { transform: translate(var(--amp, 8px), 22vh); }
+    50%  { transform: translate(calc(var(--amp, 8px) * -1), 52vh); }
+    75%  { transform: translate(var(--amp, 8px), 80vh);             opacity: 0.8; }
+    100% { transform: translate(0, 114vh);                          opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .moon-fall span { animation-duration: 6s !important; }
+    @keyframes moon-drift {
+        0%   { transform: translateY(-12vh); opacity: 0; }
+        10%  { opacity: 0.8; }
+        100% { transform: translateY(114vh); opacity: 0; }
+    }
+}
+
 /* Subtitle goes glitchy + moon-colored when the chaos message lands. */
 .moon-glitch-text {
     color: #93c5fd !important;

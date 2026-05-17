@@ -57,6 +57,44 @@ because each tab is its own audio engine on the shared hardware clock.
 - Do not re-add the emergent auto-layering — the player drives it.
 - v1.0 remains recoverable via tag `all-munkis-v1.0`; v1.1 on `main`.
 
+## Atmospheric effects (v1.1)
+
+**Falling moon sprites** (`MOON_FALL` + `syncMoonFall`/`startMoonFall`/
+`stopMoonFall`/`moonFallTick` in `game.js`). While **Moon Munki is on
+the stage** AND horror is **fully engaged** (`body.react-mode-active`
+sustained *past* the 12 s creep-in ramp — `horrorOnSince` +
+`MOON_FALL.RAMP_MS`), small moon sprites continuously rain down the
+whole viewport: parallax by size (smaller = further = slower fall),
+gentle `--amp` sine-ish sway, fade near the floor. `pointer-events:
+none`, `z-index: 9` (above stage/Munkis at z 1, **below** the tray/UI
+at z 10). Single `requestAnimationFrame` spawn loop (200–400 ms,
+**never** `setInterval`); CSS `@keyframes moon-drift` does the fall on
+the compositor; `animationend` auto-removes each sprite; hard cap
+`MAX_CONCURRENT` prunes oldest on slow devices. Stop (Moon removed /
+horror ends) → container gets `.fading`, sprites fade, full DOM
+cleanup after `STOP_FADE_MS`. Re-evaluated from `syncHorrorMode` (every
+horror transition) and `setSlot` (Moon added/removed), plus a one-shot
+ramp timer so it auto-starts the instant the 12 s ramp completes.
+
+- **No emoji.** The brief offered 🌙/🌑 emoji as an option; rejected —
+  the UI is emoji-free post-FNAF. Sprites reuse the **`sky-items`
+  moon art** (`skyItemsSheet`, the same source as the Moon-chaos
+  rain), with a drawn radial-gradient orb fallback if the sheet is
+  absent. Never a glyph.
+- **Drop-in custom sprite:** to use dedicated falling-moon art later,
+  replace `assets/sprites/sky-items.{png,json}` (both `all-munkis/`
+  and `all-munkis-app/www/`, kept byte-identical — see
+  `SKY_ITEMS_README.md`); the moon frames there feed this effect with
+  zero code change. If a *separate* sheet is ever wanted, add a loader
+  mirroring `loadSkyItemsSheet()` and point `spawnFallingMoon()` at it.
+- **All knobs tunable** in the `MOON_FALL` const (spawn cadence, size
+  range, fall-duration range, ramp gate, concurrency cap, fade-out).
+- **Future iteration:** Ice Munki on stage during horror → the *same
+  engine*, swapped to a snowflake sprite + cyan tint (and other future
+  characters could each get their own atmosphere). Generalise
+  `moonOnStage()`/`spawnFallingMoon()` to a per-character config when
+  that lands; don't fork a second copy of the loop.
+
 ## What it is
 
 - 5-slot stage × 22-mod tray. **Tap** a tray chip to teleport its Munki onto

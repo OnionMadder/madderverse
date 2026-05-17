@@ -1310,6 +1310,12 @@
             setReactDrone(on);
             anyWasReacting = on;
         }
+        // Falling-moon atmosphere: stamp when horror engaged so the
+        // effect can wait out the 12 s creep-in ramp before starting,
+        // and re-evaluate start/stop on every horror transition.
+        if (on && !horrorOnSince) horrorOnSince = performance.now();
+        if (!on) horrorOnSince = 0;
+        syncMoonFall();
     }
 
     // headArt composes the head layers (shape circle → sprite → hair → cans).
@@ -1481,6 +1487,9 @@
         checkSolidSquad();
         checkPattern();
         checkBandMilestones();
+        // Moon added to / removed from the stage mid-horror → re-evaluate
+        // the falling-moon atmosphere promptly.
+        syncMoonFall();
     }
 
     function isIceOnStage() {
@@ -1937,6 +1946,125 @@
         }
         document.body.appendChild(layer);
         setTimeout(() => layer.remove(), 4500);
+    }
+
+    // ---------- FALLING MOON SPRITES (v1.1 atmospheric) ----------
+    // While Moon Munki is ON the stage AND horror mode is FULLY engaged
+    // (react-mode-active sustained PAST the 12 s creep-in ramp), small
+    // moon sprites continuously rain down the whole viewport — parallax
+    // by size (smaller=further=slower), gentle sway, fade near the floor.
+    // Reuses the sky-items moon art (NO emoji — UI is emoji-free
+    // post-FNAF); drawn-orb fallback if the sheet is absent. Single rAF
+    // spawn loop (no setInterval drift); CSS does the fall on the
+    // compositor; animationend auto-removes each sprite. Tunable knobs
+    // below; drop-in art path documented in CLAUDE.md. Future: Ice on
+    // stage during horror → same engine, snowflake sprite + cyan tint.
+    const MOON_FALL = {
+        SPAWN_MIN_MS:   200,
+        SPAWN_MAX_MS:   400,
+        MIN_PX:         12,    // smaller = further = slower
+        MAX_PX:         32,    // larger  = nearer  = faster
+        FALL_MIN_S:     4,
+        FALL_MAX_S:     8,
+        RAMP_MS:        12000, // horror creep-in must complete first
+        MAX_CONCURRENT: 30,
+        STOP_FADE_MS:   2500
+    };
+    let moonFallLayer = null, moonFallActive = false, moonFallRAF = null;
+    let moonFallNextAt = 0, horrorOnSince = 0, moonFallRampTimer = null;
+
+    function moonOnStage() { return slots.indexOf('moon') !== -1; }
+    function moonFallShouldRun() {
+        return moonOnStage()
+            && document.body.classList.contains('react-mode-active')
+            && horrorOnSince
+            && (performance.now() - horrorOnSince) >= MOON_FALL.RAMP_MS;
+    }
+
+    function spawnFallingMoon() {
+        if (!moonFallLayer) return;
+        const m = document.createElement('span');
+        const size = MOON_FALL.MIN_PX +
+            Math.random() * (MOON_FALL.MAX_PX - MOON_FALL.MIN_PX);
+        const sheet = skyItemsSheet;
+        let css;
+        if (sheet && sheet.moons.length) {
+            const f = sheet.moons[(Math.random() * sheet.moons.length) | 0];
+            const b = SKY_RAIN_INSET;
+            const iw = f.w - 2 * b, ih = f.h - 2 * b;
+            const sc = size / Math.max(iw, ih);
+            css = `background-image:url('${sheet.src}');background-repeat:no-repeat;` +
+                  `background-size:${sheet.sheetW * sc}px ${sheet.sheetH * sc}px;` +
+                  `background-position:${-(f.x + b) * sc}px ${-(f.y + b) * sc}px;` +
+                  `width:${iw * sc}px;height:${ih * sc}px;`;
+        } else {
+            css = `width:${size}px;height:${size}px;border-radius:50%;` +
+                  `background:radial-gradient(circle at 38% 36%,#dbeafe,#1e293b 72%);` +
+                  `box-shadow:0 0 8px rgba(147,197,253,0.6);`;
+        }
+        const frac = (size - MOON_FALL.MIN_PX) / (MOON_FALL.MAX_PX - MOON_FALL.MIN_PX);
+        const dur  = MOON_FALL.FALL_MAX_S
+                   - frac * (MOON_FALL.FALL_MAX_S - MOON_FALL.FALL_MIN_S);
+        m.style.cssText = css +
+            `left:${(Math.random() * 100).toFixed(2)}vw;` +
+            `--amp:${(6 + Math.random() * 12).toFixed(1)}px;` +
+            `animation-duration:${dur.toFixed(2)}s;`;
+        m.addEventListener('animationend', () => m.remove());
+        moonFallLayer.appendChild(m);
+        while (moonFallLayer.childElementCount > MOON_FALL.MAX_CONCURRENT) {
+            moonFallLayer.removeChild(moonFallLayer.firstChild);
+        }
+    }
+
+    function moonFallTick(ts) {
+        if (!moonFallActive || !moonFallLayer) { moonFallRAF = null; return; }
+        if (ts >= moonFallNextAt) {
+            spawnFallingMoon();
+            moonFallNextAt = ts + MOON_FALL.SPAWN_MIN_MS +
+                Math.random() * (MOON_FALL.SPAWN_MAX_MS - MOON_FALL.SPAWN_MIN_MS);
+        }
+        moonFallRAF = requestAnimationFrame(moonFallTick);
+    }
+
+    function startMoonFall() {
+        if (moonFallActive) return;
+        moonFallActive = true;
+        moonFallLayer = document.createElement('div');
+        moonFallLayer.className = 'moon-fall';
+        moonFallLayer.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(moonFallLayer);
+        moonFallNextAt = 0; // spawn on the first frame
+        moonFallRAF = requestAnimationFrame(moonFallTick);
+    }
+
+    function stopMoonFall() {
+        if (!moonFallActive) return;
+        moonFallActive = false;
+        if (moonFallRAF) { cancelAnimationFrame(moonFallRAF); moonFallRAF = null; }
+        const dying = moonFallLayer;
+        moonFallLayer = null;
+        if (dying) {
+            dying.classList.add('fading'); // CSS fades the airborne sprites
+            setTimeout(() => dying.remove(), MOON_FALL.STOP_FADE_MS);
+        }
+    }
+
+    // Central evaluator — safe from anywhere (horror transitions, slot
+    // changes). Arms a one-shot timer so it auto-starts the instant the
+    // 12 s ramp completes even if no other event fires.
+    function syncMoonFall() {
+        if (moonFallRampTimer) { clearTimeout(moonFallRampTimer); moonFallRampTimer = null; }
+        if (moonFallShouldRun()) {
+            startMoonFall();
+        } else {
+            stopMoonFall();
+            if (moonOnStage()
+                && document.body.classList.contains('react-mode-active')
+                && horrorOnSince) {
+                const remain = MOON_FALL.RAMP_MS - (performance.now() - horrorOnSince);
+                if (remain > 0) moonFallRampTimer = setTimeout(syncMoonFall, remain + 50);
+            }
+        }
     }
 
     const MOON_GLITCH_LINES = [
