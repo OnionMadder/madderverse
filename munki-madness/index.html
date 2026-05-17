@@ -89,5 +89,25 @@
 </footer>
 <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 
+<!-- DEV-ONLY: level editor gate. Not a player feature. Loads editor.js
+     only via ?editor=1 or the Konami code; zero footprint otherwise. -->
+<script>
+(function(){
+  function loadEditor(){
+    if(window.__mmEditorLoaded) return;
+    window.__mmEditorLoaded=true;
+    var s=document.createElement('script');
+    s.src='editor.js'; s.async=true;
+    document.body.appendChild(s);
+  }
+  if(/[?&]editor=1(?:&|$)/.test(location.search)){ loadEditor(); return; }
+  var seq=[38,38,40,40,37,39,37,39,66,65], i=0;
+  window.addEventListener('keydown',function(e){
+    i=(e.keyCode===seq[i])?i+1:(e.keyCode===seq[0]?1:0);
+    if(i===seq.length){ i=0; loadEditor(); }
+  });
+})();
+</script>
+
 </body>
 </html>

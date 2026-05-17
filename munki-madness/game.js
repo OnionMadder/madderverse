@@ -47,57 +47,60 @@
   var USE_SPRITES = false;
 
   // ---------------------------------------------------------------------
-  // Levels — grid strings. Row index = world Y, col index = world X.
-  //   #  wall      .  floor (normal)     S  slow (sticky) floor
-  //   I  ice (slippery)   O  hole (fall)   @  start        G  goal
-  // Match the existing flat-shape convention: hand-designed, JSON-ish.
+  // Levels. The catalog lives in levels/*.json (the level editor — chunk
+  // 3 — writes there; see editor.js). game.js fetches levels/index.json
+  // then each listed file. FALLBACK_LEVELS keeps the game playable if the
+  // fetch fails (rare: file://, or pre-Capacitor-copy offline).
+  // Tile alphabet:  #  wall   .  floor   S  slow/sticky   I  ice
+  //                 O  hole   @  spawn   G  goal
+  // Level schema (JSON):  { "name", "time", "rows": [ "..." ] }
   // ---------------------------------------------------------------------
-  var LEVELS = [
-    {
-      name: "First Roll",
-      time: 45,
-      grid: [
-        "########",
-        "#@.....#",
-        "#.####.#",
-        "#.####.#",
-        "#.####.#",
-        "#.....G#",
-        "########"
-      ]
-    },
-    {
-      name: "Steady Now",
-      time: 40,
-      grid: [
-        "##########",
-        "#@.......#",
-        "#.######.#",
-        "#.#OOOO#.#",
-        "#.#OOOO#.#",
-        "#.######.#",
-        "#.......G#",
-        "##########"
-      ]
-    },
-    {
-      name: "Slick & Sticky",
-      time: 55,
-      grid: [
-        "############",
-        "#@.........#",
-        "#.########.#",
-        "#.#SSSS##..#",
-        "#.#SSSS##.O#",
-        "#.#SSSS##..#",
-        "#.########.#",
-        "#.IIIIIIII.#",
-        "#.IIIIIIII.#",
-        "#.........G#",
-        "############"
-      ]
-    }
+  var LEVELS_MANIFEST = "levels/index.json";
+  var FALLBACK_LEVELS = [
+    { name: "First Roll", time: 45, rows: [
+      "########","#@.....#","#.####.#","#.####.#","#.####.#","#.....G#","########" ] },
+    { name: "Steady Now", time: 40, rows: [
+      "##########","#@.......#","#.######.#","#.#OOOO#.#","#.#OOOO#.#","#.######.#","#.......G#","##########" ] },
+    { name: "Slick & Sticky", time: 55, rows: [
+      "############","#@.........#","#.########.#","#.#SSSS##..#","#.#SSSS##.O#",
+      "#.#SSSS##..#","#.########.#","#.IIIIIIII.#","#.IIIIIIII.#","#.........G#","############" ] }
   ];
+  var LEVELS = [];               // filled by loadCatalog()
+  var catalogReady = false;
+
+  // Internal grid form == array of row strings. Tolerates {rows} or
+  // {grid} so bundled files and editor/localStorage payloads both load.
+  function normalizeLevel(o) {
+    return {
+      name: o.name || "Untitled",
+      time: o.time || 45,
+      grid: (o.rows || o.grid || []).slice()
+    };
+  }
+
+  function loadCatalog() {
+    if (catalogReady) return Promise.resolve(LEVELS);
+    return fetch(LEVELS_MANIFEST, { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (idx) {
+        var files = (idx && idx.levels) || [];
+        return Promise.all(files.map(function (f) {
+          return fetch("levels/" + f, { cache: "no-store" })
+            .then(function (r) { if (!r.ok) throw 0; return r.json(); });
+        }));
+      })
+      .then(function (list) {
+        if (!list.length) throw 0;
+        LEVELS = list.map(normalizeLevel);
+        catalogReady = true;
+        return LEVELS;
+      })
+      .catch(function () {
+        LEVELS = FALLBACK_LEVELS.map(normalizeLevel);
+        catalogReady = true;
+        return LEVELS;
+      });
+  }
 
   // ---------------------------------------------------------------------
   // DOM
@@ -364,6 +367,8 @@
   var tileW = 64, tileH = 32, OX = 0, OY = 0;
 
   var phase = "menu";   // menu | intro | play | falling | won
+  var customLevel = null;   // non-null while play-testing an editor level
+  var mmExit = null;        // editor "exit test-play" callback, if any
   var munkable = new Munkable();
   var attempts = 0;
   var levelTime = 0;    // seconds this attempt
@@ -385,6 +390,7 @@
     try { localStorage.setItem(bestKey(i), String(t)); } catch (e) {}
   }
   function showBest() {
+    if (customLevel) { elBest.textContent = "--"; return; }
     var b = getBest(levelIndex);
     elBest.textContent = b == null ? "--" : b.toFixed(1) + "s";
   }
@@ -450,9 +456,17 @@
     return "floor";
   }
 
-  function loadLevel(i) {
-    levelIndex = ((i % LEVELS.length) + LEVELS.length) % LEVELS.length;
-    var lv = LEVELS[levelIndex];
+  // spec: a catalog index (number) OR a level object (editor test-play)
+  function loadLevel(spec) {
+    var lv;
+    if (spec && typeof spec === "object") {
+      customLevel = normalizeLevel(spec);
+      lv = customLevel;
+    } else {
+      customLevel = null;
+      levelIndex = ((spec % LEVELS.length) + LEVELS.length) % LEVELS.length;
+      lv = LEVELS[levelIndex];
+    }
     grid = lv.grid.slice();
     rows = grid.length;
     cols = grid[0].length;
@@ -486,7 +500,7 @@
 
     fitProjection();
     attempts = 0;
-    elLevel.textContent = String(levelIndex + 1);
+    elLevel.textContent = customLevel ? "TEST" : String(levelIndex + 1);
     elAttempts.textContent = "0";
     showBest();
     resetAttempt(true);
@@ -564,6 +578,7 @@
 
   document.addEventListener("keydown", function (e) {
     var k = e.key.toLowerCase();
+    if (customLevel && (k === "escape" || k === "e")) { exitTest(); return; }
     if (k === "r") restartLevel();
     if (k === "m") muteBtn.click();
   });
@@ -670,11 +685,16 @@
     timerRunning = false;
     munkable.beginUncurl();
     Sound.chime();
-    var b = getBest(levelIndex);
-    var isBest = (b == null || levelTime < b);
-    if (isBest) { setBest(levelIndex, +levelTime.toFixed(2)); }
-    showBest();
-    endTitle.textContent = LEVELS[levelIndex].name + " — Clear!";
+    var isBest = false;
+    if (!customLevel) {
+      var b = getBest(levelIndex);
+      isBest = (b == null || levelTime < b);
+      if (isBest) { setBest(levelIndex, +levelTime.toFixed(2)); }
+      showBest();
+    }
+    var lvName = customLevel ? customLevel.name : LEVELS[levelIndex].name;
+    endTitle.textContent = lvName + (customLevel ? " — Test Clear!" : " — Clear!");
+    if (nextBtn) nextBtn.textContent = customLevel ? "Back to Editor" : "Next Level";
     endTime.textContent = levelTime.toFixed(1);
     endTries.textContent = String(attempts);
     endBest.hidden = !isBest;
@@ -687,6 +707,18 @@
     flashFall(false);
     resetAttempt(false);
     attempts = Math.max(0, attempts);
+  }
+
+  // Editor test-play -> back to editor (win "Back to Editor", or Esc/E).
+  function exitTest() {
+    if (!customLevel) return;
+    var f = mmExit;
+    mmExit = null; customLevel = null;
+    phase = "menu";
+    endScreen.hidden = true;
+    flashFall(false);
+    if (nextBtn) nextBtn.textContent = "Next Level";
+    if (typeof f === "function") f();
   }
 
   // ---------------------------------------------------------------------
@@ -870,11 +902,16 @@
   startBtn.addEventListener("click", function () {
     Sound.resume();
     if (controlMode === "tilt" || controlMode === "hybrid") requestTilt();
-    startScreen.hidden = true;
-    loadLevel(0);
+    startBtn.disabled = true;
+    loadCatalog().then(function () {
+      startBtn.disabled = false;
+      startScreen.hidden = true;
+      loadLevel(0);
+    });
   });
   nextBtn.addEventListener("click", function () {
     endScreen.hidden = true;
+    if (customLevel) { exitTest(); return; }
     loadLevel(levelIndex + 1);
   });
   replayBtn.addEventListener("click", function () {
@@ -883,6 +920,32 @@
     attempts = 0; elAttempts.textContent = "0";
   });
   restartBtn.addEventListener("click", restartLevel);
+
+  // ---------------------------------------------------------------------
+  // Editor bridge (chunk 3). editor.js is only loaded behind the dev gate
+  // (?editor=1 / Konami) — see the bootstrap in index.html. The editor
+  // owns its own DOM/canvas; it just borrows these entry points.
+  // ---------------------------------------------------------------------
+  window.MM = {
+    loadCatalog: loadCatalog,
+    manifestPath: LEVELS_MANIFEST,
+    // editor-facing copy of the bundled catalog as { name, time, rows }
+    getBundledLevels: function () {
+      return LEVELS.map(function (l) {
+        return { name: l.name, time: l.time, rows: l.grid.slice() };
+      });
+    },
+    // drop straight into a playable test of an arbitrary level object;
+    // opts.onExit() fires when the player finishes or hits Esc/"Back".
+    playLevel: function (obj, opts) {
+      opts = opts || {};
+      mmExit = opts.onExit || null;
+      Sound.resume();
+      startScreen.hidden = true;
+      endScreen.hidden = true;
+      loadCatalog().then(function () { loadLevel(obj); });
+    }
+  };
 
   // first paint of the menu (board hidden behind overlay)
   requestAnimationFrame(frame);

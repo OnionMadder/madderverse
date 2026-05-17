@@ -1,0 +1,8 @@
+{
+  "_comment": "Ordered launch catalog. Each entry is a file in this folder. The level editor (chunk 3) appends here on export; game.js fetches this then each level. Schema per level: { name, time, rows[] } using the gameplay tile alphabet # . S I O @ G",
+  "levels": [
+    "01-first-roll.json",
+    "02-steady-now.json",
+    "03-slick-and-sticky.json"
+  ]
+}
