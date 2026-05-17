@@ -2339,25 +2339,41 @@
         c.scale(2, 2);
         c.lineCap = 'round'; c.lineJoin = 'round';
         const body = buildBodyPath();
-        /* Pale interior wash (matches .silhouette-fill rgba). */
+        /* Pale interior wash — always the base (and the fallback if a
+           pattern raster fails). */
         c.save();
         c.fillStyle = 'rgba(232, 232, 244, 0.94)';
         c.fill(body);
         c.restore();
-        /* The kid's strokes (the live canvas is already clipped to
-           the silhouette, so this drawImage doesn't paint outside). */
-        c.drawImage(canvas, 0, 0, STAGE_W, STAGE_H);
-        /* Inner outline ring — stroked along the body path. */
-        c.save();
-        c.strokeStyle = '#1a0f33';
-        c.lineWidth = 5;
-        c.stroke(body);
-        c.restore();
-        /* Deco layers on top, in the SAME z-order as .creature:
-           face-parts (z3) -> hat (z4) -> accessory (z5). Sequenced so
-           draw order is preserved; the hat sprite href is swapped to an
-           inlined data URL so the export canvas never taints. */
-        return Promise.resolve()
+        /* Active fill pattern, over the wash, clipped to the body —
+           reuses the live #patternDefs tiles (userSpaceOnUse, so they
+           tile identically to the screen) and the current pose's
+           silhouette as the window. Async (rasterised like the deco
+           layers) so it must resolve BEFORE strokes/outline go on top. */
+        const patFill = patternFillEl && patternFillEl.getAttribute('fill');
+        const interior = (currentPattern && patFill && patFill !== 'none' && patternDefsEl)
+            ? rasterizeDecoLayer(
+                '<defs>' + patternDefsEl.innerHTML + '</defs>' +
+                '<clipPath id="expPatWin"><path d="' + posePathD(getCurrentPose()) + '"/></clipPath>' +
+                '<rect x="0" y="0" width="' + STAGE_W + '" height="' + STAGE_H +
+                '" clip-path="url(#expPatWin)" fill="' + patFill + '"/>', c)
+            : Promise.resolve();
+        return interior
+            .then(function () {
+                /* The kid's strokes (the live canvas is already clipped
+                   to the silhouette, so this doesn't paint outside). */
+                c.drawImage(canvas, 0, 0, STAGE_W, STAGE_H);
+                /* Inner outline ring — stroked along the body path. */
+                c.save();
+                c.strokeStyle = '#1a0f33';
+                c.lineWidth = 5;
+                c.stroke(body);
+                c.restore();
+            })
+            /* Deco layers on top, in the SAME z-order as .creature:
+               face-parts (z3) -> hat (z4) -> accessory (z5). Sequenced
+               so draw order is preserved; the hat sprite href is swapped
+               to an inlined data URL so the export canvas never taints. */
             .then(function () {
                 return rasterizeDecoLayer(facePartsInnerEl && facePartsInnerEl.innerHTML, c);
             })
