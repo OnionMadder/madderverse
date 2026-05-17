@@ -18,7 +18,7 @@
 
 'use strict';
 
-const SHELL_VERSION = 'groodle-shell-v25';
+const SHELL_VERSION = 'groodle-shell-v26';
 
 /* Files baked into the cache during `install`. List anything the
    game absolutely needs to render the first frame. Hat sprites are

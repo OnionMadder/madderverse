@@ -2234,8 +2234,12 @@
        cross-origin / blob-relative-path issues SVG serialization runs
        into and keeps the export tiny. */
 
-    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+    /* Public-by-design: the publishable key is meant to ship in client
+       code; Row Level Security (see SUPABASE_SETUP.md §3) is the actual
+       guard. NOT a secret — do not put the sb_secret_/service_role key
+       here. Web build only; the native app uses the on-device gallery. */
+    const SUPABASE_URL = 'https://rzciqdsxbklshsgrftgp.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_nz4x4l_VHsbVtntLc3f8cA_8IyJW3hh';
     const GROODLE_BUCKET = 'groodle-art';
     const GROODLE_TABLE = 'groodles';
 
