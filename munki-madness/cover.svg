@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- PLACEHOLDER cover art for the homepage grid. TODO(user): replace
+     munki-madness/cover.svg (or add cover.jpg + repoint the card) with a
+     real gameplay screenshot when available. Brand palette matches
+     munki-madness/style.css. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" width="640" height="420" role="img" aria-label="Munki Madness">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#2c1a4d"/>
+      <stop offset="60%" stop-color="#1b1030"/>
+      <stop offset="100%" stop-color="#110821"/>
+    </radialGradient>
+    <radialGradient id="ball" cx="38%" cy="34%" r="70%">
+      <stop offset="0%" stop-color="#ffe39a"/>
+      <stop offset="55%" stop-color="#e7913f"/>
+      <stop offset="100%" stop-color="#9a5114"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="640" height="420" fill="url(#bg)"/>
+
+  <!-- isometric tile field -->
+  <g stroke="rgba(0,0,0,0.30)" stroke-width="1.5">
+    <!-- floor tiles -->
+    <polygon points="320,150 420,200 320,250 220,200" fill="#3d2a63"/>
+    <polygon points="220,200 320,250 220,300 120,250" fill="#3d2a63"/>
+    <polygon points="420,200 520,250 420,300 320,250" fill="#3d2a63"/>
+    <polygon points="320,250 420,300 320,350 220,300" fill="#3d2a63"/>
+    <!-- ice tile -->
+    <polygon points="420,200 520,250 420,300 320,250" fill="#7fd9ff" opacity="0.85"/>
+    <!-- goal tile (glowing gold) -->
+    <polygon points="320,250 420,300 320,350 220,300" fill="#ffd76b"/>
+    <polygon points="320,278 360,300 320,322 280,300" fill="#fff2c0" opacity="0.8"/>
+    <!-- hole -->
+    <polygon points="220,200 320,250 220,300 120,250" fill="#0a0613"/>
+    <polygon points="220,222 285,250 220,278 155,250" fill="#05030a"/>
+  </g>
+
+  <!-- the Munkable (a curled-up Munki) -->
+  <ellipse cx="322" cy="206" rx="44" ry="20" fill="#000" opacity="0.32"/>
+  <circle cx="320" cy="172" r="40" fill="url(#ball)" stroke="rgba(0,0,0,0.35)" stroke-width="2"/>
+  <ellipse cx="320" cy="172" rx="24" ry="36" fill="none" stroke="rgba(60,25,0,0.5)" stroke-width="3"/>
+
+  <text x="320" y="60" text-anchor="middle" font-family="Trebuchet MS, Segoe UI, sans-serif"
+        font-size="44" font-weight="700" fill="#ffd76b" letter-spacing="2">MUNKI MADNESS</text>
+  <text x="320" y="392" text-anchor="middle" font-family="Trebuchet MS, Segoe UI, sans-serif"
+        font-size="17" fill="#7df0c8">Tilt the heavy Munkable through the maze</text>
+</svg>
