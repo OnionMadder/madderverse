@@ -70,11 +70,13 @@
 
   // Internal grid form == array of row strings. Tolerates {rows} or
   // {grid} so bundled files and editor/localStorage payloads both load.
+  // Accepts the readable catalog form { name, time, rows } AND the
+  // editor's portable UGC schema { title, time, tiles, ... }.
   function normalizeLevel(o) {
     return {
-      name: o.name || "Untitled",
+      name: o.title || o.name || "Untitled",
       time: o.time || 45,
-      grid: (o.rows || o.grid || []).slice()
+      grid: (o.tiles || o.rows || o.grid || []).slice()
     };
   }
 

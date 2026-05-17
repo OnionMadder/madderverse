@@ -35,7 +35,66 @@
     { code: ".", label: "Eraser", fill: "#241638", eraser: true }
   ];
 
-  var STORE_PREFIX = "mm.editor.";
+  // id-keyed prefix (v1.0). Old chunk-3 name-keyed prefix still read on
+  // Load so nothing saved before this refactor is lost.
+  var KEY_PREFIX = "mm.editor.lvl.";
+  var LEGACY_PREFIX = "mm.editor.";
+
+  function uuid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0;
+      return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  // ---- LevelStorage abstraction (UGC-forward; see munki-madness/CLAUDE.md)
+  // The editor UI ONLY talks to this interface. v1.0 binds the local
+  // (localStorage) backend below. v1.5 will bind a remote backend hitting
+  // api.onionmadder.rocks/munki-madness/levels/... — every method already
+  // returns a Promise so swapping the backend needs ZERO editor-UI change.
+  function LocalLevelStorage() {}
+  LocalLevelStorage.prototype.save = function (level) {
+    level.level_id = level.level_id || uuid();
+    try { localStorage.setItem(KEY_PREFIX + level.level_id, JSON.stringify(level)); }
+    catch (e) { return Promise.reject(e); }
+    return Promise.resolve(level.level_id);
+  };
+  LocalLevelStorage.prototype.load = function (id) {
+    var raw = null;
+    try { raw = localStorage.getItem(KEY_PREFIX + id); } catch (e) {}
+    return Promise.resolve(raw ? JSON.parse(raw) : null);
+  };
+  LocalLevelStorage.prototype.list = function () {
+    var out = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf(KEY_PREFIX) === 0) {
+          try {
+            var o = JSON.parse(localStorage.getItem(k));
+            out.push({ id: o.level_id, title: o.title || "Untitled", updated_at: o.updated_at || "" });
+          } catch (e) {}
+        } else if (k && k.indexOf(LEGACY_PREFIX) === 0 && k.indexOf(KEY_PREFIX) !== 0) {
+          out.push({ id: "legacy:" + k.slice(LEGACY_PREFIX.length),
+                     title: k.slice(LEGACY_PREFIX.length) + " (legacy)", updated_at: "" });
+        }
+      }
+    } catch (e) {}
+    return Promise.resolve(out);
+  };
+  LocalLevelStorage.prototype.remove = function (id) {
+    try { localStorage.removeItem(KEY_PREFIX + id); } catch (e) {}
+    return Promise.resolve();
+  };
+  LocalLevelStorage.prototype.loadLegacy = function (name) {
+    var raw = null;
+    try { raw = localStorage.getItem(LEGACY_PREFIX + name); } catch (e) {}
+    return Promise.resolve(raw ? JSON.parse(raw) : null);
+  };
+
+  // v1.0 binding. v1.5:  Storage = new RemoteLevelStorage(API_BASE);
+  var Storage = new LocalLevelStorage();
 
   // ------- editor state -------
   var W = DEF, H = DEF;
@@ -45,6 +104,15 @@
   var tileW = 36, tileH = 18, OX = 0, OY = 0;
   var levelName = "Untitled";
   var levelTimeBudget = 60;
+  var levelId = null;          // uuid; minted on first save, then preserved
+  var levelAuthor = "ME";      // v1.5 populates from the user's creator handle
+  var createdAt = null;        // ISO; set on first save, then preserved
+  var creatorNotes = "";
+  var levelStats = defaultStats();
+
+  function defaultStats() {
+    return { plays: 0, attempts_per_play: [], completions: 0, best_time_ms: null };
+  }
 
   function makeGrid(w, h) {
     // fresh grid: wall border, floor interior, default spawn + goal so a
@@ -114,7 +182,7 @@
   }
 
   // ------- DOM -------
-  var root, cv, cx, statusEl, nameInp, wInp, hInp;
+  var root, cv, cx, statusEl, nameInp, wInp, hInp, fileInp;
 
   function injectStyle() {
     var st = document.createElement("style");
@@ -166,12 +234,20 @@
     bar.appendChild(label("H")); bar.appendChild(hInp);
     bar.appendChild(btn("New", onNew));
     bar.appendChild(btn("Save", onSave));
-    bar.appendChild(btn("Export", onExport));
-    bar.appendChild(btn("Download", onDownload));
     bar.appendChild(btn("Load", onLoad));
+    bar.appendChild(btn("Export File", onExportFile));
+    bar.appendChild(btn("Import File", onImportFile));
+    bar.appendChild(btn("Copy JSON", onCopyJSON));
     bar.appendChild(btn("Validate", function () { report(validate(), true); }));
     bar.appendChild(btn("Test Play", onTest));
     bar.appendChild(btn("Close", onClose, "warn"));
+
+    fileInp = document.createElement("input");
+    fileInp.type = "file";
+    fileInp.accept = ".json,application/json";
+    fileInp.style.display = "none";
+    fileInp.addEventListener("change", handleImport);
+    bar.appendChild(fileInp);
 
     var body = document.createElement("div"); body.className = "body";
     var pal = document.createElement("div"); pal.className = "pal";
@@ -289,16 +365,42 @@
     }
   }
 
-  // ------- level <-> JSON -------
+  // ------- level <-> portable JSON (schema_version 1) -------
+  // Self-contained & portable by design: every UGC field is present in
+  // v1.0 even though only some have UI yet, so v1.5 populates them with
+  // NO schema migration. `tiles` stays an array of row strings (the
+  // readable form the repo catalog also uses). The game engine reads
+  // `tiles`/`title`/`time` via game.js normalizeLevel.
   function toLevel() {
+    var rows = cells.map(function (row) { return row.join(""); });
+    var sp = null, goals = [];
+    for (var r = 0; r < H; r++) for (var c = 0; c < W; c++) {
+      if (cells[r][c] === "@") sp = { x: c, y: r };
+      if (cells[r][c] === "G") goals.push({ x: c, y: r });
+    }
+    var now = new Date().toISOString();
+    if (!createdAt) createdAt = now;
+    if (!levelId) levelId = uuid();
     return {
-      name: levelName || "Untitled",
-      time: levelTimeBudget,
-      rows: cells.map(function (row) { return row.join(""); })
+      schema_version: 1,
+      level_id: levelId,
+      title: levelName || "Untitled",
+      author: levelAuthor,                 // "ME" in v1.0
+      created_at: createdAt,
+      updated_at: now,
+      grid_dimensions: { w: W, h: H },
+      tiles: rows,
+      spawn: sp,
+      goals: goals,
+      metadata: { tags: [], estimated_difficulty: null, creator_notes: creatorNotes || "" },
+      stats: levelStats || defaultStats(),
+      time: levelTimeBudget                // engine time budget (extra top-level)
     };
   }
+  // Accepts portable schema OR the legacy { name, time, rows|grid } form.
   function fromLevel(o) {
-    var rows = o.rows || o.grid || [];
+    o = o || {};
+    var rows = o.tiles || o.rows || o.grid || [];
     H = clampInt(rows.length || DEF, MIN, MAX);
     W = clampInt((rows[0] || "").length || DEF, MIN, MAX);
     cells = [];
@@ -308,8 +410,13 @@
       for (var c = 0; c < W; c++) row.push(src[c] || "#");
       cells.push(row);
     }
-    levelName = o.name || "Untitled";
+    levelName = o.title || o.name || "Untitled";
     levelTimeBudget = o.time || 60;
+    levelId = o.level_id || null;          // null => Save mints a fresh id
+    levelAuthor = o.author || "ME";
+    createdAt = o.created_at || null;
+    creatorNotes = (o.metadata && o.metadata.creator_notes) || "";
+    levelStats = o.stats || defaultStats();
     if (nameInp) nameInp.value = levelName;
     if (wInp) wInp.value = W; if (hInp) hInp.value = H;
     fit(); draw();
@@ -350,10 +457,15 @@
   }
 
   // ------- actions -------
+  function resetMeta() {
+    levelId = null; createdAt = null; creatorNotes = "";
+    levelAuthor = "ME"; levelStats = defaultStats();
+  }
   function onNew() {
     if (!confirm("Discard current level and start fresh?")) return;
     W = DEF; H = DEF; cells = makeGrid(W, H);
     levelName = "Untitled"; levelTimeBudget = 60;
+    resetMeta();
     nameInp.value = levelName; wInp.value = W; hInp.value = H;
     fit(); draw();
     report({ ok:true, msg:"New " + W + "x" + H + " level." });
@@ -361,61 +473,90 @@
   function onSave() {
     var v = validate();
     if (!v.ok && !confirm("Level is not valid:\n\n" + v.msg + "\n\nSave anyway?")) { report(v); return; }
-    try {
-      localStorage.setItem(STORE_PREFIX + levelName, JSON.stringify(toLevel()));
-      report({ ok:true, msg:'Saved to browser as "' + levelName + '". Use Export/Download to put it in the repo.' });
-    } catch (e) {
-      report({ ok:false, msg:"localStorage save failed: " + e });
-    }
+    var lvl = toLevel();
+    Storage.save(lvl).then(function (id) {
+      levelId = id;
+      report({ ok:true, msg:'Saved "' + lvl.title + '" (id ' + String(id).slice(0, 8) + '…). Export File to share or commit it.' });
+    }, function (e) {
+      report({ ok:false, msg:"Save failed: " + e });
+    });
   }
-  function onExport() {
+  function onCopyJSON() {
     var v = validate(); if (!v.ok) report(v);
     var json = JSON.stringify(toLevel(), null, 2);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(json).then(function () {
-        report({ ok:true, msg:"JSON copied to clipboard — paste into munki-madness/levels/" + slug() + ".json and add it to levels/index.json." });
+        report({ ok:true, msg:"Portable level JSON copied to clipboard." });
       }, function () { fallbackCopy(json); });
     } else { fallbackCopy(json); }
   }
   function fallbackCopy(json) {
-    window.prompt("Copy this JSON into munki-madness/levels/" + slug() + ".json", json);
+    window.prompt("Copy this level JSON:", json);
   }
-  function onDownload() {
+  function onExportFile() {
     var v = validate(); if (!v.ok) report(v);
     var json = JSON.stringify(toLevel(), null, 2);
     var blob = new Blob([json], { type: "application/json" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = slug() + ".json";
+    a.download = slug() + ".munki-level.json";
     document.body.appendChild(a); a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
-    report({ ok:true, msg:"Downloaded " + slug() + ".json — move it into munki-madness/levels/ and list it in levels/index.json." });
+    report({ ok:true, msg:"Exported " + slug() + ".munki-level.json — a portable, shareable level file." });
+  }
+  function onImportFile() {
+    if (!fileInp) return;
+    fileInp.value = "";
+    fileInp.click();
+  }
+  function handleImport(ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var o = JSON.parse(rd.result);
+        fromLevel(o);
+        if (!o.level_id) levelId = null;   // imported copy gets a fresh id on Save
+        report({ ok:true, msg:'Imported "' + (o.title || o.name || f.name) + '".' });
+      } catch (e) {
+        report({ ok:false, msg:"Import failed — not a valid level file (" + e + ")" });
+      }
+    };
+    rd.readAsText(f);
   }
   function slug() {
     return (levelName || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
   }
   function onLoad() {
     var bundled = (window.MM && window.MM.getBundledLevels) ? window.MM.getBundledLevels() : [];
-    var saves = [];
-    try {
-      for (var i = 0; i < localStorage.length; i++) {
-        var k = localStorage.key(i);
-        if (k && k.indexOf(STORE_PREFIX) === 0) saves.push(k.slice(STORE_PREFIX.length));
+    Storage.list().then(function (saved) {
+      var menu = [];
+      bundled.forEach(function (l, i) { menu.push("B" + i + " : [bundled] " + l.name); });
+      saved.forEach(function (s, i) { menu.push("S" + i + " : [saved] " + s.title); });
+      if (!menu.length) { report({ ok:false, msg:"Nothing saved yet — design a level or Import File." }); return; }
+      var pick = window.prompt("Load which level? Enter its code:\n\n" + menu.join("\n"));
+      if (!pick) return;
+      pick = pick.trim();
+      if (pick[0] === "B") {
+        var bi = +pick.slice(1);
+        if (bundled[bi]) { fromLevel(bundled[bi]); levelId = null; report({ ok:true, msg:"Loaded bundled: " + bundled[bi].name + " (Save makes a local copy)." }); }
+      } else if (pick[0] === "S") {
+        var s = saved[+pick.slice(1)];
+        if (!s) return;
+        if (String(s.id).indexOf("legacy:") === 0) {
+          Storage.loadLegacy(s.id.slice(7)).then(function (o) {
+            if (o) { fromLevel(o); levelId = null; report({ ok:true, msg:"Loaded legacy save: " + s.title }); }
+            else report({ ok:false, msg:"Legacy entry unreadable." });
+          });
+        } else {
+          Storage.load(s.id).then(function (o) {
+            if (o) { fromLevel(o); report({ ok:true, msg:"Loaded: " + s.title }); }
+            else report({ ok:false, msg:"Could not load that entry." });
+          });
+        }
       }
-    } catch (e) {}
-    var menu = [];
-    bundled.forEach(function (l, i) { menu.push("B" + i + " : [bundled] " + l.name); });
-    saves.forEach(function (n, i) { menu.push("S" + i + " : [saved] " + n); });
-    if (!menu.length) { report({ ok:false, msg:"Nothing to load yet." }); return; }
-    var pick = window.prompt("Load which level? Enter the code:\n\n" + menu.join("\n"));
-    if (!pick) return;
-    pick = pick.trim();
-    if (pick[0] === "B") { var bi = +pick.slice(1); if (bundled[bi]) { fromLevel(bundled[bi]); report({ ok:true, msg:"Loaded bundled: " + bundled[bi].name }); } }
-    else if (pick[0] === "S") {
-      var si = +pick.slice(1);
-      try { var raw = localStorage.getItem(STORE_PREFIX + saves[si]); if (raw) { fromLevel(JSON.parse(raw)); report({ ok:true, msg:"Loaded saved: " + saves[si] }); } }
-      catch (e) { report({ ok:false, msg:"Load failed: " + e }); }
-    }
+    });
   }
   function onTest() {
     var v = validate();
