@@ -1,9 +1,10 @@
 /* Munki Madness — Chunk 1
    Isometric marble maze. The marble is a "Munkable" — a curled-up Munki
-   (cross-pollinates with All Munkis). Matter.js does the physics in a
-   top-down plane (no
-   constant gravity — tilt/touch apply forces); the iso projection is a
-   render-only affine transform. Audio is 100% Web Audio synthesis and is
+   (cross-pollinates with All Munkis). Physics is a custom deterministic
+   swept circle-vs-tile-grid stepper (no engine) — exact collision on the
+   grid, so the Munkable can't tunnel walls or leave the board. The iso
+   projection is a render-only affine transform. Audio is 100% Web Audio
+   synthesis and is
    written against the master-gain -> compressor -> destination pattern so
    the Bala's Song engine can later slot in as the ambient bed without a
    rewrite (see assets/sprites/SPRITES_README.md for the asset hand-off).
@@ -17,28 +18,30 @@
   "use strict";
 
   // ---------------------------------------------------------------------
-  // Matter aliases
+  // Tunables  (all in WORLD units: 1 = one tile, time in seconds)
   // ---------------------------------------------------------------------
-  var Engine = Matter.Engine,
-      World = Matter.World,
-      Bodies = Matter.Bodies,
-      Body = Matter.Body,
-      Events = Matter.Events;
-
-  // ---------------------------------------------------------------------
-  // Tunables
-  // ---------------------------------------------------------------------
+  // Custom deterministic physics — no engine. The world is an axis-aligned
+  // tile grid, so a swept circle-vs-grid stepper is exact: the Munkable
+  // collides against the grid and literally cannot pass it or leave the
+  // board. Feel is fully under our control via the knobs below.
   var CANVAS = 640;          // internal canvas resolution (square)
   var MARGIN = 56;           // px breathing room around the board
   var WALL_H = 0.55;         // wall block height in world (tile) units
-  var MARBLE_R = 0.30;       // marble radius in world units (1 = one tile)
+  var MARBLE_R = 0.30;       // Munkable radius (tiles)
 
-  // Per-surface air friction applied to the marble each step.
-  var SURFACE_DRAG = { floor: 0.085, slow: 0.150, ice: 0.012 };
+  var ACCEL = 16;            // control acceleration (tiles/s^2) — feel knob
+  var MAX_SPEED = 6;         // top speed (tiles/s) — feel knob
+  var WALL_BOUNCE = 0.25;    // wall restitution (0 = dead stop, 1 = bouncy)
+  var WALL_BONK_MIN = 1.6;   // min normal speed (tiles/s) to squeak
 
-  var FORCE = 0.00012;       // peak control force (full input) — feel knob
-  var MAX_SPEED = 3.2;       // speed cap — feel knob; lower = tamer/less clip
-  var FIXED_DT = 1 / 120;    // physics substep (s) — prevents wall tunneling
+  // Per-surface { drag: velocity damping /s, grip: accel multiplier }.
+  var SURFACE = {
+    floor: { drag: 4.5,  grip: 1.00 },
+    slow:  { drag: 11.0, grip: 0.80 },  // gravel: sticky
+    ice:   { drag: 0.5,  grip: 0.60 }   // slippery: glides, weak steering
+  };
+
+  var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // cap substeps per frame (no spiral of death)
   var TILT_FULL = 38;        // degrees of tilt that = full force
   var DRAG_FULL = 90;        // px of drag that = full force
@@ -362,14 +365,10 @@
   // ---------------------------------------------------------------------
   // Game state
   // ---------------------------------------------------------------------
-  var engine = Engine.create();
-  engine.gravity.x = 0;
-  engine.gravity.y = 0;                  // top-down: forces only
-  engine.timing.timeScale = 1;
-
   var levelIndex = 0;
   var grid = [], cols = 0, rows = 0;
-  var marble = null, walls = [];
+  // Munkable state — plain object, world units. vx/vy in tiles/s.
+  var marble = { x: 1.5, y: 1.5, vx: 0, vy: 0, speed: 0 };
   var startTile = { x: 1.5, y: 1.5 }, goalTile = { x: 0, y: 0 };
   var tileW = 64, tileH = 32, OX = 0, OY = 0;
 
@@ -478,43 +477,14 @@
     rows = grid.length;
     cols = grid[0].length;
 
-    World.clear(engine.world, false);
-    walls = [];
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         var ch = grid[r][c];
         if (ch === "@") startTile = { x: c + 0.5, y: r + 0.5 };
         if (ch === "G") goalTile = { x: c, y: r };
-        if (isWall(ch)) {
-          var wb = Bodies.rectangle(c + 0.5, r + 0.5, 1, 1, {
-            isStatic: true, restitution: 0.2, friction: 0,
-            label: "wall"
-          });
-          walls.push(wb);
-          World.add(engine.world, wb);
-        }
       }
     }
-
-    // Thick outer boundary ring — belt-and-suspenders so a Munkable can
-    // never actually leave the board even if it clips a 1-thick tile wall.
-    var T = 4;
-    var bound = [
-      Bodies.rectangle(cols / 2, -T / 2, cols + 2 * T, T, { isStatic: true, label: "wall" }),
-      Bodies.rectangle(cols / 2, rows + T / 2, cols + 2 * T, T, { isStatic: true, label: "wall" }),
-      Bodies.rectangle(-T / 2, rows / 2, T, rows + 2 * T, { isStatic: true, label: "wall" }),
-      Bodies.rectangle(cols + T / 2, rows / 2, T, rows + 2 * T, { isStatic: true, label: "wall" })
-    ];
-    for (var bi = 0; bi < bound.length; bi++) { walls.push(bound[bi]); World.add(engine.world, bound[bi]); }
-
-    marble = Bodies.circle(startTile.x, startTile.y, MARBLE_R, {
-      restitution: 0.34,
-      friction: 0.02,
-      frictionAir: SURFACE_DRAG.floor,
-      density: 0.04,
-      label: "marble"
-    });
-    World.add(engine.world, marble);
+    // Walls are the grid itself (see solidAt) — nothing to build.
 
     fitProjection();
     attempts = 0;
@@ -525,9 +495,8 @@
   }
 
   function resetAttempt(initial) {
-    Body.setPosition(marble, { x: startTile.x, y: startTile.y });
-    Body.setVelocity(marble, { x: 0, y: 0 });
-    Body.setAngularVelocity(marble, 0);
+    marble.x = startTile.x; marble.y = startTile.y;
+    marble.vx = 0; marble.vy = 0; marble.speed = 0;
     fallZ = 0; fallVZ = 0; fallScale = 1;
     levelTime = 0;
     timerRunning = false;
@@ -616,10 +585,12 @@
   window.addEventListener("keyup", function (e) { setKey(e, false); });
 
   // ---------------------------------------------------------------------
-  // Control force -> world (screen-space push, mapped through inverse iso)
+  // Control intent -> world acceleration (screen-space push through the
+  // inverse iso transform). Returns {x,y} accel in tiles/s^2 (0,0 = idle).
   // ---------------------------------------------------------------------
-  function applyControl() {
-    if (phase !== "play") return;
+  var ZERO_ACCEL = { x: 0, y: 0 };
+  function controlAccel() {
+    if (phase !== "play") return ZERO_ACCEL;
     var sx = 0, sy = 0;
     var useKeys = (controlMode === "keyboard" || controlMode === "hybrid");
     var useTilt = (controlMode === "tilt" || controlMode === "hybrid") && tilt.on;
@@ -653,78 +624,101 @@
       sx += dx; sy += dy;
     }
     sx = clamp(sx, -1, 1); sy = clamp(sy, -1, 1);
-    if (sx === 0 && sy === 0) return;
+    if (sx === 0 && sy === 0) return ZERO_ACCEL;
 
     var w = screenVecToWorld(sx, sy);
     var len = Math.hypot(w.x, w.y) || 1;
-    var f = FORCE;
-    Body.applyForce(marble, marble.position, {
-      x: (w.x / len) * f * Math.hypot(sx, sy),
-      y: (w.y / len) * f * Math.hypot(sx, sy)
-    });
+    var mag = Math.min(1, Math.hypot(sx, sy));   // input strength 0..1
+    return { x: (w.x / len) * ACCEL * mag, y: (w.y / len) * ACCEL * mag };
   }
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 
   // ---------------------------------------------------------------------
-  // Wall-bonk squeak
+  // Custom grid physics
   // ---------------------------------------------------------------------
-  Events.on(engine, "collisionStart", function (ev) {
-    if (phase !== "play") return;
-    for (var i = 0; i < ev.pairs.length; i++) {
-      var p = ev.pairs[i];
-      var hitWall = (p.bodyA.label === "wall" || p.bodyB.label === "wall");
-      var hitMarble = (p.bodyA.label === "marble" || p.bodyB.label === "marble");
-      if (hitWall && hitMarble) {
-        var sp = marble.speed;
-        if (sp > WALL_BONK_MIN) Sound.squeak(sp);
-      }
-    }
-  });
-
-  // ---------------------------------------------------------------------
-  // Per-step world logic: surface drag, hole/goal checks
-  // ---------------------------------------------------------------------
-  // One fixed physics substep: surface drag + speed cap (BEFORE integrate,
-  // so a fast Munkable can't tunnel through a 1-unit wall) + control + step.
-  function physicsTick() {
-    var cc = Math.floor(marble.position.x);
-    var rr = Math.floor(marble.position.y);
-    marble.frictionAir = SURFACE_DRAG[surfaceOf(tileAt(cc, rr))];
-    if (marble.speed > MAX_SPEED) {
-      var sc = MAX_SPEED / marble.speed;
-      Body.setVelocity(marble, { x: marble.velocity.x * sc, y: marble.velocity.y * sc });
-    }
-    applyControl();
-    Engine.update(engine, FIXED_DT * 1000);
-    containMarble();
+  // A cell is solid if it's a wall OR off the board. Holes are NOT solid
+  // (the Munkable rolls into them — that's the fall). Floor/ice/gravel/
+  // goal/spawn are passable.
+  function solidAt(c, r) {
+    if (r < 0 || c < 0 || r >= rows || c >= cols) return true;  // off-board
+    return grid[r][c] === "#";
   }
 
-  // Hard positional containment — the Munkable physically cannot leave
-  // the board no matter how fast it is or what it tunnelled through.
-  // Runs every substep, after integration. Interior holes/goal are
-  // unaffected (this only clamps the outer board rectangle).
-  function containMarble() {
-    var lo = MARBLE_R, hiX = cols - MARBLE_R, hiY = rows - MARBLE_R;
-    var p = marble.position, v = marble.velocity;
-    var nx = p.x, ny = p.y, hitX = false, hitY = false;
-    if (nx < lo) { nx = lo; hitX = true; }
-    else if (nx > hiX) { nx = hiX; hitX = true; }
-    if (ny < lo) { ny = lo; hitY = true; }
-    else if (ny > hiY) { ny = hiY; hitY = true; }
-    if (hitX || hitY) {
-      Body.setPosition(marble, { x: nx, y: ny });
-      Body.setVelocity(marble, {
-        x: hitX ? 0 : v.x,
-        y: hitY ? 0 : v.y
-      });
+  // Resolve circle-vs-solid-tile overlaps by minimum translation, and
+  // cancel the inward velocity (slide along walls, small bounce). Called
+  // after every micro-step so a fast Munkable can never pass a wall.
+  function resolveCollisions() {
+    var R = MARBLE_R;
+    for (var it = 0; it < 4; it++) {
+      var any = false;
+      var c0 = Math.floor(marble.x - R) - 1, c1 = Math.floor(marble.x + R) + 1;
+      var r0 = Math.floor(marble.y - R) - 1, r1 = Math.floor(marble.y + R) + 1;
+      for (var rr = r0; rr <= r1; rr++) {
+        for (var cc = c0; cc <= c1; cc++) {
+          if (!solidAt(cc, rr)) continue;
+          var qx = clamp(marble.x, cc, cc + 1);   // closest pt on tile AABB
+          var qy = clamp(marble.y, rr, rr + 1);
+          var dx = marble.x - qx, dy = marble.y - qy;
+          var d2 = dx * dx + dy * dy;
+          if (d2 >= R * R) continue;
+          var nx, ny, pen;
+          if (d2 > 1e-9) {
+            var d = Math.sqrt(d2);
+            nx = dx / d; ny = dy / d; pen = R - d;
+          } else {
+            // center inside the tile — eject along the shallowest face
+            var lP = marble.x - cc, rP = (cc + 1) - marble.x;
+            var tP = marble.y - rr, bP = (rr + 1) - marble.y;
+            var mX = Math.min(lP, rP), mY = Math.min(tP, bP);
+            if (mX < mY) { nx = (lP < rP) ? -1 : 1; ny = 0; pen = R + mX; }
+            else         { nx = 0; ny = (tP < bP) ? -1 : 1; pen = R + mY; }
+          }
+          marble.x += nx * pen;
+          marble.y += ny * pen;
+          var vn = marble.vx * nx + marble.vy * ny;   // velocity into wall
+          if (vn < 0) {
+            if (-vn > WALL_BONK_MIN && phase === "play") Sound.squeak(-vn);
+            marble.vx -= (1 + WALL_BOUNCE) * vn * nx;
+            marble.vy -= (1 + WALL_BOUNCE) * vn * ny;
+          }
+          any = true;
+        }
+      }
+      if (!any) break;
     }
+  }
+
+  // One fixed physics substep: integrate control + per-surface drag, cap
+  // speed, then swept-move in micro-steps (each shorter than the radius
+  // so a wall can't be skipped) resolving grid collisions as we go.
+  function physicsTick() {
+    var s = SURFACE[surfaceOf(tileAt(Math.floor(marble.x), Math.floor(marble.y)))];
+    var a = controlAccel();
+    marble.vx += a.x * s.grip * FIXED_DT;
+    marble.vy += a.y * s.grip * FIXED_DT;
+    var damp = Math.exp(-s.drag * FIXED_DT);    // frame-rate-independent
+    marble.vx *= damp; marble.vy *= damp;
+
+    var sp = Math.hypot(marble.vx, marble.vy);
+    if (sp > MAX_SPEED) { var k = MAX_SPEED / sp; marble.vx *= k; marble.vy *= k; sp = MAX_SPEED; }
+    marble.speed = sp;
+
+    var dx = marble.vx * FIXED_DT, dy = marble.vy * FIXED_DT;
+    var dist = Math.hypot(dx, dy);
+    var n = Math.max(1, Math.ceil(dist / (MARBLE_R * 0.5)));
+    for (var i = 0; i < n; i++) {
+      marble.x += dx / n;
+      marble.y += dy / n;
+      resolveCollisions();
+    }
+    marble.speed = Math.hypot(marble.vx, marble.vy);
   }
 
   function worldStep(dt) {
     if (phase === "play") {
-      var cc = Math.floor(marble.position.x);
-      var rr = Math.floor(marble.position.y);
+      var cc = Math.floor(marble.x);
+      var rr = Math.floor(marble.y);
       var ch = tileAt(cc, rr);
 
       if (!timerRunning && marble.speed > 0.05) {
@@ -755,7 +749,7 @@
     phase = "falling";
     timerRunning = false;
     fallVZ = 1.2; fallZ = 0; fallScale = 1;
-    Body.setVelocity(marble, { x: marble.velocity.x * 0.3, y: marble.velocity.y * 0.3 });
+    marble.vx *= 0.3; marble.vy *= 0.3;
     Sound.scream();
     flashFall(true);
   }
@@ -881,14 +875,14 @@
   function drawMarble() {
     if (!marble) return;
     var z = (phase === "falling") ? fallZ : 0;
-    var p = project(marble.position.x, marble.position.y, z);
+    var p = project(marble.x, marble.y, z);
 
     // shadow on the floor (skip while falling)
     if (phase !== "falling") {
       ctx.save();
       ctx.globalAlpha = 0.30;
       ctx.fillStyle = "#000";
-      var fp = project(marble.position.x, marble.position.y, 0);
+      var fp = project(marble.x, marble.y, 0);
       ctx.beginPath();
       ctx.ellipse(fp.x, fp.y + tileH * 0.10, tileW * MARBLE_R * 0.95,
                   tileH * MARBLE_R * 0.95, 0, 0, Math.PI * 2);
@@ -951,7 +945,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // Main loop — fixed-ish step into Matter, then render
+  // Main loop — fixed-step custom physics substeps, then render
   // ---------------------------------------------------------------------
   function frame(ts) {
     requestAnimationFrame(frame);
