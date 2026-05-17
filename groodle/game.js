@@ -2288,34 +2288,92 @@
        Background is left transparent — the gallery card frames each
        Groodle on its own neutral surface so background presets don't
        compete with one another in the grid. */
+    /* Hat sprite, fetched once and cached as a data URL. Inlined into
+       the serialised hat layer for export so the sheet is same-origin
+       embedded — otherwise the SVG-as-image taints the export canvas
+       and toBlob() throws. */
+    let _hatSheetDataUrl = null;
+    function getHatSheetDataUrl() {
+        if (_hatSheetDataUrl) return Promise.resolve(_hatSheetDataUrl);
+        return fetch(HAT_SHEET_URL).then(function (r) { return r.blob(); })
+            .then(function (b) {
+                return new Promise(function (res, rej) {
+                    const fr = new FileReader();
+                    fr.onload = function () { _hatSheetDataUrl = fr.result; res(_hatSheetDataUrl); };
+                    fr.onerror = function () { rej(fr.error); };
+                    fr.readAsDataURL(b);
+                });
+            });
+    }
+
+    /* Rasterise one .creature deco layer's inner markup (authored in
+       the shared 0..400 / 0..600 space) onto the export context, at the
+       same scale as the body. Wrapped in a self-contained SVG (explicit
+       xmlns + size) so it loads as an Image. Empty layer / load error
+       -> no-op so a save never fails on a missing piece. */
+    function rasterizeDecoLayer(innerHTML, c) {
+        if (!innerHTML || !innerHTML.trim()) return Promise.resolve();
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg"' +
+            ' xmlns:xlink="http://www.w3.org/1999/xlink"' +
+            ' viewBox="0 0 ' + STAGE_W + ' ' + STAGE_H + '"' +
+            ' width="' + STAGE_W + '" height="' + STAGE_H + '">' + innerHTML + '</svg>';
+        const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+        return new Promise(function (resolve) {
+            const img = new Image();
+            img.onload = function () {
+                try { c.drawImage(img, 0, 0, STAGE_W, STAGE_H); } catch (e) {}
+                URL.revokeObjectURL(url);
+                resolve();
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); resolve(); };
+            img.src = url;
+        });
+    }
+
     function composeGroodleBlob() {
         if (!ctx) return Promise.resolve(null);
-        return new Promise((resolve) => {
-            const out = document.createElement('canvas');
-            out.width = STAGE_W * 2;
-            out.height = STAGE_H * 2;
-            const c = out.getContext('2d');
-            c.scale(2, 2);
-            c.lineCap = 'round'; c.lineJoin = 'round';
-            const body = buildBodyPath();
-            /* Pale interior wash (matches .silhouette-fill rgba). */
-            c.save();
-            c.fillStyle = 'rgba(232, 232, 244, 0.94)';
-            c.fill(body);
-            c.restore();
-            /* The kid's strokes (the live canvas is already clipped to
-               the silhouette, so this drawImage doesn't paint outside). */
-            c.drawImage(canvas, 0, 0, STAGE_W, STAGE_H);
-            /* Inner outline ring — stroked along the body path. Slightly
-               wider than the on-screen filter-derived ring; close enough
-               to read as "the body outline" in a thumbnail. */
-            c.save();
-            c.strokeStyle = '#1a0f33';
-            c.lineWidth = 5;
-            c.stroke(body);
-            c.restore();
-            out.toBlob(resolve, 'image/png');
-        });
+        const out = document.createElement('canvas');
+        out.width = STAGE_W * 2;
+        out.height = STAGE_H * 2;
+        const c = out.getContext('2d');
+        c.scale(2, 2);
+        c.lineCap = 'round'; c.lineJoin = 'round';
+        const body = buildBodyPath();
+        /* Pale interior wash (matches .silhouette-fill rgba). */
+        c.save();
+        c.fillStyle = 'rgba(232, 232, 244, 0.94)';
+        c.fill(body);
+        c.restore();
+        /* The kid's strokes (the live canvas is already clipped to
+           the silhouette, so this drawImage doesn't paint outside). */
+        c.drawImage(canvas, 0, 0, STAGE_W, STAGE_H);
+        /* Inner outline ring — stroked along the body path. */
+        c.save();
+        c.strokeStyle = '#1a0f33';
+        c.lineWidth = 5;
+        c.stroke(body);
+        c.restore();
+        /* Deco layers on top, in the SAME z-order as .creature:
+           face-parts (z3) -> hat (z4) -> accessory (z5). Sequenced so
+           draw order is preserved; the hat sprite href is swapped to an
+           inlined data URL so the export canvas never taints. */
+        return Promise.resolve()
+            .then(function () {
+                return rasterizeDecoLayer(facePartsInnerEl && facePartsInnerEl.innerHTML, c);
+            })
+            .then(function () {
+                const hm = hatLayerInnerEl && hatLayerInnerEl.innerHTML;
+                if (!hm || !hm.trim()) return;
+                return getHatSheetDataUrl()
+                    .then(function (durl) { return rasterizeDecoLayer(hm.split(HAT_SHEET_URL).join(durl), c); })
+                    .catch(function () {});   // hat sprite unavailable -> save the rest
+            })
+            .then(function () {
+                return rasterizeDecoLayer(accessoryLayerInnerEl && accessoryLayerInnerEl.innerHTML, c);
+            })
+            .then(function () {
+                return new Promise(function (resolve) { out.toBlob(resolve, 'image/png'); });
+            });
     }
 
     let saveModalEl = null;
@@ -3034,8 +3092,12 @@
         const tx = (a.x + (sel.dx || 0)).toFixed(1);
         const ty = (a.y + (sel.dy || 0)).toFixed(1);
         const h = FACE_HIT[cat];
+        /* fill="transparent" inline (NOT via the CSS rule): still a
+           hit-testable paint for drag, but renders invisibly when the
+           layer is serialised standalone for the gallery export — a
+           CSS-only transparent would rasterise as a black box. */
         return '<g class="face-part" data-cat="' + cat + '" transform="translate(' + tx + ',' + ty + ')">' +
-               '<rect class="fp-hit" x="' + h.x + '" y="' + h.y + '" width="' + h.w + '" height="' + h.h + '"/>' +
+               '<rect class="fp-hit" fill="transparent" x="' + h.x + '" y="' + h.y + '" width="' + h.w + '" height="' + h.h + '"/>' +
                opt.svg + '</g>';
     }
 
