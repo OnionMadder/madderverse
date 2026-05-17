@@ -91,6 +91,30 @@
     let toneDrone = null;     // Oscillator — low rumble that swells during react mode
     let toneDroneGain = null; // Drone's gain envelope (ramps on react in/out)
     let anyWasReacting = false; // edge-detect react mode transitions for the drone
+
+    // ---------- BALA'S SONG LAYERING (v1.1) ----------
+    // Playtest finding: the "two-tab harmony" magic is NOT layered Munki
+    // voices — it's Bala's Song (the Tone.js ambient bed) playing doubled
+    // with a small offset, exactly what two open browser tabs did by
+    // accident. So: when >= MIN_MUNKIS are on the stage, a SECOND parallel
+    // clone of the ambient layer plays the same content OFFSET_S later,
+    // flat-detuned, with a longer/wetter reverb tail and a slower attack
+    // so it blooms UNDER the original instead of competing. The per-Munki
+    // play() voices and the original Tone layer are untouched. All knobs
+    // here are tunable for A/B after first ship.
+    const BALA_LAYER = {
+        ENABLED:        true,
+        MIN_MUNKIS:     3,      // >= this many on stage engages the layer
+        OFFSET_S:       1.0,    // offset clone is scheduled this much later
+        DETUNE_CENTS:  -8,      // flat detune on the offset layer's oscillators
+        REVERB_DECAY:   5,      // offset reverb decay (orig 3.4) — pushes it back
+        REVERB_WET:     0.5,    // offset reverb wet (orig 0.35) — more depth
+        ATTACK_EXTRA_S: 0.05,   // +attack on offset voices — emerges, not competes
+        BUS_GAIN:       0.55    // offset bus gain (mirrors the original busOut)
+    };
+    let toneBus2 = null, tonePad2 = null, toneBell2 = null, toneHat2 = null;
+    let toneLayer2Ready = false;
+    let balaLayerOn = false;    // edge-detect for the visual cue + achievement
     // Horror mode (body.react-mode-active) has TWO independent sources that
     // are OR'd together by syncHorrorMode():
     //   beatReacting    — Ice/Moon adjacency dwell (set by tickReactState)
@@ -137,7 +161,9 @@
         { id: 'touchOutsider', name: 'Touch the Outsider', points: 3 },
         // ----- Flying Creeps feature -----
         { id: 'creepWhisperer', name: 'Creep Whisperer',     points: 2 },
-        { id: 'allCreeps',      name: 'All Creeps Encountered', points: 3 }
+        { id: 'allCreeps',      name: 'All Creeps Encountered', points: 3 },
+        // ----- v1.1: Bala's Song Layering -----
+        { id: 'trioThreshold', name: 'Trio Threshold',       points: 1 }
     ];
     const ACHIEVEMENT_BY_ID = Object.fromEntries(ACHIEVEMENTS.map(a => [a.id, a]));
     // The first 5 ids — kept around so existing detector code that refers
@@ -263,6 +289,53 @@
         toneDrone = { osc1: droneOsc1, osc2: droneOsc2, filter: droneFilter };
 
         toneReady = true;
+
+        // ---- Bala's Song offset layer (v1.1) ----
+        // A second, independent clone of the pad/bell/hat through its own
+        // longer/wetter reverb bus. Built strictly AFTER the original is
+        // live (toneReady already true) and wrapped so any failure here
+        // can never break the original layer — it just disables doubling.
+        try {
+            const reverb2 = new Tone.Reverb({
+                decay: BALA_LAYER.REVERB_DECAY, preDelay: 0.04, wet: BALA_LAYER.REVERB_WET });
+            const delay2  = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.22, wet: 0.22 });
+            const busOut2 = new Tone.Gain(BALA_LAYER.BUS_GAIN);
+            reverb2.connect(delay2);
+            delay2.connect(busOut2);
+            Tone.connect(busOut2, masterGain);
+            toneBus2 = reverb2;
+
+            tonePad2 = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'fatsine', count: 3, spread: 22 },
+                envelope: { attack: 0.45 + BALA_LAYER.ATTACK_EXTRA_S, decay: 0.35,
+                            sustain: 0.65, release: 1.4 },
+                detune: BALA_LAYER.DETUNE_CENTS,
+                volume: -22
+            });
+            tonePad2.connect(toneBus2);
+
+            toneBell2 = new Tone.FMSynth({
+                harmonicity: 2,
+                modulationIndex: 11,
+                detune: BALA_LAYER.DETUNE_CENTS,
+                envelope:           { attack: 0.002 + BALA_LAYER.ATTACK_EXTRA_S, decay: 0.5, sustain: 0, release: 0.7 },
+                modulationEnvelope: { attack: 0.002 + BALA_LAYER.ATTACK_EXTRA_S, decay: 0.4, sustain: 0, release: 0.7 },
+                volume: -16
+            });
+            toneBell2.connect(toneBus2);
+
+            toneHat2 = new Tone.MetalSynth({
+                envelope: { attack: 0.001, decay: 0.05, release: 0.02 },
+                harmonicity: 5.1, modulationIndex: 32, resonance: 4200, octaves: 1.5,
+                detune: BALA_LAYER.DETUNE_CENTS,
+                volume: -32
+            });
+            Tone.connect(toneHat2, masterGain);
+
+            toneLayer2Ready = true;
+        } catch (_) {
+            toneLayer2Ready = false; // original layer unaffected
+        }
     }
 
     // Ramp the sub-bass drone up or down depending on whether react mode
@@ -442,6 +515,38 @@
             }
             if (bar === 3 && step === 12) {
                 toneBell.triggerAttackRelease('E6', '4n', when);
+            }
+
+            // ---- Bala's Song offset layer (v1.1) ----
+            // Same content, OFFSET_S later, on the detuned/longer-reverb
+            // clone — only while >= MIN_MUNKIS are on the stage. This is
+            // the reproduced "two-tab harmony". Edge-toggles the subtle
+            // visual cue + the Trio Threshold discovery.
+            let munkis = 0;
+            for (let i = 0; i < NUM_SLOTS; i++) if (slots[i]) munkis++;
+            const on = BALA_LAYER.ENABLED && toneLayer2Ready
+                       && munkis >= BALA_LAYER.MIN_MUNKIS;
+            if (on !== balaLayerOn) {
+                balaLayerOn = on;
+                document.body.classList.toggle('bala-layered', on);
+                if (on && typeof grantAchievement === 'function') {
+                    grantAchievement('trioThreshold');
+                }
+            }
+            if (!on) return;
+            const t = when + BALA_LAYER.OFFSET_S;
+            if (step === 0) {
+                const chord = this.chordsByBar[bar];
+                if (chord) tonePad2.triggerAttackRelease(chord, BAR_LEN * 0.92, t);
+            }
+            if (step === 2 || step === 10) {
+                toneHat2.triggerAttackRelease('C5', '32n', t);
+            }
+            if (bar === 2 && step === 0) {
+                toneBell2.triggerAttackRelease('C6', '2n', t + 0.04);
+            }
+            if (bar === 3 && step === 12) {
+                toneBell2.triggerAttackRelease('E6', '4n', t);
             }
         }
     };

@@ -315,6 +315,29 @@ main {
     position: relative;
 }
 
+/* v1.1 Bala's Song Layering — the ONLY visual tell, deliberately
+   barely-there: a slow, faint cool bloom over the stage while the
+   offset ambient layer is engaged (body.bala-layered, set when >=3
+   Munkis are on stage). Emergent, not announced. No emoji/icon — the
+   UI is emoji-free post-FNAF. */
+.stage-wrap::after {
+    content: '';
+    position: absolute;
+    inset: -8% -4% 0;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 2.6s ease;
+    background:
+        radial-gradient(ellipse at 50% 38%, rgba(150, 200, 255, 0.10), transparent 70%),
+        radial-gradient(ellipse at 50% 100%, rgba(167, 139, 250, 0.08), transparent 65%);
+    mix-blend-mode: screen;
+}
+body.bala-layered .stage-wrap::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+    .stage-wrap::after { transition: none; }
+}
+
 .stage {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
