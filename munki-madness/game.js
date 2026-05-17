@@ -29,23 +29,27 @@
   var WALL_H = 0.55;         // wall block height in world (tile) units
   var MARBLE_R = 0.30;       // Munkable radius (tiles)
 
-  var ACCEL = 16;            // control acceleration (tiles/s^2) — feel knob
-  var MAX_SPEED = 6;         // top speed (tiles/s) — feel knob
-  var WALL_BOUNCE = 0.25;    // wall restitution (0 = dead stop, 1 = bouncy)
+  // ---- Physics knobs — see PHYSICS_SPEC.md (LOCKED v1.0) ----
+  var ACCEL = 8;             // input push (deliberately slow accel)
+  var MAX_SPEED = 6;         // top speed (tiles/s)
+  var WALL_BOUNCE = 0.4;     // wall restitution — pinball bonk
+  var FRICTION_FLOOR = 0.92; // default per-frame@60 velocity multiplier
+  var BUMPER_FORCE = 4;      // instantaneous velocity-add from a bumper
+  var GRAVITY = 0;           // no gravity in v1 (reserved for Endeavor)
   var WALL_BONK_MIN = 1.6;   // min normal speed (tiles/s) to squeak
 
-  // Per-surface { drag: velocity damping /s, grip: accel multiplier }.
+  // Per-surface { drag: per-frame@60 velocity multiplier, grip: accel x }.
+  // Higher drag retains more speed (ice glides, gravel bites).
   var SURFACE = {
-    floor: { drag: 4.5,  grip: 1.00 },
-    slow:  { drag: 11.0, grip: 0.80 },  // gravel: sticky
-    ice:   { drag: 0.5,  grip: 0.60 }   // slippery: glides, weak steering
+    floor:  { drag: FRICTION_FLOOR, grip: 1.0 },
+    gravel: { drag: 0.78,           grip: 1.0 },
+    ice:    { drag: 0.99,           grip: 0.3 }
   };
 
   var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // cap substeps per frame (no spiral of death)
   var TILT_FULL = 38;        // degrees of tilt that = full force
   var DRAG_FULL = 90;        // px of drag that = full force
-  var WALL_BONK_MIN = 1.4;   // min impact speed to trigger a squeak
 
   // SPRITE-SWAP: flip to true once the curl frames + ball PNG are dropped
   // in assets/sprites/ (filenames per SPRITES_README.md). Nothing else
@@ -62,27 +66,49 @@
   // Level schema (JSON):  { "name", "time", "rows": [ "..." ] }
   // ---------------------------------------------------------------------
   var LEVELS_MANIFEST = "levels/index.json";
+  // FALLBACK keeps the game playable if the fetch fails (file:// etc).
+  // Same v1.0 schema as the bundled levels/*.json.
   var FALLBACK_LEVELS = [
-    { name: "First Roll", time: 45, rows: [
-      "########","#@.....#","#.####.#","#.####.#","#.####.#","#.....G#","########" ] },
-    { name: "Steady Now", time: 40, rows: [
-      "##########","#@.......#","#.######.#","#.#OOOO#.#","#.#OOOO#.#","#.######.#","#.......G#","##########" ] },
-    { name: "Slick & Sticky", time: 55, rows: [
-      "############","#@.........#","#.########.#","#.#SSSS##..#","#.#SSSS##.O#",
-      "#.#SSSS##..#","#.########.#","#.IIIIIIII.#","#.IIIIIIII.#","#.........G#","############" ] }
+    { name: "First Roll", grid: { w: 8, h: 7 }, target_time_ms: 18000,
+      tiles: [ { x:1,y:1,type:"spawn" }, { x:6,y:5,type:"goal" },
+               { x:3,y:3,type:"hole" }, { x:5,y:2,type:"bumper",direction:"S" },
+               { x:2,y:4,type:"spinner",rotation:"CW90" } ] }
   ];
   var LEVELS = [];               // filled by loadCatalog()
   var catalogReady = false;
 
-  // Internal grid form == array of row strings. Tolerates {rows} or
-  // {grid} so bundled files and editor/localStorage payloads both load.
-  // Accepts the readable catalog form { name, time, rows } AND the
-  // editor's portable UGC schema { title, time, tiles, ... }.
+  function dirVec(d) {
+    return d === "N" ? { x:0,y:-1 } : d === "S" ? { x:0,y:1 } :
+           d === "W" ? { x:-1,y:0 } : { x:1,y:0 };           // E default
+  }
+
+  // Parse the v1.0 object-tile schema into the internal model:
+  //   { name, target_ms, w, h, cells[r][c]={type,dir,rot}, spawn, goal }
+  // Cells not listed default to floor (see PHYSICS_SPEC.md).
   function normalizeLevel(o) {
+    var w = (o.grid && o.grid.w) || 8, h = (o.grid && o.grid.h) || 8;
+    var cells = [];
+    for (var r = 0; r < h; r++) {
+      var row = [];
+      for (var c = 0; c < w; c++) row.push({ type: "floor" });
+      cells.push(row);
+    }
+    var spawn = { x: 1, y: 1 }, goal = { x: w - 2, y: h - 2 };
+    var list = o.tiles || [];
+    for (var i = 0; i < list.length; i++) {
+      var t = list[i];
+      if (t.x < 0 || t.y < 0 || t.x >= w || t.y >= h) continue;
+      if (t.type === "spawn") { spawn = { x: t.x, y: t.y }; cells[t.y][t.x] = { type: "floor" }; continue; }
+      var cell = { type: t.type };
+      if (t.type === "bumper")  cell.dir = dirVec(t.direction || "E"), cell.dirName = t.direction || "E";
+      if (t.type === "spinner") cell.rot = (t.rotation === "CCW90") ? -1 : 1, cell.rotName = t.rotation || "CW90";
+      if (t.type === "goal") goal = { x: t.x, y: t.y };
+      cells[t.y][t.x] = cell;
+    }
     return {
       name: o.title || o.name || "Untitled",
-      time: o.time || 45,
-      grid: (o.tiles || o.rows || o.grid || []).slice()
+      target_ms: o.target_time_ms || 30000,
+      w: w, h: h, cells: cells, spawn: spawn, goal: goal
     };
   }
 
@@ -133,25 +159,26 @@
   var endTime = document.getElementById("endTime");
   var endTries = document.getElementById("endTries");
   var endBest = document.getElementById("endBest");
+  var endStars = document.getElementById("endStars");
   var fallFlash = document.getElementById("fallFlash");
 
   // ---------------------------------------------------------------------
   // Control mode
   // ---------------------------------------------------------------------
   var isTouchDevice = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
-  var CONTROL_MODES = ["keyboard", "tilt", "touch", "hybrid"];
-  // Desktop defaults to keyboard (arrows/WASD/gamepad); mobile to tilt.
-  var controlMode = isTouchDevice ? "tilt" : "keyboard";
+  // Toggle cycles Tilt-only / Drag-only / Both. Keyboard+gamepad are an
+  // always-on desktop convenience regardless of mode (see PHYSICS_SPEC).
+  var CONTROL_MODES = ["tilt", "drag", "both"];
+  var controlMode = isTouchDevice ? "tilt" : "drag";
 
   function refreshCtrlLabel() {
     var label = controlMode.charAt(0).toUpperCase() + controlMode.slice(1);
     if (ctrlLabel) ctrlLabel.textContent = label;
     if (howText) {
       howText.textContent =
-        controlMode === "keyboard" ? "Arrow keys or WASD to roll — or a game controller." :
-        controlMode === "touch" ? "Drag anywhere on screen to roll." :
-        controlMode === "tilt"  ? "Tilt your device to roll the Munkable." :
-        "Keys, tilt, drag or controller — whatever you've got.";
+        controlMode === "tilt" ? "Tilt your device to roll — (arrows/WASD/pad also work)." :
+        controlMode === "drag" ? "Drag anywhere to roll — (arrows/WASD/pad also work)." :
+        "Tilt or drag to roll — (arrows/WASD/pad also work).";
     }
   }
   refreshCtrlLabel();
@@ -159,7 +186,7 @@
   ctrlBtn.addEventListener("click", function () {
     var i = CONTROL_MODES.indexOf(controlMode);
     controlMode = CONTROL_MODES[(i + 1) % CONTROL_MODES.length];
-    if ((controlMode === "tilt" || controlMode === "hybrid")) requestTilt();
+    if (controlMode === "tilt" || controlMode === "both") requestTilt();
     refreshCtrlLabel();
   });
 
@@ -278,12 +305,45 @@
       }
     }
 
+    // Bumper thunk: short low percussive pop (triangle + fast decay).
+    function thunk() {
+      if (!ready || muted) return;
+      var t = actx.currentTime;
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = "triangle";
+      o.frequency.setValueAtTime(180, t);
+      o.frequency.exponentialRampToValueAtTime(70, t + 0.10);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.34, t + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + 0.18);
+    }
+
+    // Spinner whoosh: rising swirl — bandpassed noise sweeping up.
+    function whoosh() {
+      if (!ready || muted) return;
+      var t = actx.currentTime, dur = 0.32;
+      var src = actx.createBufferSource();
+      src.buffer = brownNoiseBuffer(actx);
+      var bp = actx.createBiquadFilter();
+      bp.type = "bandpass"; bp.Q.value = 6;
+      bp.frequency.setValueAtTime(300, t);
+      bp.frequency.exponentialRampToValueAtTime(2600, t + dur);
+      var g = actx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.30, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(bp); bp.connect(g); g.connect(master);
+      src.start(t); src.stop(t + dur + 0.02);
+    }
+
     function setMuted(m) { muted = m; if (m && rollGain) rollGain.gain.value = 0; }
     function isMuted() { return muted; }
 
     return { resume: resume, roll: roll, squeak: squeak,
-             scream: scream, chime: chime, setMuted: setMuted,
-             isMuted: isMuted };
+             scream: scream, chime: chime, thunk: thunk, whoosh: whoosh,
+             setMuted: setMuted, isMuted: isMuted };
   })();
 
   muteBtn.addEventListener("click", function () {
@@ -366,7 +426,10 @@
   // Game state
   // ---------------------------------------------------------------------
   var levelIndex = 0;
-  var grid = [], cols = 0, rows = 0;
+  var cells = [], cols = 0, rows = 0;     // cells[r][c] = {type,dir,rot,...}
+  var targetMs = 30000;                   // 3-star time target for level
+  var lastCellKey = "";                   // for fire-once bumper/spinner
+  var bumperFlash = {};                   // "c,r" -> flash timer (s)
   // Munkable state — plain object, world units. vx/vy in tiles/s.
   var marble = { x: 1.5, y: 1.5, vx: 0, vy: 0, speed: 0 };
   var startTile = { x: 1.5, y: 1.5 }, goalTile = { x: 0, y: 0 };
@@ -379,7 +442,7 @@
   var attempts = 0;
   var levelTime = 0;    // seconds this attempt
   var timerRunning = false;
-  var fallZ = 0, fallVZ = 0, fallScale = 1;
+  var fallZ = 0, fallVZ = 0, fallScale = 1, fallT = 0;
   var dragVec = { x: 0, y: 0 }, dragging = false;
   var tilt = { gamma: 0, beta: 0, on: false };
   var lastTS = 0;
@@ -450,22 +513,24 @@
   // ---------------------------------------------------------------------
   // Level loading
   // ---------------------------------------------------------------------
-  function tileAt(c, r) {
-    if (r < 0 || r >= rows || c < 0 || c >= cols) return "#";
-    return grid[r][c];
+  var WALL_CELL = { type: "wall" };
+  function cellAt(c, r) {
+    if (r < 0 || c < 0 || r >= rows || c >= cols) return WALL_CELL;  // edge = hard wall
+    return cells[r][c];
   }
-  function isWall(ch) { return ch === "#"; }
-  function isHole(ch) { return ch === "O"; }
-  function surfaceOf(ch) {
-    if (ch === "S") return "slow";
-    if (ch === "I") return "ice";
-    return "floor";
+  function isWall(c, r) { return cellAt(c, r).type === "wall"; }
+  function isHole(c, r) { return cellAt(c, r).type === "hole"; }
+  function surfaceOf(c, r) {
+    var t = cellAt(c, r).type;
+    if (t === "gravel") return "gravel";
+    if (t === "ice") return "ice";
+    return "floor";   // floor/goal/bumper/spinner all roll like floor
   }
 
   // spec: a catalog index (number) OR a level object (editor test-play)
   function loadLevel(spec) {
     var lv;
-    if (spec && typeof spec === "object") {
+    if (spec && typeof spec === "object" && (spec.tiles || spec.grid)) {
       customLevel = normalizeLevel(spec);
       lv = customLevel;
     } else {
@@ -473,18 +538,11 @@
       levelIndex = ((spec % LEVELS.length) + LEVELS.length) % LEVELS.length;
       lv = LEVELS[levelIndex];
     }
-    grid = lv.grid.slice();
-    rows = grid.length;
-    cols = grid[0].length;
-
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        var ch = grid[r][c];
-        if (ch === "@") startTile = { x: c + 0.5, y: r + 0.5 };
-        if (ch === "G") goalTile = { x: c, y: r };
-      }
-    }
-    // Walls are the grid itself (see solidAt) — nothing to build.
+    cols = lv.w; rows = lv.h; cells = lv.cells;
+    targetMs = lv.target_ms;
+    startTile = { x: lv.spawn.x + 0.5, y: lv.spawn.y + 0.5 };
+    goalTile = { x: lv.goal.x, y: lv.goal.y };
+    lastCellKey = ""; bumperFlash = {};
 
     fitProjection();
     attempts = 0;
@@ -497,7 +555,8 @@
   function resetAttempt(initial) {
     marble.x = startTile.x; marble.y = startTile.y;
     marble.vx = 0; marble.vy = 0; marble.speed = 0;
-    fallZ = 0; fallVZ = 0; fallScale = 1;
+    fallZ = 0; fallVZ = 0; fallScale = 1; fallT = 0;
+    lastCellKey = "";
     levelTime = 0;
     timerRunning = false;
     elTimer.textContent = "0.0";
@@ -592,9 +651,9 @@
   function controlAccel() {
     if (phase !== "play") return ZERO_ACCEL;
     var sx = 0, sy = 0;
-    var useKeys = (controlMode === "keyboard" || controlMode === "hybrid");
-    var useTilt = (controlMode === "tilt" || controlMode === "hybrid") && tilt.on;
-    var useDrag = (controlMode === "touch" || controlMode === "hybrid") && dragging;
+    var useKeys = true;   // keyboard/gamepad always-on convenience
+    var useTilt = (controlMode === "tilt" || controlMode === "both") && tilt.on;
+    var useDrag = (controlMode === "drag" || controlMode === "both") && dragging;
 
     if (useKeys) {
       if (keys.ArrowUp    || keys.KeyW) sy -= 1;   // screen-up
@@ -642,7 +701,7 @@
   // goal/spawn are passable.
   function solidAt(c, r) {
     if (r < 0 || c < 0 || r >= rows || c >= cols) return true;  // off-board
-    return grid[r][c] === "#";
+    return cells[r][c].type === "wall";
   }
 
   // Resolve circle-vs-solid-tile overlaps by minimum translation, and
@@ -693,12 +752,13 @@
   // speed, then swept-move in micro-steps (each shorter than the radius
   // so a wall can't be skipped) resolving grid collisions as we go.
   function physicsTick() {
-    var s = SURFACE[surfaceOf(tileAt(Math.floor(marble.x), Math.floor(marble.y)))];
+    var s = SURFACE[surfaceOf(Math.floor(marble.x), Math.floor(marble.y))];
     var a = controlAccel();
     marble.vx += a.x * s.grip * FIXED_DT;
     marble.vy += a.y * s.grip * FIXED_DT;
-    var damp = Math.exp(-s.drag * FIXED_DT);    // frame-rate-independent
-    marble.vx *= damp; marble.vy *= damp;
+    // s.drag is a per-frame@60 multiplier — convert to this substep.
+    var keep = Math.pow(s.drag, FIXED_DT * 60);
+    marble.vx *= keep; marble.vy *= keep;
 
     var sp = Math.hypot(marble.vx, marble.vy);
     if (sp > MAX_SPEED) { var k = MAX_SPEED / sp; marble.vx *= k; marble.vy *= k; sp = MAX_SPEED; }
@@ -719,26 +779,53 @@
     if (phase === "play") {
       var cc = Math.floor(marble.x);
       var rr = Math.floor(marble.y);
-      var ch = tileAt(cc, rr);
+      var cell = cellAt(cc, rr);
 
-      if (!timerRunning && marble.speed > 0.05) {
-        timerRunning = true;
-      }
+      if (!timerRunning && marble.speed > 0.05) timerRunning = true;
       if (timerRunning) {
         levelTime += dt;
         elTimer.textContent = levelTime.toFixed(1);
       }
+      // decay bumper flashes
+      for (var key in bumperFlash) {
+        bumperFlash[key] -= dt;
+        if (bumperFlash[key] <= 0) delete bumperFlash[key];
+      }
 
-      if (isHole(ch) || cc < 0 || rr < 0 || cc >= cols || rr >= rows) {
+      // fire bumper / spinner once per tile entry
+      var ck = cc + "," + rr;
+      if (ck !== lastCellKey) {
+        lastCellKey = ck;
+        if (cell.type === "bumper" && cell.dir) {
+          marble.vx += cell.dir.x * BUMPER_FORCE;
+          marble.vy += cell.dir.y * BUMPER_FORCE;
+          bumperFlash[ck] = 0.18;
+          Sound.thunk();
+        } else if (cell.type === "spinner") {
+          var rot = cell.rot || 1;             // 1 = CW90, -1 = CCW90
+          var nvx = (rot === 1) ? -marble.vy : marble.vy;
+          var nvy = (rot === 1) ?  marble.vx : -marble.vx;
+          marble.vx = nvx; marble.vy = nvy;
+          Sound.whoosh();
+        }
+      }
+
+      if (cell.type === "hole") {
         beginFall();
       } else if (cc === goalTile.x && rr === goalTile.y) {
         winLevel();
       }
     } else if (phase === "falling") {
-      fallVZ += 9 * dt;
-      fallZ -= fallVZ * dt;
-      fallScale = Math.max(0, fallScale - dt * 1.6);
-      if (fallScale <= 0.02) {
+      // 350ms shrink+sink+fade, then a 600ms beat, then respawn.
+      fallT += dt;
+      if (fallT <= 0.35) {
+        var p = fallT / 0.35;
+        fallScale = 1 - p;
+        fallZ = -0.9 * p;
+      } else {
+        fallScale = 0;
+      }
+      if (fallT >= 0.95) {
         flashFall(false);
         resetAttempt(false);
       }
@@ -748,8 +835,8 @@
   function beginFall() {
     phase = "falling";
     timerRunning = false;
-    fallVZ = 1.2; fallZ = 0; fallScale = 1;
-    marble.vx *= 0.3; marble.vy *= 0.3;
+    fallT = 0; fallZ = 0; fallScale = 1;
+    marble.vx = 0; marble.vy = 0; marble.speed = 0;
     Sound.scream();
     flashFall(true);
   }
@@ -764,6 +851,12 @@
     timerRunning = false;
     munkable.beginUncurl();
     Sound.chime();
+    // Stars: 1 = cleared, 2 = zero falls, 3 = zero falls AND under target.
+    var falls = attempts;                       // respawns this level
+    var stars = 1;
+    if (falls === 0) stars = 2;
+    if (falls === 0 && levelTime * 1000 < targetMs) stars = 3;
+
     var isBest = false;
     if (!customLevel) {
       var b = getBest(levelIndex);
@@ -773,11 +866,16 @@
     }
     var lvName = customLevel ? customLevel.name : LEVELS[levelIndex].name;
     endTitle.textContent = lvName + (customLevel ? " — Test Clear!" : " — Clear!");
+    if (endStars) {
+      endStars.textContent = "★★★".slice(0, stars) +
+                             "☆☆☆".slice(0, 3 - stars);
+      endStars.setAttribute("data-stars", String(stars));
+    }
     if (nextBtn) nextBtn.textContent = customLevel ? "Back to Editor" : "Next Level";
     endTime.textContent = levelTime.toFixed(1);
     endTries.textContent = String(attempts);
     endBest.hidden = !isBest;
-    setTimeout(function () { endScreen.hidden = false; }, 520);
+    setTimeout(function () { endScreen.hidden = false; }, 700);
   }
 
   function restartLevel() {
@@ -812,61 +910,129 @@
     ctx.closePath();
   }
 
-  function tileColors(ch) {
-    switch (ch) {
-      case "S": return { top: "#6b4b8a", side: "#4a3360" };  // sticky/slow
-      case "I": return { top: "#7fd9ff", side: "#3f93b8" };  // ice
-      case "G": return { top: "#ffd76b", side: "#b8902f" };  // goal
-      default:  return { top: "#3d2a63", side: "#291a47" };  // floor
+  function tileColor(type) {
+    switch (type) {
+      case "gravel":  return "#7a5733";  // brown
+      case "ice":     return "#7fd9ff";  // pale blue
+      case "goal":    return "#ffd76b";  // gold
+      case "bumper":  return "#c8623c";  // orange
+      case "spinner": return "#3f8f86";  // teal
+      default:        return "#3d2a63";  // floor
     }
   }
 
+  // Arrow pointing along a world direction, drawn in screen space.
+  function drawArrow(cx, cy, cen, dirName) {
+    var v = dirVec(dirName);
+    var t = project(cx + 0.5 + v.x * 0.4, cy + 0.5 + v.y * 0.4, 0);
+    var ang = Math.atan2(t.y - cen.y, t.x - cen.x);
+    var L = tileW * 0.22;
+    ctx.save();
+    ctx.translate(cen.x, cen.y);
+    ctx.rotate(ang);
+    ctx.fillStyle = "#fff1dd";
+    ctx.beginPath();
+    ctx.moveTo(L, 0); ctx.lineTo(-L * 0.5, L * 0.45);
+    ctx.lineTo(-L * 0.2, 0); ctx.lineTo(-L * 0.5, -L * 0.45);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSwirl(cen, rotDir) {
+    var ph = (performance.now() / 500) * rotDir;
+    ctx.save();
+    ctx.translate(cen.x, cen.y);
+    ctx.strokeStyle = "#cdf3ee";
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, tileW * 0.20, ph, ph + Math.PI * 1.4);
+    ctx.stroke();
+    var ex = Math.cos(ph + Math.PI * 1.4) * tileW * 0.20;
+    var ey = Math.sin(ph + Math.PI * 1.4) * tileW * 0.20;
+    ctx.fillStyle = "#cdf3ee";
+    ctx.beginPath();
+    ctx.arc(ex, ey, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   function drawBoard() {
-    var hw = tileW / 2, hh = tileH / 2;
-    // painter's order: far tiles (small x+y) first
+    var hw = tileW / 2, hh = tileH / 2, now = performance.now();
     for (var sum = 0; sum <= cols + rows; sum++) {
       for (var r = 0; r < rows; r++) {
         var c = sum - r;
         if (c < 0 || c >= cols) continue;
-        var ch = grid[r][c];
-        if (isHole(ch)) continue;                 // gap: draw nothing -> void
+        var cell = cells[r][c], type = cell.type;
         var cen = project(c + 0.5, r + 0.5, 0);
-        var col = tileColors(ch);
 
-        if (isWall(ch)) {
+        if (type === "wall") {
           var top = project(c + 0.5, r + 0.5, WALL_H);
-          // left & right faces
           ctx.fillStyle = "#1f1338";
           ctx.beginPath();
-          ctx.moveTo(cen.x - hw, cen.y);
-          ctx.lineTo(cen.x, cen.y + hh);
-          ctx.lineTo(top.x, top.y + hh);
-          ctx.lineTo(top.x - hw, top.y);
+          ctx.moveTo(cen.x - hw, cen.y); ctx.lineTo(cen.x, cen.y + hh);
+          ctx.lineTo(top.x, top.y + hh); ctx.lineTo(top.x - hw, top.y);
           ctx.closePath(); ctx.fill();
           ctx.fillStyle = "#2c1c4d";
           ctx.beginPath();
-          ctx.moveTo(cen.x + hw, cen.y);
-          ctx.lineTo(cen.x, cen.y + hh);
-          ctx.lineTo(top.x, top.y + hh);
-          ctx.lineTo(top.x + hw, top.y);
+          ctx.moveTo(cen.x + hw, cen.y); ctx.lineTo(cen.x, cen.y + hh);
+          ctx.lineTo(top.x, top.y + hh); ctx.lineTo(top.x + hw, top.y);
           ctx.closePath(); ctx.fill();
-          // top
           ctx.fillStyle = "#4a3270";
           diamond(top.x, top.y, hw, hh); ctx.fill();
-          ctx.strokeStyle = "rgba(255,255,255,0.07)";
-          ctx.stroke();
-        } else {
+          ctx.strokeStyle = "rgba(255,255,255,0.07)"; ctx.stroke();
+          continue;
+        }
+
+        if (type === "hole") {
           diamond(cen.x, cen.y, hw, hh);
-          ctx.fillStyle = col.top; ctx.fill();
-          ctx.strokeStyle = "rgba(0,0,0,0.28)";
-          ctx.lineWidth = 1; ctx.stroke();
-          if (ch === "G") {
+          ctx.fillStyle = "#150b25"; ctx.fill();
+          ctx.save();
+          diamond(cen.x, cen.y + hh * 0.16, hw * 0.66, hh * 0.66);
+          ctx.fillStyle = "#05030a"; ctx.fill();
+          ctx.restore();
+          diamond(cen.x, cen.y, hw, hh);
+          ctx.strokeStyle = "rgba(0,0,0,0.65)"; ctx.lineWidth = 2; ctx.stroke();
+          continue;
+        }
+
+        diamond(cen.x, cen.y, hw, hh);
+        ctx.fillStyle = tileColor(type); ctx.fill();
+        ctx.strokeStyle = "rgba(0,0,0,0.28)"; ctx.lineWidth = 1; ctx.stroke();
+
+        if (type === "gravel") {
+          ctx.save(); ctx.fillStyle = "rgba(0,0,0,0.28)";
+          for (var k = 0; k < 7; k++) {
+            var a = ((c * 13 + r * 29 + k * 47) % 100) / 100;
+            var b = ((c * 7 + r * 17 + k * 31) % 100) / 100;
+            ctx.beginPath();
+            ctx.arc(cen.x + (a - 0.5) * hw, cen.y + (b - 0.5) * hh, 1.4, 0, 6.28);
+            ctx.fill();
+          }
+          ctx.restore();
+        } else if (type === "ice") {
+          ctx.save();
+          ctx.globalAlpha = 0.20 + 0.18 * (0.5 + 0.5 * Math.sin(now / 320 + (c + r)));
+          diamond(cen.x, cen.y, hw * 0.6, hh * 0.6);
+          ctx.fillStyle = "#e7faff"; ctx.fill();
+          ctx.restore();
+        } else if (type === "goal") {
+          ctx.save();
+          ctx.globalAlpha = 0.35 + 0.25 * Math.sin(now / 240);
+          diamond(cen.x, cen.y, hw * 0.62, hh * 0.62);
+          ctx.fillStyle = "#fff2c0"; ctx.fill();
+          ctx.restore();
+        } else if (type === "bumper") {
+          var fk = c + "," + r, fl = bumperFlash[fk];
+          if (fl) {
             ctx.save();
-            ctx.globalAlpha = 0.35 + 0.25 * Math.sin(performance.now() / 240);
-            diamond(cen.x, cen.y, hw * 0.62, hh * 0.62);
-            ctx.fillStyle = "#fff2c0"; ctx.fill();
+            ctx.globalAlpha = Math.min(0.6, fl / 0.18 * 0.6);
+            diamond(cen.x, cen.y, hw, hh);
+            ctx.fillStyle = "#ffe0bf"; ctx.fill();
             ctx.restore();
           }
+          drawArrow(c, r, cen, cell.dirName || "E");
+        } else if (type === "spinner") {
+          drawSwirl(cen, cell.rot || 1);
         }
       }
     }
@@ -901,11 +1067,13 @@
     }
     if (phase === "falling") scale *= fallScale;
     var R = rpx * scale;
+    var fade = (phase === "falling") ? Math.max(0, fallScale) : 1;
 
     if (USE_SPRITES && Sprites.ready) {
       var img = (munkable.state === "ROLLED") ? Sprites.ball
                                            : Sprites.curl[munkable.frameIndex()];
       ctx.save();
+      ctx.globalAlpha = fade;
       ctx.translate(p.x, p.y);
       if (munkable.state === "ROLLED") ctx.rotate(munkable.spin * 0.5);
       ctx.drawImage(img, -R, -R, R * 2, R * 2);
@@ -914,6 +1082,8 @@
     }
 
     // placeholder marble: shaded sphere with a roll seam to read spin
+    ctx.save();
+    ctx.globalAlpha = fade;
     var g = ctx.createRadialGradient(
       p.x - R * 0.35, p.y - R * 0.4, R * 0.1,
       p.x, p.y, R);
@@ -934,6 +1104,7 @@
     ctx.beginPath();
     ctx.ellipse(0, 0, R * 0.62, R * 0.92, 0, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
     ctx.restore();
   }
 

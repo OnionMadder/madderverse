@@ -144,6 +144,16 @@ html, body {
 .ctrl-line .hint { opacity: 0.6; }
 .ctrl-line strong { color: #ffd76b; }
 
+.end-stars {
+    font-size: 40px;
+    letter-spacing: 6px;
+    color: #ffd76b;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.35);
+    margin: 2px 0 4px;
+}
+.end-stars[data-stars="1"] { color: #c9a14a; }
+.end-stars[data-stars="3"] { color: #ffe27a; }
+
 .end-stats {
     display: flex;
     gap: 22px;

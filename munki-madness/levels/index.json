@@ -1,35 +1,8 @@
 {
-  "_comment": "Ordered launch catalog. Editor (chunk 3) appends here on export. Per-level schema: { name, time, rows[] } using tile alphabet # . S I O @ G",
+  "_comment": "Ordered launch catalog. v1.0 object-tile schema per munki-madness/PHYSICS_SPEC.md: { name, grid:{w,h}, target_time_ms, tiles:[{x,y,type,...}] }. The 27 old single-char-row drafts were dropped when the spec locked; the editor will rebuild the catalog.",
   "levels": [
     "01-first-roll.json",
     "02-steady-now.json",
-    "03-slick-and-sticky.json",
-    "04-gentle-bend.json",
-    "05-around-the-pit.json",
-    "06-ice-lane.json",
-    "07-gravel-crawl.json",
-    "08-two-pits.json",
-    "09-switchback.json",
-    "10-ice-corner.json",
-    "11-the-moat.json",
-    "12-sticky-maze.json",
-    "13-pit-row.json",
-    "14-slip-bridge.json",
-    "15-crossroads.json",
-    "16-spiral-in.json",
-    "17-ice-pockets.json",
-    "18-gravel-gate.json",
-    "19-the-gauntlet.json",
-    "20-twin-paths.json",
-    "21-pit-slalom.json",
-    "22-glass-floor.json",
-    "23-labyrinth.json",
-    "24-hole-garden.json",
-    "25-ice-spiral.json",
-    "26-the-long-way.json",
-    "27-precision.json",
-    "28-quad.json",
-    "29-marathon.json",
-    "30-finale.json"
+    "03-slick-and-sticky.json"
   ]
 }

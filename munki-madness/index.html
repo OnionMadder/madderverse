@@ -41,7 +41,7 @@
     <span class="badge timer-badge">Time: <strong id="timer">0.0</strong>s</span>
     <span class="badge">Tries: <strong id="attempts">0</strong></span>
     <span class="badge best-badge">Best: <strong id="best">--</strong></span>
-    <button id="ctrlBtn" class="btn btn-icon" type="button" title="Control mode (tilt / touch / hybrid)">&#127918;</button>
+    <button id="ctrlBtn" class="btn btn-icon" type="button" title="Control mode (tilt / drag / both)">&#127918;</button>
     <button id="mute" class="btn btn-icon" type="button" title="Mute (M)" aria-pressed="false">&#9834;</button>
     <button id="restart" class="btn" type="button" title="Restart level (R)">Restart</button>
 </div>
@@ -63,6 +63,7 @@
         <div id="endScreen" class="overlay" hidden>
             <div class="overlay-card">
                 <h2 id="endTitle">Level Complete!</h2>
+                <div id="endStars" class="end-stars" data-stars="0">☆☆☆</div>
                 <div class="end-stats">
                     <span>Time <strong id="endTime">0.0</strong>s</span>
                     <span>Tries <strong id="endTries">0</strong></span>
