@@ -325,6 +325,74 @@ main {
     margin: 0 auto;
 }
 
+/* ====== DUAL BAND MODE (v1.1) ======
+   Stage splits into two rows of 3 — Row A = slots 0-2, Row B = 3-5.
+   The 6 grid items reflow into 2 rows when columns drop to 3. The
+   default single-row mode is untouched (these rules are all gated on
+   body.dual-band-mode or elements that only exist in the mode). */
+body.dual-band-mode .stage {
+    grid-template-columns: repeat(3, 1fr);
+    row-gap: 22px;
+    max-width: 640px;
+}
+body.dual-band-mode .stage::before {
+    content: '';
+    position: absolute;
+    left: 4%; right: 4%; top: 50%;
+    height: 1px;
+    transform: translateY(-0.5px);
+    background: linear-gradient(90deg, transparent, rgba(45,212,191,0.30), transparent);
+    pointer-events: none;
+    z-index: 0;
+}
+.btn-dualband.on {
+    background: rgba(45, 212, 191, 0.22);
+    border-color: #2dd4bf;
+    box-shadow: 0 0 16px rgba(45, 212, 191, 0.5);
+}
+.band-footswitches {
+    display: flex;
+    justify-content: center;
+    gap: 22px;
+    padding: 10px 12px 4px;
+    flex-wrap: wrap;
+}
+.band-footswitches[hidden] { display: none; }
+.band-foot {
+    -webkit-appearance: none; appearance: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 132px;
+    height: 84px;
+    border-radius: 16px;
+    border: 2px solid rgba(148, 163, 184, 0.55);
+    background: linear-gradient(180deg, rgba(30,41,59,0.92), rgba(8,12,20,0.95));
+    color: #94a3b8;
+    font-family: 'Fredoka', sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
+    transition: transform 0.06s, box-shadow 0.12s, border-color 0.12s, color 0.12s, background 0.12s;
+    touch-action: manipulation;
+}
+.band-foot:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,0.45); }
+.band-foot-label { font-size: 13px; }
+.band-foot-state { font-size: 16px; letter-spacing: 0.2em; }
+.band-foot.lit {
+    border-color: #2dd4bf;
+    color: #5eead4;
+    background: linear-gradient(180deg, rgba(13,148,136,0.55), rgba(6,30,28,0.95));
+    box-shadow: 0 6px 0 rgba(0,0,0,0.45), 0 0 22px rgba(45,212,191,0.55),
+                inset 0 0 16px rgba(45,212,191,0.35);
+}
+@media (max-width: 480px) {
+    .band-foot { width: 116px; height: 74px; }
+}
+
 /* Slots are invisible grid placeholders — no border, no background, no
    padding. The Munki standing inside is the entire visible element. Empty
    slots reserve the grid column but render nothing so the dance row stays

@@ -110,6 +110,45 @@
     let madballzUnlocked = false;
     let isMadballzMode = false;
 
+    // ---------- DUAL BAND MODE (v1.1) ----------
+    // A toggled mode: the 6-slot stage splits into two rows of 3 — Row A
+    // (slots 0-2) and Row B (slots 3-5) — each a fully independent band
+    // with its OWN Bala's Song + oscillators + loop clock (wired in
+    // chunk B). bandOn[0]/[0] gate each row's WHOLE band via a big
+    // footswitch; the player times the two switches to compose the
+    // layering. Single-row default + v1.0 audio path are untouched.
+    let isDualBandMode = false;
+    let bandOn = [false, false]; // Row A, Row B — both start OFF on entry
+    function bandFootEl(i) {
+        return document.getElementById(i === 0 ? 'bandFootA' : 'bandFootB');
+    }
+    function setBandOn(i, on) {
+        bandOn[i] = on;
+        const el = bandFootEl(i);
+        if (el) {
+            el.setAttribute('aria-pressed', String(on));
+            el.classList.toggle('lit', on);
+            const st = el.querySelector('.band-foot-state');
+            if (st) st.textContent = on ? 'ON' : 'OFF';
+        }
+        // (Chunk B reads bandOn[i] to gate that row's rowGain.)
+    }
+    function setDualBandMode(on) {
+        isDualBandMode = on;
+        document.body.classList.toggle('dual-band-mode', on);
+        const btn = document.getElementById('dualBandBtn');
+        if (btn) {
+            btn.setAttribute('aria-pressed', String(on));
+            btn.classList.toggle('on', on);
+        }
+        const foot = document.getElementById('bandFootswitches');
+        if (foot) { foot.hidden = !on; foot.setAttribute('aria-hidden', String(!on)); }
+        // Entering or leaving always resets both bands to OFF so the
+        // player starts the layering from silence and times it in.
+        setBandOn(0, false);
+        setBandOn(1, false);
+    }
+
     // ---------- ACHIEVEMENTS ----------
     // Hidden discoveries scattered across the page. Each grants moon points;
     // when total points hits MOON_UNLOCK_THRESHOLD, Moon Munki unlocks. The
@@ -2801,6 +2840,19 @@
                 songBtn.setAttribute('aria-pressed', String(isBaseSongOn));
             });
         }
+
+        // ---- Dual Band Mode (v1.1, chunk A: mode + footswitch UI) ----
+        const dualBandBtn = document.getElementById('dualBandBtn');
+        if (dualBandBtn) {
+            dualBandBtn.addEventListener('click', () => {
+                ensureAudio();
+                setDualBandMode(!isDualBandMode);
+            });
+        }
+        const footA = document.getElementById('bandFootA');
+        const footB = document.getElementById('bandFootB');
+        if (footA) footA.addEventListener('click', () => { ensureAudio(); setBandOn(0, !bandOn[0]); });
+        if (footB) footB.addEventListener('click', () => { ensureAudio(); setBandOn(1, !bandOn[1]); });
 
         // (Manual BOO! button removed — childish. triggerJumpScare still
         // auto-fires on an Ice/Moon stage drop as the FNAF scare.)
