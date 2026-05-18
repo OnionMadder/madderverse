@@ -69,13 +69,15 @@
         // 2 wings-down (the FLOAT wing-flap), 3 spot/wind-up, 4 dive,
         // 5 strike (the SWOOP), with frame 5 held through DIE. Lifecycle
         // is Float -> one swoop-attack -> die (see creepTick).
-        FLAP_MS:            150,   // FLOAT: toggle frame 1<->2 this often
-        // Menace window: it drifts + scares the Munkis this long BEFORE
-        // committing to its single dive (uniform-random per appearance,
-        // so the strike isn't predictable). Tuned long on purpose — the
-        // creep should loom, not pounce on sight.
-        SWOOP_AFTER_MIN_MS: 7000,
-        SWOOP_AFTER_MAX_MS: 13000,
+        // FLOAT wing-flap is BEAT-LOCKED (frame 1<->2 on the quarter
+        // note). FLAP_MS is only the fallback cadence used when no audio
+        // beat is advancing (pre-interaction / muted silence).
+        FLAP_MS:            300,
+        // Swoop gate = MENACE, not a timer. The creep must have menaced
+        // (come CLOSE to) at least this many DISTINCT Munkis, and loomed
+        // at least SWOOP_MIN_FLOAT_MS, before it may dive its "third".
+        SWOOP_MIN_MENACED:  2,
+        SWOOP_MIN_FLOAT_MS: 2500,
         SWOOP_MS:           750,   // dive duration (frames 3 -> 4 -> 5)
         STRIKE_AT:          0.80,  // swoop progress where the hit lands
         STRIKE_FEAR:        55,    // fear dumped on the struck Munki
@@ -3234,10 +3236,13 @@
     // An animated creature. ONE at a time. Each appearance picks a random
     // creep (one per colour). Lifecycle is Float -> one swoop-attack ->
     // die:
-    //   FLOAT  drifts across on its sine path, wing-flapping frames 1<->2;
-    //          nearby Munkis flinch (.creep-scared) + accumulate `fear`.
-    //   SWOOP  once per appearance, after a short windup, if any Munki is
-    //          on stage it dives at the nearest one playing frames 3->4->5.
+    //   FLOAT  drifts across on its sine path, wings flapping frames
+    //          1<->2 IN TIME TO THE BEAT (the menace); nearby Munkis
+    //          flinch (.creep-scared) + accumulate `fear`.
+    //   SWOOP  gated on menace — only once it has menaced (come CLOSE
+    //          to) >= SWOOP_MIN_MENACED (2) distinct Munkis and loomed
+    //          long enough does it smoothly dive its "third" (the
+    //          nearest one) playing frames 3->4->5.
     //          At STRIKE_AT it lands a hit: a fear burst + a brief knock
     //          on that Munki (uniform — no per-Munki art, per the locked
     //          "per-trigger atmosphere only" design). The kid can dodge by
@@ -3555,11 +3560,11 @@
             creepIdx, frames, refMax, curFrame: -1,
             tStart: performance.now(),
             // Phase machine: FLOAT -> (one) SWOOP -> DIE. See creepTick.
-            // swoopAt = the menace window: it drifts/scares this long
-            // BEFORE committing to its single dive (randomised so it
-            // isn't predictable).
+            // menaced = distinct slots it has come CLOSE to this
+            // appearance; the swoop is gated on its size (>= 2).
+            // lastBeat/lastBeatTs drive the beat-locked wing-flap.
             phase: 'FLOAT', flapAt: 0, swooped: false,
-            swoopAt: rand(CREEP.SWOOP_AFTER_MIN_MS, CREEP.SWOOP_AFTER_MAX_MS),
+            menaced: new Set(), lastBeat: -1, lastBeatTs: 0,
             swStart: 0, sx: 0, sy: 0, tx: 0, ty: 0,
             targetIdx: null, struck: false, dieStart: 0
         };
@@ -3642,10 +3647,22 @@
                        * CREEP.WAVE_AMP_PX;
             st.drawY = (st.edge === 'top' ? st.y : st.baseY + wave);
             creepEl.style.transform = `translate(${st.x}px, ${st.drawY}px)`;
-            // Wing-flap: alternate frame 1 <-> 2.
-            if (st.frames && st.frames.length > 1 && ts >= st.flapAt) {
-                setCreepFrame(st.curFrame === 0 ? 1 : 0);
-                st.flapAt = ts + CREEP.FLAP_MS;
+            // Wing-flap IN TIME TO THE BEAT: frame 1 (wings-up) on even
+            // quarter-notes, frame 2 (wings-down) on odd — a slow,
+            // menacing wingbeat locked to Bala's loop (beatCounter ticks
+            // once per quarter note in tickReactState). If audio hasn't
+            // started yet / no beat is advancing, fall back to a gentle
+            // timed flap so it still looks alive in silence.
+            if (st.frames && st.frames.length > 1) {
+                if (beatCounter !== st.lastBeat) {
+                    st.lastBeat = beatCounter;
+                    st.lastBeatTs = ts;
+                    setCreepFrame(beatCounter & 1);
+                } else if (ts - (st.lastBeatTs || st.tStart) > 1200
+                           && ts >= st.flapAt) {
+                    setCreepFrame(st.curFrame === 0 ? 1 : 0);
+                    st.flapAt = ts + CREEP.FLAP_MS;
+                }
             }
 
             // Proximity → flinch + fear, with CLOSE/FAR hysteresis.
@@ -3659,6 +3676,7 @@
                 if (d <= CREEP.CLOSE_PX) {
                     el.classList.add('creep-scared');
                     if (!creepScaredSlots.has(i)) { creepScaredSlots.add(i); renderSlot(i); }
+                    st.menaced.add(i); // distinct Munkis it has menaced
                     creepFear.set(i, Math.min(CREEP.FEAR_MAX,
                         cur + CREEP.FEAR_GAIN_PER_S * dt));
                 } else {
@@ -3673,10 +3691,15 @@
             });
             [...creepFear.keys()].forEach(i => { if (!live.has(i)) creepFear.delete(i); });
 
-            // The ONE swoop: after a short windup, if any Munki is on
-            // stage, dive at the nearest. If none ever is, it just
-            // floats across and exits (no attack, no death).
-            if (!st.swooped && elapsed > st.swoopAt) {
+            // The ONE swoop is GATED ON MENACE: the creep must have
+            // menaced (come CLOSE to) at least SWOOP_MIN_MENACED (2)
+            // distinct Munkis, and loomed at least SWOOP_MIN_FLOAT_MS,
+            // before it may commit to diving the nearest one (its
+            // "third"). A stage that never has 2 Munkis to menace → it
+            // never swoops, just floats across and leaves.
+            if (!st.swooped
+                && st.menaced.size >= CREEP.SWOOP_MIN_MENACED
+                && elapsed > CREEP.SWOOP_MIN_FLOAT_MS) {
                 const slots2 = slotCenters();
                 if (slots2.length) {
                     let best = null, bd = Infinity;

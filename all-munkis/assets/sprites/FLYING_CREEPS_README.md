@@ -95,10 +95,13 @@ The STANDARD sheet is **6 creeps** (one per rainbow colour) ×
 | 5 | strike     | SWOOP strike → held through DIE |
 
 Lifecycle (see the FLYING CREEPS block in `game.js`): **Float → one
-swoop-attack → die**. On each appearance the game picks one creep,
-flaps 1↔2 while drifting, then (once, if a Munki is on stage) dives
-3→4→5, lands a fear-burst + knock, and dissipates on frame 5. With no
-Munki on stage it just floats across and leaves. `CREEP.VARIANT_COUNT`
+swoop-attack → die**. On each appearance the game picks one creep and
+drifts it across, flapping wings 1↔2 **in time to the beat** (the
+menace). The swoop is **gated on menace**: only after it has come
+CLOSE to ≥2 distinct Munkis (and loomed a moment) does it smoothly
+dive its "third" (the nearest), playing 3→4→5, landing a fear-burst +
+knock, and dissipating on frame 5. A stage that never has 2 Munkis to
+menace → it just floats across and leaves (no attack). `CREEP.VARIANT_COUNT`
 (6) is the creep count and the "All Creeps Encountered" target —
 that achievement counts **creeps seen, not frames**.
 
