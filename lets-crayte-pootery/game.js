@@ -1653,6 +1653,9 @@
                    becomes the real handoff. For chunk 1, give the user
                    honest, in-character feedback that this is coming. */
                 if (SCREENS["shape"]) {
+                    /* New pot from the title — start with an empty
+                       wheel; the kid drags a lump on to begin. */
+                    SHAPE.needsLump = true;
                     showScreen("shape");
                 } else {
                     flashStub(btnStart, "WHEEL BOOTING...");
@@ -2034,7 +2037,14 @@
         lastT: 0,
         rafId: null,
         running: false,
-        shapeInited: false
+        shapeInited: false,
+
+        /* When true the wheel is empty and shaping is blocked until
+           the kid drags a clay lump onto it. Set only at genuine
+           "new pot" entry points (title START, fresh-slate); every
+           other path (re-shape, remix) leaves it false so existing
+           clay is immediately shapeable. */
+        needsLump: false
     };
 
     /* ----- 5A. Init (lazy on first onEnter) ----- */
@@ -2052,6 +2062,7 @@
         attachShapePointer();
         wireShapeButtons();
         buildClayPicker();
+        buildLumpTray();
 
         /* DPR can change on display swap. Re-size when the canvas
            is reflowed (cheap — only rebuilds the backing store). */
@@ -2100,6 +2111,167 @@
         document.querySelectorAll(".clay-swatch[data-clay]").forEach(function (b) {
             b.classList.toggle("active", b.dataset.clay === clayTypeId);
         });
+        document.querySelectorAll(".clay-lump[data-clay]").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.clay === clayTypeId);
+        });
+    }
+
+    /* ----- 5A2. Clay-lump tray (drag a lump onto the wheel) ----- */
+
+    const SHAPE_HINT_DROP  = "Grab a lump of clay and plop it on the wheel!";
+    const SHAPE_HINT_SHAPE = "Drag the clay. Pinch in to NARROW. Push out to WIDEN.";
+
+    function setShapeHint(text) {
+        const el = document.getElementById("shapeHint");
+        if (el) el.textContent = text;
+    }
+
+    /* Keep the hint + tray prompt in sync with whether a lump is
+       still needed. Called on shape onEnter and after a drop. */
+    function refreshShapeMode() {
+        setShapeHint(SHAPE.needsLump ? SHAPE_HINT_DROP : SHAPE_HINT_SHAPE);
+        const prompt = document.querySelector(".clay-lump-prompt");
+        if (prompt) {
+            prompt.textContent = SHAPE.needsLump ? "DRAG A LUMP →"
+                                                 : "SWAP CLAY →";
+        }
+    }
+
+    function buildLumpTray() {
+        const tray = document.getElementById("clayLumpTray");
+        if (!tray) return;
+        tray.innerHTML = "";
+
+        const prompt = document.createElement("span");
+        prompt.className = "clay-lump-prompt";
+        tray.appendChild(prompt);
+
+        CLAY_TYPES.forEach(function (mat) {
+            if (!isClayUnlocked(mat)) return;
+            const lump = document.createElement("button");
+            lump.type = "button";
+            lump.className = "clay-lump";
+            lump.dataset.clay = mat.id;
+            lump.title = mat.flavor;
+            lump.setAttribute("aria-label",
+                "Drag " + mat.label + " clay onto the wheel — " + mat.flavor);
+
+            const ball = document.createElement("span");
+            ball.className = "lump-ball";
+            ball.style.setProperty("--lump-color", mat.swatch);
+            lump.appendChild(ball);
+
+            const name = document.createElement("span");
+            name.className = "lump-name";
+            name.textContent = mat.label;
+            lump.appendChild(name);
+
+            if (mat.id === SHAPE.clayTypeId) lump.classList.add("active");
+            attachLumpDrag(lump, mat);
+            tray.appendChild(lump);
+        });
+        refreshShapeMode();
+    }
+
+    /* Pointer-driven drag: a ghost ball follows the finger; drop
+       it over the wheel canvas to load that clay. A plain tap
+       (no real movement) also places it — forgiving for little
+       kids who just poke the lump they want. */
+    function attachLumpDrag(lump, mat) {
+        let ghost = null, startX = 0, startY = 0, moved = false, dragId = null;
+
+        function onMove(e) {
+            if (dragId !== e.pointerId) return;
+            if (!moved &&
+                Math.hypot(e.clientX - startX, e.clientY - startY) > 6) {
+                moved = true;
+                lump.classList.add("is-dragging");
+            }
+            if (ghost) {
+                ghost.style.transform =
+                    "translate(" + (e.clientX) + "px," + (e.clientY) +
+                    "px) translate(-50%,-50%) scale(1.12)";
+            }
+        }
+
+        function overWheel(e) {
+            const c = SHAPE.canvas ||
+                      document.getElementById("shapeCanvas");
+            if (!c) return false;
+            const r = c.getBoundingClientRect();
+            return e.clientX >= r.left && e.clientX <= r.right &&
+                   e.clientY >= r.top  && e.clientY <= r.bottom;
+        }
+
+        function cleanup() {
+            window.removeEventListener("pointermove", onMove, true);
+            window.removeEventListener("pointerup", onUp, true);
+            window.removeEventListener("pointercancel", onUp, true);
+            lump.classList.remove("is-dragging");
+            dragId = null;
+        }
+
+        function onUp(e) {
+            if (dragId !== e.pointerId) return;
+            const dropped = (!moved) || overWheel(e);  /* tap OR drop on wheel */
+            if (ghost) {
+                if (dropped) {
+                    ghost.remove();
+                } else {
+                    /* Snap back toward the lump, then fade. */
+                    const lr = lump.getBoundingClientRect();
+                    ghost.classList.add("is-snapback");
+                    ghost.style.transform =
+                        "translate(" + (lr.left + lr.width / 2) + "px," +
+                        (lr.top + lr.height / 2) + "px) " +
+                        "translate(-50%,-50%) scale(0.6)";
+                    setTimeout(function () { if (ghost) ghost.remove(); }, 240);
+                }
+                ghost = null;
+            }
+            cleanup();
+            if (dropped) placeLump(mat.id);
+        }
+
+        lump.addEventListener("pointerdown", function (e) {
+            e.preventDefault();
+            dragId = e.pointerId;
+            startX = e.clientX;
+            startY = e.clientY;
+            moved = false;
+            ghost = document.createElement("div");
+            ghost.className = "clay-lump-ghost";
+            ghost.style.setProperty("--lump-color", mat.swatch);
+            ghost.style.transform =
+                "translate(" + e.clientX + "px," + e.clientY +
+                "px) translate(-50%,-50%) scale(1.12)";
+            document.body.appendChild(ghost);
+            squelch();        /* wet "grab" */
+            haptic(6);
+            window.addEventListener("pointermove", onMove, true);
+            window.addEventListener("pointerup", onUp, true);
+            window.addEventListener("pointercancel", onUp, true);
+        });
+    }
+
+    /* Lump lands on the wheel: juicy double squelch, load that
+       clay as the starting form, drop the gate so shaping works. */
+    function placeLump(clayId) {
+        setClay(clayId);
+        resetClay();
+        SHAPE.needsLump = false;
+        playSquelchVariant("plop");                 /* the wet slap */
+        setTimeout(function () { squelch(); }, 80);  /* secondary splat */
+        haptic([6, 26, 12]);
+        /* Splat burst at the wheel where the clay lands (emitParticles
+           is sparse + randomly no-ops, so fire a few for a real pop). */
+        for (let i = 0; i < 8; i++) {
+            emitParticles({
+                x: SHAPE.centerX + (Math.random() - 0.5) * 70,
+                y: SHAPE.baseY - 150
+            });
+        }
+        refreshShapeMode();
     }
 
     function sizeShapeCanvas() {
@@ -2144,7 +2316,7 @@
         const c = SHAPE.canvas;
 
         c.addEventListener("pointerdown", function (e) {
-            if (SHAPE.clayLocked) return;
+            if (SHAPE.clayLocked || SHAPE.needsLump) return;
             e.preventDefault();
             try { c.setPointerCapture(e.pointerId); } catch (_) {}
             const p = shapePointerPos(e);
@@ -2432,8 +2604,9 @@
            half, leaving the back rim visible as an arc. */
         if (opts.wheel !== false) drawWheel(ctx);
 
-        /* Pot silhouette + 3-D shading */
-        drawPot(ctx);
+        /* Pot silhouette + 3-D shading. Skipped while the wheel is
+           still empty (waiting for a lump drop) — opts.pot:false. */
+        if (opts.pot !== false) drawPot(ctx);
 
         /* Paint layer (decorate mode) — clipped to the pot silhouette
            so strokes outside the body never show. */
@@ -2488,8 +2661,42 @@
         if (opts.corners !== false) drawCornerTicks(ctx);
     }
 
-    /* Back-compat alias used by SHAPE's frame loop. */
-    function renderShape() { renderPotScene(SHAPE.ctx); }
+    /* Back-compat alias used by SHAPE's frame loop. While a lump
+       hasn't been dropped yet the pot is hidden and a pulsing
+       "drop here" ring is drawn over the spinning wheel. */
+    function renderShape() {
+        const ctx = SHAPE.ctx;
+        renderPotScene(ctx, SHAPE.needsLump ? { pot: false } : undefined);
+        if (SHAPE.needsLump) drawDropTarget(ctx);
+    }
+
+    function drawDropTarget(ctx) {
+        const cx = SHAPE.centerX;
+        const cy = SHAPE.baseY - 150;   /* over the wheel, where clay sits */
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 320);
+        const r = 70 + pulse * 10;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.strokeStyle = "rgba(0, 255, 204, " + (0.35 + pulse * 0.4) + ")";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([10, 9]);
+        ctx.lineDashOffset = -(performance.now() / 60) % 19;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        /* Down-chevron so the gesture reads as "drop it in here". */
+        ctx.strokeStyle = "rgba(0, 255, 204, " + (0.45 + pulse * 0.4) + ")";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        const a = 16, yOff = -6 + pulse * 6;
+        ctx.beginPath();
+        ctx.moveTo(-a, yOff - a * 0.6);
+        ctx.lineTo(0, yOff + a * 0.6);
+        ctx.lineTo(a, yOff - a * 0.6);
+        ctx.stroke();
+        ctx.restore();
+    }
 
     function drawShapeBackdrop(ctx) {
         /* Faint vertical gradient — top a touch lighter than bottom
@@ -2852,6 +3059,9 @@
             }
             startShapeLoop();
             wheelHumStart();   /* wheel is spinning */
+            /* Sync hint + tray prompt with whether a lump is still
+               needed (set by the new-pot entry points). */
+            refreshShapeMode();
             /* Show the "remixing @user" chip if this session has
                a pending remix. Safe to call always -- no-op if
                not remixing. */
@@ -4940,10 +5150,12 @@
         });
 
         if (fresh) fresh.addEventListener("click", function () {
-            /* Fresh slate — reset clay + paint, return to shape. */
+            /* Fresh slate — reset clay + paint, return to shape.
+               New pot ⇒ empty wheel, drag a fresh lump on. */
             resetClay();
             if (typeof clearPaint === "function") clearPaint();
             SHAPE.clayLocked = false;
+            SHAPE.needsLump = true;
             KILN.fired = false;
             showScreen("shape");
         });
@@ -7567,11 +7779,15 @@
            overwrite with the clone. */
         setTimeout(function () {
             SHAPE.clay = cloned;
+            /* Remix loads real clay — never gate it behind a lump
+               drop even if a new-pot start left the flag set. */
+            SHAPE.needsLump = false;
             /* Match the source's clay type so the remix starts
                with the same material vibe. */
             if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
             /* Re-render so the wheel reflects the new shape. */
             if (typeof renderShape === "function") renderShape();
+            refreshShapeMode();
             /* Update the persistent in-progress chip too. */
             refreshRemixInProgressChip();
         }, 50);
@@ -8485,8 +8701,10 @@
         const free   = !p.priceCents;
         const owned  = isPackOwned(p);
         if (free || owned) {
-            /* Jump straight into shape mode with this pack pre-selected. */
+            /* Jump straight into shape mode with this pack pre-selected.
+               Uses the existing clay — don't gate behind a lump drop. */
             D.activePackId = p.id;
+            SHAPE.needsLump = false;
             showScreen("shape");
             return;
         }
@@ -9353,6 +9571,7 @@
            appears (if user is on shape screen). */
         if (a.grant && a.grant.unlocksClay) {
             buildClayPicker();
+            buildLumpTray();
         }
     }
 

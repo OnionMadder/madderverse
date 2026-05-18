@@ -48,29 +48,33 @@
     <link rel="stylesheet" href="style.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
-        /* Native (Capacitor) runtime detection. The shared slim
-           site-footer is web-hub chrome whose ../ links don't
-           exist inside the packaged app and bleed into gameplay.
-           Tag <html> so CSS can hide it on native only; the web
-           build at madderverse.org has no window.Capacitor, so
-           the footer stays for SEO / legal there. */
+        /* Standalone-app detection. The shared slim site-footer is
+           web-hub chrome: its CSS (../assets/css/site-footer.css)
+           and ../ links only exist on the website, so inside the
+           packaged Capacitor app it bled in as unstyled markup
+           over gameplay. The ONLY place it should render is the
+           real production website. Keying off the host (available
+           synchronously, unlike window.Capacitor which can inject
+           late) is timing-proof: anything that isn't the
+           madderverse.org domain — Capacitor's https://localhost,
+           file://, dev servers — is treated as standalone and the
+           footer is both class-hidden AND physically removed so
+           nothing can re-show it. */
         (function () {
-            function isNative() {
-                try {
-                    var C = window.Capacitor;
-                    if (!C) return false;
-                    return typeof C.isNativePlatform === "function"
-                        ? C.isNativePlatform()
-                        : C.isNative === true;
-                } catch (e) { return false; }
+            var h = (location.hostname || "").toLowerCase();
+            var isProdWeb = h === "madderverse.org" ||
+                            h === "www.madderverse.org";
+            if (isProdWeb) return;
+            document.documentElement.classList.add("is-native");
+            function strip() {
+                var f = document.querySelector(".site-footer-slim");
+                if (f) f.remove();
+                document.querySelectorAll(
+                    'link[href*="site-footer.css"]'
+                ).forEach(function (l) { l.remove(); });
             }
-            function mark() {
-                if (isNative()) {
-                    document.documentElement.classList.add("is-native");
-                }
-            }
-            mark();
-            document.addEventListener("DOMContentLoaded", mark);
+            strip();
+            document.addEventListener("DOMContentLoaded", strip);
         })();
     </script>
 </head>
@@ -320,6 +324,14 @@
         </div>
 
     </div>
+
+    <!-- Always-visible clay-lump tray. The kid grabs a wet lump
+         and drags it onto the wheel (drop = squelch + clay loads).
+         Lives outside .shape-side-rail so it's never trapped in
+         the collapsed phone TOOLS drawer. Lumps injected by
+         buildLumpTray(). -->
+    <div class="clay-lump-tray" id="clayLumpTray"
+         aria-label="Clay lumps — drag one onto the wheel"></div>
 
 </main>
 

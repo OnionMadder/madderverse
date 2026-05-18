@@ -4865,3 +4865,128 @@ a:focus-visible {
 html.is-native .site-footer-slim {
     display: none !important;
 }
+
+/* ----- 17. Clay-lump tray (shape screen) -----
+   The kid drags a wet lump onto the wheel instead of tapping a
+   swatch. The old .clay-picker is superseded — it lived inside
+   the collapsed phone drawer where a small child can't reach it. */
+.clay-picker { display: none; }
+
+.clay-lump-tray {
+    position: fixed;
+    left: 0;
+    right: 0;
+    /* Desktop: a strip just above the safe area. */
+    bottom: calc(10px + var(--safe-bottom));
+    z-index: 90;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    flex-wrap: nowrap;
+    gap: 14px;
+    padding: 6px 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    /* Container is pass-through; only the lumps catch input so
+       taps on empty gaps still reach the canvas underneath. */
+    pointer-events: none;
+}
+.clay-lump-tray::-webkit-scrollbar { display: none; }
+
+@media (max-width: 767.98px) {
+    /* Sit above the 54px collapsed TOOLS drawer handle + a gap. */
+    .clay-lump-tray {
+        bottom: calc(62px + var(--safe-bottom));
+    }
+}
+
+.clay-lump-prompt {
+    align-self: center;
+    flex: 0 0 auto;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.4px;
+    color: var(--teal-dim);
+    text-shadow: 0 0 6px rgba(0, 255, 204, 0.4);
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.clay-lump {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 2px;
+    cursor: grab;
+    pointer-events: auto;
+    touch-action: none;          /* we own the drag gesture */
+    -webkit-tap-highlight-color: transparent;
+}
+
+.clay-lump:active { cursor: grabbing; }
+
+.clay-lump .lump-ball,
+.clay-lump-ghost {
+    width: 54px;
+    height: 50px;
+    /* Irregular blob so it reads as a hand-pinched wet lump,
+       not a tidy disc. */
+    border-radius: 48% 52% 56% 44% / 60% 58% 42% 40%;
+    background:
+        radial-gradient(circle at 38% 32%,
+            rgba(255, 255, 255, 0.45) 0%,
+            rgba(255, 255, 255, 0.12) 22%,
+            transparent 46%),
+        var(--lump-color, #a25a2c);
+    box-shadow:
+        inset -5px -7px 10px rgba(0, 0, 0, 0.45),
+        inset 3px 4px 7px rgba(255, 255, 255, 0.22),
+        0 4px 8px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+.clay-lump:hover .lump-ball,
+.clay-lump:focus-visible .lump-ball {
+    outline: none;
+    box-shadow:
+        inset -5px -7px 10px rgba(0, 0, 0, 0.45),
+        inset 3px 4px 7px rgba(255, 255, 255, 0.22),
+        0 0 12px rgba(0, 255, 204, 0.55),
+        0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.clay-lump.is-dragging .lump-ball { opacity: 0.3; }
+
+.clay-lump .lump-name {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: var(--ink-dim);
+}
+
+/* The ball that follows the finger during a drag. */
+.clay-lump-ghost {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 999;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(1.12);
+    transition: opacity 0.18s ease;
+    will-change: transform;
+}
+.clay-lump-ghost.is-snapback {
+    transition: transform 0.22s cubic-bezier(0.34, 0.8, 0.3, 1),
+                opacity 0.22s ease;
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .clay-lump-ghost,
+    .clay-lump-ghost.is-snapback { transition: none; }
+}
