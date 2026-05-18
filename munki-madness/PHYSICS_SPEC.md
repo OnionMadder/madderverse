@@ -89,8 +89,9 @@ ramp or spring bridges them.** All other tile types work at any height
   affects your own steering). Passable like floor (normal drag, same-
   plane height rule). Visual: deep current-blue tile with flowing
   chevrons scrolling along the push direction (more/brighter = stronger).
-  Editor: paint with Dir + Fld(strength) selectors; height-aware
-  validator treats it as ordinary passable terrain.
+  Editor: pre-oriented catalog swatches (Field ▲▶▼◀ × ·/··/···), one
+  click to place — no menus; height-aware validator treats it as
+  ordinary passable terrain.
 
 ## Traps (3 types)
 

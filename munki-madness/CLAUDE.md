@@ -127,9 +127,15 @@ The level editor is the seed of player-facing user-generated content.
    jumps; agrees real Level 9 is solvable). **Phase C** = per-level
    physics editor + polish. Storage abstraction unchanged (v1.5-fwd).
    2026-05-18: added a **force/gravity field** tile (continuous
-   directional push, presets gentle/med/strong) — engine + editor
-   palette (Dir + Fld selectors) + WYSIWYG flow chevrons; see
-   PHYSICS_SPEC.md "Force / gravity field".
+   directional push, presets gentle/med/strong) — engine + editor +
+   WYSIWYG flow chevrons; see PHYSICS_SPEC.md "Force / gravity field".
+   2026-05-18 **editor UX overhaul** (user pain: dropdowns/decode):
+   ALL dropdowns removed — palette is now a **Sims-style sectioned
+   catalog** (Terrain/Markers/Bumpers/Spinners/Ramps/Springs/Fields/
+   Height, 39 pre-oriented swatches incl. Bump▲▶▼◀, Ramp×dir×{+1,+2},
+   Field×dir×{·/··/···}, Spring+1/2/3). One click drops the fully-
+   configured piece; the swatch label *is* the identity (arrows/dots),
+   no canvas decoding, no post-place config.
 4. 30-level launch catalog built via the editor — **shipped** (Claude-drafted, user refines)
 5. Daily challenge (date-seeded) + per-level best-time — *next*
 6. Cosmetic marble skins (unlock + paid pack)

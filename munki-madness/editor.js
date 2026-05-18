@@ -35,26 +35,52 @@
   var HEIGHT_UNIT = 0.5;     // world-z per elevation level (mirrors game.js)
   var H_CAP = 12;            // editor sanity cap (engine has none; ~6 reads well)
 
-  // Palette → tile type. RAISE/LOWER are special height brushes (act on
-  // the painted tile's `height`, not a type). ramp/spring use the Dir +
-  // Δh selectors in the bar.
-  var PALETTE = [
-    { t: "floor",   label: "Floor",   fill: "#3d2a63" },
-    { t: "gravel",  label: "Gravel",  fill: "#7a5733" },
-    { t: "ice",     label: "Ice",     fill: "#7fd9ff" },
-    { t: "wall",    label: "Wall",    fill: "#4a3270" },
-    { t: "hole",    label: "Hole",    fill: "#0c0718" },
-    { t: "bumper",  label: "Bumper",  fill: "#c8623c" },
-    { t: "spinner", label: "Spinner", fill: "#3f8f86" },
-    { t: "field",   label: "Field",   fill: "#27506b" },
-    { t: "ramp",    label: "Ramp",    fill: "#5a4488" },
-    { t: "spring",  label: "Spring",  fill: "#1d8f73" },
-    { t: "spawn",   label: "Spawn",   fill: "#7df0c8" },
-    { t: "goal",    label: "Goal",    fill: "#ffd76b" },
-    { t: "RAISE",   label: "Raise +1", fill: "#caa14a" },
-    { t: "LOWER",   label: "Lower −1", fill: "#6b5a2a" },
-    { t: "",        label: "Eraser",  fill: "#241638", eraser: true }
-  ];
+  // ---- CATALOG (Sims-style): every placeable is a fully-configured,
+  // pre-oriented swatch you click once and drop. NO dropdowns / no
+  // post-placement config. Each entry = { sec, t, label(+icon), props }.
+  // RAISE/LOWER are height brushes; "" is the eraser (= gap).
+  var TCOL = {
+    floor:"#3d2a63", gravel:"#7a5733", ice:"#7fd9ff", wall:"#4a3270",
+    hole:"#0c0718", bumper:"#c8623c", spinner:"#3f8f86", ramp:"#5a4488",
+    spring:"#1d8f73", field:"#27506b", spawn:"#7df0c8", goal:"#ffd76b",
+    RAISE:"#caa14a", LOWER:"#6b5a2a", "":"#241638"
+  };
+  var DIRS = [["N","▲"], ["E","▶"], ["S","▼"], ["W","◀"]];
+  var CATALOG = (function () {
+    var L = [];
+    function add(sec, t, label, props) {
+      L.push({ sec: sec, t: t, label: label, props: props || {}, fill: TCOL[t] });
+    }
+    add("Terrain", "floor", "Floor");
+    add("Terrain", "gravel", "Gravel");
+    add("Terrain", "ice", "Ice");
+    add("Terrain", "wall", "Wall");
+    add("Terrain", "hole", "Hole");
+    add("Markers", "spawn", "Spawn");
+    add("Markers", "goal", "Goal");
+    DIRS.forEach(function (d) { add("Bumpers", "bumper", "Bump " + d[1], { direction: d[0] }); });
+    add("Spinners", "spinner", "Spin ↻", { rotation: "CW90" });
+    add("Spinners", "spinner", "Spin ↺", { rotation: "CCW90" });
+    [1, 2].forEach(function (hd) {
+      DIRS.forEach(function (d) {
+        add("Ramps", "ramp", "Ramp " + d[1] + " +" + hd,
+            { direction: d[0], height_delta: hd });
+      });
+    });
+    [1, 2, 3].forEach(function (s) {
+      add("Springs", "spring", "Spring +" + s, { height_delta: s });
+    });
+    [["gentle", "·"], ["med", "··"], ["strong", "···"]].forEach(function (st) {
+      DIRS.forEach(function (d) {
+        add("Fields", "field", "Field " + d[1] + " " + st[1],
+            { direction: d[0], strength: st[0] });
+      });
+    });
+    add("Height", "RAISE", "Raise +1");
+    add("Height", "LOWER", "Lower −1");
+    add("Height", "", "Eraser (gap)");
+    return L;
+  })();
   var CHAR2TYPE = { "#":"wall", ".":"floor", "S":"gravel", "I":"ice",
                     "O":"hole", "@":"spawn", "G":"goal" };
 
@@ -117,8 +143,7 @@
   // tiles: sparse map "x,y" -> { type, ...props }. Missing = gap.
   var W = DEF, H = DEF;
   var tiles = {};
-  var brush = "wall";
-  var bumpDir = "E", spinRot = "CW90", hDelta = 1, fieldStr = "med";
+  var brushEntry = null;     // selected CATALOG entry (set in build())
   var painting = false;
   var tileW = 36, tileH = 18, OX = 0, OY = 0;
   var levelName = "Untitled";
@@ -207,8 +232,7 @@
   }
 
   // ------- DOM -------
-  var root, cv, cx, statusEl, nameInp, wInp, hInp, timeInp, fileInp,
-      dirSel, rotSel, hdSel, strSel;
+  var root, cv, cx, statusEl, nameInp, wInp, hInp, timeInp, fileInp;
 
   function injectStyle() {
     var st = document.createElement("style");
@@ -222,7 +246,9 @@
       "#mmed button:hover{background:#52328a}#mmed button.warn{background:#7a2f2f;border-color:#a14a4a}" +
       "#mmed .body{flex:1;display:flex;min-height:0}" +
       "#mmed .pal{display:flex;flex-direction:column;gap:4px;padding:8px;background:#140b26;overflow:auto}" +
-      "#mmed .sw{display:flex;align-items:center;gap:7px;padding:6px 9px;border:2px solid transparent;border-radius:6px;cursor:pointer;white-space:nowrap}" +
+      "#mmed .sw{display:flex;align-items:center;gap:7px;padding:5px 9px;border:2px solid transparent;border-radius:6px;cursor:pointer;white-space:nowrap}" +
+      "#mmed .sech{opacity:.55;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;margin:9px 0 1px;padding-left:2px}" +
+      "#mmed .sech:first-child{margin-top:0}" +
       "#mmed .sw:hover{background:#1f1336}#mmed .sw.on{border-color:#ffd76b;background:#1f1336}" +
       "#mmed .chip{width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.25)}" +
       "#mmed .cvwrap{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto}" +
@@ -241,17 +267,6 @@
     var s = document.createElement("span");
     s.textContent = t; s.style.opacity = ".7"; return s;
   }
-  function mkSelect(opts, val, onCh) {
-    var s = document.createElement("select");
-    opts.forEach(function (o) {
-      var op = document.createElement("option");
-      op.value = o; op.textContent = o; s.appendChild(op);
-    });
-    s.value = val;
-    s.addEventListener("change", function () { onCh(s.value); });
-    return s;
-  }
-
   function build() {
     injectStyle();
     root = document.createElement("div"); root.id = "mmed";
@@ -270,25 +285,11 @@
     function applySize() { resizeGrid(wInp.value, hInp.value); wInp.value = W; hInp.value = H; draw(); }
     wInp.addEventListener("change", applySize);
     hInp.addEventListener("change", applySize);
-    dirSel = mkSelect(["N", "E", "S", "W"], bumpDir, function (v) { bumpDir = v; });
-    dirSel.title = "Direction — bumper push / ramp uphill";
-    rotSel = mkSelect(["CW90", "CCW90"], spinRot, function (v) { spinRot = v; });
-    rotSel.title = "Spinner rotation";
-    hdSel = mkSelect(["-2", "-1", "1", "2", "3"], String(hDelta),
-                     function (v) { hDelta = parseInt(v, 10); });
-    hdSel.title = "Height delta — ramp (default 1) / spring (default 2)";
-    strSel = mkSelect(["gentle", "med", "strong"], fieldStr,
-                      function (v) { fieldStr = v; });
-    strSel.title = "Field strength preset";
 
     bar.appendChild(label("Name")); bar.appendChild(nameInp);
     bar.appendChild(label("W")); bar.appendChild(wInp);
     bar.appendChild(label("H")); bar.appendChild(hInp);
     bar.appendChild(label("sec")); bar.appendChild(timeInp);
-    bar.appendChild(label("Dir")); bar.appendChild(dirSel);
-    bar.appendChild(label("Spn")); bar.appendChild(rotSel);
-    bar.appendChild(label("Δh")); bar.appendChild(hdSel);
-    bar.appendChild(label("Fld")); bar.appendChild(strSel);
     bar.appendChild(btn("New", onNew));
     bar.appendChild(btn("Save", onSave));
     bar.appendChild(btn("Load", onLoad));
@@ -307,15 +308,26 @@
 
     var body = document.createElement("div"); body.className = "body";
     var pal = document.createElement("div"); pal.className = "pal";
-    PALETTE.forEach(function (p) {
+    if (!brushEntry) {                       // default to the Wall piece
+      for (var bi = 0; bi < CATALOG.length; bi++)
+        if (CATALOG[bi].t === "wall") { brushEntry = CATALOG[bi]; break; }
+    }
+    var curSec = null;
+    CATALOG.forEach(function (p) {
+      if (p.sec !== curSec) {                // section header
+        curSec = p.sec;
+        var hd = document.createElement("div");
+        hd.className = "sech"; hd.textContent = curSec;
+        pal.appendChild(hd);
+      }
       var sw = document.createElement("div");
-      sw.className = "sw" + (p.t === brush && !p.eraser ? " on" : "");
+      sw.className = "sw" + (p === brushEntry ? " on" : "");
       var chip = document.createElement("div"); chip.className = "chip";
       chip.style.background = p.fill;
       var txt = document.createElement("span"); txt.textContent = p.label;
       sw.appendChild(chip); sw.appendChild(txt);
       sw.addEventListener("click", function () {
-        brush = p.eraser ? "" : p.t;
+        brushEntry = p;
         [].forEach.call(pal.querySelectorAll(".sw"), function (e) { e.classList.remove("on"); });
         sw.classList.add("on");
       });
@@ -330,7 +342,7 @@
     body.appendChild(pal); body.appendChild(cvwrap);
 
     statusEl = document.createElement("div"); statusEl.className = "status";
-    statusEl.textContent = "Editor — paint tiles; Raise/Lower set height; ramp/spring use Dir+Δh; Eraser = GAP. Validate is height-aware.";
+    statusEl.textContent = "Pick a pre-made piece from the catalog (left) and click to place it — no menus. Raise/Lower set height; Eraser = gap.";
 
     root.appendChild(bar); root.appendChild(body); root.appendChild(statusEl);
     document.body.appendChild(root);
@@ -347,33 +359,32 @@
     return pick(sx, sy);
   }
   function paintAt(cell) {
+    if (!brushEntry) return;
     if (cell.r < 0 || cell.r >= H || cell.c < 0 || cell.c >= W) return;
-    var k = key(cell.c, cell.r);
-    if (brush === "") { delete tiles[k]; draw(); return; }       // eraser = gap
+    var k = key(cell.c, cell.r), t = brushEntry.t;
+    if (t === "") { delete tiles[k]; draw(); return; }            // eraser = gap
 
     // RAISE / LOWER: adjust the existing tile's height (no-op on a gap).
-    if (brush === "RAISE" || brush === "LOWER") {
+    if (t === "RAISE" || t === "LOWER") {
       var ex = tiles[k];
       if (!ex) return;
-      var nh = (ex.height || 0) + (brush === "RAISE" ? 1 : -1);
+      var nh = (ex.height || 0) + (t === "RAISE" ? 1 : -1);
       nh = Math.max(0, Math.min(H_CAP, nh));
       if (nh === 0) delete ex.height; else ex.height = nh;
       draw(); return;
     }
 
-    if (brush === "spawn") {                                     // unique
+    if (t === "spawn") {                                          // unique
       for (var kk in tiles) if (tiles[kk].type === "spawn") delete tiles[kk];
     }
     var prev = tiles[k];
-    var cell2 = { type: brush };
-    // Painting a type onto a tile keeps its existing height so you can
+    var cell2 = { type: t };
+    // Painting a piece onto a tile keeps its existing height so you can
     // lay terrain then sculpt elevation (or retexture a plateau).
     if (prev && prev.height) cell2.height = prev.height;
-    if (brush === "bumper") cell2.direction = bumpDir;
-    if (brush === "spinner") cell2.rotation = spinRot;
-    if (brush === "ramp") { cell2.direction = bumpDir; cell2.height_delta = hDelta; }
-    if (brush === "spring") cell2.height_delta = (hDelta > 0 ? hDelta : 2);
-    if (brush === "field") { cell2.direction = bumpDir; cell2.strength = fieldStr; }
+    // The catalog entry is already fully oriented/configured — just copy
+    // its props (direction / rotation / height_delta / strength).
+    for (var pp in brushEntry.props) cell2[pp] = brushEntry.props[pp];
     tiles[k] = cell2;
     draw();
   }
