@@ -64,6 +64,17 @@
         // (hysteresis so it doesn't strobe at the threshold).
         HORROR_TRIGGER_SUM: 105,
         HORROR_RELEASE_SUM: 45,
+        // ----- Animation / lifecycle (5 frames per creep) -----
+        // Per creep the sheet packs 5 ordered frames: 1 wings-up,
+        // 2 wings-down (the FLOAT wing-flap), 3 spot/wind-up, 4 dive,
+        // 5 strike (the SWOOP), with frame 5 held through DIE. Lifecycle
+        // is Float -> one swoop-attack -> die (see creepTick).
+        FLAP_MS:            150,   // FLOAT: toggle frame 1<->2 this often
+        SWOOP_AFTER_MS:     1800,  // min FLOAT time before its ONE swoop
+        SWOOP_MS:           750,   // dive duration (frames 3 -> 4 -> 5)
+        STRIKE_AT:          0.80,  // swoop progress where the hit lands
+        STRIKE_FEAR:        55,    // fear dumped on the struck Munki
+        DIE_MS:             520,   // frame-5 + CSS dissipate, then despawn
         // z-index: above the stage BG + Munkis, below the tray/controls.
         Z_INDEX:            42
     };
@@ -1200,17 +1211,17 @@
     // invisible — the head art has transparent padding inside the frame.
     const FRAME_BLEED_INSET = 3;
     // Flying Creeps need a MUCH larger inset than the head sheets. The
-    // creep sheet is 3248×1738 with 1082×869 frames packed on a 1px
-    // horizontal gutter and a ZERO-px vertical gutter (row 0 ends at
-    // y=869, row 1 starts at y=869 — touching). paintCreepVariant scales
-    // a frame down to CREEP.SIZE_PX (128) via CSS background-size — a
-    // ~8.4× downscale — so a 1px source inset becomes ~0.12 *display*
-    // px, far below the ~4px bilinear sampling reach of that downscale,
-    // and the neighbouring creep bleeds in at the touching edge. 8 source
-    // px (~0.7% per side, invisible on the centred creature art) clears
-    // the sampling window with margin. Heads use SVG viewBox cropping on
-    // a smaller, lightly-scaled sheet, so 1px stays correct for them —
-    // do NOT raise FRAME_BLEED_INSET to "fix" creeps.
+    // STANDARD creep sheet is a uniform 6×5 grid of the 1310×1412 image
+    // (~218×282 px cells) with the cells tiling EDGE-TO-EDGE (no gutter —
+    // each frame's rect touches its neighbours). paintCreepFrame scales a
+    // frame down into the responsive creep box via CSS background-size —
+    // a multi-× downscale — so without a source inset bilinear sampling
+    // at the touching edge pulls in a sliver of the adjacent frame. 8
+    // source px (~3.7% per side here, invisible because the creature art
+    // has transparent padding inside each cell) clears the sampling
+    // window with margin. Heads use SVG viewBox cropping on a smaller,
+    // lightly-scaled sheet, so 1px stays correct for them — do NOT raise
+    // FRAME_BLEED_INSET to "fix" creeps.
     const CREEP_BLEED_INSET = 8;
     function headModArt(frameName, sheetName) {
         const sheet = SHEETS[sheetName || 'munki'];
@@ -3215,24 +3226,35 @@
     }
 
     // ---------- FLYING CREEPS ----------
-    // An ambient creature that drifts across the stage on a timer. ONE at a
-    // time. Each appearance randomly picks one of the sheet's visually
-    // distinct variants (target: CREEP.VARIANT_COUNT, currently 12) — they
-    // are mechanically identical, just different art. Munkis a Creep gets
-    // close to flinch (CSS .creep-scared, compounds with the jealous-sulk)
-    // and accumulate `fear`. When total fear across on-stage Munkis crosses
-    // CREEP.HORROR_TRIGGER_SUM, horror mode trips via the shared
-    // syncHorrorMode() path (same 12s creep-in as an Ice/Moon drop) and the
-    // hidden "Creep Whisperer" achievement unlocks. Seeing every variant at
-    // least once (across sessions) unlocks "All Creeps Encountered". Not
-    // interactive in v1.
+    // An animated creature. ONE at a time. Each appearance picks a random
+    // creep (one per colour). Lifecycle is Float -> one swoop-attack ->
+    // die:
+    //   FLOAT  drifts across on its sine path, wing-flapping frames 1<->2;
+    //          nearby Munkis flinch (.creep-scared) + accumulate `fear`.
+    //   SWOOP  once per appearance, after a short windup, if any Munki is
+    //          on stage it dives at the nearest one playing frames 3->4->5.
+    //          At STRIKE_AT it lands a hit: a fear burst + a brief knock
+    //          on that Munki (uniform — no per-Munki art, per the locked
+    //          "per-trigger atmosphere only" design). The kid can dodge by
+    //          sliding the targeted Munki away before the hit.
+    //   DIE    the swoop is terminal: frame 5 is held while CSS dissipates
+    //          it (fade+scale+spin), then it despawns. If NO Munki is on
+    //          stage it never swoops — it just floats across and exits.
+    // When total fear crosses CREEP.HORROR_TRIGGER_SUM, horror trips via
+    // the shared syncHorrorMode() path (same 12s creep-in as an Ice/Moon
+    // drop) and the hidden "Creep Whisperer" achievement unlocks; the
+    // creep dying releases its fear so creep-horror lifts with the threat.
+    // Seeing every creep at least once (across sessions) unlocks "All
+    // Creeps Encountered".
     //
-    // Sprite: assets/sprites/flying-creeps.png + flying-creeps.json
-    // (TexturePacker hash, same shape as mb-heads.json — 12 frames = 12
-    // VARIANTS, not animation frames). Until the real art lands the entity
-    // renders a clearly-marked PLACEHOLDER ghost SVG and variant tracking
-    // is inert (you can't "encounter all creeps" with no sheet). See
-    // assets/sprites/FLYING_CREEPS_README.md for the full sheet spec.
+    // Sprite: assets/sprites/flying-creeps.png + flying-creeps.json —
+    // STANDARD sheet is a uniform 6x5 grid: 6 creeps (colour columns) x
+    // 5 frames, frames named creep-<colour>-<n>; loadCreepSheet() groups
+    // them. The loader SCHEMA-DETECTS: an ungrouped/single-frame sheet
+    // (the itch-creeps.* meta swap, an old array sheet, anything else)
+    // degrades to one 1-frame creep each, so it still runs. With no sheet
+    // at all it renders a clearly-marked PLACEHOLDER ghost (tracking inert).
+    // See assets/sprites/FLYING_CREEPS_README.md for the full sheet spec.
     const CREEPS_SEEN_KEY = 'all-munkis-creeps-seen-v1';
     const creepFear = new Map();   // slotIndex -> 0..100
     // Slots a Creep is currently CLOSE to — drives the shocked-face fear
@@ -3248,7 +3270,7 @@
     let skyItemsSheet = null;      // {src, sheetW, sheetH, moons:[{x,y,w,h}]}
     let creepSpawnTimer = null;
     let creepRAF = null;
-    let creepState = null;         // { x, y, vx, baseY, tStart, stayMs, variant }
+    let creepState = null;         // see spawnCreep for the full shape (phase machine)
     let creepPaused = false;       // mirrors page-visibility (battery)
     let creepLastTs = 0;
     const creepsSeen = new Set();  // variant indices seen across all sessions
@@ -3268,44 +3290,80 @@
             localStorage.setItem(CREEPS_SEEN_KEY, JSON.stringify([...creepsSeen]));
         } catch (_) { /* ignore */ }
     }
-    // Record a freshly-spawned variant; grant "All Creeps Encountered" once
-    // every variant in the loaded sheet has been seen at least once. Only
-    // meaningful with a real sheet (the placeholder has no variants).
-    function markCreepSeen(variant) {
-        if (variant < 0) return;
-        if (creepsSeen.has(variant)) return;
-        creepsSeen.add(variant);
+    // Record a freshly-spawned creep; grant "All Creeps Encountered" once
+    // every creep in the loaded sheet has been seen at least once. Counts
+    // CREEPS (one per colour), not individual animation frames. Only
+    // meaningful with a real sheet (the placeholder has no creeps).
+    function markCreepSeen(creepIdx) {
+        if (creepIdx < 0) return;
+        if (creepsSeen.has(creepIdx)) return;
+        creepsSeen.add(creepIdx);
         saveCreepsSeen();
-        const total = creepSheet ? creepSheet.frames.length : 0;
+        const total = creepSheet ? creepSheet.creeps.length : 0;
         if (total > 0 && creepsSeen.size >= total) {
             grantAchievement('allCreeps');
         }
     }
 
-    // Try to load the real sprite sheet. Resolves to a sheet descriptor or
-    // null (→ placeholder). Never rejects — a missing sheet is expected
-    // until the art is dropped in. Each frame is a distinct VARIANT.
+    // Try to load the real sprite sheet. Resolves to a sheet descriptor
+    // ({src, sheetW, sheetH, creeps:[{color, frames:[rect,...]}]}) or null
+    // (→ placeholder). Never rejects — a missing sheet is expected until
+    // the art is dropped in.
+    //
+    // Schema detection:
+    //  • STANDARD: frame names creep-<color>-<n> → grouped by colour,
+    //    each creep's frames ordered by <n> (5-frame animation).
+    //  • FALLBACK: any ungrouped sheet (the itch-creeps.* meta swap is
+    //    single-frame; an old array sheet; anything else) → each frame
+    //    becomes its own 1-frame creep so the system still runs and
+    //    degrades gracefully (no animation, just a static drifter).
     function loadCreepSheet() {
         return fetch('assets/sprites/flying-creeps.json')
             .then(r => (r.ok ? r.json() : null))
             .then(json => {
                 if (!json || !json.frames) return null;
-                // Accept either an array or the TexturePacker object map
-                // (same shape as mb-heads.json: frames[name].frame{x,y,w,h}).
-                const frames = Array.isArray(json.frames)
-                    ? json.frames.map(f => f.frame || f)
-                    : Object.values(json.frames).map(f => f.frame || f);
-                if (!frames.length) return null;
+                const rectOf = e => (e && e.frame) ? e.frame : e;
+                let creeps = null;
+                if (!Array.isArray(json.frames)) {
+                    const groups = new Map();
+                    Object.keys(json.frames).forEach(name => {
+                        const m = /^creep-([a-z]+)-(\d+)$/i.exec(name);
+                        if (!m) return;
+                        const key = m[1].toLowerCase();
+                        if (!groups.has(key)) groups.set(key, []);
+                        groups.get(key).push({
+                            n: parseInt(m[2], 10),
+                            f: rectOf(json.frames[name])
+                        });
+                    });
+                    if (groups.size) {
+                        creeps = [...groups.entries()].map(([color, arr]) => ({
+                            color,
+                            frames: arr.sort((a, b) => a.n - b.n)
+                                       .map(o => o.f)
+                                       .filter(f => f && f.w && f.h)
+                        })).filter(c => c.frames.length);
+                    }
+                }
+                if (!creeps || !creeps.length) {
+                    const flat = (Array.isArray(json.frames)
+                        ? json.frames.map(rectOf)
+                        : Object.values(json.frames).map(rectOf)
+                    ).filter(f => f && f.w && f.h);
+                    if (!flat.length) return null;
+                    creeps = flat.map(f => ({ color: null, frames: [f] }));
+                }
+                const all = creeps.reduce((a, c) => a.concat(c.frames), []);
                 const meta = json.meta || {};
                 const size = meta.size || {};
                 return {
                     src: 'assets/sprites/flying-creeps.png',
-                    // Natural sheet pixel size — needed to scale one variant
-                    // frame into the SIZE_PX box. Fall back to bounding the
+                    // Natural sheet pixel size — needed to scale a frame
+                    // into the responsive box. Fall back to bounding the
                     // frame rects if meta.size is absent.
-                    sheetW: size.w || Math.max(...frames.map(f => f.x + f.w)),
-                    sheetH: size.h || Math.max(...frames.map(f => f.y + f.h)),
-                    frames
+                    sheetW: size.w || Math.max(...all.map(f => f.x + f.w)),
+                    sheetH: size.h || Math.max(...all.map(f => f.y + f.h)),
+                    creeps
                 };
             })
             .catch(() => null);
@@ -3340,20 +3398,16 @@
             .catch(() => null);
     }
 
-    // Paint the .flying-creep-frame child to show VARIANT `vi` (static for
-    // the whole appearance — frames are variants, not an animation cycle).
-    function paintCreepVariant(child, vi) {
-        if (!creepSheet) return;
-        const f = creepSheet.frames[vi % creepSheet.frames.length];
-        if (!f) return;
-        // Same 1px crop inset as the head sheets — flying-creeps.png also
-        // packs variants on a 2px gutter, so without the inset a scaled
-        // background-position can bleed the neighbouring variant in at the
-        // edges. Inset the source rect by FRAME_BLEED_INSET on every side.
+    // Paint the .flying-creep-frame child to show one frame rect `f`.
+    function paintCreepFrame(child, f) {
+        if (!creepSheet || !child || !f) return;
+        // Same crop inset as the head sheets — the sheet packs frames on a
+        // 2px gutter, so without the inset a scaled background-position can
+        // bleed the neighbouring frame in at the edges. Inset every side.
         const b = CREEP_BLEED_INSET;
         const ix = f.x + b, iy = f.y + b, iw = f.w - 2 * b, ih = f.h - 2 * b;
-        // Scale so the variant's longest (inset) side fills the
-        // responsive creep box (vmin-based, not fixed px).
+        // Scale so the frame's longest (inset) side fills the responsive
+        // creep box (vmin-based, not fixed px).
         const scale = creepSizePx() / Math.max(iw, ih);
         child.style.backgroundSize =
             `${creepSheet.sheetW * scale}px ${creepSheet.sheetH * scale}px`;
@@ -3361,6 +3415,30 @@
             `${-ix * scale}px ${-iy * scale}px`;
         child.style.width  = `${iw * scale}px`;
         child.style.height = `${ih * scale}px`;
+    }
+
+    // Set the active creep's current animation frame (index into its
+    // frames[]). Clamps, and only repaints when the index actually
+    // changes — safe to call every rAF tick.
+    function setCreepFrame(n) {
+        const st = creepState;
+        if (!st || !st.frames || !st.frames.length || !creepEl) return;
+        n = Math.max(0, Math.min(st.frames.length - 1, n | 0));
+        if (st.curFrame === n) return;
+        st.curFrame = n;
+        const child = creepEl.querySelector('.flying-creep-frame');
+        if (child) paintCreepFrame(child, st.frames[n]);
+    }
+
+    // Clear the ambient creep-flinch state from every slot (used on creep
+    // end AND when a creep stops floating to dive — a diving creep
+    // shouldn't keep ticking ambient dwell on far Munkis).
+    function clearCreepScared() {
+        document.querySelectorAll('.stage-slot.creep-scared')
+            .forEach(s => s.classList.remove('creep-scared'));
+        const was = [...creepScaredSlots];
+        creepScaredSlots.clear();
+        was.forEach(i => renderSlot(i));
     }
 
     function creepPlaceholderMarkup() {
@@ -3437,16 +3515,14 @@
             return;
         }
         buildCreepEl();
-        // Pick a variant uniformly from the loaded sheet (−1 = placeholder,
-        // which has no variants and never counts toward "All Creeps").
-        const variant = creepSheet
-            ? Math.floor(Math.random() * creepSheet.frames.length)
+        // Pick a creep uniformly from the loaded sheet (−1 = placeholder,
+        // which has no creeps and never counts toward "All Creeps").
+        const creepIdx = creepSheet
+            ? Math.floor(Math.random() * creepSheet.creeps.length)
             : -1;
-        if (creepSheet) {
-            const child = creepEl.querySelector('.flying-creep-frame');
-            if (child) paintCreepVariant(child, variant);
-            markCreepSeen(variant);
-        }
+        const frames = (creepSheet && creepIdx >= 0)
+            ? creepSheet.creeps[creepIdx].frames : null;
+        if (creepSheet) markCreepSeen(creepIdx);
         const vw = window.innerWidth, vh = window.innerHeight;
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
         const speed = rand(CREEP.SPEED_MIN_PXPS, CREEP.SPEED_MAX_PXPS);
@@ -3459,14 +3535,19 @@
         else if (edge === 'right') { x = vw;     y = midY; vx = -speed; }
         else { /* top */      x = vw * rand(0.2, 0.8); y = -size; vx = (Math.random() < 0.5 ? -1 : 1) * speed * 0.5; vy = speed; }
         creepState = {
-            x, y, vx, vy, baseY: y, edge, variant,
+            x, y, vx, vy, baseY: y, drawY: y, edge,
+            creepIdx, frames, curFrame: -1,
             tStart: performance.now(),
-            stayMs: rand(CREEP.STAY_MIN_MS, CREEP.STAY_MAX_MS),
-            leaving: false
+            // Phase machine: FLOAT -> (one) SWOOP -> DIE. See creepTick.
+            phase: 'FLOAT', flapAt: 0, swooped: false,
+            swStart: 0, sx: 0, sy: 0, tx: 0, ty: 0,
+            targetIdx: null, struck: false, dieStart: 0
         };
         creepActive = true;
         creepEl.hidden = false;
+        creepEl.classList.remove('flying-creep-dying');
         creepEl.classList.add('flying-creep-in');
+        if (frames) setCreepFrame(0);   // wings-up to start
         creepLastTs = performance.now();
         if (!creepRAF) creepRAF = requestAnimationFrame(creepTick);
     }
@@ -3476,16 +3557,40 @@
         creepState = null;
         if (creepEl) {
             creepEl.hidden = true;
-            creepEl.classList.remove('flying-creep-in');
+            creepEl.classList.remove('flying-creep-in', 'flying-creep-dying');
         }
-        // Clear any lingering flinch + scared-face state.
-        document.querySelectorAll('.stage-slot.creep-scared')
-            .forEach(s => s.classList.remove('creep-scared'));
-        const wasScared = [...creepScaredSlots];
-        creepScaredSlots.clear();
-        wasScared.forEach(i => renderSlot(i));
+        // Clear any lingering flinch + scared-face + knock state.
+        clearCreepScared();
+        document.querySelectorAll('.stage-slot.creep-struck')
+            .forEach(s => s.classList.remove('creep-struck'));
+        // The threat is gone: drain creep fear and release creep-horror.
+        // syncHorrorMode() still keeps horror on if Ice/Moon beat-react
+        // is independently active (it ORs the two sources).
+        creepFear.clear();
+        if (fearHorrorActive) { fearHorrorActive = false; syncHorrorMode(); }
         if (creepRAF) { cancelAnimationFrame(creepRAF); creepRAF = null; }
         scheduleCreepSpawn(false);
+    }
+
+    // The swoop landed. Fear burst + a brief knock on the struck Munki.
+    // Uniform across all Munkis (no per-Munki art) per the locked
+    // "per-trigger atmosphere only" design. A clean dodge (the kid slid
+    // the Munki away before impact) → the slot is gone → no-op.
+    function creepStrike(idx) {
+        if (idx == null || !slots[idx]) return;
+        const el = document.querySelector(
+            `.stage-slot.active[data-index="${idx}"]`);
+        if (!el) return;
+        const cur = creepFear.get(idx) || 0;
+        creepFear.set(idx, Math.min(CREEP.FEAR_MAX, cur + CREEP.STRIKE_FEAR));
+        el.classList.add('creep-struck');
+        const art = el.querySelector('.char-art');
+        const clear = () => {
+            el.classList.remove('creep-struck');
+            if (art) art.removeEventListener('animationend', clear);
+        };
+        if (art) art.addEventListener('animationend', clear);
+        setTimeout(clear, 600); // fallback if animationend never fires
     }
 
     function slotCenters() {
@@ -3507,44 +3612,102 @@
         creepLastTs = ts;
         const st = creepState;
         const elapsed = ts - st.tStart;
+        const csz = creepSizePx();
 
-        // Motion: constant drift + gentle sine bob around the entry axis.
-        st.x += st.vx * dt;
-        st.y += (st.vy || 0) * dt;
-        const wave = Math.sin((elapsed / CREEP.WAVE_PERIOD_MS) * Math.PI * 2)
-                   * CREEP.WAVE_AMP_PX;
-        const drawY = (st.edge === 'top' ? st.y : st.baseY + wave);
-        creepEl.style.transform = `translate(${st.x}px, ${drawY}px)`;
-        // Variant art is painted once at spawn (static — frames are
-        // variants, not an animation cycle), so nothing to update here.
-
-        // Proximity → flinch + fear, with CLOSE/FAR hysteresis.
-        const sr = creepEl.getBoundingClientRect();
-        const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
-        const live = new Set();
-        slotCenters().forEach(({ i, el, cx, cy }) => {
-            live.add(i);
-            const d = Math.hypot(scx - cx, scy - cy);
-            const cur = creepFear.get(i) || 0;
-            if (d <= CREEP.CLOSE_PX) {
-                el.classList.add('creep-scared');
-                if (!creepScaredSlots.has(i)) { creepScaredSlots.add(i); renderSlot(i); }
-                creepFear.set(i, Math.min(CREEP.FEAR_MAX,
-                    cur + CREEP.FEAR_GAIN_PER_S * dt));
-            } else {
-                if (d >= CREEP.FAR_PX) {
-                    el.classList.remove('creep-scared');
-                    if (creepScaredSlots.delete(i)) renderSlot(i);
-                    creepFear.set(i, Math.max(0,
-                        cur - CREEP.FEAR_DECAY_PER_S * dt));
-                }
-                // Between CLOSE and FAR: hold (hysteresis, no flicker).
+        if (st.phase === 'FLOAT') {
+            // Constant drift + gentle sine bob around the entry axis.
+            st.x += st.vx * dt;
+            st.y += (st.vy || 0) * dt;
+            const wave = Math.sin((elapsed / CREEP.WAVE_PERIOD_MS) * Math.PI * 2)
+                       * CREEP.WAVE_AMP_PX;
+            st.drawY = (st.edge === 'top' ? st.y : st.baseY + wave);
+            creepEl.style.transform = `translate(${st.x}px, ${st.drawY}px)`;
+            // Wing-flap: alternate frame 1 <-> 2.
+            if (st.frames && st.frames.length > 1 && ts >= st.flapAt) {
+                setCreepFrame(st.curFrame === 0 ? 1 : 0);
+                st.flapAt = ts + CREEP.FLAP_MS;
             }
-        });
-        // Drop fear for slots that emptied / changed under us.
-        [...creepFear.keys()].forEach(i => { if (!live.has(i)) creepFear.delete(i); });
 
-        // Fear → horror, with its own trigger/release hysteresis.
+            // Proximity → flinch + fear, with CLOSE/FAR hysteresis.
+            const sr = creepEl.getBoundingClientRect();
+            const scx = sr.left + sr.width / 2, scy = sr.top + sr.height / 2;
+            const live = new Set();
+            slotCenters().forEach(({ i, el, cx, cy }) => {
+                live.add(i);
+                const d = Math.hypot(scx - cx, scy - cy);
+                const cur = creepFear.get(i) || 0;
+                if (d <= CREEP.CLOSE_PX) {
+                    el.classList.add('creep-scared');
+                    if (!creepScaredSlots.has(i)) { creepScaredSlots.add(i); renderSlot(i); }
+                    creepFear.set(i, Math.min(CREEP.FEAR_MAX,
+                        cur + CREEP.FEAR_GAIN_PER_S * dt));
+                } else {
+                    if (d >= CREEP.FAR_PX) {
+                        el.classList.remove('creep-scared');
+                        if (creepScaredSlots.delete(i)) renderSlot(i);
+                        creepFear.set(i, Math.max(0,
+                            cur - CREEP.FEAR_DECAY_PER_S * dt));
+                    }
+                    // Between CLOSE and FAR: hold (hysteresis, no flicker).
+                }
+            });
+            [...creepFear.keys()].forEach(i => { if (!live.has(i)) creepFear.delete(i); });
+
+            // The ONE swoop: after a short windup, if any Munki is on
+            // stage, dive at the nearest. If none ever is, it just
+            // floats across and exits (no attack, no death).
+            if (!st.swooped && elapsed > CREEP.SWOOP_AFTER_MS) {
+                const slots2 = slotCenters();
+                if (slots2.length) {
+                    let best = null, bd = Infinity;
+                    slots2.forEach(s => {
+                        const d = Math.hypot(s.cx - scx, s.cy - scy);
+                        if (d < bd) { bd = d; best = s; }
+                    });
+                    st.swooped = true;
+                    st.phase   = 'SWOOP';
+                    st.swStart = ts;
+                    st.sx = st.x; st.sy = st.drawY;
+                    // Land the creep's CENTRE on the slot centre.
+                    st.tx = best.cx - csz / 2;
+                    st.ty = best.cy - csz / 2;
+                    st.targetIdx = best.i;
+                    clearCreepScared(); // the dive replaces ambient flinch
+                }
+            }
+
+            // Off-screen despawn — ONLY while floating (never attacked →
+            // just leaves). 90s watchdog is pure stuck-state insurance.
+            const off = st.x < -csz * 1.5 || st.x > window.innerWidth + csz * 1.5
+                     || st.drawY > window.innerHeight + csz * 1.5;
+            if (off || elapsed > 90000) { endCreep(); return; }
+
+        } else if (st.phase === 'SWOOP') {
+            const p = Math.min(1, (ts - st.swStart) / CREEP.SWOOP_MS);
+            const e = p * p; // accelerating dive
+            st.x     = st.sx + (st.tx - st.sx) * e;
+            st.drawY = st.sy + (st.ty - st.sy) * e;
+            creepEl.style.transform = `translate(${st.x}px, ${st.drawY}px)`;
+            // frame 3 (windup) → 4 (dive) → 5 (strike). Clamped, so a
+            // single-frame fallback creep just holds its one frame.
+            setCreepFrame(p < 0.40 ? 2 : (p < 0.75 ? 3 : 4));
+            if (!st.struck && p >= CREEP.STRIKE_AT) {
+                st.struck = true;
+                creepStrike(st.targetIdx);
+            }
+            if (p >= 1) {
+                st.phase = 'DIE';
+                st.dieStart = ts;
+                creepEl.classList.add('flying-creep-dying');
+            }
+
+        } else { // DIE — frame 5 held; CSS .flying-creep-dying dissipates.
+            if (ts - st.dieStart >= CREEP.DIE_MS) { endCreep(); return; }
+        }
+
+        // Fear → horror, with its own trigger/release hysteresis. Runs
+        // every phase so a strike's fear-burst trips horror even though
+        // the diving creep no longer accrues ambient fear.
         let sum = 0;
         creepFear.forEach(v => { sum += v; });
         if (!fearHorrorActive && sum >= CREEP.HORROR_TRIGGER_SUM) {
@@ -3555,16 +3718,6 @@
             fearHorrorActive = false;
             syncHorrorMode();
         }
-
-        // Lifetime: the Creep drifts on its constant-velocity path and
-        // ONLY despawns once it has fully left the viewport — it never
-        // vanishes mid-stage on a timer. (90s watchdog is pure insurance
-        // against a stuck state; a normal crossing is ~20–35s.)
-        const csz = creepSizePx();
-        const off = st.x < -csz * 1.5 || st.x > window.innerWidth + csz * 1.5
-                 || drawY > window.innerHeight + csz * 1.5;
-        if (off) { endCreep(); return; }
-        if (elapsed > 90000) { endCreep(); return; }
 
         creepRAF = requestAnimationFrame(creepTick);
     }

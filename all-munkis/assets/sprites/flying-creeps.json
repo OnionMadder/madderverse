@@ -1,15 +1,262 @@
 {
+  "_comment": "All Munkis STANDARD flying-creeps \u2014 6 creeps x 5 frames. Per creep (col): frame1 wings-up, 2 wings-down, 3-5 spot-swoop. Uniform 6x5 grid tiling of the 1310x1412 sheet (cell ~218x282). Names creep-<color>-<n>; loader groups by color. Itch meta sheet (itch-creeps.*) is single-frame and degrades gracefully via the loader's schema detection.",
   "frames": {
-    "creep-yellow": { "frame": { "x": 0,    "y": 0,   "w": 1082, "h": 869 } },
-    "creep-orange": { "frame": { "x": 1083, "y": 0,   "w": 1082, "h": 869 } },
-    "creep-purple": { "frame": { "x": 2166, "y": 0,   "w": 1082, "h": 869 } },
-    "creep-red":    { "frame": { "x": 0,    "y": 869, "w": 1082, "h": 869 } },
-    "creep-blue":   { "frame": { "x": 1083, "y": 869, "w": 1082, "h": 869 } },
-    "creep-green":  { "frame": { "x": 2166, "y": 869, "w": 1082, "h": 869 } }
+    "creep-yellow-1": {
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-yellow-2": {
+      "frame": {
+        "x": 0,
+        "y": 282,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-yellow-3": {
+      "frame": {
+        "x": 0,
+        "y": 565,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-yellow-4": {
+      "frame": {
+        "x": 0,
+        "y": 847,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-yellow-5": {
+      "frame": {
+        "x": 0,
+        "y": 1130,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-blue-1": {
+      "frame": {
+        "x": 218,
+        "y": 0,
+        "w": 219,
+        "h": 282
+      }
+    },
+    "creep-blue-2": {
+      "frame": {
+        "x": 218,
+        "y": 282,
+        "w": 219,
+        "h": 283
+      }
+    },
+    "creep-blue-3": {
+      "frame": {
+        "x": 218,
+        "y": 565,
+        "w": 219,
+        "h": 282
+      }
+    },
+    "creep-blue-4": {
+      "frame": {
+        "x": 218,
+        "y": 847,
+        "w": 219,
+        "h": 283
+      }
+    },
+    "creep-blue-5": {
+      "frame": {
+        "x": 218,
+        "y": 1130,
+        "w": 219,
+        "h": 282
+      }
+    },
+    "creep-green-1": {
+      "frame": {
+        "x": 437,
+        "y": 0,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-green-2": {
+      "frame": {
+        "x": 437,
+        "y": 282,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-green-3": {
+      "frame": {
+        "x": 437,
+        "y": 565,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-green-4": {
+      "frame": {
+        "x": 437,
+        "y": 847,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-green-5": {
+      "frame": {
+        "x": 437,
+        "y": 1130,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-orange-1": {
+      "frame": {
+        "x": 655,
+        "y": 0,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-orange-2": {
+      "frame": {
+        "x": 655,
+        "y": 282,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-orange-3": {
+      "frame": {
+        "x": 655,
+        "y": 565,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-orange-4": {
+      "frame": {
+        "x": 655,
+        "y": 847,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-orange-5": {
+      "frame": {
+        "x": 655,
+        "y": 1130,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-purple-1": {
+      "frame": {
+        "x": 873,
+        "y": 0,
+        "w": 219,
+        "h": 282
+      }
+    },
+    "creep-purple-2": {
+      "frame": {
+        "x": 873,
+        "y": 282,
+        "w": 219,
+        "h": 283
+      }
+    },
+    "creep-purple-3": {
+      "frame": {
+        "x": 873,
+        "y": 565,
+        "w": 219,
+        "h": 282
+      }
+    },
+    "creep-purple-4": {
+      "frame": {
+        "x": 873,
+        "y": 847,
+        "w": 219,
+        "h": 283
+      }
+    },
+    "creep-purple-5": {
+      "frame": {
+        "x": 873,
+        "y": 1130,
+        "w": 219,
+        "h": 282
+      }
+    },
+    "creep-red-1": {
+      "frame": {
+        "x": 1092,
+        "y": 0,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-red-2": {
+      "frame": {
+        "x": 1092,
+        "y": 282,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-red-3": {
+      "frame": {
+        "x": 1092,
+        "y": 565,
+        "w": 218,
+        "h": 282
+      }
+    },
+    "creep-red-4": {
+      "frame": {
+        "x": 1092,
+        "y": 847,
+        "w": 218,
+        "h": 283
+      }
+    },
+    "creep-red-5": {
+      "frame": {
+        "x": 1092,
+        "y": 1130,
+        "w": 218,
+        "h": 282
+      }
+    }
   },
   "meta": {
-    "image": "flying-creeps.png",
-    "size": { "w": 3248, "h": 1738 },
-    "note": "6 Flying Creep variants, one per Rainbow Munki colour, 3x2 grid. Cursed-Munki lore: see FLYING_CREEPS_README.md. The itch-exclusive meta sheet is itch-creeps.{png,json}."
+    "app": "all-munkis",
+    "size": {
+      "w": 1310,
+      "h": 1412
+    },
+    "scale": "1",
+    "layout": "6x5-grid",
+    "creeps": [
+      "yellow",
+      "blue",
+      "green",
+      "orange",
+      "purple",
+      "red"
+    ]
   }
 }

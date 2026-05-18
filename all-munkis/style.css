@@ -2011,8 +2011,53 @@ body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
     100% { transform: translateX( 3px) rotate( 1deg); }
 }
 
+/* ----- Creep DIE (Float → swoop → die) -----
+   The swoop is terminal: JS adds .flying-creep-dying on the last swoop
+   frame and despawns after CREEP.DIE_MS (520ms — keep these in sync).
+   The parent only fades (it owns the positioning `transform` inline, so
+   we must NOT animate transform here or it'd snap to origin mid-air).
+   The shrink/spin rides the inner .flying-creep-frame, whose transform
+   is unused by JS — safe to animate. Placeholder (no frame child) just
+   fades, which is fine. */
+.flying-creep.flying-creep-dying {
+    animation: creep-die-fade 0.52s ease-in forwards;
+}
+.flying-creep.flying-creep-dying .flying-creep-frame {
+    animation: creep-die-shrink 0.52s ease-in forwards;
+    transform-origin: 50% 60%;
+}
+@keyframes creep-die-fade {
+    0%   { opacity: 0.9; filter: drop-shadow(0 6px 18px rgba(120,160,220,0.35)); }
+    60%  { opacity: 0.55; filter: drop-shadow(0 4px 14px rgba(180,120,220,0.45)) blur(0.5px); }
+    100% { opacity: 0; filter: blur(3px); }
+}
+@keyframes creep-die-shrink {
+    0%   { transform: scale(1)    rotate(0deg); }
+    100% { transform: scale(0.45) rotate(26deg); }
+}
+
+/* ----- Creep STRIKE knock -----
+   The hit Munki gets a one-shot recoil. JS adds .creep-struck and clears
+   it on animationend (600ms fallback). Ambient .creep-scared is cleared
+   the instant the creep starts its dive, so this never fights the
+   flinch shake; it's a transform on .char-art, independent of the
+   per-beat .beat bounce (which lives on the inner body/head). */
+.stage-slot.creep-struck .char-art {
+    animation: creep-knock 0.38s cubic-bezier(0.22, 1, 0.36, 1) 1;
+}
+@keyframes creep-knock {
+    0%   { transform: translateX(0)    rotate(0deg); }
+    18%  { transform: translateX(10px) rotate(7deg) scale(0.96); }
+    45%  { transform: translateX(-6px) rotate(-4deg); }
+    70%  { transform: translateX(3px)  rotate(2deg); }
+    100% { transform: translateX(0)    rotate(0deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .flying-creep { transition: opacity 0.6s ease-in; }
     .stage-slot.creep-scared .char-art { animation: none; }
     /* Keep the brightness flash — it's a non-motion "startled" cue. */
+    /* Death: keep only the fade (no spin/shrink). Knock: no recoil. */
+    .flying-creep.flying-creep-dying .flying-creep-frame { animation: none; }
+    .stage-slot.creep-struck .char-art { animation: none; }
 }

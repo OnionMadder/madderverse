@@ -81,49 +81,66 @@ build (web + Play); the lore modal in `index.html` tells it.
 "AI slop" haters'-comments reincarnated (the `itch-creeps.*` swap) —
 the original meta joke, kept where the comments were actually made.
 
-## 6 VARIANTS, not animation frames
+## 6 creeps × 5 ANIMATION frames (v1.1)
 
-Each frame is a **distinct creep design** (a variant), not a flap-
-animation frame. On every appearance the game picks **one** variant
-uniformly at random and renders it **statically** for that whole
-pass. Shipped count: **6** (`CREEP.VARIANT_COUNT` in `game.js`), one
-per rainbow colour. Runtime uses however many frames the loaded JSON
-actually has; 6 is also the "All Creeps Encountered" target.
+The STANDARD sheet is **6 creeps** (one per rainbow colour) ×
+**5 ordered animation frames** each. Per creep the frames are:
 
-(If a future sheet bakes a per-variant flap animation, that's a v1.1
-concern — v1 is static-per-variant.)
+| Frame | Pose | Used by state |
+|---|---|---|
+| 1 | wings up   | FLOAT flap-A |
+| 2 | wings down | FLOAT flap-B |
+| 3 | spot / wind-up | SWOOP windup |
+| 4 | dive       | SWOOP dive |
+| 5 | strike     | SWOOP strike → held through DIE |
+
+Lifecycle (see the FLYING CREEPS block in `game.js`): **Float → one
+swoop-attack → die**. On each appearance the game picks one creep,
+flaps 1↔2 while drifting, then (once, if a Munki is on stage) dives
+3→4→5, lands a fear-burst + knock, and dissipates on frame 5. With no
+Munki on stage it just floats across and leaves. `CREEP.VARIANT_COUNT`
+(6) is the creep count and the "All Creeps Encountered" target —
+that achievement counts **creeps seen, not frames**.
 
 ## flying-creeps.json format (as shipped)
 
-TexturePacker → JSON (Hash), same shape as `mb-heads.json`. The
-shipped sheet is a **3-column × 2-row grid** in a **3248×1738**
-image; frames named by colour so the JSON is self-documenting:
+JSON (Hash). The STANDARD sheet is a **uniform 6-column × 5-row grid**
+of a **1310×1412** image (cells ≈218×282, tiling edge-to-edge).
+Columns are the 6 creeps left→right (yellow, blue, green, orange,
+purple, red); rows are frames 1–5 top→bottom. Frame names are
+**`creep-<colour>-<n>`** — the loader groups by `<colour>` and orders
+each creep's frames by `<n>`:
 
 ```json
 {
   "frames": {
-    "creep-yellow": { "frame": { "x": 0,    "y": 0,   "w": 1082, "h": 869 } },
-    "creep-orange": { "frame": { "x": 1083, "y": 0,   "w": 1082, "h": 869 } },
-    "creep-purple": { "frame": { "x": 2166, "y": 0,   "w": 1082, "h": 869 } },
-    "creep-red":    { "frame": { "x": 0,    "y": 869, "w": 1082, "h": 869 } },
-    "creep-blue":   { "frame": { "x": 1083, "y": 869, "w": 1082, "h": 869 } },
-    "creep-green":  { "frame": { "x": 2166, "y": 869, "w": 1082, "h": 869 } }
+    "creep-yellow-1": { "frame": { "x": 0,   "y": 0,    "w": 218, "h": 282 } },
+    "creep-yellow-2": { "frame": { "x": 0,   "y": 282,  "w": 218, "h": 283 } },
+    "...":            "(creep-yellow-3..5, then creep-blue-1..5, etc.)",
+    "creep-red-5":    { "frame": { "x": 1092,"y": 1130, "w": 218, "h": 282 } }
   },
-  "meta": { "image": "flying-creeps.png", "size": { "w": 3248, "h": 1738 } }
+  "meta": { "image": "flying-creeps.png", "size": { "w": 1310, "h": 1412 } }
 }
 ```
 
-Row 0 = yellow / orange / purple; row 1 = red / blue / green (matches
-the sheet left→right, top→bottom).
+The shipped `flying-creeps.json` is generated to tile the grid exactly;
+regenerate it if the sheet dimensions change.
 
 ### Field requirements
 
 | Field | Required | Notes |
 |---|---|---|
-| `frames[*].frame.x/y/w/h` | **yes** | Pixel rect of each variant. |
+| `frames` keys | **yes** | `creep-<colour>-<n>` for the grouped 5-frame schema. Any **ungrouped** naming → loader FALLBACK: each frame becomes its own 1-frame creep (static drifter, no animation). |
+| `frames[*].frame.x/y/w/h` | **yes** | Pixel rect of each frame. |
 | `meta.size.w/h` | recommended | Sheet pixel size; inferred from frame rects if absent. |
 | `meta.image` | optional | Ignored — loader always uses `flying-creeps.png`. |
-| `meta.fps` | ignored | Variants are static; no animation cycle in v1. |
+
+**itch swap note:** the itch-exclusive `itch-creeps.*` meta sheet is
+still **single-frame**. Swapping it over `flying-creeps.*` for the itch
+build hits the loader FALLBACK (one static creep per frame) — the
+lifecycle still runs (drift → swoop → dissipate) but with no wing-flap
+/ swoop animation. Make a 6×5 `itch-creeps` sheet later if the itch
+build should animate too.
 
 ### Replacing the sheet later
 
