@@ -1,244 +1,244 @@
 {
-  "_comment": "All Munkis STANDARD flying-creeps \u2014 6 creeps x 5 frames. Per creep (col): frame1 wings-up, 2 wings-down, 3-5 spot-swoop. Uniform 6x5 grid tiling of the 1310x1412 sheet (cell ~218x282). Names creep-<color>-<n>; loader groups by color. Itch meta sheet (itch-creeps.*) is single-frame and degrades gracefully via the loader's schema detection.",
+  "_comment": "All Munkis STANDARD flying-creeps \u2014 6 creeps x 5 frames. Per creep: 1 wings-up,2 wings-down,3-5 spot-swoop. Rects are MEASURED tight alpha bounding boxes (+6px pad), NOT a uniform grid \u2014 the sheet is hand-arranged. Regenerate with the alpha-bbox detector if the art changes. Names creep-<color>-<n>.",
   "frames": {
     "creep-yellow-1": {
       "frame": {
         "x": 0,
         "y": 0,
-        "w": 218,
-        "h": 282
+        "w": 224,
+        "h": 255
       }
     },
     "creep-yellow-2": {
       "frame": {
         "x": 0,
-        "y": 282,
-        "w": 218,
-        "h": 283
+        "y": 245,
+        "w": 224,
+        "h": 241
       }
     },
     "creep-yellow-3": {
       "frame": {
         "x": 0,
-        "y": 565,
-        "w": 218,
-        "h": 282
+        "y": 511,
+        "w": 224,
+        "h": 230
       }
     },
     "creep-yellow-4": {
       "frame": {
         "x": 0,
-        "y": 847,
-        "w": 218,
-        "h": 283
+        "y": 842,
+        "w": 224,
+        "h": 168
       }
     },
     "creep-yellow-5": {
       "frame": {
         "x": 0,
-        "y": 1130,
-        "w": 218,
-        "h": 282
+        "y": 1144,
+        "w": 223,
+        "h": 142
       }
     },
     "creep-blue-1": {
       "frame": {
-        "x": 218,
+        "x": 214,
         "y": 0,
-        "w": 219,
-        "h": 282
+        "w": 228,
+        "h": 245
       }
     },
     "creep-blue-2": {
       "frame": {
-        "x": 218,
-        "y": 282,
-        "w": 219,
-        "h": 283
+        "x": 214,
+        "y": 245,
+        "w": 228,
+        "h": 276
       }
     },
     "creep-blue-3": {
       "frame": {
-        "x": 218,
-        "y": 565,
-        "w": 219,
-        "h": 282
+        "x": 214,
+        "y": 511,
+        "w": 228,
+        "h": 341
       }
     },
     "creep-blue-4": {
       "frame": {
-        "x": 218,
-        "y": 847,
-        "w": 219,
-        "h": 283
+        "x": 214,
+        "y": 842,
+        "w": 228,
+        "h": 286
       }
     },
     "creep-blue-5": {
       "frame": {
-        "x": 218,
-        "y": 1130,
-        "w": 219,
-        "h": 282
+        "x": 214,
+        "y": 1144,
+        "w": 228,
+        "h": 261
       }
     },
     "creep-green-1": {
       "frame": {
-        "x": 437,
+        "x": 432,
         "y": 0,
-        "w": 218,
-        "h": 282
+        "w": 228,
+        "h": 225
       }
     },
     "creep-green-2": {
       "frame": {
-        "x": 437,
-        "y": 282,
-        "w": 218,
-        "h": 283
+        "x": 432,
+        "y": 245,
+        "w": 228,
+        "h": 226
       }
     },
     "creep-green-3": {
       "frame": {
-        "x": 437,
-        "y": 565,
-        "w": 218,
-        "h": 282
+        "x": 432,
+        "y": 511,
+        "w": 228,
+        "h": 158
       }
     },
     "creep-green-4": {
       "frame": {
-        "x": 437,
-        "y": 847,
-        "w": 218,
-        "h": 283
+        "x": 432,
+        "y": 842,
+        "w": 228,
+        "h": 176
       }
     },
     "creep-green-5": {
       "frame": {
-        "x": 437,
-        "y": 1130,
-        "w": 218,
-        "h": 282
+        "x": 432,
+        "y": 1144,
+        "w": 228,
+        "h": 214
       }
     },
     "creep-orange-1": {
       "frame": {
-        "x": 655,
+        "x": 650,
         "y": 0,
-        "w": 218,
-        "h": 282
+        "w": 228,
+        "h": 245
       }
     },
     "creep-orange-2": {
       "frame": {
-        "x": 655,
-        "y": 282,
-        "w": 218,
-        "h": 283
+        "x": 650,
+        "y": 245,
+        "w": 228,
+        "h": 232
       }
     },
     "creep-orange-3": {
       "frame": {
-        "x": 655,
-        "y": 565,
-        "w": 218,
-        "h": 282
+        "x": 650,
+        "y": 511,
+        "w": 228,
+        "h": 208
       }
     },
     "creep-orange-4": {
       "frame": {
-        "x": 655,
-        "y": 847,
-        "w": 218,
-        "h": 283
+        "x": 650,
+        "y": 842,
+        "w": 228,
+        "h": 226
       }
     },
     "creep-orange-5": {
       "frame": {
-        "x": 655,
-        "y": 1130,
-        "w": 218,
-        "h": 282
+        "x": 650,
+        "y": 1144,
+        "w": 228,
+        "h": 268
       }
     },
     "creep-purple-1": {
       "frame": {
-        "x": 873,
+        "x": 868,
         "y": 0,
-        "w": 219,
-        "h": 282
+        "w": 228,
+        "h": 221
       }
     },
     "creep-purple-2": {
       "frame": {
-        "x": 873,
-        "y": 282,
-        "w": 219,
-        "h": 283
+        "x": 868,
+        "y": 245,
+        "w": 228,
+        "h": 257
       }
     },
     "creep-purple-3": {
       "frame": {
-        "x": 873,
-        "y": 565,
-        "w": 219,
-        "h": 282
+        "x": 868,
+        "y": 511,
+        "w": 228,
+        "h": 276
       }
     },
     "creep-purple-4": {
       "frame": {
-        "x": 873,
-        "y": 847,
-        "w": 219,
-        "h": 283
+        "x": 868,
+        "y": 842,
+        "w": 228,
+        "h": 312
       }
     },
     "creep-purple-5": {
       "frame": {
-        "x": 873,
-        "y": 1130,
-        "w": 219,
-        "h": 282
+        "x": 868,
+        "y": 1144,
+        "w": 228,
+        "h": 240
       }
     },
     "creep-red-1": {
       "frame": {
-        "x": 1092,
+        "x": 1086,
         "y": 0,
-        "w": 218,
-        "h": 282
+        "w": 224,
+        "h": 200
       }
     },
     "creep-red-2": {
       "frame": {
-        "x": 1092,
-        "y": 282,
-        "w": 218,
-        "h": 283
+        "x": 1086,
+        "y": 245,
+        "w": 224,
+        "h": 204
       }
     },
     "creep-red-3": {
       "frame": {
-        "x": 1092,
-        "y": 565,
-        "w": 218,
-        "h": 282
+        "x": 1086,
+        "y": 511,
+        "w": 224,
+        "h": 194
       }
     },
     "creep-red-4": {
       "frame": {
-        "x": 1092,
-        "y": 847,
-        "w": 218,
-        "h": 283
+        "x": 1086,
+        "y": 842,
+        "w": 224,
+        "h": 222
       }
     },
     "creep-red-5": {
       "frame": {
-        "x": 1092,
-        "y": 1130,
-        "w": 218,
-        "h": 282
+        "x": 1086,
+        "y": 1144,
+        "w": 224,
+        "h": 194
       }
     }
   },
@@ -248,8 +248,7 @@
       "w": 1310,
       "h": 1412
     },
-    "scale": "1",
-    "layout": "6x5-grid",
+    "layout": "measured-bbox",
     "creeps": [
       "yellow",
       "blue",

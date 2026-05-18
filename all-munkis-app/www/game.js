@@ -70,7 +70,12 @@
         // 5 strike (the SWOOP), with frame 5 held through DIE. Lifecycle
         // is Float -> one swoop-attack -> die (see creepTick).
         FLAP_MS:            150,   // FLOAT: toggle frame 1<->2 this often
-        SWOOP_AFTER_MS:     1800,  // min FLOAT time before its ONE swoop
+        // Menace window: it drifts + scares the Munkis this long BEFORE
+        // committing to its single dive (uniform-random per appearance,
+        // so the strike isn't predictable). Tuned long on purpose — the
+        // creep should loom, not pounce on sight.
+        SWOOP_AFTER_MIN_MS: 7000,
+        SWOOP_AFTER_MAX_MS: 13000,
         SWOOP_MS:           750,   // dive duration (frames 3 -> 4 -> 5)
         STRIKE_AT:          0.80,  // swoop progress where the hit lands
         STRIKE_FEAR:        55,    // fear dumped on the struck Munki
@@ -3404,27 +3409,30 @@
     }
 
     // Paint the .flying-creep-frame child to show one frame rect `f`.
-    function paintCreepFrame(child, f) {
+    // The hand-arranged sheet has tight, VARYING-size frames (a spread-
+    // wing swoop frame is far bigger than a tucked-wings one — measured
+    // bbox JSON, not a uniform grid). So we render every frame of a creep
+    // at ONE constant `sheetScale` (set from that creep's largest frame
+    // so its biggest pose just fills the box) and CENTRE the frame in a
+    // fixed `box`. The creep then holds its size + position and only the
+    // POSE changes between frames, instead of pulsing/teleporting. The
+    // box is overflow:hidden in CSS so neighbouring sheet art can't peek.
+    function paintCreepFrame(child, f, box, sheetScale) {
         if (!creepSheet || !child || !f) return;
-        // Same crop inset as the head sheets — the sheet packs frames on a
-        // 2px gutter, so without the inset a scaled background-position can
-        // bleed the neighbouring frame in at the edges. Inset every side.
-        const b = CREEP_BLEED_INSET;
-        const ix = f.x + b, iy = f.y + b, iw = f.w - 2 * b, ih = f.h - 2 * b;
-        // Scale so the frame's longest (inset) side fills the responsive
-        // creep box (vmin-based, not fixed px).
-        const scale = creepSizePx() / Math.max(iw, ih);
+        const fcx = (f.x + f.w / 2) * sheetScale;
+        const fcy = (f.y + f.h / 2) * sheetScale;
+        child.style.width  = `${box}px`;
+        child.style.height = `${box}px`;
         child.style.backgroundSize =
-            `${creepSheet.sheetW * scale}px ${creepSheet.sheetH * scale}px`;
+            `${creepSheet.sheetW * sheetScale}px ${creepSheet.sheetH * sheetScale}px`;
         child.style.backgroundPosition =
-            `${-ix * scale}px ${-iy * scale}px`;
-        child.style.width  = `${iw * scale}px`;
-        child.style.height = `${ih * scale}px`;
+            `${(box / 2 - fcx).toFixed(2)}px ${(box / 2 - fcy).toFixed(2)}px`;
     }
 
     // Set the active creep's current animation frame (index into its
     // frames[]). Clamps, and only repaints when the index actually
-    // changes — safe to call every rAF tick.
+    // changes — safe to call every rAF tick. Constant per-creep scale
+    // (box / its largest frame) keeps every pose at the same size.
     function setCreepFrame(n) {
         const st = creepState;
         if (!st || !st.frames || !st.frames.length || !creepEl) return;
@@ -3432,7 +3440,10 @@
         if (st.curFrame === n) return;
         st.curFrame = n;
         const child = creepEl.querySelector('.flying-creep-frame');
-        if (child) paintCreepFrame(child, st.frames[n]);
+        if (!child) return;
+        const box = creepSizePx();
+        const scale = box / (st.refMax || box);
+        paintCreepFrame(child, st.frames[n], box, scale);
     }
 
     // Clear the ambient creep-flinch state from every slot (used on creep
@@ -3527,6 +3538,11 @@
             : -1;
         const frames = (creepSheet && creepIdx >= 0)
             ? creepSheet.creeps[creepIdx].frames : null;
+        // Largest dimension across THIS creep's frames — the shared
+        // scale reference so every pose renders at one consistent size.
+        const refMax = frames
+            ? Math.max(...frames.map(f => Math.max(f.w, f.h)))
+            : 0;
         if (creepSheet) markCreepSeen(creepIdx);
         const vw = window.innerWidth, vh = window.innerHeight;
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
@@ -3541,10 +3557,14 @@
         else { /* top */      x = vw * rand(0.2, 0.8); y = -size; vx = (Math.random() < 0.5 ? -1 : 1) * speed * 0.5; vy = speed; }
         creepState = {
             x, y, vx, vy, baseY: y, drawY: y, edge,
-            creepIdx, frames, curFrame: -1,
+            creepIdx, frames, refMax, curFrame: -1,
             tStart: performance.now(),
             // Phase machine: FLOAT -> (one) SWOOP -> DIE. See creepTick.
+            // swoopAt = the menace window: it drifts/scares this long
+            // BEFORE committing to its single dive (randomised so it
+            // isn't predictable).
             phase: 'FLOAT', flapAt: 0, swooped: false,
+            swoopAt: rand(CREEP.SWOOP_AFTER_MIN_MS, CREEP.SWOOP_AFTER_MAX_MS),
             swStart: 0, sx: 0, sy: 0, tx: 0, ty: 0,
             targetIdx: null, struck: false, dieStart: 0
         };
@@ -3661,7 +3681,7 @@
             // The ONE swoop: after a short windup, if any Munki is on
             // stage, dive at the nearest. If none ever is, it just
             // floats across and exits (no attack, no death).
-            if (!st.swooped && elapsed > CREEP.SWOOP_AFTER_MS) {
+            if (!st.swooped && elapsed > st.swoopAt) {
                 const slots2 = slotCenters();
                 if (slots2.length) {
                     let best = null, bd = Infinity;
