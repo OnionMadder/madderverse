@@ -78,6 +78,20 @@ ramp or spring bridges them.** All other tile types work at any height
 - **Spring** — `height_delta` (e.g. +2). Stepping on it launches the
   marble up by N levels (visual arc ~0.45s) + a "boing" SFX.
 
+## Force / gravity field (2026-05-18)
+
+- **Field** — `{ type:"field", direction:"N|S|E|W", strength:"gentle|
+  med|strong" }`. While the marble's center is over the tile, a
+  **continuous** acceleration `FIELD_FORCE[strength]` (tiles/s²;
+  `{gentle:8, med:16, strong:30}`) is applied in `direction` **every
+  substep** — composes with control + drag + the speed cap. NOT scaled
+  by surface grip (a current shoves you the same on ice; grip only
+  affects your own steering). Passable like floor (normal drag, same-
+  plane height rule). Visual: deep current-blue tile with flowing
+  chevrons scrolling along the push direction (more/brighter = stronger).
+  Editor: paint with Dir + Fld(strength) selectors; height-aware
+  validator treats it as ordinary passable terrain.
+
 ## Traps (3 types)
 
 - **Hole** — kill tile. When the marble's *center* crosses a hole:

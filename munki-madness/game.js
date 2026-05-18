@@ -37,6 +37,11 @@
   var WALL_BOUNCE = 0.4;     // wall restitution — pinball bonk
   var FRICTION_FLOOR = 0.965;// per-frame@60 vel multiplier — player-dialed
   var BUMPER_FORCE = 4;      // instantaneous velocity-add from a bumper
+  // Force/gravity field: continuous push (tiles/s^2) while the marble is
+  // over a `field` tile. Presets chosen vs ACCEL 24: gentle = easily
+  // overridden, med = must actively counter, strong = exceeds player
+  // input (a true current you ride/route around).
+  var FIELD_FORCE = { gentle: 8, med: 16, strong: 30 };
   var GRAVITY = 0;           // no gravity in v1 (reserved for Endeavor)
   var WALL_BONK_MIN = 1.6;   // min normal speed (tiles/s) to squeak
 
@@ -147,6 +152,11 @@
       cell.hd = (t.height_delta == null) ? 1 : t.height_delta;
     }
     if (t.type === "spring") cell.hd = (t.height_delta == null) ? 2 : t.height_delta;
+    if (t.type === "field") {
+      cell.dir = dirVec(t.direction || "E"); cell.dirName = t.direction || "E";
+      cell.fkey = FIELD_FORCE[t.strength] != null ? t.strength : "med";
+      cell.fmag = FIELD_FORCE[cell.fkey];
+    }
     return cell;
   }
   function normalizeLevel(o) {
@@ -908,10 +918,18 @@
   // speed, then swept-move in micro-steps (each shorter than the radius
   // so a wall can't be skipped) resolving grid collisions as we go.
   function physicsTick() {
-    var s = SURFACE[surfaceOf(Math.floor(marble.x), Math.floor(marble.y))];
+    var mc = Math.floor(marble.x), mr = Math.floor(marble.y);
+    var s = SURFACE[surfaceOf(mc, mr)];
     var a = controlAccel();
-    marble.vx += a.x * s.grip * FIXED_DT;
-    marble.vy += a.y * s.grip * FIXED_DT;
+    // Force/gravity field: continuous environmental push (NOT scaled by
+    // surface grip — a current shoves you the same on ice; grip only
+    // affects your own steering). Composes with control + drag + cap.
+    var ft = cellAt(mc, mr), ffx = 0, ffy = 0;
+    if (ft && ft.type === "field" && ft.dir) {
+      ffx = ft.dir.x * ft.fmag; ffy = ft.dir.y * ft.fmag;
+    }
+    marble.vx += (a.x * s.grip + ffx) * FIXED_DT;
+    marble.vy += (a.y * s.grip + ffy) * FIXED_DT;
     // s.drag is a per-frame@60 multiplier — convert to this substep.
     var keep = Math.pow(s.drag, FIXED_DT * 60);
     marble.vx *= keep; marble.vy *= keep;
@@ -1101,6 +1119,7 @@
       case "goal":    return "#ffd76b";  // gold
       case "bumper":  return "#c8623c";  // orange
       case "spinner": return "#3f8f86";  // teal
+      case "field":   return "#27506b";  // deep current-blue
       default:        return "#3d2a63";  // floor
     }
   }
@@ -1263,6 +1282,27 @@
         drawArrow(c, r, cen, cell.dirName || "E", hgt * HEIGHT_UNIT);
       } else if (type === "spinner") {
         drawSwirl(cen, cell.rot || 1);
+      } else if (type === "field") {
+        // flowing chevrons scrolling along the push direction; more /
+        // brighter = stronger preset.
+        var fv = cell.dir || dirVec(cell.dirName || "E");
+        var fwd = project(c + 0.5 + fv.x * 0.4, r + 0.5 + fv.y * 0.4, hgt * HEIGHT_UNIT);
+        var fang = Math.atan2(fwd.y - cen.y, fwd.x - cen.x);
+        var lvl = cell.fkey === "strong" ? 3 : cell.fkey === "gentle" ? 1 : 2;
+        var span = tileW * 0.34, scr = (performance.now() / 360) % 1;
+        ctx.save();
+        ctx.translate(cen.x, cen.y); ctx.rotate(fang);
+        ctx.strokeStyle = "rgba(170,232,255," + (0.32 + 0.16 * lvl) + ")";
+        ctx.lineWidth = 1.5 + lvl * 0.4;
+        for (var fi = 0; fi < 3; fi++) {
+          var fxp = -span + ((fi + scr) / 3) * (span * 2);
+          ctx.beginPath();
+          ctx.moveTo(fxp - span * 0.18, -hh * 0.42);
+          ctx.lineTo(fxp + span * 0.18, 0);
+          ctx.lineTo(fxp - span * 0.18, hh * 0.42);
+          ctx.stroke();
+        }
+        ctx.restore();
       } else if (type === "spring") {
         ctx.save();
         ctx.strokeStyle = "#9ff0d6"; ctx.lineWidth = 2.5;

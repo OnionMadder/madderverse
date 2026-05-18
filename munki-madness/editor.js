@@ -46,6 +46,7 @@
     { t: "hole",    label: "Hole",    fill: "#0c0718" },
     { t: "bumper",  label: "Bumper",  fill: "#c8623c" },
     { t: "spinner", label: "Spinner", fill: "#3f8f86" },
+    { t: "field",   label: "Field",   fill: "#27506b" },
     { t: "ramp",    label: "Ramp",    fill: "#5a4488" },
     { t: "spring",  label: "Spring",  fill: "#1d8f73" },
     { t: "spawn",   label: "Spawn",   fill: "#7df0c8" },
@@ -117,7 +118,7 @@
   var W = DEF, H = DEF;
   var tiles = {};
   var brush = "wall";
-  var bumpDir = "E", spinRot = "CW90", hDelta = 1;
+  var bumpDir = "E", spinRot = "CW90", hDelta = 1, fieldStr = "med";
   var painting = false;
   var tileW = 36, tileH = 18, OX = 0, OY = 0;
   var levelName = "Untitled";
@@ -207,7 +208,7 @@
 
   // ------- DOM -------
   var root, cv, cx, statusEl, nameInp, wInp, hInp, timeInp, fileInp,
-      dirSel, rotSel, hdSel;
+      dirSel, rotSel, hdSel, strSel;
 
   function injectStyle() {
     var st = document.createElement("style");
@@ -276,6 +277,9 @@
     hdSel = mkSelect(["-2", "-1", "1", "2", "3"], String(hDelta),
                      function (v) { hDelta = parseInt(v, 10); });
     hdSel.title = "Height delta — ramp (default 1) / spring (default 2)";
+    strSel = mkSelect(["gentle", "med", "strong"], fieldStr,
+                      function (v) { fieldStr = v; });
+    strSel.title = "Field strength preset";
 
     bar.appendChild(label("Name")); bar.appendChild(nameInp);
     bar.appendChild(label("W")); bar.appendChild(wInp);
@@ -284,6 +288,7 @@
     bar.appendChild(label("Dir")); bar.appendChild(dirSel);
     bar.appendChild(label("Spn")); bar.appendChild(rotSel);
     bar.appendChild(label("Δh")); bar.appendChild(hdSel);
+    bar.appendChild(label("Fld")); bar.appendChild(strSel);
     bar.appendChild(btn("New", onNew));
     bar.appendChild(btn("Save", onSave));
     bar.appendChild(btn("Load", onLoad));
@@ -368,6 +373,7 @@
     if (brush === "spinner") cell2.rotation = spinRot;
     if (brush === "ramp") { cell2.direction = bumpDir; cell2.height_delta = hDelta; }
     if (brush === "spring") cell2.height_delta = (hDelta > 0 ? hDelta : 2);
+    if (brush === "field") { cell2.direction = bumpDir; cell2.strength = fieldStr; }
     tiles[k] = cell2;
     draw();
   }
@@ -499,6 +505,24 @@
         cx.strokeStyle = "#cdf3ee"; cx.lineWidth = 2.4;
         var d0 = (cell.rotation === "CCW90") ? -1 : 1;
         cx.beginPath(); cx.arc(0, 0, tileW*0.20, 0, Math.PI*1.4*d0, d0 < 0); cx.stroke();
+        cx.restore();
+      } else if (ty === "field") {
+        var fv = dirVec(cell.direction || "E");
+        var fwd = project(c + 0.5 + fv.x*0.4, r + 0.5 + fv.y*0.4, topZ);
+        var fang = Math.atan2(fwd.y - cen.y, fwd.x - cen.x);
+        var lvlF = cell.strength === "strong" ? 3 : cell.strength === "gentle" ? 1 : 2;
+        var span = tileW*0.34;
+        cx.save(); cx.translate(cen.x, cen.y); cx.rotate(fang);
+        cx.strokeStyle = "rgba(170,232,255," + (0.34 + 0.16*lvlF) + ")";
+        cx.lineWidth = 1.5 + lvlF*0.4;
+        for (var fi = 0; fi < 3; fi++) {
+          var fxp = -span + (fi/3)*(span*2);
+          cx.beginPath();
+          cx.moveTo(fxp - span*0.18, -hh*0.42);
+          cx.lineTo(fxp + span*0.18, 0);
+          cx.lineTo(fxp - span*0.18, hh*0.42);
+          cx.stroke();
+        }
         cx.restore();
       } else if (ty === "spring") {
         cx.save(); cx.strokeStyle = "#9ff0d6"; cx.lineWidth = 2.5;

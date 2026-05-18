@@ -126,6 +126,10 @@ The level editor is the seed of player-facing user-generated content.
    mirroring engine blocked()/ramp/spring — rejects unbridged height
    jumps; agrees real Level 9 is solvable). **Phase C** = per-level
    physics editor + polish. Storage abstraction unchanged (v1.5-fwd).
+   2026-05-18: added a **force/gravity field** tile (continuous
+   directional push, presets gentle/med/strong) — engine + editor
+   palette (Dir + Fld selectors) + WYSIWYG flow chevrons; see
+   PHYSICS_SPEC.md "Force / gravity field".
 4. 30-level launch catalog built via the editor — **shipped** (Claude-drafted, user refines)
 5. Daily challenge (date-seeded) + per-level best-time — *next*
 6. Cosmetic marble skins (unlock + paid pack)
