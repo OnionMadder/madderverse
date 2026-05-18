@@ -42,6 +42,15 @@ No build system — files ship to the browser as-is.
 Tile alphabet (shared by both): `#` wall · `.` floor · `S` slow/sticky ·
 `I` ice · `O` hole · `@` spawn · `G` goal.
 
+**Per-level physics override (opt-in):** a level JSON may add a sparse
+top-level `"physics": { ... }` block (keys mirror the `?tune=1` panel:
+`ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`, `TILT_FORCE_MULTIPLIER`,
+`floor.drag`, `gravel.drag`, `ice.drag`, `ice.grip`). It's overlaid on
+the global `BASE_PHYS`; levels with no block keep the global feel
+unchanged. The Live Tune panel's **Copy physics block** emits a
+paste-ready sparse block for the current level. Full spec +
+clamp/runaway rules in `PHYSICS_SPEC.md` → "Per-level physics override".
+
 ### Portable schema v1
 
 ```json

@@ -58,6 +58,48 @@
   var TILT_FLIP_Y = 1;            // set -1 if forward/back feels inverted
   var DRAG_FULL = 90;        // px of drag that = full force
 
+  // ---- Per-level physics overlay (opt-in) ----
+  // The constants above are the GLOBAL BASE. A level JSON may carry a
+  // sparse "physics" block listing ONLY the knobs it changes; loadLevel
+  // overlays it on BASE_PHYS, so any level without a physics block is
+  // byte-identical to the global feel. Keys mirror the ?tune=1 panel 1:1
+  // so its "Copy values" output pastes straight into a level.
+  var BASE_PHYS = {
+    "ACCEL": ACCEL, "MAX_SPEED": MAX_SPEED, "WALL_BOUNCE": WALL_BOUNCE,
+    "TILT_FORCE_MULTIPLIER": TILT_FORCE_MULTIPLIER,
+    "floor.drag": SURFACE.floor.drag, "gravel.drag": SURFACE.gravel.drag,
+    "ice.drag": SURFACE.ice.drag, "ice.grip": SURFACE.ice.grip
+  };
+  var curLevelLabel = "";   // shown in the tune panel's Copy header
+  var tuneLvlEl = null;     // tune-panel subtitle (current level)
+  var tuneRefreshers = [];  // snap panel sliders to live values on level load
+  function clampPhys(k, v) {
+    v = +v;
+    if (!isFinite(v)) return BASE_PHYS[k];
+    if (k === "WALL_BOUNCE") return Math.max(0, Math.min(0.98, v));
+    if (k === "floor.drag" || k === "gravel.drag" || k === "ice.drag")
+      return Math.max(0.3, Math.min(0.9999, v));   // <1 or velocity runs away
+    return Math.max(0, v);
+  }
+  function applyPhysics(p) {
+    ACCEL = p["ACCEL"]; MAX_SPEED = p["MAX_SPEED"];
+    WALL_BOUNCE = p["WALL_BOUNCE"];
+    TILT_FORCE_MULTIPLIER = p["TILT_FORCE_MULTIPLIER"];
+    SURFACE.floor.drag  = p["floor.drag"];
+    SURFACE.gravel.drag = p["gravel.drag"];
+    SURFACE.ice.drag    = p["ice.drag"];
+    SURFACE.ice.grip    = p["ice.grip"];
+  }
+  // effective = BASE overlaid with a level's sparse override (clamped).
+  function effectivePhysics(override) {
+    var e = {}, k;
+    for (k in BASE_PHYS) e[k] = BASE_PHYS[k];
+    if (override) for (k in override)
+      if (BASE_PHYS.hasOwnProperty(k) && override[k] != null)
+        e[k] = clampPhys(k, override[k]);
+    return e;
+  }
+
   // SPRITE-SWAP: flip to true once the curl frames + ball PNG are dropped
   // in assets/sprites/ (filenames per SPRITES_README.md). Nothing else
   // needs to change for the placeholder -> real-sprite handoff.
@@ -138,7 +180,8 @@
       name: o.title || o.name || "Untitled",
       target_ms: o.target_time_ms || 30000,
       w: w, h: h, tmap: tmap, spawn: spawn, goal: goal,
-      bx: minX, by: minY, ex: maxX, ey: maxY, maxH: maxH
+      bx: minX, by: minY, ex: maxX, ey: maxY, maxH: maxH,
+      physics: (o.physics && typeof o.physics === "object") ? o.physics : null
     };
   }
 
@@ -615,6 +658,14 @@
     cols = lv.w; rows = lv.h; tmap = lv.tmap;
     lvBounds = { bx: lv.bx, by: lv.by, ex: lv.ex, ey: lv.ey, maxH: lv.maxH };
     targetMs = lv.target_ms;
+    // Opt-in per-level physics: BASE overlaid with this level's sparse
+    // override (or just BASE if it has none — identical to global feel).
+    applyPhysics(effectivePhysics(lv.physics));
+    curLevelLabel = (customLevel ? "TEST" : "L" + (levelIndex + 1)) +
+                    " · " + (lv.name || "Untitled");
+    if (tuneLvlEl) tuneLvlEl.textContent = curLevelLabel +
+      (lv.physics ? "  [has override]" : "  [global]");
+    for (var ti = 0; ti < tuneRefreshers.length; ti++) tuneRefreshers[ti]();
     startTile = { x: lv.spawn.x + 0.5, y: lv.spawn.y + 0.5 };
     var sct = tmap[lv.spawn.x + "," + lv.spawn.y];
     startTile.h = sct ? (sct.height || 0) : 0;
@@ -1530,8 +1581,12 @@
       "padding:10px 12px;color:#f3ecff;font:12px monospace;");
     var title = document.createElement("div");
     title.textContent = "LIVE TUNE  (?tune=1)";
-    title.setAttribute("style", "color:#ffd76b;font-weight:700;margin-bottom:6px;");
+    title.setAttribute("style", "color:#ffd76b;font-weight:700;margin-bottom:2px;");
     box.appendChild(title);
+    tuneLvlEl = document.createElement("div");
+    tuneLvlEl.setAttribute("style", "color:#7df0c8;font-size:11px;margin-bottom:6px;");
+    tuneLvlEl.textContent = curLevelLabel || "(no level yet)";
+    box.appendChild(tuneLvlEl);
 
     SPECS.forEach(function (s) {
       var row = document.createElement("div");
@@ -1549,26 +1604,45 @@
       setLabel();
       row.appendChild(lab); row.appendChild(rng);
       box.appendChild(row);
+      // so a level switch (which applies that level's physics) snaps the
+      // sliders + labels to the new effective values.
+      tuneRefreshers.push(function () { rng.value = s.get(); setLabel(); });
     });
 
     var copy = document.createElement("button");
-    copy.textContent = "Copy values";
+    copy.textContent = "Copy physics block";
     copy.setAttribute("style",
       "margin-top:8px;width:100%;background:#3c2464;color:#f3ecff;" +
       "border:1px solid #5a3286;border-radius:6px;padding:7px;font:inherit;cursor:pointer;");
     copy.addEventListener("click", function () {
-      var txt = "ACCEL=" + ACCEL + "  MAX_SPEED=" + MAX_SPEED +
-                "  WALL_BOUNCE=" + WALL_BOUNCE +
-                "  TILT_FORCE_MULTIPLIER=" + TILT_FORCE_MULTIPLIER +
-                "  SURFACE.floor.drag=" + SURFACE.floor.drag +
-                "  SURFACE.gravel.drag=" + SURFACE.gravel.drag +
-                "  SURFACE.ice.drag=" + SURFACE.ice.drag +
-                "  SURFACE.ice.grip=" + SURFACE.ice.grip;
+      // Emit a paste-ready, SPARSE "physics" block — only the knobs that
+      // differ from the global BASE — to drop into THIS level's JSON.
+      var live = {
+        "ACCEL": ACCEL, "MAX_SPEED": MAX_SPEED, "WALL_BOUNCE": WALL_BOUNCE,
+        "TILT_FORCE_MULTIPLIER": TILT_FORCE_MULTIPLIER,
+        "floor.drag": SURFACE.floor.drag, "gravel.drag": SURFACE.gravel.drag,
+        "ice.drag": SURFACE.ice.drag, "ice.grip": SURFACE.ice.grip
+      };
+      var diff = [];
+      for (var k in BASE_PHYS) {
+        if (+live[k] !== +BASE_PHYS[k]) {
+          diff.push('    ' + JSON.stringify(k) + ': ' + (+live[k]));
+        }
+      }
+      var txt;
+      if (!diff.length) {
+        txt = "// " + curLevelLabel + " matches the global defaults — " +
+              "no per-level \"physics\" override needed.";
+      } else {
+        txt = "// " + curLevelLabel + " — paste this into that level's " +
+              "JSON (top level):\n" +
+              '  "physics": {\n' + diff.join(",\n") + "\n  }";
+      }
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(txt).then(
-          function () { copy.textContent = "Copied ✓"; setTimeout(function () { copy.textContent = "Copy values"; }, 1200); },
-          function () { window.prompt("Tell Claude these values:", txt); });
-      } else { window.prompt("Tell Claude these values:", txt); }
+          function () { copy.textContent = "Copied ✓"; setTimeout(function () { copy.textContent = "Copy physics block"; }, 1400); },
+          function () { window.prompt("Copy this physics block:", txt); });
+      } else { window.prompt("Copy this physics block:", txt); }
     });
     box.appendChild(copy);
 

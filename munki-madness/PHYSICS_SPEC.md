@@ -25,6 +25,34 @@ Drag values are **per-frame multipliers referenced to 60fps** and are
 applied frame-rate-independently in the engine (converted per physics
 substep as `drag^(dt*60)`).
 
+### Per-level physics override (opt-in, 2026-05-18)
+
+The constants above are the **global BASE**. Any level JSON MAY add a
+**sparse** top-level `"physics"` object listing ONLY the knobs it wants
+different; `loadLevel` overlays it on the BASE (`effectivePhysics`), so a
+level **without** a `physics` block is byte-identical to the global feel
+(opt-in — existing levels untouched). Keys mirror the `?tune=1` panel
+1:1:
+
+```json
+"physics": {
+  "ACCEL": 30,
+  "ice.drag": 0.999,
+  "ice.grip": 0.15
+}
+```
+
+Accepted keys: `ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`,
+`TILT_FORCE_MULTIPLIER`, `floor.drag`, `gravel.drag`, `ice.drag`,
+`ice.grip`. Values are clamped on apply (drags 0.3–0.9999, `WALL_BOUNCE`
+0–0.98 — they're per-frame multipliers; ≥1 = runaway). Workflow: open
+`?tune=1`, play the level, dial the sliders, hit **Copy physics block**
+— it copies a paste-ready *sparse* `"physics": { … }` (only values that
+differ from BASE) headed with the level label; paste into that level's
+JSON. The panel subtitle shows the current level + `[global]` /
+`[has override]`, and switching levels snaps the sliders to that level's
+effective values.
+
 ## Surfaces (3 tile types)
 
 | Tile | drag | grip | Visual |
