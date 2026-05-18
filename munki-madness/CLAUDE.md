@@ -1,8 +1,8 @@
 # Munki Madness — game-specific guidance
 
 Marble-Madness-style isometric maze. The player ball is just called a
-**"marble"** — the old "marble" name was dropped (2026-05-18); keep it
-"marble" in code, UI, and docs. Visually it's a curled-up Munki
+**"marble"** — the earlier "Munkable" name was dropped 2026-05-18; keep
+it "marble" in code, UI, and docs (do not reintroduce "Munkable"). Visually it's a curled-up Munki
 (deliberate cross-pollination with All Munkis — same character family +
 Web-Audio engine signature). Game *title* stays **"Munki Madness"**.
 Internals: physics object `marble`; the curl/roll-animation class is

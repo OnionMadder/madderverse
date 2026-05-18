@@ -32,10 +32,10 @@
   var MARBLE_R = 0.30;       // Marble radius (tiles)
 
   // ---- Physics knobs — see PHYSICS_SPEC.md (LOCKED v1.0) ----
-  var ACCEL = 16;            // input push — snappy baseline (tune via ?tune=1)
-  var MAX_SPEED = 6;         // top speed (tiles/s)
+  var ACCEL = 24;            // input push — player-dialed 2026-05-18 (?tune=1)
+  var MAX_SPEED = 12;        // top speed (tiles/s) — player-dialed
   var WALL_BOUNCE = 0.4;     // wall restitution — pinball bonk
-  var FRICTION_FLOOR = 0.92; // per-frame@60 vel multiplier (tune via ?tune=1)
+  var FRICTION_FLOOR = 0.965;// per-frame@60 vel multiplier — player-dialed
   var BUMPER_FORCE = 4;      // instantaneous velocity-add from a bumper
   var GRAVITY = 0;           // no gravity in v1 (reserved for Endeavor)
   var WALL_BONK_MIN = 1.6;   // min normal speed (tiles/s) to squeak
@@ -45,14 +45,14 @@
   var SURFACE = {
     floor:  { drag: FRICTION_FLOOR, grip: 1.0 },
     gravel: { drag: 0.78,           grip: 1.0 },
-    ice:    { drag: 0.99,           grip: 0.3 }
+    ice:    { drag: 0.998,          grip: 0.3 }
   };
 
   var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // cap substeps per frame (no spiral of death)
   // ---- Tilt control (see report) — calibrated, retuned for heavy ball ----
   var TILT_FULL = 15;             // deg of tilt PAST the recentred zero = full
-  var TILT_FORCE_MULTIPLIER = 1.2;// extra tilt gain — feel knob
+  var TILT_FORCE_MULTIPLIER = 1.4;// extra tilt gain — player-dialed 2026-05-18
   var TILT_DEADZONE = 2.5;        // deg of slack around zero (anti-jitter)
   var TILT_FLIP_X = 1;            // set -1 if left/right feels inverted
   var TILT_FLIP_Y = 1;            // set -1 if forward/back feels inverted
@@ -1501,21 +1501,25 @@
     if (!on) return;
 
     var SPECS = [
-      { k: "ACCEL",        min: 4,    max: 24,    step: 0.5,
+      // Ranges widened 2026-05-18 (player maxed ACCEL/MAX_SPEED). NOTE:
+      // *.drag are per-frame velocity multipliers and WALL_BOUNCE is a
+      // restitution — they MUST stay < 1 or velocity runs away; maxes are
+      // capped just below 1 deliberately. Don't raise them to/over 1.
+      { k: "ACCEL",        min: 2,    max: 60,    step: 1,
         get: function () { return ACCEL; },        set: function (v) { ACCEL = v; } },
-      { k: "MAX_SPEED",    min: 2,    max: 12,    step: 0.5,
+      { k: "MAX_SPEED",    min: 2,    max: 30,    step: 1,
         get: function () { return MAX_SPEED; },    set: function (v) { MAX_SPEED = v; } },
-      { k: "WALL_BOUNCE",  min: 0,    max: 0.9,   step: 0.05,
+      { k: "WALL_BOUNCE",  min: 0,    max: 0.95,  step: 0.05,
         get: function () { return WALL_BOUNCE; },  set: function (v) { WALL_BOUNCE = v; } },
-      { k: "TILT_FORCE_MULTIPLIER", min: 0.4, max: 3, step: 0.1,
+      { k: "TILT_FORCE_MULTIPLIER", min: 0.2, max: 6, step: 0.1,
         get: function () { return TILT_FORCE_MULTIPLIER; }, set: function (v) { TILT_FORCE_MULTIPLIER = v; } },
-      { k: "floor.drag",   min: 0.80, max: 0.99,  step: 0.005,
+      { k: "floor.drag",   min: 0.60, max: 0.999, step: 0.002,
         get: function () { return SURFACE.floor.drag; },  set: function (v) { SURFACE.floor.drag = v; } },
-      { k: "gravel.drag",  min: 0.60, max: 0.95,  step: 0.005,
+      { k: "gravel.drag",  min: 0.40, max: 0.999, step: 0.002,
         get: function () { return SURFACE.gravel.drag; }, set: function (v) { SURFACE.gravel.drag = v; } },
-      { k: "ice.drag",     min: 0.93, max: 0.999, step: 0.002,
+      { k: "ice.drag",     min: 0.90, max: 0.9995, step: 0.001,
         get: function () { return SURFACE.ice.drag; },    set: function (v) { SURFACE.ice.drag = v; } },
-      { k: "ice.grip",     min: 0.05, max: 1,     step: 0.05,
+      { k: "ice.grip",     min: 0,    max: 2,     step: 0.05,
         get: function () { return SURFACE.ice.grip; },    set: function (v) { SURFACE.ice.grip = v; } }
     ];
 

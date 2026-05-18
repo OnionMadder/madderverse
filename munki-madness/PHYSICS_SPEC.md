@@ -9,10 +9,11 @@ Tunable constants at the top of `game.js`:
 
 | Constant | v1.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `16` | input push force (snappy known-good baseline; live-tunable via ?tune=1) |
-| `MAX_SPEED` | `6` | top speed (tiles/s), unchanged |
+| `ACCEL` | `24` | input push force (player-dialed 2026-05-18 — "finally fun"; live-tunable via ?tune=1) |
+| `MAX_SPEED` | `12` | top speed (tiles/s) — player-dialed |
 | `WALL_BOUNCE` | `0.4` | wall restitution — satisfying pinball bonk recovery |
-| `FRICTION_FLOOR` | `0.92` | per-frame@60 velocity multiplier — coast/decay balance; live-tunable via ?tune=1 |
+| `FRICTION_FLOOR` | `0.965` | per-frame@60 velocity multiplier (= `floor` drag) — player-dialed; live-tunable via ?tune=1 |
+| `TILT_FORCE_MULTIPLIER` | `1.4` | extra tilt-input gain — player-dialed |
 | `BUMPER_FORCE` | `4` | instantaneous velocity-add a bumper imparts |
 | `GRAVITY` | `0` | no gravity in v1 (flat plane); reserved for Endeavor |
 
@@ -28,9 +29,9 @@ substep as `drag^(dt*60)`).
 
 | Tile | drag | grip | Visual |
 |---|---|---|---|
-| `floor` | 0.92 (normal) | 1.0 | standard isometric tile (purple) |
+| `floor` | 0.965 (normal) | 1.0 | standard isometric tile (purple) |
 | `gravel` | 0.78 (sticky) | 1.0 | brown speckled tile |
-| `ice` | 0.99 (glides) | 0.3 (weak steering) | pale blue, subtle shimmer |
+| `ice` | 0.998 (glides) | 0.3 (weak steering) | pale blue, subtle shimmer |
 
 Higher drag = retains more velocity (0.99 ice glides far; 0.78 gravel
 bites). grip multiplies control acceleration on that surface.
