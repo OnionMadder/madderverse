@@ -799,6 +799,72 @@ body.dual-band-mode .stage::before {
     .chip-label { font-size: 8px; }
 }
 
+/* ====== MOBILE STAGE + BANK REFLOW (phones only — max-width: 600px) ======
+   Phones get a 2×3 stage + a single-row bank. Desktop and tablets
+   (≥601px) are deliberately UNTOUCHED: they keep the 1×6 stage strip,
+   the larger bank chips, and the existing dual-band rules verbatim. The
+   600px cutoff matches the phone-portrait stage-art query at the top of
+   this file (and excludes ≥768px tablets-in-portrait by the same logic).
+   Every rule here is scoped inside this query — nothing leaks wider. */
+@media (max-width: 600px) {
+    /* Stage is ALWAYS two rows of three on phones, in BOTH modes (visual
+       symmetry preserved regardless of mode). Single-band and dual-band
+       share this geometry; dual-band only layers on the centre divider
+       (.stage::before, already defined) + the footswitches + the per-row
+       band semantics (slots 0-2 = Row A / Band 1 top, slots 3-5 = Row B
+       / Band 2 bottom — that mapping already exists in game.js; the data
+       model is unchanged at 6 slots, so every achievement that reads the
+       slots[] array — Solid Squad, Pattern Maker, Solid Sequence — keeps
+       working with zero logic change; this is a pure CSS reflow). The
+       row-gap + max-width EASE over 250ms so toggling into dual-band
+       visibly "splits" the two rows apart — the player sees the change. */
+    .stage {
+        grid-template-columns: repeat(3, 1fr);
+        column-gap: 6px;
+        row-gap: 10px;
+        max-width: 440px;
+        transition: row-gap 0.25s ease, max-width 0.25s ease;
+    }
+    body.dual-band-mode .stage {
+        grid-template-columns: repeat(3, 1fr);
+        row-gap: 30px;          /* rows part further — the visible cue */
+        max-width: 440px;
+    }
+
+    /* Single-row bank. flex:1 evenly distributes the per-bank chips
+       (6 rainbow + the evil 7th-wheel swap chip; 8 only in the rare
+       both-evils case) across the width with NO wrap, replacing the old
+       4+3 wrap that ate the stage. min-width:0 lets them shrink to fit.
+       Touch-target math (worst cases):
+         360px / 7 chips → ~46px wide   (≥ the 44px mobile guideline)
+         360px / 8 chips → ~41px wide   (~3px under 44 — the only
+                                          sub-guideline case; the chip is
+                                          still ~84px TALL so the actual
+                                          tap area stays large for a kid)
+         390–414px       → ~48–55px wide (comfortable)
+       Reclaiming the wrapped second row also frees ~110px of vertical
+       height — that's the room the bigger 2×3 Munkis now use. */
+    .tray { flex-wrap: nowrap; gap: 4px; padding: 4px 6px 6px; }
+    .tray-chip {
+        flex: 1 1 0;
+        min-width: 0;
+        width: auto;
+        height: 84px;
+        padding: 4px 2px;
+    }
+    .chip-icon { min-width: 0; }
+    .chip-label { font-size: 9px; letter-spacing: 0; }
+    .tray-hint  { font-size: 9px; letter-spacing: 0.1em; }
+
+    /* Footswitches sit comfortably on a 360px row (2 × 104 + 22 gap =
+       230px). They're display:none via [hidden] until JS enters
+       dual-band, so their appearance is itself a clear mode cue
+       alongside the 250ms row-split ease above. */
+    .band-foot { width: 104px; height: 64px; }
+    .band-foot-label { font-size: 11px; }
+    .band-foot-state { font-size: 14px; }
+}
+
 /* (Was: explicit padding-bottom on short phones. Now main reads --tray-h
    on every breakpoint so the value auto-tracks the actual tray height.) */
 
