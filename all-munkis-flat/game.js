@@ -3373,6 +3373,11 @@
                     // frame rects if meta.size is absent.
                     sheetW: size.w || Math.max(...all.map(f => f.x + f.w)),
                     sheetH: size.h || Math.max(...all.map(f => f.y + f.h)),
+                    // ONE global scale reference (max frame dim across
+                    // ALL creeps) so every creep renders at the SAME
+                    // size regardless of per-frame wing-width variation.
+                    refMax: meta.refMax
+                        || Math.max(...all.map(f => Math.max(f.w, f.h))),
                     creeps
                 };
             })
@@ -3538,11 +3543,13 @@
             : -1;
         const frames = (creepSheet && creepIdx >= 0)
             ? creepSheet.creeps[creepIdx].frames : null;
-        // Largest dimension across THIS creep's frames — the shared
-        // scale reference so every pose renders at one consistent size.
-        const refMax = frames
-            ? Math.max(...frames.map(f => Math.max(f.w, f.h)))
-            : 0;
+        // GLOBAL scale reference (same for every creep) so all creeps
+        // render at the same basic size regardless of wing-width
+        // variation. Falls back to this creep's own max if the sheet
+        // didn't carry a global refMax.
+        const refMax = (creepSheet && creepSheet.refMax)
+            ? creepSheet.refMax
+            : (frames ? Math.max(...frames.map(f => Math.max(f.w, f.h))) : 0);
         if (creepSheet) markCreepSeen(creepIdx);
         const vw = window.innerWidth, vh = window.innerHeight;
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
@@ -3566,7 +3573,8 @@
             phase: 'FLOAT', flapAt: 0, swooped: false,
             menaced: new Set(), lastBeat: -1, lastBeatTs: 0,
             swStart: 0, sx: 0, sy: 0, tx: 0, ty: 0,
-            targetIdx: null, struck: false, dieStart: 0
+            targetIdx: null, struck: false, dieStart: 0,
+            faceLeft: false
         };
         creepActive = true;
         creepEl.hidden = false;
@@ -3646,7 +3654,14 @@
             const wave = Math.sin((elapsed / CREEP.WAVE_PERIOD_MS) * Math.PI * 2)
                        * CREEP.WAVE_AMP_PX;
             st.drawY = (st.edge === 'top' ? st.y : st.baseY + wave);
-            creepEl.style.transform = `translate(${st.x}px, ${st.drawY}px)`;
+            // The art is drawn flying LEFT→RIGHT; mirror it when the
+            // creep is travelling leftward so it always faces its
+            // direction of flight (scaleX on the outer, after translate
+            // — the inner frame's death-shrink transform is unaffected).
+            st.faceLeft = st.vx < 0;
+            creepEl.style.transform =
+                `translate(${st.x}px, ${st.drawY}px)` +
+                (st.faceLeft ? ' scaleX(-1)' : '');
             // Wing-flap IN TIME TO THE BEAT: frame 1 (wings-up) on even
             // quarter-notes, frame 2 (wings-down) on odd — a slow,
             // menacing wingbeat locked to Bala's loop (beatCounter ticks
@@ -3715,6 +3730,8 @@
                     st.tx = best.cx - csz / 2;
                     st.ty = best.cy - csz / 2;
                     st.targetIdx = best.i;
+                    // Face the dive direction for the whole swoop.
+                    st.faceLeft = st.tx < st.sx;
                     clearCreepScared(); // the dive replaces ambient flinch
                 }
             }
@@ -3730,7 +3747,9 @@
             const e = p * p; // accelerating dive
             st.x     = st.sx + (st.tx - st.sx) * e;
             st.drawY = st.sy + (st.ty - st.sy) * e;
-            creepEl.style.transform = `translate(${st.x}px, ${st.drawY}px)`;
+            creepEl.style.transform =
+                `translate(${st.x}px, ${st.drawY}px)` +
+                (st.faceLeft ? ' scaleX(-1)' : '');
             // frame 3 (windup) → 4 (dive) → 5 (strike). Clamped, so a
             // single-frame fallback creep just holds its one frame.
             setCreepFrame(p < 0.40 ? 2 : (p < 0.75 ? 3 : 4));
