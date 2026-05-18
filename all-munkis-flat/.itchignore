@@ -1,0 +1,6 @@
+# Files that must NOT be in the itch.io upload zip.
+# (itch.io itself doesn't read this file — it documents intent and is
+#  honoured by the zip command in README.md: `-x "*.md" -x ".itchignore"`.)
+README.md
+.itchignore
+*.md

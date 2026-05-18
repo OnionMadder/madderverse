@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>All Munkis</title>
+    <!-- ITCH_URL placeholder — cross-site canonical/og:url/twitter:url
+         stripped for the itch.io flat build. Once the itch.io page
+         exists, optionally set these three to that page's URL:
+         <link rel="canonical" href="https://USER.itch.io/all-munkis" />
+         <meta property="og:url"     content="https://USER.itch.io/all-munkis" />
+         <meta name="twitter:url"    content="https://USER.itch.io/all-munkis" /> -->
+    <meta name="title" content="Bala's Adventures of All Munkis - A Sprunki Game from the Madderverse" />
+    <meta name="description" content="A Sprunki-style music game for kids. Drag, drop, transform, and make weird beats. Safe, free, and ad-free." />
+    <meta name="keywords" content="sprunki, sprunki game, kids music game, incredibox, The Madderverse, Onion Madder, Mad Sundar LLC, indie kids games, free kids games, ad-free games, Madderverse, Onion Madder, kid-friendly puzzles, safe gaming for kids" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Bala's Adventures of All Munkis - A Sprunki Game from the Madderverse" />
+    <meta property="og:description" content="A Sprunki-style music game for kids. Drag, drop, transform, and make weird beats. Safe, free, and ad-free." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Bala's Adventures of All Munkis - A Sprunki Game from the Madderverse" />
+    <meta name="twitter:description" content="A Sprunki-style music game for kids. Drag, drop, transform, and make weird beats. Safe, free, and ad-free." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" />
+    <meta name="apple-mobile-web-app-title" content="The Madderverse" />
+    <meta name="application-name" content="The Madderverse" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="assets/css/site-footer.css" />
+    <!-- GoatCounter analytics intentionally stripped for the itch.io
+         flat build — itch games should not phone home to madderverse
+         analytics. (Web/Play builds keep it; this is the itch clone.) -->
+</head>
+
+<body>
+
+    <!-- Prominent top-left "home" (⌂ → Madderverse) intentionally removed
+         for the itch.io flat build: an itch game living in an iframe
+         shouldn't push players off-platform from a prominent corner
+         affordance. The unobtrusive footer keeps a Madderverse link
+         (new tab) for anyone who wants to find the rest of the games. -->
+
+    <!-- Page-nav header stripped; game controls floated into the
+         universal .madder-controls top-right cluster. The
+         status/title/subtitle copy from the old header is gone
+         — the page-title is implied by the URL + home button. -->
+    <div class="madder-controls">
+        <button id="storyBtn"    class="btn btn-story"    type="button" title="Read the lore">LORE</button>
+        <button id="madballzBtn" class="btn btn-madballz" type="button" title="Meet the Madballz" hidden>MEET THE MADBALLZ</button>
+        <button id="backBtn"     class="btn btn-back"     type="button" title="Back to the light" hidden>&larr; BACK</button>
+        <button id="remixBtn"    class="btn btn-remix"    type="button">REMIX</button>
+        <button id="clearBtn"    class="btn btn-clear"    type="button">CLEAR</button>
+        <button id="songBtn"     class="btn btn-song"     type="button" aria-pressed="true" title="Toggle level song">SONG</button>
+        <button id="dualBandBtn" class="btn btn-dualband" type="button" aria-pressed="false" title="Two independent bands — time their footswitches to layer Bala's Song">DUAL BAND</button>
+        <button id="muteBtn"     class="icon-btn"         type="button" aria-label="mute"><span id="muteIcon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg></span></button>
+    </div>
+
+    <main>
+        <div class="stage-wrap">
+            <div id="stage" class="stage" aria-label="6 munki slots"></div>
+        </div>
+    </main>
+
+    <!-- Dual Band Mode footswitches. Hidden until DUAL BAND mode is on.
+         Each is a big stomp-style on/off for that row's WHOLE band
+         (its own Bala's Song + its own Munki voices, on its own loop
+         clock). The player times these to compose the layering. -->
+    <div id="bandFootswitches" class="band-footswitches" hidden aria-hidden="true">
+        <button id="bandFootA" class="band-foot" type="button" aria-pressed="false" aria-label="Band A on or off">
+            <span class="band-foot-label">BAND A</span>
+            <span class="band-foot-state">OFF</span>
+        </button>
+        <button id="bandFootB" class="band-foot" type="button" aria-pressed="false" aria-label="Band B on or off">
+            <span class="band-foot-label">BAND B</span>
+            <span class="band-foot-state">OFF</span>
+        </button>
+    </div>
+
+    <div class="tray-wrap">
+        <div class="bank-switcher">
+            <button id="bankPrev" class="bank-arrow" type="button" aria-label="Previous bank">&lsaquo;</button>
+            <span id="bankLabel" class="bank-label">BANK 1</span>
+            <button id="bankNext" class="bank-arrow" type="button" aria-label="Next bank">&rsaquo;</button>
+        </div>
+        <div class="tray-hint" id="trayHint">Drag a Munki onto the stage · Tap on stage to react · Drag off stage to remove</div>
+        <div id="tray" class="tray" aria-label="character tray"></div>
+        <!-- Swap altar. Hidden until Moon is unlocked; then shows the
+             not-currently-active evil. Drag onto the 7th-wheel chip in the
+             tray to swap. Populated by renderMunkiAltar() in game.js. -->
+        <div id="munkiAltar" class="munki-altar" aria-label="swap altar" hidden></div>
+    </div>
+
+    <!-- (Childish full-screen "BOO!" overlay removed. The FNAF jump scare
+         — red flash + screen shake + sprite glitch + shriek — still fires
+         automatically when Ice/Moon lands on the stage; it just no longer
+         shouts a cartoon "BOO!".) -->
+
+    <!-- Egg counter chip. Hidden by default; revealed on first achievement.
+         Tap to open the achievements panel listing every unlocked entry. -->
+    <button id="eggCounter" class="egg-counter" type="button" aria-live="polite"
+            aria-haspopup="dialog" aria-label="Open achievements" hidden>
+        <span class="egg-counter-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998z"/></svg></span>
+        <span class="egg-counter-text">0/5</span>
+    </button>
+
+    <!-- Achievements panel — populated by renderAchievementsPanel() on open.
+         Lists only the achievements the kid has unlocked; locked ones don't
+         appear at all so the discovery surface stays intact. -->
+    <aside id="achievementsPanel" class="achievements-panel"
+           aria-hidden="true" role="dialog" aria-label="Achievements"></aside>
+
+    <!-- Moon Munki reveal overlay. Fades in when the 5th egg is found,
+         shows a moon glyph + "MOON MUNKI AWAKENED" text, fades out after
+         ~3.5s. Tapping it dismisses early. Only fires once per kid (the
+         moonUnlocked persisted flag gates it). -->
+    <div id="moonReveal" class="moon-reveal" aria-hidden="true" role="dialog">
+        <div class="moon-reveal-card">
+            <div class="moon-reveal-glyph" aria-hidden="true"><svg viewBox="0 0 24 24" width="76" height="76" fill="currentColor"><path d="M21.752 15.002A9.718 9.718 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998z"/></svg></div>
+            <div class="moon-reveal-title">MOON MUNKI AWAKENED</div>
+            <div class="moon-reveal-sub">He joins your bank.</div>
+        </div>
+    </div>
+
+    <!-- Hidden corner hotspots for the 4-corners egg. 60×60 transparent
+         taps in each viewport corner. pointer-events: auto in CSS so they
+         catch taps without showing anything. -->
+    <div id="cornerTL" class="corner-egg corner-tl" aria-hidden="true"></div>
+    <div id="cornerTR" class="corner-egg corner-tr" aria-hidden="true"></div>
+    <div id="cornerBR" class="corner-egg corner-br" aria-hidden="true"></div>
+    <div id="cornerBL" class="corner-egg corner-bl" aria-hidden="true"></div>
+
+    <!-- Horror-mode corner Munkis: Moon creeps in from the lower-left edge,
+         Ice from the lower-right. Slowly fade + slide into view while
+         body.react-mode-active is set, then fade back out when react mode
+         ends. Frames cropped from assets/bg-img/bg-munkis.png. -->
+    <svg class="horror-munki horror-munki--moon" viewBox="2 2 432 988" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+        <image href="assets/bg-img/bg-munkis.png" x="0" y="0" width="870" height="992"/>
+    </svg>
+    <svg class="horror-munki horror-munki--ice" viewBox="436 2 432 988" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+        <image href="assets/bg-img/bg-munkis.png" x="0" y="0" width="870" height="992"/>
+    </svg>
+
+    <!-- Story modal: opens when the player hits the LORE button. The lore
+         explains the 7 crew colors, the BLACK Watchers (one per bank), the
+         4 WHITE evils (Ice, Moon, Void, Static), and the Madballz tie-in. -->
+<div id="storyModal" class="story-modal" aria-hidden="true" role="dialog" aria-labelledby="storyTitle">
+        <div class="story-card">
+            <button id="storyCloseBtn" class="story-close" type="button" aria-label="Close lore">&times;</button>
+            <button id="storyReadBtn" class="story-read" type="button" aria-label="Read the lore aloud">
+                <span class="story-read-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg></span>
+                <span class="story-read-lbl">Read</span>
+            </button>
+            <h2 id="storyTitle" class="story-title">THE RAINBOW &amp; THE CURSED MUNKIS</h2>
+            <div class="story-body">
+                <p>Six Munkis make the rainbow. <strong>Red</strong>, <strong>Orange</strong>, <strong>Yellow</strong>, <strong>Green</strong>, <strong>Blue</strong>, and <strong>Purple</strong>. Together they shine, and together they keep the loop going.</p>
+
+                <p>And then there are the <strong class="lore-bad">two who don't fit</strong>. <strong>Ice Munki</strong> is too cold to be a color. <strong>Moon Munki</strong> is too dark. When the rainbow gets together, those two have to watch from the side. They wish you'd pick them — you'll hear them say so if you stop by.</p>
+
+                <p>It's not because they're mean. It's because they're not used to being chosen. But jealousy that old turns sharp. Long ago, Ice and Moon reached out and <strong class="lore-bad">cursed</strong> some of the rainbow Munkis — twisting them, giving them wings, and casting them out.</p>
+
+                <p>Those are the <strong class="lore-bad">Flying Creeps</strong>: Red, Orange, Yellow, Green, Blue, and Purple, each warped into a winged, sorrowful thing. Forever they drift back to the stage — not to rejoin the rainbow, but to ruin the performance they can never be part of again.</p>
+
+                <p>And if Ice or Moon themselves land on the stage — the room goes a little <em>WRONG</em>. The lights flicker. The music shivers. That's <strong>HORROR MODE</strong>.</p>
+
+                <p class="story-hint">Moon is shy. He's hiding somewhere on this page. Try things. Tap things. Maybe he'll show up.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tone.js (MIT, v14.8.49, self-hosted) — used for the richer ambient
+         layer (reverb/delay bus, PolySynth pad, FM bell, drum kit). The
+         per-Munki play() functions still use raw WebAudio underneath. -->
+    <script src="assets/vendor/tone.min.js"></script>
+    <script src="game.js"></script>
+
+    <footer class="site-footer-slim" aria-label="Site info">
+        <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="https://madderverse.org/" target="_blank" rel="noopener">The Madderverse</a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="https://madderverse.org/about.html" target="_blank" rel="noopener">About</a>
+    </footer>
+    <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
+</body>
+</html>
