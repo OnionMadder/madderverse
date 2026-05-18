@@ -48,6 +48,13 @@
     --radius-sm:    4px;
     --radius-md:    8px;
     --radius-lg:    14px;
+
+    /* Android 15+ / notched-phone safe area. The app targets
+       SDK 35 (forced edge-to-edge) so the WebView draws behind
+       the bottom gesture / 3-button nav bar. Anything pinned to
+       bottom:0 must pad by this or it sits under the system bar
+       and becomes untappable. Resolves to 0 on desktop. */
+    --safe-bottom:  env(safe-area-inset-bottom, 0px);
 }
 
 /* ----- 2. Reset / base ----- */
@@ -63,6 +70,7 @@ html, body {
     color: var(--ink);
     font-family: var(--font-ui);
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 body {
@@ -173,6 +181,7 @@ a:focus-visible {
     margin: 0 auto;
     padding: 24px 16px 60px;
     min-height: calc(100vh - 110px); /* keep footer near the bottom */
+    min-height: calc(100dvh - 110px);
     display: flex;
     flex-direction: column;
 }
@@ -683,7 +692,7 @@ a:focus-visible {
 
 .specs-hook {
     position: fixed;
-    bottom: 12px;
+    bottom: calc(12px + var(--safe-bottom));
     right: 12px;
     z-index: 60;
     width: 32px;
@@ -4682,9 +4691,13 @@ a:focus-visible {
         z-index: 80;
         max-width: none;
         max-height: 72vh;
+        max-height: 72dvh;
         overflow-y: auto;
         gap: 12px;
-        padding: 0 14px 18px;
+        /* Bottom pad clears the Android gesture / nav bar so the
+           last control row (FIRE IT / FINISH FORM) isn't hidden
+           under it when the drawer is open. */
+        padding: 0 14px calc(18px + var(--safe-bottom));
         background: linear-gradient(180deg,
             #082028 0%,
             #051218 26%,
@@ -4695,7 +4708,9 @@ a:focus-visible {
         box-shadow:
             0 -8px 24px rgba(0, 0, 0, 0.65),
             0 -1px 0 0 rgba(255, 46, 136, 0.35);
-        transform: translateY(calc(100% - 54px));
+        /* Collapsed: leave the 54px handle ABOVE the gesture bar
+           (extra --safe-bottom lift) so it stays grabbable. */
+        transform: translateY(calc(100% - 54px - var(--safe-bottom)));
         transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
     }
 
@@ -4757,7 +4772,7 @@ a:focus-visible {
        (54px handle + the canvas-wrap's own padding). */
     #screen-shape,
     #screen-decorate {
-        padding-bottom: 72px;
+        padding-bottom: calc(72px + var(--safe-bottom));
     }
 }
 
