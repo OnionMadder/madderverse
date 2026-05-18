@@ -1,8 +1,8 @@
 /* Munki Madness — Chunk 1
-   Isometric marble maze. The marble is a "Munkable" — a curled-up Munki
+   Isometric marble maze. The marble is a "Marble" — a curled-up Munki
    (cross-pollinates with All Munkis). Physics is a custom deterministic
    swept circle-vs-tile-grid stepper (no engine) — exact collision on the
-   grid, so the Munkable can't tunnel walls or leave the board. The iso
+   grid, so the Marble can't tunnel walls or leave the board. The iso
    projection is a render-only affine transform. Audio is 100% Web Audio
    synthesis and is
    written against the master-gain -> compressor -> destination pattern so
@@ -21,7 +21,7 @@
   // Tunables  (all in WORLD units: 1 = one tile, time in seconds)
   // ---------------------------------------------------------------------
   // Custom deterministic physics — no engine. The world is an axis-aligned
-  // tile grid, so a swept circle-vs-grid stepper is exact: the Munkable
+  // tile grid, so a swept circle-vs-grid stepper is exact: the Marble
   // collides against the grid and literally cannot pass it or leave the
   // board. Feel is fully under our control via the knobs below.
   var CANVAS = 640;          // internal canvas resolution (square)
@@ -29,7 +29,7 @@
   var WALL_H = 0.55;         // wall block height in world (tile) units
   var HEIGHT_UNIT = 0.5;     // world-z rise per elevation level
   var SPRING_ARC = 0.45;     // spring launch visual-arc duration (s)
-  var MARBLE_R = 0.30;       // Munkable radius (tiles)
+  var MARBLE_R = 0.30;       // Marble radius (tiles)
 
   // ---- Physics knobs — see PHYSICS_SPEC.md (LOCKED v1.0) ----
   var ACCEL = 16;            // input push — snappy baseline (tune via ?tune=1)
@@ -420,50 +420,50 @@
         var im = new Image();
         im.onload = function () { ok++; done(); };
         im.onerror = done;
-        im.src = base + "munkable-curl-" + idx + ".png";
+        im.src = base + "marble-curl-" + idx + ".png";
         Sprites.curl[idx - 1] = im;
       })(i);
     }
     var b = new Image();
     b.onload = function () { ok++; done(); };
     b.onerror = done;
-    b.src = base + "munkable-ball.png";
+    b.src = base + "marble-ball.png";
     Sprites.ball = b;
   }
   loadSprites();
 
   // ---------------------------------------------------------------------
-  // Munkable — the player marble (a curled-up Munki). Animation state
+  // Marble — the player marble (a curled-up Munki). Animation state
   // machine: STANDING -> CURLING -> ROLLED -> UNCURLING.
   // Curl/uncurl play frames 1..5 over ~400ms at level start/end. While
   // ROLLED the sprite spins to match the physics velocity vector.
   // ---------------------------------------------------------------------
-  function Munkable() {
+  function Marble() {
     this.state = "STANDING";
     this.animT = 0;            // 0..1 progress through curl/uncurl
     this.spin = 0;             // accumulated roll angle (rad)
     this.popT = 0;             // placeholder curl-pop timer (s)
   }
-  Munkable.ANIM_DUR = 0.4;     // seconds for a full curl / uncurl
-  Munkable.prototype.beginCurl = function () {
+  Marble.ANIM_DUR = 0.4;     // seconds for a full curl / uncurl
+  Marble.prototype.beginCurl = function () {
     this.state = "CURLING"; this.animT = 0; this.popT = 0;
   };
-  Munkable.prototype.beginUncurl = function () {
+  Marble.prototype.beginUncurl = function () {
     this.state = "UNCURLING"; this.animT = 0;
   };
-  Munkable.prototype.update = function (dt, speed) {
+  Marble.prototype.update = function (dt, speed) {
     if (this.state === "CURLING") {
-      this.animT += dt / Munkable.ANIM_DUR;
+      this.animT += dt / Marble.ANIM_DUR;
       this.popT += dt;
       if (this.animT >= 1) { this.animT = 1; this.state = "ROLLED"; }
     } else if (this.state === "UNCURLING") {
-      this.animT += dt / Munkable.ANIM_DUR;
+      this.animT += dt / Marble.ANIM_DUR;
       if (this.animT >= 1) { this.animT = 1; this.state = "STANDING"; }
     } else if (this.state === "ROLLED") {
       this.spin += speed * dt * 2.4;
     }
   };
-  Munkable.prototype.frameIndex = function () {
+  Marble.prototype.frameIndex = function () {
     if (this.state === "CURLING")  return Math.min(4, Math.floor(this.animT * 5));
     if (this.state === "UNCURLING") return Math.min(4, Math.floor((1 - this.animT) * 5));
     if (this.state === "ROLLED")   return 4;
@@ -479,7 +479,7 @@
   var targetMs = 30000;                   // 3-star time target for level
   var lastCellKey = "";                   // for fire-once bumper/spinner/spring
   var bumperFlash = {};                   // "c,r" -> flash timer (s)
-  // Munkable state — plain object, world units. vx/vy in tiles/s.
+  // Marble state — plain object, world units. vx/vy in tiles/s.
   // mh = current plane (integer height); zv = visual world-z; zArc =
   // transient spring-launch hop added on top of zv.
   var marble = { x: 1.5, y: 1.5, vx: 0, vy: 0, speed: 0, mh: 0, zv: 0, zArc: 0, arcT: 0 };
@@ -489,7 +489,7 @@
   var phase = "menu";   // menu | intro | play | falling | won
   var customLevel = null;   // non-null while play-testing an editor level
   var mmExit = null;        // editor "exit test-play" callback, if any
-  var munkable = new Munkable();
+  var marbleAnim = new Marble();
   var attempts = 0;
   var levelTime = 0;    // seconds this attempt
   var timerRunning = false;
@@ -641,8 +641,8 @@
     levelTime = 0;
     timerRunning = false;
     elTimer.textContent = "0.0";
-    munkable = new Munkable();
-    munkable.beginCurl();              // curl-up intro every spawn
+    marbleAnim = new Marble();
+    marbleAnim.beginCurl();              // curl-up intro every spawn
     phase = "intro";
     if (!initial) {
       attempts++;
@@ -807,11 +807,11 @@
   // Custom grid physics
   // ---------------------------------------------------------------------
   // A cell is solid if it's a wall OR off the board. Holes are NOT solid
-  // (the Munkable rolls into them — that's the fall). Floor/ice/gravel/
+  // (the Marble rolls into them — that's the fall). Floor/ice/gravel/
   // goal/spawn are passable.
   // Resolve circle-vs-solid-tile overlaps by minimum translation, and
   // cancel the inward velocity (slide along walls, small bounce). Called
-  // after every micro-step so a fast Munkable can never pass a wall.
+  // after every micro-step so a fast Marble can never pass a wall.
   function resolveCollisions() {
     var R = MARBLE_R;
     for (var it = 0; it < 4; it++) {
@@ -896,7 +896,7 @@
         if (bumperFlash[key] <= 0) delete bumperFlash[key];
       }
 
-      // ---- elevation: where is the Munkable's plane + visual z? ----
+      // ---- elevation: where is the Marble's plane + visual z? ----
       var planeZ = marble.mh * HEIGHT_UNIT;
       if (cell && cell.type === "ramp") {
         var p = rampProgress(cell, cc, rr);
@@ -905,7 +905,7 @@
         planeZ = (cell.height + cell.hd * p) * HEIGHT_UNIT;
       } else if (cell && cell.type === "spring") {
         // plane is governed by the launch — do NOT reset it to the
-        // spring's base height or the Munkable can never leave upward.
+        // spring's base height or the Marble can never leave upward.
         planeZ = marble.mh * HEIGHT_UNIT;
       } else if (cell) {
         marble.mh = cell.height;
@@ -982,7 +982,7 @@
   function winLevel() {
     phase = "won";
     timerRunning = false;
-    munkable.beginUncurl();
+    marbleAnim.beginUncurl();
     Sound.chime();
     // Stars: 1 = cleared, 2 = zero falls, 3 = zero falls AND under target.
     var falls = attempts;                       // respawns this level
@@ -1233,7 +1233,7 @@
     var z = marble.zv + ((phase === "falling") ? fallZ : 0);
     var p = project(marble.x, marble.y, z);
 
-    // shadow sits on the Munkable's current plane (skip while falling)
+    // shadow sits on the Marble's current plane (skip while falling)
     if (phase !== "falling") {
       ctx.save();
       ctx.globalAlpha = 0.30;
@@ -1249,23 +1249,23 @@
     // placeholder "curl pop" during the intro: scale 1.0 -> 0.6 w/ bounce
     var rpx = tileW * MARBLE_R;
     var scale = 1;
-    if (munkable.state === "CURLING") {
-      var k = munkable.animT;
+    if (marbleAnim.state === "CURLING") {
+      var k = marbleAnim.animT;
       scale = 1 - 0.4 * k + 0.08 * Math.sin(k * Math.PI * 3) * (1 - k);
-    } else if (munkable.state === "UNCURLING") {
-      scale = 0.6 + 0.4 * munkable.animT;
+    } else if (marbleAnim.state === "UNCURLING") {
+      scale = 0.6 + 0.4 * marbleAnim.animT;
     }
     if (phase === "falling") scale *= fallScale;
     var R = rpx * scale;
     var fade = (phase === "falling") ? Math.max(0, fallScale) : 1;
 
     if (USE_SPRITES && Sprites.ready) {
-      var img = (munkable.state === "ROLLED") ? Sprites.ball
-                                           : Sprites.curl[munkable.frameIndex()];
+      var img = (marbleAnim.state === "ROLLED") ? Sprites.ball
+                                           : Sprites.curl[marbleAnim.frameIndex()];
       ctx.save();
       ctx.globalAlpha = fade;
       ctx.translate(p.x, p.y);
-      if (munkable.state === "ROLLED") ctx.rotate(munkable.spin * 0.5);
+      if (marbleAnim.state === "ROLLED") ctx.rotate(marbleAnim.spin * 0.5);
       ctx.drawImage(img, -R, -R, R * 2, R * 2);
       ctx.restore();
       return;
@@ -1288,7 +1288,7 @@
     // seam line rotates with accumulated spin
     ctx.save();
     ctx.translate(p.x, p.y);
-    ctx.rotate(munkable.spin * 0.5);
+    ctx.rotate(marbleAnim.spin * 0.5);
     ctx.strokeStyle = "rgba(60,25,0,0.55)";
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -1338,19 +1338,19 @@
     lastTS = ts;
 
     if (phase === "intro") {
-      munkable.update(dt, 0);
-      if (munkable.state === "ROLLED") phase = "play";
+      marbleAnim.update(dt, 0);
+      if (marbleAnim.state === "ROLLED") phase = "play";
     } else if (phase === "play") {
       var steps = Math.max(1, Math.min(MAX_SUBSTEPS, Math.round(dt / FIXED_DT)));
       for (var s = 0; s < steps && phase === "play"; s++) physicsTick();
-      munkable.update(dt, marble.speed);
+      marbleAnim.update(dt, marble.speed);
       Sound.roll(marble.speed);
     } else if (phase === "falling") {
       Sound.roll(0);
-      munkable.update(dt, 0);
+      marbleAnim.update(dt, 0);
     } else if (phase === "won") {
       Sound.roll(0);
-      munkable.update(dt, 0);
+      marbleAnim.update(dt, 0);
     } else {
       Sound.roll(0);
     }

@@ -16,7 +16,7 @@ Tunable constants at the top of `game.js`:
 | `BUMPER_FORCE` | `4` | instantaneous velocity-add a bumper imparts |
 | `GRAVITY` | `0` | no gravity in v1 (flat plane); reserved for Endeavor |
 
-The Munkable should feel like a steel ball-bearing on a wood-and-plastic
+The marble should feel like a steel ball-bearing on a wood-and-plastic
 maze toy: slow to start, slow to stop, lots of mid-roll momentum. Players
 win through careful control, not snap reflexes.
 
@@ -38,20 +38,20 @@ bites). grip multiplies control acceleration on that surface.
 ## Elevation (v1.1)
 
 Every tile has an integer `height` (default 0), rendered raised in the
-iso projection. The Munkable has a plane `mh`. **It cannot cross between
+iso projection. The marble has a plane `mh`. **It cannot cross between
 tiles of different height — that edge is an invisible wall — unless a
 ramp or spring bridges them.** All other tile types work at any height
 (a hole at height 2 still kills, a bumper at height 1 still redirects).
 
 - **Ramp** — `direction` (N|S|E|W) + `height_delta` (e.g. +1/-1).
-  Smoothly transitions the Munkable between `height` and
+  Smoothly transitions the marble between `height` and
   `height+height_delta`; rendered as an iso slope with an up-arrow.
 - **Spring** — `height_delta` (e.g. +2). Stepping on it launches the
-  Munkable up by N levels (visual arc ~0.45s) + a "boing" SFX.
+  marble up by N levels (visual arc ~0.45s) + a "boing" SFX.
 
 ## Traps (3 types)
 
-- **Hole** — kill tile. When the Munkable's *center* crosses a hole:
+- **Hole** — kill tile. When the marble's *center* crosses a hole:
   fall animation (scale-down + opacity fade over **350ms**) + the
   descending scream SFX, then a **600ms** beat, then respawn at the
   level `spawn`. `attempts` increments. Visual: dark pit with rough rim.

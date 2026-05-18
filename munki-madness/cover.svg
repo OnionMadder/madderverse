@@ -36,7 +36,7 @@
     <polygon points="220,222 285,250 220,278 155,250" fill="#05030a"/>
   </g>
 
-  <!-- the Munkable (a curled-up Munki) -->
+  <!-- the marble (a curled-up Munki) -->
   <ellipse cx="322" cy="206" rx="44" ry="20" fill="#000" opacity="0.32"/>
   <circle cx="320" cy="172" r="40" fill="url(#ball)" stroke="rgba(0,0,0,0.35)" stroke-width="2"/>
   <ellipse cx="320" cy="172" rx="24" ry="36" fill="none" stroke="rgba(60,25,0,0.5)" stroke-width="3"/>
@@ -44,5 +44,5 @@
   <text x="320" y="60" text-anchor="middle" font-family="Trebuchet MS, Segoe UI, sans-serif"
         font-size="44" font-weight="700" fill="#ffd76b" letter-spacing="2">MUNKI MADNESS</text>
   <text x="320" y="392" text-anchor="middle" font-family="Trebuchet MS, Segoe UI, sans-serif"
-        font-size="17" fill="#7df0c8">Tilt the heavy Munkable through the maze</text>
+        font-size="17" fill="#7df0c8">Tilt the heavy marble through the maze</text>
 </svg>

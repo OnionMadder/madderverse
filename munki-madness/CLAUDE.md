@@ -1,10 +1,13 @@
 # Munki Madness — game-specific guidance
 
-Marble-Madness-style isometric maze. The player marble **is a curled-up
-Munki**, canonically called a **"Munkable"** (plural Munkables) — this is
-deliberate cross-pollination with All Munkis (same character family, same
-Web-Audio engine signature). Game *title* stays "Munki Madness"; only the
-marble entity is a "Munkable".
+Marble-Madness-style isometric maze. The player ball is just called a
+**"marble"** — the old "marble" name was dropped (2026-05-18); keep it
+"marble" in code, UI, and docs. Visually it's a curled-up Munki
+(deliberate cross-pollination with All Munkis — same character family +
+Web-Audio engine signature). Game *title* stays **"Munki Madness"**.
+Internals: physics object `marble`; the curl/roll-animation class is
+`Marble` with instance `marbleAnim` (distinct from the `marble` object);
+sprite files are `marble-curl-1..5.png` + `marble-ball.png`.
 
 Flat-shape game (matches the repo convention): `index.html` + `game.js` +
 `style.css` + `editor.js` at the root, `assets/` and `levels/` alongside.
@@ -22,7 +25,7 @@ No build system — files ship to the browser as-is.
   editor bridge.
 - `editor.js` — dev-only level editor (see UGC roadmap below).
 - `levels/*.json` + `levels/index.json` — the curated launch catalog.
-- `assets/sprites/SPRITES_README.md` — Munkable sprite hand-off spec
+- `assets/sprites/SPRITES_README.md` — marble sprite hand-off spec
   (`USE_SPRITES` flag in game.js flips placeholder → real art).
 
 ## Two level representations (intentional)
@@ -96,12 +99,12 @@ The level editor is the seed of player-facing user-generated content.
 
 ## Chunk plan / status
 
-1. Scaffold + physics + 3 test levels + placeholder Munkable + audio — **shipped**
+1. Scaffold + physics + 3 test levels + placeholder marble + audio — **shipped**
 2. Real sprite integration + 5-phase curl animation — *blocked on user-supplied art*
 3. In-app level editor (dev-only) + UGC-ready portable schema + storage abstraction — **shipped**
 4. 30-level launch catalog built via the editor — **shipped** (Claude-drafted, user refines)
 5. Daily challenge (date-seeded) + per-level best-time — *next*
-6. Cosmetic Munkable skins (unlock + paid pack)
+6. Cosmetic marble skins (unlock + paid pack)
 7. Capacitor wrap for Android + Play Store assets
 8. Ghost-run replay feature
 9. **(v1.5, separate ship)** UGC backend (Cloudflare Worker) + Community
