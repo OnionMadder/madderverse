@@ -119,8 +119,91 @@
     // layering. Single-row default + v1.0 audio path are untouched.
     let isDualBandMode = false;
     let bandOn = [false, false]; // Row A, Row B — both start OFF on entry
+    // ---- Chunk B audio (built lazily on first dual-band entry) ----
+    // Pattern ported from the Tonehouse prototype: each band is the SAME
+    // untouched engine code (BASE_SONG + per-Munki play()) scheduled into
+    // its OWN bus GainNode + its OWN Tone ambient set on its OWN loop
+    // clock; both buses converge at the single masterGain -> compressor
+    // (the locked design's required convergence). v1.0 single-row path is
+    // never touched — scheduleStep just early-returns its audio in mode.
+    let dualReady = false;
+    let rowGain = [null, null];   // per-row bus -> masterGain (footswitch gates)
+    let rowTone = [null, null];   // per-row {pad,bell,hat} (own Bala's Song)
+    let rowClock = [
+        { step: 0, bar: 0, next: 0, started: false },
+        { step: 0, bar: 0, next: 0, started: false }
+    ];
     function bandFootEl(i) {
         return document.getElementById(i === 0 ? 'bandFootA' : 'bandFootB');
+    }
+    function ensureDualBandAudio() {
+        if (dualReady || !audioCtx || !masterGain) return;
+        for (let r = 0; r < 2; r++) {
+            const rg = audioCtx.createGain();
+            rg.gain.value = 0;            // silent until the footswitch lifts it
+            rg.connect(masterGain);       // converge at the one master/compressor
+            rowGain[r] = rg;
+            // This row's OWN Bala's Song: its own Tone ambient instances
+            // through its own reverb/delay bus -> this row's gain. Wrapped
+            // so a Tone failure can never break the raw-WebAudio path.
+            if (typeof Tone !== 'undefined' && toneReady) {
+                try {
+                    const rv = new Tone.Reverb({ decay: 3.4, preDelay: 0.04, wet: 0.35 });
+                    const dl = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: 0.22, wet: 0.22 });
+                    const bo = new Tone.Gain(0.55);
+                    rv.connect(dl); dl.connect(bo); Tone.connect(bo, rg);
+                    const pad = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: 'fatsine', count: 3, spread: 22 },
+                        envelope: { attack: 0.45, decay: 0.35, sustain: 0.65, release: 1.4 },
+                        volume: -22 });
+                    pad.connect(rv);
+                    const bell = new Tone.FMSynth({
+                        harmonicity: 2, modulationIndex: 11,
+                        envelope:           { attack: 0.002, decay: 0.5, sustain: 0, release: 0.7 },
+                        modulationEnvelope: { attack: 0.002, decay: 0.4, sustain: 0, release: 0.7 },
+                        volume: -16 });
+                    bell.connect(rv);
+                    const hat = new Tone.MetalSynth({
+                        envelope: { attack: 0.001, decay: 0.05, release: 0.08 },
+                        harmonicity: 5.1, modulationIndex: 32, resonance: 4200,
+                        octaves: 1.5, volume: -32 });
+                    Tone.connect(hat, rg);
+                    rowTone[r] = { pad: pad, bell: bell, hat: hat };
+                } catch (_) { rowTone[r] = null; }
+            }
+        }
+        dualReady = true;
+    }
+    // Mirrors TONE_LAYER.play onto a given row's own ambient instruments.
+    function playRowTone(r, step, bar, when) {
+        const T = rowTone[r];
+        if (!T) return;
+        const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR;
+        if (step === 0) {
+            const ch = TONE_LAYER.chordsByBar[bar];
+            if (ch) T.pad.triggerAttackRelease(ch, BAR_LEN * 0.92, when);
+        }
+        if (step === 2 || step === 10) T.hat.triggerAttackRelease('C5', '32n', when);
+        if (bar === 2 && step === 0)  T.bell.triggerAttackRelease('C6', '2n', when + 0.04);
+        if (bar === 3 && step === 12) T.bell.triggerAttackRelease('E6', '4n', when);
+    }
+    // One scheduler tick for one band: its own Bala's Song bed + Tone
+    // ambient + only its 3 slots, all into this row's bus. Row A = slots
+    // 0-2, Row B = slots 3-5. Engine code (BASE_SONG/play) is untouched —
+    // we only pass this row's bus as `out` and this row's clock as `when`.
+    function dualRowStep(r, step, bar, when) {
+        if (!rowGain[r]) return;
+        if (isBaseSongOn) {
+            BASE_SONG.play(audioCtx, rowGain[r], when, step, bar);
+            playRowTone(r, step, bar, when);
+        }
+        const lo = r * 3;
+        for (let i = lo; i < lo + 3; i++) {
+            const id = slots[i];
+            if (!id) continue;
+            const ch = CHARACTERS[id];
+            if (ch && ch.play) ch.play(audioCtx, rowGain[r], when, step);
+        }
     }
     function setBandOn(i, on) {
         bandOn[i] = on;
@@ -131,7 +214,19 @@
             const st = el.querySelector('.band-foot-state');
             if (st) st.textContent = on ? 'ON' : 'OFF';
         }
-        // (Chunk B reads bandOn[i] to gate that row's rowGain.)
+        // Footswitch = mute/unmute this row's WHOLE band via its bus gain.
+        if (rowGain[i] && audioCtx) {
+            const g = rowGain[i].gain, t = audioCtx.currentTime;
+            g.cancelScheduledValues(t);
+            g.setValueAtTime(g.value, t);
+            g.linearRampToValueAtTime(on ? 1 : 0, t + 0.06);
+        }
+        // First time a band is switched ON, anchor its loop clock to NOW.
+        // The gap between the two anchors = whenever the player stamped
+        // each footswitch = the performed offset (the two-tab magic).
+        if (on && audioCtx && !rowClock[i].started) {
+            rowClock[i] = { step: 0, bar: 0, next: audioCtx.currentTime + 0.08, started: true };
+        }
     }
     function setDualBandMode(on) {
         isDualBandMode = on;
@@ -143,8 +238,11 @@
         }
         const foot = document.getElementById('bandFootswitches');
         if (foot) { foot.hidden = !on; foot.setAttribute('aria-hidden', String(!on)); }
-        // Entering or leaving always resets both bands to OFF so the
-        // player starts the layering from silence and times it in.
+        if (on) { ensureAudio(); ensureDualBandAudio(); }
+        // Entering or leaving always resets both bands to OFF + un-anchors
+        // their clocks, so the player re-times the layering from silence.
+        rowClock[0].started = false;
+        rowClock[1].started = false;
         setBandOn(0, false);
         setBandOn(1, false);
     }
@@ -349,20 +447,43 @@
                 currentBar = (currentBar + 1) % BARS_PER_LOOP;
             }
         }
+        // Dual Band Mode: each band runs its OWN independent loop clock,
+        // pumped here in the same look-ahead window. A band's clock only
+        // advances once it's been switched on (rowClock[r].started).
+        if (isDualBandMode) {
+            for (let r = 0; r < 2; r++) {
+                const rc = rowClock[r];
+                if (!rc.started) continue;
+                while (rc.next < audioCtx.currentTime + SCHEDULE_AHEAD) {
+                    dualRowStep(r, rc.step, rc.bar, rc.next);
+                    rc.next += SECONDS_PER_STEP;
+                    rc.step++;
+                    if (rc.step >= STEPS_PER_BAR) {
+                        rc.step = 0;
+                        rc.bar = (rc.bar + 1) % BARS_PER_LOOP;
+                    }
+                }
+            }
+        }
         schedTimer = setTimeout(schedule, LOOKAHEAD_MS);
     }
 
     function scheduleStep(step, bar, when) {
-        if (isBaseSongOn) {
-            BASE_SONG.play(audioCtx, masterGain, when, step, bar);
-            TONE_LAYER.play(step, bar, when); // ambient pad + bell + hat
-        }
-        // User-placed mods
-        for (let i = 0; i < NUM_SLOTS; i++) {
-            const id = slots[i];
-            if (!id) continue;
-            const ch = CHARACTERS[id];
-            if (ch && ch.play) ch.play(audioCtx, masterGain, when, step);
+        // Single-row v1.0 audio path (byte-unchanged). In Dual Band Mode
+        // the audio is produced by dualRowStep() per band instead; we
+        // still run the quarter-note visual/react tick below.
+        if (!isDualBandMode) {
+            if (isBaseSongOn) {
+                BASE_SONG.play(audioCtx, masterGain, when, step, bar);
+                TONE_LAYER.play(step, bar, when); // ambient pad + bell + hat
+            }
+            // User-placed mods
+            for (let i = 0; i < NUM_SLOTS; i++) {
+                const id = slots[i];
+                if (!id) continue;
+                const ch = CHARACTERS[id];
+                if (ch && ch.play) ch.play(audioCtx, masterGain, when, step);
+            }
         }
         if (step % 4 === 0) {
             const delayMs = Math.max(0, (when - audioCtx.currentTime) * 1000);
