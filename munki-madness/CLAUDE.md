@@ -34,9 +34,15 @@ No build system — files ship to the browser as-is.
    the readable form `{ "name", "time", "rows": ["####", ...] }`. Kept
    deliberately terse for clean git diffs and hand-tweaking. This is
    repo-authored content, NOT user content.
-2. **Editor / UGC portable schema** (`schema_version: 1`): self-contained
-   and portable, emitted by the editor's Save / Export File. Carries
-   every UGC field from day one so v1.5 needs **no schema migration**.
+2. **Editor output = the same object-tile catalog JSON** (Phase A
+   rework, 2026-05-18). `editor.js` now emits exactly what `game.js`
+   loads: `{ name, grid:{w,h}, target_time_ms, tiles:[{x,y,type,…}],
+   physics? }` — directly playable / committable into `levels/`. It
+   exports **explicit sparse tiles** (no `fill` key — eraser = gap);
+   functionally identical to a `fill`+sparse level but verbose for
+   big rectangular ones (a Phase C compaction nicety, not a bug). The
+   old `schema_version:1` portable `rows[]` UGC schema is **deferred to
+   v1.5** (the `LevelStorage` seam below already future-proofs it).
 
 `game.js normalizeLevel()` accepts BOTH (`title||name`, `tiles||rows||grid`).
 Tile alphabet (shared by both): `#` wall · `.` floor · `S` slow/sticky ·
@@ -110,7 +116,13 @@ The level editor is the seed of player-facing user-generated content.
 
 1. Scaffold + physics + 3 test levels + placeholder marble + audio — **shipped**
 2. Real sprite integration + 5-phase curl animation — *blocked on user-supplied art*
-3. In-app level editor (dev-only) + UGC-ready portable schema + storage abstraction — **shipped**
+3. In-app level editor (dev-only) — **Phase A shipped** (reworked to the
+   v1.1 object-tile schema: WYSIWYG iso paint, all flat tile types +
+   bumper/spinner dir·rot, sparse/gap shapes, lossless load of real
+   catalog levels, validate, Save/Load/Export/Copy/Import/Test-Play).
+   **Phase B** = elevation (height brush, ramp, spring, height-aware
+   render + reachability). **Phase C** = per-level physics editor +
+   polish. Storage abstraction unchanged (v1.5-forward).
 4. 30-level launch catalog built via the editor — **shipped** (Claude-drafted, user refines)
 5. Daily challenge (date-seeded) + per-level best-time — *next*
 6. Cosmetic marble skins (unlock + paid pack)
