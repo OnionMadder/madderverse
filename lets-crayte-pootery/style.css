@@ -4854,3 +4854,14 @@ a:focus-visible {
     /* Keep the kiln glitch filter visible even without the shake
        so the overheated state still reads correctly. */
 }
+
+/* ----- 16. Native (Capacitor) overrides -----
+   The shared slim site footer is a fixed bottom strip whose CSS
+   (../assets/css/site-footer.css) and ../ links don't resolve
+   inside the packaged app — it bleeds in as unstyled web chrome
+   over the bottom tool drawer. The inline detector in index.html
+   adds html.is-native only in the native runtime; the web build
+   at madderverse.org keeps the footer for SEO / legal. */
+html.is-native .site-footer-slim {
+    display: none !important;
+}
