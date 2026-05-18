@@ -1579,14 +1579,42 @@
       "position:fixed;left:8px;bottom:8px;z-index:9998;width:248px;" +
       "background:rgba(14,7,32,0.92);border:1px solid #3a2a5c;border-radius:10px;" +
       "padding:10px 12px;color:#f3ecff;font:12px monospace;");
+    // Collapsible header — tap to fold the panel down to just this bar
+    // (small screens default collapsed so it doesn't cover the maze).
     var title = document.createElement("div");
-    title.textContent = "LIVE TUNE  (?tune=1)";
-    title.setAttribute("style", "color:#ffd76b;font-weight:700;margin-bottom:2px;");
+    title.setAttribute("style",
+      "color:#ffd76b;font-weight:700;cursor:pointer;user-select:none;" +
+      "-webkit-user-select:none;display:flex;align-items:center;gap:6px;");
+    var caret = document.createElement("span");
+    var tlabel = document.createElement("span");
+    tlabel.textContent = "LIVE TUNE (?tune=1)";
+    title.appendChild(caret); title.appendChild(tlabel);
     box.appendChild(title);
+
+    var bodyEl = document.createElement("div");
+    bodyEl.setAttribute("style", "margin-top:6px;");
+    box.appendChild(bodyEl);
+
+    var collapsed;
+    try {
+      var sv = localStorage.getItem("mm.tune.collapsed");
+      collapsed = (sv === null) ? (window.innerWidth < 720) : (sv === "1");
+    } catch (e) { collapsed = (window.innerWidth < 720); }
+    function applyCollapsed() {
+      bodyEl.style.display = collapsed ? "none" : "block";
+      caret.textContent = collapsed ? "▸" : "▾";
+      box.style.width = collapsed ? "auto" : "248px";
+    }
+    title.addEventListener("click", function () {
+      collapsed = !collapsed;
+      try { localStorage.setItem("mm.tune.collapsed", collapsed ? "1" : "0"); } catch (e) {}
+      applyCollapsed();
+    });
+
     tuneLvlEl = document.createElement("div");
     tuneLvlEl.setAttribute("style", "color:#7df0c8;font-size:11px;margin-bottom:6px;");
     tuneLvlEl.textContent = curLevelLabel || "(no level yet)";
-    box.appendChild(tuneLvlEl);
+    bodyEl.appendChild(tuneLvlEl);
 
     SPECS.forEach(function (s) {
       var row = document.createElement("div");
@@ -1603,7 +1631,7 @@
       rng.addEventListener("input", function () { s.set(parseFloat(rng.value)); setLabel(); });
       setLabel();
       row.appendChild(lab); row.appendChild(rng);
-      box.appendChild(row);
+      bodyEl.appendChild(row);
       // so a level switch (which applies that level's physics) snaps the
       // sliders + labels to the new effective values.
       tuneRefreshers.push(function () { rng.value = s.get(); setLabel(); });
@@ -1644,8 +1672,9 @@
           function () { window.prompt("Copy this physics block:", txt); });
       } else { window.prompt("Copy this physics block:", txt); }
     });
-    box.appendChild(copy);
+    bodyEl.appendChild(copy);
 
+    applyCollapsed();   // honor saved/default fold state
     if (document.body) document.body.appendChild(box);
     else document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(box); });
   })();
