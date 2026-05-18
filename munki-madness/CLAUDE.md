@@ -116,13 +116,16 @@ The level editor is the seed of player-facing user-generated content.
 
 1. Scaffold + physics + 3 test levels + placeholder marble + audio — **shipped**
 2. Real sprite integration + 5-phase curl animation — *blocked on user-supplied art*
-3. In-app level editor (dev-only) — **Phase A shipped** (reworked to the
-   v1.1 object-tile schema: WYSIWYG iso paint, all flat tile types +
-   bumper/spinner dir·rot, sparse/gap shapes, lossless load of real
-   catalog levels, validate, Save/Load/Export/Copy/Import/Test-Play).
-   **Phase B** = elevation (height brush, ramp, spring, height-aware
-   render + reachability). **Phase C** = per-level physics editor +
-   polish. Storage abstraction unchanged (v1.5-forward).
+3. In-app level editor (dev-only) — **Phases A + B shipped**. A: v1.1
+   object-tile rework (WYSIWYG iso paint, flat tile set, sparse/gap,
+   lossless load, validate, Save/Load/Export/Copy/Import/Test-Play). B:
+   ELEVATION — Raise/Lower height brushes (cap 12), ramp (Dir + Δh) &
+   spring (Δh) tiles with the bar's Dir/Δh selectors, height-aware
+   WYSIWYG render mirroring game.js (skirts/plateaus/sloped ramps),
+   and a height-aware reachability validator (BFS over (x,y,plane)
+   mirroring engine blocked()/ramp/spring — rejects unbridged height
+   jumps; agrees real Level 9 is solvable). **Phase C** = per-level
+   physics editor + polish. Storage abstraction unchanged (v1.5-fwd).
 4. 30-level launch catalog built via the editor — **shipped** (Claude-drafted, user refines)
 5. Daily challenge (date-seeded) + per-level best-time — *next*
 6. Cosmetic marble skins (unlock + paid pack)
