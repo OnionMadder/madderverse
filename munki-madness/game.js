@@ -32,10 +32,10 @@
   var MARBLE_R = 0.30;       // Munkable radius (tiles)
 
   // ---- Physics knobs — see PHYSICS_SPEC.md (LOCKED v1.0) ----
-  var ACCEL = 10;            // input push — slow-starting heavy ball
+  var ACCEL = 14;            // input push — responsive (tune via ?tune=1)
   var MAX_SPEED = 6;         // top speed (tiles/s)
   var WALL_BOUNCE = 0.4;     // wall restitution — pinball bonk
-  var FRICTION_FLOOR = 0.88; // per-frame@60 vel multiplier (decays to a stop)
+  var FRICTION_FLOOR = 0.92; // per-frame@60 vel multiplier (tune via ?tune=1)
   var BUMPER_FORCE = 4;      // instantaneous velocity-add from a bumper
   var GRAVITY = 0;           // no gravity in v1 (reserved for Endeavor)
   var WALL_BONK_MIN = 1.6;   // min normal speed (tiles/s) to squeak
