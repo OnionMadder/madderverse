@@ -9,7 +9,7 @@ Tunable constants at the top of `game.js`:
 
 | Constant | v1.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `14` | input push force (responsive heavy ball; live-tunable via ?tune=1) |
+| `ACCEL` | `16` | input push force (snappy known-good baseline; live-tunable via ?tune=1) |
 | `MAX_SPEED` | `6` | top speed (tiles/s), unchanged |
 | `WALL_BOUNCE` | `0.4` | wall restitution — satisfying pinball bonk recovery |
 | `FRICTION_FLOOR` | `0.92` | per-frame@60 velocity multiplier — coast/decay balance; live-tunable via ?tune=1 |
