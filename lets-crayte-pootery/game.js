@@ -4079,6 +4079,115 @@
                 "#c8e2a8"    /* fog */
             ],
             patterns: ["dot", "wave"]
+        },
+
+        /* ---- Weekly drop runway (Fridays 17:00Z) ----
+           ~2.5 months queued ahead so a pack lands every week
+           without a code change. Glazes are final-ish hex;
+           patterns intentionally reuse the always-present core
+           stamp ids as placeholders — bespoke stamp art ships in
+           the same commit each pack goes live (per the queued-
+           pack convention above). To add more weeks: copy a block,
+           bump the Friday date, keep ids unique. */
+        {
+            id: "dinodig", label: "DINO DIG",
+            description: "Fossil bone, amber, jurassic jungle greens.",
+            coverEmoji: "\u{1F996}",   /* T-Rex */
+            priceCents: 99,
+            releaseDate: "2026-06-12T17:00:00Z",
+            glazes: ["#6b5a3c", "#cdb98a", "#e4b13e",
+                     "#3f5d2a", "#7a3a18"],
+            patterns: ["triangle", "star"]
+        },
+        {
+            id: "mermaidcove", label: "MERMAID COVE",
+            description: "Pearl, seafoam, deep-lagoon shimmer.",
+            coverEmoji: "\u{1F9DC}",   /* merperson */
+            priceCents: 99,
+            releaseDate: "2026-06-19T17:00:00Z",
+            glazes: ["#1f7a8c", "#7fd4c1", "#bdf0e6",
+                     "#f4d9e6", "#2b3a8c"],
+            patterns: ["wave", "heart"]
+        },
+        {
+            id: "deepspace", label: "DEEP SPACE",
+            description: "Black hole, nebula violet, starfield white.",
+            coverEmoji: "\u{1F680}",   /* rocket */
+            priceCents: 99,
+            releaseDate: "2026-06-26T17:00:00Z",
+            glazes: ["#05030f", "#3a1f80", "#7a3c8c",
+                     "#2b6fff", "#f4f6ea"],
+            patterns: ["star", "ring"]
+        },
+        {
+            id: "ninjadojo", label: "NINJA DOJO",
+            description: "Shadow black, steel, dawn-sky red.",
+            coverEmoji: "\u{1F977}",   /* ninja */
+            priceCents: 99,
+            releaseDate: "2026-07-03T17:00:00Z",
+            glazes: ["#0a0a0a", "#3a3a44", "#8a9098",
+                     "#b53939", "#e9e4c8"],
+            patterns: ["x", "chevron"]
+        },
+        {
+            id: "unicorndream", label: "UNICORN DREAM",
+            description: "Cotton-candy pastels + holo sparkle.",
+            coverEmoji: "\u{1F984}",   /* unicorn */
+            priceCents: 99,
+            releaseDate: "2026-07-10T17:00:00Z",
+            glazes: ["#ffc8e0", "#c8aedb", "#b8d8ed",
+                     "#fff4e0", "#ff8cd0"],
+            patterns: ["star", "heart"]
+        },
+        {
+            id: "bugworld", label: "BUG WORLD",
+            description: "Beetle iridescent, leaf green, soil brown.",
+            coverEmoji: "\u{1F41E}",   /* lady beetle */
+            priceCents: 99,
+            releaseDate: "2026-07-17T17:00:00Z",
+            glazes: ["#1f6b3a", "#7a8f3a", "#4a3522",
+                     "#b53939", "#2b6b6c"],
+            patterns: ["dot", "ring"]
+        },
+        {
+            id: "piratecove", label: "PIRATE COVE",
+            description: "Treasure gold, deep sea, weathered wood.",
+            coverEmoji: "\u{2693}",   /* anchor */
+            priceCents: 99,
+            releaseDate: "2026-07-24T17:00:00Z",
+            glazes: ["#244e6b", "#e4b13e", "#5a3a1a",
+                     "#1a0e08", "#e9e4c8"],
+            patterns: ["x", "star"]
+        },
+        {
+            id: "frostbite", label: "FROSTBITE",
+            description: "Glacier blue, snow white, aurora teal.",
+            coverEmoji: "\u{2744}",   /* snowflake */
+            priceCents: 99,
+            releaseDate: "2026-07-31T17:00:00Z",
+            glazes: ["#bfe8f5", "#7fb8d9", "#f4f6ea",
+                     "#2b6b6c", "#244e9b"],
+            patterns: ["star", "triangle"]
+        },
+        {
+            id: "superhero", label: "SUPER POT",
+            description: "Comic primaries + halftone POW stamps.",
+            coverEmoji: "\u{1F9B8}",   /* superhero */
+            priceCents: 99,
+            releaseDate: "2026-08-07T17:00:00Z",
+            glazes: ["#d92128", "#244e9b", "#e4b13e",
+                     "#f4f6ea", "#1a0e08"],
+            patterns: ["star", "chevron"]
+        },
+        {
+            id: "rainbowdeluxe", label: "RAINBOW DELUXE",
+            description: "Full prism + animated RGB cycle.",
+            coverEmoji: "\u{1F308}",   /* rainbow */
+            priceCents: 99,
+            releaseDate: "2026-08-14T17:00:00Z",
+            glazes: ["@rgb-cycle", "#d92128", "#ff7a00",
+                     "#e4b13e", "#5f8d5d", "#2b6fff", "#7a3c8c"],
+            patterns: ["heart", "ring"]
         }
     ];
 
