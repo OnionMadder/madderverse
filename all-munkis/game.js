@@ -60,7 +60,11 @@
         FEAR_GAIN_PER_S:    34,      // fear ramp while CLOSE
         FEAR_DECAY_PER_S:   8,       // fear bleed while FAR
         SCARE_COUNT:        3,       // distinct Munkis to scare, then go
-        MAX_HUNT_MS:        16000,   // hard stop → EXIT even if < 3 scared
+        SCARE_DWELL_MS:     2200,    // it HOVERS this long menacing each
+                                     // one (within CLOSE_PX) before that
+                                     // Munki counts as scared + it moves
+                                     // on — leaving range resets the timer
+        MAX_HUNT_MS:        20000,   // hard stop → EXIT even if < 3 scared
         EXIT_SPEED_MULT:    5,       // off-screen dive = FLY × this
         FLY_HOME_OFFSET_PX: 130,     // cruise height above the Munki band
         // Sum of all on-stage fear that trips horror + the lower level
@@ -3833,6 +3837,7 @@
             // opposite edge) once `scared` reaches SCARE_COUNT or the
             // hunt times out. exitStart stamps the EXIT dive.
             phase: 'HUNT', scared: new Set(), exitStart: 0,
+            steerTarget: null, lingerStart: 0,
             lastBeat: -1, lastBeatTs: 0, flapAt: 0,
             faceLeft: dir < 0
         };
@@ -3923,22 +3928,51 @@
             const c = creepCenterXY();
             const sc = slotCenters();
 
-            // Steer toward the nearest Munki we haven't scared yet —
-            // that's the "hunting": it visits Munkis one by one.
-            let steer = null, bd = Infinity;
-            sc.forEach(s => {
-                if (st.scared.has(s.i)) return;
-                const d = Math.hypot(s.cx - c.cx, s.cy - c.cy);
-                if (d < bd) { bd = d; steer = s; }
-            });
-            if (steer) {
-                const tX = steer.cx - csz / 2, tY = steer.cy - csz / 2;
-                const dx = tX - st.x, dy = tY - st.y;
-                const dd = Math.hypot(dx, dy) || 1;
-                const step = st.speed * dt;
-                if (dd <= step) { st.x = tX; st.y = tY; }
-                else { st.x += (dx / dd) * step; st.y += (dy / dd) * step; }
-                st.faceLeft = dx < 0;
+            // Pick / refresh the current quarry: nearest active Munki
+            // not already scared. Keep it until it's been menaced long
+            // enough (or it leaves the stage).
+            if (st.steerTarget == null
+                || !slots[st.steerTarget]
+                || st.scared.has(st.steerTarget)
+                || !sc.some(s => s.i === st.steerTarget)) {
+                let pick = null, bd = Infinity;
+                sc.forEach(s => {
+                    if (st.scared.has(s.i)) return;
+                    const d = Math.hypot(s.cx - c.cx, s.cy - c.cy);
+                    if (d < bd) { bd = d; pick = s; }
+                });
+                st.steerTarget = pick ? pick.i : null;
+                st.lingerStart = 0;
+            }
+            const tgt = st.steerTarget != null
+                ? sc.find(s => s.i === st.steerTarget) : null;
+
+            if (tgt) {
+                const tdist = Math.hypot(tgt.cx - c.cx, tgt.cy - c.cy);
+                if (tdist > CREEP.CLOSE_PX) {
+                    // Approach: fly straight at it (the hunt).
+                    const tX = tgt.cx - csz / 2, tY = tgt.cy - csz / 2;
+                    const dx = tX - st.x, dy = tY - st.y;
+                    const dd = Math.hypot(dx, dy) || 1;
+                    const step = st.speed * dt;
+                    if (dd <= step) { st.x = tX; st.y = tY; }
+                    else { st.x += (dx / dd) * step; st.y += (dy / dd) * step; }
+                    st.faceLeft = dx < 0;
+                    st.lingerStart = 0;          // not menacing yet
+                } else {
+                    // In range → HOVER and MENACE it: hold position
+                    // (just bob) while the proximity loop below scares
+                    // it + banks fear. Counts as scared only after a
+                    // full SCARE_DWELL_MS in range; leaving range (kid
+                    // pulls it away) resets the timer — a rescue.
+                    if (!st.lingerStart) st.lingerStart = ts;
+                    st.faceLeft = (tgt.cx < c.cx);
+                    if (ts - st.lingerStart >= CREEP.SCARE_DWELL_MS) {
+                        st.scared.add(st.steerTarget);
+                        st.steerTarget = null;
+                        st.lingerStart = 0;
+                    }
+                }
             } else {
                 // Nothing left to scare → head on out (toward exit).
                 st.x += st.dir * st.speed * dt;
@@ -3954,8 +3988,9 @@
 
             // RESTORED passive proximity: any Munki within CLOSE_PX
             // flinches + accrues fear; bleeds off once clearly FAR
-            // (CLOSE/FAR hysteresis stops boundary flicker). This is the
-            // fun interaction the player asked to keep.
+            // (CLOSE/FAR hysteresis stops boundary flicker). NOTE: this
+            // no longer marks Munkis "scared" — that's gated on the
+            // dwell above so the creep actually has to STICK AROUND.
             const live = new Set();
             sc.forEach(({ i, el, cx, cy }) => {
                 live.add(i);
@@ -3964,7 +3999,6 @@
                 if (d <= CREEP.CLOSE_PX) {
                     el.classList.add('creep-scared');
                     if (!creepScaredSlots.has(i)) { creepScaredSlots.add(i); renderSlot(i); }
-                    st.scared.add(i);
                     creepFear.set(i, Math.min(CREEP.FEAR_MAX,
                         cur + CREEP.FEAR_GAIN_PER_S * dt));
                 } else if (d >= CREEP.FAR_PX) {
