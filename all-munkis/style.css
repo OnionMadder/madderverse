@@ -1680,35 +1680,54 @@ body.moon-tilt main {
     }
 }
 
-/* Comets — the rarer, bigger, fast DIAGONAL streak woven into the same
-   Moon-horror rain. Shares .moon-fall (cap/fade/teardown); this class
-   swaps the animation to a straight diagonal driven by the per-comet
-   --dx (horizontal travel) and --rot (sprite tilt along its path), with
-   an ease-out so it whips in then trails off, plus a cool glow. */
+/* Comets — bigger, SLOW, shaky, glitchy DIAGONAL falls woven into the
+   same Moon-horror rain. A haunted shooting star that doesn't know
+   where it's going. Three stacked animations on the one span, on
+   non-conflicting properties:
+     • comet-streak  (transform + opacity) — the slow LINEAR diagonal
+       path over the per-comet --dur (4–7 s); no ease-out whip; just a
+       quick fade-in and a fade-out at the floor. --dx = horizontal
+       travel, --rot = sprite tilt along the diagonal.
+     • comet-jitter  (the independent `translate:` property) — fast
+       jerky ±2-4px wobble so it looks unstable.
+     • comet-flicker (`filter` only — drop-shadow glow + filter-opacity
+       + hue/brightness) — glitchy opacity/colour wobble. filter-opacity
+       MULTIPLIES the streak's opacity envelope, so no property fight. */
 .moon-fall span.comet {
-    animation-name: comet-streak;
-    animation-timing-function: cubic-bezier(0.16, 0.7, 0.3, 1);
-    filter: drop-shadow(0 0 10px rgba(186, 230, 253, 0.8));
+    animation: comet-streak  var(--dur, 5s) linear forwards,
+               comet-jitter  0.09s steps(2, jump-none) infinite,
+               comet-flicker 0.16s steps(1) infinite;
 }
 @keyframes comet-streak {
     0%   { transform: translate(0, -16vh) rotate(var(--rot, 28deg));
            opacity: 0; }
-    14%  { opacity: 0.95; }
-    85%  { opacity: 0.9; }
+    9%   { opacity: 0.92; }
+    88%  { opacity: 0.9; }
     100% { transform: translate(var(--dx, 40vw), 118vh)
                        rotate(var(--rot, 28deg));
            opacity: 0; }
 }
+@keyframes comet-jitter {
+    0%   { translate: 0 0; }
+    20%  { translate: 3px -2px; }
+    40%  { translate: -2px 3px; }
+    60%  { translate: 4px 1px; }
+    80%  { translate: -3px -3px; }
+    100% { translate: 2px -1px; }
+}
+@keyframes comet-flicker {
+    0%   { filter: drop-shadow(0 0 9px rgba(186,230,253,0.7))
+                    opacity(0.78) hue-rotate(0deg) brightness(1); }
+    50%  { filter: drop-shadow(0 0 14px rgba(196,210,255,0.85))
+                    opacity(1) hue-rotate(-16deg) brightness(1.18); }
+    100% { filter: drop-shadow(0 0 7px rgba(180,235,255,0.6))
+                    opacity(0.84) hue-rotate(10deg) brightness(0.95); }
+}
 @media (prefers-reduced-motion: reduce) {
-    /* Halve the horizontal whip; keep it a calm diagonal drift. */
-    .moon-fall span.comet { animation-duration: 4s !important; }
-    @keyframes comet-streak {
-        0%   { transform: translate(0, -16vh) rotate(var(--rot, 28deg));
-               opacity: 0; }
-        12%  { opacity: 0.85; }
-        100% { transform: translate(calc(var(--dx, 40vw) * 0.5), 118vh)
-                           rotate(var(--rot, 28deg));
-               opacity: 0; }
+    /* No shake / no glitch — a calm slow diagonal drift only. */
+    .moon-fall span.comet {
+        animation: comet-streak var(--dur, 5s) linear forwards;
+        filter: drop-shadow(0 0 9px rgba(186, 230, 253, 0.7));
     }
 }
 

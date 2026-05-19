@@ -66,10 +66,13 @@ AND horror is **fully engaged** (`body.react-mode-active` sustained
 *past* the 12 s creep-in ramp — `horrorOnSince` + `MOON_FALL.RAMP_MS`),
 small moon sprites continuously rain down the whole viewport: parallax
 by size (smaller = further = slower fall), gentle `--amp` sine-ish
-sway, fade near the floor — **punctuated by the occasional big, fast,
-diagonal COMET streak** (`MOON_FALL.COMET_CHANCE` per spawn; CSS
-`@keyframes comet-streak` driven by per-comet `--dx`/`--rot`). Comets
-are the Moon trigger's signature flourish per the locked "per-trigger
+sway, fade near the floor — **punctuated by the occasional big, SLOW,
+shaky, glitchy diagonal COMET fall** (`MOON_FALL.COMET_CHANCE` per
+spawn; three stacked CSS anims — `comet-streak` slow linear diagonal
+path over per-comet `--dur`/`--dx`/`--rot`, `comet-jitter` the
+unstable `translate:` wobble, `comet-flicker` the opacity/colour
+glitch). A haunted shooting star that doesn't know where it's going —
+the Moon trigger's signature flourish per the locked "per-trigger
 atmosphere" design (Moon-horror = moons + comets; Ice will get its own
 snow). `pointer-events:
 none`, `z-index: 9` (above stage/Munkis at z 1, **below** the tray/UI

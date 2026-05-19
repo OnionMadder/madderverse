@@ -88,22 +88,28 @@ The STANDARD sheet is **6 creeps** (one per rainbow colour) ×
 
 | Frame | Pose | Used by state |
 |---|---|---|
-| 1 | wings up   | FLOAT flap-A |
-| 2 | wings down | FLOAT flap-B |
-| 3 | spot / wind-up | SWOOP windup |
-| 4 | dive       | SWOOP dive |
-| 5 | strike     | SWOOP strike → held through DIE |
+| 1 | wings up   | FLY / SPOT / PULL-UP flap-A |
+| 2 | wings down | FLY / SPOT / PULL-UP flap-B |
+| 3 | spot / wind-up | DIVE windup (p < .40) |
+| 4 | dive       | DIVE mid (p < .75) |
+| 5 | strike     | DIVE strike → held through IMPACT |
 
-Lifecycle (see the FLYING CREEPS block in `game.js`): **Float → one
-swoop-attack → die**. On each appearance the game picks one creep and
-drifts it across, flapping wings 1↔2 **in time to the beat** (the
-menace). The swoop is **gated on menace**: only after it has come
-CLOSE to ≥2 distinct Munkis (and loomed a moment) does it smoothly
-dive its "third" (the nearest), playing 3→4→5, landing a fear-burst +
-knock, and dissipating on frame 5. A stage that never has 2 Munkis to
-menace → it just floats across and leaves (no attack). `CREEP.VARIANT_COUNT`
-(6) is the creep count and the "All Creeps Encountered" target —
-that achievement counts **creeps seen, not frames**.
+Lifecycle (see the FLYING CREEPS block in `game.js`) — a **predatory
+dive cycle**: **FLY → SPOT → DIVE → IMPACT → PULL-UP**, repeated for
+`CREEP.DIVE_COUNT` (3) targets, then **EXIT** off the opposite edge
+from entry. FLY cruises a band ABOVE the Munkis (wings beat-flapping
+1↔2); when a Munki comes within `SPOT_RANGE_PX` it **SPOT**s (pause +
+orient + tense wing pulse, `SPOT_MS`), then **DIVE**s — a fast
+accelerating nose-down lunge (`DIVE_SPEED_MULT`, frames 3→4→5) at that
+Munki. **React is triggered ONLY by a completed dive's IMPACT**
+(`onDiveImpact`: that Munki's startle shake + shocked face + knock +
+`DIVE_FEAR`) — passive proximity no longer does anything. Then it
+**PULL-UP**s back to flight height and picks the next target (random,
+no repeats unless only one Munki). Targets random from on-stage
+Munkis; an empty stage → it just cruises through and leaves.
+`CREEP.VARIANT_COUNT` (6) is the creep count and the "All Creeps
+Encountered" target — that achievement counts **creeps seen, not
+frames**.
 
 ## Sheet format (as shipped) — PER-CREEP sheets
 
