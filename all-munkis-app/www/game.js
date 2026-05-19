@@ -2123,17 +2123,20 @@
         setTimeout(() => layer.remove(), 4500);
     }
 
-    // ---------- FALLING MOON SPRITES (v1.1 atmospheric) ----------
+    // ---------- FALLING MOON + COMET SPRITES (v1.1 atmospheric) -------
     // While Moon Munki is ON the stage AND horror mode is FULLY engaged
-    // (react-mode-active sustained PAST the 12 s creep-in ramp), small
-    // moon sprites continuously rain down the whole viewport — parallax
-    // by size (smaller=further=slower), gentle sway, fade near the floor.
-    // Reuses the sky-items moon art (NO emoji — UI is emoji-free
-    // post-FNAF); drawn-orb fallback if the sheet is absent. Single rAF
-    // spawn loop (no setInterval drift); CSS does the fall on the
-    // compositor; animationend auto-removes each sprite. Tunable knobs
-    // below; drop-in art path documented in CLAUDE.md. Future: Ice on
-    // stage during horror → same engine, snowflake sprite + cyan tint.
+    // (react-mode-active sustained PAST the 12 s creep-in ramp), the sky
+    // rains down the whole viewport: mostly small MOON sprites — parallax
+    // by size (smaller=further=slower), gentle sway, fade near the floor
+    // — punctuated by the occasional big, fast, diagonal COMET streak
+    // (COMET_CHANCE per spawn). This is the Moon trigger's signature
+    // atmosphere (locked "per-trigger atmosphere" design). Reuses the
+    // sky-items moon + comet art (NO emoji — UI is emoji-free post-FNAF);
+    // drawn fallbacks if the sheet is absent. Single rAF spawn loop (no
+    // setInterval drift); CSS does the travel on the compositor;
+    // animationend auto-removes each sprite. Tunable knobs below; drop-in
+    // art path documented in CLAUDE.md. Future: Ice on stage during
+    // horror → same engine, snowflake sprite + cyan tint.
     const MOON_FALL = {
         SPAWN_MIN_MS:   200,
         SPAWN_MAX_MS:   400,
@@ -2143,7 +2146,19 @@
         FALL_MAX_S:     8,
         RAMP_MS:        12000, // horror creep-in must complete first
         MAX_CONCURRENT: 30,
-        STOP_FADE_MS:   2500
+        STOP_FADE_MS:   2500,
+        // Comets: rarer, bigger, fast DIAGONAL streaks woven into the
+        // same Moon-horror rain (per the locked "per-trigger
+        // atmosphere" design — Moon-horror = moons + comets). Each
+        // spawn rolls COMET_CHANCE to be a comet instead of a moon
+        // (only if the sheet actually has comet frames).
+        COMET_CHANCE:   0.07,
+        COMET_MIN_PX:   46,
+        COMET_MAX_PX:   84,
+        COMET_FALL_MIN_S: 1.3,
+        COMET_FALL_MAX_S: 2.4,
+        COMET_DX_MIN_VW: 24,   // horizontal travel across the fall
+        COMET_DX_MAX_VW: 60
     };
     let moonFallLayer = null, moonFallActive = false, moonFallRAF = null;
     let moonFallNextAt = 0, horrorOnSince = 0, moonFallRampTimer = null;
@@ -2191,10 +2206,64 @@
         }
     }
 
+    // Rarer, bigger, fast DIAGONAL streak. Same .moon-fall layer (so it
+    // shares the cap / fade / teardown); CSS class `comet` swaps it to
+    // the comet-streak keyframe driven by the per-comet --dx / --rot.
+    function spawnFallingComet() {
+        if (!moonFallLayer) return;
+        const sheet = skyItemsSheet;
+        const m = document.createElement('span');
+        m.className = 'comet';
+        const size = MOON_FALL.COMET_MIN_PX +
+            Math.random() * (MOON_FALL.COMET_MAX_PX - MOON_FALL.COMET_MIN_PX);
+        let css;
+        if (sheet && sheet.comets && sheet.comets.length) {
+            const f = sheet.comets[(Math.random() * sheet.comets.length) | 0];
+            const b = SKY_RAIN_INSET;
+            const iw = f.w - 2 * b, ih = f.h - 2 * b;
+            const sc = size / Math.max(iw, ih);
+            css = `background-image:url('${sheet.src}');background-repeat:no-repeat;` +
+                  `background-size:${sheet.sheetW * sc}px ${sheet.sheetH * sc}px;` +
+                  `background-position:${-(f.x + b) * sc}px ${-(f.y + b) * sc}px;` +
+                  `width:${iw * sc}px;height:${ih * sc}px;`;
+        } else {
+            // Drawn fallback: bright head + a fading streak tail.
+            css = `width:${size}px;height:${Math.max(3, size * 0.18).toFixed(1)}px;` +
+                  `border-radius:50%;background:linear-gradient(90deg,` +
+                  `rgba(186,230,253,0) 0%,rgba(191,219,254,0.55) 45%,#ffffff 100%);` +
+                  `box-shadow:0 0 14px rgba(186,230,253,0.85);`;
+        }
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        const dx  = dir * (MOON_FALL.COMET_DX_MIN_VW +
+            Math.random() * (MOON_FALL.COMET_DX_MAX_VW - MOON_FALL.COMET_DX_MIN_VW));
+        const rot = dir > 0 ? 28 : -28;
+        const dur = MOON_FALL.COMET_FALL_MIN_S +
+            Math.random() * (MOON_FALL.COMET_FALL_MAX_S - MOON_FALL.COMET_FALL_MIN_S);
+        // Start so the diagonal travels INTO view rather than off-edge.
+        const startLeft = dir > 0 ? (Math.random() * 70 - 10)
+                                  : (Math.random() * 70 + 40);
+        m.style.cssText = css +
+            `left:${startLeft.toFixed(2)}vw;` +
+            `--dx:${dx.toFixed(1)}vw;` +
+            `--rot:${rot}deg;` +
+            `animation-duration:${dur.toFixed(2)}s;`;
+        m.addEventListener('animationend', () => m.remove());
+        moonFallLayer.appendChild(m);
+        while (moonFallLayer.childElementCount > MOON_FALL.MAX_CONCURRENT) {
+            moonFallLayer.removeChild(moonFallLayer.firstChild);
+        }
+    }
+
     function moonFallTick(ts) {
         if (!moonFallActive || !moonFallLayer) { moonFallRAF = null; return; }
         if (ts >= moonFallNextAt) {
-            spawnFallingMoon();
+            if (skyItemsSheet && skyItemsSheet.comets
+                && skyItemsSheet.comets.length
+                && Math.random() < MOON_FALL.COMET_CHANCE) {
+                spawnFallingComet();
+            } else {
+                spawnFallingMoon();
+            }
             moonFallNextAt = ts + MOON_FALL.SPAWN_MIN_MS +
                 Math.random() * (MOON_FALL.SPAWN_MAX_MS - MOON_FALL.SPAWN_MIN_MS);
         }
@@ -3290,11 +3359,11 @@
     let creepEl = null;            // the floating DOM element
     let creepActive = false;       // currently drifting across?
     let creepSheet = null;         // {src, sheetW, sheetH, frames:[...]} or null
-    // Moon-chaos rain art: 8 moon variants cropped from sky-items.png.
-    // The 4 comet-* frames in that sheet are deliberately ignored here
-    // (reserved for v1.1). null until loaded — moonRain falls back to a
-    // drawn glowing orb, never an emoji.
-    let skyItemsSheet = null;      // {src, sheetW, sheetH, moons:[{x,y,w,h}]}
+    // Sky art cropped from sky-items.png: `moons` (8, the gentle
+    // Moon-horror precipitation + the Moon-chaos splash) and `comets`
+    // (4, the rarer big fast diagonal streaks woven into Moon-horror).
+    // null until loaded — callers fall back to drawn shapes, never emoji.
+    let skyItemsSheet = null;      // {src, sheetW, sheetH, moons:[…], comets:[…]}
     let creepSpawnTimer = null;
     let creepRAF = null;
     let creepState = null;         // see spawnCreep for the full shape (phase machine)
@@ -3430,30 +3499,34 @@
             .catch(() => null);
     }
 
-    // Loads sky-items.{png,json} for the moon-chaos rain. Same
-    // TexturePacker-hash shape as flying-creeps.json. Returns ONLY the 8
-    // moon frames — any frame whose name contains "comet" is skipped
-    // (the 4 large comets are reserved for v1.1). null if absent.
+    // Loads sky-items.{png,json} (TexturePacker-hash). Splits frames
+    // into `moons` (gentle background precipitation) and `comets` (the
+    // rarer, bigger, fast diagonal streaks) by name. Either list may be
+    // empty; null only if the sheet has neither.
     function loadSkyItemsSheet() {
         return fetch('assets/sprites/sky-items.json')
             .then(r => (r.ok ? r.json() : null))
             .then(json => {
                 if (!json || !json.frames) return null;
-                const moons = Object.keys(json.frames)
-                    .filter(name => !/comet/i.test(name))
-                    .map(name => {
-                        const e = json.frames[name];
-                        return (e && e.frame) ? e.frame : e;
-                    })
-                    .filter(f => f && f.w && f.h);
-                if (!moons.length) return null;
+                const rect = name => {
+                    const e = json.frames[name];
+                    return (e && e.frame) ? e.frame : e;
+                };
+                const names = Object.keys(json.frames);
+                const moons = names.filter(n => !/comet/i.test(n))
+                    .map(rect).filter(f => f && f.w && f.h);
+                const comets = names.filter(n => /comet/i.test(n))
+                    .map(rect).filter(f => f && f.w && f.h);
+                if (!moons.length && !comets.length) return null;
+                const all = moons.concat(comets);
                 const meta = json.meta || {};
                 const size = meta.size || {};
                 return {
                     src: 'assets/sprites/sky-items.png',
-                    sheetW: size.w || Math.max(...moons.map(f => f.x + f.w)),
-                    sheetH: size.h || Math.max(...moons.map(f => f.y + f.h)),
-                    moons
+                    sheetW: size.w || Math.max(...all.map(f => f.x + f.w)),
+                    sheetH: size.h || Math.max(...all.map(f => f.y + f.h)),
+                    moons,
+                    comets
                 };
             })
             .catch(() => null);

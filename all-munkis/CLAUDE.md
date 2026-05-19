@@ -59,13 +59,19 @@ because each tab is its own audio engine on the shared hardware clock.
 
 ## Atmospheric effects (v1.1)
 
-**Falling moon sprites** (`MOON_FALL` + `syncMoonFall`/`startMoonFall`/
-`stopMoonFall`/`moonFallTick` in `game.js`). While **Moon Munki is on
-the stage** AND horror is **fully engaged** (`body.react-mode-active`
-sustained *past* the 12 s creep-in ramp — `horrorOnSince` +
-`MOON_FALL.RAMP_MS`), small moon sprites continuously rain down the
-whole viewport: parallax by size (smaller = further = slower fall),
-gentle `--amp` sine-ish sway, fade near the floor. `pointer-events:
+**Falling moon + comet sprites** (`MOON_FALL` + `syncMoonFall`/
+`startMoonFall`/`stopMoonFall`/`moonFallTick` /`spawnFallingMoon`/
+`spawnFallingComet` in `game.js`). While **Moon Munki is on the stage**
+AND horror is **fully engaged** (`body.react-mode-active` sustained
+*past* the 12 s creep-in ramp — `horrorOnSince` + `MOON_FALL.RAMP_MS`),
+small moon sprites continuously rain down the whole viewport: parallax
+by size (smaller = further = slower fall), gentle `--amp` sine-ish
+sway, fade near the floor — **punctuated by the occasional big, fast,
+diagonal COMET streak** (`MOON_FALL.COMET_CHANCE` per spawn; CSS
+`@keyframes comet-streak` driven by per-comet `--dx`/`--rot`). Comets
+are the Moon trigger's signature flourish per the locked "per-trigger
+atmosphere" design (Moon-horror = moons + comets; Ice will get its own
+snow). `pointer-events:
 none`, `z-index: 9` (above stage/Munkis at z 1, **below** the tray/UI
 at z 10). Single `requestAnimationFrame` spawn loop (200–400 ms,
 **never** `setInterval`); CSS `@keyframes moon-drift` does the fall on
@@ -78,9 +84,10 @@ ramp timer so it auto-starts the instant the 12 s ramp completes.
 
 - **No emoji.** The brief offered 🌙/🌑 emoji as an option; rejected —
   the UI is emoji-free post-FNAF. Sprites reuse the **`sky-items`
-  moon art** (`skyItemsSheet`, the same source as the Moon-chaos
-  rain), with a drawn radial-gradient orb fallback if the sheet is
-  absent. Never a glyph.
+  art** (`skyItemsSheet` → `.moons` for the rain, `.comets` for the
+  streaks; same source as the Moon-chaos rain), with drawn fallbacks
+  (radial-gradient orb / glowing streak) if the sheet is absent.
+  Never a glyph.
 - **Drop-in custom sprite:** to use dedicated falling-moon art later,
   replace `assets/sprites/sky-items.{png,json}` (both `all-munkis/`
   and `all-munkis-app/www/`, kept byte-identical — see
@@ -88,7 +95,8 @@ ramp timer so it auto-starts the instant the 12 s ramp completes.
   zero code change. If a *separate* sheet is ever wanted, add a loader
   mirroring `loadSkyItemsSheet()` and point `spawnFallingMoon()` at it.
 - **All knobs tunable** in the `MOON_FALL` const (spawn cadence, size
-  range, fall-duration range, ramp gate, concurrency cap, fade-out).
+  range, fall-duration range, ramp gate, concurrency cap, fade-out;
+  comet rarity `COMET_CHANCE`, comet size/speed/diagonal-travel).
 - **Future iteration:** Ice Munki on stage during horror → the *same
   engine*, swapped to a snowflake sprite + cyan tint (and other future
   characters could each get their own atmosphere). Generalise

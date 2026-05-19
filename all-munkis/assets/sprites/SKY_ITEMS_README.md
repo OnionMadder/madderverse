@@ -21,19 +21,19 @@ the game never falls back to an emoji (see "Fallback" below).
   "meta": { "size": { "w":2602, "h":1089 } } }
 ```
 
-**The loader keeps ONLY frames whose name does NOT contain `comet`**
-(case-insensitive). So:
+**The loader (`loadSkyItemsSheet`) splits frames by name into
+`moons` (name does NOT contain `comet`) and `comets` (name DOES,
+case-insensitive). So:
 
-- The **8 moon variants** (any name, e.g. `moon-red`, `moon-cyan`, …)
-  are picked at random, one per rain particle, cropped from the PNG and
-  scaled small. Frame names don't matter beyond the `comet` exclusion —
-  a leading-letter typo (`oon-cyan`) would still have worked, but keep
-  them clean.
-- The **4 `comet-*` frames are deliberately ignored in v1.0.** They are
-  reserved for **v1.1** (large comet streaks). Leaving them in the sheet
-  is fine and intended — `game.js` will simply not draw them until the
-  1.1 feature lands. Do **not** remove them to "clean up"; 1.1 expects
-  them here.
+- The **8 moon variants** (e.g. `moon-red`, `moon-cyan`, …) feed the
+  Moon-chaos splash and the gentle Moon-horror rain — picked at
+  random, cropped, scaled small. Names don't matter beyond the
+  `comet` substring rule, but keep them clean.
+- The **4 `comet-*` frames are LIVE as of v1.1.** They are the rarer,
+  bigger, fast **diagonal streaks** woven into the Moon-horror rain
+  (`spawnFallingComet`, `MOON_FALL.COMET_CHANCE`). Keep them named
+  with the `comet` substring so the split works; do **not** remove
+  them.
 
 `meta.image` is ignored — the loader always uses
 `assets/sprites/sky-items.png`. `meta.size` is recommended; if absent
@@ -72,6 +72,7 @@ The chaos effect still works; it just isn't the painted moons.
 
 ## Status
 
-**SHIPPED in v1.0.** 8 moons live in the rain; 4 comets parked for
-v1.1. This is the standard sheet for web **and** the Play app (no
-itch-exclusive variant, unlike `flying-creeps`).
+**SHIPPED.** 8 moons live in the Moon-chaos splash + Moon-horror
+rain (v1.0); the 4 comets are now LIVE too as the v1.1 Moon-horror
+diagonal streaks. This is the standard sheet for web **and** the Play
+app (no itch-exclusive variant, unlike `flying-creeps`).

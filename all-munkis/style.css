@@ -1680,6 +1680,38 @@ body.moon-tilt main {
     }
 }
 
+/* Comets — the rarer, bigger, fast DIAGONAL streak woven into the same
+   Moon-horror rain. Shares .moon-fall (cap/fade/teardown); this class
+   swaps the animation to a straight diagonal driven by the per-comet
+   --dx (horizontal travel) and --rot (sprite tilt along its path), with
+   an ease-out so it whips in then trails off, plus a cool glow. */
+.moon-fall span.comet {
+    animation-name: comet-streak;
+    animation-timing-function: cubic-bezier(0.16, 0.7, 0.3, 1);
+    filter: drop-shadow(0 0 10px rgba(186, 230, 253, 0.8));
+}
+@keyframes comet-streak {
+    0%   { transform: translate(0, -16vh) rotate(var(--rot, 28deg));
+           opacity: 0; }
+    14%  { opacity: 0.95; }
+    85%  { opacity: 0.9; }
+    100% { transform: translate(var(--dx, 40vw), 118vh)
+                       rotate(var(--rot, 28deg));
+           opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    /* Halve the horizontal whip; keep it a calm diagonal drift. */
+    .moon-fall span.comet { animation-duration: 4s !important; }
+    @keyframes comet-streak {
+        0%   { transform: translate(0, -16vh) rotate(var(--rot, 28deg));
+               opacity: 0; }
+        12%  { opacity: 0.85; }
+        100% { transform: translate(calc(var(--dx, 40vw) * 0.5), 118vh)
+                           rotate(var(--rot, 28deg));
+               opacity: 0; }
+    }
+}
+
 /* ====== HORROR-MODE OVERLAY (v1.1) ======
    Keyed off the EXISTING body.react-mode-active (same class that drives
    the 12 s corner-Munki creep — these ramp in lockstep). #horror-overlay
