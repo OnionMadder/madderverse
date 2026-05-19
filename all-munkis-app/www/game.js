@@ -46,28 +46,30 @@
         WAVE_AMP_PX:        22,      // subtle bob while cruising
         WAVE_PERIOD_MS:     2200,
         SIZE_PX:            128,     // rendered creep box cap (square)
-        // ----- Predatory dive cycle -----
-        // FLY → SPOT → DIVE → IMPACT → PULL-UP, repeated for DIVE_COUNT
-        // targets, then EXIT off the opposite edge. React is triggered
-        // ONLY by a completed dive's IMPACT — never by passive proximity.
-        SPOT_RANGE_PX:      180,     // FLY→SPOT trigger: creep↔Munki centre
-        SPOT_MS:            500,     // orient/wind-up pause before diving
-        DIVE_SPEED_MULT:    5,       // DIVE speed = FLY × this (4–6)
-        PULLUP_SPEED_MULT:  1.8,     // PULL-UP speed = FLY × this
-        IMPACT_PX:          44,      // dive "hits" within this of target
-        IMPACT_MS:          170,     // frame-5 hold at the hit
-        DIVE_COUNT:         3,       // targets attacked before EXIT
-        FLY_HOME_OFFSET_PX: 150,     // flight height ABOVE the Munki band
-        // Fear is EVENT-driven now: each completed dive dumps DIVE_FEAR
-        // on that Munki (no passive proximity ticking). 3 dives (~120)
-        // reliably crosses HORROR_TRIGGER_SUM. Drained on creep exit.
+        // ----- Hunting cycle (HUNT → EXIT) -----
+        // The creep actively flies toward Munkis. Passive proximity is
+        // the fun interaction (restored): any Munki within CLOSE_PX
+        // flinches (.creep-scared + shocked face) and accrues fear,
+        // bleeding off once clearly FAR (CLOSE/FAR hysteresis stops
+        // boundary flicker). Once it has scared SCARE_COUNT *distinct*
+        // Munkis — or the hunt times out — it EXITs in a fast dive off
+        // the opposite edge from entry. No Munki dive-bomb / no IMPACT.
+        CLOSE_PX:           110,     // scare radius (creep↔Munki centre)
+        FAR_PX:             160,     // must clear this before fear decays
         FEAR_MAX:           100,
-        DIVE_FEAR:          40,
+        FEAR_GAIN_PER_S:    34,      // fear ramp while CLOSE
+        FEAR_DECAY_PER_S:   8,       // fear bleed while FAR
+        SCARE_COUNT:        3,       // distinct Munkis to scare, then go
+        MAX_HUNT_MS:        16000,   // hard stop → EXIT even if < 3 scared
+        EXIT_SPEED_MULT:    5,       // off-screen dive = FLY × this
+        FLY_HOME_OFFSET_PX: 130,     // cruise height above the Munki band
+        // Sum of all on-stage fear that trips horror + the lower level
+        // it must fall back below before horror releases (hysteresis).
         HORROR_TRIGGER_SUM: 105,
         HORROR_RELEASE_SUM: 45,
-        // FLY / SPOT / PULL-UP wing-flap is BEAT-LOCKED (frame 1<->2 on
-        // the quarter note); FLAP_MS is only the fallback when no audio
-        // beat is advancing. DIVE plays frames 3→4→5; IMPACT holds 5.
+        // HUNT wing-flap is BEAT-LOCKED (frame 1<->2 on the quarter
+        // note); FLAP_MS is only the fallback when no audio beat is
+        // advancing. The EXIT dive off-screen plays frames 3→4→5.
         FLAP_MS:            300,
         // Size normalisation. The exporter packs uniform frame CANVASES
         // but the creep DRAWN inside each varies in size — so we measure
@@ -3718,8 +3720,8 @@
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
         const speed = rand(CREEP.SPEED_MIN_PXPS, CREEP.SPEED_MAX_PXPS);
         const size = creepSizePx();
-        // Flight height: a band ABOVE where the Munkis stand, so the
-        // creep cruises overhead hunting and dives DOWN onto targets.
+        // Flight height: a band ABOVE where the Munkis stand, used when
+        // the creep has no specific Munki to steer toward.
         const sc0 = slotCenters();
         let flyHomeY;
         if (sc0.length) {
@@ -3740,13 +3742,12 @@
             sheetW: creepDef ? creepDef.sheetW : 0,
             sheetH: creepDef ? creepDef.sheetH : 0,
             tStart: performance.now(),
-            // Predatory cycle: FLY → SPOT → DIVE → IMPACT → PULL-UP
-            // (×DIVE_COUNT) → EXIT. phaseStart stamps the current phase;
-            // targeted[] = slots already dived (avoid repeats when able).
-            phase: 'FLY', phaseStart: performance.now(),
-            divesDone: 0, targeted: [], target: null,
-            sx: 0, sy: 0, tx: 0, ty: 0, diveDur: 0,
-            lastBeat: -1, lastBeatTs: 0, flapAt: 0, pulseAt: 0,
+            // Hunting cycle: HUNT (steer toward un-scared Munkis; passive
+            // proximity scares + accrues fear) → EXIT (fast dive off the
+            // opposite edge) once `scared` reaches SCARE_COUNT or the
+            // hunt times out. exitStart stamps the EXIT dive.
+            phase: 'HUNT', scared: new Set(), exitStart: 0,
+            lastBeat: -1, lastBeatTs: 0, flapAt: 0,
             faceLeft: dir < 0
         };
         creepActive = true;
@@ -3765,10 +3766,8 @@
             creepEl.hidden = true;
             creepEl.classList.remove('flying-creep-in', 'flying-creep-dying');
         }
-        // Clear any lingering flinch + scared-face + knock state.
+        // Clear any lingering flinch + scared-face state.
         clearCreepScared();
-        document.querySelectorAll('.stage-slot.creep-struck')
-            .forEach(s => s.classList.remove('creep-struck'));
         // The threat is gone: drain creep fear and release creep-horror.
         // syncHorrorMode() still keeps horror on if Ice/Moon beat-react
         // is independently active (it ORs the two sources).
@@ -3776,29 +3775,6 @@
         if (fearHorrorActive) { fearHorrorActive = false; syncHorrorMode(); }
         if (creepRAF) { cancelAnimationFrame(creepRAF); creepRAF = null; }
         scheduleCreepSpawn(false);
-    }
-
-    // A dive's IMPACT landed on Munki `idx`. THE ONLY thing that
-    // triggers a Munki's creep-react now (passive proximity no longer
-    // does). One-shot burst: the startle shake + shocked face
-    // (.creep-scared → expressionForSlot returns 2) AND the knock
-    // (.creep-struck), plus a chunk of fear. Auto-clears after ~1.2 s
-    // so it reads as a hit, not a permanent state. A clean dodge (kid
-    // slid the Munki away before the dive connected) → slot gone → no-op.
-    function onDiveImpact(idx) {
-        if (idx == null || !slots[idx]) return;
-        const el = document.querySelector(
-            `.stage-slot.active[data-index="${idx}"]`);
-        if (!el) return;
-        const cur = creepFear.get(idx) || 0;
-        creepFear.set(idx, Math.min(CREEP.FEAR_MAX, cur + CREEP.DIVE_FEAR));
-        el.classList.add('creep-struck', 'creep-scared');
-        if (!creepScaredSlots.has(idx)) { creepScaredSlots.add(idx); renderSlot(idx); }
-        const clear = () => {
-            el.classList.remove('creep-struck', 'creep-scared');
-            if (creepScaredSlots.delete(idx)) renderSlot(idx);
-        };
-        setTimeout(clear, 1200);
     }
 
     function slotCenters() {
@@ -3855,139 +3831,99 @@
         const elapsed = ts - st.tStart;
         const csz = creepSizePx();
 
-        if (st.phase === 'FLY') {
-            // Cruise: drift horizontally, hold the flight height (descend
-            // to it if entering from the top), gentle bob, beat-flap.
-            st.x += st.dir * st.speed * dt;
-            const dyf = st.flyHomeY - st.y, stepf = st.speed * dt;
-            st.y += Math.abs(dyf) <= stepf ? dyf : Math.sign(dyf) * stepf;
+        if (st.phase === 'HUNT') {
+            // One creep-centre read per tick (1-frame lag is fine and
+            // matches the original proven proximity behaviour).
+            const c = creepCenterXY();
+            const sc = slotCenters();
+
+            // Steer toward the nearest Munki we haven't scared yet —
+            // that's the "hunting": it visits Munkis one by one.
+            let steer = null, bd = Infinity;
+            sc.forEach(s => {
+                if (st.scared.has(s.i)) return;
+                const d = Math.hypot(s.cx - c.cx, s.cy - c.cy);
+                if (d < bd) { bd = d; steer = s; }
+            });
+            if (steer) {
+                const tX = steer.cx - csz / 2, tY = steer.cy - csz / 2;
+                const dx = tX - st.x, dy = tY - st.y;
+                const dd = Math.hypot(dx, dy) || 1;
+                const step = st.speed * dt;
+                if (dd <= step) { st.x = tX; st.y = tY; }
+                else { st.x += (dx / dd) * step; st.y += (dy / dd) * step; }
+                st.faceLeft = dx < 0;
+            } else {
+                // Nothing left to scare → head on out (toward exit).
+                st.x += st.dir * st.speed * dt;
+                const dyf = st.flyHomeY - st.y, sf = st.speed * dt;
+                st.y += Math.abs(dyf) <= sf ? dyf : Math.sign(dyf) * sf;
+                st.faceLeft = st.dir < 0;
+            }
             const bob = Math.sin((elapsed / CREEP.WAVE_PERIOD_MS) * Math.PI * 2)
-                      * CREEP.WAVE_AMP_PX;
+                      * (CREEP.WAVE_AMP_PX * 0.5);
             st.drawY = st.y + bob;
-            st.faceLeft = st.dir < 0;
             creepEl.style.transform = creepTransform(st, 0);
             creepFlap(st, ts, false);
 
-            if (st.divesDone >= CREEP.DIVE_COUNT) {
-                st.phase = 'EXIT'; st.phaseStart = ts;
+            // RESTORED passive proximity: any Munki within CLOSE_PX
+            // flinches + accrues fear; bleeds off once clearly FAR
+            // (CLOSE/FAR hysteresis stops boundary flicker). This is the
+            // fun interaction the player asked to keep.
+            const live = new Set();
+            sc.forEach(({ i, el, cx, cy }) => {
+                live.add(i);
+                const d = Math.hypot(c.cx - cx, c.cy - cy);
+                const cur = creepFear.get(i) || 0;
+                if (d <= CREEP.CLOSE_PX) {
+                    el.classList.add('creep-scared');
+                    if (!creepScaredSlots.has(i)) { creepScaredSlots.add(i); renderSlot(i); }
+                    st.scared.add(i);
+                    creepFear.set(i, Math.min(CREEP.FEAR_MAX,
+                        cur + CREEP.FEAR_GAIN_PER_S * dt));
+                } else if (d >= CREEP.FAR_PX) {
+                    el.classList.remove('creep-scared');
+                    if (creepScaredSlots.delete(i)) renderSlot(i);
+                    creepFear.set(i, Math.max(0,
+                        cur - CREEP.FEAR_DECAY_PER_S * dt));
+                }
+                // Between CLOSE and FAR: hold (hysteresis, no flicker).
+            });
+            [...creepFear.keys()].forEach(i => { if (!live.has(i)) creepFear.delete(i); });
+
+            // Scared SCARE_COUNT distinct Munkis (or the hunt timed
+            // out) → dramatic fast dive off the opposite edge.
+            if (st.scared.size >= CREEP.SCARE_COUNT
+                || elapsed > CREEP.MAX_HUNT_MS) {
+                st.phase = 'EXIT'; st.exitStart = ts;
                 st.dir = st.entryEdge === 'right' ? 1
                        : st.entryEdge === 'left'  ? -1 : st.dir;
                 st.exitDown = (st.entryEdge === 'top');
-            } else {
-                // Hunt: SPOT the nearest Munki within range.
-                const c = creepCenterXY();
-                let best = null, bd = CREEP.SPOT_RANGE_PX;
-                slotCenters().forEach(s => {
-                    const d = Math.hypot(s.cx - c.cx, s.cy - c.cy);
-                    if (d <= bd) { bd = d; best = s; }
-                });
-                if (best) {
-                    st.phase = 'SPOT'; st.phaseStart = ts;
-                    st.target = best.i;
-                }
+                st.faceLeft = (st.dir < 0 && !st.exitDown);
             }
-            // Cruised off without anything to hunt → gone.
-            const off = st.x < -csz * 1.6
-                     || st.x > window.innerWidth + csz * 1.6;
+            // Wandered fully off (no targets / pushed off) → just gone.
+            const off = st.x < -csz * 1.8
+                     || st.x > window.innerWidth + csz * 1.8
+                     || st.drawY > window.innerHeight + csz * 1.8;
             if (off || elapsed > 90000) { endCreep(); return; }
 
-        } else if (st.phase === 'SPOT') {
-            // Pause + orient toward the marked Munki; tense wing pulse.
-            const tc = slotCenters().find(s => s.i === st.target);
-            if (!tc || !slots[st.target]) {
-                st.phase = 'FLY'; st.phaseStart = ts;
-            } else {
-                const c = creepCenterXY();
-                st.faceLeft = (tc.cx < c.cx);
-                creepEl.style.transform = creepTransform(st, 0);
-                creepFlap(st, ts, true);
-                if (ts - st.phaseStart >= CREEP.SPOT_MS) {
-                    st.sx = st.x; st.sy = st.drawY;
-                    st.tx = tc.cx - csz / 2;
-                    st.ty = tc.cy - csz / 2;
-                    st.faceLeft = st.tx < st.sx;
-                    const dist = Math.hypot(st.tx - st.sx, st.ty - st.sy);
-                    const dv = st.speed * CREEP.DIVE_SPEED_MULT;
-                    st.diveDur = Math.max(160, (dist / dv) * 1000);
-                    st.phase = 'DIVE'; st.phaseStart = ts;
-                }
-            }
-
-        } else if (st.phase === 'DIVE') {
-            // Rapid accelerating lunge straight at the locked point.
-            const p = Math.min(1, (ts - st.phaseStart) / st.diveDur);
-            const e = p * p;
-            st.x     = st.sx + (st.tx - st.sx) * e;
-            st.drawY = st.sy + (st.ty - st.sy) * e;
-            const tilt = st.faceLeft ? -22 : 22; // nose-down dive
+        } else { // EXIT — fast dive off the OPPOSITE edge from entry.
+            const ex = st.speed * CREEP.EXIT_SPEED_MULT;
+            if (st.exitDown) { st.drawY += ex * dt; st.y = st.drawY; }
+            else { st.x += st.dir * ex * dt; }
+            const td = ts - st.exitStart;
+            setCreepFrame(td < 180 ? 2 : (td < 360 ? 3 : 4));
+            const tilt = st.exitDown ? 0 : (st.faceLeft ? -22 : 22);
             creepEl.style.transform = creepTransform(st, tilt);
-            setCreepFrame(p < 0.40 ? 2 : (p < 0.75 ? 3 : 4));
-            const tc = slotCenters().find(s => s.i === st.target);
-            let hit = p >= 1;
-            if (tc) {
-                const c = creepCenterXY();
-                if (Math.hypot(tc.cx - c.cx, tc.cy - c.cy)
-                    <= CREEP.IMPACT_PX) hit = true;
-            }
-            if (hit) {
-                onDiveImpact(st.target);          // the ONLY react trigger
-                st.phase = 'IMPACT'; st.phaseStart = ts;
-            }
-
-        } else if (st.phase === 'IMPACT') {
-            setCreepFrame(4);                      // frame 5 held at the hit
-            creepEl.style.transform =
-                creepTransform(st, st.faceLeft ? -22 : 22);
-            if (ts - st.phaseStart >= CREEP.IMPACT_MS) {
-                st.divesDone++;
-                if (st.targeted.indexOf(st.target) === -1) {
-                    st.targeted.push(st.target);
-                }
-                st.phase = 'PULLUP'; st.phaseStart = ts;
-            }
-
-        } else if (st.phase === 'PULLUP') {
-            // Climb back up to flight height, drifting forward, eased.
-            const up = st.speed * CREEP.PULLUP_SPEED_MULT;
-            st.x += st.dir * up * 0.5 * dt;
-            const dyp = st.flyHomeY - st.drawY, stepp = up * dt;
-            st.drawY += Math.abs(dyp) <= stepp ? dyp
-                      : Math.sign(dyp) * stepp;
-            st.y = st.drawY;
-            st.faceLeft = st.dir < 0;
-            creepEl.style.transform = creepTransform(st, 0);
-            creepFlap(st, ts, false);
-            if (Math.abs(st.drawY - st.flyHomeY) < 2) {
-                if (st.divesDone >= CREEP.DIVE_COUNT) {
-                    st.phase = 'EXIT';
-                    st.dir = st.entryEdge === 'right' ? 1
-                           : st.entryEdge === 'left'  ? -1 : st.dir;
-                    st.exitDown = (st.entryEdge === 'top');
-                } else {
-                    st.phase = 'FLY';
-                }
-                st.phaseStart = ts;
-            }
-
-        } else { // EXIT — leave by the OPPOSITE edge from entry.
-            if (st.exitDown) {
-                st.drawY += st.speed * CREEP.PULLUP_SPEED_MULT * dt;
-                st.y = st.drawY;
-            } else {
-                st.x += st.dir * st.speed * CREEP.PULLUP_SPEED_MULT * dt;
-            }
-            st.faceLeft = (st.dir < 0 && !st.exitDown);
-            creepEl.style.transform = creepTransform(st, 0);
-            creepFlap(st, ts, false);
-            const gone = st.x < -csz * 1.6
-                      || st.x > window.innerWidth + csz * 1.6
-                      || st.drawY > window.innerHeight + csz * 1.6;
-            if (gone || ts - st.phaseStart > 8000) { endCreep(); return; }
+            const gone = st.x < -csz * 1.8
+                      || st.x > window.innerWidth + csz * 1.8
+                      || st.drawY > window.innerHeight + csz * 1.8;
+            if (gone || td > 6000) { endCreep(); return; }
         }
 
-        // Fear → horror, with its own trigger/release hysteresis. Runs
-        // every phase; fear is now only added by completed dive IMPACTs
-        // (onDiveImpact), so ~3 dives reliably crosses the threshold.
+        // Fear → horror, with its own trigger/release hysteresis. Fear
+        // accrues from passive proximity (HUNT block); a creep that
+        // lingers scaring its 3 Munkis reliably crosses the threshold.
         let sum = 0;
         creepFear.forEach(v => { sum += v; });
         if (!fearHorrorActive && sum >= CREEP.HORROR_TRIGGER_SUM) {

@@ -88,25 +88,25 @@ The STANDARD sheet is **6 creeps** (one per rainbow colour) ×
 
 | Frame | Pose | Used by state |
 |---|---|---|
-| 1 | wings up   | FLY / SPOT / PULL-UP flap-A |
-| 2 | wings down | FLY / SPOT / PULL-UP flap-B |
-| 3 | spot / wind-up | DIVE windup (p < .40) |
-| 4 | dive       | DIVE mid (p < .75) |
-| 5 | strike     | DIVE strike → held through IMPACT |
+| 1 | wings up   | HUNT flap-A |
+| 2 | wings down | HUNT flap-B |
+| 3 | spot / wind-up | EXIT dive (t < 180 ms) |
+| 4 | dive       | EXIT dive (t < 360 ms) |
+| 5 | strike     | EXIT dive (held, ≥ 360 ms) |
 
-Lifecycle (see the FLYING CREEPS block in `game.js`) — a **predatory
-dive cycle**: **FLY → SPOT → DIVE → IMPACT → PULL-UP**, repeated for
-`CREEP.DIVE_COUNT` (3) targets, then **EXIT** off the opposite edge
-from entry. FLY cruises a band ABOVE the Munkis (wings beat-flapping
-1↔2); when a Munki comes within `SPOT_RANGE_PX` it **SPOT**s (pause +
-orient + tense wing pulse, `SPOT_MS`), then **DIVE**s — a fast
-accelerating nose-down lunge (`DIVE_SPEED_MULT`, frames 3→4→5) at that
-Munki. **React is triggered ONLY by a completed dive's IMPACT**
-(`onDiveImpact`: that Munki's startle shake + shocked face + knock +
-`DIVE_FEAR`) — passive proximity no longer does anything. Then it
-**PULL-UP**s back to flight height and picks the next target (random,
-no repeats unless only one Munki). Targets random from on-stage
-Munkis; an empty stage → it just cruises through and leaves.
+Lifecycle (see the FLYING CREEPS block in `game.js`) — a **hunting
+cycle**: **HUNT → EXIT**. In HUNT the creep steers toward the nearest
+Munki it hasn't scared yet (wings beat-flapping 1↔2) — that's the
+hunt, it visits Munkis one at a time. **Passive proximity is the
+interaction**: any Munki within `CLOSE_PX` flinches (`.creep-scared`
+→ shocked face) and accrues fear, bleeding off once clearly past
+`FAR_PX` (CLOSE/FAR hysteresis stops boundary flicker). Once it has
+scared `CREEP.SCARE_COUNT` (3) **distinct** Munkis — or the hunt
+exceeds `MAX_HUNT_MS` — it **EXIT**s in a fast dive
+(`EXIT_SPEED_MULT`, frames 3→4→5) off the **opposite edge from
+entry**. Fewer than 3 Munkis on stage → it scares what's there then
+times out and leaves; an empty stage → it just cruises through and
+leaves.
 `CREEP.VARIANT_COUNT` (6) is the creep count and the "All Creeps
 Encountered" target — that achievement counts **creeps seen, not
 frames**.
