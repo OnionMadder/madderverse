@@ -278,6 +278,11 @@
         }
     }
     function setBandOn(i, on) {
+        // Defensive: a stray footswitch click before the dual-band audio
+        // graph is wired (e.g. ensureDualBandAudio bailed when masterGain
+        // wasn't ready) silently no-ops the gain ramp. Idempotent via
+        // dualReady, so calling it from here always closes that gap.
+        if (on) ensureDualBandAudio();
         bandOn[i] = on;
         const el = bandFootEl(i);
         if (el) {
@@ -1847,10 +1852,14 @@
         return slots.indexOf('ice') !== -1;
     }
 
-    // Toggles `.frozen-by-ice` on every active non-ice slot whenever an Ice
-    // Munki is on the board. Class is only added on the transition from
-    // unfrozen → frozen so the RIP/skull animation re-fires for fresh
-    // victims, but doesn't loop forever on already-frozen slots.
+    // Toggles `.frozen-by-ice` on every active non-ice slot whenever an
+    // Ice Munki is on the board. Class is only added on the transition
+    // from unfrozen → frozen so the ice-climb animation re-fires for
+    // fresh victims, but doesn't loop forever on already-frozen slots.
+    // After ICE_ENCASE_MS (matches the @keyframes ice-climb duration),
+    // .frozen-encased is added — that's the moment the bounce stops.
+    const ICE_ENCASE_MS = 3500;
+    const iceEncaseTimers = new Map(); // slotIndex → setTimeout id
     function updateIceFreeze() {
         const iceOn = isIceOnStage();
         document.body.classList.toggle('ice-on-stage', iceOn);
@@ -1861,8 +1870,19 @@
             const wasFrozen = slot.classList.contains('frozen-by-ice');
             if (shouldFreeze && !wasFrozen) {
                 slot.classList.add('frozen-by-ice');
+                // Schedule the "head finally encased → bouncing stops"
+                // transition to land when the climb animation tops out.
+                clearTimeout(iceEncaseTimers.get(idx));
+                iceEncaseTimers.set(idx, setTimeout(() => {
+                    if (slot.classList.contains('frozen-by-ice')) {
+                        slot.classList.add('frozen-encased');
+                    }
+                    iceEncaseTimers.delete(idx);
+                }, ICE_ENCASE_MS));
             } else if (!shouldFreeze && wasFrozen) {
-                slot.classList.remove('frozen-by-ice');
+                slot.classList.remove('frozen-by-ice', 'frozen-encased');
+                const t = iceEncaseTimers.get(idx);
+                if (t) { clearTimeout(t); iceEncaseTimers.delete(idx); }
             }
         });
     }
@@ -3902,7 +3922,11 @@
         const frames = creepDef ? creepDef.frames : null;
         if (hasCreeps) markCreepSeen(creepIdx);
         const vw = window.innerWidth, vh = window.innerHeight;
-        const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
+        // Always enter from a side edge — top-edge entries used to drop
+        // straight down on EXIT (so some creeps appeared to dive off
+        // while others flew sideways). Side-only entries guarantee a
+        // consistent horizontal sweep + horizontal exit for every creep.
+        const edge = (Math.random() < 0.5) ? 'left' : 'right';
         const speed = rand(CREEP.SPEED_MIN_PXPS, CREEP.SPEED_MAX_PXPS);
         const size = creepSizePx();
         // Flight height: a band ABOVE where the Munkis stand, used when
@@ -3916,10 +3940,8 @@
             flyHomeY = vh * 0.3;
         }
         let x, y, dir;
-        if (edge === 'left')  { x = -size;       y = flyHomeY; dir =  1; }
-        else if (edge === 'right') { x = vw;     y = flyHomeY; dir = -1; }
-        else { /* top */      x = vw * rand(0.2, 0.8); y = -size;
-               dir = (Math.random() < 0.5 ? -1 : 1); }
+        if (edge === 'left') { x = -size; y = flyHomeY; dir =  1; }
+        else                 { x = vw;    y = flyHomeY; dir = -1; }
         creepState = {
             x, y, drawY: y, entryEdge: edge, dir, speed, flyHomeY,
             creepIdx, frames, curFrame: -1,
@@ -4103,28 +4125,24 @@
             if (st.scared.size >= CREEP.SCARE_COUNT
                 || elapsed > CREEP.MAX_HUNT_MS) {
                 st.phase = 'EXIT'; st.exitStart = ts;
-                st.dir = st.entryEdge === 'right' ? 1
-                       : st.entryEdge === 'left'  ? -1 : st.dir;
-                st.exitDown = (st.entryEdge === 'top');
-                st.faceLeft = (st.dir < 0 && !st.exitDown);
+                // Always horizontal — exit the OPPOSITE side edge.
+                st.dir = (st.entryEdge === 'right') ? 1 : -1;
+                st.faceLeft = (st.dir < 0);
             }
             // Wandered fully off (no targets / pushed off) → just gone.
             const off = st.x < -csz * 1.8
-                     || st.x > window.innerWidth + csz * 1.8
-                     || st.drawY > window.innerHeight + csz * 1.8;
+                     || st.x > window.innerWidth + csz * 1.8;
             if (off || elapsed > 90000) { endCreep(); return; }
 
-        } else { // EXIT — fast dive off the OPPOSITE edge from entry.
+        } else { // EXIT — fast horizontal dive off the opposite side.
             const ex = st.speed * CREEP.EXIT_SPEED_MULT;
-            if (st.exitDown) { st.drawY += ex * dt; st.y = st.drawY; }
-            else { st.x += st.dir * ex * dt; }
+            st.x += st.dir * ex * dt;
             const td = ts - st.exitStart;
             setCreepFrame(td < 180 ? 2 : (td < 360 ? 3 : 4));
-            const tilt = st.exitDown ? 0 : (st.faceLeft ? -22 : 22);
+            const tilt = st.faceLeft ? -22 : 22;
             creepEl.style.transform = creepTransform(st, tilt);
             const gone = st.x < -csz * 1.8
-                      || st.x > window.innerWidth + csz * 1.8
-                      || st.drawY > window.innerHeight + csz * 1.8;
+                      || st.x > window.innerWidth + csz * 1.8;
             if (gone || td > 6000) { endCreep(); return; }
         }
 

@@ -363,6 +363,18 @@ body.dual-band-mode .stage::before {
     pointer-events: none;
     z-index: 0;
 }
+/* DUAL BAND toggle — mirrors .btn-song's amber pattern but in the
+   project teal so it reads as the v1.1 mode switch sibling. The base
+   rule was missing → the button looked invisible. */
+.btn-dualband {
+    border: 2px solid #2dd4bf;
+    color: #2dd4bf;
+    text-shadow: 0 0 6px rgba(45, 212, 191, 0.55);
+}
+.btn-dualband:hover, .btn-dualband:active {
+    background: rgba(45, 212, 191, 0.15);
+    color: #fff;
+}
 .btn-dualband.on {
     background: rgba(45, 212, 191, 0.22);
     border-color: #2dd4bf;
@@ -409,6 +421,19 @@ body.dual-band-mode .stage::before {
 }
 @media (max-width: 480px) {
     .band-foot { width: 116px; height: 74px; }
+}
+/* While DUAL BAND is on, any band that's still OFF gently pulses so
+   the player knows "tap me to make sound" (the locked design starts
+   both bands silent; the pulse advertises the interaction). */
+body.dual-band-mode .band-foot:not(.lit) {
+    animation: band-foot-attn 1.6s ease-in-out infinite;
+}
+@keyframes band-foot-attn {
+    0%, 100% { box-shadow: 0 6px 0 rgba(0,0,0,0.45), 0 0 0 rgba(45,212,191,0); }
+    50%      { box-shadow: 0 6px 0 rgba(0,0,0,0.45), 0 0 18px rgba(45,212,191,0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+    body.dual-band-mode .band-foot:not(.lit) { animation: none; }
 }
 
 /* Slots are invisible grid placeholders — no border, no background, no
@@ -1269,10 +1294,13 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     animation: ice-shiver 0.6s ease-in-out infinite !important;
 }
 
-/* Frozen Munkis don't get to dance to the beat — squashing the bounce
-   reads as "stiff, frozen solid". */
-.stage-slot.frozen-by-ice .char-art.beat .char-body,
-.stage-slot.frozen-by-ice .char-art.beat .char-head {
+/* Bouncing continues WHILE the ice is climbing from feet → head; the
+   bounce only stops once the freeze is fully encased (JS adds the
+   .frozen-encased class after ICE_ENCASE_MS — see updateIceFreeze).
+   That reads as "the cold is creeping up; once it reaches the head,
+   you're frozen solid". */
+.stage-slot.frozen-encased .char-art.beat .char-body,
+.stage-slot.frozen-encased .char-art.beat .char-head {
     animation: none !important;
 }
 
@@ -1299,24 +1327,44 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     pointer-events: none;
 }
 
-/* Frost silently encases the slot — thin cracks + a cold dark vignette
-   fade in ONCE. No text, no comic bounce; just cold dread. */
+/* Ice CLIMBS the slot from feet → head: a bottom-anchored frost
+   layer whose HEIGHT animates 0% → 105% over ICE_ENCASE_MS (~3.5 s).
+   The top edge of the layer fades to transparent so it reads as a
+   rising ice level rather than a slab dropping in. JS adds
+   .frozen-encased the moment it tops out (matches the animation
+   duration) — at that point the beat-bounce is suppressed (see
+   .frozen-encased rule above) and the Munki is locked in ice. */
 .stage-slot.frozen-by-ice::after {
     content: '';
     position: absolute;
-    inset: 0;
+    left: 0; right: 0; bottom: 0;
+    height: 0;
     background:
+        /* the ice column — dense at the floor, fading at the rising
+           waterline; light cracks layered for texture. */
+        linear-gradient(to top,
+            rgba(165, 243, 252, 0.94) 0%,
+            rgba(165, 243, 252, 0.86) 35%,
+            rgba(199, 246, 253, 0.72) 70%,
+            rgba(224, 252, 255, 0.55) 88%,
+            rgba(224, 252, 255, 0.00) 100%),
         linear-gradient(118deg, transparent 45%, rgba(224, 252, 255, 0.6) 47%, transparent 49%),
         linear-gradient(204deg, transparent 58%, rgba(165, 243, 252, 0.5) 60%, transparent 62%),
-        linear-gradient(70deg,  transparent 70%, rgba(224, 252, 255, 0.42) 72%, transparent 74%),
-        radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(6, 18, 28, 0.46) 100%);
-    opacity: 0;
-    animation: ice-encase 0.55s ease-out forwards;
+        linear-gradient(70deg,  transparent 70%, rgba(224, 252, 255, 0.42) 72%, transparent 74%);
+    animation: ice-climb 3.5s ease-in-out forwards;
     z-index: 7;
     pointer-events: none;
 }
-
-@keyframes ice-encase { from { opacity: 0; } to { opacity: 0.92; } }
+@keyframes ice-climb {
+    from { height: 0%;   }
+    to   { height: 105%; }
+}
+/* Once fully encased: a faint cold vignette settles over the whole
+   slot (the world has gone dark behind the ice) and the climbing
+   layer holds at full. */
+.stage-slot.frozen-encased {
+    box-shadow: inset 0 0 28px rgba(6, 18, 28, 0.45);
+}
 
 .stage-slot.frozen-by-ice .slot-label {
     color: #67e8f9 !important;
@@ -1340,7 +1388,8 @@ body.ice-on-stage .stage-slot.active.slot-bad[data-char="ice"] {
 @media (prefers-reduced-motion: reduce) {
     .stage-slot.frozen-by-ice .char-art { animation: none !important; }
     .stage-slot.frozen-by-ice .slot-icon::before { animation: none; }
-    .stage-slot.frozen-by-ice::after { animation: none; opacity: 0.92; }
+    /* No climb — snap straight to fully encased. */
+    .stage-slot.frozen-by-ice::after { animation: none; height: 105%; }
 }
 
 /* ====== MOON RULES (chaos events fired by clicks while Moon is on stage) ====== */
