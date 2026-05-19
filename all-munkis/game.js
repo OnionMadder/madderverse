@@ -185,7 +185,7 @@
     // ---------- DUAL BAND MODE (v1.1) ----------
     // A toggled mode: the 6-slot stage splits into two rows of 3 — Row A
     // (slots 0-2) and Row B (slots 3-5) — each a fully independent band
-    // with its OWN Bala's Song + oscillators + loop clock (wired in
+    // with its OWN Bala's Theme + oscillators + loop clock (wired in
     // chunk B). bandOn[0]/[0] gate each row's WHOLE band via a big
     // footswitch; the player times the two switches to compose the
     // layering. Single-row default + v1.0 audio path are untouched.
@@ -200,7 +200,7 @@
     // never touched — scheduleStep just early-returns its audio in mode.
     let dualReady = false;
     let rowGain = [null, null];   // per-row bus -> masterGain (footswitch gates)
-    let rowTone = [null, null];   // per-row {pad,bell,hat} (own Bala's Song)
+    let rowTone = [null, null];   // per-row {pad,bell,hat} (own Bala's Theme)
     let rowClock = [
         { step: 0, bar: 0, next: 0, started: false },
         { step: 0, bar: 0, next: 0, started: false }
@@ -215,7 +215,7 @@
             rg.gain.value = 0;            // silent until the footswitch lifts it
             rg.connect(masterGain);       // converge at the one master/compressor
             rowGain[r] = rg;
-            // This row's OWN Bala's Song: its own Tone ambient instances
+            // This row's OWN Bala's Theme: its own Tone ambient instances
             // through its own reverb/delay bus -> this row's gain. Wrapped
             // so a Tone failure can never break the raw-WebAudio path.
             if (typeof Tone !== 'undefined' && toneReady) {
@@ -259,7 +259,7 @@
         if (bar === 2 && step === 0)  T.bell.triggerAttackRelease('C6', '2n', when + 0.04);
         if (bar === 3 && step === 12) T.bell.triggerAttackRelease('E6', '4n', when);
     }
-    // One scheduler tick for one band: its own Bala's Song bed + Tone
+    // One scheduler tick for one band: its own Bala's Theme bed + Tone
     // ambient + only its 3 slots, all into this row's bus. Row A = slots
     // 0-2, Row B = slots 3-5. Engine code (BASE_SONG/play) is untouched —
     // we only pass this row's bus as `out` and this row's clock as `when`.
@@ -382,7 +382,7 @@
             // Mobile audio hygiene Fix 3 — master lowpass BEFORE the
             // compressor. Tiny phone speakers can't cleanly reproduce
             // >~14 kHz; that energy comes back as "static-y residue"
-            // over long sessions. Musically inaudible (Bala's Song's
+            // over long sessions. Musically inaudible (Bala's Theme's
             // top partials sit well below 14 kHz) but phones sound
             // dramatically cleaner. (Future madderverse/lib/audio/:
             // keep this node — it's a speaker-protection stage, not an
@@ -397,7 +397,7 @@
             // peak above ~-3 dBFS reaches small speakers. ratio stays 6
             // (already >= the 4 floor — more peak control, not less).
             // This only tames transients/peaks; it does NOT recolor the
-            // tone — Bala's Song character is preserved.
+            // tone — Bala's Theme character is preserved.
             comp.threshold.value = -14;
             comp.knee.value = 10;
             comp.ratio.value = 6;

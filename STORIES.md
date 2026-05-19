@@ -6,7 +6,7 @@ made — humans, machines, and the people watching from the comments.
 
 ---
 
-## The Bala's Song Paradox
+## The Bala's Theme Paradox
 
 *aka the AI-slop vibe-call*
 
@@ -50,14 +50,14 @@ tell," this is the counterexample I keep in my pocket.
 
 It's worth being honest the other way too: the music being good was not
 craft on the machine's part either. There was no intent to recover —
-the teardown in `lib/audio/BALAS_SONG.md` is explicit about that. The
+the teardown in `lib/audio/BALAS_THEME.md` is explicit about that. The
 "magic" is emergent: pure waveforms, slow envelopes, a heavy shared
 reverb bus, a sentimental four-chord loop, a compressor gluing it. Nice
 accident, well-documented after the fact. Crediting it as machine genius
 would be the same vibe-call in the other direction.
 
 **Where it goes from here.** That accidental engine is now the canon.
-Bala's Song becomes the voice of the shared `madderverse/lib/audio/`
+Bala's Theme becomes the voice of the shared `madderverse/lib/audio/`
 library — every rhythm-based madderverse game pulls from the same
 system, so the whole brand ends up speaking in the sound a commenter
 heard and, without meaning to, approved. Which makes that commenter the

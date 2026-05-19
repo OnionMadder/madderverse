@@ -15,7 +15,7 @@ because each tab is its own audio engine on the shared hardware clock.
 **Design history (so nobody re-litigates it):**
 - v1.1 was first frozen as a geometric "Dual Row Stage" (front/back
   slot rows). Playtest: didn't reproduce the magic.
-- An emergent auto-layering ("Bala's Song Layering", commit
+- An emergent auto-layering ("Bala's Theme Layering", commit
   `9037367`: a single parallel Tone clone auto-engaging at ≥3 Munkis)
   was built, then **REVERTED** — the player wants to *perform* the
   layering, not have the game do it automatically.
@@ -29,7 +29,7 @@ because each tab is its own audio engine on the shared hardware clock.
 - In the mode the stage is **two rows of 3 slots** (Row A, Row B) —
   6 Munkis total, split into two bands. No bigger geometry.
 - **Each row is a fully independent band:**
-  1. Its **own Bala's Song** — its own Tone ambient instrument
+  1. Its **own Bala's Theme** — its own Tone ambient instrument
      instances (pad/bell/hat) through its own reverb/delay bus.
   2. Its **own oscillators** for its Munki voices (per-Munki `play()`
      already mints fresh oscillators per call; in this mode each

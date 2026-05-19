@@ -1,4 +1,4 @@
-# Bala's Song — reverse-engineered analysis of the All Munkis audio engine
+# Bala's Theme — reverse-engineered analysis of the All Munkis audio engine
 
 **What this is.** A teardown of the audio code in `all-munkis/game.js`,
 written so the future shared library at `madderverse/lib/audio/` has one
@@ -11,7 +11,7 @@ oscillators"). There was no musical intent to recover — no key chosen on
 purpose, no arrangement decisions, no mix engineering. So this document
 does **not** reverse-engineer intent. It documents the exact configuration
 that exists and analyses, after the fact, which of those values produce
-the perceived "Bala's Song" quality — the soft, sustained,
+the perceived "Bala's Theme" quality — the soft, sustained,
 faintly-Final-Fantasy wash people reacted to. The musicality is
 **emergent**, not authored. That distinction is the whole point (see
 `madderverse/STORIES.md`).
@@ -244,7 +244,7 @@ sits *under* the chiptune instead of smearing against it.
 
 ---
 
-## 6. Analysis — what actually produces the "Bala's Song" quality
+## 6. Analysis — what actually produces the "Bala's Theme" quality
 
 After the fact (no intent existed), these are the 3–5 elements doing the
 work, most → least significant:
