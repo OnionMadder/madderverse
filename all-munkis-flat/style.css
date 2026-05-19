@@ -1817,6 +1817,33 @@ body.react-mode-active #horror-overlay .red-vignette {
     body.react-mode-active #horror-overlay .red-vignette { animation: none; }
 }
 
+/* ===== Dread stage tiers (Chunk 3) =====
+   applyDreadStageClass() sets body.react-mode-active for the `dread`
+   AND `terror` stages, so every horror rule above IS the `dread` tier
+   (full look, unchanged → no regression). `unease` is a faint
+   pre-horror layer that sits BELOW it (deliberately NO watching eyes
+   and NO corner Munkis — those stay react-mode-active only). `terror`
+   AMPS beyond `dread`; these rules follow the react-mode-active ones
+   so they win at equal specificity. The per-Munki flinch/freak-out is
+   independent (the unified fear ladder), so Munkis still react at
+   `unease` even though the screen barely shifts. */
+body.dread-unease #horror-overlay .bg-dim {
+    opacity: 0.16;
+    transition: opacity 6s ease;
+}
+body.dread-unease #horror-overlay .red-vignette {
+    opacity: 0.16;
+    transition: opacity 6s ease;
+}
+body.dread-terror #horror-overlay .bg-dim { opacity: 0.74; }
+body.dread-terror #horror-overlay .red-vignette {
+    opacity: 0.95;
+    animation-duration: 2.4s;   /* faster, harder "still alive" pulse */
+}
+@media (prefers-reduced-motion: reduce) {
+    body.dread-terror #horror-overlay .red-vignette { animation: none; }
+}
+
 /* Subtitle goes glitchy + moon-colored when the chaos message lands. */
 .moon-glitch-text {
     color: #93c5fd !important;

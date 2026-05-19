@@ -156,18 +156,16 @@
     let toneBell = null;      // FMSynth — section-transition sparkle
     let toneHat = null;       // MetalSynth — off-beat hi-hat tick
     let toneDrone = null;     // Oscillator — low rumble that swells during react mode
-    let toneDroneGain = null; // Drone's gain envelope (ramps on react in/out)
-    let anyWasReacting = false; // edge-detect react mode transitions for the drone
-    // Horror mode (body.react-mode-active) is OR'd by syncHorrorMode():
-    //   beatReacting    — any Munki at PANIC fear (set by tickReactState
-    //                     from the unified per-Munki fear ladder)
-    //   fearHorrorActive — the creep fear sum crossed the horror sum
-    //                      (set by the Flying Creep system).
-    let beatReacting = false;
+    let toneDroneGain = null; // Drone's gain envelope (ramps per dread stage)
+    let droneLevel = -1;      // last drone target (edge-detect; stage-driven)
+    // Chunk 3: the dread STAGE owns horror now (applyDreadStageClass).
+    // `fearHorrorActive` survives only as the latch for the
+    // creepWhisperer achievement (creep fear sum crossed the horror
+    // sum) — it no longer gates any visual.
     let fearHorrorActive = false;
-    // True whenever horror mode (body.react-mode-active) is on, from
-    // EITHER source. While on, every on-stage non-evil Munki cycles its
-    // head 1→5 (staggered per slot), not just the Ice/Moon-adjacent one.
+    // Set true at the `dread`/`terror` stages. While on, every on-stage
+    // non-evil Munki cycles its head 1→5 (staggered per slot) — the
+    // global ripple on top of the per-Munki fear ladder.
     let horrorActive = false;
     let horrorStartBeat = 0;
 
@@ -495,12 +493,17 @@
     // Ramp the sub-bass drone up or down depending on whether react mode
     // is active. Long 4-s envelope so the menace sneaks in rather than
     // popping. Called from tickReactState only on a transition.
-    function setReactDrone(on) {
+    // Stage-driven now: target gain ramps with the dread stage (calm 0,
+    // unease faint, dread the old 0.32, terror loudest). Edge-detected
+    // on `droneLevel` so it only re-ramps when the stage actually moves.
+    function setReactDrone(level) {
+        if (level === droneLevel) return;
+        droneLevel = level;
         if (!toneReady || !toneDroneGain) return;
         const now = Tone.now();
         toneDroneGain.gain.cancelScheduledValues(now);
         toneDroneGain.gain.setValueAtTime(toneDroneGain.gain.value, now);
-        toneDroneGain.gain.linearRampToValueAtTime(on ? 0.32 : 0, now + 4);
+        toneDroneGain.gain.linearRampToValueAtTime(level, now + 3.5);
     }
 
     function schedule() {
@@ -1483,12 +1486,33 @@
         munkiFear.forEach(v => { p += v; });
         return p;
     }
+    // CHUNK 3: the SINGLE owner of the horror presentation. On a stage
+    // change it sets body.dread-<stage>, drives the legacy
+    // `react-mode-active` (= stage is dread|terror, so every existing
+    // horror CSS rule keeps working unchanged — the full look is the
+    // `dread` tier; `unease` adds a subtle pre-horror layer, `terror`
+    // amps beyond it), the global Munki face-cycle (`horrorActive`),
+    // the stage-leveled sub-bass drone, and the falling-moon gate.
     function applyDreadStageClass() {
         const s = dreadStage();
         if (s === dreadStageNow) return;
         document.body.classList.remove('dread-' + dreadStageNow);
         document.body.classList.add('dread-' + s);
         dreadStageNow = s;
+        const horror = (s === 'dread' || s === 'terror');
+        document.body.classList.toggle('react-mode-active', horror);
+        if (horror && !horrorActive) horrorStartBeat = beatCounter;
+        horrorActive = horror;
+        setReactDrone(s === 'terror' ? 0.5
+                    : s === 'dread'  ? 0.32
+                    : s === 'unease' ? 0.12
+                    :                  0);
+        // Falling-moon atmosphere gate (owner moved here from
+        // syncHorrorMode): stamp when full horror engages so it can
+        // wait out the 12 s creep-in ramp; clear when it lifts.
+        if (horror && !horrorOnSince) horrorOnSince = performance.now();
+        if (!horror) horrorOnSince = 0;
+        syncMoonFall();
     }
     function dreadTick(ts) {
         if (document.hidden) {
@@ -1560,7 +1584,6 @@
     function tickReactState() {
         beatCounter++;
         const now = performance.now();
-        let anyPanic = false;
         const toRender = new Set();
         for (let i = 0; i < NUM_SLOTS; i++) {
             const id = slots[i];
@@ -1583,10 +1606,8 @@
             } else if (f < FEAR.PANIC_RELEASE && panicStartBeat.has(i)) {
                 panicStartBeat.delete(i);
             }
-            if (f >= FEAR.PANIC) anyPanic = true;
             if (f >= FEAR.FLINCH) toRender.add(i); // face advances/holds
         }
-        beatReacting = anyPanic;
         refreshFearVisuals();   // shake class diff (unified)
         kickDread();            // keep the dread meter ticking (Chunk 1)
         syncHorrorMode();
@@ -1601,26 +1622,14 @@
         toRender.forEach(i => renderSlot(i));
     }
 
-    // Single owner of body.react-mode-active + the sub-bass drone. Horror
-    // is on if EITHER the beat-driven Ice/Moon adjacency OR the Flying
-    // fear accumulation says so. Called from tickReactState (every beat)
-    // and from the Flying Creep fear logic (on threshold transitions) so it
-    // engages promptly regardless of which source fires.
+    // Chunk 3: the dread STAGE is the single source of truth now (see
+    // applyDreadStageClass — it owns react-mode-active / horrorActive /
+    // drone / moon-fall). This is just the prompt-engage hook: callers
+    // (tickReactState every beat, the creep fear logic) poke it so the
+    // meter loop is alive and re-stages immediately, instead of waiting
+    // for the next pressure change.
     function syncHorrorMode() {
-        const on = beatReacting || fearHorrorActive;
-        document.body.classList.toggle('react-mode-active', on);
-        if (on && !horrorActive) horrorStartBeat = beatCounter; // clean cycle start
-        horrorActive = on;
-        if (on !== anyWasReacting) {
-            setReactDrone(on);
-            anyWasReacting = on;
-        }
-        // Falling-moon atmosphere: stamp when horror engaged so the
-        // effect can wait out the 12 s creep-in ramp before starting,
-        // and re-evaluate start/stop on every horror transition.
-        if (on && !horrorOnSince) horrorOnSince = performance.now();
-        if (!on) horrorOnSince = 0;
-        syncMoonFall();
+        kickDread();
     }
 
     // headArt composes the head layers (shape circle → sprite → hair → cans).
@@ -2072,11 +2081,25 @@
     function triggerJumpScare() {
         if (isJumpScareActive) return;
         isJumpScareActive = true;
-        addDread(DREAD.JUMPSCARE_SPIKE);   // instant meter spike (Chunk 1)
+        addDread(DREAD.JUMPSCARE_SPIKE);   // instant meter spike
 
         // Make sure the audio engine is alive before we try to play anything;
         // also lets the kid trigger a scare as their very first interaction.
         ensureAudio();
+
+        // CHUNK 3 gating: the FULL scare (shriek + screen flash) only
+        // fires once dread has reached the `dread` stage. A legit
+        // Ice/Moon drop self-qualifies — its JUMPSCARE_SPIKE (60) lifts
+        // the meter past DREAD on the spot. Below that it's a soft beat:
+        // the dread bump + a brief shocked face, no full-screen scare.
+        if (dreadStage() !== 'dread' && dreadStage() !== 'terror') {
+            renderAllSlots();
+            setTimeout(() => {
+                isJumpScareActive = false;
+                renderAllSlots();
+            }, 500);
+            return;
+        }
         playJumpScareSound();
 
         document.body.classList.add('jumpscare');
