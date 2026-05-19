@@ -42,7 +42,7 @@ as-is.
    pull / smooth / flatten brushes for the terrain itself, obstacle
    palette drag-and-drop, spawn + well placement, save/load JSON.
    Gloved-hand cursor matching the wireframe aesthetic.
-4. **Phase 4 — audio + polish.** Bala's Song background, rolling SFX
+4. **Phase 4 — audio + polish.** Bala's Theme background, rolling SFX
    scaled by velocity, whoosh on well entry, "captured!" on goal-reach,
    reverse-gravity hum. All Web Audio synthesized.
 5. **Phase 5 — 5 test levels** built using the new physics.

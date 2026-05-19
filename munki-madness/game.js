@@ -19,25 +19,29 @@
   // ---------------------------------------------------------------------
   // Physics knobs — see PHYSICS_SPEC.md. Live-tunable via ?tune=1.
   // ---------------------------------------------------------------------
-  var ACCEL = 16;            // player-input push (cells/s^2)
-  var MAX_SPEED = 6;         // top speed (cells/s)
+  var ACCEL = 20;            // player-input push (cells/s^2)
+  var MAX_SPEED = 7;         // top speed (cells/s)
   var WALL_BOUNCE = 0.4;     // edge restitution (pinball bonk)
-  var FRICTION_FLOOR = 0.92; // per-frame@60 velocity multiplier (drag)
+  var FRICTION_FLOOR = 0.955;// per-frame@60 velocity multiplier (drag)
+                              // — higher = heavier (momentum lingers).
   // How hard the surface slope pulls the marble. The gravity accel is
   // -GRAVITY_K * gradient(height); a well's cone wall becomes a real pull.
-  var GRAVITY_K = 34;
-  var MARBLE_R = 0.34;       // marble radius (cells) — keeps it off the rim
+  var GRAVITY_K = 40;
+  var MARBLE_R = 0.42;       // marble radius (cells) — keeps it off the rim
 
   // Well capture: the marble is "in the goal" when it's inside the well's
-  // bowl AND too slow to climb back out (trapped at the bottom).
-  var ESCAPE_SPEED = 1.6;    // below this speed inside the bowl => captured
+  // bowl AND too slow to climb back out (trapped at the bottom). With the
+  // heavier feel the ball carries more momentum into the bowl, so the
+  // threshold is forgiving — the capture-dwell timer still rejects fly-throughs.
+  var ESCAPE_SPEED = 2.2;
 
   var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // anti spiral-of-death
 
   // ---- Tilt control (ported from v1.0; recalibrated feel) ----
-  var TILT_FULL = 15;             // deg past the recentred zero = full input
-  var TILT_FORCE_MULTIPLIER = 1.4;
+  var TILT_FULL = 10;             // deg past the recentred zero = full input
+                                  // (smaller = more responsive to subtle tilts)
+  var TILT_FORCE_MULTIPLIER = 2.0;
   var TILT_DEADZONE = 2.5;        // deg of slack around zero (anti-jitter)
   var TILT_FLIP_X = 1, TILT_FLIP_Y = 1;
   var DRAG_FULL = 90;             // px of drag that = full input

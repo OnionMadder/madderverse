@@ -66,13 +66,15 @@ Tunable constants at the top of `game.js` (live-tunable via `?tune=1`):
 
 | Constant | v2.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `16` | player-input push (cells/s²) |
-| `MAX_SPEED` | `6` | top speed (cells/s) |
+| `ACCEL` | `20` | player-input push (cells/s²) |
+| `MAX_SPEED` | `7` | top speed (cells/s) |
 | `WALL_BOUNCE` | `0.4` | edge restitution — pinball bonk |
-| `FRICTION_FLOOR` | `0.92` | per-frame@60 velocity multiplier (drag) |
-| `GRAVITY_K` | `34` | slope → accel multiplier (see above) |
-| `TILT_FORCE_MULTIPLIER` | `1.4` | extra tilt-input gain |
-| `MARBLE_R` | `0.34` | marble radius (cells); keeps it off the rim |
+| `FRICTION_FLOOR` | `0.955` | per-frame@60 velocity multiplier — higher = heavier (momentum lingers) |
+| `GRAVITY_K` | `40` | slope → accel multiplier (see above) |
+| `TILT_FULL` | `10°` | deg past the recentred zero that saturates tilt input |
+| `TILT_FORCE_MULTIPLIER` | `2.0` | extra tilt-input gain |
+| `MARBLE_R` | `0.42` | marble radius (cells); keeps it off the rim |
+| `ESCAPE_SPEED` | `2.2` | bowl-speed threshold below which the marble is captured (cells/s) |
 
 The marble should feel **heavy** — gravity dominates, player input
 nudges. On a flat plane the marble barely accelerates from tilt alone;
@@ -112,7 +114,7 @@ A level defines `well = { x, y, captureR }`. The marble is **captured**
 when it is simultaneously:
 
 1. Inside the capture bowl: `distance((x,y), (well.x, well.y)) < captureR`, **and**
-2. Too slow to climb back out: `|v| < ESCAPE_SPEED` (Phase 1: `1.6` cells/s),
+2. Too slow to climb back out: `|v| < ESCAPE_SPEED` (Phase 1: `2.2` cells/s),
 3. for at least `0.28 s` of continuous dwell (anti-flicker; a marble
    that streaks across the bowl at high speed will not falsely trigger).
 
@@ -158,8 +160,9 @@ which is multiplied by `ACCEL` and added to slope gravity:
 - **Keyboard** (always on): WASD + arrows; full deflection per axis.
 - **Tilt** (mobile, opt-in): `DeviceOrientationEvent.gamma` →
   `inputX`, `beta` → `inputY`. Both pass through a `TILT_DEADZONE`
-  (`2.5°`) and saturate at `TILT_FULL` (`15°` past the recentered
-  zero) × `TILT_FORCE_MULTIPLIER`. A **Recenter** button snapshots
+  (`2.5°`) and saturate at `TILT_FULL` (`10°` past the recentered
+  zero) × `TILT_FORCE_MULTIPLIER`. A smaller `TILT_FULL` makes
+  subtle tilts more authoritative. A **Recenter** button snapshots
   the current orientation as the new neutral.
 - **Drag** (touch + mouse): pointer offset from press origin →
   `inputX/Y`, saturating at `DRAG_FULL` (`90 px`).
