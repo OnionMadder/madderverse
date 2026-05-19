@@ -57,6 +57,80 @@ because each tab is its own audio engine on the shared hardware clock.
 - Do not re-add the emergent auto-layering — the player drives it.
 - v1.0 remains recoverable via tag `all-munkis-v1.0`; v1.1 on `main`.
 
+## The Dread System (v1.1 — LOCKED design)
+
+Consolidates the formerly-separate scare systems (creep proximity
+fear, Ice/Moon 8-beat adjacency dwell, the binary `react-mode-active`
+horror, jumpscare) into ONE model. Locked via three decisions
+(2026-05): **unified dread meter**, **unified react pipeline**,
+**distinct Ice/Moon personalities**.
+
+### 1. One meter — `dread` (0–100)
+
+A single global value. **Everything frightening adds to it; it decays
+when threats are absent** (hysteresis so it doesn't flicker). Replaces
+the `beatReacting || fearHorrorActive` OR — `syncHorrorMode()` becomes
+a function of the dread STAGE, not two booleans.
+
+Contributors (all tunable in a `DREAD` config block):
+- **Creep proximity** — each Munki a creep is CLOSE to feeds dread
+  while close (the restored proximity fear).
+- **Ice/Moon adjacency** — each regular Munki sitting next to Ice or
+  Moon feeds dread per beat (replaces the binary 8-beat trip — now a
+  steady climb; more/longer adjacencies = faster).
+- **Jumpscare** — Ice/Moon dropped into a slot adds an instant spike.
+- Decay: a base bleed-off per second whenever no contributor is
+  active, slower near the top (a scared room stays tense a moment).
+
+### 2. Stages (escalation, not on/off)
+
+`dreadStage()` maps the meter to a stage; a body class drives all CSS
+so visuals ramp instead of snapping. Default thresholds (tunable):
+
+| Stage | dread | Feel |
+|---|---|---|
+| `calm`   | < 25  | normal game |
+| `unease` | 25–55 | subtle: faint desaturate + low drone, Munkis glance/flinch; no eyes yet |
+| `dread`  | 55–80 | the *current* horror look ramps in (BG dim, corner Ice/Moon creep, drone up, eyes + vignette, Munkis face-cycle) |
+| `terror` | 80+   | max dim + vignette pulse, full atmosphere, fastest react, jumpscare-enabled |
+
+Map the existing binary horror visuals onto `dread`+`terror` so
+nothing regresses when the meter lands underneath.
+
+### 3. Unified react pipeline (per-Munki `fear`)
+
+ONE path. Each Munki has its own `fear` fed by **both** creep
+proximity **and** Ice/Moon adjacency (no more two separate concepts).
+Per-Munki fear escalates that Munki's reaction on one ladder:
+**flinch shake → shocked face (expr 2) → beat-cycling 1→5**. The
+global `dread` is a function of the summed per-Munki fear + spikes.
+This replaces the ad-hoc `.creep-scared` set AND the 8-beat
+`reactStartBeat` dwell trip with the single ladder.
+
+### 4. Distinct Ice vs Moon personalities
+
+Same meter, same react pipeline — but the *flavour* of the corruption
+differs by which evil is present (layers if both are on stage):
+- **Moon = chaos / disorientation.** Perception lies: the existing
+  click-chaos, plus stage-scaled hue drift, text/subtitle glitch,
+  slot-shuffle phantoms, the falling-moons + comets atmosphere.
+- **Ice = freeze / stillness / slow.** The world seizes: the existing
+  `.frozen-by-ice` spread, plus stage-scaled visual slow/stutter,
+  Munkis frost over and stop bouncing, cyan pallor + (future) snow
+  atmosphere, an audio lowpass "frozen" muffle.
+
+### Hard rules
+
+- The v1.0 single-band **audio engine** stays byte-unchanged — Dread
+  is a presentation/state layer on top, like horror mode was.
+- One owner: `syncDread()`/`dreadStage()` is the only thing toggling
+  the stage classes; nothing else reaches for `react-mode-active`.
+- Build in chunks, each its own commit, mirrored web+app+itch flat:
+  **(1)** dread meter + stages under the existing visuals (no
+  regression) → **(2)** unified per-Munki react ladder → **(3)** stage
+  visual tiers + jumpscare gating → **(4)** Moon personality →
+  **(5)** Ice personality (+ snow atmosphere when art lands).
+
 ## Atmospheric effects (v1.1)
 
 **Falling moon + comet sprites** (`MOON_FALL` + `syncMoonFall`/
