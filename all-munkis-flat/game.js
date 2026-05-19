@@ -3320,66 +3320,95 @@
     // (→ placeholder). Never rejects — a missing sheet is expected until
     // the art is dropped in.
     //
-    // Schema detection:
-    //  • STANDARD: frame names creep-<color>-<n> → grouped by colour,
-    //    each creep's frames ordered by <n> (5-frame animation).
-    //  • FALLBACK: any ungrouped sheet (the itch-creeps.* meta swap is
-    //    single-frame; an old array sheet; anything else) → each frame
-    //    becomes its own 1-frame creep so the system still runs and
-    //    degrades gracefully (no animation, just a static drifter).
-    function loadCreepSheet() {
+    // PRIMARY: per-creep sheets — assets/sprites/creep-<colour>.{png,json}.
+    // Each is its own exporter sheet (Sprite Sheet Maker / TexturePacker
+    // hash) of 5 UNIFORM frames on ONE canvas size; the artist centres
+    // each pose inside that fixed canvas, so we use the exporter `frame`
+    // rects VERBATIM — no alpha-detection, no re-centering (that fought
+    // the artist's framing and was why sprites drifted). Frame order is
+    // the leading integer in each key (`1G-flight`..`5G-swoop`).
+    // FALLBACK: a single legacy assets/sprites/flying-creeps.{png,json}
+    // (the itch-creeps.* meta swap / old sheet) — schema-detected and
+    // degraded to per-creep groups or 1-frame static drifters so the
+    // itch build + no-art placeholder still work.
+    const CREEP_COLORS = ['blue','green','orange','purple','red','yellow'];
+    function loadOneCreepSheet(color) {
+        return fetch(`assets/sprites/creep-${color}.json`)
+            .then(r => (r.ok ? r.json() : null))
+            .then(json => {
+                if (!json || !json.frames || Array.isArray(json.frames)) return null;
+                const rectOf = e => (e && e.frame) ? e.frame : e;
+                const frames = Object.keys(json.frames)
+                    .map(name => {
+                        const m = /^\s*(\d+)/.exec(name);
+                        return { n: m ? parseInt(m[1], 10) : 999,
+                                 f: rectOf(json.frames[name]) };
+                    })
+                    .sort((a, b) => a.n - b.n)
+                    .map(o => o.f)
+                    .filter(f => f && f.w && f.h);
+                if (!frames.length) return null;
+                const meta = json.meta || {}, size = meta.size || {};
+                return {
+                    color,
+                    src: `assets/sprites/creep-${color}.png`,
+                    sheetW: size.w || Math.max(...frames.map(f => f.x + f.w)),
+                    sheetH: size.h || Math.max(...frames.map(f => f.y + f.h)),
+                    frames
+                };
+            })
+            .catch(() => null);
+    }
+    function loadLegacyCreepSheet() {
         return fetch('assets/sprites/flying-creeps.json')
             .then(r => (r.ok ? r.json() : null))
             .then(json => {
                 if (!json || !json.frames) return null;
                 const rectOf = e => (e && e.frame) ? e.frame : e;
-                let creeps = null;
+                const src = 'assets/sprites/flying-creeps.png';
+                const meta = json.meta || {}, size = meta.size || {};
+                let groups = null;
                 if (!Array.isArray(json.frames)) {
-                    const groups = new Map();
+                    const g = new Map();
                     Object.keys(json.frames).forEach(name => {
                         const m = /^creep-([a-z]+)-(\d+)$/i.exec(name);
                         if (!m) return;
-                        const key = m[1].toLowerCase();
-                        if (!groups.has(key)) groups.set(key, []);
-                        groups.get(key).push({
-                            n: parseInt(m[2], 10),
-                            f: rectOf(json.frames[name])
-                        });
+                        const k = m[1].toLowerCase();
+                        if (!g.has(k)) g.set(k, []);
+                        g.get(k).push({ n: parseInt(m[2], 10),
+                                        f: rectOf(json.frames[name]) });
                     });
-                    if (groups.size) {
-                        creeps = [...groups.entries()].map(([color, arr]) => ({
-                            color,
-                            frames: arr.sort((a, b) => a.n - b.n)
-                                       .map(o => o.f)
-                                       .filter(f => f && f.w && f.h)
-                        })).filter(c => c.frames.length);
-                    }
+                    if (g.size) groups = [...g.entries()].map(([color, a]) => ({
+                        color,
+                        frames: a.sort((x, y) => x.n - y.n).map(o => o.f)
+                                 .filter(f => f && f.w && f.h)
+                    })).filter(c => c.frames.length);
                 }
-                if (!creeps || !creeps.length) {
+                if (!groups || !groups.length) {
                     const flat = (Array.isArray(json.frames)
                         ? json.frames.map(rectOf)
                         : Object.values(json.frames).map(rectOf)
                     ).filter(f => f && f.w && f.h);
                     if (!flat.length) return null;
-                    creeps = flat.map(f => ({ color: null, frames: [f] }));
+                    groups = flat.map(f => ({ color: null, frames: [f] }));
                 }
-                const all = creeps.reduce((a, c) => a.concat(c.frames), []);
-                const meta = json.meta || {};
-                const size = meta.size || {};
-                return {
-                    src: 'assets/sprites/flying-creeps.png',
-                    // Natural sheet pixel size — needed to scale a frame
-                    // into the responsive box. Fall back to bounding the
-                    // frame rects if meta.size is absent.
-                    sheetW: size.w || Math.max(...all.map(f => f.x + f.w)),
-                    sheetH: size.h || Math.max(...all.map(f => f.y + f.h)),
-                    // ONE global scale reference (max frame dim across
-                    // ALL creeps) so every creep renders at the SAME
-                    // size regardless of per-frame wing-width variation.
-                    refMax: meta.refMax
-                        || Math.max(...all.map(f => Math.max(f.w, f.h))),
-                    creeps
-                };
+                const sW = size.w || Math.max(...groups.flatMap(c =>
+                    c.frames.map(f => f.x + f.w)));
+                const sH = size.h || Math.max(...groups.flatMap(c =>
+                    c.frames.map(f => f.y + f.h)));
+                return { creeps: groups.map(c => ({
+                    color: c.color, src, sheetW: sW, sheetH: sH,
+                    frames: c.frames
+                })) };
+            })
+            .catch(() => null);
+    }
+    function loadCreepSheet() {
+        return Promise.all(CREEP_COLORS.map(loadOneCreepSheet))
+            .then(list => {
+                const creeps = list.filter(Boolean);
+                if (creeps.length) return { creeps };
+                return loadLegacyCreepSheet();
             })
             .catch(() => null);
     }
@@ -3413,31 +3442,32 @@
             .catch(() => null);
     }
 
-    // Paint the .flying-creep-frame child to show one frame rect `f`.
-    // The hand-arranged sheet has tight, VARYING-size frames (a spread-
-    // wing swoop frame is far bigger than a tucked-wings one — measured
-    // bbox JSON, not a uniform grid). So we render every frame of a creep
-    // at ONE constant `sheetScale` (set from that creep's largest frame
-    // so its biggest pose just fills the box) and CENTRE the frame in a
-    // fixed `box`. The creep then holds its size + position and only the
-    // POSE changes between frames, instead of pulsing/teleporting. The
-    // box is overflow:hidden in CSS so neighbouring sheet art can't peek.
-    function paintCreepFrame(child, f, box, sheetScale) {
-        if (!creepSheet || !child || !f) return;
-        const fcx = (f.x + f.w / 2) * sheetScale;
-        const fcy = (f.y + f.h / 2) * sheetScale;
+    // Paint the .flying-creep-frame child to show exporter frame rect
+    // `f` from sheet `src` (sheet pixel size sheetW×sheetH). The frames
+    // are UNIFORM exporter cells with the artist's pose already centred
+    // inside each — so we render the frame rect VERBATIM: scale it to
+    // the box by its longest side and centre that frame box. No alpha
+    // bbox, no per-pose recentring (those moved the artist's framing
+    // around and made sprites drift). Same scale every frame ⇒ no pulse;
+    // same canvas size across creeps ⇒ every creep the same basic size.
+    function paintCreepFrame(child, f, box, src, sheetW, sheetH) {
+        if (!child || !f) return;
+        const scale = box / Math.max(f.w, f.h);
+        const fw = f.w * scale, fh = f.h * scale;
         child.style.width  = `${box}px`;
         child.style.height = `${box}px`;
+        child.style.backgroundImage = `url('${src}')`;
         child.style.backgroundSize =
-            `${creepSheet.sheetW * sheetScale}px ${creepSheet.sheetH * sheetScale}px`;
+            `${sheetW * scale}px ${sheetH * scale}px`;
+        // Centre the frame rect inside the square box.
         child.style.backgroundPosition =
-            `${(box / 2 - fcx).toFixed(2)}px ${(box / 2 - fcy).toFixed(2)}px`;
+            `${((box - fw) / 2 - f.x * scale).toFixed(2)}px ` +
+            `${((box - fh) / 2 - f.y * scale).toFixed(2)}px`;
     }
 
     // Set the active creep's current animation frame (index into its
     // frames[]). Clamps, and only repaints when the index actually
-    // changes — safe to call every rAF tick. Constant per-creep scale
-    // (box / its largest frame) keeps every pose at the same size.
+    // changes — safe to call every rAF tick.
     function setCreepFrame(n) {
         const st = creepState;
         if (!st || !st.frames || !st.frames.length || !creepEl) return;
@@ -3446,9 +3476,8 @@
         st.curFrame = n;
         const child = creepEl.querySelector('.flying-creep-frame');
         if (!child) return;
-        const box = creepSizePx();
-        const scale = box / (st.refMax || box);
-        paintCreepFrame(child, st.frames[n], box, scale);
+        paintCreepFrame(child, st.frames[n], creepSizePx(),
+                        st.src, st.sheetW, st.sheetH);
     }
 
     // Clear the ambient creep-flinch state from every slot (used on creep
@@ -3507,11 +3536,11 @@
         creepEl.style.width = csz + 'px';
         creepEl.style.height = csz + 'px';
         creepEl.style.zIndex = String(CREEP.Z_INDEX);
-        if (creepSheet) {
-            // Real sheet: a child whose background we lock to one variant.
+        if (creepSheet && creepSheet.creeps && creepSheet.creeps.length) {
+            // Real sheet(s): a child whose background paintCreepFrame
+            // locks to the chosen creep's frame (per-creep src/size).
             const f = document.createElement('div');
             f.className = 'flying-creep-frame';
-            f.style.backgroundImage = `url('${creepSheet.src}')`;
             creepEl.appendChild(f);
         } else {
             creepEl.innerHTML = creepPlaceholderMarkup();
@@ -3538,19 +3567,14 @@
         buildCreepEl();
         // Pick a creep uniformly from the loaded sheet (−1 = placeholder,
         // which has no creeps and never counts toward "All Creeps").
-        const creepIdx = creepSheet
+        const hasCreeps = !!(creepSheet && creepSheet.creeps
+                              && creepSheet.creeps.length);
+        const creepIdx = hasCreeps
             ? Math.floor(Math.random() * creepSheet.creeps.length)
             : -1;
-        const frames = (creepSheet && creepIdx >= 0)
-            ? creepSheet.creeps[creepIdx].frames : null;
-        // GLOBAL scale reference (same for every creep) so all creeps
-        // render at the same basic size regardless of wing-width
-        // variation. Falls back to this creep's own max if the sheet
-        // didn't carry a global refMax.
-        const refMax = (creepSheet && creepSheet.refMax)
-            ? creepSheet.refMax
-            : (frames ? Math.max(...frames.map(f => Math.max(f.w, f.h))) : 0);
-        if (creepSheet) markCreepSeen(creepIdx);
+        const creepDef = hasCreeps ? creepSheet.creeps[creepIdx] : null;
+        const frames = creepDef ? creepDef.frames : null;
+        if (hasCreeps) markCreepSeen(creepIdx);
         const vw = window.innerWidth, vh = window.innerHeight;
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
         const speed = rand(CREEP.SPEED_MIN_PXPS, CREEP.SPEED_MAX_PXPS);
@@ -3564,7 +3588,10 @@
         else { /* top */      x = vw * rand(0.2, 0.8); y = -size; vx = (Math.random() < 0.5 ? -1 : 1) * speed * 0.5; vy = speed; }
         creepState = {
             x, y, vx, vy, baseY: y, drawY: y, edge,
-            creepIdx, frames, refMax, curFrame: -1,
+            creepIdx, frames, curFrame: -1,
+            src:    creepDef ? creepDef.src    : null,
+            sheetW: creepDef ? creepDef.sheetW : 0,
+            sheetH: creepDef ? creepDef.sheetH : 0,
             tStart: performance.now(),
             // Phase machine: FLOAT -> (one) SWOOP -> DIE. See creepTick.
             // menaced = distinct slots it has come CLOSE to this

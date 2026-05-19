@@ -1,0 +1,115 @@
+{
+  "frames": {
+    "1G-flight": {
+      "frame": {
+        "x": 1,
+        "y": 1,
+        "w": 216,
+        "h": 217
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 217
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 146
+      }
+    },
+    "2G-flight": {
+      "frame": {
+        "x": 218,
+        "y": 1,
+        "w": 216,
+        "h": 217
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 217
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 164
+      }
+    },
+    "3G-swoop": {
+      "frame": {
+        "x": 435,
+        "y": 1,
+        "w": 216,
+        "h": 217
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 217
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 202
+      }
+    },
+    "4G-swoop": {
+      "frame": {
+        "x": 652,
+        "y": 1,
+        "w": 216,
+        "h": 217
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 217
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 217
+      }
+    },
+    "5G-swoop": {
+      "frame": {
+        "x": 869,
+        "y": 1,
+        "w": 216,
+        "h": 217
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 216,
+        "h": 217
+      },
+      "sourceSize": {
+        "w": 216,
+        "h": 214
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 1086,
+      "h": 219
+    },
+    "scale": "1"
+  }
+}
