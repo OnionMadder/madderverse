@@ -1588,6 +1588,71 @@
         window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
     }
 
+    /* ---------- 1b. ANDROID HARDWARE / GESTURE BACK ----------
+       @capacitor/app surfaces the system Back gesture as a
+       'backButton' event. With no listener Android kills the
+       whole app on every back press — brutal mid-pot. Route it:
+       close an open modal first, else step up the screen tree,
+       and only exit from the title. The web build has no
+       window.Capacitor so this is inert there (browser Back is
+       untouched). */
+    const BACK_PARENT = {
+        shape: "title",
+        decorate: "shape",
+        kiln: "decorate",
+        gallery: "title",
+        shop: "title",
+        achievements: "title",
+        profile: "title",
+        account: "profile",
+        stats: "title"
+    };
+
+    /* Full-screen modals are overlays toggled via [hidden]. Back
+       should dismiss the open one before navigating. Ordered
+       most-transient first; the close fns reset inputs/state. */
+    function closeTopModal() {
+        const modals = [
+            ["devMenu",           typeof closeDevMenu === "function" ? closeDevMenu : null],
+            ["submitPickerModal", typeof closeSubmitPicker === "function" ? closeSubmitPicker : null],
+            ["createBattleModal", typeof closeCreateBattleModal === "function" ? closeCreateBattleModal : null],
+            ["battleDetail",      typeof closeBattleDetail === "function" ? closeBattleDetail : null],
+            ["potDetail",         typeof closeDetail === "function" ? closeDetail : null],
+            ["specsPanel",        null]
+        ];
+        for (let i = 0; i < modals.length; i++) {
+            const el = document.getElementById(modals[i][0]);
+            if (el && !el.hidden) {
+                if (modals[i][1]) { try { modals[i][1](); } catch (_) {} }
+                else el.hidden = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function capacitorApp() {
+        return window.Capacitor &&
+               window.Capacitor.Plugins &&
+               window.Capacitor.Plugins.App;
+    }
+
+    function handleHardwareBack() {
+        if (closeTopModal()) return;
+        const parent = BACK_PARENT[currentScreen];
+        if (parent) { showScreen(parent); return; }
+        /* Title (or any unmapped root): Back exits the app, the
+           Android-standard behavior from a home screen. */
+        const App = capacitorApp();
+        if (App && typeof App.exitApp === "function") App.exitApp();
+    }
+
+    function wireHardwareBack() {
+        const App = capacitorApp();
+        if (!App || typeof App.addListener !== "function") return; /* web */
+        App.addListener("backButton", handleHardwareBack);
+    }
+
     /* ---------- 2. TITLE SCREEN ---------- */
 
     registerScreen("title", {
@@ -9947,6 +10012,7 @@
         initEggs();
         showScreen("title");
         wireDrawerHandles();
+        wireHardwareBack();
         initPushOptInModal();
         /* Phase 1: kick off auth boot AFTER the title is mounted
            so the user sees something immediately. The auth
