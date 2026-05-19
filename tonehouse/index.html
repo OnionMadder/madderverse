@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Tonehouse — the All Munkis audio engine</title>
+    <link rel="canonical" href="https://madderverse.org/tonehouse/" />
+    <meta property="og:url" content="https://madderverse.org/tonehouse/" />
+    <meta name="twitter:url" content="https://madderverse.org/tonehouse/" />
+    <meta name="title" content="Tonehouse - The All Munkis Audio Engine, Naked - The Madderverse" />
+    <meta name="description" content="The All Munkis custom audio engine, extracted into a standalone realtime playground: harmony layer, master FX rack, chaos toys. Self-contained, no ads, no network." />
+    <meta name="keywords" content="tonehouse, all munkis, audio engine, web audio, Tone.js, realtime synth playground, generative music, The Madderverse, Onion Madder, Mad Sundar LLC, ad-free, no tracking" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Tonehouse - The All Munkis Audio Engine, Naked - The Madderverse" />
+    <meta property="og:description" content="The All Munkis custom audio engine, extracted into a standalone realtime playground: harmony layer, master FX rack, chaos toys." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tonehouse - The All Munkis Audio Engine, Naked - The Madderverse" />
+    <meta name="twitter:description" content="The All Munkis custom audio engine, extracted into a standalone realtime playground: harmony layer, master FX rack, chaos toys." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#00ffcc" />
+    <meta name="apple-mobile-web-app-title" content="The Madderverse" />
+    <meta name="application-name" content="The Madderverse" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body class="scanlines">
+
+<a class="madder-home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+
+<header class="top">
+  <h1 class="wordmark" data-text="TONEHOUSE">TONEHOUSE</h1>
+  <p class="tag">the All Munkis audio engine, taken out of the game so you can poke it</p>
+  <p class="twotab">↯ <strong>HARMONY</strong> (master bar) is the built-in version of the
+     accidental two-tab effect — but you can still open this in two tabs for double trouble.</p>
+</header>
+
+<section class="viz">
+  <canvas id="scope" aria-label="oscilloscope"></canvas>
+  <canvas id="spectrum" aria-label="frequency spectrum"></canvas>
+</section>
+
+<nav class="mode-select" role="tablist" aria-label="mode">
+  <button class="modebtn on" data-mode="studio" role="tab" aria-selected="true">HARMONY</button>
+  <button class="modebtn" data-mode="toy" role="tab" aria-selected="false">COOP</button>
+  <button class="modebtn" data-mode="twin" role="tab" aria-selected="false">TRUE&nbsp;TWIN</button>
+</nav>
+
+<div id="studio">
+
+<nav class="tabs" role="tablist" aria-label="panels">
+  <button class="tab on" data-tab="mixer" role="tab" aria-selected="true">MIXER</button>
+  <button class="tab" data-tab="fx" role="tab" aria-selected="false">FX</button>
+  <button class="tab chaos-tab" data-tab="chaos" role="tab" aria-selected="false">CHAOS</button>
+</nav>
+
+<!-- ===================== MIXER ===================== -->
+<section class="panel" data-panel="mixer" role="tabpanel">
+  <h2 class="lbl">VOICES</h2>
+  <div class="voice-head">
+    <span></span><span>voice</span><span>M</span><span>S</span><span>ch</span>
+    <span>gain</span><span>pan</span><span>pitch</span>
+  </div>
+  <p class="fine">ch = channel: tap to cycle <b>M</b>ain → <b>H</b>armony → <b>B</b>oth.
+     Harmony bus = detuned + offset + reverb (set via the FX tab).</p>
+  <div id="voiceRows" class="rows"></div>
+
+  <h2 class="lbl">BED</h2>
+  <div class="bed">
+    <button id="baseToggle" class="wide on" aria-pressed="true">Bala’s Theme: ON</button>
+    <button id="toneToggle" class="wide on" aria-pressed="true">Ambient Layer: ON</button>
+    <label class="slab">
+      <span>Ambient level <b id="ambientVal">0.55</b></span>
+      <input id="ambientLevel" type="range" min="0" max="1" step="0.01" value="0.55" />
+    </label>
+    <p id="toneNote" class="fine">Ambient layer = Tone.js (MIT, v14.8.49, self-hosted — no network calls).</p>
+  </div>
+</section>
+
+<!-- ===================== FX ===================== -->
+<section class="panel" data-panel="fx" role="tabpanel" hidden>
+  <h2 class="lbl">HARMONY LAYER</h2>
+  <p class="fine">Toggle <b>Harmony</b> in the master bar. A full second instance of the
+     engine, time-offset + detuned — the Bala’s-Song-Layering lab for All Munkis v1.1.</p>
+  <label class="slab">
+    <span>Offset <b id="harmOffsetVal">1.00s</b></span>
+    <input id="harmOffset" type="range" min="-2" max="2" step="0.01" value="1" />
+  </label>
+  <label class="slab">
+    <span>Detune <b id="harmDetuneVal">-8¢</b></span>
+    <input id="harmDetune" type="range" min="-50" max="50" step="1" value="-8" />
+  </label>
+  <label class="slab">
+    <span>Harmony reverb wet <b id="harmWetVal">0.50</b></span>
+    <input id="harmWet" type="range" min="0" max="1" step="0.01" value="0.5" />
+  </label>
+
+  <h2 class="lbl">MASTER FX</h2>
+  <label class="slab">
+    <span>Tempo <b id="bpmVal">100</b> BPM</span>
+    <input id="bpm" type="range" min="20" max="300" step="1" value="100" />
+  </label>
+  <label class="slab">
+    <span>Master pitch <b id="mPitchVal">0</b> st</span>
+    <input id="mPitch" type="range" min="-12" max="12" step="1" value="0" />
+  </label>
+  <label class="slab">
+    <span>Filter cutoff <b id="fxCutVal">20000Hz</b></span>
+    <input id="fxCut" type="range" min="0" max="1" step="0.001" value="1" />
+  </label>
+  <label class="slab">
+    <span>Filter Q (≥10 self-oscillates) <b id="fxQVal">0.7</b></span>
+    <input id="fxQ" type="range" min="0.5" max="20" step="0.1" value="0.7" />
+  </label>
+  <label class="slab">
+    <span>Delay time <b id="fxDelayTVal">0.00s</b></span>
+    <input id="fxDelayT" type="range" min="0" max="1" step="0.01" value="0" />
+  </label>
+  <label class="slab">
+    <span>Delay feedback <b id="fxDelayFbVal">0.00</b></span>
+    <input id="fxDelayFb" type="range" min="0" max="0.95" step="0.01" value="0" />
+  </label>
+  <label class="slab">
+    <span>Delay level <b id="fxDelayLvlVal">0.00</b></span>
+    <input id="fxDelayLvl" type="range" min="0" max="1" step="0.01" value="0" />
+  </label>
+  <label class="slab">
+    <span>Ambient reverb wet <b id="ambWetVal">0.35</b></span>
+    <input id="ambWet" type="range" min="0" max="1" step="0.01" value="0.35" />
+  </label>
+</section>
+
+<!-- ===================== CHAOS ===================== -->
+<section class="panel chaos" data-panel="chaos" role="tabpanel" hidden>
+  <p class="hazard-note">⚠ THIS IS A TOY — these will break the sound on purpose.
+     <b>PANIC</b> is your kill switch.</p>
+  <div class="chaos-grid">
+    <button id="panicBtn" class="chx panic">PANIC<small>cut all audio</small></button>
+    <button id="tapeBtn" class="chx" aria-label="tape stop (hold)">TAPE&nbsp;STOP<small>hold</small></button>
+    <button id="randomBtn" class="chx">RANDOMIZE<small>re-roll</small></button>
+    <button id="invertBtn" class="chx">INVERT<small>flip voices</small></button>
+    <button id="holdBtn" class="chx" aria-label="hold note (hold)">HOLD<small>hold</small></button>
+  </div>
+  <p class="fine">TAPE STOP &amp; HOLD are momentary — hold the button (or focus it and hold
+     Space/Enter). RANDOMIZE re-rolls voices, tempo, filter &amp; harmony. INVERT flips every
+     voice on/off.</p>
+</section>
+
+<footer class="master">
+  <div class="transport">
+    <button id="playBtn" class="big">PLAY</button>
+    <button id="stopBtn" class="big alt">STOP</button>
+    <button id="panicBar" class="big panic">PANIC</button>
+  </div>
+  <div class="bar-row">
+    <button id="harmonyToggle" class="wide" aria-pressed="false">Harmony: OFF</button>
+  </div>
+  <label class="slab">
+    <span>Master gain <b id="masterVal">0.55</b></span>
+    <input id="masterGain" type="range" min="0" max="1" step="0.01" value="0.55" />
+  </label>
+  <p class="fine">Faithful extraction of <code>madderverse/all-munkis</code>'s audio engine.
+     Self-contained, runs from <code>file://</code> — no build, no network.</p>
+</footer>
+
+</div><!-- /#studio -->
+
+<!-- ===================== TRUE TWIN ===================== -->
+<section id="twin" hidden>
+  <h2 class="lbl">TRUE TWIN — the real two-tab effect</h2>
+  <p class="fine">A genuine <b>second AudioContext</b> runs an independent copy of the
+     engine on its own hardware clock. The two clocks drift a few parts-per-million
+     forever, so the phase relationship never stops moving — exactly like opening the
+     page in two tabs, because that's literally what this is. No detune, no fixed
+     offset: the drift does it all. Tempo / voice toggles are mirrored from the
+     HARMONY tab; the twin runs the raw engine (no Tone ambient, no master FX) — same
+     as a fresh tab.</p>
+  <div class="transport">
+    <button id="twinPlay" class="big">PLAY</button>
+    <button id="twinStop" class="big alt">STOP</button>
+    <button id="twinPanic" class="big panic">PANIC</button>
+  </div>
+  <div class="bar-row">
+    <button id="reseedBtn" class="wide">RESEED&nbsp;DRIFT</button>
+  </div>
+  <label class="slab">
+    <span>Twin level <b id="twinLvlVal">0.55</b></span>
+    <input id="twinLevel" type="range" min="0" max="1" step="0.01" value="0.55" />
+  </label>
+  <p id="twinDrift" class="fine">twin idle — press PLAY</p>
+</section>
+
+<!-- ===================== COOP ===================== -->
+<section id="toy" hidden>
+  <div class="toy-bar">
+    <button id="toyPlay" class="big">PLAY</button>
+    <button id="toyStop" class="big alt">STOP</button>
+    <button id="shuffleBtn" class="toy-btn">SHUFFLE&nbsp;ROLES</button>
+    <button id="cutoffBtn" class="toy-btn" aria-pressed="false">CUT-OFF&nbsp;OFF</button>
+    <button id="gearBtn" class="toy-btn gear" aria-expanded="false" aria-label="settings">⚙</button>
+  </div>
+
+  <div id="toySettings" class="toy-settings" hidden>
+    <div class="set-row">
+      <span>Layout</span>
+      <button class="seg" data-layout="solo">SOLO</button>
+      <button class="seg on" data-layout="2p">2-PLAYER</button>
+    </div>
+    <div class="set-row">
+      <button id="bowserChk" class="toy-btn" aria-pressed="false">BOWSER:&nbsp;OFF</button>
+      <span class="fine">adds a 3rd-player chaos strip across the bottom</span>
+    </div>
+    <div id="manualAssign" class="assign"></div>
+    <p class="fine">SHUFFLE&nbsp;ROLES re-deals voices between players each round.
+       PLAY starts the backing bed; the pads make sound even with the bed stopped.</p>
+  </div>
+
+  <div id="toyField" class="toy-field two"></div>
+  <div id="bowserStrip" class="bowser-wrap" hidden></div>
+</section>
+
+<script src="tone.min.js"></script>
+<script src="game.js?v=4"></script>
+
+<footer class="site-footer-slim" aria-label="Site info">
+    <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../">The Madderverse</a>
+    <span class="sep" aria-hidden="true">·</span>
+    <a href="../about.html">About</a>
+</footer>
+<script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
+</body>
+</html>
