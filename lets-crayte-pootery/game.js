@@ -854,40 +854,62 @@
         });
     }
 
-    /* ---------- 0bb. DAILY THEME (Phase 2 chunk 4-lite) ----------
-       Curated rotating prompt pool. Today's prompt is picked
-       deterministically by day-of-year mod pool.length so every
-       user sees the same theme on the same day. The BATTLES tab
-       lazy-creates today's "daily-bot" battle the first time
-       it's loaded each day — anyone visiting kicks off the
-       battle for everyone else.                                */
+    /* ---------- 0bb. WEEKLY THEME ----------
+       The battle theme rotates every Thursday at 00:00 UTC, so
+       the whole world is on the same prompt the same week. The
+       anchor (2026-01-01) is itself a Thursday, so every
+       THEME_ANCHOR + 7n boundary lands on a Thursday for free.
 
-    const DAILY_THEMES = [
-        "BLUE", "RED", "GOLD", "BLACK", "RAINBOW",
-        "SPOOKY", "CUTE", "GROSS", "FANCY", "TINY",
-        "GIANT", "ALIEN", "ANCIENT", "FUTURE", "GLITCH",
-        "SLIME", "ICE", "FIRE", "GALAXY", "JUNGLE",
-        "ROBOT", "MONSTER", "CANDY", "WIZARD", "GHOST",
-        "OCEAN", "DESERT", "FOREST", "VOLCANO", "CLOUD",
-        "PINGAS", "POOTSPLOSION", "SECRET", "BROKEN"
+       THEME_SCHEDULE is just an ordered list — append as many
+       future weeks as you want; it modulo-wraps, so the game
+       NEVER breaks if the schedule isn't topped up (it simply
+       cycles). ~5 months / 20 weeks seeded below; add more any
+       time, no other code changes needed.                      */
+
+    const THEME_ANCHOR = Date.UTC(2026, 0, 1); /* Thu 2026-01-01 */
+    const WEEK_MS = 7 * 86400000;
+
+    const THEME_SCHEDULE = [
+        "BLUE",    "MONSTER", "GOLD",    "SLIME",
+        "SPOOKY",  "RAINBOW", "ROBOT",   "CANDY",
+        "ICE",     "JUNGLE",  "GALAXY",  "FANCY",
+        "TINY",    "FIRE",    "OCEAN",   "WIZARD",
+        "GLITCH",  "ANCIENT", "GHOST",   "VOLCANO"
     ];
 
-    /* Day-of-year — 1..366 inclusive, locale-stable. */
-    function dayOfYear(d) {
-        const start = Date.UTC(d.getUTCFullYear(), 0, 0);
-        const now   = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-        return Math.floor((now - start) / 86400000);
+    /* Whole Thursday-weeks since the anchor (clamped >= 0 so any
+       date before the anchor still resolves to week 0). UTC keeps
+       the rollover identical for everyone, worldwide. */
+    function weekIndex(d) {
+        const utcMid = Date.UTC(
+            d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+        const w = Math.floor((utcMid - THEME_ANCHOR) / WEEK_MS);
+        return w < 0 ? 0 : w;
     }
 
-    function todaysTheme() {
-        const idx = dayOfYear(new Date()) % DAILY_THEMES.length;
-        return DAILY_THEMES[idx];
+    function currentWeekKey() { return weekIndex(new Date()); }
+
+    function currentTheme() {
+        const L = THEME_SCHEDULE.length;
+        return THEME_SCHEDULE[currentWeekKey() % L];
     }
 
+    /* Back-compat alias — older call sites still call todaysTheme(). */
+    function todaysTheme() { return currentTheme(); }
+
+    /* "daily-bot" is kept as the system author string for backward
+       compat with rows already in the DB + the sort/style code.
+       Identity is now the Thursday-WEEK the battle was created in,
+       so ONE bot battle serves the whole week regardless of the
+       row's server-side expiry. Falls back to theme + still-live
+       if a row somehow has no created_at. */
     function isTodayDailyBattle(b) {
         if (!b || b.created_by !== "daily-bot") return false;
-        if (b.theme !== todaysTheme()) return false;
-        return new Date(b.expires_at).getTime() > Date.now();
+        if (b.created_at) {
+            return weekIndex(new Date(b.created_at)) === currentWeekKey();
+        }
+        return b.theme === currentTheme() &&
+               new Date(b.expires_at).getTime() > Date.now();
     }
 
     /* createBattle without owner attribution. user_id stays NULL
@@ -919,10 +941,12 @@
     /* ---------- 0b. POT BATTLES (Day 5 chunk F) ----------
        Backend helpers for the battles / battle_entries /
        battle_votes tables. UI lives in the BATTLES gallery tab
-       further down. One vote per browser per entry is enforced
-       by the unique(entry_id, voter_token) constraint on the
-       table — Postgres returns 409 Conflict on a re-vote and
-       the client treats that as "already voted".              */
+       further down. Two limits stack: (1) the server's
+       unique(entry_id, voter_token) constraint stops voting the
+       same entry twice (409 -> treated as "already voted"), and
+       (2) a client-side one-vote-per-calendar-day cap
+       (hasVotedToday / markVotedToday) — same trust level as the
+       per-browser token, no backend change.                    */
 
     /* Per-browser voter token (uuid v4 cached in localStorage).
        Also doubles as the device id for "you submitted this
@@ -6888,6 +6912,25 @@
         } catch (_) {}
     }
 
+    /* One vote per user per calendar day. Same client-trust level
+       as the existing per-browser vote token (no backend change).
+       Local date so "tomorrow" matches the kid's wall clock. */
+    function voteDayKey() {
+        const d = new Date();
+        return d.getFullYear() + "-" + (d.getMonth() + 1) +
+               "-" + d.getDate();
+    }
+    function hasVotedToday() {
+        try {
+            return localStorage.getItem("crayte-vote-day") ===
+                   voteDayKey();
+        } catch (_) { return false; }
+    }
+    function markVotedToday() {
+        try { localStorage.setItem("crayte-vote-day", voteDayKey()); }
+        catch (_) {}
+    }
+
     function formatBattleTime(expiresAt) {
         const ms = new Date(expiresAt).getTime() - Date.now();
         if (ms <= 0) return { text: "FINISHED", live: false };
@@ -7004,7 +7047,7 @@
         if (b.created_by === "daily-bot") {
             const badge = document.createElement("span");
             badge.className = "battle-daily-badge";
-            badge.textContent = "★ TODAY";
+            badge.textContent = "★ THIS WEEK";
             theme.appendChild(badge);
             theme.appendChild(document.createTextNode(" " + b.theme));
         } else {
@@ -7243,17 +7286,27 @@
             voteBtn.type = "button";
             voteBtn.className = "battle-vote-btn";
             const alreadyVoted = myVotes.has(raw.id);
+            /* One vote per day: once spent, every other pot's
+               button shows the locked state so the kid sees why
+               they can't keep tapping. */
+            const lockedToday = hasVotedToday() && !alreadyVoted;
             if (alreadyVoted) voteBtn.classList.add("voted");
+            if (lockedToday)  voteBtn.classList.add("day-locked");
             /* Heart glyph -- empty pre-vote, filled post-vote.
                Reads at a glance for a 5yo without needing literacy. */
             voteBtn.innerHTML = alreadyVoted
                 ? "<span class='vote-heart' aria-hidden='true'>&#10084;</span>" +
                   "<span class='vote-label'>VOTED</span>"
+                : lockedToday
+                ? "<span class='vote-heart' aria-hidden='true'>&#9825;</span>" +
+                  "<span class='vote-label'>1/DAY</span>"
                 : "<span class='vote-heart' aria-hidden='true'>&#9825;</span>" +
                   "<span class='vote-label'>VOTE</span>";
             voteBtn.setAttribute("aria-label",
-                alreadyVoted ? "You voted for this pot" : "Vote for this pot");
-            voteBtn.disabled = expired || alreadyVoted;
+                alreadyVoted ? "You voted for this pot"
+                : lockedToday ? "You've used today's vote — come back tomorrow"
+                : "Vote for this pot");
+            voteBtn.disabled = expired || alreadyVoted || lockedToday;
             voteBtn.addEventListener("click", function (e) {
                 e.stopPropagation();
                 handleVoteClick(raw.id, voteBtn, count, card);
@@ -7266,7 +7319,7 @@
                voted + not expired). Kid-accessible -- they can
                just tap the pot they like. The vote button stays
                for adult muscle-memory + screen readers.        */
-            if (!alreadyVoted && !expired) {
+            if (!alreadyVoted && !expired && !lockedToday) {
                 card.classList.add("is-votable");
                 card.addEventListener("click", function (e) {
                     /* If the tap originated on the author link
@@ -7330,12 +7383,29 @@
 
     function handleVoteClick(entryId, btn, countEl, card) {
         if (btn.disabled) return;
-        btn.disabled = true;
         const heart = btn.querySelector(".vote-heart");
         const label = btn.querySelector(".vote-label");
+        /* One vote per day. If it's spent, say so kindly (no
+           modal — a 5yo just needs the button to explain itself)
+           and bail without consuming anything. */
+        if (hasVotedToday()) {
+            const prev = label ? label.textContent : "";
+            if (label) label.textContent = "TMRW!";
+            btn.classList.add("day-locked");
+            btn.setAttribute("aria-label",
+                "You've used today's vote — come back tomorrow");
+            setTimeout(function () {
+                if (label && label.textContent === "TMRW!") {
+                    label.textContent = prev || "1/DAY";
+                }
+            }, 1600);
+            return;
+        }
+        btn.disabled = true;
         if (label) label.textContent = "...";
         voteForEntry(entryId).then(function (res) {
             if (res.ok || res.duplicate) {
+                markVotedToday();
                 rememberMyVote(entryId);
                 btn.classList.add("voted");
                 if (heart)  heart.innerHTML = "&#10084;";   /* filled heart */
