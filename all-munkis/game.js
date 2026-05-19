@@ -109,11 +109,19 @@
         DECAY_HIGH_PER_S: 7,    // slower while already high (stays tense)
         // Pressure contributors (added into the live target each tick).
         PER_ADJACENT:     42,   // each Ice/Moon-adjacent regular Munki
-        JUMPSCARE_SPIKE:  60    // instant add on an Ice/Moon drop
+        JUMPSCARE_SPIKE:  60,   // instant add on an Ice/Moon drop
+        // Moon "perception lies" — passive phantom-flicker cadence
+        // (ms window) while Moon is on stage at the dread / terror
+        // stages. Non-destructive (ghost in an empty slot only).
+        PHANTOM_DREAD_MIN_MS:  9000,
+        PHANTOM_DREAD_MAX_MS:  15000,
+        PHANTOM_TERROR_MIN_MS: 4500,
+        PHANTOM_TERROR_MAX_MS: 8000
     };
     let dread = 0;                 // 0–100, the single meter
     let dreadStageNow = 'calm';    // last applied stage (class bookkeeping)
     let dreadRAF = null, dreadLastTs = 0;
+    let moonPhantomNextAt = 0;     // scheduled ts for the next phantom
 
     // ---- Unified per-Munki fear (Dread System chunk 2) ----
     // ONE fear value per slot (0–FEAR.MAX) fed by BOTH creep proximity
@@ -1531,6 +1539,27 @@
             dread = Math.max(0, dread - dec * dt);
         }
         applyDreadStageClass();
+        // Moon "perception lies" (Chunk 4): while Moon is on stage AND
+        // fully dreaded, a phantom Munki occasionally flickers into an
+        // empty slot — NON-destructive (never touches slots[]); more
+        // often at terror. The CSS hue-warp layer is driven separately
+        // by body.moon-present + the stage class.
+        if (moonOnStage()
+            && (dreadStageNow === 'dread' || dreadStageNow === 'terror')) {
+            const terror = (dreadStageNow === 'terror');
+            const lo = terror ? DREAD.PHANTOM_TERROR_MIN_MS
+                              : DREAD.PHANTOM_DREAD_MIN_MS;
+            const hi = terror ? DREAD.PHANTOM_TERROR_MAX_MS
+                              : DREAD.PHANTOM_DREAD_MAX_MS;
+            if (!moonPhantomNextAt) {
+                moonPhantomNextAt = ts + rand(lo, hi);
+            } else if (ts >= moonPhantomNextAt) {
+                moonPhantomDrop();
+                moonPhantomNextAt = ts + rand(lo, hi);
+            }
+        } else {
+            moonPhantomNextAt = 0;
+        }
         // Self-stop at idle (no meter, no pressure) — restarted by
         // kickDread() the next time a contributor appears.
         if (dread <= 0 && target <= 0) { dreadRAF = null; return; }
@@ -1808,7 +1837,9 @@
         checkPattern();
         checkBandMilestones();
         // Moon added to / removed from the stage mid-horror → re-evaluate
-        // the falling-moon atmosphere promptly.
+        // the falling-moon atmosphere promptly, and flag Moon presence
+        // for the stage-scaled "perception lies" chaos (Chunk 4).
+        document.body.classList.toggle('moon-present', moonOnStage());
         syncMoonFall();
     }
 
@@ -4223,6 +4254,16 @@
         root.appendChild(eyes);
         root.appendChild(vig);
         document.body.appendChild(root);
+        // Moon "perception lies" backdrop hue-warp layer (Chunk 4).
+        // Inert until body.moon-present + a dread stage drives its
+        // keyframes from CSS. z below tray/vignette so the controls
+        // stay readable while the stage + Munkis warp.
+        if (!document.getElementById('moon-warp')) {
+            const mw = document.createElement('div');
+            mw.id = 'moon-warp';
+            mw.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(mw);
+        }
         // If the viewport crosses the phone-portrait threshold (rotate /
         // resize), re-place the existing pairs to match the stage plate
         // CSS just swapped to. Cheap — only moves the divs, no rebuild.

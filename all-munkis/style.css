@@ -1844,6 +1844,62 @@ body.dread-terror #horror-overlay .red-vignette {
     body.dread-terror #horror-overlay .red-vignette { animation: none; }
 }
 
+/* ===== Moon personality — "perception lies" (Chunk 4) =====
+   #moon-warp is a fixed, click-through backdrop layer over the stage
+   (z 7: above the stage/Munkis at z 1, BELOW the vignette z8 /
+   moon-fall z9 / tray z10 — so the world the kid is looking at warps
+   while the controls stay readable). Inert by default; only when Moon
+   is on stage (body.moon-present) AND a dread stage is reached does
+   it slowly hue-rotate/desaturate the scene behind it, scaled by
+   stage. backdrop-filter is already used elsewhere (.tray-wrap), so
+   this is safe; it never competes with the transient click-chaos
+   body/main animations (different element + property). */
+#moon-warp {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 7;
+    backdrop-filter: hue-rotate(0deg);
+    -webkit-backdrop-filter: hue-rotate(0deg);
+}
+body.moon-present.dread-unease #moon-warp {
+    animation: moon-warp-soft 17s ease-in-out infinite;
+}
+body.moon-present.dread-dread #moon-warp {
+    animation: moon-warp-med 11s ease-in-out infinite;
+}
+body.moon-present.dread-terror #moon-warp {
+    animation: moon-warp-hard 6.5s ease-in-out infinite;
+}
+@keyframes moon-warp-soft {
+    0%, 100% { backdrop-filter: hue-rotate(-10deg);
+               -webkit-backdrop-filter: hue-rotate(-10deg); }
+    50%      { backdrop-filter: hue-rotate(12deg);
+               -webkit-backdrop-filter: hue-rotate(12deg); }
+}
+@keyframes moon-warp-med {
+    0%, 100% { backdrop-filter: hue-rotate(-26deg) saturate(1.05);
+               -webkit-backdrop-filter: hue-rotate(-26deg) saturate(1.05); }
+    50%      { backdrop-filter: hue-rotate(34deg) saturate(0.9);
+               -webkit-backdrop-filter: hue-rotate(34deg) saturate(0.9); }
+}
+@keyframes moon-warp-hard {
+    0%, 100% { backdrop-filter: hue-rotate(-52deg) saturate(1.15) contrast(1.05);
+               -webkit-backdrop-filter: hue-rotate(-52deg) saturate(1.15) contrast(1.05); }
+    50%      { backdrop-filter: hue-rotate(60deg) saturate(0.82) contrast(1.1);
+               -webkit-backdrop-filter: hue-rotate(60deg) saturate(0.82) contrast(1.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    /* No swirling hue cycle — hold a faint static shift instead. */
+    body.moon-present.dread-unease #moon-warp,
+    body.moon-present.dread-dread  #moon-warp,
+    body.moon-present.dread-terror #moon-warp {
+        animation: none;
+        backdrop-filter: hue-rotate(18deg) saturate(0.95);
+        -webkit-backdrop-filter: hue-rotate(18deg) saturate(0.95);
+    }
+}
+
 /* Subtitle goes glitchy + moon-colored when the chaos message lands. */
 .moon-glitch-text {
     color: #93c5fd !important;

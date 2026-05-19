@@ -111,9 +111,17 @@ This replaces the ad-hoc `.creep-scared` set AND the 8-beat
 
 Same meter, same react pipeline — but the *flavour* of the corruption
 differs by which evil is present (layers if both are on stage):
-- **Moon = chaos / disorientation.** Perception lies: the existing
-  click-chaos, plus stage-scaled hue drift, text/subtitle glitch,
-  slot-shuffle phantoms, the falling-moons + comets atmosphere.
+- **Moon = chaos / disorientation.** Perception lies. SHIPPED
+  (Chunk 4): `body.moon-present` + a stage-scaled `#moon-warp`
+  backdrop hue/desaturate warp over the stage (soft→med→hard by
+  dread stage; z7 so chrome stays readable), and a stage-scaled
+  *non-destructive* phantom-Munki flicker (`moonPhantomDrop` into an
+  EMPTY slot only, never `slots[]`; rarer at `dread`, frequent at
+  `terror`). Plus the pre-existing click-chaos + falling-moons/comets
+  atmosphere. NOTE: subtitle-glitch was dropped — the header `#subtitle`
+  no longer exists in the stripped UI; destructive shuffle/invert
+  stay click-chaos-only on purpose (passive must never wreck the
+  kid's composition).
 - **Ice = freeze / stillness / slow.** The world seizes: the existing
   `.frozen-by-ice` spread, plus stage-scaled visual slow/stutter,
   Munkis frost over and stop bouncing, cyan pallor + (future) snow
