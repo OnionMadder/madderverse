@@ -87,6 +87,30 @@
         Z_INDEX:            42
     };
 
+    // ---------- DREAD SYSTEM (v1.1 — see CLAUDE.md "The Dread System") ----------
+    // CHUNK 1: the meter + stages live UNDERNEATH the existing horror
+    // visuals. `body.react-mode-active` is still computed exactly as
+    // before (zero regression) — `body.dread-<stage>` is emitted in
+    // parallel and not yet read by any CSS/audio. Later chunks migrate
+    // the visuals onto the stages, fold the two react concepts into one
+    // per-Munki ladder, and split Moon/Ice personalities.
+    const DREAD = {
+        // Stage thresholds on the 0–100 meter.
+        UNEASE:           25,
+        DREAD:            55,
+        TERROR:           80,
+        // Meter dynamics (px/units per second).
+        RISE_PER_S:       45,   // climb toward the live threat pressure
+        DECAY_PER_S:      14,   // bleed when below pressure / threat gone
+        DECAY_HIGH_PER_S: 7,    // slower while already high (stays tense)
+        // Pressure contributors (added into the live target each tick).
+        PER_ADJACENT:     42,   // each Ice/Moon-adjacent regular Munki
+        JUMPSCARE_SPIKE:  60    // instant add on an Ice/Moon drop
+    };
+    let dread = 0;                 // 0–100, the single meter
+    let dreadStageNow = 'calm';    // last applied stage (class bookkeeping)
+    let dreadRAF = null, dreadLastTs = 0;
+
     // ---------- AUDIO ENGINE ----------
     let audioCtx = null;
     let masterGain = null;
@@ -1412,6 +1436,71 @@
         return evil(left) || evil(right);
     }
 
+    // ----- Dread meter (CHUNK 1) -----
+    // Stage from the meter value.
+    function dreadStage() {
+        return dread >= DREAD.TERROR ? 'terror'
+             : dread >= DREAD.DREAD  ? 'dread'
+             : dread >= DREAD.UNEASE ? 'unease'
+             :                         'calm';
+    }
+    // Live "threat pressure" the meter eases toward: every Munki a
+    // creep currently scares (its creepFear) + every regular Munki
+    // sitting next to Ice/Moon. Read-only over existing state — does
+    // not alter the creep or dwell logic (Chunk 1 = no regression).
+    function dreadPressure() {
+        let p = 0;
+        creepFear.forEach(v => { p += v; });
+        for (let i = 0; i < NUM_SLOTS; i++) {
+            const id = slots[i];
+            if (id && id !== 'ice' && id !== 'moon' && isTriggerAdjacent(i)) {
+                p += DREAD.PER_ADJACENT;
+            }
+        }
+        return p;
+    }
+    function applyDreadStageClass() {
+        const s = dreadStage();
+        if (s === dreadStageNow) return;
+        document.body.classList.remove('dread-' + dreadStageNow);
+        document.body.classList.add('dread-' + s);
+        dreadStageNow = s;
+    }
+    function dreadTick(ts) {
+        if (document.hidden) {
+            dreadRAF = requestAnimationFrame(dreadTick);
+            dreadLastTs = ts;
+            return;
+        }
+        const dt = Math.min(0.05, (ts - dreadLastTs) / 1000) || 0;
+        dreadLastTs = ts;
+        const target = Math.min(100, dreadPressure());
+        if (target > dread) {
+            dread = Math.min(100, dread + DREAD.RISE_PER_S * dt);
+        } else {
+            const dec = dread > DREAD.DREAD
+                ? DREAD.DECAY_HIGH_PER_S : DREAD.DECAY_PER_S;
+            dread = Math.max(0, dread - dec * dt);
+        }
+        applyDreadStageClass();
+        // Self-stop at idle (no meter, no pressure) — restarted by
+        // kickDread() the next time a contributor appears.
+        if (dread <= 0 && target <= 0) { dreadRAF = null; return; }
+        dreadRAF = requestAnimationFrame(dreadTick);
+    }
+    // Ensure the meter loop is running (cheap; self-stops when idle).
+    function kickDread() {
+        if (dreadRAF) return;
+        dreadLastTs = performance.now();
+        dreadRAF = requestAnimationFrame(dreadTick);
+    }
+    // Instant meter bump (jumpscare). Clamped; restarts the loop.
+    function addDread(n) {
+        dread = Math.max(0, Math.min(100, dread + n));
+        applyDreadStageClass();
+        kickDread();
+    }
+
     // Beat-quantised state machine. Fires once per quarter note (from
     // scheduleStep). Increments dwell for every regular Munki next to an
     // antagonist; trips that Munki into react mode when dwell crosses
@@ -1447,6 +1536,7 @@
             }
         }
         beatReacting = anyReacting;
+        kickDread();          // keep the dread meter ticking (Chunk 1)
         syncHorrorMode();
         // While horror is on, every occupied non-evil slot is cycling its
         // expression (see expressionForSlot) — re-render them all each
@@ -1925,6 +2015,7 @@
     function triggerJumpScare() {
         if (isJumpScareActive) return;
         isJumpScareActive = true;
+        addDread(DREAD.JUMPSCARE_SPIKE);   // instant meter spike (Chunk 1)
 
         // Make sure the audio engine is alive before we try to play anything;
         // also lets the kid trigger a scare as their very first interaction.
@@ -3934,6 +4025,7 @@
             fearHorrorActive = false;
             syncHorrorMode();
         }
+        kickDread();          // creep proximity feeds the meter (Chunk 1)
 
         creepRAF = requestAnimationFrame(creepTick);
     }
