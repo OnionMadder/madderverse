@@ -88,11 +88,12 @@
         // scale every frame so its NORM_DIM renders to NORM_FILL × the
         // box. Result: the creep reads the same size in every pose; the
         // wing-flap then shows as the OTHER dimension changing (real
-        // animation, not a size jump). NORM_DIM 'width' keeps body
-        // length constant so the vertical flap stays expressive;
-        // 'height' or 'max' available if a creep needs it.
-        NORM_DIM:           'width',
-        NORM_FILL:          0.82,
+        // animation, not a size jump). 'area' (geom-mean of the content
+        // box) is the steadiest single proxy — a wing-flap moves only
+        // one axis so it barely swings the overall size, yet the flap
+        // still reads. 'width' / 'height' / 'max' available per creep.
+        NORM_DIM:           'area',
+        NORM_FILL:          0.80,
         // z-index: above the stage BG + Munkis, below the tray/controls.
         Z_INDEX:            42
     };
@@ -3513,8 +3514,9 @@
         let scale, sx, sy, sw, sh;
         if (f.cw && f.ch) {
             const cur = CREEP.NORM_DIM === 'height' ? f.ch
+                      : CREEP.NORM_DIM === 'width'  ? f.cw
                       : CREEP.NORM_DIM === 'max'    ? Math.max(f.cw, f.ch)
-                      :                               f.cw;
+                      :                  Math.sqrt(f.cw * f.ch); // 'area'
             scale = (box * CREEP.NORM_FILL) / cur;
             sx = f.cx; sy = f.cy; sw = f.cw; sh = f.ch;
         } else {
@@ -3522,15 +3524,20 @@
             sx = f.x; sy = f.y; sw = f.w; sh = f.h;
         }
         const dw = sw * scale, dh = sh * scale;
-        child.style.width  = `${box}px`;
-        child.style.height = `${box}px`;
+        // The element is sized to EXACTLY the rendered sprite and centred
+        // in the outer creep box (position:absolute; inset:0;
+        // margin:auto in CSS). Because it's the sprite's own size with
+        // overflow:hidden, the background can only ever show THIS frame's
+        // pixels — no adjacent strip frame can bleed into a margin (the
+        // ghost double-creep). background-position puts the source rect
+        // at the element's origin.
+        child.style.width  = `${dw.toFixed(2)}px`;
+        child.style.height = `${dh.toFixed(2)}px`;
         child.style.backgroundImage = `url('${src}')`;
         child.style.backgroundSize =
             `${sheetW * scale}px ${sheetH * scale}px`;
-        // Centre the (content or frame) box inside the square box.
         child.style.backgroundPosition =
-            `${((box - dw) / 2 - sx * scale).toFixed(2)}px ` +
-            `${((box - dh) / 2 - sy * scale).toFixed(2)}px`;
+            `${(-sx * scale).toFixed(2)}px ${(-sy * scale).toFixed(2)}px`;
     }
 
     // Set the active creep's current animation frame (index into its
@@ -3647,12 +3654,23 @@
         const edge = ['left', 'right', 'top'][Math.floor(Math.random() * 3)];
         const speed = rand(CREEP.SPEED_MIN_PXPS, CREEP.SPEED_MAX_PXPS);
         const size = creepSizePx();
-        // Cross roughly the vertical middle band of the viewport so the
-        // path overlaps where Munkis stand near the bottom-ish stage.
-        const midY = vh * rand(0.32, 0.6);
+        // Fly along the band where the Munkis actually ARE (avg active
+        // slot Y, slight jitter), so a left/right pass genuinely brings
+        // the creep within CLOSE_PX → flinch/fear/menace actually fire
+        // and the swoop can gate. Falls back to a mid band if the stage
+        // is empty (nothing to menace anyway). A 'top' entry descends
+        // straight through the row regardless.
+        const sc0 = slotCenters();
+        let bandY;
+        if (sc0.length) {
+            const avg = sc0.reduce((a, s) => a + s.cy, 0) / sc0.length;
+            bandY = avg + (Math.random() * 2 - 1) * (size * 0.35);
+        } else {
+            bandY = vh * rand(0.32, 0.6);
+        }
         let x, y, vx, vy = 0;
-        if (edge === 'left')  { x = -size;       y = midY; vx =  speed; }
-        else if (edge === 'right') { x = vw;     y = midY; vx = -speed; }
+        if (edge === 'left')  { x = -size;       y = bandY; vx =  speed; }
+        else if (edge === 'right') { x = vw;     y = bandY; vx = -speed; }
         else { /* top */      x = vw * rand(0.2, 0.8); y = -size; vx = (Math.random() < 0.5 ? -1 : 1) * speed * 0.5; vy = speed; }
         creepState = {
             x, y, vx, vy, baseY: y, drawY: y, edge,

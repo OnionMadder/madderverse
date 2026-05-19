@@ -1961,15 +1961,20 @@ body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
 .flying-creep.flying-creep-in { opacity: 0.9; }
 .flying-creep[hidden] { display: none; }
 
-/* Animation frame layer. paintCreepFrame() sizes this to a fixed square
-   box and windows the scaled sheet so the current frame is centred at a
-   constant per-creep scale (see game.js). overflow:hidden guarantees no
-   neighbouring sheet art can ever peek past the box edge. Until the
-   sheet loads .flying-creep holds the inline placeholder SVG and this
-   rule is unused. */
+/* Animation frame layer. paintCreepFrame() sizes this element to EXACTLY
+   the rendered sprite (its own measured content box, scaled) and it is
+   absolutely centred inside the outer .flying-creep via inset:0 +
+   margin:auto. Because the element is the sprite's own size with
+   overflow:hidden, the windowed sheet can only ever show THIS frame —
+   an adjacent strip frame can never bleed into a margin (the ghost
+   double-creep). transform is left free for the death-shrink animation
+   (the centring uses margin:auto, not transform). Until the sheet loads
+   .flying-creep holds the inline placeholder SVG and this rule is
+   unused. */
 .flying-creep .flying-creep-frame {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    inset: 0;
+    margin: auto;
     overflow: hidden;
     background-repeat: no-repeat;
     image-rendering: -webkit-optimize-contrast;
