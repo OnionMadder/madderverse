@@ -4210,6 +4210,12 @@
         lastPaintPos: null,
         strokedThisGesture: false,
 
+        /* Flips true the moment the kid places a custom imported
+           sticker on this pot. Persisted onto the saved gallery
+           entry; the battle-submit path blocks any tainted entry
+           from going public (local-only UGC safety boundary). */
+        usedCustomSticker: false,
+
         /* Zoom + pan for detail work.
            zoom: display multiplier (1.0 = canvas at its natural CSS
                  size; 4.0 = 4x scale on top of CSS sizing).
@@ -4623,6 +4629,9 @@
         D.paintCtx.setTransform(1, 0, 0, 1, 0, 0);
         D.paintCtx.clearRect(0, 0, D.paintCanvas.width, D.paintCanvas.height);
         D.paintCtx.restore();
+        /* Clearing wipes any prior custom-sticker pixels too — flag
+           starts fresh until a new sticker lands. */
+        D.usedCustomSticker = false;
     }
 
     /* ----- 6D. Pointer / paint ----- */
@@ -4997,6 +5006,8 @@
     function stampAt(p) {
         const fn = PATTERN_DRAWERS[D.pattern];
         if (!fn) return;
+        /* Custom-sticker placements taint the pot — it stays local. */
+        if (isCustomStickerId(D.pattern)) D.usedCustomSticker = true;
         /* Slightly bigger than brush dot so a "thin" stamp still
            reads as a recognizable shape. */
         const r = D.size * 1.7;
@@ -5018,6 +5029,119 @@
         noteGlazeUsed(D.glaze);
         notePatternUsed(D.pattern);
     }
+
+    /* ----- 6D2. CUSTOM STICKERS (local-only) -----
+       The kid imports a transparent PNG from their device, it
+       becomes a stamp tile in the decorate palette, persists
+       across sessions, and any pot that uses one is flagged
+       (D.usedCustomSticker -> entry.usedCustomSticker). The
+       battle-submit path REFUSES tainted entries, so arbitrary
+       user images never enter the shared/public surface. */
+
+    const CUSTOM_STICKER_KEY = "crayte-custom-stickers";
+    const CUSTOM_STICKER_MAX = 12;     /* cabinet size */
+    const CUSTOM_STICKER_PX  = 256;    /* downsample max edge */
+    let CUSTOM_STICKERS = [];          /* {id, dataURL, img}[] */
+
+    function isCustomStickerId(id) {
+        return typeof id === "string" && id.indexOf("custom-") === 0;
+    }
+
+    function registerCustomStickerDrawer(rec) {
+        /* Imported PNG keeps its own pixels — ignore the paint
+           color so transparency + sticker colors are preserved.
+           Drawn into the same r*2 box every other stamp uses. */
+        PATTERN_DRAWERS[rec.id] = function (ctx, x, y, r /*, color */) {
+            if (rec.img && rec.img.complete && rec.img.naturalWidth > 0) {
+                ctx.drawImage(rec.img, x - r, y - r, r * 2, r * 2);
+            }
+        };
+    }
+
+    function loadCustomStickers() {
+        try {
+            const raw = localStorage.getItem(CUSTOM_STICKER_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            CUSTOM_STICKERS = arr.map(function (s) {
+                const img = new Image();
+                img.src = s.dataURL;
+                const rec = { id: s.id, dataURL: s.dataURL, img: img };
+                registerCustomStickerDrawer(rec);
+                return rec;
+            });
+        } catch (_) { CUSTOM_STICKERS = []; }
+    }
+
+    function persistCustomStickers() {
+        try {
+            const arr = CUSTOM_STICKERS.map(function (s) {
+                return { id: s.id, dataURL: s.dataURL };
+            });
+            localStorage.setItem(CUSTOM_STICKER_KEY, JSON.stringify(arr));
+        } catch (_) {}
+    }
+
+    function pickCustomStickerFile() {
+        /* Plain <input type=file> works fine in Capacitor's WebView
+           — no native camera/photos plugin needed. */
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/png";
+        input.style.display = "none";
+        input.addEventListener("change", function () {
+            const f = input.files && input.files[0];
+            document.body.removeChild(input);
+            if (f) importStickerFile(f);
+        });
+        document.body.appendChild(input);
+        input.click();
+    }
+
+    function importStickerFile(file) {
+        const reader = new FileReader();
+        reader.onload = function () {
+            const img = new Image();
+            img.onload = function () {
+                /* Downsample so localStorage + render cost stay sane. */
+                const max = CUSTOM_STICKER_PX;
+                const scale = Math.min(1,
+                    max / Math.max(img.width, img.height));
+                const w = Math.max(1, Math.round(img.width  * scale));
+                const h = Math.max(1, Math.round(img.height * scale));
+                const c = document.createElement("canvas");
+                c.width = w; c.height = h;
+                c.getContext("2d").drawImage(img, 0, 0, w, h);
+                const dataURL = c.toDataURL("image/png");
+                const rec = {
+                    id: "custom-" + Date.now().toString(36) + "-" +
+                        Math.random().toString(36).slice(2, 6),
+                    dataURL: dataURL,
+                    img: new Image()
+                };
+                rec.img.src = dataURL;
+                CUSTOM_STICKERS.push(rec);
+                /* Cap the cabinet — drop the oldest beyond the limit
+                   and unregister its drawer so the id can't resolve. */
+                while (CUSTOM_STICKERS.length > CUSTOM_STICKER_MAX) {
+                    const dropped = CUSTOM_STICKERS.shift();
+                    delete PATTERN_DRAWERS[dropped.id];
+                }
+                registerCustomStickerDrawer(rec);
+                persistCustomStickers();
+                /* Pre-select the freshly-imported sticker, rebuild the
+                   palette so it appears, and flip into STAMP mode. */
+                D.pattern = rec.id;
+                if (typeof buildToolUI === "function") buildToolUI();
+                if (typeof setTool === "function") setTool("stamp");
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    /* Eager load so PATTERN_DRAWERS entries are registered before
+       any render touches them. */
+    loadCustomStickers();
 
     /* ----- 6E. Tool UI ----- */
 
@@ -5090,6 +5214,49 @@
                 });
                 pp.appendChild(btn);
             });
+
+            /* Custom imported stickers — always appended, after the
+               current pack's stamps, so the kid's own collection
+               travels across pack switches. Visually marked so it's
+               obvious they're personal (and that submitting them to
+               battles is blocked). */
+            CUSTOM_STICKERS.forEach(function (rec) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "stamp-btn is-custom-sticker";
+                btn.dataset.pattern = rec.id;
+                btn.setAttribute("aria-label",
+                    "Your imported sticker (local only, not for battles)");
+                btn.title = "Imported sticker — local only";
+                /* Use the image itself as the icon. */
+                const thumb = document.createElement("img");
+                thumb.src = rec.dataURL;
+                thumb.alt = "";
+                thumb.width = 32; thumb.height = 32;
+                thumb.style.objectFit = "contain";
+                btn.appendChild(thumb);
+                if (rec.id === D.pattern) btn.classList.add("active");
+                btn.addEventListener("click", function () {
+                    D.pattern = rec.id;
+                    pp.querySelectorAll(".stamp-btn").forEach(function (s) {
+                        s.classList.toggle("active",
+                            s.dataset.pattern === rec.id);
+                    });
+                    setTool("stamp");
+                });
+                pp.appendChild(btn);
+            });
+
+            /* "+" tile that opens the file picker. */
+            const addBtn = document.createElement("button");
+            addBtn.type = "button";
+            addBtn.className = "stamp-btn is-add-sticker";
+            addBtn.setAttribute("aria-label",
+                "Import a transparent PNG as a custom sticker");
+            addBtn.title = "Import sticker (PNG)";
+            addBtn.textContent = "+";
+            addBtn.addEventListener("click", pickCustomStickerFile);
+            pp.appendChild(addBtn);
         }
 
         /* Tool-mode buttons */
@@ -5435,7 +5602,13 @@
                 overfiredSeed: EGG.overheatSeed || 0,
                 /* Day-4 chunk B: exploded pots saved as shattered
                    trophies rather than thrown out. */
-                exploded: KILN.exploded === true
+                exploded: KILN.exploded === true,
+                /* Local-only UGC flag — any imported PNG sticker
+                   used on this pot taints the entry and blocks it
+                   from public battle submission. Carries forward
+                   on remix so a tainted source can't be laundered. */
+                usedCustomSticker: !!D.usedCustomSticker ||
+                    !!(REMIX.pending && REMIX.pending.usedCustomSticker)
             };
             /* If this firing was started via REMIX, bake the
                lineage in. Cleared after consumption so a follow-up
@@ -7602,7 +7775,13 @@
         if (themeEl) themeEl.textContent = battle.theme;
         grid.innerHTML = "";
 
-        const mine = loadGalleryEntries().slice().reverse();
+        /* Hide tainted pots (custom-sticker UGC) from the picker
+           entirely — they're private and the gate downstream would
+           reject them anyway. Cleaner to not offer the choice. */
+        const mine = loadGalleryEntries()
+            .filter(function (e) { return !e.usedCustomSticker; })
+            .slice()
+            .reverse();
         if (mine.length === 0) {
             panel.hidden = false;
             return;
@@ -7647,6 +7826,20 @@
     }
 
     function submitChosenToBattle(entry, battle) {
+        /* Local-only UGC boundary: any pot that used an imported
+           custom sticker is BLOCKED from public submission. The
+           pot stays fully playable in the kid's own gallery; this
+           gate only prevents arbitrary user images entering the
+           shared battles surface. */
+        if (entry && entry.usedCustomSticker) {
+            alert(
+                "Pots with imported stickers stay in your own gallery — " +
+                "they can't be submitted to public battles.\n\n" +
+                "Pick a different pot, or make one without custom stickers!"
+            );
+            closeSubmitPicker();
+            return;
+        }
         const author = (window.prompt(
             "Sign as (optional):",
             getRememberedAuthor()
@@ -8007,7 +8200,11 @@
             /* Snapshot the source pot's name + thumbnail so the
                credit chip has data even if the FK target is gone
                or offline. */
-            remixedFromName:   entry.name || ""
+            remixedFromName:   entry.name || "",
+            /* Carry the local-only UGC taint so a remix of a pot
+               that used an imported sticker stays blocked from
+               public battles even if the user clears + repaints. */
+            usedCustomSticker: !!entry.usedCustomSticker
         };
 
         /* Drop into shape mode with the cloned clay. Deep-copy

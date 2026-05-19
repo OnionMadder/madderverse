@@ -4991,3 +4991,53 @@ html.is-native #btnInstall {
     .clay-lump-ghost,
     .clay-lump-ghost.is-snapback { transition: none; }
 }
+
+/* ----- 18. Custom-sticker tiles (decorate palette) ----- */
+
+/* Imported PNGs the kid added themselves. Dashed border + a small
+   corner mark so it reads as "personal / not for sharing" — these
+   pots are also blocked from public battle submission. */
+.stamp-btn.is-custom-sticker {
+    border-style: dashed;
+    border-color: var(--teal);
+    position: relative;
+    background:
+        repeating-conic-gradient(
+            rgba(255, 255, 255, 0.04) 0% 25%,
+            transparent 25% 50%) 0 0 / 12px 12px,
+        var(--bg-panel);
+}
+.stamp-btn.is-custom-sticker::after {
+    content: "★";
+    position: absolute;
+    top: 2px; right: 4px;
+    font-size: 9px;
+    color: var(--teal);
+    opacity: 0.85;
+    pointer-events: none;
+}
+.stamp-btn.is-custom-sticker img {
+    display: block;
+    image-rendering: auto;
+}
+
+/* The "+" import-sticker tile. */
+.stamp-btn.is-add-sticker {
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--teal);
+    border-style: dashed;
+    border-color: var(--teal-low);
+    background: var(--bg-panel);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+.stamp-btn.is-add-sticker:hover,
+.stamp-btn.is-add-sticker:focus-visible {
+    color: var(--pink-bright);
+    border-color: var(--pink-bright);
+    outline: none;
+}
