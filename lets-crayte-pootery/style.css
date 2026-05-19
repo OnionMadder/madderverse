@@ -4862,7 +4862,8 @@ a:focus-visible {
    over the bottom tool drawer. The inline detector in index.html
    adds html.is-native only in the native runtime; the web build
    at madderverse.org keeps the footer for SEO / legal. */
-html.is-native .site-footer-slim {
+html.is-native .site-footer-slim,
+html.is-native #btnInstall {
     display: none !important;
 }
 
