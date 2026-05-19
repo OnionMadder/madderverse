@@ -82,6 +82,17 @@
         STRIKE_AT:          0.80,  // swoop progress where the hit lands
         STRIKE_FEAR:        55,    // fear dumped on the struck Munki
         DIE_MS:             520,   // frame-5 + CSS dissipate, then despawn
+        // Size normalisation. The exporter packs uniform frame CANVASES
+        // but the creep DRAWN inside each varies in size — so we measure
+        // each frame's real painted content (alpha bbox, in-browser) and
+        // scale every frame so its NORM_DIM renders to NORM_FILL × the
+        // box. Result: the creep reads the same size in every pose; the
+        // wing-flap then shows as the OTHER dimension changing (real
+        // animation, not a size jump). NORM_DIM 'width' keeps body
+        // length constant so the vertical flap stays expressive;
+        // 'height' or 'max' available if a creep needs it.
+        NORM_DIM:           'width',
+        NORM_FILL:          0.82,
         // z-index: above the stage BG + Munkis, below the tray/controls.
         Z_INDEX:            42
     };
@@ -3447,27 +3458,79 @@
             .catch(() => null);
     }
 
-    // Paint the .flying-creep-frame child to show exporter frame rect
-    // `f` from sheet `src` (sheet pixel size sheetW×sheetH). The frames
-    // are UNIFORM exporter cells with the artist's pose already centred
-    // inside each — so we render the frame rect VERBATIM: scale it to
-    // the box by its longest side and centre that frame box. No alpha
-    // bbox, no per-pose recentring (those moved the artist's framing
-    // around and made sprites drift). Same scale every frame ⇒ no pulse;
-    // same canvas size across creeps ⇒ every creep the same basic size.
+    // Measure each frame's REAL painted content (alpha bounding box) in
+    // a canvas, once per creep at load. The exporter packs uniform frame
+    // canvases but the creep drawn inside each varies in size — these
+    // measured boxes (fr.cx/cy/cw/ch, sheet coords) let paintCreepFrame
+    // normalise every pose to the same on-screen size. Same-origin over
+    // http (dev server / madderverse.org / Capacitor) so getImageData is
+    // fine; if it ever taints (file://) we just skip → full-frame paint.
+    function measureCreepContent(creep) {
+        if (!creep || !creep.src || !creep.frames) return;
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const cv = document.createElement('canvas');
+                const cx = cv.getContext('2d', { willReadFrequently: true });
+                creep.frames.forEach(fr => {
+                    cv.width = fr.w; cv.height = fr.h;
+                    cx.clearRect(0, 0, fr.w, fr.h);
+                    cx.drawImage(img, fr.x, fr.y, fr.w, fr.h,
+                                 0, 0, fr.w, fr.h);
+                    const d = cx.getImageData(0, 0, fr.w, fr.h).data;
+                    let mnx = fr.w, mny = fr.h, mxx = -1, mxy = -1;
+                    for (let y = 0; y < fr.h; y++) {
+                        const row = y * fr.w;
+                        for (let x = 0; x < fr.w; x++) {
+                            if (d[(row + x) * 4 + 3] > 16) {
+                                if (x < mnx) mnx = x;
+                                if (x > mxx) mxx = x;
+                                if (y < mny) mny = y;
+                                if (y > mxy) mxy = y;
+                            }
+                        }
+                    }
+                    if (mxx >= mnx && mxy >= mny) {
+                        fr.cx = fr.x + mnx; fr.cy = fr.y + mny;
+                        fr.cw = mxx - mnx + 1; fr.ch = mxy - mny + 1;
+                    }
+                });
+            } catch (_) { /* tainted/unavailable → full-frame fallback */ }
+        };
+        img.onerror = () => {};
+        img.src = creep.src;
+    }
+
+    // Paint the .flying-creep-frame child to show frame `f`. If the
+    // frame's measured content box (cx/cy/cw/ch) is available, scale so
+    // its CREEP.NORM_DIM renders to NORM_FILL × the box and centre that
+    // content box — so every pose is the SAME on-screen size and the
+    // wing-flap reads as motion, not a size jump. Until measured (or if
+    // measuring was blocked) it falls back to the verbatim exporter
+    // frame rect, scaled longest-side to the box and centred.
     function paintCreepFrame(child, f, box, src, sheetW, sheetH) {
         if (!child || !f) return;
-        const scale = box / Math.max(f.w, f.h);
-        const fw = f.w * scale, fh = f.h * scale;
+        let scale, sx, sy, sw, sh;
+        if (f.cw && f.ch) {
+            const cur = CREEP.NORM_DIM === 'height' ? f.ch
+                      : CREEP.NORM_DIM === 'max'    ? Math.max(f.cw, f.ch)
+                      :                               f.cw;
+            scale = (box * CREEP.NORM_FILL) / cur;
+            sx = f.cx; sy = f.cy; sw = f.cw; sh = f.ch;
+        } else {
+            scale = box / Math.max(f.w, f.h);
+            sx = f.x; sy = f.y; sw = f.w; sh = f.h;
+        }
+        const dw = sw * scale, dh = sh * scale;
         child.style.width  = `${box}px`;
         child.style.height = `${box}px`;
         child.style.backgroundImage = `url('${src}')`;
         child.style.backgroundSize =
             `${sheetW * scale}px ${sheetH * scale}px`;
-        // Centre the frame rect inside the square box.
+        // Centre the (content or frame) box inside the square box.
         child.style.backgroundPosition =
-            `${((box - fw) / 2 - f.x * scale).toFixed(2)}px ` +
-            `${((box - fh) / 2 - f.y * scale).toFixed(2)}px`;
+            `${((box - dw) / 2 - sx * scale).toFixed(2)}px ` +
+            `${((box - dh) / 2 - sy * scale).toFixed(2)}px`;
     }
 
     // Set the active creep's current animation frame (index into its
@@ -3819,7 +3882,13 @@
     function startCreepSystem() {
         if (!CREEP.ENABLED) return;
         loadCreepsSeen();
-        loadCreepSheet().then(sheet => { creepSheet = sheet; });
+        loadCreepSheet().then(sheet => {
+            creepSheet = sheet;
+            // Measure each creep's real content boxes for size
+            // normalisation (mutates frame objs in place; paint uses
+            // them once ready, full-frame fallback until then).
+            if (sheet && sheet.creeps) sheet.creeps.forEach(measureCreepContent);
+        });
         loadSkyItemsSheet().then(s => { skyItemsSheet = s; });
         scheduleCreepSpawn(true);
         // Pause drift + spawn while the app is backgrounded (battery; also
