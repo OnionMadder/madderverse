@@ -1,200 +1,245 @@
-# Munki Madness — Physics + Tile Spec v1.0 (LOCKED)
+# Munki Madness v2.0 — Physics + Mesh Spec (Phase 1)
 
-Source of truth for the engine. Locked 2026-05-17. Future sessions: build
-to match this exactly; change the spec here first if behaviour must change.
+Source of truth for the engine. v1.0 (Matter.js iso tile maze) lives in
+git history; v2.0 is a continuous heightmap world rendered as a glowing
+wireframe mesh. The goal is a **WELL** — a deep depression the marble
+falls into and cannot roll back out of.
 
-## Marble feel: heavy metal ball (pinball weight)
+This document covers Phase 1 (engine foundation). Obstacle layers
+(Phase 2), the sculptural editor (Phase 3), audio (Phase 4), and the
+level catalog (Phase 5) will extend it in subsequent commits.
 
-Tunable constants at the top of `game.js`:
+## World model
 
-| Constant | v1.0 value | Meaning |
+The world is a **grid of corner heights**, not tiles.
+
+- Grid size: `gw × gh` cells → `(gw+1) × (gh+1)` corner heights
+  (default Phase 1: 18 × 18).
+- Each cell `(cx, cy)` is bounded by corners
+  `(cx,cy) (cx+1,cy) (cx,cy+1) (cx+1,cy+1)`.
+- Heights are signed scalars; `0` = flat plane, negative = depression
+  (well), positive = hill.
+- Heights are stored as `Float64Array` of length `(gw+1) × (gh+1)`,
+  row-major: `H[i + j*(gw+1)]`.
+
+The marble's world position `(x, y)` is in **cell units** (range
+`[MARBLE_R, gw - MARBLE_R] × [MARBLE_R, gh - MARBLE_R]`), not pixels.
+
+## Bilinear elevation
+
+At any world point `(wx, wy)` inside a cell with origin corner
+`(i0, j0)` and fractional offsets `fx = wx - i0`, `fy = wy - j0`:
+
+```
+top    = h00 + (h10 - h00) * fx
+bot    = h01 + (h11 - h01) * fx
+height = top + (bot - top) * fy
+```
+
+This is a `C^0` continuous surface (smooth within a cell; the gradient
+is piecewise-linear across cell boundaries).
+
+## Gradient — the gravity source
+
+Partial derivatives of the same bilinear patch, in `height / cell`:
+
+```
+dH/dx = (h10 - h00) + ((h11 - h01) - (h10 - h00)) * fy
+dH/dy = (h01 - h00) + ((h11 - h10) - (h01 - h00)) * fx
+```
+
+Slope gravity accel applied to the marble each substep:
+
+```
+ax_grav = -GRAVITY_K * dH/dx
+ay_grav = -GRAVITY_K * dH/dy
+```
+
+The marble accelerates **opposite** the gradient (downhill). A well —
+which is a Gaussian depression dug into the corners — produces a smooth
+radial pull that grows from zero at the rim into a strong central
+funnel.
+
+## Marble feel — heavy ball on a curved sheet
+
+Tunable constants at the top of `game.js` (live-tunable via `?tune=1`):
+
+| Constant | v2.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `24` | input push force (player-dialed 2026-05-18 — "finally fun"; live-tunable via ?tune=1) |
-| `MAX_SPEED` | `12` | top speed (tiles/s) — player-dialed |
-| `WALL_BOUNCE` | `0.4` | wall restitution — satisfying pinball bonk recovery |
-| `FRICTION_FLOOR` | `0.965` | per-frame@60 velocity multiplier (= `floor` drag) — player-dialed; live-tunable via ?tune=1 |
-| `TILT_FORCE_MULTIPLIER` | `1.4` | extra tilt-input gain — player-dialed |
-| `BUMPER_FORCE` | `4` | instantaneous velocity-add a bumper imparts |
-| `GRAVITY` | `0` | no gravity in v1 (flat plane); reserved for Endeavor |
+| `ACCEL` | `16` | player-input push (cells/s²) |
+| `MAX_SPEED` | `6` | top speed (cells/s) |
+| `WALL_BOUNCE` | `0.4` | edge restitution — pinball bonk |
+| `FRICTION_FLOOR` | `0.92` | per-frame@60 velocity multiplier (drag) |
+| `GRAVITY_K` | `34` | slope → accel multiplier (see above) |
+| `TILT_FORCE_MULTIPLIER` | `1.4` | extra tilt-input gain |
+| `MARBLE_R` | `0.34` | marble radius (cells); keeps it off the rim |
 
-The marble should feel like a steel ball-bearing on a wood-and-plastic
-maze toy: slow to start, slow to stop, lots of mid-roll momentum. Players
-win through careful control, not snap reflexes.
+The marble should feel **heavy** — gravity dominates, player input
+nudges. On a flat plane the marble barely accelerates from tilt alone;
+near a well, the slope wins and the player has to actively fight or
+guide the pull.
 
-Drag values are **per-frame multipliers referenced to 60fps** and are
-applied frame-rate-independently in the engine (converted per physics
-substep as `drag^(dt*60)`).
+`FRICTION_FLOOR` and `WALL_BOUNCE` must stay strictly less than `1` or
+velocity runs away. The `?tune=1` sliders clamp `FRICTION_FLOOR` to
+`[0.30, 0.9999]` and `WALL_BOUNCE` to `[0, 0.98]`.
 
-### Per-level physics override (opt-in, 2026-05-18)
+## Integration
 
-The constants above are the **global BASE**. Any level JSON MAY add a
-**sparse** top-level `"physics"` object listing ONLY the knobs it wants
-different; `loadLevel` overlays it on the BASE (`effectivePhysics`), so a
-level **without** a `physics` block is byte-identical to the global feel
-(opt-in — existing levels untouched). Keys mirror the `?tune=1` panel
-1:1:
+Fixed-timestep substepping for determinism across framerates:
+
+```
+FIXED_DT     = 1/120 s
+MAX_SUBSTEPS = 8       // anti spiral-of-death
+```
+
+Each substep:
+
+1. Sample `(h, dH/dx, dH/dy)` at the marble's current position.
+2. `ax = -GRAVITY_K * dH/dx + inputX * ACCEL`
+   `ay = -GRAVITY_K * dH/dy + inputY * ACCEL`
+3. `v += a * dt`
+4. Apply drag: `v *= FRICTION_FLOOR ^ (dt * 60)` (frame-rate-independent).
+5. Clamp `|v|` to `MAX_SPEED`.
+6. `x += vx * dt; y += vy * dt`.
+7. Bounce off mesh boundary: clamp `x` to `[MARBLE_R, gw - MARBLE_R]`
+   and `y` similarly; invert the offending velocity component with
+   `WALL_BOUNCE` restitution.
+8. Well check (see next section).
+
+## Goal mechanic — captured by the well
+
+A level defines `well = { x, y, captureR }`. The marble is **captured**
+when it is simultaneously:
+
+1. Inside the capture bowl: `distance((x,y), (well.x, well.y)) < captureR`, **and**
+2. Too slow to climb back out: `|v| < ESCAPE_SPEED` (Phase 1: `1.6` cells/s),
+3. for at least `0.28 s` of continuous dwell (anti-flicker; a marble
+   that streaks across the bowl at high speed will not falsely trigger).
+
+While captured, the marble visually **sinks** into the hole (`marble.sink`
+ramps `0 → 1` and lifts the marble down into the bowl on screen).
+
+Phase 1 ships **one built-in level**, the **Tutorial Well**:
+- 18 × 18 grid, all corners zero except a Gaussian dome `depth=-7.5`,
+  `sigma=3.4` centred at the grid middle.
+- Spawn at `(2, 2)`, far enough out on the flat to require active
+  steering toward the slope before gravity takes over.
+- `time = 45s` budget for the 3★ time bracket (`≤22.5s` = 3★,
+  `≤36s` = 2★, otherwise 1★).
+
+Phase 5 replaces the built-in with a `levels/*.json` catalog.
+
+## Per-level physics overlay
+
+The constants above are the **global BASE**. A level JSON MAY carry a
+sparse `"physics"` block listing only the knobs it overrides:
 
 ```json
 "physics": {
-  "ACCEL": 30,
-  "ice.drag": 0.999,
-  "ice.grip": 0.15
+  "ACCEL": 14,
+  "FRICTION_FLOOR": 0.94
 }
 ```
 
-Accepted keys: `ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`,
-`TILT_FORCE_MULTIPLIER`, `floor.drag`, `gravel.drag`, `ice.drag`,
-`ice.grip`. Values are clamped on apply (drags 0.3–0.9999, `WALL_BOUNCE`
-0–0.98 — they're per-frame multipliers; ≥1 = runaway). Workflow: open
-`?tune=1`, play the level, dial the sliders, hit **Copy physics block**
-— it copies a paste-ready *sparse* `"physics": { … }` (only values that
-differ from BASE) headed with the level label; paste into that level's
-JSON. The panel subtitle shows the current level + `[global]` /
-`[has override]`, and switching levels snaps the sliders to that level's
-effective values.
+`effectivePhysics(level.physics)` overlays it onto `BASE_PHYS` (clamped
+per `clampPhys`). Levels with no `"physics"` block keep the global feel
+byte-identical. The `?tune=1` panel's **Copy physics block** button
+emits a paste-ready sparse block reflecting any sliders the playtester
+moved away from defaults.
 
-## Surfaces (3 tile types)
+Allowed keys: `ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`, `FRICTION_FLOOR`,
+`GRAVITY_K`, `TILT_FORCE_MULTIPLIER`. Unknown keys are ignored.
 
-| Tile | drag | grip | Visual |
-|---|---|---|---|
-| `floor` | 0.965 (normal) | 1.0 | standard isometric tile (purple) |
-| `gravel` | 0.78 (sticky) | 1.0 | brown speckled tile |
-| `ice` | 0.998 (glides) | 0.3 (weak steering) | pale blue, subtle shimmer |
+## Input → world acceleration
 
-Higher drag = retains more velocity (0.99 ice glides far; 0.78 gravel
-bites). grip multiplies control acceleration on that surface.
+Three control paths feed the same `(inputX, inputY)` unit-ish vector,
+which is multiplied by `ACCEL` and added to slope gravity:
 
-## Elevation (v1.1)
+- **Keyboard** (always on): WASD + arrows; full deflection per axis.
+- **Tilt** (mobile, opt-in): `DeviceOrientationEvent.gamma` →
+  `inputX`, `beta` → `inputY`. Both pass through a `TILT_DEADZONE`
+  (`2.5°`) and saturate at `TILT_FULL` (`15°` past the recentered
+  zero) × `TILT_FORCE_MULTIPLIER`. A **Recenter** button snapshots
+  the current orientation as the new neutral.
+- **Drag** (touch + mouse): pointer offset from press origin →
+  `inputX/Y`, saturating at `DRAG_FULL` (`90 px`).
 
-Every tile has an integer `height` (default 0), rendered raised in the
-iso projection. The marble has a plane `mh`. **It cannot cross between
-tiles of different height — that edge is an invisible wall — unless a
-ramp or spring bridges them.** All other tile types work at any height
-(a hole at height 2 still kills, a bumper at height 1 still redirects).
+All three sum, then the combined `(sx, sy)` is renormalised to
+magnitude `≤ 1` so combining tilt + keys can't yield a `>1.4` boost.
 
-- **Ramp** — `direction` (N|S|E|W) + `height_delta` (e.g. +1/-1).
-  Smoothly transitions the marble between `height` and
-  `height+height_delta`; rendered as an iso slope with an up-arrow.
-- **Spring** — `height_delta` (e.g. +2). Stepping on it launches the
-  marble up by N levels (visual arc ~0.45s) + a "boing" SFX.
+The `?tune=1` `TILT_FORCE_MULTIPLIER` slider scales the tilt path only.
 
-## Force / gravity field (2026-05-18)
+## Rendering — wireframe triangular mesh
 
-- **Field** — `{ type:"field", direction:"N|S|E|W", strength:"gentle|
-  med|strong" }`. While the marble's center is over the tile, a
-  **continuous** acceleration `FIELD_FORCE[strength]` (tiles/s²;
-  `{gentle:8, med:16, strong:30}`) is applied in `direction` **every
-  substep** — composes with control + drag + the speed cap. NOT scaled
-  by surface grip (a current shoves you the same on ice; grip only
-  affects your own steering). Passable like floor (normal drag, same-
-  plane height rule). Visual: deep current-blue tile with flowing
-  chevrons scrolling along the push direction (more/brighter = stronger).
-  Editor: pre-oriented catalog swatches (Field ▲▶▼◀ × ·/··/···), one
-  click to place — no menus; height-aware validator treats it as
-  ordinary passable terrain.
+Canvas2D, no WebGL. Each frame:
 
-## Traps (3 types)
+1. Project every corner `(i, j, H[i,j])` through `project()` into
+   screen space, once.
+2. Stroke each **row** as a single polyline (horizontal grid lines).
+3. Stroke each **column** as a single polyline (vertical grid lines).
+4. Stroke all **diagonals** (split each cell into two triangles) in one
+   batched path, dimmer than the row/column lines.
+5. Stroke three concentric **well rings** at the bowl bottom, sampled
+   through `hm.sample` so the rings hug the curved surface.
+6. Draw the marble as a glowing radial gradient at its projected
+   position, scaled by perspective and the `sink` amount.
 
-- **Hole** — kill tile. When the marble's *center* crosses a hole:
-  fall animation (scale-down + opacity fade over **350ms**) + the
-  descending scream SFX, then a **600ms** beat, then respawn at the
-  level `spawn`. `attempts` increments. Visual: dark pit with rough rim.
-- **Bumper** — directional force tile, `direction: N|S|E|W`. On contact,
-  an instantaneous velocity-add in that direction (`BUMPER_FORCE`,
-  default 4). "thunk" SFX + small flash. Visual: colored arrow tile.
-  Fires once per entry.
-- **Spinner** — velocity rotator, `rotation: CW90|CCW90` (v1; `CW45`
-  etc. reserved for v1.1). On the center crossing the tile, the velocity
-  vector rotates by the configured amount. "whoosh" SFX. Visual: swirl
-  icon + rotating arrow. Fires once per entry.
+Line color tints by row/column **average height** to give a depth cue:
+deeper-than-average lines glow more saturated cyan; ridges fade toward
+white. `shadowBlur` is applied per stroke pass for the glow.
 
-## Win condition + star rating
+## Camera — fixed angled topographic view
 
-Single `goal` tile per level. Reaching it = level-complete with stars:
+Fixed for Phase 1 (no rotation). Pitch is the angle of the ground plane
+toward the camera; `pitchCos / pitchSin` are precomputed.
 
-- **1 star** — completed (always granted on goal-reach)
-- **2 stars** — completed with zero falls (no hole respawns)
-- **3 stars** — zero falls AND under the level's `target_time_ms`
-
-Each level JSON sets `target_time_ms` (default: a reasonable medium
-target if omitted).
-
-## Death / fail
-
-Only a hole kills. Board edges are hard walls (cannot fall off). Infinite
-retries, no game-over screen — respawn at `spawn`, `attempts` visible.
-
-## Time pressure: soft
-
-A visible clock counts **up** during play. Bonus star if under
-`target_time_ms`. No fail-state on running long.
-
-## Control modes
-
-- **Tilt** (DeviceOrientation) — default on mobile
-- **Drag-anywhere** — default on desktop, fallback on tilt-less devices
-- **Keyboard arrows/WASD (+gamepad)** — always-on desktop convenience
-- **Toggle** cycles: Tilt-only / Drag-only / Both-active
-- **Tilt indicator** (always-on, bottom-right): live gamma/beta in
-  degrees (0.1° precision) + a dial dot showing direction/magnitude vs
-  the calibrated zero. Tap cycles BOTH → NUMBERS_ONLY → VISUAL_ONLY
-  (persisted in localStorage `mm.tiltUI`).
-
-## Grid: variable per level, sparse
-
-Each level JSON sets `grid: { w, h }` — **default 24x24**, valid up to
-32x32. The tile map is **sparse**: a cell with no tile is a *gap* —
-visually empty and impassable (acts like a wall). Levels can be
-L-shaped, plus-shaped, multi-island, irregular. Optional top-level
-`"fill": "floor"` pre-paints the whole w×h rectangle (convenience for
-rectangular levels); omit it for irregular shapes. Board edge / any gap
-is implicitly a hard wall. Rendering scales to the level's tile bounds.
-
-## Level JSON schema (v1.1)
-
-```json
-{
-  "name": "Ramp Up",
-  "grid": { "w": 24, "h": 24 },
-  "fill": "floor",
-  "target_time_ms": 20000,
-  "tiles": [
-    { "x": 1, "y": 1, "type": "spawn" },
-    { "x": 6, "y": 5, "type": "goal", "height": 1 },
-    { "x": 3, "y": 3, "type": "hole" },
-    { "x": 2, "y": 4, "type": "bumper", "direction": "E" },
-    { "x": 5, "y": 2, "type": "spinner", "rotation": "CW90" },
-    { "x": 4, "y": 5, "type": "ramp", "direction": "E", "height_delta": 1 },
-    { "x": 8, "y": 5, "type": "spring", "height_delta": 2 },
-    { "x": 4, "y": 1, "type": "gravel" },
-    { "x": 1, "y": 5, "type": "ice" },
-    { "x": 3, "y": 1, "type": "wall", "height": 1 }
-  ]
-}
+```
+project(gx, gy, h):
+  a       = gx - gw/2
+  b       = gy - gh/2
+  depthN  = b * pitchSin / gh + 0.5    // ~0 far, ~1 near
+  pscale  = 1 / (1 + persp * (1 - depthN))
+  screenX = W/2 + a * cell * pscale
+  ground  = b * pitchCos
+  screenY = H * 0.40 + (ground * cell - h * heightK * cell * 0.5) * pscale
 ```
 
-Tile types: `floor` `gravel` `ice` `wall` `hole` `bumper`(+`direction`)
-`spinner`(+`rotation`) `ramp`(+`direction`,`height_delta`)
-`spring`(+`height_delta`) `spawn` `goal`. Any tile may carry `height`
-(int, default 0). With `fill`, unlisted cells default to that type;
-without `fill`, unlisted cells are gaps. Exactly one `spawn` and one
-`goal` per level. `spawn`/`goal` roll like floor. `wall`/gap impassable.
+Defaults: `pitch ≈ 35.5°` (`cos=0.81, sin=0.58`), `heightK = 0.85`,
+`persp = 0.34`. A well's bottom appears as a clear depression on
+screen; hills rise off the mesh.
 
-## Audio (Web Audio synthesis only)
+## State machine
 
-- Rolling: filtered brown noise, gain + cutoff scaled by velocity; silent
-  when stationary.
-- Wall bonk squeak: pitch by impact speed (unchanged).
-- Hole scream: descending saw ~600→80Hz with wobble.
-- Bumper thunk: low percussive pop on contact.
-- Spinner whoosh: rising swirl on contact.
-- Spring boing: rising triangle sproing with a tail.
-- Goal chime: C-E-G sine arpeggio ~200ms.
-- **BG music slot**: empty; reserved for the harmonized Bala's Song once
-  `madderverse/lib/audio/` is extracted.
+`phase ∈ { menu, play, win }`.
 
-## Rendering
+- `menu`: start overlay visible; engine still ticks the renderer so
+  the menu has a live mesh background.
+- `play`: physics runs, timer counts, input feeds.
+- `win`: end overlay visible, best time updated.
 
-Isometric Canvas2D. `screenX=(wx-wy)*tileW/2; screenY=(wx+wy)*tileH/2`
-(render-only). Each tile type has a distinct visual identity per the
-tables above.
+Restart (`R` / button) increments `attempts`, resets the marble to
+spawn, zeroes the timer. Best time is keyed `mm2.best.<levelNum>` in
+`localStorage`.
+
+## Editor bridge (Phase 3 placeholder)
+
+`game.js` exposes `window.MM`:
+
+```js
+MM.getBundledLevels()   // -> [tutorialLevel]
+MM.playLevel(level)     // swap to a runtime-built level (editor test-play)
+```
+
+Phase 3 will fill `MM.loadCatalog` and add load/save round-tripping.
+
+---
+
+## Workflow notes
+
+- Build in chunks; commit per phase; push direct to `main` as a clean
+  fast-forward of `origin/main` (never force). Pause for user playtest
+  between phases.
+- The All-Munkis v1.0/v1.1 branch-isolation rule does **not** apply to
+  this folder.
+- Not linked from the hub `index.html` yet (intentionally unadvertised
+  until further along).

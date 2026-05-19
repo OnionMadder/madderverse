@@ -1,4 +1,5 @@
-/* Munki Madness — game-only styles. Hub/404 use ../assets/css/style.css;
+/* Munki Madness v2.0 — game-only styles. Dark wireframe aesthetic to
+   match the topographic-mesh visual. Hub/404 use ../assets/css/style.css;
    the slim footer uses ../assets/css/site-footer.css. Nothing here leaks
    to the hub (no body.kids-hub selectors). */
 
@@ -8,8 +9,8 @@ html, body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: #150b26;
-    color: #f3ecff;
+    background: #050814;
+    color: #dff6ff;
     font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
@@ -36,8 +37,10 @@ html, body {
     display: block;
     border-radius: 14px;
     background:
-        radial-gradient(circle at 50% 35%, #2c1a4d 0%, #1b1030 60%, #110821 100%);
-    box-shadow: 0 18px 60px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(255,255,255,0.04);
+        radial-gradient(circle at 50% 30%, #0a1230 0%, #060a1c 55%, #02040c 100%);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.7),
+                inset 0 0 0 1px rgba(120,200,255,0.06),
+                inset 0 0 28px rgba(40,120,200,0.10);
     touch-action: none;
 }
 
@@ -55,13 +58,13 @@ html, body {
     font-size: 22px;
     line-height: 1;
     text-decoration: none;
-    color: #f3ecff;
-    background: rgba(40, 24, 70, 0.72);
-    border: 1px solid rgba(255,255,255,0.14);
+    color: #dff6ff;
+    background: rgba(12, 24, 48, 0.78);
+    border: 1px solid rgba(120,200,255,0.20);
     border-radius: 10px;
     backdrop-filter: blur(4px);
 }
-.madder-home:hover { background: rgba(60, 36, 100, 0.85); }
+.madder-home:hover { background: rgba(20, 40, 78, 0.92); }
 
 /* ---- top-right control cluster ---- */
 .madder-controls {
@@ -82,8 +85,8 @@ html, body {
     letter-spacing: 0.5px;
     padding: 6px 9px;
     border-radius: 8px;
-    background: rgba(40, 24, 70, 0.72);
-    border: 1px solid rgba(255,255,255,0.10);
+    background: rgba(12, 24, 48, 0.78);
+    border: 1px solid rgba(120,200,255,0.14);
     white-space: nowrap;
 }
 .badge strong { color: #ffd76b; font-weight: 700; }
@@ -92,15 +95,15 @@ html, body {
 .btn {
     font: inherit;
     font-size: 13px;
-    color: #f3ecff;
-    background: rgba(60, 36, 100, 0.82);
-    border: 1px solid rgba(255,255,255,0.16);
+    color: #dff6ff;
+    background: rgba(20, 40, 78, 0.86);
+    border: 1px solid rgba(120,200,255,0.22);
     border-radius: 8px;
     padding: 7px 12px;
     cursor: pointer;
     user-select: none;
 }
-.btn:hover { background: rgba(82, 50, 134, 0.92); }
+.btn:hover { background: rgba(30, 60, 110, 0.96); }
 .btn:active { transform: translateY(1px); }
 .btn-icon { padding: 7px 10px; font-size: 15px; }
 .btn-big { font-size: 17px; padding: 12px 26px; margin-top: 6px; }
@@ -112,7 +115,7 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(17, 8, 33, 0.78);
+    background: rgba(4, 8, 20, 0.78);
     backdrop-filter: blur(3px);
     border-radius: 14px;
     z-index: 20;
@@ -130,8 +133,8 @@ html, body {
 }
 .overlay-card h1 {
     font-size: clamp(30px, 7vw, 52px);
-    color: #ffd76b;
-    text-shadow: 0 3px 0 rgba(0,0,0,0.35);
+    color: #7df0c8;
+    text-shadow: 0 0 18px rgba(80,200,255,0.55), 0 3px 0 rgba(0,0,0,0.35);
     letter-spacing: 1px;
 }
 .overlay-card h2 {
