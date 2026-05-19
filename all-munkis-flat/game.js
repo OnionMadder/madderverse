@@ -115,6 +115,26 @@
     let dreadStageNow = 'calm';    // last applied stage (class bookkeeping)
     let dreadRAF = null, dreadLastTs = 0;
 
+    // ---- Unified per-Munki fear (Dread System chunk 2) ----
+    // ONE fear value per slot (0–FEAR.MAX) fed by BOTH creep proximity
+    // AND Ice/Moon adjacency. Drives a single react ladder in
+    // expressionForSlot: >= FLINCH → afraid (.creep-scared shake +
+    // shocked face 2); >= PANIC → full freak-out (expression cycles
+    // 1→5 per beat). Replaces the old creep `.creep-scared` set + the
+    // separate 8-beat Ice/Moon dwell trip.
+    const FEAR = {
+        MAX:               100,
+        FLINCH:            1,    // any fear → shake + shocked face
+        PANIC:             55,   // full expression-cycle freak-out
+        PANIC_RELEASE:     33,   // hysteresis to leave panic (no flicker)
+        ADJ_GAIN_PER_BEAT: 7,    // Ice/Moon adjacency ramp (~8 beats→PANIC)
+        DECAY_PER_BEAT:    6     // bleeds off when nothing feeds it
+    };
+    const munkiFear      = new Map(); // slot → 0..FEAR.MAX (THE fear)
+    const afraidSlots    = new Set(); // slots currently >= FLINCH (diff)
+    const panicStartBeat = new Map(); // slot → beat the panic anchored
+    const fearFedAt      = new Map(); // slot → last ts a source fed it
+
     // ---------- AUDIO ENGINE ----------
     let audioCtx = null;
     let masterGain = null;
@@ -138,12 +158,11 @@
     let toneDrone = null;     // Oscillator — low rumble that swells during react mode
     let toneDroneGain = null; // Drone's gain envelope (ramps on react in/out)
     let anyWasReacting = false; // edge-detect react mode transitions for the drone
-    // Horror mode (body.react-mode-active) has TWO independent sources that
-    // are OR'd together by syncHorrorMode():
-    //   beatReacting    — Ice/Moon adjacency dwell (set by tickReactState)
-    //   fearHorrorActive — a Flying Creep scared the Munkis enough (set by
-    //                      the Flying Creep system). Either alone lights the
-    //                      12s slow-creep corner-sprite visual.
+    // Horror mode (body.react-mode-active) is OR'd by syncHorrorMode():
+    //   beatReacting    — any Munki at PANIC fear (set by tickReactState
+    //                     from the unified per-Munki fear ladder)
+    //   fearHorrorActive — the creep fear sum crossed the horror sum
+    //                      (set by the Flying Creep system).
     let beatReacting = false;
     let fearHorrorActive = false;
     // True whenever horror mode (body.react-mode-active) is on, from
@@ -1382,18 +1401,16 @@
     // time. Madballz mods have a static `headFrame` and ignore this.
     // Priority (highest first):
     //   jumpscare    →  2 (shocked, briefest gate)
-    //   react mode   →  cycles 1→2→3→4→5→1 on every quarter note (auto-fired
-    //                   after dwelling adjacent to Ice or Moon for
-    //                   REACT_DWELL_BEATS beats — see tickReactState)
+    //   PANIC fear   →  cycles 1→2→3→4→5→1 every quarter note (the
+    //                   unified fear ladder — munkiFear >= FEAR.PANIC,
+    //                   fed by creep proximity OR Ice/Moon adjacency)
+    //   FLINCH fear  →  2 (shocked) + .creep-scared shake
     //   just placed  →  2 (shocked, ~600 ms after a fresh drop)
     //   manual tap   →  whichever expression the kid last tapped to
     //   default      →  1 (silly / idle)
     const PLACED_SHOCK_MS = 600;
     const placedAt = new Map();         // slotIndex → performance.now()
     const manualExpression = new Map();  // slotIndex → 1..5 (set by tap-cycle)
-    const dwellBeats = new Map();        // slotIndex → consecutive beats adjacent to a trigger
-    const reactStartBeat = new Map();    // slotIndex → beatCounter when react fired
-    const REACT_DWELL_BEATS = 8;         // ~4.8 s at 100 BPM
     let beatCounter = 0;                 // monotonically ticks on every quarter note
 
     function expressionForSlot(slotIndex) {
@@ -1402,11 +1419,20 @@
         const id = slots[slotIndex];
         if (!id) return 1;
         const isEvil = (id === 'ice' || id === 'moon');
-        // A Creep within CLOSE_PX → snap to shocked (2). Most urgent
-        // read; the .creep-scared shake compounds on top of this.
-        if (!isEvil && creepScaredSlots.has(slotIndex)) return 2;
-        const r = reactStartBeat.get(slotIndex);
-        if (r !== undefined) return ((beatCounter - r) % 5) + 1;
+        // Unified fear ladder (creep proximity OR Ice/Moon adjacency):
+        //   >= PANIC  → full freak-out, cycle 1→5 anchored on the beat
+        //               panic started (staggered by slot so the dread
+        //               ripples instead of lock-stepping)
+        //   >= FLINCH → shocked (2); the .creep-scared shake compounds
+        if (!isEvil) {
+            const f = munkiFear.get(slotIndex) || 0;
+            if (f >= FEAR.PANIC) {
+                const a = panicStartBeat.has(slotIndex)
+                    ? panicStartBeat.get(slotIndex) : beatCounter;
+                return (((beatCounter - a) + slotIndex) % 5) + 1;
+            }
+            if (f >= FEAR.FLINCH) return 2;
+        }
         // Horror mode: EVERY on-stage non-evil Munki cycles 1→5, offset
         // by slot so the dread ripples across the stage rather than all
         // flipping in lockstep.
@@ -1448,19 +1474,13 @@
              : dread >= DREAD.UNEASE ? 'unease'
              :                         'calm';
     }
-    // Live "threat pressure" the meter eases toward: every Munki a
-    // creep currently scares (its creepFear) + every regular Munki
-    // sitting next to Ice/Moon. Read-only over existing state — does
-    // not alter the creep or dwell logic (Chunk 1 = no regression).
+    // Live "threat pressure" the meter eases toward = the total
+    // unified Munki fear on stage. Since munkiFear is now fed by BOTH
+    // creep proximity AND Ice/Moon adjacency (Chunk 2), summing it
+    // captures every threat source without double-counting.
     function dreadPressure() {
         let p = 0;
-        creepFear.forEach(v => { p += v; });
-        for (let i = 0; i < NUM_SLOTS; i++) {
-            const id = slots[i];
-            if (id && id !== 'ice' && id !== 'moon' && isTriggerAdjacent(i)) {
-                p += DREAD.PER_ADJACENT;
-            }
-        }
+        munkiFear.forEach(v => { p += v; });
         return p;
     }
     function applyDreadStageClass() {
@@ -1505,46 +1525,73 @@
         kickDread();
     }
 
-    // Beat-quantised state machine. Fires once per quarter note (from
-    // scheduleStep). Increments dwell for every regular Munki next to an
-    // antagonist; trips that Munki into react mode when dwell crosses
-    // REACT_DWELL_BEATS. Resets dwell when the kid moves things around so
-    // the kid can rescue a Munki by sliding it away in time.
+    // Single owner of the `.creep-scared` shake class + the afraidSlots
+    // diff set. A Munki is "afraid" (shake + shocked face) whenever its
+    // unified fear is >= FLINCH, regardless of source (creep OR Ice/
+    // Moon). Idempotent; only re-renders a slot on a membership change.
+    // Called per beat (tickReactState) AND per creep frame (creepTick)
+    // so the shake appears the instant a creep gets close.
+    function refreshFearVisuals() {
+        for (let i = 0; i < NUM_SLOTS; i++) {
+            const id = slots[i];
+            const f = munkiFear.get(i) || 0;
+            const afraid = !!id && id !== 'ice' && id !== 'moon'
+                           && f >= FEAR.FLINCH;
+            if (afraid === afraidSlots.has(i)) continue;
+            const el = document.querySelector(
+                `.stage-slot[data-index="${i}"]`);
+            if (afraid) {
+                afraidSlots.add(i);
+                if (el) el.classList.add('creep-scared');
+            } else {
+                afraidSlots.delete(i);
+                if (el) el.classList.remove('creep-scared');
+            }
+            renderSlot(i);
+        }
+    }
+
+    // Beat-quantised fear update. Fires once per quarter note (from
+    // scheduleStep). Ice/Moon adjacency RAMPS the unified per-Munki
+    // fear (~8 beats to PANIC, matching the old dwell feel); creep
+    // proximity ramps it from creepTick between beats. A central decay
+    // bleeds fear off once nothing has fed a slot recently (fearFedAt),
+    // so the kid can still rescue a Munki by pulling it away in time.
     function tickReactState() {
         beatCounter++;
-        let anyReacting = false;
+        const now = performance.now();
+        let anyPanic = false;
         const toRender = new Set();
         for (let i = 0; i < NUM_SLOTS; i++) {
             const id = slots[i];
-            // Empty slots and the antagonists themselves never react.
             if (!id || id === 'ice' || id === 'moon') {
-                if (dwellBeats.delete(i))     toRender.add(i);
-                if (reactStartBeat.delete(i)) toRender.add(i);
+                munkiFear.delete(i);
+                if (panicStartBeat.delete(i)) toRender.add(i);
+                fearFedAt.delete(i);
                 continue;
             }
-            if (isTriggerAdjacent(i)) {
-                const next = (dwellBeats.get(i) || 0) + 1;
-                dwellBeats.set(i, next);
-                if (next >= REACT_DWELL_BEATS && !reactStartBeat.has(i)) {
-                    reactStartBeat.set(i, beatCounter);
-                    manualExpression.delete(i); // react overrides any prior tap
-                    toRender.add(i);
-                }
-            } else {
-                if (dwellBeats.delete(i))     toRender.add(i);
-                if (reactStartBeat.delete(i)) toRender.add(i);
+            let f = munkiFear.get(i) || 0;
+            const adj = isTriggerAdjacent(i);
+            if (adj) { f += FEAR.ADJ_GAIN_PER_BEAT; fearFedAt.set(i, now); }
+            const fedRecently = (now - (fearFedAt.get(i) || 0)) < 350;
+            if (!adj && !fedRecently) f -= FEAR.DECAY_PER_BEAT;
+            f = Math.max(0, Math.min(FEAR.MAX, f));
+            munkiFear.set(i, f);
+            if (f >= FEAR.PANIC && !panicStartBeat.has(i)) {
+                panicStartBeat.set(i, beatCounter);
+                manualExpression.delete(i); // panic overrides a prior tap
+            } else if (f < FEAR.PANIC_RELEASE && panicStartBeat.has(i)) {
+                panicStartBeat.delete(i);
             }
-            if (reactStartBeat.has(i)) {
-                anyReacting = true;
-                toRender.add(i); // expression cycles every beat
-            }
+            if (f >= FEAR.PANIC) anyPanic = true;
+            if (f >= FEAR.FLINCH) toRender.add(i); // face advances/holds
         }
-        beatReacting = anyReacting;
-        kickDread();          // keep the dread meter ticking (Chunk 1)
+        beatReacting = anyPanic;
+        refreshFearVisuals();   // shake class diff (unified)
+        kickDread();            // keep the dread meter ticking (Chunk 1)
         syncHorrorMode();
-        // While horror is on, every occupied non-evil slot is cycling its
-        // expression (see expressionForSlot) — re-render them all each
-        // beat so the sprites actually advance, not just the dwell ones.
+        // While horror is on, every occupied non-evil Munki cycles —
+        // re-render them all each beat so the sprites actually advance.
         if (horrorActive) {
             for (let i = 0; i < NUM_SLOTS; i++) {
                 const sid = slots[i];
@@ -1700,8 +1747,14 @@
         // the new occupant starts from a clean default. dwell + react are
         // cheap to rebuild via the beat tick if conditions re-apply.
         manualExpression.delete(index);
-        dwellBeats.delete(index);
-        reactStartBeat.delete(index);
+        munkiFear.delete(index);
+        panicStartBeat.delete(index);
+        fearFedAt.delete(index);
+        if (afraidSlots.delete(index)) {
+            const ael = document.querySelector(
+                `.stage-slot[data-index="${index}"]`);
+            if (ael) ael.classList.remove('creep-scared');
+        }
         // New occupant restarts the solidSequence tap counter for this slot.
         resetSlotTapCount(index);
         if (charId) {
@@ -3435,10 +3488,9 @@
     // at all it renders a clearly-marked PLACEHOLDER ghost (tracking inert).
     // See assets/sprites/FLYING_CREEPS_README.md for the full sheet spec.
     const CREEPS_SEEN_KEY = 'all-munkis-creeps-seen-v1';
-    const creepFear = new Map();   // slotIndex -> 0..100
-    // Slots a Creep is currently CLOSE to — drives the shocked-face fear
-    // expression (expressionForSlot), not just the .creep-scared shake.
-    const creepScaredSlots = new Set();
+    // (Unified per-Munki fear lives in `munkiFear` near the Dread
+    // config — creep proximity feeds it, the beat tick + ladder read
+    // it. No creep-private fear/scared maps any more.)
     let creepEl = null;            // the floating DOM element
     let creepActive = false;       // currently drifting across?
     let creepSheet = null;         // {src, sheetW, sheetH, frames:[...]} or null
@@ -3711,17 +3763,6 @@
                         st.src, st.sheetW, st.sheetH);
     }
 
-    // Clear the ambient creep-flinch state from every slot (used on creep
-    // end AND when a creep stops floating to dive — a diving creep
-    // shouldn't keep ticking ambient dwell on far Munkis).
-    function clearCreepScared() {
-        document.querySelectorAll('.stage-slot.creep-scared')
-            .forEach(s => s.classList.remove('creep-scared'));
-        const was = [...creepScaredSlots];
-        creepScaredSlots.clear();
-        was.forEach(i => renderSlot(i));
-    }
-
     function creepPlaceholderMarkup() {
         // Translucent drifting ghost + a tiny PLACEHOLDER tag so it's
         // obvious this isn't the final art. Replaced automatically the
@@ -3857,12 +3898,11 @@
             creepEl.hidden = true;
             creepEl.classList.remove('flying-creep-in', 'flying-creep-dying');
         }
-        // Clear any lingering flinch + scared-face state.
-        clearCreepScared();
-        // The threat is gone: drain creep fear and release creep-horror.
-        // syncHorrorMode() still keeps horror on if Ice/Moon beat-react
-        // is independently active (it ORs the two sources).
-        creepFear.clear();
+        // Don't wipe fear — unified munkiFear may also hold Ice/Moon
+        // adjacency dread, and creep-induced fear should DECAY (the
+        // Munkis calm over a few seconds, a nicer "phew" than a snap).
+        // The creep-sum horror source is gone though, so release it;
+        // syncHorrorMode keeps horror on if any Munki is still in PANIC.
         if (fearHorrorActive) { fearHorrorActive = false; syncHorrorMode(); }
         if (creepRAF) { cancelAnimationFrame(creepRAF); creepRAF = null; }
         scheduleCreepSpawn(false);
@@ -3986,30 +4026,23 @@
             creepEl.style.transform = creepTransform(st, 0);
             creepFlap(st, ts, false);
 
-            // RESTORED passive proximity: any Munki within CLOSE_PX
-            // flinches + accrues fear; bleeds off once clearly FAR
-            // (CLOSE/FAR hysteresis stops boundary flicker). NOTE: this
-            // no longer marks Munkis "scared" — that's gated on the
-            // dwell above so the creep actually has to STICK AROUND.
-            const live = new Set();
-            sc.forEach(({ i, el, cx, cy }) => {
-                live.add(i);
-                const d = Math.hypot(c.cx - cx, c.cy - cy);
-                const cur = creepFear.get(i) || 0;
-                if (d <= CREEP.CLOSE_PX) {
-                    el.classList.add('creep-scared');
-                    if (!creepScaredSlots.has(i)) { creepScaredSlots.add(i); renderSlot(i); }
-                    creepFear.set(i, Math.min(CREEP.FEAR_MAX,
+            // Passive proximity feeds the UNIFIED per-Munki fear: any
+            // Munki within CLOSE_PX banks fear (and stamps fearFedAt so
+            // the beat decay won't fight it). No decay / no class here —
+            // the central beat tick decays, refreshFearVisuals() drives
+            // the shake, the ladder in expressionForSlot drives the
+            // face. The dwell logic above (SCARE_DWELL_MS) still gates
+            // when a Munki counts toward the scare quota.
+            const nowMs = performance.now();
+            sc.forEach(({ i, cx, cy }) => {
+                if (Math.hypot(c.cx - cx, c.cy - cy) <= CREEP.CLOSE_PX) {
+                    const cur = munkiFear.get(i) || 0;
+                    munkiFear.set(i, Math.min(FEAR.MAX,
                         cur + CREEP.FEAR_GAIN_PER_S * dt));
-                } else if (d >= CREEP.FAR_PX) {
-                    el.classList.remove('creep-scared');
-                    if (creepScaredSlots.delete(i)) renderSlot(i);
-                    creepFear.set(i, Math.max(0,
-                        cur - CREEP.FEAR_DECAY_PER_S * dt));
+                    fearFedAt.set(i, nowMs);
                 }
-                // Between CLOSE and FAR: hold (hysteresis, no flicker).
             });
-            [...creepFear.keys()].forEach(i => { if (!live.has(i)) creepFear.delete(i); });
+            refreshFearVisuals();   // shake appears the instant it's close
 
             // Scared SCARE_COUNT distinct Munkis (or the hunt timed
             // out) → dramatic fast dive off the opposite edge.
@@ -4045,7 +4078,7 @@
         // accrues from passive proximity (HUNT block); a creep that
         // lingers scaring its 3 Munkis reliably crosses the threshold.
         let sum = 0;
-        creepFear.forEach(v => { sum += v; });
+        munkiFear.forEach(v => { sum += v; });
         if (!fearHorrorActive && sum >= CREEP.HORROR_TRIGGER_SUM) {
             fearHorrorActive = true;
             syncHorrorMode();
