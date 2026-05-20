@@ -1472,6 +1472,63 @@
        second deeper layer for cartoon mouth-feel. Fires on
        actual clay deformation; throttled in applyShaping so a
        sustained drag emits one every ~90-160ms.                */
+    /* User-recorded clay audio (splat for lump-on-wheel + six
+       squelches for shaping) sits in assets/audio/. We prefer
+       the files; if any pool fails to load (e.g. very first run
+       offline, or the file was renamed) we transparently fall
+       back to the synth squelch below — the app can never go
+       silent. Each file is wrapped in a small pool of Audio
+       objects so two rapid plays don't clobber each other. */
+
+    const CLAY_SFX_POOL_SIZE = 3;
+    const SQUELCH_FILE_NAMES = [
+        "squelch-one",   "squelch-two",  "squelch-three",
+        "squelch-four",  "squelch-five", "squelch-six"
+    ];
+
+    function makeAudioPool(src) {
+        const pool = [];
+        let failed = false;
+        for (let i = 0; i < CLAY_SFX_POOL_SIZE; i++) {
+            const a = new Audio(src);
+            a.preload = "auto";
+            a.addEventListener("error", function () { failed = true; });
+            pool.push(a);
+        }
+        return {
+            play: function (vol) {
+                if (failed) return false;
+                /* Find a free Audio (paused / ended); else steal #0. */
+                let pick = null;
+                for (let i = 0; i < pool.length; i++) {
+                    if (pool[i].paused || pool[i].ended) {
+                        pick = pool[i]; break;
+                    }
+                }
+                if (!pick) pick = pool[0];
+                try {
+                    pick.currentTime = 0;
+                    pick.volume = (vol == null) ? 1 : vol;
+                    const p = pick.play();
+                    /* Suppress unhandled rejections from autoplay
+                       policy / brief race conditions — fallback
+                       below still gives us synth coverage. */
+                    if (p && typeof p.catch === "function") {
+                        p.catch(function () {});
+                    }
+                    return true;
+                } catch (_) { return false; }
+            }
+        };
+    }
+
+    const CLAY_SFX = {
+        splat: makeAudioPool("assets/audio/splat.mp3"),
+        squelches: SQUELCH_FILE_NAMES.map(function (n) {
+            return makeAudioPool("assets/audio/" + n + ".mp3");
+        })
+    };
+
     /* Squelch ships in 4 timbre variants randomly chosen on each
        call so sustained shaping doesn't repeat the same beat.
        Each variant tunes the noise sweep + decides whether to
@@ -1480,12 +1537,27 @@
     const SQUELCH_VARIANTS = ["sharp", "wet", "blorp", "plop"];
 
     function squelch() {
+        /* Prefer the recorded squelches — random pick from the six. */
+        const list = CLAY_SFX.squelches;
+        if (list && list.length) {
+            const idx = Math.floor(Math.random() * list.length);
+            if (list[idx].play(1.0)) return;
+        }
+        /* Synth fallback so the game never goes silent. */
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const variant = SQUELCH_VARIANTS[
             Math.floor(Math.random() * SQUELCH_VARIANTS.length)
         ];
         playSquelchVariant(variant);
+    }
+
+    /* Lump landing on the wheel — the recorded splat. Synth
+       fallback is the original juicy double-blop. */
+    function claySplat() {
+        if (CLAY_SFX.splat && CLAY_SFX.splat.play(1.0)) return;
+        playSquelchVariant("plop");
+        setTimeout(function () { squelch(); }, 80);
     }
 
     function playSquelchVariant(variant) {
@@ -2349,8 +2421,7 @@
         setClay(clayId);
         resetClay();
         SHAPE.needsLump = false;
-        playSquelchVariant("plop");                 /* the wet slap */
-        setTimeout(function () { squelch(); }, 80);  /* secondary splat */
+        claySplat();                                /* recorded splat, synth fallback */
         haptic([6, 26, 12]);
         /* Splat burst at the wheel where the clay lands (emitParticles
            is sparse + randomly no-ops, so fire a few for a real pop). */
