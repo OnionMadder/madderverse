@@ -1389,21 +1389,19 @@ a:focus-visible {
     gap: 6px;
 }
 
-/* Pack tabs (chunk 4) — 6 small tabs above tool-modes that switch
-   the active GLAZE_PACK. Scrolls horizontally on tight viewports. */
+/* Pack tabs — wrap to as many rows as needed so every pack is
+   visible on any screen without scrollbars or hidden-swipe
+   gestures. Same UX desktop + mobile. */
 .pack-tabs {
+    flex-wrap: wrap;
     gap: 4px;
     padding-bottom: 4px;
     margin-bottom: 2px;
     border-bottom: 1px dashed var(--teal-low);
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
 }
-.pack-tabs::-webkit-scrollbar { display: none; }
 
 .pack-tab {
-    flex: 1 0 auto;
+    flex: 0 0 auto;
     padding: 7px 9px;
     font-family: var(--font-mono);
     font-size: 10px;
@@ -1516,21 +1514,9 @@ a:focus-visible {
 .palette {
     flex: 1;
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
     padding: 2px 4px 6px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--teal-low) transparent;
-    /* iOS smooth scroll */
-    -webkit-overflow-scrolling: touch;
-}
-
-.palette::-webkit-scrollbar { height: 6px; }
-.palette::-webkit-scrollbar-track { background: transparent; }
-.palette::-webkit-scrollbar-thumb {
-    background: var(--teal-low);
-    border-radius: 3px;
 }
 
 .swatch {
@@ -4864,17 +4850,15 @@ html.is-native #btnInstall {
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    flex-wrap: nowrap;
-    gap: 14px;
+    /* Wrap instead of scroll/swipe — every clay always visible on
+       desktop AND mobile, no hidden swipe gesture required. */
+    flex-wrap: wrap;
+    gap: 8px 14px;
     padding: 6px 14px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
     /* Container is pass-through; only the lumps catch input so
        taps on empty gaps still reach the canvas underneath. */
     pointer-events: none;
 }
-.clay-lump-tray::-webkit-scrollbar { display: none; }
 
 @media (max-width: 767.98px) {
     /* Sit above the 54px collapsed TOOLS drawer handle + a gap. */
