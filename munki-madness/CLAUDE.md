@@ -35,9 +35,12 @@ as-is.
 ## v2.0 phase plan
 
 1. **Phase 1 — heightmap physics + wireframe rendering + well-as-goal.**
-   Engine foundation. One built-in tutorial level. *Current commit.*
-2. **Phase 2 — obstacle types** layered on top of the mesh: reverse-gravity
-   zones, bumpers, ice, mud, conveyors, wind, tractor wells.
+   Engine foundation. One built-in tutorial level. **Shipped.**
+2. **Phase 2 — obstacle types + 3 demo levels + Bala's Theme BG loop.**
+   Reverse-gravity zones, bumpers, ice, mud, conveyors, wind, tractor.
+   Tutorial Well + Bumper Ring + Reverse Crossing + Ice Approach.
+   `assets/audio/balas-theme.mp3` (user's recording) loops in the BG.
+   *Current commit.*
 3. **Phase 3 — sculptural level editor** (`?editor=1` / Konami). Press /
    pull / smooth / flatten brushes for the terrain itself, obstacle
    palette drag-and-drop, spawn + well placement, save/load JSON.

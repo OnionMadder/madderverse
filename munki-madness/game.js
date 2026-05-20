@@ -114,8 +114,26 @@
   };
 
   // ---------------------------------------------------------------------
-  // Level model. Phase 5 loads these from levels/*.json; Phase 1 ships a
-  // single built-in "tutorial well" so the heightmap feel can be played.
+  // Obstacle types — Phase 2. Each obstacle is a sparse object on top of
+  // the heightmap. Effects are accumulated per physics substep into a
+  // small state struct that the integrator reads.
+  //
+  //   { type:"bumper",   x, y, r }                     // solid disc; reflects + kicks
+  //   { type:"reverse",  x, y, r }                     // slope gravity flips while inside
+  //   { type:"ice",      x, y, r }                     // less drag + less input grip
+  //   { type:"mud",      x, y, r }                     // more drag, slight grip loss
+  //   { type:"conveyor", x, y, r, dx, dy, strength }   // constant directional push in radius
+  //   { type:"wind",     x, y, r, dx, dy, strength }   // softer directional, falloff to edge
+  //   { type:"tractor",  x, y, r, strength }           // pulls toward (x,y); never captures
+  //
+  // r is the *effect radius* (cell units). dx/dy for directional types are
+  // unit-ish; strength is cells/s^2 contribution at full intensity.
+  // ---------------------------------------------------------------------
+  var BUMPER_KICK = 2.6;   // extra outward speed kick per bumper hit (cells/s)
+
+  // ---------------------------------------------------------------------
+  // Level catalog — Phase 2 ships the Tutorial Well plus three obstacle
+  // demos. Phase 5 swaps these for a JSON catalog loaded from levels/*.
   // ---------------------------------------------------------------------
   function buildTutorialLevel() {
     var gw = 18, gh = 18;
@@ -128,10 +146,101 @@
       hm: hm,
       spawn: { x: 2.0, y: 2.0 },
       well: well,
+      obstacles: [],
       time: 45,
       physics: null
     };
   }
+
+  function buildBumperRingLevel() {
+    var gw = 18, gh = 18;
+    var hm = new HeightMap(gw, gh);
+    var well = { x: gw / 2, y: gh / 2, captureR: 1.6 };
+    hm.dome(well.x, well.y, -7.5, 3.0);
+    // Ring of bumpers around the well with a single gap facing the spawn
+    // (upper-left). Player must thread that gap or bounce off and retry.
+    var obs = [];
+    var gapAngle = -Math.PI * 0.75;             // toward upper-left
+    var gapHalfWidth = Math.PI * 0.20;          // half-angle of the open slot
+    for (var k = 0; k < 9; k++) {
+      var ang = -Math.PI + (k / 9) * Math.PI * 2;
+      var dA = Math.abs(((ang - gapAngle + Math.PI * 3) % (Math.PI * 2)) - Math.PI);
+      if (dA < gapHalfWidth) continue;
+      obs.push({
+        type: "bumper",
+        x: well.x + Math.cos(ang) * 3.2,
+        y: well.y + Math.sin(ang) * 3.2,
+        r: 0.45
+      });
+    }
+    return {
+      title: "Bumper Ring",
+      hm: hm,
+      spawn: { x: 2.2, y: 2.2 },
+      well: well,
+      obstacles: obs,
+      time: 60,
+      physics: null
+    };
+  }
+
+  function buildReverseCrossingLevel() {
+    var gw = 18, gh = 18;
+    var hm = new HeightMap(gw, gh);
+    // Gentle slope downhill from spawn (upper-left, high) to well (lower-
+    // right, low). Without the reverse zone the marble would roll straight
+    // in; the zone in the middle flips slope gravity so you have to FIGHT
+    // your way across with tilt + momentum.
+    for (var j = 0; j <= gh; j++) {
+      for (var i = 0; i <= gw; i++) {
+        hm.set(i, j, (gw - i) * 0.18 + (gh - j) * 0.10);
+      }
+    }
+    var well = { x: 14.5, y: 14.5, captureR: 1.6 };
+    hm.dome(well.x, well.y, -6.5, 2.8);
+    var obs = [
+      { type: "reverse", x: 8.5, y: 8.5, r: 3.4 }
+    ];
+    return {
+      title: "Reverse Crossing",
+      hm: hm,
+      spawn: { x: 2.5, y: 2.5 },
+      well: well,
+      obstacles: obs,
+      time: 60,
+      physics: null
+    };
+  }
+
+  function buildIceApproachLevel() {
+    var gw = 18, gh = 18;
+    var hm = new HeightMap(gw, gh);
+    var well = { x: 14.0, y: 13.0, captureR: 1.7 };
+    // Slightly deeper bowl so the marble can settle even with momentum.
+    hm.dome(well.x, well.y, -8.0, 3.2);
+    // Large ice patch covering the approach. The marble can't shed speed
+    // crossing it — overcommit and you whip past the well's pull.
+    var obs = [
+      { type: "ice", x: 8.5, y: 8.0, r: 3.6 }
+    ];
+    return {
+      title: "Ice Approach",
+      hm: hm,
+      spawn: { x: 3.0, y: 3.0 },
+      well: well,
+      obstacles: obs,
+      time: 60,
+      physics: null
+    };
+  }
+
+  // Order = play order; "Next Level" wraps at the end.
+  var LEVELS = [
+    buildTutorialLevel,
+    buildBumperRingLevel,
+    buildReverseCrossingLevel,
+    buildIceApproachLevel
+  ];
 
   // ---------------------------------------------------------------------
   // DOM
@@ -194,15 +303,44 @@
     refreshCtrlLabel();
   });
 
-  // Audio is Phase 4 — keep a no-op stub so the mute button stays inert
-  // but present (UI parity with the final build).
-  var Sound = { resume: function () {}, roll: function () {}, win: function () {},
-                whoosh: function () {}, mute: function () {}, muted: false };
+  // ---------------------------------------------------------------------
+  // Audio — Phase 2 wires Bala's Theme as the looping BG (user recorded
+  // his own arrangement; see project_balas_theme_per_game_arrangement
+  // in /memory). Browsers block autoplay until a user gesture, so the
+  // loop arms here and actually starts in startGame() after the click.
+  // Rolling SFX, whoosh, captured, etc. layer on top in Phase 4.
+  // ---------------------------------------------------------------------
   var soundMuted = false;
+  try { soundMuted = localStorage.getItem("mm2.muted") === "1"; } catch (e) {}
+  var BG_VOL = 0.55;
+  var bgAudio = new Audio("assets/audio/balas-theme.mp3?v=20260519c");
+  bgAudio.loop = true;
+  bgAudio.preload = "auto";
+  bgAudio.volume = soundMuted ? 0 : BG_VOL;
+  var Sound = {
+    resume: function () {
+      // Must be called from inside a user-gesture handler the first time.
+      if (soundMuted) return;
+      var p = bgAudio.play();
+      if (p && p.catch) p.catch(function () {}); // ignore "blocked until gesture"
+    },
+    roll: function () {},  // Phase 4
+    win: function () {},   // Phase 4
+    whoosh: function () {} // Phase 4
+  };
+  function applyMute() {
+    bgAudio.volume = soundMuted ? 0 : BG_VOL;
+    if (muteBtn) {
+      muteBtn.setAttribute("aria-pressed", soundMuted ? "true" : "false");
+      muteBtn.style.opacity = soundMuted ? "0.5" : "1";
+    }
+  }
+  applyMute();
   if (muteBtn) muteBtn.addEventListener("click", function () {
     soundMuted = !soundMuted;
-    muteBtn.setAttribute("aria-pressed", soundMuted ? "true" : "false");
-    muteBtn.style.opacity = soundMuted ? "0.5" : "1";
+    try { localStorage.setItem("mm2.muted", soundMuted ? "1" : "0"); } catch (e) {}
+    applyMute();
+    if (!soundMuted) Sound.resume();   // counts as a gesture if we hadn't started yet
   });
 
   // ---------------------------------------------------------------------
@@ -372,8 +510,10 @@
   function fmtBest(t) { return t == null ? "--" : t.toFixed(1) + "s"; }
 
   function loadLevel(num) {
+    if (num < 1) num = 1;
+    if (num > LEVELS.length) num = ((num - 1) % LEVELS.length) + 1;
     levelNum = num;
-    level = buildTutorialLevel(); // Phase 5 swaps in the catalog
+    level = LEVELS[num - 1]();
     curLevelLabel = "L" + num + " " + level.title;
     applyPhysics(effectivePhysics(level.physics));
     for (var i = 0; i < tuneRefreshers.length; i++) tuneRefreshers[i]();
@@ -414,9 +554,10 @@
   if (startBtn) startBtn.addEventListener("click", startGame);
   if (replayBtn) replayBtn.addEventListener("click", restartLevel);
   if (nextBtn) nextBtn.addEventListener("click", function () {
-    // Phase 1 ships one level; "Next" replays it until the catalog lands.
     attempts = 1;
-    loadLevel(levelNum);
+    var n = levelNum + 1;
+    if (n > LEVELS.length) n = 1;     // wrap at end of catalog
+    loadLevel(n);
     phase = "play";
     if (endScreen) endScreen.hidden = true;
   });
@@ -450,6 +591,82 @@
   }
 
   // ---------------------------------------------------------------------
+  // Obstacle effects — accumulate per-substep modifiers from each
+  // in-range obstacle. Bumpers resolve immediately (collision response);
+  // surface/field zones contribute to a small state struct the integrator
+  // reads. Zones use a soft cosine falloff so edges don't snap on/off.
+  // ---------------------------------------------------------------------
+  function applyObstacleEffects(state) {
+    var obs = level.obstacles;
+    if (!obs || !obs.length) return;
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      var dx = marble.x - o.x;
+      var dy = marble.y - o.y;
+      var dist2 = dx * dx + dy * dy;
+
+      if (o.type === "bumper") {
+        var cr = (o.r || 0.5) + MARBLE_R;
+        if (dist2 < cr * cr) {
+          var dist0 = Math.sqrt(dist2) || 0.0001;
+          var nx = dx / dist0, ny = dy / dist0;
+          marble.x = o.x + nx * cr;       // pop the marble out of the disc
+          marble.y = o.y + ny * cr;
+          var vn = marble.vx * nx + marble.vy * ny;
+          if (vn < 0) {
+            marble.vx -= (1 + WALL_BOUNCE) * vn * nx;
+            marble.vy -= (1 + WALL_BOUNCE) * vn * ny;
+            marble.vx += nx * BUMPER_KICK; // pinball-y outward kick
+            marble.vy += ny * BUMPER_KICK;
+            state.bonk = true;
+          }
+        }
+        continue;
+      }
+
+      var r = o.r || 1;
+      if (dist2 > r * r) continue;
+      var dist = Math.sqrt(dist2);
+      // Cosine falloff: 1.0 at center, 0.0 at the edge. Smoother edge
+      // transitions than linear (avoids a discontinuous gradient).
+      var falloff = 0.5 + 0.5 * Math.cos(Math.PI * (dist / r));
+
+      switch (o.type) {
+        case "reverse":
+          state.gravFlip = -1;
+          break;
+        case "ice":
+          // pull drag toward 0.995 (slippery) and grip toward 0.35.
+          state.drag = state.drag + (0.995 - state.drag) * falloff;
+          state.gripMul = Math.min(state.gripMul, 1 - 0.65 * falloff);
+          break;
+        case "mud":
+          // pull drag toward 0.70 (sticky) and grip down ~15%.
+          state.drag = state.drag + (0.70 - state.drag) * falloff;
+          state.gripMul = Math.min(state.gripMul, 1 - 0.15 * falloff);
+          break;
+        case "conveyor":
+          var cs = (o.strength || 14);
+          state.extraAx += (o.dx || 0) * cs;
+          state.extraAy += (o.dy || 0) * cs;
+          break;
+        case "wind":
+          var ws = (o.strength || 8) * falloff;
+          state.extraAx += (o.dx || 0) * ws;
+          state.extraAy += (o.dy || 0) * ws;
+          break;
+        case "tractor":
+          var ts = (o.strength || 12) * falloff;
+          if (dist > 0.05) {
+            state.extraAx += (-dx / dist) * ts;
+            state.extraAy += (-dy / dist) * ts;
+          }
+          break;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------
   // Physics step
   // ---------------------------------------------------------------------
   function physStep(dt) {
@@ -457,20 +674,35 @@
     var s = hm.sample(marble.x, marble.y);
     marble.h = s.h;
 
-    // Slope gravity: accelerate downhill (opposite the height gradient).
-    var ax = -GRAVITY_K * s.gx;
-    var ay = -GRAVITY_K * s.gy;
+    // Per-substep effect accumulator. Defaults = no-obstacle behaviour
+    // (matches Phase 1 byte-for-byte when level.obstacles is empty).
+    var st = {
+      drag: FRICTION_FLOOR, gripMul: 1, gravFlip: 1,
+      extraAx: 0, extraAy: 0, bonk: false
+    };
+    applyObstacleEffects(st);
 
-    // Player input adds on top of gravity.
+    // Slope gravity: accelerate downhill (opposite the height gradient).
+    // gravFlip is -1 inside reverse-gravity zones.
+    var ax = st.gravFlip * -GRAVITY_K * s.gx;
+    var ay = st.gravFlip * -GRAVITY_K * s.gy;
+
+    // Player input adds on top of gravity, scaled by surface grip
+    // (ice reduces authority; mud nibbles slightly).
     var c = controlVec();
-    ax += c.x * ACCEL;
-    ay += c.y * ACCEL;
+    ax += c.x * ACCEL * st.gripMul;
+    ay += c.y * ACCEL * st.gripMul;
+
+    // Field obstacles (conveyor / wind / tractor) layer on the same axis.
+    ax += st.extraAx;
+    ay += st.extraAy;
 
     marble.vx += ax * dt;
     marble.vy += ay * dt;
 
-    // Per-frame@60 drag, applied frame-rate-independently.
-    var d = Math.pow(FRICTION_FLOOR, dt * 60);
+    // Per-frame@60 drag, applied frame-rate-independently. drag is the
+    // effective per-frame multiplier after ice/mud zones.
+    var d = Math.pow(st.drag, dt * 60);
     marble.vx *= d;
     marble.vy *= d;
 
@@ -535,6 +767,179 @@
     var ground = b * CAM.pitchCos;
     var screenY = Hh * 0.40 + (ground * cell - h * CAM.heightK * cell * 0.5) * pscale;
     return { sx: screenX, sy: screenY, sc: pscale };
+  }
+
+  // ---------------------------------------------------------------------
+  // Obstacle rendering — each type has a distinct wireframe-aesthetic
+  // signature so the player can read it at a glance. Perimeters are
+  // sampled through the heightmap so they hug the curved surface.
+  // ---------------------------------------------------------------------
+  function obstacleStyle(type) {
+    // [stroke, fill, glyphColor]. Translucent fills so the mesh shows through.
+    switch (type) {
+      case "bumper":   return ["rgba(120,240,255,0.95)", "rgba(70,180,235,0.45)", "rgba(255,255,255,0.9)"];
+      case "reverse":  return ["rgba(255,120,200,0.95)", "rgba(180,60,160,0.20)", "rgba(255,170,220,0.9)"];
+      case "ice":      return ["rgba(180,230,255,0.85)", "rgba(120,200,255,0.18)", "rgba(220,240,255,0.85)"];
+      case "mud":      return ["rgba(190,140,90,0.85)",  "rgba(120,80,40,0.32)",  "rgba(220,170,110,0.85)"];
+      case "conveyor": return ["rgba(110,255,170,0.95)", "rgba(40,180,120,0.18)", "rgba(160,255,200,0.9)"];
+      case "wind":     return ["rgba(180,255,210,0.7)",  "rgba(120,220,180,0.10)","rgba(200,255,220,0.85)"];
+      case "tractor":  return ["rgba(255,180,90,0.95)",  "rgba(220,130,40,0.18)", "rgba(255,210,140,0.9)"];
+    }
+    return ["#fff", "rgba(255,255,255,0.1)", "#fff"];
+  }
+  function ringPath(cx, cy, r, segs) {
+    ctx.beginPath();
+    for (var s = 0; s <= segs; s++) {
+      var a = s / segs * Math.PI * 2;
+      var wx = cx + Math.cos(a) * r;
+      var wy = cy + Math.sin(a) * r;
+      var hh = level.hm.sample(wx, wy).h;
+      var pp = project(wx, wy, hh);
+      if (s === 0) ctx.moveTo(pp.sx, pp.sy); else ctx.lineTo(pp.sx, pp.sy);
+    }
+  }
+  function renderObstacles() {
+    var obs = level.obstacles;
+    if (!obs || !obs.length) return;
+    ctx.lineWidth = Math.max(1, DPR * 1.2);
+    ctx.shadowBlur = 10 * DPR;
+    for (var i = 0; i < obs.length; i++) {
+      var o = obs[i];
+      var st = obstacleStyle(o.type);
+      var cx = o.x, cy = o.y;
+      var rad = o.r != null ? o.r : 0.5;
+      var hC = level.hm.sample(cx, cy).h;
+      var pc = project(cx, cy, hC);
+      ctx.shadowColor = st[0];
+
+      if (o.type === "bumper") {
+        // Solid cyan disc — small, central glow.
+        ringPath(cx, cy, rad, 22);
+        ctx.fillStyle = st[1];
+        ctx.fill();
+        ctx.strokeStyle = st[0];
+        ctx.stroke();
+        // bright dot at the centre
+        ctx.beginPath();
+        ctx.arc(pc.sx, pc.sy, Math.max(2, 3 * DPR * pc.sc), 0, Math.PI * 2);
+        ctx.fillStyle = st[2];
+        ctx.fill();
+        continue;
+      }
+
+      // Zone obstacles — outer ring + a faint translucent fill.
+      ringPath(cx, cy, rad, 36);
+      ctx.fillStyle = st[1];
+      ctx.fill();
+      ctx.strokeStyle = st[0];
+      ctx.stroke();
+
+      // Type-specific glyph inside the ring.
+      ctx.strokeStyle = st[2];
+      switch (o.type) {
+        case "reverse": {
+          // Spiral arms to read as "wrong-way / inverted".
+          var arms = 3;
+          for (var a = 0; a < arms; a++) {
+            ctx.beginPath();
+            for (var t = 0; t <= 24; t++) {
+              var u = t / 24;
+              var ang = (a / arms) * Math.PI * 2 + u * Math.PI * 1.4;
+              var rr = u * rad * 0.85;
+              var wx2 = cx + Math.cos(ang) * rr;
+              var wy2 = cy + Math.sin(ang) * rr;
+              var hh2 = level.hm.sample(wx2, wy2).h;
+              var pp2 = project(wx2, wy2, hh2);
+              if (t === 0) ctx.moveTo(pp2.sx, pp2.sy); else ctx.lineTo(pp2.sx, pp2.sy);
+            }
+            ctx.stroke();
+          }
+          break;
+        }
+        case "ice": {
+          // Six radial shimmer spokes — snowflake-ish.
+          for (var k = 0; k < 6; k++) {
+            var ang2 = k / 6 * Math.PI * 2;
+            var wxa = cx + Math.cos(ang2) * rad * 0.15;
+            var wya = cy + Math.sin(ang2) * rad * 0.15;
+            var wxb = cx + Math.cos(ang2) * rad * 0.85;
+            var wyb = cy + Math.sin(ang2) * rad * 0.85;
+            var ha = level.hm.sample(wxa, wya).h;
+            var hb = level.hm.sample(wxb, wyb).h;
+            var pa = project(wxa, wya, ha);
+            var pb = project(wxb, wyb, hb);
+            ctx.beginPath();
+            ctx.moveTo(pa.sx, pa.sy);
+            ctx.lineTo(pb.sx, pb.sy);
+            ctx.stroke();
+          }
+          break;
+        }
+        case "mud": {
+          // Scattered dots inside the zone.
+          var dots = 11;
+          for (var di = 0; di < dots; di++) {
+            // pseudo-random but stable per-level position (cheap hash on di+seed)
+            var seed = (i * 7 + di * 13) % 97;
+            var fang = (seed * 2.39996) % (Math.PI * 2);
+            var fr = (((seed * 17) % 100) / 100) * rad * 0.7;
+            var dx2 = cx + Math.cos(fang) * fr;
+            var dy2 = cy + Math.sin(fang) * fr;
+            var hd = level.hm.sample(dx2, dy2).h;
+            var pd = project(dx2, dy2, hd);
+            ctx.beginPath();
+            ctx.arc(pd.sx, pd.sy, Math.max(1, 1.6 * DPR * pd.sc), 0, Math.PI * 2);
+            ctx.fillStyle = st[2];
+            ctx.fill();
+          }
+          break;
+        }
+        case "conveyor":
+        case "wind": {
+          // Three chevrons pointing along (dx,dy).
+          var ux = o.dx || 0, uy = o.dy || 0;
+          var um = Math.sqrt(ux * ux + uy * uy) || 1;
+          ux /= um; uy /= um;
+          var px = -uy, py = ux; // perpendicular
+          for (var c = -1; c <= 1; c++) {
+            // Three chevrons spaced along the direction axis, each
+            // pointing in (ux,uy) like a flowing conveyor strip.
+            var off = c * rad * 0.45;
+            var tipx = cx + ux * off;
+            var tipy = cy + uy * off;
+            var armL = rad * 0.35;
+            var aL_x = tipx - ux * armL - px * armL * 0.6;
+            var aL_y = tipy - uy * armL - py * armL * 0.6;
+            var aR_x = tipx - ux * armL + px * armL * 0.6;
+            var aR_y = tipy - uy * armL + py * armL * 0.6;
+            var hT = level.hm.sample(tipx, tipy).h;
+            var hL = level.hm.sample(aL_x, aL_y).h;
+            var hR = level.hm.sample(aR_x, aR_y).h;
+            var pT = project(tipx, tipy, hT);
+            var pL = project(aL_x, aL_y, hL);
+            var pR = project(aR_x, aR_y, hR);
+            ctx.beginPath();
+            ctx.moveTo(pL.sx, pL.sy);
+            ctx.lineTo(pT.sx, pT.sy);
+            ctx.lineTo(pR.sx, pR.sy);
+            ctx.stroke();
+          }
+          break;
+        }
+        case "tractor": {
+          // Concentric tightening rings — "pull inward" cue.
+          for (var ti = 0; ti < 3; ti++) {
+            var trad = rad * (0.25 + ti * 0.25);
+            ringPath(cx, cy, trad, 28);
+            ctx.strokeStyle = "rgba(255,180,90," + (0.85 - ti * 0.2) + ")";
+            ctx.stroke();
+          }
+          break;
+        }
+      }
+    }
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
   }
 
   // ---------------------------------------------------------------------
@@ -630,6 +1035,8 @@
       ctx.lineWidth = Math.max(1, DPR * 1.4);
       ctx.stroke();
     }
+
+    renderObstacles();
 
     // Marble — glowing sphere sitting on the surface.
     var mp = project(marble.x, marble.y, marble.h - marble.sink * 1.6);

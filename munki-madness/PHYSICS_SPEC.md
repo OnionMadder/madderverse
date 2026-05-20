@@ -5,9 +5,9 @@ git history; v2.0 is a continuous heightmap world rendered as a glowing
 wireframe mesh. The goal is a **WELL** — a deep depression the marble
 falls into and cannot roll back out of.
 
-This document covers Phase 1 (engine foundation). Obstacle layers
-(Phase 2), the sculptural editor (Phase 3), audio (Phase 4), and the
-level catalog (Phase 5) will extend it in subsequent commits.
+This document covers Phases 1–2 (engine foundation + obstacle layer).
+The sculptural editor (Phase 3), audio polish / SFX (Phase 4), and the
+JSON level catalog (Phase 5) will extend it in subsequent commits.
 
 ## World model
 
@@ -129,7 +129,36 @@ Phase 1 ships **one built-in level**, the **Tutorial Well**:
 - `time = 45s` budget for the 3★ time bracket (`≤22.5s` = 3★,
   `≤36s` = 2★, otherwise 1★).
 
-Phase 5 replaces the built-in with a `levels/*.json` catalog.
+Phase 2 adds three obstacle-demo levels (Bumper Ring, Reverse Crossing,
+Ice Approach); Phase 5 replaces the whole catalog with `levels/*.json`.
+
+## Obstacles (Phase 2)
+
+Each level may carry an `obstacles` array of sparse objects. Effects
+are accumulated per physics substep into a small `state` struct read
+by the integrator. Zones use a cosine falloff (`1.0` at centre, `0.0`
+at the edge) so transitions are smooth.
+
+| Type | Fields | Effect |
+|---|---|---|
+| `bumper` | `{ x, y, r }` | Solid disc collision — position correction + reflect along contact normal × `(1+WALL_BOUNCE)` + outward `BUMPER_KICK` (`2.6` cells/s). Pinball-y bonk. |
+| `reverse` | `{ x, y, r }` | While inside, slope gravity flips sign (`gravFlip = -1`). The terrain that was downhill now pushes you uphill. |
+| `ice` | `{ x, y, r }` | Pull effective drag toward `0.995` (slippery) and input grip toward `0.35` (less steering authority) by `falloff`. |
+| `mud` | `{ x, y, r }` | Pull effective drag toward `0.70` (sticky) and grip down ~15%. |
+| `conveyor` | `{ x, y, r, dx, dy, strength }` | Constant directional accel `(dx, dy) * strength` while inside — full force, no falloff (it's a moving belt). |
+| `wind` | `{ x, y, r, dx, dy, strength }` | Same as conveyor but multiplied by `falloff` — strongest at the centre, fades at the edge. |
+| `tractor` | `{ x, y, r, strength }` | Pulls the marble toward `(x, y)` with `strength * falloff`. A mini-well that *does not capture*. |
+
+`dx, dy` for directional types are unit-ish; the integrator does not
+renormalise them, so e.g. `{ dx: 0.6, dy: 0.8 }` plays as a 1.0-strength
+push in that direction. Phase 3 editor will keep them normalised.
+
+Bumpers resolve immediately during effect accumulation (position
+correction + impulse). Field zones contribute to `state.extraAx/Ay`
+which the integrator adds to slope gravity + player input.
+
+The default obstacle list is empty (`[]`); a level with no obstacles is
+**byte-identical to the Phase 1 integrator**.
 
 ## Per-level physics overlay
 
@@ -171,6 +200,19 @@ All three sum, then the combined `(sx, sy)` is renormalised to
 magnitude `≤ 1` so combining tilt + keys can't yield a `>1.4` boost.
 
 The `?tune=1` `TILT_FORCE_MULTIPLIER` slider scales the tilt path only.
+
+## Audio (Phase 2: BG loop only; Phase 4 adds SFX)
+
+Bala's Theme is played as an HTMLAudio loop at `assets/audio/balas-theme.mp3`.
+The user records his own arrangement per game ([Chocobo doctrine](../../memory/project_balas_theme_per_game_arrangement.md));
+do not synth-port Tonehouse for this game. Volume defaults to `0.55`;
+mute state persists in `localStorage` (`mm2.muted`). The mute button
+gates volume via the existing UI button. Browsers block autoplay until
+a user gesture — `Sound.resume()` is called from the Start handler
+and from the mute toggle to satisfy that.
+
+Phase 4 adds: rolling SFX scaled by velocity, whoosh on well entry,
+"captured!" on goal-reach, reverse-gravity hum.
 
 ## Rendering — wireframe triangular mesh
 
