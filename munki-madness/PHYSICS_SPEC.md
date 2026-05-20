@@ -227,8 +227,9 @@ Phase 1 ships **one built-in level**, the **Tutorial Well**:
 - `time = 45s` budget for the 3★ time bracket (`≤22.5s` = 3★,
   `≤36s` = 2★, otherwise 1★).
 
-Phase 2 adds three obstacle-demo levels (Bumper Ring, Reverse Crossing,
-Ice Approach); Phase 5 replaces the whole catalog with `levels/*.json`.
+Phase 2 ships six obstacle-demo levels alongside the Tutorial Well:
+Bumper Ring, Reverse Crossing, Ice Approach, Conveyor Belt, Wind Lane,
+Tractor Slingshot. Phase 5 replaces the whole catalog with `levels/*.json`.
 
 ## Obstacles (Phase 2)
 
@@ -239,13 +240,18 @@ at the edge) so transitions are smooth.
 
 | Type | Fields | Effect |
 |---|---|---|
-| `bumper` | `{ x, y, r }` | Solid disc collision — position correction + reflect along contact normal × `(1+WALL_BOUNCE)` + outward `BUMPER_KICK` (`2.6` cells/s). Pinball-y bonk. |
-| `reverse` | `{ x, y, r }` | While inside, slope gravity flips sign (`gravFlip = -1`). The terrain that was downhill now pushes you uphill. |
-| `ice` | `{ x, y, r }` | Pull effective drag toward `0.995` (slippery) and input grip toward `0.35` (less steering authority) by `falloff`. |
-| `mud` | `{ x, y, r }` | Pull effective drag toward `0.70` (sticky) and grip down ~15%. |
-| `conveyor` | `{ x, y, r, dx, dy, strength }` | Constant directional accel `(dx, dy) * strength` while inside — full force, no falloff (it's a moving belt). |
-| `wind` | `{ x, y, r, dx, dy, strength }` | Same as conveyor but multiplied by `falloff` — strongest at the centre, fades at the edge. |
-| `tractor` | `{ x, y, r, strength }` | Pulls the marble toward `(x, y)` with `strength * falloff`. A mini-well that *does not capture*. |
+| `bumper` | `{ x, y, r }` | Solid disc collision — position correction + reflect along contact normal × `(1+WALL_BOUNCE)` + outward `BUMPER_KICK` kick. Rendered as a short 3D-look post (top + bottom rings + vertical struts, `BUMPER_POST_H` tall). |
+| `reverse` | `{ x, y, r }` | While inside, slope gravity flips sign (`gravFlip = -1`). The terrain that was downhill now pushes you uphill. Well-pull flips too. |
+| `ice` | `{ x, y, r }` | Pull effective drag toward `ICE_DRAG_TARGET` (slippery) and input grip down by `ICE_GRIP_REDUCE` × `falloff`. |
+| `mud` | `{ x, y, r }` | Pull effective drag toward `MUD_DRAG_TARGET` (sticky) and grip down by `MUD_GRIP_REDUCE` × `falloff`. |
+| `conveyor` | `{ x, y, r, dx, dy, strength? }` | Constant directional accel `(dx, dy) × (strength || CONVEYOR_STR)` while inside — full force, no falloff (it's a moving belt). |
+| `wind` | `{ x, y, r, dx, dy, strength? }` | Same as conveyor but multiplied by `falloff` — strongest at the centre, fades at the edge. `strength || WIND_STR`. |
+| `tractor` | `{ x, y, r, strength? }` | Pulls the marble toward `(x, y)` with `(strength || TRACTOR_STR) × falloff`. A mini-well that *does not capture*. |
+
+Each obstacle MAY override its own `strength` inline. The constants
+above (`BUMPER_KICK`, `CONVEYOR_STR`, `WIND_STR`, `TRACTOR_STR`,
+`ICE_*`, `MUD_*`) are the level-builder defaults, all tunable on
+`?tune=1`.
 
 `dx, dy` for directional types are unit-ish; the integrator does not
 renormalise them, so e.g. `{ dx: 0.6, dy: 0.8 }` plays as a 1.0-strength
@@ -280,9 +286,10 @@ Allowed keys: `ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`, `FRICTION_FLOOR`,
 `GRAVITY_MULT`, `TILT_FORCE_MULTIPLIER`, `ESCAPE_THRESHOLD`,
 `WELL_PULL_STRENGTH`, `WELL_PULL_RADIUS`, `WELL_PULL_MIN_DIST`,
 `WELL_PULL_FALLOFF_EXP`, `WELL_PULL_MAX_FORCE`, `WELL_DRAIN_RADIUS`,
-`WELL_DRAIN_FRICTION`. Unknown keys are ignored. (`GRAVITY_K` is the
-internal base for slope gravity; the well-pull cap is now exposed as
-`WELL_PULL_MAX_FORCE`.)
+`WELL_DRAIN_FRICTION`, `BUMPER_KICK`, `CONVEYOR_STR`, `WIND_STR`,
+`TRACTOR_STR`, `ICE_DRAG_TARGET`, `ICE_GRIP_REDUCE`,
+`MUD_DRAG_TARGET`, `MUD_GRIP_REDUCE`. Unknown keys are ignored.
+(`GRAVITY_K` and `BUMPER_POST_H` are internal; the rest are tunable.)
 
 ## Tune panel (`?tune=1`)
 
@@ -304,6 +311,14 @@ Slider ranges (clamped on apply to keep the engine numerically safe):
 | `WELL_PULL_MAX_FORCE` | 1 – 30 | 0.5 |
 | `WELL_DRAIN_RADIUS` | 0.5 – 5 | 0.1 |
 | `WELL_DRAIN_FRICTION` | 0.5 – 0.99 | 0.01 |
+| `BUMPER_KICK` | 0 – 10 | 0.1 |
+| `CONVEYOR_STR` | 0 – 40 | 1 |
+| `WIND_STR` | 0 – 30 | 1 |
+| `TRACTOR_STR` | 0 – 30 | 1 |
+| `ICE_DRAG_TARGET` | 0.90 – 0.999 | 0.001 |
+| `ICE_GRIP_REDUCE` | 0 – 1 | 0.05 |
+| `MUD_DRAG_TARGET` | 0.30 – 0.99 | 0.01 |
+| `MUD_GRIP_REDUCE` | 0 – 1 | 0.05 |
 
 Panel layout matches v1.0's: a fixed-width `320px` panel pinned
 bottom-left over the gameplay (NOT panel-spanning). Sliders span the

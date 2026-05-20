@@ -85,7 +85,15 @@
     "WELL_PULL_FALLOFF_EXP": WELL_PULL_FALLOFF_EXP,
     "WELL_PULL_MAX_FORCE": WELL_PULL_MAX_FORCE,
     "WELL_DRAIN_RADIUS": WELL_DRAIN_RADIUS,
-    "WELL_DRAIN_FRICTION": WELL_DRAIN_FRICTION
+    "WELL_DRAIN_FRICTION": WELL_DRAIN_FRICTION,
+    "BUMPER_KICK": BUMPER_KICK,
+    "CONVEYOR_STR": CONVEYOR_STR,
+    "WIND_STR": WIND_STR,
+    "TRACTOR_STR": TRACTOR_STR,
+    "ICE_DRAG_TARGET": ICE_DRAG_TARGET,
+    "ICE_GRIP_REDUCE": ICE_GRIP_REDUCE,
+    "MUD_DRAG_TARGET": MUD_DRAG_TARGET,
+    "MUD_GRIP_REDUCE": MUD_GRIP_REDUCE
   };
   var curLevelLabel = "";
   var tuneLvlEl = null;
@@ -163,7 +171,18 @@
   // r is the *effect radius* (cell units). dx/dy for directional types are
   // unit-ish; strength is cells/s^2 contribution at full intensity.
   // ---------------------------------------------------------------------
-  var BUMPER_KICK = 2.6;   // extra outward speed kick per bumper hit (cells/s)
+  // Per-obstacle default strengths (tune panel exposes all of these).
+  // Each obstacle MAY override its own strength inline (`o.strength`); the
+  // constants are the LEVEL DEFAULT a builder/editor gets when it doesn't.
+  var BUMPER_KICK       = 2.6;    // outward speed kick per bumper hit (cells/s)
+  var BUMPER_POST_H     = 0.85;   // visual post height above the mesh (cells)
+  var CONVEYOR_STR      = 14;     // conveyor constant force (cells/s^2)
+  var WIND_STR          = 8;      // wind force at zone centre (cells/s^2)
+  var TRACTOR_STR       = 12;     // tractor pull at zone centre (cells/s^2)
+  var ICE_DRAG_TARGET   = 0.995;  // per-frame@60 drag the ice zone pulls toward
+  var ICE_GRIP_REDUCE   = 0.65;   // fraction of input authority an ice zone removes
+  var MUD_DRAG_TARGET   = 0.70;   // per-frame@60 drag the mud zone pulls toward
+  var MUD_GRIP_REDUCE   = 0.15;   // fraction of input authority a mud zone removes
 
   // ---------------------------------------------------------------------
   // Level catalog — Phase 2 ships the Tutorial Well plus three obstacle
@@ -268,12 +287,81 @@
     };
   }
 
+  function buildConveyorBeltLevel() {
+    var gw = 18, gh = 18;
+    var hm = new HeightMap(gw, gh);
+    var well = { x: 14.5, y: 9.0, captureR: 1.6 };
+    hm.dome(well.x, well.y, -7.0, 3.0);
+    // A north-pushing conveyor straddles the path from spawn (lower-left)
+    // to well (mid-right). Player rolls east and the belt knocks them
+    // north — over-tilt south to compensate, or thread around the edge.
+    var obs = [
+      { type: "conveyor", x: 9.0, y: 8.0, r: 2.8, dx: 0, dy: -1 }
+    ];
+    return {
+      title: "Conveyor Belt",
+      hm: hm,
+      spawn: { x: 2.5, y: 14.0 },
+      well: well,
+      obstacles: obs,
+      time: 60,
+      physics: null
+    };
+  }
+
+  function buildWindLaneLevel() {
+    var gw = 18, gh = 18;
+    var hm = new HeightMap(gw, gh);
+    var well = { x: 15.0, y: 3.5, captureR: 1.7 };
+    hm.dome(well.x, well.y, -7.5, 3.2);
+    // Wide wind zone in mid-field pushes SOUTH while the well sits up at
+    // the top-right. The marble has to plow through the gust to reach it.
+    // Wind is gentler than conveyor and has cosine falloff to the edge.
+    var obs = [
+      { type: "wind", x: 9.0, y: 9.0, r: 5.0, dx: 0, dy: 1 }
+    ];
+    return {
+      title: "Wind Lane",
+      hm: hm,
+      spawn: { x: 2.5, y: 14.0 },
+      well: well,
+      obstacles: obs,
+      time: 60,
+      physics: null
+    };
+  }
+
+  function buildTractorSlingshotLevel() {
+    var gw = 18, gh = 18;
+    var hm = new HeightMap(gw, gh);
+    var well = { x: 15.0, y: 15.0, captureR: 1.7 };
+    hm.dome(well.x, well.y, -7.5, 3.0);
+    // A tractor sits off the direct spawn→well line and pulls the marble
+    // off-course. Aim ABOVE the well to compensate, or ride the curve.
+    // (Tractor doesn't capture — it's a deflector, not a goal.)
+    var obs = [
+      { type: "tractor", x: 8.5, y: 12.5, r: 4.0 }
+    ];
+    return {
+      title: "Tractor Slingshot",
+      hm: hm,
+      spawn: { x: 2.5, y: 2.5 },
+      well: well,
+      obstacles: obs,
+      time: 60,
+      physics: null
+    };
+  }
+
   // Order = play order; "Next Level" wraps at the end.
   var LEVELS = [
     buildTutorialLevel,
     buildBumperRingLevel,
     buildReverseCrossingLevel,
-    buildIceApproachLevel
+    buildIceApproachLevel,
+    buildConveyorBeltLevel,
+    buildWindLaneLevel,
+    buildTractorSlingshotLevel
   ];
 
   // ---------------------------------------------------------------------
@@ -517,6 +605,14 @@
     if (k === "WELL_PULL_MAX_FORCE") return clamp(v, 1, 30);
     if (k === "WELL_DRAIN_RADIUS") return clamp(v, 0.5, 5);
     if (k === "WELL_DRAIN_FRICTION") return clamp(v, 0.5, 0.99);
+    if (k === "BUMPER_KICK") return clamp(v, 0, 10);
+    if (k === "CONVEYOR_STR") return clamp(v, 0, 40);
+    if (k === "WIND_STR") return clamp(v, 0, 30);
+    if (k === "TRACTOR_STR") return clamp(v, 0, 30);
+    if (k === "ICE_DRAG_TARGET") return clamp(v, 0.90, 0.999);
+    if (k === "ICE_GRIP_REDUCE") return clamp(v, 0, 1);
+    if (k === "MUD_DRAG_TARGET") return clamp(v, 0.30, 0.99);
+    if (k === "MUD_GRIP_REDUCE") return clamp(v, 0, 1);
     return Math.max(0, v);
   }
   function applyPhysics(p) {
@@ -531,6 +627,14 @@
     WELL_PULL_MAX_FORCE = p.WELL_PULL_MAX_FORCE;
     WELL_DRAIN_RADIUS = p.WELL_DRAIN_RADIUS;
     WELL_DRAIN_FRICTION = p.WELL_DRAIN_FRICTION;
+    BUMPER_KICK = p.BUMPER_KICK;
+    CONVEYOR_STR = p.CONVEYOR_STR;
+    WIND_STR = p.WIND_STR;
+    TRACTOR_STR = p.TRACTOR_STR;
+    ICE_DRAG_TARGET = p.ICE_DRAG_TARGET;
+    ICE_GRIP_REDUCE = p.ICE_GRIP_REDUCE;
+    MUD_DRAG_TARGET = p.MUD_DRAG_TARGET;
+    MUD_GRIP_REDUCE = p.MUD_GRIP_REDUCE;
   }
   function effectivePhysics(override) {
     var e = {}, k;
@@ -698,27 +802,27 @@
           state.gravFlip = -1;
           break;
         case "ice":
-          // pull drag toward 0.995 (slippery) and grip toward 0.35.
-          state.drag = state.drag + (0.995 - state.drag) * falloff;
-          state.gripMul = Math.min(state.gripMul, 1 - 0.65 * falloff);
+          // Pull drag toward ICE_DRAG_TARGET (slippery) and grip down.
+          state.drag = state.drag + (ICE_DRAG_TARGET - state.drag) * falloff;
+          state.gripMul = Math.min(state.gripMul, 1 - ICE_GRIP_REDUCE * falloff);
           break;
         case "mud":
-          // pull drag toward 0.70 (sticky) and grip down ~15%.
-          state.drag = state.drag + (0.70 - state.drag) * falloff;
-          state.gripMul = Math.min(state.gripMul, 1 - 0.15 * falloff);
+          // Pull drag toward MUD_DRAG_TARGET (sticky) and grip down.
+          state.drag = state.drag + (MUD_DRAG_TARGET - state.drag) * falloff;
+          state.gripMul = Math.min(state.gripMul, 1 - MUD_GRIP_REDUCE * falloff);
           break;
         case "conveyor":
-          var cs = (o.strength || 14);
+          var cs = (o.strength != null ? o.strength : CONVEYOR_STR);
           state.extraAx += (o.dx || 0) * cs;
           state.extraAy += (o.dy || 0) * cs;
           break;
         case "wind":
-          var ws = (o.strength || 8) * falloff;
+          var ws = (o.strength != null ? o.strength : WIND_STR) * falloff;
           state.extraAx += (o.dx || 0) * ws;
           state.extraAy += (o.dy || 0) * ws;
           break;
         case "tractor":
-          var ts = (o.strength || 12) * falloff;
+          var ts = (o.strength != null ? o.strength : TRACTOR_STR) * falloff;
           if (dist > 0.05) {
             state.extraAx += (-dx / dist) * ts;
             state.extraAy += (-dy / dist) * ts;
@@ -932,15 +1036,60 @@
       ctx.shadowColor = st[0];
 
       if (o.type === "bumper") {
-        // Solid cyan disc — small, central glow.
-        ringPath(cx, cy, rad, 22);
+        // 3D post: bottom ring on the mesh + top ring lifted by
+        // BUMPER_POST_H + vertical struts between. Reads as a short
+        // cylindrical post on the wireframe surface.
+        var segs = 22;
+        var struts = 8;
+        // Project the perimeter twice — once at ground, once at the top.
+        var bot = [];
+        var top = [];
+        for (var sb = 0; sb <= segs; sb++) {
+          var a2 = sb / segs * Math.PI * 2;
+          var wx = cx + Math.cos(a2) * rad;
+          var wy = cy + Math.sin(a2) * rad;
+          var hh = level.hm.sample(wx, wy).h;
+          bot.push(project(wx, wy, hh));
+          top.push(project(wx, wy, hh + BUMPER_POST_H));
+        }
+        // Translucent cylindrical wall (subtle fill between the rings).
+        ctx.beginPath();
+        ctx.moveTo(bot[0].sx, bot[0].sy);
+        for (var ss = 1; ss <= segs; ss++) ctx.lineTo(bot[ss].sx, bot[ss].sy);
+        for (var st2 = segs; st2 >= 0; st2--) ctx.lineTo(top[st2].sx, top[st2].sy);
+        ctx.closePath();
         ctx.fillStyle = st[1];
         ctx.fill();
+        // Bottom ring (dimmer — it sits on the mesh).
+        ctx.beginPath();
+        for (var sd = 0; sd <= segs; sd++) {
+          if (sd === 0) ctx.moveTo(bot[sd].sx, bot[sd].sy);
+          else ctx.lineTo(bot[sd].sx, bot[sd].sy);
+        }
+        ctx.strokeStyle = "rgba(80,180,235,0.55)";
+        ctx.stroke();
+        // Top ring (brighter — the cap).
+        ctx.beginPath();
+        for (var su = 0; su <= segs; su++) {
+          if (su === 0) ctx.moveTo(top[su].sx, top[su].sy);
+          else ctx.lineTo(top[su].sx, top[su].sy);
+        }
         ctx.strokeStyle = st[0];
         ctx.stroke();
-        // bright dot at the centre
+        // Vertical struts.
         ctx.beginPath();
-        ctx.arc(pc.sx, pc.sy, Math.max(2, 3 * DPR * pc.sc), 0, Math.PI * 2);
+        for (var sv = 0; sv < struts; sv++) {
+          var idx = Math.round(sv / struts * segs);
+          ctx.moveTo(bot[idx].sx, bot[idx].sy);
+          ctx.lineTo(top[idx].sx, top[idx].sy);
+        }
+        ctx.strokeStyle = "rgba(120,220,255,0.75)";
+        ctx.stroke();
+        // Bright dot at the centre of the top cap.
+        var hCt = level.hm.sample(cx, cy).h + BUMPER_POST_H;
+        var pct = project(cx, cy, hCt);
+        ctx.beginPath();
+        ctx.arc(pct.sx, pct.sy, Math.max(2, 3 * DPR * pct.sc), 0, Math.PI * 2);
         ctx.fillStyle = st[2];
         ctx.fill();
         continue;
@@ -1279,7 +1428,33 @@
         set: function (v) { WELL_DRAIN_RADIUS = v; } },
       { k: "WELL_DRAIN_FRICTION",   min: 0.5,  max: 0.99, step: 0.01, fmt: 2,
         get: function () { return WELL_DRAIN_FRICTION; },
-        set: function (v) { WELL_DRAIN_FRICTION = v; } }
+        set: function (v) { WELL_DRAIN_FRICTION = v; } },
+      // Obstacle default strengths — each obstacle MAY override its
+      // own strength inline; these are the level-builder defaults.
+      { k: "BUMPER_KICK",           min: 0,    max: 10,   step: 0.1,  fmt: 1,
+        get: function () { return BUMPER_KICK; },
+        set: function (v) { BUMPER_KICK = v; } },
+      { k: "CONVEYOR_STR",          min: 0,    max: 40,   step: 1,    fmt: 0,
+        get: function () { return CONVEYOR_STR; },
+        set: function (v) { CONVEYOR_STR = v; } },
+      { k: "WIND_STR",              min: 0,    max: 30,   step: 1,    fmt: 0,
+        get: function () { return WIND_STR; },
+        set: function (v) { WIND_STR = v; } },
+      { k: "TRACTOR_STR",           min: 0,    max: 30,   step: 1,    fmt: 0,
+        get: function () { return TRACTOR_STR; },
+        set: function (v) { TRACTOR_STR = v; } },
+      { k: "ICE_DRAG_TARGET",       min: 0.90, max: 0.999,step: 0.001,fmt: 3,
+        get: function () { return ICE_DRAG_TARGET; },
+        set: function (v) { ICE_DRAG_TARGET = v; } },
+      { k: "ICE_GRIP_REDUCE",       min: 0,    max: 1,    step: 0.05, fmt: 2,
+        get: function () { return ICE_GRIP_REDUCE; },
+        set: function (v) { ICE_GRIP_REDUCE = v; } },
+      { k: "MUD_DRAG_TARGET",       min: 0.30, max: 0.99, step: 0.01, fmt: 2,
+        get: function () { return MUD_DRAG_TARGET; },
+        set: function (v) { MUD_DRAG_TARGET = v; } },
+      { k: "MUD_GRIP_REDUCE",       min: 0,    max: 1,    step: 0.05, fmt: 2,
+        get: function () { return MUD_GRIP_REDUCE; },
+        set: function (v) { MUD_GRIP_REDUCE = v; } }
     ];
 
     function fmtNum(v, dp) {
