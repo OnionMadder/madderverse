@@ -19,22 +19,41 @@
   // ---------------------------------------------------------------------
   // Physics knobs — see PHYSICS_SPEC.md. Live-tunable via ?tune=1.
   // ---------------------------------------------------------------------
-  var ACCEL = 22;            // player-input push (cells/s^2)
-  var MAX_SPEED = 6;         // top speed (cells/s)
+  // Player-dialed via ?tune=1 (locked 2026-05-19; previous values
+  // archived in the commit immediately before this one).
+  var ACCEL = 30;            // player-input push (cells/s^2)
+  var MAX_SPEED = 7;         // top speed (cells/s)
   var WALL_BOUNCE = 0.4;     // edge restitution (pinball bonk)
-  var FRICTION_FLOOR = 0.92; // per-frame@60 velocity multiplier (drag)
+  var FRICTION_FLOOR = 0.96; // per-frame@60 velocity multiplier (drag)
   // GRAVITY_K is the *base* slope-to-accel constant — internal, not on
   // the tune panel. The exposed knob is GRAVITY_MULT (player-tunable);
   // effective slope gravity is -GRAVITY_K * GRAVITY_MULT * gradient.
   // MULT=0 → flat (no slope pull); MULT=1 → full base; MULT=2 → wild.
   var GRAVITY_K = 40;
-  var GRAVITY_MULT = 0.5;
+  var GRAVITY_MULT = 0.15;
   var MARBLE_R = 0.42;       // marble radius (cells) — keeps it off the rim
 
   // Well capture: the marble is "in the goal" when it's inside the well's
   // bowl AND its speed is below ESCAPE_THRESHOLD (cells/s) — trapped at
   // the bottom. The 0.28s dwell timer still rejects fly-throughs.
-  var ESCAPE_THRESHOLD = 2.2;
+  var ESCAPE_THRESHOLD = 1.1;
+
+  // ---- Per-well attraction force (additive to the gradient gravity) ----
+  // The heightmap gradient gives the *terrain* its feel — gentle when
+  // GRAVITY_MULT is low. Wells get their own localised pull so capture
+  // is reliable even when the surrounding mesh is almost flat. Force
+  // magnitude at distance d:
+  //
+  //   mag = STRENGTH * (RADIUS / max(d, MIN_DIST)) ^ FALLOFF_EXP
+  //
+  // Applied in the direction of the well centre. At d == RADIUS the
+  // magnitude equals STRENGTH; closer than RADIUS it ramps fast.
+  // Capped at WELL_PULL_MAX (hidden) so cranked tunings can't NaN out.
+  var WELL_PULL_STRENGTH    = 1.5;
+  var WELL_PULL_RADIUS      = 3.0;
+  var WELL_PULL_MIN_DIST    = 0.5;
+  var WELL_PULL_FALLOFF_EXP = 2.0;
+  var WELL_PULL_MAX         = 500;  // hard cap (cells/s^2), internal
 
   var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // anti spiral-of-death
@@ -42,7 +61,7 @@
   // ---- Tilt control (ported from v1.0; recalibrated feel) ----
   var TILT_FULL = 10;             // deg past the recentred zero = full input
                                   // (smaller = more responsive to subtle tilts)
-  var TILT_FORCE_MULTIPLIER = 2.0;
+  var TILT_FORCE_MULTIPLIER = 2.8;
   var TILT_DEADZONE = 2.5;        // deg of slack around zero (anti-jitter)
   var TILT_FLIP_X = 1, TILT_FLIP_Y = 1;
   var DRAG_FULL = 90;             // px of drag that = full input
@@ -53,7 +72,11 @@
     "ACCEL": ACCEL, "MAX_SPEED": MAX_SPEED, "WALL_BOUNCE": WALL_BOUNCE,
     "FRICTION_FLOOR": FRICTION_FLOOR, "GRAVITY_MULT": GRAVITY_MULT,
     "TILT_FORCE_MULTIPLIER": TILT_FORCE_MULTIPLIER,
-    "ESCAPE_THRESHOLD": ESCAPE_THRESHOLD
+    "ESCAPE_THRESHOLD": ESCAPE_THRESHOLD,
+    "WELL_PULL_STRENGTH": WELL_PULL_STRENGTH,
+    "WELL_PULL_RADIUS": WELL_PULL_RADIUS,
+    "WELL_PULL_MIN_DIST": WELL_PULL_MIN_DIST,
+    "WELL_PULL_FALLOFF_EXP": WELL_PULL_FALLOFF_EXP
   };
   var curLevelLabel = "";
   var tuneLvlEl = null;
@@ -478,6 +501,10 @@
     if (k === "FRICTION_FLOOR") return clamp(v, 0.3, 0.999);
     if (k === "GRAVITY_MULT") return clamp(v, 0, 2);
     if (k === "ESCAPE_THRESHOLD") return clamp(v, 0, 5);
+    if (k === "WELL_PULL_STRENGTH") return clamp(v, 0, 10);
+    if (k === "WELL_PULL_RADIUS") return clamp(v, 0.5, 8);
+    if (k === "WELL_PULL_MIN_DIST") return clamp(v, 0.1, 1);
+    if (k === "WELL_PULL_FALLOFF_EXP") return clamp(v, 0.5, 4);
     return Math.max(0, v);
   }
   function applyPhysics(p) {
@@ -485,6 +512,10 @@
     FRICTION_FLOOR = p.FRICTION_FLOOR; GRAVITY_MULT = p.GRAVITY_MULT;
     TILT_FORCE_MULTIPLIER = p.TILT_FORCE_MULTIPLIER;
     ESCAPE_THRESHOLD = p.ESCAPE_THRESHOLD;
+    WELL_PULL_STRENGTH = p.WELL_PULL_STRENGTH;
+    WELL_PULL_RADIUS = p.WELL_PULL_RADIUS;
+    WELL_PULL_MIN_DIST = p.WELL_PULL_MIN_DIST;
+    WELL_PULL_FALLOFF_EXP = p.WELL_PULL_FALLOFF_EXP;
   }
   function effectivePhysics(override) {
     var e = {}, k;
@@ -693,6 +724,26 @@
     var gK = GRAVITY_K * GRAVITY_MULT;
     var ax = st.gravFlip * -gK * s.gx;
     var ay = st.gravFlip * -gK * s.gy;
+
+    // Per-well attraction — additive to the gradient gravity. Designed
+    // so the marble can roll freely over gentle slopes (small GRAVITY_MULT)
+    // but still falls reliably into the well as it approaches the rim.
+    //   mag = STRENGTH * (RADIUS / max(d, MIN_DIST)) ^ FALLOFF_EXP
+    // Subject to the same gravFlip so reverse-gravity zones repel from
+    // wells consistently with the rest of the landscape physics.
+    var w = level.well;
+    var wpx = w.x - marble.x;
+    var wpy = w.y - marble.y;
+    var wd  = Math.sqrt(wpx * wpx + wpy * wpy);
+    if (wd > 0.0001 && WELL_PULL_STRENGTH > 0) {
+      var dc = Math.max(wd, WELL_PULL_MIN_DIST);
+      var wmag = WELL_PULL_STRENGTH *
+                 Math.pow(WELL_PULL_RADIUS / dc, WELL_PULL_FALLOFF_EXP);
+      if (wmag > WELL_PULL_MAX) wmag = WELL_PULL_MAX;
+      var wnx = wpx / wd, wny = wpy / wd;
+      ax += st.gravFlip * wmag * wnx;
+      ay += st.gravFlip * wmag * wny;
+    }
 
     // Player input adds on top of gravity, scaled by surface grip
     // (ice reduces authority; mud nibbles slightly).
@@ -1144,7 +1195,20 @@
         get: function () { return TILT_FORCE_MULTIPLIER; },
         set: function (v) { TILT_FORCE_MULTIPLIER = v; } },
       { k: "ESCAPE_THRESHOLD",      min: 0,    max: 5.0,  step: 0.1,  fmt: 1,
-        get: function () { return ESCAPE_THRESHOLD; },set: function (v) { ESCAPE_THRESHOLD = v; } }
+        get: function () { return ESCAPE_THRESHOLD; },set: function (v) { ESCAPE_THRESHOLD = v; } },
+      // Per-well attraction layer — see PHYSICS_SPEC "Well-pull force".
+      { k: "WELL_PULL_STRENGTH",    min: 0,    max: 10,   step: 0.1,  fmt: 2,
+        get: function () { return WELL_PULL_STRENGTH; },
+        set: function (v) { WELL_PULL_STRENGTH = v; } },
+      { k: "WELL_PULL_RADIUS",      min: 0.5,  max: 8,    step: 0.1,  fmt: 1,
+        get: function () { return WELL_PULL_RADIUS; },
+        set: function (v) { WELL_PULL_RADIUS = v; } },
+      { k: "WELL_PULL_MIN_DIST",    min: 0.1,  max: 1.0,  step: 0.05, fmt: 2,
+        get: function () { return WELL_PULL_MIN_DIST; },
+        set: function (v) { WELL_PULL_MIN_DIST = v; } },
+      { k: "WELL_PULL_FALLOFF_EXP", min: 0.5,  max: 4.0,  step: 0.1,  fmt: 1,
+        get: function () { return WELL_PULL_FALLOFF_EXP; },
+        set: function (v) { WELL_PULL_FALLOFF_EXP = v; } }
     ];
 
     function fmtNum(v, dp) {

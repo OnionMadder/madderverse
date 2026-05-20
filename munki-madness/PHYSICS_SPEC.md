@@ -57,6 +57,45 @@ ax_grav = -gK * dH/dx
 ay_grav = -gK * dH/dy
 ```
 
+## Well-pull force (per-well attraction layer)
+
+Separate, additive force toward each level's well centre. Decouples
+the **terrain feel** (gradient gravity, kept light) from **capture
+reliability** (well-pull, kept punchy). Without it, lowering
+`GRAVITY_MULT` to make the open mesh feel gentle would also weaken
+the well's draw and let the marble roll past the rim.
+
+Computed each physics substep:
+
+```
+d_vec  = (well.x - marble.x, well.y - marble.y)
+d      = |d_vec|
+d_c    = max(d, WELL_PULL_MIN_DIST)                   // singularity clamp
+mag    = WELL_PULL_STRENGTH * (WELL_PULL_RADIUS / d_c) ^ WELL_PULL_FALLOFF_EXP
+mag    = min(mag, WELL_PULL_MAX)                      // safety cap
+n_hat  = d_vec / d
+ax_well = gravFlip * mag * n_hat.x
+ay_well = gravFlip * mag * n_hat.y
+```
+
+Then `ax_well, ay_well` are **added** to the gradient-gravity `ax, ay`
+before player input + field obstacles. `gravFlip` is the same factor
+the slope gravity uses (`-1` inside reverse-gravity zones), so a
+reverse zone consistently flips both the terrain pull AND the well
+pull — wells *repel* inside a reverse zone.
+
+### Intuition
+
+- At `d == WELL_PULL_RADIUS` (default `3.0` cells): `mag = STRENGTH = 1.5` — gentle nudge from the rim.
+- At `d == WELL_PULL_MIN_DIST` (default `0.5` cells, i.e. essentially at the bottom): `mag = STRENGTH × (3.0 / 0.5)² = 1.5 × 36 = 54` cells/s² — strong final grab.
+- At `d == 6.0` cells (twice `RADIUS`): `mag = STRENGTH × 0.5² = 0.375` — almost ignorable from afar.
+
+So the marble feels free across most of the mesh and gets pulled in
+sharply only after it crosses the rim. Crank `STRENGTH` for stickier
+wells; raise `RADIUS` for wider reach (the rim "begins" further out);
+raise `FALLOFF_EXP` for a steeper near-field grab (an exponent of `3`
+makes the close-up pull dramatic without lengthening the reach).
+
 The marble accelerates **opposite** the gradient (downhill). A well —
 which is a Gaussian depression dug into the corners — produces a smooth
 radial pull that grows from zero at the rim into a strong central
@@ -68,16 +107,25 @@ Tunable constants at the top of `game.js` (live-tunable via `?tune=1`):
 
 | Constant | v2.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `22` | player-input push (cells/s²) |
-| `MAX_SPEED` | `6` | top speed (cells/s) |
+| `ACCEL` | `30` | player-input push (cells/s²) |
+| `MAX_SPEED` | `7` | top speed (cells/s) |
 | `WALL_BOUNCE` | `0.4` | edge restitution — pinball bonk |
-| `FRICTION_FLOOR` | `0.92` | per-frame@60 velocity multiplier (drag) |
+| `FRICTION_FLOOR` | `0.96` | per-frame@60 velocity multiplier (drag) |
 | `GRAVITY_K` | `40` | base slope→accel constant (internal; not on the tune panel) |
-| `GRAVITY_MULT` | `0.5` | player-tunable multiplier on `GRAVITY_K`. Effective gravity = `GRAVITY_K × GRAVITY_MULT`. `0` = flat-plane (no slope pull); `2` = wild |
+| `GRAVITY_MULT` | `0.15` | player-tunable multiplier on `GRAVITY_K`. Effective gravity = `GRAVITY_K × GRAVITY_MULT`. `0` = flat-plane (no slope pull); `2` = wild. *Currently low — terrain is gentle; wells get their own pull (see below).* |
 | `TILT_FULL` | `10°` | deg past the recentred zero that saturates tilt input |
-| `TILT_FORCE_MULTIPLIER` | `2.0` | extra tilt-input gain |
+| `TILT_FORCE_MULTIPLIER` | `2.8` | extra tilt-input gain |
 | `MARBLE_R` | `0.42` | marble radius (cells); keeps it off the rim |
-| `ESCAPE_THRESHOLD` | `2.2` | bowl-speed threshold below which the marble is captured (cells/s) |
+| `ESCAPE_THRESHOLD` | `1.1` | bowl-speed threshold below which the marble is captured (cells/s) |
+| `WELL_PULL_STRENGTH` | `1.5` | well-attraction magnitude at `d = RADIUS` (cells/s²) |
+| `WELL_PULL_RADIUS` | `3.0` | characteristic radius of the well's gravitational reach (cells) |
+| `WELL_PULL_MIN_DIST` | `0.5` | distance clamp to avoid an infinite spike at d→0 (cells) |
+| `WELL_PULL_FALLOFF_EXP` | `2.0` | power of the falloff. `1` = linear · `2` = inverse-square · `3` = cubic |
+| `WELL_PULL_MAX` | `500` | hard cap on the well-pull magnitude (cells/s²); internal safety |
+
+Constants locked from a `?tune=1` L1 Tutorial Well playthrough on
+2026-05-19; previous values archived in the commit immediately before
+this one.
 
 The marble should feel **heavy** — gravity dominates, player input
 nudges. On a flat plane the marble barely accelerates from tilt alone;
@@ -182,9 +230,11 @@ emits a paste-ready sparse block reflecting any sliders the playtester
 moved away from defaults.
 
 Allowed keys: `ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`, `FRICTION_FLOOR`,
-`GRAVITY_MULT`, `TILT_FORCE_MULTIPLIER`, `ESCAPE_THRESHOLD`. Unknown
-keys are ignored. (`GRAVITY_K` is the internal base; only `GRAVITY_MULT`
-is tunable.)
+`GRAVITY_MULT`, `TILT_FORCE_MULTIPLIER`, `ESCAPE_THRESHOLD`,
+`WELL_PULL_STRENGTH`, `WELL_PULL_RADIUS`, `WELL_PULL_MIN_DIST`,
+`WELL_PULL_FALLOFF_EXP`. Unknown keys are ignored. (`GRAVITY_K` and
+`WELL_PULL_MAX` are internal bases; only the multipliers / shape
+parameters are tunable.)
 
 ## Tune panel (`?tune=1`)
 
@@ -199,6 +249,10 @@ Slider ranges (clamped on apply to keep the engine numerically safe):
 | `FRICTION_FLOOR` | 0.70 – 0.99 | 0.01 |
 | `TILT_FORCE_MULTIPLIER` | 0.5 – 3.0 | 0.1 |
 | `ESCAPE_THRESHOLD` | 0 – 5.0 | 0.1 |
+| `WELL_PULL_STRENGTH` | 0 – 10 | 0.1 |
+| `WELL_PULL_RADIUS` | 0.5 – 8 | 0.1 |
+| `WELL_PULL_MIN_DIST` | 0.1 – 1.0 | 0.05 |
+| `WELL_PULL_FALLOFF_EXP` | 0.5 – 4.0 | 0.1 |
 
 Panel layout matches v1.0's: a fixed-width `320px` panel pinned
 bottom-left over the gameplay (NOT panel-spanning). Sliders span the
