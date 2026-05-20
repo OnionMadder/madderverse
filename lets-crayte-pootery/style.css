@@ -1206,7 +1206,18 @@ a:focus-visible {
 .canvas-overlay-btn {
     position: absolute;
     top: 14px;
+    /* Undo sits at the far right; redo (.is-redo) sits to its
+       left so the natural reading order is "redo  undo" from
+       left-to-right, with undo as the primary action closer to
+       the user's thumb. */
     right: 14px;
+}
+
+.canvas-overlay-btn.is-redo {
+    right: calc(14px + 38px + 8px);   /* one button + gap left of undo */
+}
+
+.canvas-overlay-btn {
     width: 38px;
     height: 38px;
     padding: 0;
@@ -1386,6 +1397,7 @@ a:focus-visible {
 }
 
 .tool-modes {
+    flex-wrap: wrap;
     gap: 6px;
 }
 

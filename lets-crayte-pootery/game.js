@@ -4311,11 +4311,17 @@
         activePointers: null,
         gestureStart: null,    /* { distance, midX, midY, zoom, panX, panY } */
 
-        /* Undo stack — PNG dataURL snapshots of the paint canvas
-           taken at the start of each user gesture. PNG compresses
-           sparse canvases extremely well so 20 levels stays under
-           ~2MB even with busy decoration. */
+        /* Undo / redo stacks — PNG dataURL snapshots of the paint
+           canvas. Undo captures the BEFORE state at the start of
+           each user gesture; popping it pushes the current state
+           into redoStack so the user can step back forward. Any
+           NEW action (pushUndoSnapshot) clears redoStack — once
+           you start a new branch, the old future is gone (this
+           is the standard editor model). PNG compresses sparse
+           canvases extremely well so 20 levels of each stays well
+           under a couple of MB even with busy decoration. */
         undoStack: [],
+        redoStack: [],
 
         running: false,
         rafId: null,
@@ -4325,43 +4331,86 @@
 
     const UNDO_LIMIT = 20;
 
-    function pushUndoSnapshot() {
-        if (!D.paintCanvas) return;
-        try {
-            D.undoStack.push(D.paintCanvas.toDataURL("image/png"));
-            while (D.undoStack.length > UNDO_LIMIT) D.undoStack.shift();
-        } catch (e) {
-            console.warn("[CRAYte] undo snapshot failed", e);
+    function snapshotPaint() {
+        if (!D.paintCanvas) return null;
+        try { return D.paintCanvas.toDataURL("image/png"); }
+        catch (e) {
+            console.warn("[CRAYte] snapshot failed", e);
+            return null;
         }
-        updateUndoButton();
     }
 
-    function popUndo() {
-        if (D.undoStack.length === 0) return;
-        const dataUrl = D.undoStack.pop();
+    /* Replace the paint canvas pixels with a dataURL snapshot.
+       Transform is reset before drawImage so the snapshot lands
+       in pixel coords (it was taken at native res via toDataURL),
+       not in the DPR-scaled logical space the brush uses. */
+    function restorePaintFromDataURL(dataUrl, onDone) {
+        if (!dataUrl || !D.paintCtx) { if (onDone) onDone(); return; }
         const img = new Image();
         img.onload = function () {
             D.paintCtx.save();
-            /* Reset transform so drawImage lands in pixel coords,
-               not the DPR-scaled logical space. Snapshot was taken
-               at native canvas resolution via toDataURL. */
             D.paintCtx.setTransform(1, 0, 0, 1, 0, 0);
-            D.paintCtx.clearRect(0, 0, D.paintCanvas.width, D.paintCanvas.height);
+            D.paintCtx.clearRect(0, 0,
+                D.paintCanvas.width, D.paintCanvas.height);
             D.paintCtx.drawImage(img, 0, 0);
             D.paintCtx.restore();
-            updateUndoButton();
+            if (onDone) onDone();
         };
         img.src = dataUrl;
     }
 
-    function clearUndoStack() {
-        D.undoStack.length = 0;
-        updateUndoButton();
+    function pushUndoSnapshot() {
+        if (!D.paintCanvas) return;
+        const snap = snapshotPaint();
+        if (snap) {
+            D.undoStack.push(snap);
+            while (D.undoStack.length > UNDO_LIMIT) D.undoStack.shift();
+        }
+        /* A new action invalidates any redo branch — once you start
+           drawing again, the previously-undone future is gone. */
+        D.redoStack.length = 0;
+        updateUndoRedoButtons();
     }
 
-    function updateUndoButton() {
-        const btn = document.getElementById("undoBtn");
-        if (btn) btn.disabled = D.undoStack.length === 0;
+    function popUndo() {
+        if (D.undoStack.length === 0) return;
+        /* Stash current state in redoStack so REDO can come back. */
+        const before = snapshotPaint();
+        const dataUrl = D.undoStack.pop();
+        restorePaintFromDataURL(dataUrl, function () {
+            if (before) {
+                D.redoStack.push(before);
+                while (D.redoStack.length > UNDO_LIMIT) D.redoStack.shift();
+            }
+            updateUndoRedoButtons();
+        });
+    }
+
+    function popRedo() {
+        if (D.redoStack.length === 0) return;
+        /* Stash current so UNDO can step back through this branch. */
+        const before = snapshotPaint();
+        const dataUrl = D.redoStack.pop();
+        restorePaintFromDataURL(dataUrl, function () {
+            if (before) {
+                D.undoStack.push(before);
+                while (D.undoStack.length > UNDO_LIMIT) D.undoStack.shift();
+            }
+            updateUndoRedoButtons();
+        });
+    }
+
+    function clearUndoStack() {
+        D.undoStack.length = 0;
+        D.redoStack.length = 0;
+        updateUndoRedoButtons();
+    }
+
+    function updateUndoRedoButtons() {
+        const u = document.getElementById("undoBtn");
+        const r = document.getElementById("redoBtn");
+        if (u) u.disabled = D.undoStack.length === 0;
+        if (r) r.disabled = D.redoStack.length === 0;
     }
 
     function activePack() {
@@ -4634,22 +4683,32 @@
     }
 
     function wireUndoAndRotate() {
-        /* Undo button */
+        /* Undo + Redo buttons */
         const undoBtn = document.getElementById("undoBtn");
         if (undoBtn) undoBtn.addEventListener("click", popUndo);
+        const redoBtn = document.getElementById("redoBtn");
+        if (redoBtn) redoBtn.addEventListener("click", popRedo);
 
-        /* Global Ctrl/Cmd+Z — only fires on decorate screen and
-           only when focus isn't in a text input (don't hijack
-           the gallery name field or the auth email field). */
+        /* Global keyboard:
+             Ctrl/Cmd+Z         -> undo
+             Ctrl/Cmd+Shift+Z   -> redo
+             Ctrl/Cmd+Y         -> redo (Windows convention)
+           Only fires on the decorate screen, and skipped when
+           focus is in a text input so we don't hijack the gallery
+           name field / auth email field. */
         document.addEventListener("keydown", function (e) {
             if (!(e.ctrlKey || e.metaKey)) return;
-            if (e.key !== "z" && e.key !== "Z") return;
-            if (e.shiftKey) return;   /* leave shift+ctrl+z for future redo */
             if (currentScreen !== "decorate") return;
             const t = e.target;
             if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
-            e.preventDefault();
-            popUndo();
+            const k = (e.key || "").toLowerCase();
+            if (k === "z" && !e.shiftKey) {
+                e.preventDefault();
+                popUndo();
+            } else if ((k === "z" && e.shiftKey) || k === "y") {
+                e.preventDefault();
+                popRedo();
+            }
         });
 
         /* Rotation slider */

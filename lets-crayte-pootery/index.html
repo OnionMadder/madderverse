@@ -366,12 +366,17 @@
         <div class="canvas-wrap">
             <canvas id="decorateCanvas" width="400" height="600"
                     aria-label="Locked pot. Drag to paint, tap to stamp. Pinch to zoom, two-finger drag to pan."></canvas>
-            <!-- Floating UNDO button — pinned to the top-right of
-                 the canvas frame. Ctrl/Cmd+Z works too. Disabled
-                 when there's nothing to undo. -->
+            <!-- Floating UNDO / REDO pair — pinned to the top-right
+                 of the canvas frame. Ctrl/Cmd+Z + Ctrl/Cmd+Shift+Z
+                 (or Ctrl/Cmd+Y) also work. Both disable when their
+                 stack is empty. -->
             <button class="canvas-overlay-btn" id="undoBtn" type="button"
                     title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
                 <span aria-hidden="true">&#x21B6;</span>
+            </button>
+            <button class="canvas-overlay-btn is-redo" id="redoBtn" type="button"
+                    title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
+                <span aria-hidden="true">&#x21B7;</span>
             </button>
 
             <!-- Zoom controls. Pinch + two-finger pan work on touch;
