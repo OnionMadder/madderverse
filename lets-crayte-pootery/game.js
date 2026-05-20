@@ -1276,6 +1276,9 @@
     let wheelHum = null;
 
     function wheelHumStart() {
+        /* Prefer the recorded looping spinning-wheel ambient.
+           Synth oscillator hum below is the fallback. */
+        if (WHEEL_AMBIENT.start()) return;
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         if (wheelHum) return;
@@ -1320,6 +1323,9 @@
     }
 
     function wheelHumStop() {
+        /* Stop both the recorded ambient AND the synth fallback —
+           idempotent; whichever wasn't running becomes a no-op. */
+        WHEEL_AMBIENT.stop();
         if (!wheelHum) return;
         const { osc1, osc2, trem, g, ctx } = wheelHum;
         const now = ctx.currentTime;
@@ -1367,11 +1373,11 @@
         src.start(now);
     }
 
-    /* Spray hiss — tiny high-pass-filtered noise puff. Played
-       on a fraction of spray-tool pointer moves so a sustained
-       hold sounds like a continuous airbrush, not a constant
-       wall of hiss. ~0.03 gain — sits well under wet loop.    */
+    /* Spray hiss — prefers the recorded spray-paint.mp3 (pool of
+       3 so rapid taps overlap). Synth high-pass noise puff below
+       is the fallback. */
     function spraySound() {
+        if (SPRAY_SFX && SPRAY_SFX.play(0.9)) return;
         const ctx = ensureAudio();
         if (!ctx || ctx.state !== "running") return;
         const now = ctx.currentTime;
@@ -1529,31 +1535,56 @@
         })
     };
 
-    /* Kiln audio: one shared file for door open AND close (the
-       sound is symmetric enough to share), and a long firing
-       ambience sized to the 5s firing window. Same pool +
-       synth-fallback pattern as the clay audio. */
+    /* Kiln audio: one single recorded track for the entire firing
+       moment (was previously split into door + fire). Plays at
+       firing-stage entry; closing/opening stages are silent
+       (the recording covers the dramatic arc itself). */
     const KILN_SFX = {
-        door: makeAudioPool("assets/audio/kiln-openclose.mp3"),
-        fire: makeAudioPool("assets/audio/kiln-fire.mp3")
+        sequence: makeAudioPool("assets/audio/kiln-sequence.mp3")
     };
 
-    /* Recorded door sound preferred; synth kilnDoorThunk kept as
-       fallback so the door always makes SOMETHING. */
-    function kilnDoorPlay() {
-        if (KILN_SFX.door && KILN_SFX.door.play(1.0)) return;
-        if (typeof kilnDoorThunk === "function") kilnDoorThunk(1.0);
-    }
-
-    /* Recorded fire ambience preferred; synth kilnRoar kept as
-       fallback. The file is sized to the current firing window
-       — if firing duration changes, the file will either tail
-       early or get cut off, but the synth fallback always
-       respects the duration. */
-    function kilnFirePlay(durationSec) {
-        if (KILN_SFX.fire && KILN_SFX.fire.play(1.0)) return;
+    /* Recorded fire sequence preferred; synth kilnRoar kept as
+       fallback. */
+    function kilnSequencePlay(durationSec) {
+        if (KILN_SFX.sequence && KILN_SFX.sequence.play(1.0)) return;
         if (typeof kilnRoar === "function") kilnRoar(durationSec);
     }
+
+    /* Ambient looping spinning-wheel — plays underneath squelches
+       during the entire shape/decorate/kiln cycle. One Audio
+       element (not a pool — single ambient track), .loop=true,
+       moderate volume so the squelches sit on top. Replaces the
+       synth wheel hum; synth wheelHumStart still fires as a
+       fallback if the file fails. */
+    const WHEEL_AMBIENT = (function () {
+        try {
+            const a = new Audio("assets/audio/spinning-wheel.mp3");
+            a.preload = "auto";
+            a.loop = true;
+            a.volume = 0.55;
+            let failed = false;
+            a.addEventListener("error", function () { failed = true; });
+            return {
+                start: function () {
+                    if (failed) return false;
+                    try {
+                        const p = a.play();
+                        if (p && typeof p.catch === "function") p.catch(function () {});
+                        return true;
+                    } catch (_) { return false; }
+                },
+                stop: function () {
+                    try { a.pause(); a.currentTime = 0; } catch (_) {}
+                }
+            };
+        } catch (_) {
+            return { start: function () { return false; }, stop: function () {} };
+        }
+    }());
+
+    /* Spray-paint recording for the SPRAY decorate tool — replaces
+       the synth spraySound. Pool of 3 so rapid taps overlap. */
+    const SPRAY_SFX = makeAudioPool("assets/audio/spray-paint.mp3");
 
     /* Squelch ships in 4 timbre variants randomly chosen on each
        call so sustained shaping doesn't repeat the same beat.
@@ -2325,17 +2356,6 @@
         if (prompt) {
             prompt.textContent = SHAPE.needsLump ? "DRAG A LUMP →"
                                                  : "SWAP CLAY →";
-        }
-        /* New pot needs a lump — auto-open the shape-side-rail
-           drawer so the lump tray is immediately visible at first
-           sight on phone. (Desktop layout is row-flex; the .is-open
-           class is harmless there.) The kid can collapse the drawer
-           afterward to get full-canvas shaping room. */
-        const drawer = document.querySelector("#screen-shape .shape-side-rail");
-        if (drawer && SHAPE.needsLump) {
-            drawer.classList.add("is-open");
-            const handle = drawer.querySelector(".drawer-handle");
-            if (handle) handle.setAttribute("aria-expanded", "true");
         }
     }
 
@@ -6399,15 +6419,16 @@
             }
         } else if (state === "closing") {
             setKilnStatus("DOORS CLOSING");
-            kilnDoorPlay();      /* recorded door, synth thunk fallback */
             haptic([16]);
+            /* No door audio — kiln-sequence covers the dramatic arc
+               at firing-entry. (Synth kilnDoorThunk available as a
+               manual fallback if she ever wants door clunks back.) */
         } else if (state === "firing") {
             setKilnStatus("FIRING IT");
             haptic([22]);
-            kilnFirePlay(KILN_DUR.firing / 1000);   /* recorded fire ambience, synth roar fallback */
+            kilnSequencePlay(KILN_DUR.firing / 1000);
         } else if (state === "opening") {
             setKilnStatus("DOORS OPENING");
-            kilnDoorPlay();
             haptic([16]);
         } else if (state === "reveal") {
             setKilnStatus("FIRED");

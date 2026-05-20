@@ -4745,7 +4745,11 @@ a:focus-visible {
         width: 100%;
         height: 54px;
         flex-shrink: 0;
-        background: none;
+        /* Solid background matching the drawer's top gradient stop.
+           Sticky + transparent let inner-scroll content bleed through
+           the TOOLS label — opaque background + higher z-index keep
+           the handle visually on top no matter what's behind it. */
+        background: #082028;
         border: none;
         padding: 0;
         cursor: pointer;
@@ -4758,7 +4762,7 @@ a:focus-visible {
             0 0 8px rgba(255, 46, 136, 0.45);
         position: sticky;
         top: 0;
-        z-index: 1;
+        z-index: 5;
     }
 
     .drawer-handle::before {
@@ -4879,6 +4883,74 @@ a:focus-visible {
 html.is-native .site-footer-slim,
 html.is-native #btnInstall {
     display: none !important;
+}
+
+/* ----- 19. Floating primary actions (FINISH FORM / FIRE IT) -----
+   Pinned to the bottom-right corner. Visible by default; hidden
+   when the matching tool drawer is open so they don't compete
+   with the in-drawer tools the kid is choosing. .btn-control
+   .primary already gives them the pink/CTA styling — we just
+   reposition. */
+.float-action {
+    position: fixed;
+    bottom: calc(72px + var(--safe-bottom));   /* above the 54px collapsed drawer handle + 18px gap */
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    z-index: 85;                               /* above drawer z-80 */
+    /* Match .btn-control.primary visual treatment without depending
+       on whether the page CSS class cascade picks it up correctly
+       (the button is outside its original .shape-controls/
+       .decorate-controls flex parent). */
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 22px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: #fff;
+    background: linear-gradient(180deg, var(--pink) 0%, var(--pink-deep) 100%);
+    border: 1.5px solid var(--pink);
+    border-radius: var(--radius-md);
+    box-shadow:
+        0 0 0 1px #000,
+        0 6px 14px rgba(0, 0, 0, 0.55),
+        0 0 22px rgba(255, 46, 136, 0.45);
+    cursor: pointer;
+    transition: opacity 0.18s ease,
+                transform 0.06s ease,
+                box-shadow 0.15s ease;
+    text-shadow: 1px 1px 0 #000;
+}
+
+.float-action:hover,
+.float-action:focus-visible {
+    outline: none;
+    box-shadow:
+        0 0 0 1px #000,
+        0 6px 14px rgba(0, 0, 0, 0.55),
+        0 0 32px rgba(255, 46, 136, 0.65);
+}
+
+.float-action:active {
+    transform: translateY(1px);
+}
+
+.float-action .btn-glyph {
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* Hide when the matching drawer is open. :has() is supported in
+   modern Chromium (Capacitor's WebView) + Safari + Firefox 121+,
+   so this works in every target. On desktop the drawer never has
+   .is-open (the handle is display:none above 768px), so the
+   floating button stays visible — which is the intended behavior:
+   no separate desktop variant needed. */
+#screen-shape:has(.shape-side-rail.is-open) .shape-float-finish,
+#screen-decorate:has(.decorate-side-rail.is-open) .decorate-float-fire {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
 }
 
 /* ----- 17. Clay-lump tray (shape screen) -----

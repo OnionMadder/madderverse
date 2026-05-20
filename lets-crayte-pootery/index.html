@@ -345,16 +345,20 @@
                 <button class="btn-control" id="shapeReset" type="button">
                     <span class="btn-label">RESET</span>
                 </button>
-                <button class="btn-control primary" id="shapeFinish" type="button">
-                    <span class="btn-label">FINISH FORM</span>
-                    <span class="btn-glyph" aria-hidden="true">&#9656;</span>
-                </button>
             </div>
 
         </div>
 
     </div>
 
+    <!-- FINISH FORM lives outside the drawer as a floating button
+         so it's reachable while the kid is shaping with the tray
+         collapsed. Hidden when the drawer is open (.is-open) so
+         it doesn't compete visually with the in-drawer tools. -->
+    <button class="float-action shape-float-finish" id="shapeFinish" type="button">
+        <span class="btn-label">FINISH FORM</span>
+        <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+    </button>
 
 </main>
 
@@ -480,15 +484,19 @@
             <button class="btn-control" id="decClear" type="button">
                 <span class="btn-label">CLEAR</span>
             </button>
-            <button class="btn-control primary" id="decFire" type="button">
-                <span class="btn-label">FIRE IT</span>
-                <span class="btn-glyph" aria-hidden="true">&#9656;</span>
-            </button>
         </div>
 
         </div><!-- /.decorate-side-rail -->
 
     </div>
+
+    <!-- FIRE IT mirrors the shape-screen FINISH FORM pattern —
+         floating action outside the drawer, hidden when the
+         decorate drawer is open. -->
+    <button class="float-action decorate-float-fire" id="decFire" type="button">
+        <span class="btn-label">FIRE IT</span>
+        <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+    </button>
 
 </main>
 
