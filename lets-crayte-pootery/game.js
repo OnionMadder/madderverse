@@ -4649,11 +4649,13 @@
             Testing" with test accounts
        ============================================================ */
 
-    /* REPLACE THIS with the Android (Public) SDK key from the
-       RevenueCat dashboard once the account is set up. While the
-       key is the placeholder, billing is a no-op (paid packs
-       show a friendly "coming soon" alert instead of crashing). */
-    const RC_PUBLIC_API_KEY = "REPLACE_WITH_REVENUECAT_ANDROID_PUBLIC_SDK_KEY";
+    /* RevenueCat Android (Public) SDK key for the Pootery project.
+       The `test_` prefix is RC's sandbox/development key — fine for
+       Closed Testing purchases against Play Console license-tester
+       accounts. If RC ever issues a separate `goog_…` production
+       key for this project, swap here when promoting to public
+       release. */
+    const RC_PUBLIC_API_KEY = "test_BETXawCnGRASMRRkdweWKBklNkZ";
 
     /* Pack id -> RC entitlement id mapping. The Play Console
        product IDs + the RC entitlement IDs must match these
