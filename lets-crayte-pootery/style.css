@@ -2131,8 +2131,17 @@ a:focus-visible {
 
 .pot-detail-card {
     width: min(440px, 96vw);
+    /* Definite height (NOT just max-height) so the flex:1
+       canvas-wrap actually has leftover space to claim. Capped
+       at 96vh to leave a small backdrop margin. */
+    height: min(96vh, 720px);
     max-height: 96vh;
-    overflow-y: auto;
+    /* Self-contained popup: nothing scrolls. The titlebar / name /
+       actions take their natural height, the canvas-wrap takes
+       whatever's left and shrinks the pot preview to fit. */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     background: #051419;
     border: 2px solid var(--teal);
     border-radius: var(--radius-md);
@@ -2171,15 +2180,28 @@ a:focus-visible {
 }
 
 .detail-canvas-wrap {
+    /* Takes whatever vertical space is left after titlebar / name /
+       actions; min-height:0 lets the flex item actually shrink
+       below its content. Inner flex centers the canvas. */
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: #06141a;
     padding: 8px;
+    overflow: hidden;
 }
 
 #detailCanvas {
     display: block;
-    width: 100%;
-    aspect-ratio: 400 / 600;
-    height: auto;
+    /* The canvas's width="400" height="600" attributes provide the
+       intrinsic 2:3 ratio; max-width AND max-height = 100% let the
+       browser scale down to whichever container dimension runs out
+       first, preserving aspect — no explicit width/height in CSS,
+       no aspect-ratio, no 0×0 collapse. */
+    max-width: 100%;
+    max-height: 100%;
     background: #0c1f25;
     border-radius: var(--radius-sm);
 }
@@ -2198,6 +2220,12 @@ a:focus-visible {
 
 .detail-name-input {
     flex: 1;
+    /* <input> has a UA default min-width from its `size` attribute
+       (~150px) that overrides flex shrinking — making the row
+       overflow horizontally on narrow popups. Explicit min-width:0
+       lets flex actually compress it to fit. */
+    min-width: 0;
+    width: 100%;
     padding: 8px 10px;
     background: var(--bg-deep);
     border: 1px solid var(--teal-low);
@@ -2217,12 +2245,19 @@ a:focus-visible {
 
 .detail-actions {
     display: flex;
+    /* Wrap so 3 wide buttons (DELETE / SHARE TO EVERYONE / STOP
+       SHARING) don't push the popup horizontally past its width. */
+    flex-wrap: wrap;
     gap: 10px;
     padding: 12px 14px 14px;
 }
 
 .detail-actions .btn-control {
-    flex: 1;
+    /* Don't GROW (otherwise each button takes a full wrapped row
+       and the actions block becomes comically tall on narrow
+       viewports). Can shrink down to a min that still reads. */
+    flex: 0 1 auto;
+    min-width: 90px;
     padding: 12px 10px;
 }
 
