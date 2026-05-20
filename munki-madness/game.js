@@ -1307,19 +1307,27 @@
     renderObstacles();
 
     // ---- MARBLE — must draw LAST. Load-bearing for z-order: anything
-    // drawn after this can occlude the ball. The marble's *physics*
-    // position is on the surface (centre at marble.h), but rendering at
-    // that Z visually buries the ball one radius into the mesh — and
-    // any obstacle with a translucent fill (ice, mud, etc.) sits at
-    // that same Z and covered the lower hemisphere, making the ball
-    // appear to "disappear into" the obstacle. Lift the rendered Z by
-    // MARBLE_R so the ball's BOTTOM rides the mesh — visually it
-    // sits on top, which is what the physics already says.
+    // drawn after this can occlude the ball.
+    //
+    // The marble was "disappearing into" obstacles (ice in particular)
+    // because we were rendering the visual sphere with its CENTRE on
+    // the mesh surface — the lower hemisphere extended into the mesh,
+    // and any obstacle with a translucent fill at that surface plane
+    // covered it. First attempt was a world-Z lift by MARBLE_R, but
+    // the visual sphere is 2× the physics radius (cellPx * MARBLE_R *
+    // 2.0 ≈ 21 px), and a world-Z lift only translates to ~5 px on
+    // screen — still mostly buried. The proper fix is a SCREEN-SPACE
+    // lift after projection: shift the centre up by the actual rendered
+    // pixel radius so the visual ball's BOTTOM touches the mesh.
+    //
+    // marble.sink decreases renderZ during capture so the ball still
+    // descends through the surface and into the bowl visually.
     ctx.save();
-    var renderZ = marble.h + MARBLE_R - marble.sink * 1.6;
+    var renderZ = marble.h - marble.sink * 3.0;   // sink scaled to clear the lift
     var mp = project(marble.x, marble.y, renderZ);
     var cellPx = Math.min(W, Hh) / (Math.max(hm.gw, hm.gh) * 1.18);
     var rad = cellPx * MARBLE_R * 2.0 * mp.sc * (1 - marble.sink * 0.45);
+    mp.sy -= rad * (1 - marble.sink);  // ride mesh at rest; sink takes lift away
     ctx.shadowBlur = 18 * DPR;
     ctx.shadowColor = "rgba(255,150,90,0.95)";
     var grd = ctx.createRadialGradient(
