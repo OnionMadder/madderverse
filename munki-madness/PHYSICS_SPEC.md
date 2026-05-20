@@ -48,11 +48,13 @@ dH/dx = (h10 - h00) + ((h11 - h01) - (h10 - h00)) * fy
 dH/dy = (h01 - h00) + ((h11 - h10) - (h01 - h00)) * fx
 ```
 
-Slope gravity accel applied to the marble each substep:
+Slope gravity accel applied to the marble each substep (effective
+strength `= GRAVITY_K × GRAVITY_MULT`):
 
 ```
-ax_grav = -GRAVITY_K * dH/dx
-ay_grav = -GRAVITY_K * dH/dy
+gK      = GRAVITY_K * GRAVITY_MULT
+ax_grav = -gK * dH/dx
+ay_grav = -gK * dH/dy
 ```
 
 The marble accelerates **opposite** the gradient (downhill). A well —
@@ -66,15 +68,16 @@ Tunable constants at the top of `game.js` (live-tunable via `?tune=1`):
 
 | Constant | v2.0 value | Meaning |
 |---|---|---|
-| `ACCEL` | `20` | player-input push (cells/s²) |
-| `MAX_SPEED` | `7` | top speed (cells/s) |
+| `ACCEL` | `22` | player-input push (cells/s²) |
+| `MAX_SPEED` | `6` | top speed (cells/s) |
 | `WALL_BOUNCE` | `0.4` | edge restitution — pinball bonk |
-| `FRICTION_FLOOR` | `0.955` | per-frame@60 velocity multiplier — higher = heavier (momentum lingers) |
-| `GRAVITY_K` | `40` | slope → accel multiplier (see above) |
+| `FRICTION_FLOOR` | `0.92` | per-frame@60 velocity multiplier (drag) |
+| `GRAVITY_K` | `40` | base slope→accel constant (internal; not on the tune panel) |
+| `GRAVITY_MULT` | `0.5` | player-tunable multiplier on `GRAVITY_K`. Effective gravity = `GRAVITY_K × GRAVITY_MULT`. `0` = flat-plane (no slope pull); `2` = wild |
 | `TILT_FULL` | `10°` | deg past the recentred zero that saturates tilt input |
 | `TILT_FORCE_MULTIPLIER` | `2.0` | extra tilt-input gain |
 | `MARBLE_R` | `0.42` | marble radius (cells); keeps it off the rim |
-| `ESCAPE_SPEED` | `2.2` | bowl-speed threshold below which the marble is captured (cells/s) |
+| `ESCAPE_THRESHOLD` | `2.2` | bowl-speed threshold below which the marble is captured (cells/s) |
 
 The marble should feel **heavy** — gravity dominates, player input
 nudges. On a flat plane the marble barely accelerates from tilt alone;
@@ -114,7 +117,7 @@ A level defines `well = { x, y, captureR }`. The marble is **captured**
 when it is simultaneously:
 
 1. Inside the capture bowl: `distance((x,y), (well.x, well.y)) < captureR`, **and**
-2. Too slow to climb back out: `|v| < ESCAPE_SPEED` (Phase 1: `2.2` cells/s),
+2. Too slow to climb back out: `|v| < ESCAPE_THRESHOLD` (default `2.2` cells/s),
 3. for at least `0.28 s` of continuous dwell (anti-flicker; a marble
    that streaks across the bowl at high speed will not falsely trigger).
 
@@ -179,7 +182,30 @@ emits a paste-ready sparse block reflecting any sliders the playtester
 moved away from defaults.
 
 Allowed keys: `ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`, `FRICTION_FLOOR`,
-`GRAVITY_K`, `TILT_FORCE_MULTIPLIER`. Unknown keys are ignored.
+`GRAVITY_MULT`, `TILT_FORCE_MULTIPLIER`, `ESCAPE_THRESHOLD`. Unknown
+keys are ignored. (`GRAVITY_K` is the internal base; only `GRAVITY_MULT`
+is tunable.)
+
+## Tune panel (`?tune=1`)
+
+Slider ranges (clamped on apply to keep the engine numerically safe):
+
+| Knob | Range | Step |
+|---|---|---|
+| `ACCEL` | 5 – 40 | 1 |
+| `GRAVITY_MULT` | 0 – 2.0 | 0.05 |
+| `MAX_SPEED` | 2 – 15 | 0.5 |
+| `WALL_BOUNCE` | 0 – 0.99 | 0.05 |
+| `FRICTION_FLOOR` | 0.70 – 0.99 | 0.01 |
+| `TILT_FORCE_MULTIPLIER` | 0.5 – 3.0 | 0.1 |
+| `ESCAPE_THRESHOLD` | 0 – 5.0 | 0.1 |
+
+Panel layout is sized for phone-portrait — width `min(92vw, 520px)`,
+sliders span full panel width, value readout is 18px bold cyan above
+each slider with `font-variant-numeric: tabular-nums`. Collapsible.
+**"Copy current values"** at the bottom emits ALL knobs as a JSON
+snippet for paste-back; those values become the new defaults the
+next time the file is committed.
 
 ## Input → world acceleration
 

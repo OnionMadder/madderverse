@@ -19,21 +19,22 @@
   // ---------------------------------------------------------------------
   // Physics knobs — see PHYSICS_SPEC.md. Live-tunable via ?tune=1.
   // ---------------------------------------------------------------------
-  var ACCEL = 20;            // player-input push (cells/s^2)
-  var MAX_SPEED = 7;         // top speed (cells/s)
+  var ACCEL = 22;            // player-input push (cells/s^2)
+  var MAX_SPEED = 6;         // top speed (cells/s)
   var WALL_BOUNCE = 0.4;     // edge restitution (pinball bonk)
-  var FRICTION_FLOOR = 0.955;// per-frame@60 velocity multiplier (drag)
-                              // — higher = heavier (momentum lingers).
-  // How hard the surface slope pulls the marble. The gravity accel is
-  // -GRAVITY_K * gradient(height); a well's cone wall becomes a real pull.
+  var FRICTION_FLOOR = 0.92; // per-frame@60 velocity multiplier (drag)
+  // GRAVITY_K is the *base* slope-to-accel constant — internal, not on
+  // the tune panel. The exposed knob is GRAVITY_MULT (player-tunable);
+  // effective slope gravity is -GRAVITY_K * GRAVITY_MULT * gradient.
+  // MULT=0 → flat (no slope pull); MULT=1 → full base; MULT=2 → wild.
   var GRAVITY_K = 40;
+  var GRAVITY_MULT = 0.5;
   var MARBLE_R = 0.42;       // marble radius (cells) — keeps it off the rim
 
   // Well capture: the marble is "in the goal" when it's inside the well's
-  // bowl AND too slow to climb back out (trapped at the bottom). With the
-  // heavier feel the ball carries more momentum into the bowl, so the
-  // threshold is forgiving — the capture-dwell timer still rejects fly-throughs.
-  var ESCAPE_SPEED = 2.2;
+  // bowl AND its speed is below ESCAPE_THRESHOLD (cells/s) — trapped at
+  // the bottom. The 0.28s dwell timer still rejects fly-throughs.
+  var ESCAPE_THRESHOLD = 2.2;
 
   var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // anti spiral-of-death
@@ -50,8 +51,9 @@
   // (Phase 5 catalog uses this; the seam exists now). Keys mirror ?tune=1.
   var BASE_PHYS = {
     "ACCEL": ACCEL, "MAX_SPEED": MAX_SPEED, "WALL_BOUNCE": WALL_BOUNCE,
-    "FRICTION_FLOOR": FRICTION_FLOOR, "GRAVITY_K": GRAVITY_K,
-    "TILT_FORCE_MULTIPLIER": TILT_FORCE_MULTIPLIER
+    "FRICTION_FLOOR": FRICTION_FLOOR, "GRAVITY_MULT": GRAVITY_MULT,
+    "TILT_FORCE_MULTIPLIER": TILT_FORCE_MULTIPLIER,
+    "ESCAPE_THRESHOLD": ESCAPE_THRESHOLD
   };
   var curLevelLabel = "";
   var tuneLvlEl = null;
@@ -472,14 +474,17 @@
   function clampPhys(k, v) {
     v = +v;
     if (!isFinite(v)) return BASE_PHYS[k];
-    if (k === "WALL_BOUNCE") return clamp(v, 0, 0.98);
-    if (k === "FRICTION_FLOOR") return clamp(v, 0.3, 0.9999);
+    if (k === "WALL_BOUNCE") return clamp(v, 0, 0.99);
+    if (k === "FRICTION_FLOOR") return clamp(v, 0.3, 0.999);
+    if (k === "GRAVITY_MULT") return clamp(v, 0, 2);
+    if (k === "ESCAPE_THRESHOLD") return clamp(v, 0, 5);
     return Math.max(0, v);
   }
   function applyPhysics(p) {
     ACCEL = p.ACCEL; MAX_SPEED = p.MAX_SPEED; WALL_BOUNCE = p.WALL_BOUNCE;
-    FRICTION_FLOOR = p.FRICTION_FLOOR; GRAVITY_K = p.GRAVITY_K;
+    FRICTION_FLOOR = p.FRICTION_FLOOR; GRAVITY_MULT = p.GRAVITY_MULT;
     TILT_FORCE_MULTIPLIER = p.TILT_FORCE_MULTIPLIER;
+    ESCAPE_THRESHOLD = p.ESCAPE_THRESHOLD;
   }
   function effectivePhysics(override) {
     var e = {}, k;
@@ -684,8 +689,10 @@
 
     // Slope gravity: accelerate downhill (opposite the height gradient).
     // gravFlip is -1 inside reverse-gravity zones.
-    var ax = st.gravFlip * -GRAVITY_K * s.gx;
-    var ay = st.gravFlip * -GRAVITY_K * s.gy;
+    // Effective strength = GRAVITY_K * GRAVITY_MULT (MULT is the panel knob).
+    var gK = GRAVITY_K * GRAVITY_MULT;
+    var ax = st.gravFlip * -gK * s.gx;
+    var ay = st.gravFlip * -gK * s.gy;
 
     // Player input adds on top of gravity, scaled by surface grip
     // (ice reduces authority; mud nibbles slightly).
@@ -730,7 +737,7 @@
     var dwx = marble.x - w.x, dwy = marble.y - w.y;
     var dwell = Math.sqrt(dwx * dwx + dwy * dwy);
     var inBowl = dwell < w.captureR;
-    var slow = Math.sqrt(marble.vx * marble.vx + marble.vy * marble.vy) < ESCAPE_SPEED;
+    var slow = Math.sqrt(marble.vx * marble.vx + marble.vy * marble.vy) < ESCAPE_THRESHOLD;
     if (inBowl && slow) {
       captureTimer += dt;
       // Visually sink the marble into the hole as it settles.
@@ -1108,56 +1115,86 @@
   };
 
   // ---------------------------------------------------------------------
-  // Live-tune panel — ?tune=1 (ported pattern from v1.0)
+  // Live-tune panel — ?tune=1.
+  //   - Wide on phone (92vw) so sliders have real drag precision.
+  //   - Big value readout above each slider, monospace, cyan.
+  //   - Collapsible to a single bar tap; collapse state persisted.
+  //   - "Copy current values" dumps ALL knobs as a JSON snippet you can
+  //     paste back to Claude; the new values become defaults next commit.
   // ---------------------------------------------------------------------
   (function buildTunePanel() {
     var on = false;
     try { on = /[?&]tune=1(?:&|$)/.test(location.search); } catch (e) {}
     if (!on) return;
 
+    // Slider specs — order = display order. Ranges per spec; ESCAPE and
+    // GRAVITY_MULT are the new Phase-1.1 knobs.
     var SPECS = [
-      { k: "ACCEL", min: 4, max: 48, step: 1,
-        get: function () { return ACCEL; }, set: function (v) { ACCEL = v; } },
-      { k: "MAX_SPEED", min: 2, max: 18, step: 0.5,
-        get: function () { return MAX_SPEED; }, set: function (v) { MAX_SPEED = v; } },
-      { k: "GRAVITY_K", min: 4, max: 90, step: 1,
-        get: function () { return GRAVITY_K; }, set: function (v) { GRAVITY_K = v; } },
-      { k: "WALL_BOUNCE", min: 0, max: 0.95, step: 0.05,
-        get: function () { return WALL_BOUNCE; }, set: function (v) { WALL_BOUNCE = v; } },
-      { k: "FRICTION_FLOOR", min: 0.70, max: 0.999, step: 0.002,
-        get: function () { return FRICTION_FLOOR; }, set: function (v) { FRICTION_FLOOR = v; } },
-      { k: "TILT_FORCE_MULTIPLIER", min: 0.2, max: 6, step: 0.1,
-        get: function () { return TILT_FORCE_MULTIPLIER; }, set: function (v) { TILT_FORCE_MULTIPLIER = v; } }
+      { k: "ACCEL",                 min: 5,    max: 40,   step: 1,    fmt: 0,
+        get: function () { return ACCEL; },           set: function (v) { ACCEL = v; } },
+      { k: "GRAVITY_MULT",          min: 0,    max: 2.0,  step: 0.05, fmt: 2,
+        get: function () { return GRAVITY_MULT; },    set: function (v) { GRAVITY_MULT = v; } },
+      { k: "MAX_SPEED",             min: 2,    max: 15,   step: 0.5,  fmt: 1,
+        get: function () { return MAX_SPEED; },       set: function (v) { MAX_SPEED = v; } },
+      { k: "WALL_BOUNCE",           min: 0,    max: 0.99, step: 0.05, fmt: 2,
+        get: function () { return WALL_BOUNCE; },     set: function (v) { WALL_BOUNCE = v; } },
+      { k: "FRICTION_FLOOR",        min: 0.70, max: 0.99, step: 0.01, fmt: 2,
+        get: function () { return FRICTION_FLOOR; },  set: function (v) { FRICTION_FLOOR = v; } },
+      { k: "TILT_FORCE_MULTIPLIER", min: 0.5,  max: 3.0,  step: 0.1,  fmt: 1,
+        get: function () { return TILT_FORCE_MULTIPLIER; },
+        set: function (v) { TILT_FORCE_MULTIPLIER = v; } },
+      { k: "ESCAPE_THRESHOLD",      min: 0,    max: 5.0,  step: 0.1,  fmt: 1,
+        get: function () { return ESCAPE_THRESHOLD; },set: function (v) { ESCAPE_THRESHOLD = v; } }
     ];
+
+    function fmtNum(v, dp) {
+      if (dp === 0) return String(Math.round(v));
+      return (+v).toFixed(dp);
+    }
 
     var box = document.createElement("div");
     box.setAttribute("style",
-      "position:fixed;left:8px;bottom:8px;z-index:9998;width:248px;" +
-      "background:rgba(8,14,28,0.92);border:1px solid #1f4a66;border-radius:10px;" +
-      "padding:10px 12px;color:#dff6ff;font:12px monospace;");
+      "position:fixed;" +
+      "left:max(8px, env(safe-area-inset-left, 0px));" +
+      "bottom:max(8px, env(safe-area-inset-bottom, 0px));" +
+      "z-index:9998;" +
+      "width:min(92vw, 520px);" +
+      "max-height:80vh;" +
+      "overflow-y:auto;" +
+      "background:rgba(8,14,28,0.95);" +
+      "border:1px solid #1f4a66;" +
+      "border-radius:12px;" +
+      "padding:14px 16px;" +
+      "color:#dff6ff;" +
+      "font:13px ui-monospace, Menlo, Consolas, monospace;" +
+      "box-shadow:0 8px 32px rgba(0,0,0,0.55);");
+
     var title = document.createElement("div");
     title.setAttribute("style",
       "color:#7df0c8;font-weight:700;cursor:pointer;user-select:none;" +
-      "-webkit-user-select:none;display:flex;align-items:center;gap:6px;");
+      "-webkit-user-select:none;display:flex;align-items:center;gap:8px;" +
+      "font-size:13px;letter-spacing:0.5px;");
     var caret = document.createElement("span");
     var tlabel = document.createElement("span");
-    tlabel.textContent = "LIVE TUNE (?tune=1)";
+    tlabel.textContent = "LIVE TUNE  (?tune=1)";
     title.appendChild(caret); title.appendChild(tlabel);
     box.appendChild(title);
 
     var bodyEl = document.createElement("div");
-    bodyEl.setAttribute("style", "margin-top:6px;");
+    bodyEl.setAttribute("style", "margin-top:10px;");
     box.appendChild(bodyEl);
 
     var collapsed;
     try {
       var sv = localStorage.getItem("mm2.tune.collapsed");
-      collapsed = (sv === null) ? (window.innerWidth < 720) : (sv === "1");
-    } catch (e) { collapsed = (window.innerWidth < 720); }
+      // Default: expanded so the user finds the sliders straight away on
+      // first open; once she collapses once the preference sticks.
+      collapsed = (sv === "1");
+    } catch (e) { collapsed = false; }
     function applyCollapsed() {
       bodyEl.style.display = collapsed ? "none" : "block";
       caret.textContent = collapsed ? "▸" : "▾";
-      box.style.width = collapsed ? "auto" : "248px";
+      box.style.width = collapsed ? "auto" : "min(92vw, 520px)";
     }
     title.addEventListener("click", function () {
       collapsed = !collapsed;
@@ -1166,59 +1203,100 @@
     });
 
     tuneLvlEl = document.createElement("div");
-    tuneLvlEl.setAttribute("style", "color:#7df0c8;font-size:11px;margin-bottom:6px;");
+    tuneLvlEl.setAttribute("style",
+      "color:#7df0c8;font-size:12px;margin-bottom:10px;opacity:0.8;");
     tuneLvlEl.textContent = curLevelLabel || "(no level yet)";
     bodyEl.appendChild(tuneLvlEl);
 
     SPECS.forEach(function (s) {
       var row = document.createElement("div");
-      row.setAttribute("style", "margin:5px 0;");
-      var lab = document.createElement("div");
+      row.setAttribute("style", "margin:10px 0 14px;");
+
+      var head = document.createElement("div");
+      head.setAttribute("style",
+        "display:flex;justify-content:space-between;align-items:baseline;" +
+        "margin-bottom:5px;gap:8px;");
+      var lab = document.createElement("span");
+      lab.textContent = s.k;
+      lab.setAttribute("style", "font-size:13px;opacity:0.92;");
       var val = document.createElement("span");
-      val.setAttribute("style", "color:#7df0c8;");
-      function setLabel() { val.textContent = (+s.get()).toFixed(3).replace(/\.?0+$/, ""); }
-      lab.textContent = s.k + " = "; lab.appendChild(val);
+      val.setAttribute("style",
+        "color:#7df0c8;font-size:18px;font-weight:700;" +
+        "font-variant-numeric:tabular-nums;");
+      function setLabel() { val.textContent = fmtNum(s.get(), s.fmt); }
+      head.appendChild(lab); head.appendChild(val);
+      row.appendChild(head);
+
       var rng = document.createElement("input");
-      rng.type = "range"; rng.min = s.min; rng.max = s.max; rng.step = s.step;
+      rng.type = "range";
+      rng.min = s.min; rng.max = s.max; rng.step = s.step;
       rng.value = s.get();
-      rng.setAttribute("style", "width:100%;");
+      // Full-width slider with a bigger touch target on mobile.
+      rng.setAttribute("style",
+        "width:100%;height:28px;-webkit-appearance:none;appearance:none;" +
+        "background:transparent;");
       rng.addEventListener("input", function () { s.set(parseFloat(rng.value)); setLabel(); });
       setLabel();
-      row.appendChild(lab); row.appendChild(rng);
+      row.appendChild(rng);
       bodyEl.appendChild(row);
       tuneRefreshers.push(function () { rng.value = s.get(); setLabel(); });
     });
 
+    // "Copy current values" — emits ALL knobs as a JSON snippet the user
+    // can paste back so Claude can commit them as the new defaults.
     var copy = document.createElement("button");
-    copy.textContent = "Copy physics block";
+    copy.textContent = "Copy current values";
     copy.setAttribute("style",
       "margin-top:8px;width:100%;background:#173a52;color:#dff6ff;" +
-      "border:1px solid #2a6a8c;border-radius:6px;padding:7px;font:inherit;cursor:pointer;");
+      "border:1px solid #2a6a8c;border-radius:8px;padding:11px;" +
+      "font:inherit;font-size:14px;cursor:pointer;font-weight:600;");
     copy.addEventListener("click", function () {
-      var live = {
-        "ACCEL": ACCEL, "MAX_SPEED": MAX_SPEED, "WALL_BOUNCE": WALL_BOUNCE,
-        "FRICTION_FLOOR": FRICTION_FLOOR, "GRAVITY_K": GRAVITY_K,
-        "TILT_FORCE_MULTIPLIER": TILT_FORCE_MULTIPLIER
-      };
-      var diff = [];
-      for (var k in BASE_PHYS) {
-        if (+live[k] !== +BASE_PHYS[k]) diff.push('    ' + JSON.stringify(k) + ': ' + (+live[k]));
-      }
-      var txt = diff.length
-        ? "// " + curLevelLabel + " — paste into that level's JSON:\n" +
-          '  "physics": {\n' + diff.join(",\n") + "\n  }"
-        : "// " + curLevelLabel + " matches the global defaults — no override needed.";
+      // All current values — paste-back format.
+      var live = {};
+      SPECS.forEach(function (s) {
+        live[s.k] = +(+s.get()).toFixed(s.fmt + 2); // a couple extra dp for fidelity
+      });
+      var txt =
+        "// Munki Madness v2.0 — tuned constants from " + curLevelLabel + "\n" +
+        "// Paste back to Claude to make these the new defaults.\n" +
+        JSON.stringify(live, null, 2);
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(txt).then(
-          function () { copy.textContent = "Copied ✓"; setTimeout(function () { copy.textContent = "Copy physics block"; }, 1400); },
-          function () { window.prompt("Copy this physics block:", txt); });
-      } else { window.prompt("Copy this physics block:", txt); }
+          function () {
+            copy.textContent = "Copied ✓";
+            setTimeout(function () { copy.textContent = "Copy current values"; }, 1400);
+          },
+          function () { window.prompt("Copy these values:", txt); });
+      } else { window.prompt("Copy these values:", txt); }
     });
     bodyEl.appendChild(copy);
 
     applyCollapsed();
     if (document.body) document.body.appendChild(box);
     else document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(box); });
+  })();
+
+  // Better-looking range thumb across browsers — wider thumb for easier
+  // drag on phone. Injected once when ?tune=1 is active.
+  (function injectTuneCSS() {
+    var on = false;
+    try { on = /[?&]tune=1(?:&|$)/.test(location.search); } catch (e) {}
+    if (!on) return;
+    var style = document.createElement("style");
+    style.textContent =
+      'input[type=range]{appearance:none;-webkit-appearance:none;}' +
+      'input[type=range]::-webkit-slider-runnable-track{' +
+        'height:6px;border-radius:3px;background:linear-gradient(90deg,#1f4a66,#2a6a8c);}' +
+      'input[type=range]::-moz-range-track{' +
+        'height:6px;border-radius:3px;background:#1f4a66;}' +
+      'input[type=range]::-webkit-slider-thumb{' +
+        '-webkit-appearance:none;appearance:none;width:24px;height:24px;' +
+        'border-radius:50%;background:#7df0c8;margin-top:-9px;' +
+        'box-shadow:0 0 8px rgba(125,240,200,0.6);cursor:grab;}' +
+      'input[type=range]::-moz-range-thumb{' +
+        'width:24px;height:24px;border:0;border-radius:50%;background:#7df0c8;' +
+        'box-shadow:0 0 8px rgba(125,240,200,0.6);cursor:grab;}';
+    document.head.appendChild(style);
   })();
 
   // ---------------------------------------------------------------------
