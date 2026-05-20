@@ -4888,30 +4888,20 @@ html.is-native #btnInstall {
 .clay-picker { display: none; }
 
 .clay-lump-tray {
-    position: fixed;
-    left: 0;
-    right: 0;
-    /* Desktop: a strip just above the safe area. */
-    bottom: calc(10px + var(--safe-bottom));
-    z-index: 90;
+    /* Lives inside the shape-side-rail drawer now (at the top,
+       above the hint + RESET/FINISH). No more fixed floating —
+       it flows in the drawer's column and rides whatever state
+       the drawer is in (collapsed = hidden with the rest of the
+       tools, open = visible at the top). needsLump auto-opens
+       the drawer so the lumps are first thing the kid sees. */
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: center;
-    /* Wrap instead of scroll/swipe — every clay always visible on
-       desktop AND mobile, no hidden swipe gesture required. */
     flex-wrap: wrap;
     gap: 8px 14px;
-    padding: 6px 14px;
-    /* Container is pass-through; only the lumps catch input so
-       taps on empty gaps still reach the canvas underneath. */
-    pointer-events: none;
-}
-
-@media (max-width: 767.98px) {
-    /* Sit above the 54px collapsed TOOLS drawer handle + a gap. */
-    .clay-lump-tray {
-        bottom: calc(62px + var(--safe-bottom));
-    }
+    padding: 4px 0 8px;
+    width: 100%;
+    max-width: 420px;
 }
 
 .clay-lump-prompt {

@@ -23,15 +23,21 @@
     <meta name="twitter:description" content="Shape clay on a spinning wheel, decorate with cursed glazes, fire it in the kiln." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
     <meta name="twitter:image:alt" content="Let's CRAYte! Pootery — a YTP-themed pottery wheel game." />
+    <!-- All icon refs point to Pootery's OWN icons — previously the
+         32/16/shortcut favicon refs pointed at the shared
+         madderverse.org/assets/favi/ paths, which served the
+         hub's generic mark when this page was bookmarked or
+         installed standalone. Now bookmarks + PWA installs get
+         the pot+POOT lockup. -->
     <link rel="apple-touch-icon" href="icons/icon-512.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
-    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="shortcut icon" href="icons/icon-192.png" />
     <!-- Pootery-specific manifest (replaces the hub-wide one for this game)
          so "Add to Home Screen" installs Pootery as its own app, not the
          Madderverse hub. -->
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
     <meta name="theme-color" content="#ff2e88" />
     <!-- iOS PWA: full-screen + black-translucent status bar match the
          onioncore palette. Without these the app launches in a Safari-
@@ -317,6 +323,16 @@
                 <span class="drawer-label">TOOLS</span>
             </button>
 
+            <!-- Clay-lump tray (drag a wet lump onto the wheel).
+                 Lives at the top of the drawer so when the kid
+                 needs to drop a new lump, opening the drawer
+                 shows them right at eye level. The needsLump
+                 gate auto-opens the drawer so this is visible at
+                 first sight on a new pot. Lumps injected by
+                 buildLumpTray(). -->
+            <div class="clay-lump-tray" id="clayLumpTray"
+                 aria-label="Clay lumps — drag one onto the wheel"></div>
+
             <div class="clay-picker" id="clayPicker" role="tablist" aria-label="Clay material">
                 <span class="row-label">CLAY</span>
                 <!-- swatches injected by buildClayPicker() -->
@@ -340,13 +356,6 @@
 
     </div>
 
-    <!-- Always-visible clay-lump tray. The kid grabs a wet lump
-         and drags it onto the wheel (drop = squelch + clay loads).
-         Lives outside .shape-side-rail so it's never trapped in
-         the collapsed phone TOOLS drawer. Lumps injected by
-         buildLumpTray(). -->
-    <div class="clay-lump-tray" id="clayLumpTray"
-         aria-label="Clay lumps — drag one onto the wheel"></div>
 
 </main>
 

@@ -2326,6 +2326,17 @@
             prompt.textContent = SHAPE.needsLump ? "DRAG A LUMP →"
                                                  : "SWAP CLAY →";
         }
+        /* New pot needs a lump — auto-open the shape-side-rail
+           drawer so the lump tray is immediately visible at first
+           sight on phone. (Desktop layout is row-flex; the .is-open
+           class is harmless there.) The kid can collapse the drawer
+           afterward to get full-canvas shaping room. */
+        const drawer = document.querySelector("#screen-shape .shape-side-rail");
+        if (drawer && SHAPE.needsLump) {
+            drawer.classList.add("is-open");
+            const handle = drawer.querySelector(".drawer-handle");
+            if (handle) handle.setAttribute("aria-expanded", "true");
+        }
     }
 
     function buildLumpTray() {
