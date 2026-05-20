@@ -1529,6 +1529,32 @@
         })
     };
 
+    /* Kiln audio: one shared file for door open AND close (the
+       sound is symmetric enough to share), and a long firing
+       ambience sized to the 5s firing window. Same pool +
+       synth-fallback pattern as the clay audio. */
+    const KILN_SFX = {
+        door: makeAudioPool("assets/audio/kiln-openclose.mp3"),
+        fire: makeAudioPool("assets/audio/kiln-fire.mp3")
+    };
+
+    /* Recorded door sound preferred; synth kilnDoorThunk kept as
+       fallback so the door always makes SOMETHING. */
+    function kilnDoorPlay() {
+        if (KILN_SFX.door && KILN_SFX.door.play(1.0)) return;
+        if (typeof kilnDoorThunk === "function") kilnDoorThunk(1.0);
+    }
+
+    /* Recorded fire ambience preferred; synth kilnRoar kept as
+       fallback. The file is sized to the current firing window
+       — if firing duration changes, the file will either tail
+       early or get cut off, but the synth fallback always
+       respects the duration. */
+    function kilnFirePlay(durationSec) {
+        if (KILN_SFX.fire && KILN_SFX.fire.play(1.0)) return;
+        if (typeof kilnRoar === "function") kilnRoar(durationSec);
+    }
+
     /* Squelch ships in 4 timbre variants randomly chosen on each
        call so sustained shaping doesn't repeat the same beat.
        Each variant tunes the noise sweep + decides whether to
@@ -5579,7 +5605,11 @@
     const KILN_DUR = {
         intro:    500,
         closing:  700,
-        firing:   3500,
+        /* Firing extended from 3500ms -> 5000ms. The longer window
+           gives the kid more time to click during firing, which
+           feeds the overheat / burnt-pot mechanic. Recorded
+           kiln-fire.mp3 is sized to this 5s window. */
+        firing:   5000,
         opening:  700,
         reveal:   1500,
         exploded: 2500,   /* shards-fly window after a kaboom */
@@ -6358,14 +6388,15 @@
             }
         } else if (state === "closing") {
             setKilnStatus("DOORS CLOSING");
+            kilnDoorPlay();      /* recorded door, synth thunk fallback */
+            haptic([16]);
         } else if (state === "firing") {
             setKilnStatus("FIRING IT");
-            kilnDoorThunk(1.0);
             haptic([22]);
-            kilnRoar(KILN_DUR.firing / 1000);
+            kilnFirePlay(KILN_DUR.firing / 1000);   /* recorded fire ambience, synth roar fallback */
         } else if (state === "opening") {
             setKilnStatus("DOORS OPENING");
-            kilnDoorThunk(0.6);
+            kilnDoorPlay();
             haptic([16]);
         } else if (state === "reveal") {
             setKilnStatus("FIRED");
