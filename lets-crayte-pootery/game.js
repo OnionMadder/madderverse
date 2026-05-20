@@ -7404,16 +7404,31 @@
         grid.appendChild(list);
 
         if (count) count.textContent = "LOADING...";
-        fetchBattles(50).then(function (rows) {
+        fetchBattles(50).then(function (rawRows) {
             if (currentScreen !== "gallery" || GALLERY.tab !== "battles") return;
+            /* Transition cleanup: when the theme rotated daily, every
+               day's bot battle was a fresh row. Under the new weekly
+               cadence those old daily-bot rows are leftovers — their
+               themes don't match this week's, and surfacing them
+               makes the list look "still on the daily updates."
+               Drop bot battles that aren't the current Thursday-
+               week's; keep all user-created battles regardless. The
+               filtered-out rows still exist in Supabase, so trophies
+               / personal entries from them are recoverable through
+               crayte-my-battle-entries — we just don't surface the
+               stale rows in the gallery list anymore. */
+            const rows = rawRows.filter(function (b) {
+                if (!b) return false;
+                if (b.created_by !== "daily-bot") return true;
+                return isTodayDailyBattle(b);
+            });
             BATTLE.cachedList = rows;
             BATTLE.cachedAt = Date.now();
 
-            /* Daily-battle housekeeping: if today's daily-bot
-               battle doesn't exist yet, anyone visiting today
-               creates it (first-come, first-served). The created
-               row is appended to the local cache so it renders
-               immediately. */
+            /* Weekly-battle housekeeping: if this week's bot battle
+               doesn't exist yet, anyone visiting creates it (first-
+               come, first-served). The created row is appended to
+               the local cache so it renders immediately. */
             const existingDaily = rows.find(isTodayDailyBattle);
             const ensureDaily = existingDaily
                 ? Promise.resolve(existingDaily)
