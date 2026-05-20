@@ -45,15 +45,21 @@
   // magnitude at distance d:
   //
   //   mag = STRENGTH * (RADIUS / max(d, MIN_DIST)) ^ FALLOFF_EXP
+  //   mag = min(mag, WELL_PULL_MAX_FORCE)                  // critical cap
   //
   // Applied in the direction of the well centre. At d == RADIUS the
-  // magnitude equals STRENGTH; closer than RADIUS it ramps fast.
-  // Capped at WELL_PULL_MAX (hidden) so cranked tunings can't NaN out.
-  var WELL_PULL_STRENGTH    = 1.5;
+  // magnitude equals STRENGTH; closer than RADIUS it would ramp fast,
+  // but WELL_PULL_MAX_FORCE caps it so the marble doesn't get yanked
+  // past the bowl. Once *inside* the drain zone (WELL_DRAIN_RADIUS)
+  // an extra per-frame friction (WELL_DRAIN_FRICTION) bleeds momentum
+  // so the marble settles to capture.
+  var WELL_PULL_STRENGTH    = 5.2;
   var WELL_PULL_RADIUS      = 3.0;
   var WELL_PULL_MIN_DIST    = 0.5;
   var WELL_PULL_FALLOFF_EXP = 2.0;
-  var WELL_PULL_MAX         = 500;  // hard cap (cells/s^2), internal
+  var WELL_PULL_MAX_FORCE   = 12;   // tunable; old internal hidden cap was 500
+  var WELL_DRAIN_RADIUS     = 1.5;  // tunable; inner damping zone
+  var WELL_DRAIN_FRICTION   = 0.85; // tunable; per-frame@60 v-multiplier while inside
 
   var FIXED_DT = 1 / 120;    // physics substep (s)
   var MAX_SUBSTEPS = 8;      // anti spiral-of-death
@@ -76,7 +82,10 @@
     "WELL_PULL_STRENGTH": WELL_PULL_STRENGTH,
     "WELL_PULL_RADIUS": WELL_PULL_RADIUS,
     "WELL_PULL_MIN_DIST": WELL_PULL_MIN_DIST,
-    "WELL_PULL_FALLOFF_EXP": WELL_PULL_FALLOFF_EXP
+    "WELL_PULL_FALLOFF_EXP": WELL_PULL_FALLOFF_EXP,
+    "WELL_PULL_MAX_FORCE": WELL_PULL_MAX_FORCE,
+    "WELL_DRAIN_RADIUS": WELL_DRAIN_RADIUS,
+    "WELL_DRAIN_FRICTION": WELL_DRAIN_FRICTION
   };
   var curLevelLabel = "";
   var tuneLvlEl = null;
@@ -505,6 +514,9 @@
     if (k === "WELL_PULL_RADIUS") return clamp(v, 0.5, 8);
     if (k === "WELL_PULL_MIN_DIST") return clamp(v, 0.1, 1);
     if (k === "WELL_PULL_FALLOFF_EXP") return clamp(v, 0.5, 4);
+    if (k === "WELL_PULL_MAX_FORCE") return clamp(v, 1, 30);
+    if (k === "WELL_DRAIN_RADIUS") return clamp(v, 0.5, 5);
+    if (k === "WELL_DRAIN_FRICTION") return clamp(v, 0.5, 0.99);
     return Math.max(0, v);
   }
   function applyPhysics(p) {
@@ -516,6 +528,9 @@
     WELL_PULL_RADIUS = p.WELL_PULL_RADIUS;
     WELL_PULL_MIN_DIST = p.WELL_PULL_MIN_DIST;
     WELL_PULL_FALLOFF_EXP = p.WELL_PULL_FALLOFF_EXP;
+    WELL_PULL_MAX_FORCE = p.WELL_PULL_MAX_FORCE;
+    WELL_DRAIN_RADIUS = p.WELL_DRAIN_RADIUS;
+    WELL_DRAIN_FRICTION = p.WELL_DRAIN_FRICTION;
   }
   function effectivePhysics(override) {
     var e = {}, k;
@@ -535,7 +550,18 @@
   var levelNum = 1;
   var attempts = 0;
   var elapsed = 0;             // s since level (re)start
-  var captureTimer = 0;        // s the marble has dwelt in the bowl
+  var captureTimer = 0;        // s the marble has dwelt in the bowl (slow + inBowl)
+  var drainDwell = 0;          // s the marble has dwelt INSIDE the drain zone
+                               // (bypass capture: trapped long enough = done)
+  // Live diagnostic state — read by the ?tune=1 overlay each frame.
+  var mmDbg = {
+    pos:   { x: 0, y: 0 },
+    vel:   { x: 0, y: 0, m: 0 },
+    pull:  { x: 0, y: 0, m: 0 },
+    wd:    0,        // distance to well centre
+    inBowl: false,
+    inDrain: false
+  };
 
   function bestKey() { return "mm2.best." + levelNum; }
   function getBest() {
@@ -555,7 +581,7 @@
     for (var i = 0; i < tuneRefreshers.length; i++) tuneRefreshers[i]();
     if (tuneLvlEl) tuneLvlEl.textContent = curLevelLabel;
     resetMarble();
-    elapsed = 0; captureTimer = 0;
+    elapsed = 0; captureTimer = 0; drainDwell = 0;
     if (levelEl) levelEl.textContent = String(num);
     if (bestEl) bestEl.textContent = fmtBest(getBest());
     if (attemptsEl) attemptsEl.textContent = String(attempts);
@@ -572,7 +598,7 @@
     attempts++;
     if (attemptsEl) attemptsEl.textContent = String(attempts);
     resetMarble();
-    elapsed = 0; captureTimer = 0;
+    elapsed = 0; captureTimer = 0; drainDwell = 0;
     phase = "play";
     if (endScreen) endScreen.hidden = true;
   }
@@ -735,14 +761,19 @@
     var wpx = w.x - marble.x;
     var wpy = w.y - marble.y;
     var wd  = Math.sqrt(wpx * wpx + wpy * wpy);
+    var wpfx = 0, wpfy = 0, wmag = 0;   // captured for the diagnostic overlay
     if (wd > 0.0001 && WELL_PULL_STRENGTH > 0) {
       var dc = Math.max(wd, WELL_PULL_MIN_DIST);
-      var wmag = WELL_PULL_STRENGTH *
-                 Math.pow(WELL_PULL_RADIUS / dc, WELL_PULL_FALLOFF_EXP);
-      if (wmag > WELL_PULL_MAX) wmag = WELL_PULL_MAX;
+      wmag = WELL_PULL_STRENGTH *
+             Math.pow(WELL_PULL_RADIUS / dc, WELL_PULL_FALLOFF_EXP);
+      // Critical cap: without this, STRENGTH=5.2 at MIN_DIST=0.5 yields
+      // 187 cells/s^2 and shoots the marble straight through the well.
+      if (wmag > WELL_PULL_MAX_FORCE) wmag = WELL_PULL_MAX_FORCE;
       var wnx = wpx / wd, wny = wpy / wd;
-      ax += st.gravFlip * wmag * wnx;
-      ay += st.gravFlip * wmag * wny;
+      wpfx = st.gravFlip * wmag * wnx;
+      wpfy = st.gravFlip * wmag * wny;
+      ax += wpfx;
+      ay += wpfy;
     }
 
     // Player input adds on top of gravity, scaled by surface grip
@@ -764,6 +795,16 @@
     marble.vx *= d;
     marble.vy *= d;
 
+    // Drain zone — extra per-frame@60 damping while inside WELL_DRAIN_RADIUS
+    // of the well centre. Bleeds momentum hard so the marble settles to
+    // the capture threshold even with WELL_PULL pulling it in.
+    var inDrain = (wd < WELL_DRAIN_RADIUS);
+    if (inDrain) {
+      var dd = Math.pow(WELL_DRAIN_FRICTION, dt * 60);
+      marble.vx *= dd;
+      marble.vy *= dd;
+    }
+
     // Speed clamp.
     var sp = Math.sqrt(marble.vx * marble.vx + marble.vy * marble.vy);
     if (sp > MAX_SPEED) {
@@ -783,21 +824,39 @@
     else if (marble.y > hiY) { marble.y = hiY; marble.vy = -marble.vy * WALL_BOUNCE; bonk = true; }
     if (bonk) flashFall();
 
-    // Well capture: inside the bowl AND too slow to climb back out.
-    var w = level.well;
+    // Well capture: two paths, whichever fires first.
+    //   (a) Inside captureR bowl AND speed < ESCAPE_THRESHOLD continuously
+    //       for 0.28s — the classic capture (was the only criterion).
+    //   (b) Inside the drain zone for 0.30s continuously — bypass capture
+    //       for when the marble is moving fast but trapped by the drain
+    //       damping (prevents the "approaches but never settles" stall).
     var dwx = marble.x - w.x, dwy = marble.y - w.y;
     var dwell = Math.sqrt(dwx * dwx + dwy * dwy);
+    var sp2 = Math.sqrt(marble.vx * marble.vx + marble.vy * marble.vy);
     var inBowl = dwell < w.captureR;
-    var slow = Math.sqrt(marble.vx * marble.vx + marble.vy * marble.vy) < ESCAPE_THRESHOLD;
+    var slow = sp2 < ESCAPE_THRESHOLD;
     if (inBowl && slow) {
       captureTimer += dt;
-      // Visually sink the marble into the hole as it settles.
       marble.sink = Math.min(1, marble.sink + dt * 3);
-      if (captureTimer > 0.28) win();
+      if (captureTimer > 0.28) { win(); }
     } else {
       captureTimer = Math.max(0, captureTimer - dt * 2);
       marble.sink = Math.max(0, marble.sink - dt * 4);
     }
+    if (inDrain) {
+      drainDwell += dt;
+      if (drainDwell > 0.30) { win(); }
+    } else {
+      drainDwell = 0;
+    }
+
+    // Update the diagnostic snapshot for the ?tune=1 overlay.
+    mmDbg.pos.x = marble.x;  mmDbg.pos.y = marble.y;
+    mmDbg.vel.x = marble.vx; mmDbg.vel.y = marble.vy; mmDbg.vel.m = sp2;
+    mmDbg.pull.x = wpfx;     mmDbg.pull.y = wpfy;     mmDbg.pull.m = wmag;
+    mmDbg.wd = wd;
+    mmDbg.inBowl = inBowl;
+    mmDbg.inDrain = inDrain;
   }
 
   // ---------------------------------------------------------------------
@@ -1208,7 +1267,17 @@
         set: function (v) { WELL_PULL_MIN_DIST = v; } },
       { k: "WELL_PULL_FALLOFF_EXP", min: 0.5,  max: 4.0,  step: 0.1,  fmt: 1,
         get: function () { return WELL_PULL_FALLOFF_EXP; },
-        set: function (v) { WELL_PULL_FALLOFF_EXP = v; } }
+        set: function (v) { WELL_PULL_FALLOFF_EXP = v; } },
+      // Capture fixes — see PHYSICS_SPEC "Well-pull cap + drain zone".
+      { k: "WELL_PULL_MAX_FORCE",   min: 1,    max: 30,   step: 0.5,  fmt: 1,
+        get: function () { return WELL_PULL_MAX_FORCE; },
+        set: function (v) { WELL_PULL_MAX_FORCE = v; } },
+      { k: "WELL_DRAIN_RADIUS",     min: 0.5,  max: 5.0,  step: 0.1,  fmt: 1,
+        get: function () { return WELL_DRAIN_RADIUS; },
+        set: function (v) { WELL_DRAIN_RADIUS = v; } },
+      { k: "WELL_DRAIN_FRICTION",   min: 0.5,  max: 0.99, step: 0.01, fmt: 2,
+        get: function () { return WELL_DRAIN_FRICTION; },
+        set: function (v) { WELL_DRAIN_FRICTION = v; } }
     ];
 
     function fmtNum(v, dp) {
@@ -1276,6 +1345,32 @@
       "color:#7df0c8;font-size:11px;margin-bottom:6px;opacity:0.8;");
     tuneLvlEl.textContent = curLevelLabel || "(no level yet)";
     bodyEl.appendChild(tuneLvlEl);
+
+    // Live diagnostic overlay — pos / vel / well-pull / zone flags.
+    // Tiny font so it doesn't eat slider room. Updates at ~12 Hz.
+    var dbgEl = document.createElement("pre");
+    dbgEl.setAttribute("style",
+      "margin:0 0 8px;padding:6px 8px;" +
+      "background:rgba(20,40,60,0.55);border-radius:5px;" +
+      "color:#bcd9e6;font:10px ui-monospace, Menlo, Consolas, monospace;" +
+      "line-height:1.35;white-space:pre;");
+    bodyEl.appendChild(dbgEl);
+    function pad(s, n) { s = String(s); return s.length >= n ? s : (s + "      ").slice(0, n); }
+    function f(v, dp) { return (v >= 0 ? " " : "") + (+v).toFixed(dp); }
+    function updateDbg() {
+      var inBowl = mmDbg.inBowl ? "Y" : ".";
+      var inDrain = mmDbg.inDrain ? "Y" : ".";
+      dbgEl.textContent =
+        "pos  " + f(mmDbg.pos.x, 2) + "  " + f(mmDbg.pos.y, 2) +
+        "   d=" + f(mmDbg.wd, 2) + "\n" +
+        "vel  " + f(mmDbg.vel.x, 2) + "  " + f(mmDbg.vel.y, 2) +
+        "   |v|=" + f(mmDbg.vel.m, 2) + "\n" +
+        "pull " + f(mmDbg.pull.x, 2) + "  " + f(mmDbg.pull.y, 2) +
+        "  |F|=" + f(mmDbg.pull.m, 2) + "\n" +
+        "bowl=" + inBowl + "  drain=" + inDrain;
+    }
+    updateDbg();
+    setInterval(updateDbg, 80);
 
     SPECS.forEach(function (s) {
       // v1.0-style row: label + readout on one line, native HTML range

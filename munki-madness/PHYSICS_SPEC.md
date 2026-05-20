@@ -86,15 +86,59 @@ pull — wells *repel* inside a reverse zone.
 
 ### Intuition
 
-- At `d == WELL_PULL_RADIUS` (default `3.0` cells): `mag = STRENGTH = 1.5` — gentle nudge from the rim.
-- At `d == WELL_PULL_MIN_DIST` (default `0.5` cells, i.e. essentially at the bottom): `mag = STRENGTH × (3.0 / 0.5)² = 1.5 × 36 = 54` cells/s² — strong final grab.
-- At `d == 6.0` cells (twice `RADIUS`): `mag = STRENGTH × 0.5² = 0.375` — almost ignorable from afar.
+- At `d == WELL_PULL_RADIUS` (default `3.0` cells): `mag = STRENGTH = 5.2` — a real tug from the rim.
+- At `d == WELL_PULL_MIN_DIST` (default `0.5` cells): raw formula gives `5.2 × 36 = 187` cells/s² — but **clamped to `WELL_PULL_MAX_FORCE = 12`** before being applied.
+- At `d == 6.0` cells (twice `RADIUS`): `mag = STRENGTH × 0.5² = 1.3` — present but weak.
 
 So the marble feels free across most of the mesh and gets pulled in
 sharply only after it crosses the rim. Crank `STRENGTH` for stickier
 wells; raise `RADIUS` for wider reach (the rim "begins" further out);
 raise `FALLOFF_EXP` for a steeper near-field grab (an exponent of `3`
 makes the close-up pull dramatic without lengthening the reach).
+
+### Well-pull cap + drain zone (capture reliability)
+
+A previous build had an internal `WELL_PULL_MAX = 500` cap that was
+useless for gameplay: at the default `STRENGTH=5.2, MIN_DIST=0.5,
+EXP=2`, the raw force at the rim of the inner zone is `187` cells/s²,
+which yanked the marble *through* the well centre at exit speed faster
+than `ESCAPE_THRESHOLD` could ever fire. Two-stage fix:
+
+1. **`WELL_PULL_MAX_FORCE` (tunable, default `12`)** — the well-pull
+   magnitude is clamped to this value after the inverse-square formula.
+   Keeps the near-field force in the realm of `ACCEL`-sized numbers
+   so the marble can be decelerated by drag instead of overshooting.
+2. **Drain zone — `WELL_DRAIN_RADIUS` + `WELL_DRAIN_FRICTION`**: once
+   the marble is within `WELL_DRAIN_RADIUS` (default `1.5` cells) of
+   the well centre, an extra per-frame@60 velocity multiplier
+   (`WELL_DRAIN_FRICTION`, default `0.85`) is applied after the
+   normal drag. From `|v| = 7` the marble reaches `|v| < 1.1` in
+   ~14 frames (~230 ms) — solidly below `ESCAPE_THRESHOLD`.
+
+### Two capture paths (whichever fires first)
+
+The classic capture (in-bowl AND below `ESCAPE_THRESHOLD` continuously
+for `0.28 s`) remains the primary route. The fix adds a **drain-dwell
+bypass**:
+
+```
+inDrain   = distance(marble, well) < WELL_DRAIN_RADIUS
+drainDwell += dt   while inDrain   (reset to 0 when outside)
+if drainDwell > 0.30 → captured (regardless of velocity)
+```
+
+So even if the drain damping somehow isn't enough to push the marble
+below `ESCAPE_THRESHOLD`, half a second of "stuck inside the bowl"
+locks in the capture. Both paths share the win() handler; whichever
+triggers first wins.
+
+### Live diagnostic overlay
+
+When `?tune=1` is active, the panel shows a tiny readout updated at
+~12 Hz with the marble's `pos`, `vel` (vector + `|v|`), well-pull
+force (`pull` vector + `|F|`), distance to well `d`, and `bowl` /
+`drain` zone flags. Useful for watching the capture sequence happen
+(or fail) in real time as you dial.
 
 The marble accelerates **opposite** the gradient (downhill). A well —
 which is a Gaussian depression dug into the corners — produces a smooth
@@ -117,11 +161,13 @@ Tunable constants at the top of `game.js` (live-tunable via `?tune=1`):
 | `TILT_FORCE_MULTIPLIER` | `2.8` | extra tilt-input gain |
 | `MARBLE_R` | `0.42` | marble radius (cells); keeps it off the rim |
 | `ESCAPE_THRESHOLD` | `1.1` | bowl-speed threshold below which the marble is captured (cells/s) |
-| `WELL_PULL_STRENGTH` | `1.5` | well-attraction magnitude at `d = RADIUS` (cells/s²) |
+| `WELL_PULL_STRENGTH` | `5.2` | well-attraction magnitude at `d = RADIUS` (cells/s²) |
 | `WELL_PULL_RADIUS` | `3.0` | characteristic radius of the well's gravitational reach (cells) |
 | `WELL_PULL_MIN_DIST` | `0.5` | distance clamp to avoid an infinite spike at d→0 (cells) |
 | `WELL_PULL_FALLOFF_EXP` | `2.0` | power of the falloff. `1` = linear · `2` = inverse-square · `3` = cubic |
-| `WELL_PULL_MAX` | `500` | hard cap on the well-pull magnitude (cells/s²); internal safety |
+| `WELL_PULL_MAX_FORCE` | `12` | hard cap on the well-pull magnitude (cells/s²). **Critical**: without this, default STRENGTH/RADIUS/EXP at d=MIN_DIST yields ≥187 cells/s² and shoots the marble through the well |
+| `WELL_DRAIN_RADIUS` | `1.5` | inner damping zone — marble bleeds momentum hard while inside (cells) |
+| `WELL_DRAIN_FRICTION` | `0.85` | per-frame@60 velocity multiplier applied inside the drain zone (separate from `FRICTION_FLOOR`) |
 
 Constants locked from a `?tune=1` L1 Tutorial Well playthrough on
 2026-05-19; previous values archived in the commit immediately before
@@ -232,9 +278,10 @@ moved away from defaults.
 Allowed keys: `ACCEL`, `MAX_SPEED`, `WALL_BOUNCE`, `FRICTION_FLOOR`,
 `GRAVITY_MULT`, `TILT_FORCE_MULTIPLIER`, `ESCAPE_THRESHOLD`,
 `WELL_PULL_STRENGTH`, `WELL_PULL_RADIUS`, `WELL_PULL_MIN_DIST`,
-`WELL_PULL_FALLOFF_EXP`. Unknown keys are ignored. (`GRAVITY_K` and
-`WELL_PULL_MAX` are internal bases; only the multipliers / shape
-parameters are tunable.)
+`WELL_PULL_FALLOFF_EXP`, `WELL_PULL_MAX_FORCE`, `WELL_DRAIN_RADIUS`,
+`WELL_DRAIN_FRICTION`. Unknown keys are ignored. (`GRAVITY_K` is the
+internal base for slope gravity; the well-pull cap is now exposed as
+`WELL_PULL_MAX_FORCE`.)
 
 ## Tune panel (`?tune=1`)
 
@@ -253,6 +300,9 @@ Slider ranges (clamped on apply to keep the engine numerically safe):
 | `WELL_PULL_RADIUS` | 0.5 – 8 | 0.1 |
 | `WELL_PULL_MIN_DIST` | 0.1 – 1.0 | 0.05 |
 | `WELL_PULL_FALLOFF_EXP` | 0.5 – 4.0 | 0.1 |
+| `WELL_PULL_MAX_FORCE` | 1 – 30 | 0.5 |
+| `WELL_DRAIN_RADIUS` | 0.5 – 5 | 0.1 |
+| `WELL_DRAIN_FRICTION` | 0.5 – 0.99 | 0.01 |
 
 Panel layout matches v1.0's: a fixed-width `320px` panel pinned
 bottom-left over the gameplay (NOT panel-spanning). Sliders span the
