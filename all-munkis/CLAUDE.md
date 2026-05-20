@@ -122,10 +122,21 @@ differs by which evil is present (layers if both are on stage):
   no longer exists in the stripped UI; destructive shuffle/invert
   stay click-chaos-only on purpose (passive must never wreck the
   kid's composition).
-- **Ice = freeze / stillness / slow.** The world seizes: the existing
-  `.frozen-by-ice` spread, plus stage-scaled visual slow/stutter,
-  Munkis frost over and stop bouncing, cyan pallor + (future) snow
-  atmosphere, an audio lowpass "frozen" muffle.
+- **Ice = freeze / stillness / slow.** The world seizes. SHIPPED
+  (Chunk 5): `body.ice-on-stage` (already toggled by `updateIceFreeze`)
+  + a stage-scaled `#ice-freeze-warp` backdrop layer that desaturates
+  / dims / blurs / hue-shifts in `steps()` timing — no smooth easing
+  (ice locks things, it doesn't flow), so the scene literally
+  STUTTERS, scaling soft → med → hard by dread stage. Bottom-up ice
+  CLIMB on each frozen Munki (`@keyframes ice-climb` over 3.5 s); when
+  it tops out the JS adds `.frozen-encased` and the `.beat` bounce
+  stops (visibly locked solid). Stage-scaled **`setIceMuffle`** ramps
+  the existing `masterLP` lowpass DOWN (calm bypass at 14 kHz → unease
+  7 kHz → dread 2.5 kHz → terror ~700 Hz "underwater") so the audio
+  itself goes cold. Snow `SNOW_FALL` engine mirrors MOON_FALL — gentle
+  cyan/white specks drift down while Ice is on stage and horror is
+  past the 12 s ramp (drawn fallback; drop real snowflake art later by
+  swapping the inline background).
 
 ### Hard rules
 

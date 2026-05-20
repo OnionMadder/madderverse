@@ -1949,6 +1949,99 @@ body.moon-present.dread-terror #moon-warp {
     }
 }
 
+/* ===== Ice personality — "the world seizes" (Chunk 5) =====
+   Sibling of #moon-warp. Where Moon drifts the hue, Ice STUTTERS — the
+   filter snaps between desaturate/brightness/blur states via steps()
+   timing (no smooth easing, on purpose: ice locks things, it doesn't
+   flow). Scales by stage; terror adds a faint cyan frost vignette.
+   Same z (7) so both can layer when Ice+Moon are both on stage. */
+#ice-freeze-warp {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 7;
+    backdrop-filter: saturate(1) brightness(1);
+    -webkit-backdrop-filter: saturate(1) brightness(1);
+}
+body.ice-on-stage.dread-unease #ice-freeze-warp {
+    animation: ice-stutter-soft 5.4s steps(6, jump-none) infinite;
+}
+body.ice-on-stage.dread-dread #ice-freeze-warp {
+    animation: ice-stutter-med 4.2s steps(8, jump-none) infinite;
+}
+body.ice-on-stage.dread-terror #ice-freeze-warp {
+    animation: ice-stutter-hard 3.0s steps(10, jump-none) infinite;
+    background: radial-gradient(circle at center,
+        transparent 55%, rgba(165, 243, 252, 0.14) 100%);
+}
+@keyframes ice-stutter-soft {
+    0%   { backdrop-filter: saturate(0.92) brightness(1);
+           -webkit-backdrop-filter: saturate(0.92) brightness(1); }
+    100% { backdrop-filter: saturate(0.80) brightness(0.96);
+           -webkit-backdrop-filter: saturate(0.80) brightness(0.96); }
+}
+@keyframes ice-stutter-med {
+    0%   { backdrop-filter: saturate(0.74) brightness(0.96) blur(0px);
+           -webkit-backdrop-filter: saturate(0.74) brightness(0.96) blur(0px); }
+    100% { backdrop-filter: saturate(0.58) brightness(0.88) blur(0.7px);
+           -webkit-backdrop-filter: saturate(0.58) brightness(0.88) blur(0.7px); }
+}
+@keyframes ice-stutter-hard {
+    0%   { backdrop-filter: saturate(0.50) brightness(0.85) blur(0.6px) hue-rotate(170deg);
+           -webkit-backdrop-filter: saturate(0.50) brightness(0.85) blur(0.6px) hue-rotate(170deg); }
+    100% { backdrop-filter: saturate(0.36) brightness(0.74) blur(1.2px) hue-rotate(182deg);
+           -webkit-backdrop-filter: saturate(0.36) brightness(0.74) blur(1.2px) hue-rotate(182deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    /* No stutter cycle — hold a static cold tint instead. */
+    body.ice-on-stage.dread-unease #ice-freeze-warp,
+    body.ice-on-stage.dread-dread  #ice-freeze-warp,
+    body.ice-on-stage.dread-terror #ice-freeze-warp {
+        animation: none;
+        backdrop-filter: saturate(0.68) brightness(0.92);
+        -webkit-backdrop-filter: saturate(0.68) brightness(0.92);
+    }
+}
+
+/* ===== Snow atmosphere — Ice's signature precipitation (Chunk 5) =====
+   Mirrors .moon-fall (cap / fade / teardown / z 9) but each particle
+   is a tiny cyan/white speck (drawn fallback — no sprite needed; drop
+   real snowflake art later by swapping the inline background). Falls
+   gentler than moons (slower duration, slightly larger amp sway). */
+.snow-fall {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9;
+    overflow: hidden;
+    transition: opacity 2.5s ease;
+}
+.snow-fall.fading { opacity: 0; }
+.snow-fall span {
+    position: absolute;
+    top: -12vh;
+    will-change: transform, opacity;
+    animation-name: snow-drift;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+}
+@keyframes snow-drift {
+    0%   { transform: translate(0, -12vh);                          opacity: 0; }
+    8%   {                                                          opacity: 0.85; }
+    25%  { transform: translate(var(--amp, 12px), 22vh); }
+    50%  { transform: translate(calc(var(--amp, 12px) * -1), 52vh); }
+    75%  { transform: translate(var(--amp, 12px), 80vh);            opacity: 0.8; }
+    100% { transform: translate(0, 114vh);                          opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .snow-fall span { animation-duration: 9s !important; }
+    @keyframes snow-drift {
+        0%   { transform: translateY(-12vh); opacity: 0; }
+        10%  { opacity: 0.8; }
+        100% { transform: translateY(114vh); opacity: 0; }
+    }
+}
+
 /* Subtitle goes glitchy + moon-colored when the chaos message lands. */
 .moon-glitch-text {
     color: #93c5fd !important;

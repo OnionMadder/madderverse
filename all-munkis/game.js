@@ -146,6 +146,10 @@
     // ---------- AUDIO ENGINE ----------
     let audioCtx = null;
     let masterGain = null;
+    let masterLP = null;            // 14 kHz speaker-protect LP — also
+                                     // modulated DOWNWARD by setIceMuffle()
+                                     // for Ice's "frozen / underwater" feel.
+    let iceMuffleLevel = -1;        // last applied muffle level (edge-detect)
     let isPlaying = false;
     let isMuted = false;
     let isBaseSongOn = true;                 // background "level music" theme
@@ -392,7 +396,7 @@
             // dramatically cleaner. (Future madderverse/lib/audio/:
             // keep this node — it's a speaker-protection stage, not an
             // EQ choice.)
-            const masterLP = audioCtx.createBiquadFilter();
+            masterLP = audioCtx.createBiquadFilter();
             masterLP.type = 'lowpass';
             masterLP.frequency.value = 14000;
             masterLP.Q.value = 0.7;
@@ -1526,6 +1530,11 @@
         if (horror && !horrorOnSince) horrorOnSince = performance.now();
         if (!horror) horrorOnSince = 0;
         syncMoonFall();
+        // Ice personality (Chunk 5): scale the master lowpass muffle +
+        // the snow atmosphere by the same stage. Both no-op unless Ice
+        // is actually on stage.
+        setIceMuffle(s);
+        syncSnowFall();
     }
     function dreadTick(ts) {
         if (document.hidden) {
@@ -1885,6 +1894,10 @@
                 if (t) { clearTimeout(t); iceEncaseTimers.delete(idx); }
             }
         });
+        // Ice presence changed — refresh the Chunk 5 atmosphere
+        // immediately (not just on the next dread-stage transition).
+        setIceMuffle(dreadStageNow);
+        syncSnowFall();
     }
 
     // ---------- TRAY: drag-to-place ----------
@@ -2524,6 +2537,122 @@
                 if (remain > 0) moonFallRampTimer = setTimeout(syncMoonFall, remain + 50);
             }
         }
+    }
+
+    // ---------- FALLING SNOWFLAKES (v1.1 — Ice atmosphere, Chunk 5) ----------
+    // Sibling of MOON_FALL: while Ice Munki is ON the stage AND horror
+    // is fully engaged past the 12 s ramp, gentle snow drifts down. NO
+    // sheet — each particle is a tiny cyan/white speck (drawn fallback,
+    // can swap to a real snowflake sheet later by editing the inline
+    // background). Same self-managing rAF + fade-out pattern.
+    const SNOW_FALL = {
+        SPAWN_MIN_MS:   220,
+        SPAWN_MAX_MS:   450,
+        MIN_PX:         10,
+        MAX_PX:         22,
+        FALL_MIN_S:     6,    // gentler than moons
+        FALL_MAX_S:     11,
+        RAMP_MS:        12000,
+        MAX_CONCURRENT: 36,
+        STOP_FADE_MS:   2500
+    };
+    let snowFallLayer = null, snowFallActive = false, snowFallRAF = null;
+    let snowFallNextAt = 0, snowFallRampTimer = null;
+
+    function snowFallShouldRun() {
+        return isIceOnStage()
+            && document.body.classList.contains('react-mode-active')
+            && horrorOnSince
+            && (performance.now() - horrorOnSince) >= SNOW_FALL.RAMP_MS;
+    }
+    function spawnFallingSnowflake() {
+        if (!snowFallLayer) return;
+        const s = document.createElement('span');
+        const size = SNOW_FALL.MIN_PX +
+            Math.random() * (SNOW_FALL.MAX_PX - SNOW_FALL.MIN_PX);
+        const baseCss =
+            `width:${size}px;height:${size}px;border-radius:50%;` +
+            `background:radial-gradient(circle at 38% 32%,` +
+                `#ffffff 0%,#cffafe 55%,rgba(165,243,252,0) 100%);` +
+            `box-shadow:0 0 ${(size*0.6).toFixed(1)}px rgba(165,243,252,0.78);`;
+        const frac = (size - SNOW_FALL.MIN_PX) / (SNOW_FALL.MAX_PX - SNOW_FALL.MIN_PX);
+        const dur = SNOW_FALL.FALL_MAX_S
+                  - frac * (SNOW_FALL.FALL_MAX_S - SNOW_FALL.FALL_MIN_S);
+        s.style.cssText = baseCss +
+            `left:${(Math.random() * 100).toFixed(2)}vw;` +
+            `--amp:${(10 + Math.random() * 16).toFixed(1)}px;` +
+            `animation-duration:${dur.toFixed(2)}s;`;
+        s.addEventListener('animationend', () => s.remove());
+        snowFallLayer.appendChild(s);
+        while (snowFallLayer.childElementCount > SNOW_FALL.MAX_CONCURRENT) {
+            snowFallLayer.removeChild(snowFallLayer.firstChild);
+        }
+    }
+    function snowFallTick(ts) {
+        if (!snowFallActive || !snowFallLayer) { snowFallRAF = null; return; }
+        if (ts >= snowFallNextAt) {
+            spawnFallingSnowflake();
+            snowFallNextAt = ts + SNOW_FALL.SPAWN_MIN_MS +
+                Math.random() * (SNOW_FALL.SPAWN_MAX_MS - SNOW_FALL.SPAWN_MIN_MS);
+        }
+        snowFallRAF = requestAnimationFrame(snowFallTick);
+    }
+    function startSnowFall() {
+        if (snowFallActive) return;
+        snowFallActive = true;
+        snowFallLayer = document.createElement('div');
+        snowFallLayer.className = 'snow-fall';
+        snowFallLayer.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(snowFallLayer);
+        snowFallNextAt = 0;
+        snowFallRAF = requestAnimationFrame(snowFallTick);
+    }
+    function stopSnowFall() {
+        if (!snowFallActive) return;
+        snowFallActive = false;
+        if (snowFallRAF) { cancelAnimationFrame(snowFallRAF); snowFallRAF = null; }
+        const dying = snowFallLayer;
+        snowFallLayer = null;
+        if (dying) {
+            dying.classList.add('fading');
+            setTimeout(() => dying.remove(), SNOW_FALL.STOP_FADE_MS);
+        }
+    }
+    function syncSnowFall() {
+        if (snowFallRampTimer) { clearTimeout(snowFallRampTimer); snowFallRampTimer = null; }
+        if (snowFallShouldRun()) {
+            startSnowFall();
+        } else {
+            stopSnowFall();
+            if (isIceOnStage()
+                && document.body.classList.contains('react-mode-active')
+                && horrorOnSince) {
+                const remain = SNOW_FALL.RAMP_MS - (performance.now() - horrorOnSince);
+                if (remain > 0) snowFallRampTimer = setTimeout(syncSnowFall, remain + 50);
+            }
+        }
+    }
+
+    // Ice "frozen / underwater" master lowpass muffle. Modulates the
+    // existing masterLP frequency by the dread stage when Ice is on
+    // stage: calm = bypass (14 kHz), unease = 7 kHz (a touch dampened),
+    // dread = 2.5 kHz (clearly muffled), terror = 700 Hz (nearly
+    // underwater). exponentialRampToValueAtTime because frequency is
+    // logarithmic; edge-detected via iceMuffleLevel so it only re-ramps
+    // when the (stage, ice-on-stage) state actually changes.
+    function setIceMuffle(stage) {
+        if (!masterLP || !audioCtx) return;
+        const ice = isIceOnStage();
+        const target = (!ice || stage === 'calm') ? 14000
+                     : stage === 'unease' ? 7000
+                     : stage === 'dread'  ? 2500
+                     :                       700;  // terror
+        if (target === iceMuffleLevel) return;
+        iceMuffleLevel = target;
+        const now = audioCtx.currentTime;
+        masterLP.frequency.cancelScheduledValues(now);
+        masterLP.frequency.setValueAtTime(masterLP.frequency.value, now);
+        masterLP.frequency.exponentialRampToValueAtTime(target, now + 2.5);
     }
 
     const MOON_GLITCH_LINES = [
@@ -4281,6 +4410,15 @@
             mw.id = 'moon-warp';
             mw.setAttribute('aria-hidden', 'true');
             document.body.appendChild(mw);
+        }
+        // Ice "world seizes" backdrop layer (Chunk 5). Sibling of
+        // #moon-warp; same z. Inert until body.ice-on-stage + a dread
+        // stage drives the steps() stutter from CSS.
+        if (!document.getElementById('ice-freeze-warp')) {
+            const ifw = document.createElement('div');
+            ifw.id = 'ice-freeze-warp';
+            ifw.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(ifw);
         }
         // If the viewport crosses the phone-portrait threshold (rotate /
         // resize), re-place the existing pairs to match the stage plate
