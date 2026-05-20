@@ -1152,21 +1152,26 @@
       return (+v).toFixed(dp);
     }
 
+    // v1.0-style: fixed-width panel pinned bottom-left over the gameplay
+    // area. Wide enough to give each slider ~280px of pixel travel for
+    // real drag precision, but not panel-spanning — tap the header bar
+    // to collapse the body to a tiny tab when the canvas needs the room.
     var box = document.createElement("div");
     box.setAttribute("style",
       "position:fixed;" +
       "left:max(8px, env(safe-area-inset-left, 0px));" +
       "bottom:max(8px, env(safe-area-inset-bottom, 0px));" +
       "z-index:9998;" +
-      "width:min(92vw, 520px);" +
+      "width:320px;" +
+      "max-width:calc(100vw - 16px);" +
       "max-height:80vh;" +
       "overflow-y:auto;" +
       "background:rgba(8,14,28,0.95);" +
       "border:1px solid #1f4a66;" +
-      "border-radius:12px;" +
-      "padding:14px 16px;" +
+      "border-radius:10px;" +
+      "padding:10px 12px;" +
       "color:#dff6ff;" +
-      "font:13px ui-monospace, Menlo, Consolas, monospace;" +
+      "font:12px ui-monospace, Menlo, Consolas, monospace;" +
       "box-shadow:0 8px 32px rgba(0,0,0,0.55);");
 
     var title = document.createElement("div");
@@ -1181,7 +1186,7 @@
     box.appendChild(title);
 
     var bodyEl = document.createElement("div");
-    bodyEl.setAttribute("style", "margin-top:10px;");
+    bodyEl.setAttribute("style", "margin-top:6px;");
     box.appendChild(bodyEl);
 
     var collapsed;
@@ -1194,7 +1199,7 @@
     function applyCollapsed() {
       bodyEl.style.display = collapsed ? "none" : "block";
       caret.textContent = collapsed ? "▸" : "▾";
-      box.style.width = collapsed ? "auto" : "min(92vw, 520px)";
+      box.style.width = collapsed ? "auto" : "320px";
     }
     title.addEventListener("click", function () {
       collapsed = !collapsed;
@@ -1204,24 +1209,27 @@
 
     tuneLvlEl = document.createElement("div");
     tuneLvlEl.setAttribute("style",
-      "color:#7df0c8;font-size:12px;margin-bottom:10px;opacity:0.8;");
+      "color:#7df0c8;font-size:11px;margin-bottom:6px;opacity:0.8;");
     tuneLvlEl.textContent = curLevelLabel || "(no level yet)";
     bodyEl.appendChild(tuneLvlEl);
 
     SPECS.forEach(function (s) {
+      // v1.0-style row: label + readout on one line, native HTML range
+      // input below. The slider gets the full inner width of the panel
+      // (~296px of pixel travel inside a 320px panel) for drag precision.
       var row = document.createElement("div");
-      row.setAttribute("style", "margin:10px 0 14px;");
+      row.setAttribute("style", "margin:6px 0 8px;");
 
       var head = document.createElement("div");
       head.setAttribute("style",
         "display:flex;justify-content:space-between;align-items:baseline;" +
-        "margin-bottom:5px;gap:8px;");
+        "margin-bottom:2px;gap:8px;");
       var lab = document.createElement("span");
       lab.textContent = s.k;
-      lab.setAttribute("style", "font-size:13px;opacity:0.92;");
+      lab.setAttribute("style", "font-size:12px;opacity:0.92;");
       var val = document.createElement("span");
       val.setAttribute("style",
-        "color:#7df0c8;font-size:18px;font-weight:700;" +
+        "color:#7df0c8;font-size:14px;font-weight:700;" +
         "font-variant-numeric:tabular-nums;");
       function setLabel() { val.textContent = fmtNum(s.get(), s.fmt); }
       head.appendChild(lab); head.appendChild(val);
@@ -1231,10 +1239,9 @@
       rng.type = "range";
       rng.min = s.min; rng.max = s.max; rng.step = s.step;
       rng.value = s.get();
-      // Full-width slider with a bigger touch target on mobile.
-      rng.setAttribute("style",
-        "width:100%;height:28px;-webkit-appearance:none;appearance:none;" +
-        "background:transparent;");
+      // Native range input — no custom track/thumb styling. Just full
+      // width so the pixel travel matches the panel width.
+      rng.setAttribute("style", "width:100%;");
       rng.addEventListener("input", function () { s.set(parseFloat(rng.value)); setLabel(); });
       setLabel();
       row.appendChild(rng);
@@ -1248,8 +1255,8 @@
     copy.textContent = "Copy current values";
     copy.setAttribute("style",
       "margin-top:8px;width:100%;background:#173a52;color:#dff6ff;" +
-      "border:1px solid #2a6a8c;border-radius:8px;padding:11px;" +
-      "font:inherit;font-size:14px;cursor:pointer;font-weight:600;");
+      "border:1px solid #2a6a8c;border-radius:6px;padding:7px;" +
+      "font:inherit;cursor:pointer;");
     copy.addEventListener("click", function () {
       // All current values — paste-back format.
       var live = {};
@@ -1276,28 +1283,6 @@
     else document.addEventListener("DOMContentLoaded", function () { document.body.appendChild(box); });
   })();
 
-  // Better-looking range thumb across browsers — wider thumb for easier
-  // drag on phone. Injected once when ?tune=1 is active.
-  (function injectTuneCSS() {
-    var on = false;
-    try { on = /[?&]tune=1(?:&|$)/.test(location.search); } catch (e) {}
-    if (!on) return;
-    var style = document.createElement("style");
-    style.textContent =
-      'input[type=range]{appearance:none;-webkit-appearance:none;}' +
-      'input[type=range]::-webkit-slider-runnable-track{' +
-        'height:6px;border-radius:3px;background:linear-gradient(90deg,#1f4a66,#2a6a8c);}' +
-      'input[type=range]::-moz-range-track{' +
-        'height:6px;border-radius:3px;background:#1f4a66;}' +
-      'input[type=range]::-webkit-slider-thumb{' +
-        '-webkit-appearance:none;appearance:none;width:24px;height:24px;' +
-        'border-radius:50%;background:#7df0c8;margin-top:-9px;' +
-        'box-shadow:0 0 8px rgba(125,240,200,0.6);cursor:grab;}' +
-      'input[type=range]::-moz-range-thumb{' +
-        'width:24px;height:24px;border:0;border-radius:50%;background:#7df0c8;' +
-        'box-shadow:0 0 8px rgba(125,240,200,0.6);cursor:grab;}';
-    document.head.appendChild(style);
-  })();
 
   // ---------------------------------------------------------------------
   // Boot

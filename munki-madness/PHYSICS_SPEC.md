@@ -200,9 +200,15 @@ Slider ranges (clamped on apply to keep the engine numerically safe):
 | `TILT_FORCE_MULTIPLIER` | 0.5 – 3.0 | 0.1 |
 | `ESCAPE_THRESHOLD` | 0 – 5.0 | 0.1 |
 
-Panel layout is sized for phone-portrait — width `min(92vw, 520px)`,
-sliders span full panel width, value readout is 18px bold cyan above
-each slider with `font-variant-numeric: tabular-nums`. Collapsible.
+Panel layout matches v1.0's: a fixed-width `320px` panel pinned
+bottom-left over the gameplay (NOT panel-spanning). Sliders span the
+panel's inner width — ~296 px of pixel-travel per slider track, which
+is the precision dimension that matters. Slider visuals are native
+HTML range inputs (no custom thumb / track CSS). Value readout is
+14 px bold cyan above each slider with `font-variant-numeric:
+tabular-nums`. Tap the header bar to collapse the body to a small
+tab; tap again to expand. Default is **expanded on first load**;
+collapse state persists in `localStorage` (`mm2.tune.collapsed`).
 **"Copy current values"** at the bottom emits ALL knobs as a JSON
 snippet for paste-back; those values become the new defaults the
 next time the file is committed.
