@@ -425,17 +425,15 @@
                 <button class="tool-btn" data-tool="eraser"   type="button">ERASE</button>
             </div>
 
+            <!-- SIZE — slider matching the ROT row so the
+                 control vocabulary is consistent (was three
+                 discrete pucks before). -->
             <div class="tool-row size-row">
                 <span class="row-label">SIZE</span>
-                <button class="size-btn" data-size="6"  type="button" aria-label="Thin">
-                    <span class="size-dot s-thin"></span>
-                </button>
-                <button class="size-btn" data-size="14" type="button" aria-label="Medium">
-                    <span class="size-dot s-med"></span>
-                </button>
-                <button class="size-btn" data-size="24" type="button" aria-label="Thick">
-                    <span class="size-dot s-thick"></span>
-                </button>
+                <input type="range" min="4" max="32" step="1" value="14"
+                       id="brushSize" class="tool-slider"
+                       aria-label="Brush size in pixels" />
+                <span class="rotate-value" id="brushSizeValue">14</span>
             </div>
 
             <!-- Stamp rotation (applied to stamp placement only;
@@ -444,7 +442,7 @@
             <div class="tool-row rotate-row">
                 <span class="row-label">ROT</span>
                 <input type="range" min="0" max="345" step="15" value="0"
-                       id="stampRotate" class="rotate-slider"
+                       id="stampRotate" class="tool-slider"
                        aria-label="Stamp rotation in degrees" />
                 <span class="rotate-value" id="stampRotateValue">0&deg;</span>
                 <button class="rotate-reset" id="stampRotateReset" type="button"

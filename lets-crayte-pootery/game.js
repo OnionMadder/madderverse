@@ -2152,7 +2152,11 @@
         /* Sample model */
         N:      28,
         MIN_R:  20,     /* clay can't pinch to nothing */
-        MAX_R:  128,    /* clay can't escape the canvas */
+        MAX_R:  170,    /* clay can't escape the canvas — bumped
+                           from 128 so pots can reach actual roundness
+                           instead of squaring up against the inner
+                           frame (was leaving ~72px of unused margin
+                           on each side; now ~30px of breathing room). */
         INIT_R: 72,     /* starting cylinder radius */
 
         /* Shaping behavior.
@@ -4980,7 +4984,8 @@
         const isSplat = (kind === "splatter");
         const dots    = isSplat ? (4 + Math.floor(Math.random() * 5))
                                 : (12 + Math.floor(Math.random() * 8));
-        const spread  = isSplat ? (D.size * 2.6) : (D.size * 1.3);
+        const eSize  = effectiveBrushSize();
+        const spread  = isSplat ? (eSize * 2.6) : (eSize * 1.3);
         const baseAlpha = isSplat ? 0.38 : 0.10;
         ctx.save();
         ctx.fillStyle = currentPaintColor();
@@ -5007,6 +5012,15 @@
        don't paint a continuous wall — every 3rd move emits. */
     let _splatStrokeCount = 0;
 
+    /* Effective paint radius in canvas-px. Divides D.size by D.zoom
+       so a zoomed-in view lets the kid draw fine details — the tool
+       tip stays roughly the same SCREEN size at any zoom level.
+       Floored so it can't disappear into sub-pixel land. */
+    function effectiveBrushSize() {
+        const z = (D && D.zoom > 0.01) ? D.zoom : 1;
+        return Math.max(0.6, D.size / z);
+    }
+
     function paintDot(p) {
         const ctx = D.paintCtx;
         if (D.tool === "spray") {
@@ -5029,7 +5043,7 @@
             noteGlazeUsed(D.glaze);
         }
         ctx.beginPath();
-        ctx.arc(p.x, p.y, D.size, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, effectiveBrushSize(), 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
     }
@@ -5061,7 +5075,7 @@
         } else {
             ctx.strokeStyle = currentPaintColor();
         }
-        ctx.lineWidth = D.size * 2;
+        ctx.lineWidth = effectiveBrushSize() * 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.beginPath();
@@ -5082,8 +5096,9 @@
         /* Custom-sticker placements taint the pot — it stays local. */
         if (isCustomStickerId(D.pattern)) D.usedCustomSticker = true;
         /* Slightly bigger than brush dot so a "thin" stamp still
-           reads as a recognizable shape. */
-        const r = D.size * 1.7;
+           reads as a recognizable shape. Scales with zoom alongside
+           the brush so a zoomed-in view stamps smaller details. */
+        const r = effectiveBrushSize() * 1.7;
         const color = currentPaintColor();
         const ctx = D.paintCtx;
         if (D.stampRotation) {
@@ -5340,17 +5355,21 @@
             b.classList.toggle("active", b.dataset.tool === D.tool);
         });
 
-        /* Size pucks */
-        document.querySelectorAll(".size-btn[data-size]").forEach(function (b) {
-            b.addEventListener("click", function () {
-                D.size = parseInt(b.dataset.size, 10);
-                document.querySelectorAll(".size-btn").forEach(function (s) {
-                    s.classList.toggle("active", s.dataset.size === b.dataset.size);
-                });
+        /* Size slider (matches the ROT slider pattern so all
+           tool-row inputs share one control vocabulary). */
+        const sizeSlider = document.getElementById("brushSize");
+        const sizeValue  = document.getElementById("brushSizeValue");
+        if (sizeSlider) {
+            sizeSlider.value = String(D.size);
+            if (sizeValue) sizeValue.textContent = String(D.size);
+            sizeSlider.addEventListener("input", function () {
+                const v = parseInt(sizeSlider.value, 10);
+                if (!isNaN(v) && v > 0) {
+                    D.size = v;
+                    if (sizeValue) sizeValue.textContent = String(v);
+                }
             });
-            b.classList.toggle("active",
-                parseInt(b.dataset.size, 10) === D.size);
-        });
+        }
     }
 
     function setTool(tool) {
