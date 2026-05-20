@@ -669,6 +669,24 @@
         </div>
     </section>
 
+    <!-- ALWAYS-VISIBLE: restore-purchases.
+         Industry-standard requirement — even when automatic
+         restore works on sign-in, a manual button is expected
+         by users (and by Play Store reviewers). Wired to
+         restorePurchases() in game.js. -->
+    <section class="account-stack">
+        <div class="account-card">
+            <h3 class="account-headline">PURCHASES</h3>
+            <p class="account-blurb">
+                Already bought packs on this Google account? Tap to
+                restore them on this device.
+            </p>
+            <button class="btn-control" id="restorePurchasesBtn" type="button">
+                <span class="btn-label">RESTORE PURCHASES</span>
+            </button>
+        </div>
+    </section>
+
     <!-- ALWAYS-VISIBLE: push notifications settings.
          Per-device, so it lives outside the signed-in/out
          partition. Hidden entirely on unsupported browsers via JS. -->

@@ -4624,6 +4624,187 @@
         return isPackOwned(pack);
     }
 
+    /* ============================================================
+       BILLING (RevenueCat)
+       ============================================================
+       RC is the source of truth for paid-pack entitlements. The
+       local OWNED_PACKS_KEY localStorage is a CACHE — RC writes
+       to it via syncEntitlements() so cross-device restore "just
+       works": user signs in to Supabase on a new device, we tell
+       RC their app user id, RC returns the entitlements they
+       already own, we cache locally + the pack tab appears.
+
+       Setup checklist (in CLAUDE.md "RevenueCat billing setup"):
+         1. Create RC account, add Android app, get public SDK key
+         2. Set RC_PUBLIC_API_KEY below
+         3. Create products in Play Console with these EXACT IDs:
+              pack_dinosaur   $0.99
+              pack_unicorn    $0.99
+              pack_onioncore  $0.99
+              pack_mega       $1.99
+         4. Mirror them in RC dashboard with matching identifiers
+         5. Create an entitlement in RC named the same as each
+            product id and attach the matching product to it
+         6. Ship and test purchases via Play Console "License
+            Testing" with test accounts
+       ============================================================ */
+
+    /* REPLACE THIS with the Android (Public) SDK key from the
+       RevenueCat dashboard once the account is set up. While the
+       key is the placeholder, billing is a no-op (paid packs
+       show a friendly "coming soon" alert instead of crashing). */
+    const RC_PUBLIC_API_KEY = "REPLACE_WITH_REVENUECAT_ANDROID_PUBLIC_SDK_KEY";
+
+    /* Pack id -> RC entitlement id mapping. The Play Console
+       product IDs + the RC entitlement IDs must match these
+       values exactly (1:1 model: each pack has its own product +
+       its own entitlement). */
+    const PACK_ENTITLEMENTS = {
+        dinosaur:  "pack_dinosaur",
+        unicorn:   "pack_unicorn",
+        onioncore: "pack_onioncore",
+        mega:      "pack_mega"
+    };
+
+    function rcPlugin() {
+        return window.Capacitor &&
+               window.Capacitor.Plugins &&
+               window.Capacitor.Plugins.Purchases;
+    }
+
+    function rcConfigured() {
+        return RC_PUBLIC_API_KEY &&
+               RC_PUBLIC_API_KEY.indexOf("REPLACE_") < 0;
+    }
+
+    let _rcReady = false;
+
+    async function initBilling() {
+        const P = rcPlugin();
+        if (!P) return;                /* web preview / no native bridge */
+        if (!rcConfigured()) {
+            console.warn("[CRAYte] RC_PUBLIC_API_KEY not set — billing inert");
+            return;
+        }
+        try {
+            await P.configure({
+                apiKey: RC_PUBLIC_API_KEY,
+                appUserID: currentUserId() || null
+            });
+            _rcReady = true;
+            await syncEntitlements();
+        } catch (e) {
+            console.warn("[CRAYte] RC init failed", e);
+        }
+    }
+
+    /* Sign-in / sign-out side: tell RC about the user id change so
+       entitlements follow the account, not the device. Hooked into
+       onAuthChange in init(). */
+    async function rcSyncUser() {
+        const P = rcPlugin();
+        if (!P || !_rcReady) return;
+        try {
+            const uid = currentUserId();
+            if (uid) {
+                await P.logIn({ appUserID: uid });
+            } else {
+                await P.logOut();
+            }
+            await syncEntitlements();
+        } catch (e) {
+            console.warn("[CRAYte] RC user sync failed", e);
+        }
+    }
+
+    /* Pull current entitlements from RC and mark matching packs
+       as owned in the local cache. We never auto-unmark — a
+       missing entitlement (refund, expiry) is rare enough that
+       a slightly-stale cache is fine; the next purchase + sync
+       will rectify any drift. */
+    async function syncEntitlements() {
+        const P = rcPlugin();
+        if (!P || !_rcReady) return;
+        try {
+            const result = await P.getCustomerInfo();
+            const info = result && result.customerInfo;
+            const active = (info && info.entitlements && info.entitlements.active) || {};
+            Object.keys(PACK_ENTITLEMENTS).forEach(function (packId) {
+                if (active[PACK_ENTITLEMENTS[packId]]) markPackOwned(packId);
+            });
+        } catch (e) {
+            console.warn("[CRAYte] entitlement sync failed", e);
+        }
+    }
+
+    /* Real purchase flow. Called from handleShopCardClick when a
+       paid pack is tapped. */
+    async function purchasePack(packId) {
+        const P = rcPlugin();
+        if (!P || !_rcReady) {
+            alert(
+                "Purchases will be available when the app launches " +
+                "on Google Play. (Billing is not active in this build.)"
+            );
+            return;
+        }
+        const entId = PACK_ENTITLEMENTS[packId];
+        if (!entId) return;
+        try {
+            /* Fetch the matching product from the current offering.
+               The offering on the RC dashboard must include all four
+               pack products. */
+            const offResult = await P.getOfferings();
+            const current = offResult && offResult.offerings && offResult.offerings.current;
+            const pkgs = (current && current.availablePackages) || [];
+            const pkg = pkgs.find(function (p) {
+                return p && p.product && p.product.identifier === entId;
+            });
+            if (!pkg) {
+                alert("This pack isn't available right now. Try again later.");
+                return;
+            }
+            const purchase = await P.purchasePackage({ aPackage: pkg });
+            const customerInfo = purchase && purchase.customerInfo;
+            const active = (customerInfo && customerInfo.entitlements &&
+                            customerInfo.entitlements.active) || {};
+            if (active[entId]) {
+                markPackOwned(packId);
+                if (currentScreen === "shop" &&
+                    typeof refreshShopScreen === "function") {
+                    refreshShopScreen();
+                }
+            }
+        } catch (e) {
+            if (e && e.userCancelled) return;
+            console.warn("[CRAYte] purchase failed", e);
+            alert("Purchase didn't go through. Try again or use " +
+                  "Restore Purchases in your account.");
+        }
+    }
+
+    /* Restore-purchases button (Settings / Account screen). Always
+       safe to call — even on first run after a fresh install. */
+    async function restorePurchases() {
+        const P = rcPlugin();
+        if (!P || !_rcReady) {
+            alert("Restore is only available in the installed app.");
+            return false;
+        }
+        try {
+            await P.restorePurchases();
+            await syncEntitlements();
+            alert("Purchases restored. Any packs you've bought before " +
+                  "should appear now.");
+            return true;
+        } catch (e) {
+            console.warn("[CRAYte] restore failed", e);
+            alert("Restore failed. Make sure you're signed in to the " +
+                  "same Google account that made the original purchase.");
+            return false;
+        }
+    }
+
     /* (Re)build the decorate pack-tabs row from GLAZE_PACKS.
        Owned + free packs only. Clicks are handled via event
        delegation on the container so re-renders don't need
@@ -8988,6 +9169,9 @@
             showScreen("title");
         });
 
+        const restore = document.getElementById("restorePurchasesBtn");
+        if (restore) restore.addEventListener("click", restorePurchases);
+
         initPushSettingsToggle();
 
         const googleBtn = document.getElementById("signInGoogleBtn");
@@ -9345,12 +9529,11 @@
             );
             return;
         }
-        /* Released + paid + not owned -- Stripe wiring TBD. */
-        alert(
-            p.label + " — $" + (p.priceCents / 100).toFixed(2) + "\n\n" +
-            "Pay-to-own packs are landing soon. " +
-            "Bookmark this and check back."
-        );
+        /* Released + paid + not owned -- fire the real RC purchase
+           flow. purchasePack handles the unconfigured-billing fall
+           back (shows a friendly "available at launch" alert)
+           so this is safe in any build state. */
+        purchasePack(p.id);
     }
 
     registerScreen("shop", {
@@ -10589,7 +10772,11 @@
            have the localStorage link, so this URL is the way to
            recover them on phones / tablets without dev tools. */
         adoptFromURL();
-        initAuth().then(checkURLDeepLinks);
+        initAuth().then(checkURLDeepLinks).then(initBilling);
+        /* When auth state changes (sign-in / sign-out), tell RC so
+           paid-pack entitlements follow the user account, not the
+           device. No-op if RC isn't configured yet. */
+        onAuthChange(rcSyncUser);
         /* Trophy reveal -- runs in parallel with auth boot.
            Doesn't need a session (uses crayte-my-battle-entries
            from localStorage) so anonymous players still see

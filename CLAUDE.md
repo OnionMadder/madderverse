@@ -87,3 +87,77 @@ Other top-level entries:
 - The old `lets-crayte-pootery-app` folder was zipped as `lets-crayte-pootery.zip` on Desktop; recovered and used to populate `pootery-app/www/`
 - User had previous failed attempt with Google Play (deleted from Console); this is a fresh upload
 - No waiting on Google cert—we generate our own, sign with it, and upload to Console
+
+---
+
+## Let's CRAYte! Pootery — RevenueCat billing setup (paid packs)
+
+**Status:** Code skeleton wired; awaiting external setup before paid packs are actually purchasable.
+
+The Capacitor plugin `@revenuecat/purchases-capacitor` is installed and the billing module (`initBilling` / `purchasePack` / `restorePurchases` / `syncEntitlements` / `rcSyncUser`) is integrated in `game.js`. While the placeholder API key is in place, paid-pack taps show a friendly "available when the app launches on Google Play" alert — billing is INERT, not broken.
+
+**To activate billing before the production push:**
+
+### 1. RevenueCat dashboard
+
+1. Create a free RevenueCat account at https://app.revenuecat.com
+2. Create a new project → add an Android app with package id `org.madderverse.pootery`
+3. Under **API Keys** → copy the **Android (Public) SDK key** (starts with `goog_…`)
+4. Paste it into `game.js`, replacing the `RC_PUBLIC_API_KEY` constant value
+
+### 2. Google Play Console product catalog
+
+Under your Pootery app → **Monetize** → **In-app products**, create **four products** with these **exact** product IDs (must match `PACK_ENTITLEMENTS` in `game.js`):
+
+| Product ID | Price | Label |
+|------------|-------|-------|
+| `pack_dinosaur`  | $0.99 | DINOSAUR |
+| `pack_unicorn`   | $0.99 | UNICORN |
+| `pack_onioncore` | $0.99 | ONIONCORE |
+| `pack_mega`      | $1.99 | MEGA |
+
+Each must be **Active** and have a price set.
+
+### 3. RevenueCat product + entitlement linkage
+
+Back in the RC dashboard:
+
+1. **Products** → add 4 products, identifiers matching the Play Console IDs above
+2. **Entitlements** → create 4 entitlements with the same identifiers (`pack_dinosaur`, `pack_unicorn`, `pack_onioncore`, `pack_mega`)
+3. For each entitlement, attach its matching product (1:1)
+4. **Offerings** → create a "current" offering containing all 4 products
+
+### 4. Cap-sync + build
+
+```
+cd pootery-app
+npx cap sync android      # registers RC's native code into android/
+```
+
+Then rebuild the AAB. The `@revenuecat/purchases-capacitor` plugin requires the cap-sync step to wire its native Android module; without it, `window.Capacitor.Plugins.Purchases` won't be present and `initBilling` will silently no-op.
+
+### 5. Test purchases (before production)
+
+Add a Google account as a **License tester** in Play Console (`Setup` → `License testing`). Closed-testing track installs from that tester account let you make purchases without being charged.
+
+### How the cross-device flow works
+
+- On app launch, `initBilling()` configures RC with the user's Supabase user ID as `appUserID` (or anonymous if not signed in).
+- `syncEntitlements()` queries RC for active entitlements and mirrors them to the local `crayte-owned-packs` cache.
+- When the user signs in to Supabase (`onAuthChange` listener), `rcSyncUser()` tells RC the new user ID via `Purchases.logIn` → RC returns the entitlements tied to that account → packs the user bought on a *different* device now appear here.
+- When the user buys a pack, RC validates the purchase server-side with Google Play (no app-side validation needed).
+- **Restore Purchases** button in the Account screen calls `Purchases.restorePurchases()` as a manual fallback (Play Store reviewers and users both expect this button).
+
+### What this delivers
+
+- ✅ Pack purchases via Google Play Billing (no Stripe — Google requires Billing for digital goods)
+- ✅ Each purchase tied to the user's Google Play account
+- ✅ On app launch: query RC entitlements + sync to local cache
+- ✅ Cross-device restore via Supabase user id ↔ RC app user id link
+- ✅ Manual "Restore Purchases" button in Account screen
+- ✅ Server-side purchase validation (RC handles this against Google Play Developer API)
+
+### What this does NOT yet deliver
+
+- ❌ Gallery pots syncing across devices (still localStorage-only; v1.1 work)
+- ❌ Refund-handling UI flow if RC reports a previously-owned entitlement is no longer active (current behavior: the cache keeps it; harmless drift until next purchase)
