@@ -4068,26 +4068,24 @@
          coverEmoji -- single emoji used as shop-card cover until
                        real art lands. */
     const GLAZE_PACKS = [
+        /* ============================================================
+           6 FREE PACKS — 7 glazes + 5 stamps each.
+           User finalizes stamps as custom PNGs pre-release.
+           ============================================================ */
         {
             id: "core",  label: "BASIC",
-            description: "The starter set. Sienna, terracotta, sage, ink.",
+            description: "The starter set. Earth, sage, sky, and ink.",
             coverEmoji: "\u{1FAB4}",   /* potted plant */
             glazes: [
                 "#3a2218",   /* dark clay */
                 "#7a3a18",   /* sienna */
                 "#cc6633",   /* terracotta */
                 "#e4b13e",   /* amber */
-                "#e9e4c8",   /* bone */
                 "#f4f6ea",   /* milk white */
                 "#5f8d5d",   /* sage */
-                "#2b6b6c",   /* deep teal */
-                "#244e9b",   /* cobalt */
-                "#7a3c8c",   /* plum */
-                "#b53939",   /* crimson */
                 "#1a0e08"    /* ink */
             ],
-            patterns: ["dot", "ring", "star", "chevron",
-                       "wave", "triangle", "x", "heart"]
+            patterns: ["dot", "ring", "star", "chevron", "wave"]
         },
         {
             id: "candy", label: "CANDY",
@@ -4102,20 +4100,22 @@
                 "#ff7a00",   /* orange creamsicle */
                 "#9534d8"    /* grape soda */
             ],
-            patterns: ["lollipop", "candy-cane", "gumballs", "drip"]
+            patterns: ["lollipop", "candy-cane", "gumballs", "drip", "dot"]
         },
         {
             id: "plushie", label: "PLUSH",
-            description: "Teddy brown, pastel pink, plush textures.",
+            description: "Teddy brown, pastel pink, soft plush palette.",
             coverEmoji: "\u{1F9F8}",   /* teddy bear */
             glazes: [
                 "#a07050",   /* teddy brown */
                 "#ffc8e0",   /* pastel pink */
                 "#fff4e0",   /* soft cream */
                 "#c8aedb",   /* lavender */
-                "#b8d8ed"    /* sky blue */
+                "#b8d8ed",   /* sky blue */
+                "#ffd5b8",   /* peach */
+                "#c8efd1"    /* mint */
             ],
-            patterns: ["teddy", "paw", "button", "plush-grain"]
+            patterns: ["teddy", "paw", "button", "plush-grain", "heart"]
         },
         {
             id: "modded", label: "MODDED",
@@ -4127,10 +4127,10 @@
                 "#ff10a0",      /* hot pink */
                 "#00d4ff",      /* electric blue */
                 "#0a0a0a",      /* black ops */
-                "#c8c8c8"       /* brushed aluminum */
+                "#c8c8c8",      /* brushed aluminum */
+                "#b347ff"       /* cyber violet */
             ],
-            patterns: ["circuit", "fan-hex", "rgb-strip",
-                       "power", "reset", "trace"]
+            patterns: ["circuit", "fan-hex", "rgb-strip", "power", "reset"]
         },
         {
             id: "gamer", label: "GAMER",
@@ -4141,173 +4141,114 @@
                 "#ff8c1a",   /* retro orange */
                 "#ff2a8a",   /* arcade pink */
                 "#2a3a3a",   /* scanline gray */
-                "#ffea00"    /* hi-score yellow */
+                "#ffea00",   /* hi-score yellow */
+                "#6b1da6",   /* pixel purple */
+                "#6e3713"    /* atari brown */
             ],
             patterns: ["pixel-heart", "controller", "game-over",
-                       "pixel-skull", "cloud-8bit", "press-start"]
+                       "pixel-skull", "press-start"]
+        },
+        {
+            id: "space", label: "SPACE",
+            description: "Cosmic void, nebula violet, supernova white.",
+            coverEmoji: "\u{1F680}",   /* rocket */
+            glazes: [
+                "#05030f",   /* cosmic void */
+                "#3a1f80",   /* nebula violet */
+                "#7a3c8c",   /* galactic purple */
+                "#2b6fff",   /* supernova blue */
+                "#f4f6ea",   /* starfield white */
+                "#ffd700",   /* quasar gold */
+                "#00d4ff"    /* comet cyan */
+            ],
+            patterns: ["star", "ring", "triangle", "dot", "chevron"]
         },
 
         /* ============================================================
-           QUEUED PAID PACKS
+           4 PAID PACKS
            ============================================================
-           These appear in the shop as "DROPS <date>" until their
-           releaseDate passes, then become purchasable. priceCents
-           drives the shop label. Glaze + pattern lists are placeholder
-           swatches -- the real art ships in the same commit as the
-           pack going live. */
-        {
-            id: "blacklight", label: "BLACKLIGHT",
-            description: "Glow-in-the-dark glazes + tape-deck stamps.",
-            coverEmoji: "\u{1F526}",   /* flashlight */
-            priceCents: 99,
-            releaseDate: "2026-05-22T17:00:00Z",
-            glazes: [
-                "#39ff14",   /* radioactive green */
-                "#00ffff",   /* uv cyan */
-                "#ff2bff",   /* highlighter pink */
-                "#ffea00",   /* highlighter yellow */
-                "#100838"    /* uv-purple black */
-            ],
-            patterns: ["dot", "star"]   /* placeholder until art lands */
-        },
-        {
-            id: "starpup", label: "STAR PUPPY",
-            description: "Cosmic dog adventures. Constellation paw prints.",
-            coverEmoji: "\u{1F436}",   /* dog face */
-            priceCents: 99,
-            releaseDate: "2026-05-29T17:00:00Z",
-            glazes: [
-                "#0a0a3c",   /* deep space */
-                "#fff",      /* star white */
-                "#ffd700",   /* star gold */
-                "#a07050",   /* puppy brown */
-                "#ff69b4"    /* nebula pink */
-            ],
-            patterns: ["paw", "star"]
-        },
-        {
-            id: "swampcore", label: "SWAMPCORE",
-            description: "Bog moss, algae bloom, mystery fog.",
-            coverEmoji: "\u{1F438}",   /* frog */
-            priceCents: 99,
-            releaseDate: "2026-06-05T17:00:00Z",
-            glazes: [
-                "#3e4a1c",   /* deep moss */
-                "#7a8f3a",   /* algae */
-                "#4a3522",   /* bog brown */
-                "#9bb05c",   /* swamp light */
-                "#c8e2a8"    /* fog */
-            ],
-            patterns: ["dot", "wave"]
-        },
+           99¢ each except MEGA at $1.99 (double-size: 14 glazes /
+           10 stamps). releaseDate omitted = available now (no
+           "DROPS <date>" gate on the shop card).
 
-        /* ---- Weekly drop runway (Fridays 17:00Z) ----
-           ~2.5 months queued ahead so a pack lands every week
-           without a code change. Glazes are final-ish hex;
-           patterns intentionally reuse the always-present core
-           stamp ids as placeholders — bespoke stamp art ships in
-           the same commit each pack goes live (per the queued-
-           pack convention above). To add more weeks: copy a block,
-           bump the Friday date, keep ids unique. */
+           Stamp lists are placeholder ids (core-set stamp ids) until
+           user authors the bespoke PNGs for each pack. MEGA's stamps
+           are loaded dynamically from MEGA_STAMP_FILES below — its
+           patterns array starts empty and gets populated as PNGs
+           land.
+           ============================================================ */
         {
-            id: "dinodig", label: "DINO DIG",
-            description: "Fossil bone, amber, jurassic jungle greens.",
+            id: "dinosaur", label: "DINOSAUR",
+            description: "Fossil bone, amber, jurassic jungle greens, T-rex red.",
             coverEmoji: "\u{1F996}",   /* T-Rex */
             priceCents: 99,
-            releaseDate: "2026-06-12T17:00:00Z",
-            glazes: ["#6b5a3c", "#cdb98a", "#e4b13e",
-                     "#3f5d2a", "#7a3a18"],
-            patterns: ["triangle", "star"]
+            glazes: [
+                "#6b5a3c",   /* fossil bone */
+                "#cdb98a",   /* amber sand */
+                "#e4b13e",   /* amber */
+                "#3f5d2a",   /* jungle green */
+                "#7a3a18",   /* dirt brown */
+                "#2c1810",   /* swamp shadow */
+                "#c84a3a"    /* t-rex red */
+            ],
+            patterns: ["triangle", "star", "x", "dot", "ring"]
         },
         {
-            id: "mermaidcove", label: "MERMAID COVE",
-            description: "Pearl, seafoam, deep-lagoon shimmer.",
-            coverEmoji: "\u{1F9DC}",   /* merperson */
-            priceCents: 99,
-            releaseDate: "2026-06-19T17:00:00Z",
-            glazes: ["#1f7a8c", "#7fd4c1", "#bdf0e6",
-                     "#f4d9e6", "#2b3a8c"],
-            patterns: ["wave", "heart"]
-        },
-        {
-            id: "deepspace", label: "DEEP SPACE",
-            description: "Black hole, nebula violet, starfield white.",
-            coverEmoji: "\u{1F680}",   /* rocket */
-            priceCents: 99,
-            releaseDate: "2026-06-26T17:00:00Z",
-            glazes: ["#05030f", "#3a1f80", "#7a3c8c",
-                     "#2b6fff", "#f4f6ea"],
-            patterns: ["star", "ring"]
-        },
-        {
-            id: "ninjadojo", label: "NINJA DOJO",
-            description: "Shadow black, steel, dawn-sky red.",
-            coverEmoji: "\u{1F977}",   /* ninja */
-            priceCents: 99,
-            releaseDate: "2026-07-03T17:00:00Z",
-            glazes: ["#0a0a0a", "#3a3a44", "#8a9098",
-                     "#b53939", "#e9e4c8"],
-            patterns: ["x", "chevron"]
-        },
-        {
-            id: "unicorndream", label: "UNICORN DREAM",
-            description: "Cotton-candy pastels + holo sparkle.",
+            id: "unicorn", label: "UNICORN",
+            description: "Cotton-candy pastels, holo sparkle, magic gold.",
             coverEmoji: "\u{1F984}",   /* unicorn */
             priceCents: 99,
-            releaseDate: "2026-07-10T17:00:00Z",
-            glazes: ["#ffc8e0", "#c8aedb", "#b8d8ed",
-                     "#fff4e0", "#ff8cd0"],
-            patterns: ["star", "heart"]
+            glazes: [
+                "#ffc8e0",   /* cotton pink */
+                "#c8aedb",   /* lilac */
+                "#b8d8ed",   /* sky */
+                "#fff4e0",   /* cream */
+                "#ff8cd0",   /* hot pink */
+                "#cce8c8",   /* mint */
+                "#ffd700"    /* magic gold */
+            ],
+            patterns: ["heart", "star", "triangle", "dot", "ring"]
         },
         {
-            id: "bugworld", label: "BUG WORLD",
-            description: "Beetle iridescent, leaf green, soil brown.",
-            coverEmoji: "\u{1F41E}",   /* lady beetle */
+            id: "onioncore", label: "ONIONCORE",
+            description: "Pootery's own palette. Hot pink + teal, dark teal frame.",
+            coverEmoji: "\u{1F9C5}",   /* onion */
             priceCents: 99,
-            releaseDate: "2026-07-17T17:00:00Z",
-            glazes: ["#1f6b3a", "#7a8f3a", "#4a3522",
-                     "#b53939", "#2b6b6c"],
-            patterns: ["dot", "ring"]
+            glazes: [
+                "#00ffcc",   /* teal */
+                "#ff2e88",   /* hot pink */
+                "#ff5cab",   /* pink bright */
+                "#143842",   /* frame teal */
+                "#b81866",   /* deep pink */
+                "#06141a",   /* near black */
+                "#eaf6f4"    /* chalk white */
+            ],
+            patterns: ["dot", "ring", "x", "chevron", "heart"]
         },
         {
-            id: "piratecove", label: "PIRATE COVE",
-            description: "Treasure gold, deep sea, weathered wood.",
-            coverEmoji: "\u{2693}",   /* anchor */
-            priceCents: 99,
-            releaseDate: "2026-07-24T17:00:00Z",
-            glazes: ["#244e6b", "#e4b13e", "#5a3a1a",
-                     "#1a0e08", "#e9e4c8"],
-            patterns: ["x", "star"]
-        },
-        {
-            id: "frostbite", label: "FROSTBITE",
-            description: "Glacier blue, snow white, aurora teal.",
-            coverEmoji: "\u{2744}",   /* snowflake */
-            priceCents: 99,
-            releaseDate: "2026-07-31T17:00:00Z",
-            glazes: ["#bfe8f5", "#7fb8d9", "#f4f6ea",
-                     "#2b6b6c", "#244e9b"],
-            patterns: ["star", "triangle"]
-        },
-        {
-            id: "superhero", label: "SUPER POT",
-            description: "Comic primaries + halftone POW stamps.",
-            coverEmoji: "\u{1F9B8}",   /* superhero */
-            priceCents: 99,
-            releaseDate: "2026-08-07T17:00:00Z",
-            glazes: ["#d92128", "#244e9b", "#e4b13e",
-                     "#f4f6ea", "#1a0e08"],
-            patterns: ["star", "chevron"]
-        },
-        {
-            id: "rainbowdeluxe", label: "RAINBOW DELUXE",
-            description: "Full prism + animated RGB cycle.",
-            coverEmoji: "\u{1F308}",   /* rainbow */
-            priceCents: 99,
-            releaseDate: "2026-08-14T17:00:00Z",
-            glazes: ["@rgb-cycle", "#d92128", "#ff7a00",
-                     "#e4b13e", "#5f8d5d", "#2b6fff", "#7a3c8c"],
-            patterns: ["heart", "ring"]
+            id: "mega", label: "MEGA",
+            description: "Double-size pack: 14 metallics + electrics + RGB, 10 custom stamps.",
+            coverEmoji: "\u{1F31F}",   /* glowing star */
+            priceCents: 199,
+            glazes: [
+                "@rgb-cycle",   /* animated rainbow */
+                "#ffd700",      /* gold */
+                "#c0c0c0",      /* silver */
+                "#b87333",      /* copper */
+                "#4a4a4a",      /* gunmetal */
+                "#ff0080",      /* electric magenta */
+                "#00ff80",      /* electric mint */
+                "#80ff00",      /* electric lime */
+                "#ff8000",      /* electric orange */
+                "#8000ff",      /* electric violet */
+                "#f5f5f5",      /* chalk */
+                "#1a0e08",      /* deep ink */
+                "#ffa6c9",      /* cotton */
+                "#c8e2a8"       /* soft sage */
+            ],
+            /* Empty — populated by loadMegaStamps() from
+               MEGA_STAMP_FILES below. Target: 10 stamps. */
+            patterns: []
         }
     ];
 
@@ -4464,30 +4405,27 @@
     }
 
     /* ============================================================
-       MEGA PACK — Day 5 chunk D
+       MEGA PACK custom stamps — Day 5 chunk D
        ============================================================
-       Custom PNG stamps the user commits to assets/patterns/.
-       To add a stamp:
+       MEGA is now defined as a paid pack in GLAZE_PACKS above; this
+       block just populates its patterns[] array dynamically from
+       PNGs committed to assets/patterns/. To add a stamp:
          1. Drop a PNG (transparent bg recommended) into
             lets-crayte-pootery/assets/patterns/
-         2. Add an entry to MEGA_STAMP_FILES below with a unique
-            id (becomes the pattern id) + the filename
-         3. Commit + push — the next page load will show the
-            stamp in the MEGA tab.
-       The pack stays hidden until at least one stamp is
-       registered, so an empty manifest doesn't pollute the
-       tab strip.
+         2. Add an entry to MEGA_STAMP_FILES below with a unique id
+            (becomes the pattern id) + the filename
+         3. Commit + push — next page load shows it in the MEGA tab.
+       Target: 10 stamps for the launch MEGA pack.
        ============================================================ */
 
-    const MEGA_PACK = {
-        id: "mega",
-        label: "MEGA",
-        glazes: [
-            "#ff2e88", "#33ff66", "#ffea00",
-            "#00d4ff", "#ff8c1a", "#9534d8", "#f4f6ea"
-        ],
-        patterns: []
-    };
+    /* Locate the MEGA pack inside GLAZE_PACKS so loadMegaStamps
+       can push pattern ids into its patterns array. */
+    const MEGA_PACK = (function () {
+        for (let i = 0; i < GLAZE_PACKS.length; i++) {
+            if (GLAZE_PACKS[i].id === "mega") return GLAZE_PACKS[i];
+        }
+        return null;
+    }());
 
     /* Stamp manifest. Add entries here as you commit PNGs.
        Example (uncomment AFTER the file lands in the folder):
@@ -4539,9 +4477,9 @@
     }
 
     function loadMegaStamps() {
+        if (!MEGA_PACK) return;
         if (!MEGA_STAMP_FILES || MEGA_STAMP_FILES.length === 0) return;
 
-        let registered = 0;
         MEGA_STAMP_FILES.forEach(function (entry) {
             if (!entry || !entry.id || !entry.file) return;
             if (MEGA_PACK.patterns.indexOf(entry.id) >= 0) return;
@@ -4566,12 +4504,7 @@
 
             PATTERN_DRAWERS[entry.id] = megaStampDrawer(entry.id);
             MEGA_PACK.patterns.push(entry.id);
-            registered++;
         });
-
-        if (registered > 0 && GLAZE_PACKS.indexOf(MEGA_PACK) < 0) {
-            GLAZE_PACKS.push(MEGA_PACK);
-        }
     }
 
     /* Register on module eval — happens after PATTERN_DRAWERS is
@@ -5437,16 +5370,23 @@
                 pp.appendChild(btn);
             });
 
-            /* "+" tile that opens the file picker. */
-            const addBtn = document.createElement("button");
-            addBtn.type = "button";
-            addBtn.className = "stamp-btn is-add-sticker";
-            addBtn.setAttribute("aria-label",
-                "Import a transparent PNG as a custom sticker");
-            addBtn.title = "Import sticker (PNG)";
-            addBtn.textContent = "+";
-            addBtn.addEventListener("click", pickCustomStickerFile);
-            pp.appendChild(addBtn);
+            /* "+" tile that opens the file picker — PAID PACKS
+               ONLY. Custom-PNG import is a paid-tier feature; free
+               packs surface only their bundled stamps + any custom
+               stickers the kid already owns (those still display
+               in every pack so a paid-pack import isn't trapped
+               behind one specific pack tab). */
+            if (pack && pack.priceCents > 0) {
+                const addBtn = document.createElement("button");
+                addBtn.type = "button";
+                addBtn.className = "stamp-btn is-add-sticker";
+                addBtn.setAttribute("aria-label",
+                    "Import a transparent PNG as a custom sticker");
+                addBtn.title = "Import sticker (PNG)";
+                addBtn.textContent = "+";
+                addBtn.addEventListener("click", pickCustomStickerFile);
+                pp.appendChild(addBtn);
+            }
         }
 
         /* Tool-mode buttons */
