@@ -341,7 +341,8 @@ a:focus-visible {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 6px 12px;
     width: min(440px, 92vw);
     padding: 12px 18px;
     background: linear-gradient(120deg,
@@ -380,10 +381,19 @@ a:focus-visible {
 
 .dtb-theme {
     flex: 1 1 auto;
+    /* Without min-width:0, flex items refuse to shrink below their
+       content size — a long theme word would push past the banner
+       edge. With this + max-width, long names ellipsize cleanly
+       instead of bleeding off-screen. */
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     text-align: center;
     font-family: var(--font-title);
-    font-size: clamp(18px, 4.5vw, 26px);
-    letter-spacing: 3px;
+    font-size: clamp(16px, 4.2vw, 24px);
+    letter-spacing: 2px;
     color: var(--pink-bright);
     text-shadow:
         2px 2px 0 #000,
@@ -2970,7 +2980,16 @@ a:focus-visible {
     background: none;
     padding: 0;
     cursor: pointer;
-    font: inherit;
+    /* Explicit longhands — `font: inherit` (shorthand) was wiping
+       font-family and pulling in the parent's system sans, which
+       made signed-in @handles render in a different font from
+       anonymous bylines on the same gallery card. Restating the
+       .pot-author typography here keeps the look identical both
+       when combined with .pot-author (gallery cards) and standalone
+       (battle creator byline). */
+    font-family: var(--font-lcd);
+    font-size: 13px;
+    letter-spacing: 0.8px;
     color: inherit;
     text-align: left;
 }

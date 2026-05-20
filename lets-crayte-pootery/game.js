@@ -2740,8 +2740,10 @@
         }
 
         /* Rim opening on top — drawn AFTER paint so the rim ring
-           stays visible even with a painted pot. */
-        drawRim(ctx);
+           stays visible even with a painted pot. Gated alongside
+           drawPot so the empty wheel before lump placement doesn't
+           show a phantom pot opening floating in the air. */
+        if (opts.pot !== false) drawRim(ctx);
 
         /* Particles last so they're on top. Decorate disables. */
         if (opts.particles !== false) drawParticles(ctx);
@@ -8382,17 +8384,49 @@
 
     function deleteCurrentEntry() {
         const entry = GALLERY.detailEntry;
-        if (!entry) return;
+        if (!entry || !entry.id) return;
+        const wasShared = !!entry.publicId;
         const ok = window.confirm(
-            "Delete this pot? This cannot be undone."
+            wasShared
+                ? "Delete this pot from your gallery AND stop " +
+                  "sharing it with everyone? This cannot be undone."
+                : "Delete this pot? This cannot be undone."
         );
         if (!ok) return;
-        const arr = loadGalleryEntries().filter(function (e) {
-            return e.id !== entry.id;
+
+        /* Remove from local gallery first so the UI updates even
+           if the public-delete network call is slow / fails. */
+        const targetId = entry.id;
+        const before = loadGalleryEntries();
+        const after = before.filter(function (e) {
+            return e && e.id !== targetId;
         });
-        saveGalleryEntries(arr);
-        closeDetail();
-        refreshGalleryGrid();
+        if (after.length === before.length) {
+            console.warn("[CRAYte] delete: no local entry matched id=" + targetId);
+        }
+        saveGalleryEntries(after);
+
+        /* If this pot was shared to the public gallery, also remove
+           it from Supabase — otherwise the user sees their deleted
+           pot still alive on the Public tab and thinks delete is
+           broken. Cache invalidation forces a fresh fetch next time
+           the Public tab paints. */
+        const pubId = entry.publicId;
+        const cleanup = function () {
+            GALLERY.publicCache = null;
+            closeDetail();
+            refreshGalleryGrid();
+        };
+        if (wasShared && pubId && typeof deletePublicPot === "function") {
+            deletePublicPot(pubId).then(function (success) {
+                if (!success) {
+                    console.warn("[CRAYte] public unshare failed for", pubId);
+                }
+                cleanup();
+            });
+        } else {
+            cleanup();
+        }
     }
 
     /* ----- 8D. PNG export -----
