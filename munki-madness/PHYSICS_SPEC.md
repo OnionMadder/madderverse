@@ -380,6 +380,17 @@ Canvas2D, no WebGL. Each frame:
    through `hm.sample` so the rings hug the curved surface.
 6. Draw the marble as a glowing radial gradient at its projected
    position, scaled by perspective and the `sink` amount.
+   **The marble is rendered with Z = `marble.h + MARBLE_R` so its
+   visual bottom sits on the mesh** (its physics centre is at the
+   surface, but its physics radius is `MARBLE_R`, so the visual centre
+   needs to rise by one radius to look right). A dark outline stroke
+   keeps the ball readable against any translucent obstacle fill.
+
+**Render order is load-bearing:** mesh → well rings → obstacles →
+marble. The marble MUST be drawn last; anything drawn after it can
+occlude it. Fixed 2026-05-19 after the ice tile's translucent cyan
+fill was covering the marble's lower hemisphere because the marble
+was being rendered with its centre at the surface plane.
 
 Line color tints by row/column **average height** to give a depth cue:
 deeper-than-average lines glow more saturated cyan; ridges fade toward

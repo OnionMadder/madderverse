@@ -1306,8 +1306,18 @@
 
     renderObstacles();
 
-    // Marble — glowing sphere sitting on the surface.
-    var mp = project(marble.x, marble.y, marble.h - marble.sink * 1.6);
+    // ---- MARBLE — must draw LAST. Load-bearing for z-order: anything
+    // drawn after this can occlude the ball. The marble's *physics*
+    // position is on the surface (centre at marble.h), but rendering at
+    // that Z visually buries the ball one radius into the mesh — and
+    // any obstacle with a translucent fill (ice, mud, etc.) sits at
+    // that same Z and covered the lower hemisphere, making the ball
+    // appear to "disappear into" the obstacle. Lift the rendered Z by
+    // MARBLE_R so the ball's BOTTOM rides the mesh — visually it
+    // sits on top, which is what the physics already says.
+    ctx.save();
+    var renderZ = marble.h + MARBLE_R - marble.sink * 1.6;
+    var mp = project(marble.x, marble.y, renderZ);
     var cellPx = Math.min(W, Hh) / (Math.max(hm.gw, hm.gh) * 1.18);
     var rad = cellPx * MARBLE_R * 2.0 * mp.sc * (1 - marble.sink * 0.45);
     ctx.shadowBlur = 18 * DPR;
@@ -1322,8 +1332,14 @@
     ctx.arc(mp.sx, mp.sy, Math.max(2, rad), 0, Math.PI * 2);
     ctx.fillStyle = grd;
     ctx.fill();
+    // Dark outline for contrast against any obstacle fill (cyan ice,
+    // tan mud, green conveyor, etc.) — keeps the ball readable.
     ctx.shadowBlur = 0;
     ctx.shadowColor = "transparent";
+    ctx.lineWidth = Math.max(1, DPR * 1.1);
+    ctx.strokeStyle = "rgba(40,18,8,0.70)";
+    ctx.stroke();
+    ctx.restore();
 
     if (dbg.show) {
       ctx.fillStyle = "rgba(0,0,0,0.55)";
