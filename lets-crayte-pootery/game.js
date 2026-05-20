@@ -4118,20 +4118,6 @@
             patterns: ["teddy", "paw", "button", "plush-grain"]
         },
         {
-            id: "doggo", label: "DOGGO",
-            description: "Who's a good pot? Every coat color + paw stamps.",
-            coverEmoji: "\u{1F436}",   /* dog face */
-            glazes: [
-                "#d9a567",   /* golden retriever */
-                "#f4f4ec",   /* dalmatian white */
-                "#8a9aaa",   /* husky gray */
-                "#5a3422",   /* chocolate lab */
-                "#2a2a2a"    /* black lab */
-            ],
-            patterns: ["paw", "bone", "doghouse", "goodboy",
-                       "whosagoodboy", "dachshund"]
-        },
-        {
             id: "modded", label: "MODDED",
             description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
             coverEmoji: "\u{1F5A5}",   /* desktop computer */
