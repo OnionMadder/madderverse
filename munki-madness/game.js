@@ -824,12 +824,12 @@
     else if (marble.y > hiY) { marble.y = hiY; marble.vy = -marble.vy * WALL_BOUNCE; bonk = true; }
     if (bonk) flashFall();
 
-    // Well capture: two paths, whichever fires first.
+    // Well capture: two paths, whichever fires first. Post-capture
+    // timing halved 2026-05-19 — "you did it!" moment was too long.
     //   (a) Inside captureR bowl AND speed < ESCAPE_THRESHOLD continuously
-    //       for 0.28s — the classic capture (was the only criterion).
-    //   (b) Inside the drain zone for 0.30s continuously — bypass capture
-    //       for when the marble is moving fast but trapped by the drain
-    //       damping (prevents the "approaches but never settles" stall).
+    //       for 0.14s — the classic capture path.
+    //   (b) Inside the drain zone for 0.15s continuously — bypass capture
+    //       for when the marble is moving fast but trapped by drain damping.
     var dwx = marble.x - w.x, dwy = marble.y - w.y;
     var dwell = Math.sqrt(dwx * dwx + dwy * dwy);
     var sp2 = Math.sqrt(marble.vx * marble.vx + marble.vy * marble.vy);
@@ -837,15 +837,17 @@
     var slow = sp2 < ESCAPE_THRESHOLD;
     if (inBowl && slow) {
       captureTimer += dt;
-      marble.sink = Math.min(1, marble.sink + dt * 3);
-      if (captureTimer > 0.28) { win(); }
+      // sink animation ramp doubled (dt*3 → dt*6) so the marble settles
+      // into the hole in ~0.17s instead of ~0.33s
+      marble.sink = Math.min(1, marble.sink + dt * 6);
+      if (captureTimer > 0.14) { win(); }
     } else {
       captureTimer = Math.max(0, captureTimer - dt * 2);
       marble.sink = Math.max(0, marble.sink - dt * 4);
     }
     if (inDrain) {
       drainDwell += dt;
-      if (drainDwell > 0.30) { win(); }
+      if (drainDwell > 0.15) { win(); }
     } else {
       drainDwell = 0;
     }

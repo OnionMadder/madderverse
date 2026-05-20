@@ -94,6 +94,30 @@ RemoteLevelStorage drop-in) carries forward conceptually but is not
 materialised in Phase 1 — there's nothing to store yet. Phase 3 brings
 it back as part of the editor.
 
+## Tune panel (`?tune=1`) is PERMANENT dev infrastructure
+
+The live-tune slider panel triggered by `?tune=1` is **not a Phase 1
+artefact to be removed before launch.** It stays in the codebase
+forever as permanent dev tooling — exposed via a hidden query string
+so end users never see it unless they look for it.
+
+- **Never strip it out** when polishing for release. It will ship to
+  the Play Store with the game; players don't discover it unless they
+  manually add `?tune=1` to the URL.
+- **All physics-dial knobs that ship as gameplay-tunable constants
+  belong on this panel** (`ACCEL`, `GRAVITY_MULT`, the `WELL_PULL_*`
+  family, etc. — see `PHYSICS_SPEC.md` for the canonical table).
+- **New tunables go here too** when added. Live-tune is the primary
+  workflow for finding the right values; without the panel each tweak
+  costs a build cycle.
+- **The "Copy current values" button is part of the contract** —
+  user dials, hits Copy, pastes back, Claude commits as new defaults.
+  Keep that round-trip working.
+
+The dev panel is gated by `?tune=1`; the player-facing experience at
+`https://madderverse.org/munki-madness/` is identical to a build that
+never had the panel compiled in.
+
 ## Workflow notes
 
 - Build in phases; commit per phase; push direct to `main` as a clean

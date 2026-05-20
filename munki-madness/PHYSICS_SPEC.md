@@ -118,18 +118,19 @@ than `ESCAPE_THRESHOLD` could ever fire. Two-stage fix:
 ### Two capture paths (whichever fires first)
 
 The classic capture (in-bowl AND below `ESCAPE_THRESHOLD` continuously
-for `0.28 s`) remains the primary route. The fix adds a **drain-dwell
+for `0.14 s`) remains the primary route. The fix adds a **drain-dwell
 bypass**:
 
 ```
 inDrain   = distance(marble, well) < WELL_DRAIN_RADIUS
 drainDwell += dt   while inDrain   (reset to 0 when outside)
-if drainDwell > 0.30 → captured (regardless of velocity)
+if drainDwell > 0.15 → captured (regardless of velocity)
 ```
 
-So even if the drain damping somehow isn't enough to push the marble
-below `ESCAPE_THRESHOLD`, half a second of "stuck inside the bowl"
-locks in the capture. Both paths share the win() handler; whichever
+Both dwell thresholds were halved 2026-05-19 — the original 0.28/0.30 s
+post-capture wait was too long. The marble.sink visual ramp was also
+doubled (`dt*3 → dt*6`) so the marble settles into the hole in ~0.17 s
+instead of ~0.33 s. Both paths share the `win()` handler; whichever
 triggers first wins.
 
 ### Live diagnostic overlay
