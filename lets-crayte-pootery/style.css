@@ -2759,7 +2759,7 @@ a:focus-visible {
         grid-template-columns: 1fr;
     }
     .shop-card {
-        grid-template-columns: 48px 1fr auto;
+        grid-template-columns: 48px 1fr;
         gap: 10px;
         padding: 10px 12px;
     }
@@ -2772,7 +2772,9 @@ a:focus-visible {
 
 .shop-card {
     display: grid;
-    grid-template-columns: 56px 1fr auto;
+    /* CTA column was removed when the action button moved into
+       the pack-detail modal. The card is now [icon] [meta]. */
+    grid-template-columns: 56px 1fr;
     align-items: center;
     gap: 12px;
     padding: 12px 14px;
@@ -2860,6 +2862,10 @@ a:focus-visible {
 .shop-card.is-owned .shop-status   { color: #66ffb3; }
 .shop-card.is-queued .shop-status  { color: var(--pink-bright); }
 
+/* .shop-cta retained for historical reference only — the chip was
+   removed from buildShopCard. The CTA now lives in the pack-detail
+   modal below. Keeping the rule scoped to its class means nothing
+   renders unless we re-introduce the chip. */
 .shop-cta {
     align-self: center;
     padding: 6px 10px;
@@ -2879,6 +2885,220 @@ a:focus-visible {
 .shop-card.is-queued .shop-cta {
     border-color: var(--pink-bright);
     color: var(--pink-bright);
+}
+
+/* ----- Pack-detail modal -----
+   Opens when the user taps a shop card. Shows every glaze + every
+   stamp in the pack and hosts the PLAY / BUY / NOTIFY ME button.
+   Built lazily by openPackPreviewModal in game.js; closed by ✕,
+   ESC, or backdrop click. */
+.pack-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(3, 10, 14, 0.78);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.pack-modal {
+    position: relative;
+    width: 100%;
+    max-width: 420px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 22px 22px 18px;
+    border: 1px solid var(--teal);
+    border-radius: var(--radius-md);
+    background:
+        repeating-linear-gradient(0deg,
+            rgba(0,0,0,0.18) 0 1px,
+            transparent 1px 2px),
+        linear-gradient(180deg, #082030 0%, #04131a 100%);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(0, 255, 204, 0.08) inset;
+    color: var(--ink);
+}
+.pack-modal.is-owned {
+    border-color: #66ffb3;
+}
+.pack-modal.is-queued {
+    border-color: var(--pink-bright);
+}
+
+.pack-modal-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    line-height: 1;
+    font-size: 18px;
+    border: 1px solid var(--teal-low);
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.4);
+    color: var(--teal);
+    cursor: pointer;
+}
+.pack-modal-close:hover {
+    border-color: var(--teal);
+    color: #fff;
+}
+
+.pack-modal-header {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 14px;
+    align-items: center;
+    margin-right: 36px;   /* clear the close button */
+    margin-bottom: 14px;
+}
+.pack-modal-cover {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    line-height: 1;
+}
+.pack-modal-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+.pack-modal-name {
+    margin: 0;
+    font-family: var(--font-title, var(--font-mono));
+    font-size: 20px;
+    letter-spacing: 1.6px;
+    color: var(--ink);
+}
+.pack-modal-status {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1.4px;
+    color: var(--teal);
+}
+.pack-modal.is-owned  .pack-modal-status { color: #66ffb3; }
+.pack-modal.is-queued .pack-modal-status { color: var(--pink-bright); }
+
+.pack-modal-desc {
+    margin: 0 0 16px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink-dim);
+}
+
+.pack-modal-section {
+    margin: 14px 0 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--teal-low);
+    text-transform: uppercase;
+}
+
+.pack-modal-colors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.pack-modal-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.pack-modal-swatch.is-rgb {
+    background: conic-gradient(
+        from 0deg,
+        #ff0080, #ff8000, #ffea00, #80ff00,
+        #00ff80, #00d4ff, #2b6fff, #8000ff, #ff0080);
+}
+
+.pack-modal-stamps {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 8px;
+}
+.pack-modal-stamp {
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(0, 255, 204, 0.12);
+    border-radius: var(--radius-sm);
+    padding: 6px;
+}
+.pack-modal-stamp canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.pack-modal-action {
+    width: 100%;
+    margin-top: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--teal);
+    border-radius: var(--radius-md);
+    background: rgba(0, 255, 204, 0.08);
+    color: var(--teal);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    cursor: pointer;
+}
+.pack-modal-action:hover {
+    background: rgba(0, 255, 204, 0.18);
+    color: #fff;
+}
+.pack-modal.is-owned .pack-modal-action {
+    border-color: #66ffb3;
+    color: #66ffb3;
+    background: rgba(102, 255, 179, 0.08);
+}
+.pack-modal.is-owned .pack-modal-action:hover {
+    background: rgba(102, 255, 179, 0.2);
+    color: #fff;
+}
+.pack-modal.is-queued .pack-modal-action {
+    border-color: var(--pink-bright);
+    color: var(--pink-bright);
+    background: rgba(255, 46, 136, 0.08);
+}
+.pack-modal.is-queued .pack-modal-action:hover {
+    background: rgba(255, 46, 136, 0.18);
+    color: #fff;
+}
+
+/* Narrow phones: tighten the modal so it fills the viewport
+   nicely and the stamp grid stays at least 4 columns wide. */
+@media (max-width: 520px) {
+    .pack-modal-overlay { padding: 12px; }
+    .pack-modal { padding: 18px 16px 14px; }
+    .pack-modal-header {
+        grid-template-columns: 56px 1fr;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+    .pack-modal-cover { width: 56px; height: 56px; font-size: 32px; }
+    .pack-modal-name { font-size: 18px; }
+    .pack-modal-stamps {
+        grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    }
 }
 
 /* ----- 14a-i. PROFILE screen (Phase 1 chunk 2 — public pages) ----- */

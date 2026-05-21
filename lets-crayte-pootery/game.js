@@ -9510,11 +9510,12 @@
 
         card.appendChild(meta);
 
-        const cta = document.createElement("span");
-        cta.className = "shop-cta";
-        cta.textContent = shopCtaText(p);
-        card.appendChild(cta);
-
+        /* No CTA button on the card — tapping anywhere on the card
+           opens the pack-detail modal (see openPackPreviewModal),
+           which is where the PLAY / BUY / NOTIFY ME button lives.
+           Pack state (FREE / $0.99 / DROPS XYZ / OWNED) is already
+           shown by .shop-status inside .shop-meta, so the card
+           grid drops the trailing auto column. */
         return card;
     }
 
@@ -9538,16 +9539,30 @@
         return "BUY";
     }
 
+    /* Tap on a shop card -> open the pack-detail modal. The modal
+       shows every glaze + every stamp included in the pack and
+       hosts the single PLAY / BUY / NOTIFY ME button. The previous
+       inline-CTA flow lived here directly; that logic now belongs
+       to performPackAction(), which the modal's action button
+       calls. */
     function handleShopCardClick(packId) {
         const p = GLAZE_PACKS.find(function (x) { return x.id === packId; });
         if (!p) return;
-        const free   = !p.priceCents;
-        const owned  = isPackOwned(p);
+        openPackPreviewModal(p);
+    }
+
+    /* Runs the actual PLAY / BUY / NOTIFY-ME action for a pack.
+       Called by the modal's action button. Mirrors what the
+       inline shop-card CTA used to do. */
+    function performPackAction(p) {
+        if (!p) return;
+        const free  = !p.priceCents;
+        const owned = isPackOwned(p);
         if (free || owned) {
-            /* Jump straight into shape mode with this pack pre-selected.
-               Uses the existing clay — don't gate behind a lump drop. */
+            /* Jump into shape mode with this pack pre-selected. */
             D.activePackId = p.id;
             SHAPE.needsLump = false;
+            closePackPreviewModal();
             showScreen("shape");
             return;
         }
@@ -9560,11 +9575,198 @@
             );
             return;
         }
-        /* Released + paid + not owned -- fire the real RC purchase
-           flow. purchasePack handles the unconfigured-billing fall
-           back (shows a friendly "available at launch" alert)
-           so this is safe in any build state. */
+        /* Released + paid + not owned -- real RC purchase. */
         purchasePack(p.id);
+    }
+
+    /* ----- Pack-detail modal -----
+       A single element pair (overlay + card) is lazily created the
+       first time openPackPreviewModal runs and reused thereafter.
+       Re-opening rebuilds the inner content for whichever pack
+       was tapped. Closing leaves the elements detached so the
+       hover styles + ESC/backdrop listeners aren't doubled up. */
+
+    let _packModalEls = null;
+
+    function ensurePackModalEls() {
+        if (_packModalEls) return _packModalEls;
+        const overlay = document.createElement("div");
+        overlay.className = "pack-modal-overlay";
+        overlay.addEventListener("click", function (e) {
+            if (e.target === overlay) closePackPreviewModal();
+        });
+
+        const card = document.createElement("div");
+        card.className = "pack-modal";
+        card.setAttribute("role", "dialog");
+        card.setAttribute("aria-modal", "true");
+        overlay.appendChild(card);
+
+        const onKey = function (e) {
+            if (e.key === "Escape") closePackPreviewModal();
+        };
+
+        _packModalEls = { overlay, card, onKey };
+        return _packModalEls;
+    }
+
+    function closePackPreviewModal() {
+        if (!_packModalEls) return;
+        const { overlay, onKey } = _packModalEls;
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        document.removeEventListener("keydown", onKey);
+    }
+
+    function openPackPreviewModal(p) {
+        if (!p) return;
+        const els = ensurePackModalEls();
+        const { overlay, card, onKey } = els;
+
+        /* Pack-state classes mirror the card so the modal accents
+           match (owned = green, queued = pink, free/paid = teal). */
+        card.classList.remove("is-owned", "is-queued", "is-free");
+        if (isPackOwned(p))         card.classList.add("is-owned");
+        if (!isPackReleased(p))     card.classList.add("is-queued");
+        if (!p.priceCents)          card.classList.add("is-free");
+
+        card.innerHTML = "";
+
+        const close = document.createElement("button");
+        close.className = "pack-modal-close";
+        close.type = "button";
+        close.setAttribute("aria-label", "Close");
+        close.textContent = "✕";   /* × */
+        close.addEventListener("click", closePackPreviewModal);
+        card.appendChild(close);
+
+        const header = document.createElement("div");
+        header.className = "pack-modal-header";
+
+        const cover = document.createElement("div");
+        cover.className = "pack-modal-cover";
+        cover.textContent = p.coverEmoji || "\u{1FAB4}";
+        applyPackIconToCover(cover, p);
+        header.appendChild(cover);
+
+        const heading = document.createElement("div");
+        heading.className = "pack-modal-heading";
+        const name = document.createElement("h2");
+        name.className = "pack-modal-name";
+        name.textContent = p.label;
+        heading.appendChild(name);
+        const status = document.createElement("span");
+        status.className = "pack-modal-status";
+        status.textContent = shopStatusText(p);
+        heading.appendChild(status);
+        header.appendChild(heading);
+
+        card.appendChild(header);
+
+        if (p.description) {
+            const desc = document.createElement("p");
+            desc.className = "pack-modal-desc";
+            desc.textContent = p.description;
+            card.appendChild(desc);
+        }
+
+        /* Colors strip ----------------------------------------- */
+        const colorsTitle = document.createElement("h3");
+        colorsTitle.className = "pack-modal-section";
+        colorsTitle.textContent = "GLAZES";
+        card.appendChild(colorsTitle);
+
+        const colors = document.createElement("div");
+        colors.className = "pack-modal-colors";
+        (p.glazes || []).forEach(function (g) {
+            const s = document.createElement("div");
+            s.className = "pack-modal-swatch";
+            if (g === "@rgb-cycle") {
+                s.classList.add("is-rgb");
+                s.title = "RGB cycle";
+            } else {
+                s.style.background = g;
+                s.title = g;
+            }
+            colors.appendChild(s);
+        });
+        card.appendChild(colors);
+
+        /* Stamps strip ----------------------------------------- */
+        const stampsTitle = document.createElement("h3");
+        stampsTitle.className = "pack-modal-section";
+        stampsTitle.textContent = "STAMPS";
+        card.appendChild(stampsTitle);
+
+        const stamps = document.createElement("div");
+        stamps.className = "pack-modal-stamps";
+        (p.patterns || []).forEach(function (id) {
+            const tile = document.createElement("div");
+            tile.className = "pack-modal-stamp";
+            const cv = document.createElement("canvas");
+            cv.width  = 64;
+            cv.height = 64;
+            tile.appendChild(cv);
+            stamps.appendChild(tile);
+            paintStampPreview(cv, id);
+        });
+        card.appendChild(stamps);
+
+        /* Action button --------------------------------------- */
+        const action = document.createElement("button");
+        action.className = "pack-modal-action";
+        action.type = "button";
+        action.textContent = shopCtaText(p);
+        action.addEventListener("click", function () {
+            performPackAction(p);
+        });
+        card.appendChild(action);
+
+        document.body.appendChild(overlay);
+        document.addEventListener("keydown", onKey);
+    }
+
+    /* Render a single stamp preview onto a small canvas. Works
+       for both procedural drawers (dot, ring, wave...) and the
+       sheet-backed drawers (candy/jawbreaker, mega/icecream...).
+       Sheet drawers are registered when each sheet's TexturePacker
+       JSON resolves; the same applies for the sheet img's pixels.
+       If either is missing on first paint, we poll a few rAF
+       frames so the preview pops in as soon as it's ready,
+       without needing the modal to be torn down + rebuilt. */
+    function paintStampPreview(cv, id) {
+        const ctx = cv.getContext("2d");
+        const w = cv.width, h = cv.height;
+        let tries = 0;
+        const MAX_TRIES = 90;   /* ~1.5s @ 60fps */
+        function attempt() {
+            ctx.clearRect(0, 0, w, h);
+            const fn = PATTERN_DRAWERS[id];
+            const slash = id.indexOf("/");
+            let imgReady = true;
+            if (slash > 0) {
+                const sheetName = id.slice(0, slash);
+                const rec = STICKER_SHEETS[sheetName];
+                imgReady = !!(rec && rec.img && rec.img.complete &&
+                              rec.img.naturalWidth > 0 && rec.frames);
+            }
+            if (fn && imgReady) {
+                /* Procedural drawers need a paint color — pick a
+                   tone that reads on the modal's dark background. */
+                fn(ctx, w / 2, h / 2, w * 0.45, "#eaf6f4");
+                return;
+            }
+            if (tries++ < MAX_TRIES) {
+                requestAnimationFrame(attempt);
+                return;
+            }
+            /* Give-up placeholder — readable but unobtrusive. */
+            ctx.fillStyle = "rgba(255, 255, 255, 0.25)";
+            ctx.font = "bold 22px monospace";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("?", w / 2, h / 2);
+        }
+        attempt();
     }
 
     registerScreen("shop", {
