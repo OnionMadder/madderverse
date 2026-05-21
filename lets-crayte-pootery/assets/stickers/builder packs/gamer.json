@@ -1,123 +1,123 @@
 {
   "frames": {
-    "gamer": {
+    "buttons": {
       "frame": {
         "x": 2,
         "y": 2,
-        "w": 341,
-        "h": 341
+        "w": 100,
+        "h": 100
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 341,
-        "h": 341
+        "w": 100,
+        "h": 100
       },
       "sourceSize": {
-        "w": 341,
-        "h": 341
-      }
-    },
-    "click": {
-      "frame": {
-        "x": 345,
-        "y": 2,
-        "w": 414,
-        "h": 414
-      },
-      "rotated": false,
-      "trimmed": false,
-      "spriteSourceSize": {
-        "x": 0,
-        "y": 0,
-        "w": 414,
-        "h": 414
-      },
-      "sourceSize": {
-        "w": 414,
-        "h": 414
-      }
-    },
-    "glove": {
-      "frame": {
-        "x": 761,
-        "y": 2,
-        "w": 421,
-        "h": 421
-      },
-      "rotated": false,
-      "trimmed": false,
-      "spriteSourceSize": {
-        "x": 0,
-        "y": 0,
-        "w": 421,
-        "h": 421
-      },
-      "sourceSize": {
-        "w": 421,
-        "h": 421
+        "w": 100,
+        "h": 100
       }
     },
     "dpad": {
       "frame": {
-        "x": 1184,
+        "x": 104,
         "y": 2,
-        "w": 352,
-        "h": 352
+        "w": 115,
+        "h": 115
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 352,
-        "h": 352
+        "w": 115,
+        "h": 115
       },
       "sourceSize": {
-        "w": 352,
-        "h": 352
+        "w": 115,
+        "h": 115
       }
     },
-    "heart": {
+    "gamer": {
       "frame": {
-        "x": 1538,
+        "x": 221,
         "y": 2,
-        "w": 355,
-        "h": 355
+        "w": 201,
+        "h": 201
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 355,
-        "h": 355
+        "w": 201,
+        "h": 201
       },
       "sourceSize": {
-        "w": 355,
-        "h": 355
+        "w": 201,
+        "h": 201
       }
     },
-    "star": {
+    "joystick": {
       "frame": {
-        "x": 1895,
+        "x": 424,
         "y": 2,
-        "w": 345,
-        "h": 345
+        "w": 100,
+        "h": 100
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 345,
-        "h": 345
+        "w": 100,
+        "h": 100
       },
       "sourceSize": {
-        "w": 345,
-        "h": 345
+        "w": 100,
+        "h": 100
+      }
+    },
+    "screen": {
+      "frame": {
+        "x": 526,
+        "y": 2,
+        "w": 173,
+        "h": 173
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 173,
+        "h": 173
+      },
+      "sourceSize": {
+        "w": 173,
+        "h": 173
+      }
+    },
+    "startselect": {
+      "frame": {
+        "x": 701,
+        "y": 2,
+        "w": 76,
+        "h": 76
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 76,
+        "h": 76
+      },
+      "sourceSize": {
+        "w": 76,
+        "h": 76
       }
     }
   },
@@ -127,8 +127,8 @@
     "image": "spritesheet.png",
     "format": "RGBA8888",
     "size": {
-      "w": 2242,
-      "h": 425
+      "w": 779,
+      "h": 205
     },
     "scale": "1"
   }

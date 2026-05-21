@@ -4738,17 +4738,36 @@
         };
     }
 
+    /* Builder-pack sheets live in a "builder packs/" subfolder
+       (Kelly's content organization). Everything else sits flat
+       in assets/stickers/. encodeURI handles the space in the
+       folder name so the fetch + Image src stay valid. */
+    const STICKER_SHEET_DIRS = {
+        plush:    "builder packs/",
+        gamer:    "builder packs/",
+        dinosaur: "builder packs/"
+    };
+
+    function stickerSheetPath(name, ext) {
+        const dir = STICKER_SHEET_DIRS[name] || "";
+        return encodeURI("assets/stickers/" + dir + name + "." + ext);
+    }
+
     function loadStickerSheets() {
         const sheets = [
-            "candy", "plush", "modded", "gamer", "space",
-            "breakfast", "music", "dinosaur", "mega"
+            /* crafter */
+            "candy", "modded", "space", "breakfast", "music",
+            /* builder (subfolder) */
+            "plush", "gamer", "dinosaur",
+            /* special */
+            "mega", "chickens", "aliens", "literally-moons"
         ];
         sheets.forEach(function (name) {
             const img = new Image();
-            img.src = "assets/stickers/" + name + ".png";
+            img.src = stickerSheetPath(name, "png");
             const rec = { img: img, frames: null, iconFrame: name };
             STICKER_SHEETS[name] = rec;
-            fetch("assets/stickers/" + name + ".json")
+            fetch(stickerSheetPath(name, "json"))
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (manifest) {
                     if (!manifest || !manifest.frames) return;
@@ -4816,6 +4835,7 @@
            ============================================================ */
         {
             id: "core",  label: "BASIC",
+            packType: "crafter",
             backgroundSvg: "core",    /* assets/backgrounds/core.svg (optional) */
             description: "The starter set. Earth, sage, sky, and ink.",
             coverEmoji: "\u{1FAB4}",   /* potted plant */
@@ -4836,6 +4856,7 @@
         },
         {
             id: "candy", label: "CANDY",
+            packType: "crafter",
             sheet: "candy",
             surfaceTexture: "candy",   /* assets/textures/candy.png */
             backgroundSvg: "candy",    /* assets/backgrounds/candy.svg (optional) */
@@ -4861,6 +4882,8 @@
         },
         {
             id: "plushie", label: "PLUSH",
+            packType: "builder",   /* parts build a teddy bear */
+            buildSubject: "bear",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
             surfaceTexture: "plush",   /* assets/textures/plush.png */
             backgroundSvg: "plush",    /* assets/backgrounds/plush.svg (optional) */
@@ -4879,11 +4902,14 @@
                 "TEDDY BROWN", "PASTEL PINK", "SOFT CREAM",
                 "LAVENDER", "SKY BLUE", "PEACH", "MINT"
             ],
-            patterns: ["plush/heart", "plush/kidney", "plush/button",
-                       "plush/patch", "plush/ear"]
+            /* Bear-building parts: place the eyes, nose, mouth,
+               ears + a heart to assemble a teddy face on the pot. */
+            patterns: ["plush/eyes", "plush/heart", "plush/mouth",
+                       "plush/nose", "plush/ear"]
         },
         {
             id: "modded", label: "MODDED",
+            packType: "crafter",
             sheet: "modded",
             surfaceTexture: "modded",   /* assets/textures/modded.png */
             backgroundSvg: "modded",   /* assets/backgrounds/modded.svg (optional) */
@@ -4908,6 +4934,8 @@
         },
         {
             id: "gamer", label: "GAMER",
+            packType: "builder",   /* parts build a handheld console */
+            buildSubject: "handheld console",
             sheet: "gamer",
             surfaceTexture: "gamer",   /* assets/textures/gamer.png */
             backgroundSvg: "gamer",    /* assets/backgrounds/gamer.svg (optional) */
@@ -4927,11 +4955,14 @@
                 "SCANLINE GRAY", "HI-SCORE YELLOW",
                 "PIXEL PURPLE", "ATARI BROWN"
             ],
-            patterns: ["gamer/click", "gamer/glove", "gamer/dpad",
-                       "gamer/heart", "gamer/star"]
+            /* Console-building parts: screen, d-pad, buttons,
+               joystick + start/select to assemble a handheld. */
+            patterns: ["gamer/screen", "gamer/dpad", "gamer/buttons",
+                       "gamer/joystick", "gamer/startselect"]
         },
         {
             id: "space", label: "SPACE",
+            packType: "crafter",
             sheet: "space",
             surfaceTexture: "space",   /* assets/textures/space.png */
             backgroundSvg: "space",    /* assets/backgrounds/space.svg (optional) */
@@ -4968,6 +4999,8 @@
            ============================================================ */
         {
             id: "dinosaur", label: "DINOSAUR",
+            packType: "builder",   /* parts build a dinosaur */
+            buildSubject: "dino",
             sheet: "dinosaur",
             backgroundSvg: "dinosaur", /* assets/backgrounds/dinosaur.svg (optional) */
             description: "Fossil bone, amber, jurassic jungle greens, T-rex red.",
@@ -4993,6 +5026,7 @@
         },
         {
             id: "breakfast", label: "BREAKFAST",
+            packType: "crafter",
             sheet: "breakfast",
             backgroundSvg: "breakfast",/* assets/backgrounds/breakfast.svg (optional) */
             description: "Maple syrup, golden butter, berry jam, espresso.",
@@ -5017,6 +5051,7 @@
         },
         {
             id: "music", label: "MUSIC",
+            packType: "crafter",
             sheet: "music",
             backgroundSvg: "music",    /* assets/backgrounds/music.svg (optional) */
             description: "Vinyl black, brass, neon stage lights.",
@@ -5041,6 +5076,7 @@
         },
         {
             id: "mega", label: "MEGA",
+            packType: "special",
             sheet: "mega",
             backgroundSvg: "mega",     /* assets/backgrounds/mega.svg (optional) */
             description: "Double-size pack: 14 metallics + electrics + RGB, 10 custom stamps.",
@@ -5073,6 +5109,109 @@
                        "mega/candy", "mega/gumballs", "mega/candydog",
                        "mega/husky", "mega/bigdog", "mega/cat",
                        "mega/toucan"]
+        },
+
+        /* ============================================================
+           SPECIAL PACKS — chickens / aliens / moons. $1.99 each,
+           matching MEGA's tier. Bigger / more elaborate stamp sets.
+           Descriptions are PLACEHOLDERS — Kelly writes the final
+           copy. Glaze palettes are reasonable starters keyed to
+           each theme; tweak freely.
+           ============================================================ */
+        {
+            id: "chickens", label: "CHICKENS",
+            packType: "special",
+            sheet: "chickens",
+            backgroundSvg: "chickens", /* assets/backgrounds/chickens.svg (optional) */
+            description: "PLACEHOLDER — twelve costumed chickens. " +
+                         "Kelly writes the real copy.",
+            coverEmoji: "\u{1F414}",   /* chicken */
+            priceCents: 199,
+            glazes: [
+                "#f4f0e6",   /* hen white */
+                "#c8923a",   /* feed gold */
+                "#d23b2a",   /* comb red */
+                "#ffb000",   /* beak orange */
+                "#6b4a2a",   /* coop brown */
+                "#3f8a4a",   /* pasture green */
+                "#2a2a2a"    /* rooster black */
+            ],
+            glazeNames: [
+                "HEN WHITE", "FEED GOLD", "COMB RED",
+                "BEAK ORANGE", "COOP BROWN", "PASTURE GREEN",
+                "ROOSTER BLACK"
+            ],
+            patterns: [
+                "chickens/costume (1)", "chickens/costume (2)",
+                "chickens/costume (3)", "chickens/costume (4)",
+                "chickens/costume (5)", "chickens/costume (6)",
+                "chickens/costume (7)", "chickens/costume (8)",
+                "chickens/costume (9)", "chickens/costume (10)",
+                "chickens/costume (11)", "chickens/costume (12)"
+            ]
+        },
+        {
+            id: "aliens", label: "ALIENS",
+            packType: "special",
+            sheet: "aliens",
+            backgroundSvg: "aliens",   /* assets/backgrounds/aliens.svg (optional) */
+            description: "PLACEHOLDER — nine little visitors. " +
+                         "Kelly writes the real copy.",
+            coverEmoji: "\u{1F47D}",   /* alien */
+            priceCents: 199,
+            glazes: [
+                "#7CFC00",   /* alien green */
+                "#9b30ff",   /* cosmic violet */
+                "#00e5ff",   /* ray cyan */
+                "#ff2e88",   /* nebula pink */
+                "#c0c0c0",   /* saucer chrome */
+                "#1b1b3a",   /* deep space */
+                "#ffe600"    /* tractor-beam yellow */
+            ],
+            glazeNames: [
+                "ALIEN GREEN", "COSMIC VIOLET", "RAY CYAN",
+                "NEBULA PINK", "SAUCER CHROME", "DEEP SPACE",
+                "BEAM YELLOW"
+            ],
+            patterns: [
+                "aliens/alien-one", "aliens/alien-two",
+                "aliens/alien-three", "aliens/alien-four",
+                "aliens/alien-five", "aliens/alien-six",
+                "aliens/alien-seven", "aliens/alien-eight",
+                "aliens/alien-nine"
+            ]
+        },
+        {
+            id: "moons", label: "MOONS",
+            packType: "special",
+            sheet: "literally-moons",   /* sheet file is hyphenated */
+            backgroundSvg: "moons",    /* assets/backgrounds/moons.svg (optional) */
+            description: "PLACEHOLDER — literally moons. And comets. " +
+                         "Kelly writes the real copy.",
+            coverEmoji: "\u{1F319}",   /* crescent moon */
+            priceCents: 199,
+            glazes: [
+                "#d8d2c4",   /* lunar grey */
+                "#8a6fc4",   /* moon violet */
+                "#ff8c42",   /* moon orange */
+                "#ff7ab0",   /* moon pink */
+                "#39c0d8",   /* moon cyan */
+                "#3a6fff",   /* moon blue */
+                "#0a0a1f"    /* void black */
+            ],
+            glazeNames: [
+                "LUNAR GREY", "MOON VIOLET", "MOON ORANGE",
+                "MOON PINK", "MOON CYAN", "MOON BLUE",
+                "VOID BLACK"
+            ],
+            patterns: [
+                "literally-moons/moon-violet", "literally-moons/moon-orange",
+                "literally-moons/moon-pink", "literally-moons/moon-red",
+                "literally-moons/moon-yellow", "literally-moons/moon-cyan",
+                "literally-moons/moon-blue", "literally-moons/moon-green",
+                "literally-moons/comet-yellow", "literally-moons/comet-blue",
+                "literally-moons/comet-purple", "literally-moons/comet-red"
+            ]
         }
     ];
 
@@ -5447,10 +5586,13 @@
          1. Create RC account, add Android app, get public SDK key
          2. Set RC_PUBLIC_API_KEY below
          3. Create products in Play Console with these EXACT IDs:
-              pack_dinosaur   $0.99
-              pack_breakfast  $0.99
-              pack_music      $0.99
-              pack_mega       $1.99
+              pack_dinosaur   $0.99   (builder — dino)
+              pack_breakfast  $0.99   (crafter)
+              pack_music      $0.99   (crafter)
+              pack_mega       $1.99   (special)
+              pack_chickens   $1.99   (special)
+              pack_aliens     $1.99   (special)
+              pack_moons      $1.99   (special)
          4. Mirror them in RC dashboard with matching identifiers
          5. Create an entitlement in RC named the same as each
             product id and attach the matching product to it
@@ -5474,7 +5616,10 @@
         dinosaur:  "pack_dinosaur",
         breakfast: "pack_breakfast",
         music:     "pack_music",
-        mega:      "pack_mega"
+        mega:      "pack_mega",
+        chickens:  "pack_chickens",
+        aliens:    "pack_aliens",
+        moons:     "pack_moons"
     };
 
     function rcPlugin() {
@@ -11203,6 +11348,16 @@
         const name = document.createElement("h3");
         name.className = "shop-name";
         name.textContent = p.label;
+        /* Pack-type tag — CRAFTER / BUILDER / SPECIAL chip next to
+           the name so the kid knows at a glance whether they're
+           getting random decals (crafter), character-build parts
+           (builder), or a big elaborate set (special). */
+        if (p.packType) {
+            const tag = document.createElement("span");
+            tag.className = "shop-type-tag type-" + p.packType;
+            tag.textContent = packTypeLabel(p);
+            name.appendChild(tag);
+        }
         meta.appendChild(name);
 
         const desc = document.createElement("p");
@@ -11224,6 +11379,20 @@
            shown by .shop-status inside .shop-meta, so the card
            grid drops the trailing auto column. */
         return card;
+    }
+
+    /* Pack-type chip label. Builder packs name what they build
+       (BUILD A BEAR) when buildSubject is set; otherwise just
+       the type word. */
+    function packTypeLabel(p) {
+        if (!p || !p.packType) return "";
+        if (p.packType === "builder") {
+            return p.buildSubject
+                ? ("BUILD: " + p.buildSubject.toUpperCase())
+                : "BUILDER";
+        }
+        if (p.packType === "special") return "SPECIAL";
+        return "CRAFTER";
     }
 
     function shopStatusText(p) {

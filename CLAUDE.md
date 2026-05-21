@@ -109,12 +109,22 @@ The Capacitor plugin `@revenuecat/purchases-capacitor` is installed and the bill
 
 Under your Pootery app → **Monetize** → **In-app products**, create **four products** with these **exact** product IDs (must match `PACK_ENTITLEMENTS` in `game.js`):
 
-| Product ID | Price | Label |
-|------------|-------|-------|
-| `pack_dinosaur`  | $0.99 | DINOSAUR |
-| `pack_breakfast` | $0.99 | BREAKFAST |
-| `pack_music`     | $0.99 | MUSIC |
-| `pack_mega`      | $1.99 | MEGA |
+| Product ID | Price | Label | Type |
+|------------|-------|-------|------|
+| `pack_dinosaur`  | $0.99 | DINOSAUR | builder (dino) |
+| `pack_breakfast` | $0.99 | BREAKFAST | crafter |
+| `pack_music`     | $0.99 | MUSIC | crafter |
+| `pack_mega`      | $1.99 | MEGA | special |
+| `pack_chickens`  | $1.99 | CHICKENS | special |
+| `pack_aliens`    | $1.99 | ALIENS | special |
+| `pack_moons`     | $1.99 | MOONS | special |
+
+**Pack types** (curation labels, same drag-place mechanics):
+- **crafter** — random decorative stamps + glazes + texture (candy, modded, space, breakfast, music)
+- **builder** — character/theme part stamps that assemble a subject (plush→bear, gamer→console, dinosaur→dino) + glazes + texture
+- **special** — bigger / more elaborate sets at the $1.99 tier (mega, chickens, aliens, moons)
+
+plush + gamer remain FREE (builder is a curation label, not a price tier). The 3 new special packs (chickens, aliens, moons) + their RevenueCat entitlements need creating before they're purchasable.
 
 Each must be **Active** and have a price set.
 

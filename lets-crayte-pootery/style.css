@@ -2975,6 +2975,31 @@ a:focus-visible {
     font-size: 14px;
     letter-spacing: 1.4px;
     color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+}
+
+/* Pack-type chip — CRAFTER / BUILD: BEAR / SPECIAL. Sits inline
+   next to the pack name in the shop card. Color-coded per type:
+   teal crafter (the default making-stuff vibe), pink builder
+   (the "assemble a character" hook), gold special (premium). */
+.shop-type-tag {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+    border: 1px solid currentColor;
+    line-height: 1;
+}
+.shop-type-tag.type-crafter { color: var(--teal); }
+.shop-type-tag.type-builder { color: var(--pink-bright); }
+.shop-type-tag.type-special {
+    color: #ffd24a;
+    background: rgba(255, 210, 74, 0.1);
 }
 
 .shop-desc {
