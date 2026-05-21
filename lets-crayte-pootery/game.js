@@ -2262,20 +2262,36 @@
 
        Decorate freezes the wheel, so we hold the pattern static
        there too. */
+    /* SPIN-VIEW OVERRIDE
+       When the gallery detail modal is drag-spinning the pot,
+       it sets _viewSpinDx to the pixel offset both texture
+       layers should scroll by. Texture painters honor this
+       override INSTEAD of the wheel-phase calculation, so the
+       drag drives the rotation directly. renderSavedPot sets
+       it before painting + clears it after so other render
+       paths are unaffected. null = use wheel phase as before. */
+    let _viewSpinDx = null;
+
     function paintClayTexture(ctx, mat, bounds) {
         if (!ctx || !mat) return;
         const pat = getClayPattern(ctx, mat.id);
         if (!pat) return;
 
         let dx = 0;
-        /* Only scroll the surface texture while the wheel is
-           actively spinning. Decorate freezes the wheel; kiln
-           has the pot locked inside a closed oven — neither
-           should look like a rotating cylinder. */
-        if (currentScreen === "shape" &&
+        if (_viewSpinDx != null &&
                 typeof DOMMatrix === "function" &&
                 typeof pat.setTransform === "function") {
-            /* maxR derived from the bounds the caller passed in
+            dx = _viewSpinDx;
+            try { pat.setTransform(new DOMMatrix().translateSelf(dx, 0)); }
+            catch (_) { dx = 0; }
+        } else if (currentScreen === "shape" &&
+                typeof DOMMatrix === "function" &&
+                typeof pat.setTransform === "function") {
+            /* Only scroll the surface texture while the wheel is
+               actively spinning. Decorate freezes the wheel; kiln
+               has the pot locked inside a closed oven — neither
+               should look like a rotating cylinder.
+               maxR derived from the bounds the caller passed in
                (bounds.w ~ 2*maxR + 8). Scrolling one circumference
                per revolution would be 2π·maxR; we slow it to
                ~maxR·0.55 per radian which visually matches the
@@ -2395,20 +2411,19 @@
         const pat = getSurfacePattern(ctx, pack.surfaceTexture);
         if (!pat) return;
 
-        /* On the shape screen the wheel is spinning, so the
-           surface texture (the pack skin wrapping the cylinder)
-           needs to scroll in sync to read as a rotating object.
-           Mirrors the wheel-phase trick paintClayTexture uses
-           but at LESS THAN HALF the scroll rate — busy patterns
-           like the SPACE nebula or CANDY swirl were dizzying at
-           the clay layer's 0.55 multiplier. 0.22 reads as a
-           gentle rotation that still sells the spin without
-           making anyone seasick. The clay layer underneath
-           keeps its 0.55 (the grain is subtle enough that the
-           higher rate doesn't compound visually). Decorate +
-           kiln reset the transform so wheel-stopped screens
-           stay still. */
-        if (currentScreen === "shape" &&
+        /* SPIN-VIEW override: gallery detail modal sets _viewSpinDx
+           when the user is drag-spinning the pot, in which case
+           we use that pixel offset directly (1:1 with finger
+           motion). Otherwise on the shape screen the wheel is
+           spinning and we use the wheel-phase trick at 0.22 of
+           the visible radius (less than half the clay layer's
+           0.55 so busy pack patterns don't get dizzying). */
+        if (_viewSpinDx != null &&
+                typeof DOMMatrix === "function" &&
+                typeof pat.setTransform === "function") {
+            try { pat.setTransform(new DOMMatrix().translateSelf(_viewSpinDx, 0)); }
+            catch (_) {}
+        } else if (currentScreen === "shape" &&
                 typeof DOMMatrix === "function" &&
                 typeof pat.setTransform === "function") {
             const visibleRadius = bounds.w * 0.5 - 4;
@@ -7745,6 +7760,14 @@
         const savedClayTypeId = SHAPE.clayTypeId;
         SHAPE.clay = entry.clay || SHAPE.clay;
         if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
+        /* SPIN-VIEW: gallery detail modal passes opts.spinDx so the
+           texture painters scroll the pattern in lock-step with
+           the drag. Default null = no override (thumbnails render
+           in their normal static state). Captured + restored
+           around the render so concurrent paths can't see a stale
+           value. */
+        const savedSpinDx = _viewSpinDx;
+        if (typeof opts.spinDx === "number") _viewSpinDx = opts.spinDx;
         try {
             if (opts.background !== false) {
                 ctx.fillStyle = "#0c1f25";
@@ -7831,10 +7854,11 @@
         } finally {
             SHAPE.clay = savedClay;
             SHAPE.clayTypeId = savedClayTypeId;
+            _viewSpinDx = savedSpinDx;
         }
     }
 
-    function renderEntryIntoCanvas(canvas, entry) {
+    function renderEntryIntoCanvas(canvas, entry, opts) {
         const cssW = canvas.clientWidth  || canvas.width;
         const cssH = canvas.clientHeight || canvas.height;
         const dpr = window.devicePixelRatio || 1;
@@ -7845,7 +7869,7 @@
         const ctx = canvas.getContext("2d");
         ctx.setTransform(dpr * (cssW / SHAPE.W), 0, 0,
                          dpr * (cssH / SHAPE.H), 0, 0);
-        renderSavedPot(ctx, entry);
+        renderSavedPot(ctx, entry, opts || {});
     }
 
     /* ----- 8B. Grid building ----- */
@@ -9320,12 +9344,21 @@
 
     function openDetail(entry) {
         GALLERY.detailEntry = entry;
+        /* SPIN-VIEW: reset on every open so each pot starts from
+           its natural front-facing orientation. Drag-spin updates
+           this value below; renderEntryIntoCanvas passes it to
+           renderSavedPot as opts.spinDx. */
+        GALLERY.detailSpin = 0;
         const panel  = document.getElementById("potDetail");
         const canvas = document.getElementById("detailCanvas");
         const name   = document.getElementById("detailName");
         const date   = document.getElementById("detailDate");
         const pack   = document.getElementById("detailPack");
         if (!panel || !canvas) return;
+
+        /* Drag-to-spin pointer handlers. Wired once per canvas
+           element; the _spinWired flag prevents stacking. */
+        attachDetailSpinHandlers(canvas);
 
         if (name) {
             name.value = entry.name || "";
@@ -9353,8 +9386,70 @@
         panel.hidden = false;
 
         loadEntryPaint(entry).then(function () {
-            renderEntryIntoCanvas(canvas, entry);
+            renderDetailCanvas();
         });
+    }
+
+    /* Re-render the detail-modal canvas honoring the current
+       spin offset. Called on open + every drag tick. */
+    function renderDetailCanvas() {
+        const canvas = document.getElementById("detailCanvas");
+        const entry  = GALLERY.detailEntry;
+        if (!canvas || !entry) return;
+        renderEntryIntoCanvas(canvas, entry, {
+            spinDx: GALLERY.detailSpin || 0
+        });
+    }
+
+    /* Drag-to-spin handlers on the detail-modal canvas. Mapping:
+       1 logical canvas pixel of horizontal drag = 1 pixel of
+       texture scroll, which feels 1:1 with the finger. Wraps
+       around naturally because CanvasPattern repeats infinitely
+       — no special wrap logic needed. Wired ONCE per canvas
+       element (the modal reuses the same canvas across opens);
+       _spinWired flag prevents stacking listeners on re-open. */
+    function attachDetailSpinHandlers(canvas) {
+        if (!canvas || canvas._spinWired) return;
+        canvas._spinWired = true;
+        canvas.style.cursor = "grab";
+        canvas.style.touchAction = "none";
+
+        let dragging = false;
+        let startX = 0;
+        let startSpin = 0;
+        /* Convert client X to logical canvas X. The detail canvas
+           is scaled via CSS; we want the drag-to-scroll ratio
+           to feel 1:1 with what the user SEES, so we compute the
+           scale and divide deltas by it. */
+        function logicalDx(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scale = rect.width / SHAPE.W;
+            return (e.clientX - startX) / (scale || 1);
+        }
+
+        canvas.addEventListener("pointerdown", function (e) {
+            if (e.button !== undefined && e.button !== 0) return;
+            dragging = true;
+            startX = e.clientX;
+            startSpin = GALLERY.detailSpin || 0;
+            canvas.style.cursor = "grabbing";
+            try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+            e.preventDefault();
+        });
+        canvas.addEventListener("pointermove", function (e) {
+            if (!dragging) return;
+            GALLERY.detailSpin = startSpin + logicalDx(e);
+            renderDetailCanvas();
+        });
+        const endDrag = function (e) {
+            if (!dragging) return;
+            dragging = false;
+            canvas.style.cursor = "grab";
+            try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+        };
+        canvas.addEventListener("pointerup",     endDrag);
+        canvas.addEventListener("pointercancel", endDrag);
+        canvas.addEventListener("pointerleave",  endDrag);
     }
 
     /* Show / hide the trophy badge on the detail modal. Tapping
