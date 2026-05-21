@@ -2193,6 +2193,90 @@
         return CLAY_TYPES[0];
     }
 
+    /* ============================================================
+       CLAY TEXTURES — tilable surface PNGs at assets/textures/
+       ============================================================
+       Five 128x128 seamless textures, one per clay type. Each is
+       applied on top of the linear gradient fill via a soft-light
+       composite so the existing global shading (the cross-pot
+       gradient + highlight strip + throwing rings) still reads
+       clearly, but the surface picks up grit / specks / brush
+       marks that flat color can't sell.
+
+       Textures load asynchronously; renderPotScene falls back to
+       the gradient-only look until each image decodes. Patterns
+       are cached per (ctx, clayId) the first time they paint, so
+       there's no per-frame allocation in the render hot path.
+       ============================================================ */
+    const CLAY_TEXTURE_FILES = {
+        earthenware: "terra",
+        porcelain:   "white",
+        stoneware:   "gray",
+        basalt:      "black",
+        galaxy:      "blue"
+    };
+    const CLAY_TEXTURES = Object.create(null);          /* matId -> Image */
+    const CLAY_PATTERN_CACHE = new WeakMap();           /* ctx -> {matId:Pattern} */
+
+    function loadClayTextures() {
+        Object.keys(CLAY_TEXTURE_FILES).forEach(function (matId) {
+            const img = new Image();
+            img.src = "assets/textures/" +
+                      CLAY_TEXTURE_FILES[matId] + ".png";
+            CLAY_TEXTURES[matId] = img;
+        });
+    }
+    loadClayTextures();
+
+    function getClayPattern(ctx, matId) {
+        if (!ctx) return null;
+        let cache = CLAY_PATTERN_CACHE.get(ctx);
+        if (!cache) {
+            cache = Object.create(null);
+            CLAY_PATTERN_CACHE.set(ctx, cache);
+        }
+        if (cache[matId]) return cache[matId];
+        const img = CLAY_TEXTURES[matId];
+        if (!img || !img.complete || img.naturalWidth === 0) return null;
+        try {
+            const pat = ctx.createPattern(img, "repeat");
+            cache[matId] = pat;
+            return pat;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /* Paint the clay's surface texture over the gradient fill.
+       Caller must have already built the pot path + filled it
+       with the gradient. We clip to the path, multiply the
+       texture in (so the gradient shading still wins on dark/light
+       contrasts), then restore. */
+    function paintClayTexture(ctx, mat, bounds) {
+        if (!ctx || !mat) return;
+        const pat = getClayPattern(ctx, mat.id);
+        if (!pat) return;
+        ctx.save();
+        buildPotPath(ctx);
+        ctx.clip();
+        /* soft-light keeps the gradient's color + lighting intact
+           and just adds the texture's value variation. multiply
+           darkens too aggressively; source-over with reduced
+           alpha flattens the gradient. soft-light is the sweet
+           spot for "subtle grit". */
+        ctx.globalCompositeOperation = "soft-light";
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = pat;
+        ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+        /* A faint second pass in source-over with low alpha
+           re-introduces the texture's color speckles (otherwise
+           soft-light leaves them too washed out). */
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 0.22;
+        ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+        ctx.restore();
+    }
+
     const SHAPE = {
         /* Logical canvas size. Display scales via CSS aspect-ratio;
            backing store is W*dpr × H*dpr. */
@@ -3058,6 +3142,17 @@
         grad.addColorStop(1.00, stops[5]);
         ctx.fillStyle = grad;
         ctx.fill();
+
+        /* Surface texture — tilable PNG per clay type, layered on
+           top of the gradient via soft-light so the global shading
+           still reads. No-op until the matching texture image
+           finishes decoding. */
+        paintClayTexture(ctx, mat, {
+            x: cx - maxR - 4,
+            y: clay[N - 1].y - 4,
+            w: (maxR + 4) * 2,
+            h: SHAPE.baseY - clay[N - 1].y + 14
+        });
 
         /* Highlight strip — rolls left/right as the wheel spins
            in SHAPE mode (sells the rotation that a symmetric
