@@ -1580,6 +1580,7 @@ a:focus-visible {
 }
 
 .swatch {
+    position: relative;   /* anchor for the floating name chip */
     flex: 0 0 auto;
     width: 30px;
     height: 30px;
@@ -1603,6 +1604,37 @@ a:focus-visible {
         0 0 0 1px #fff,
         0 0 0 3px var(--pink-bright),
         0 0 10px rgba(255, 46, 136, 0.6);
+}
+
+/* Floating name chip above each glaze swatch on hover/focus.
+   Built from the data-name attribute set by buildToolUI; reads
+   "CHERRY RED" / "SCANLINE GRAY" / etc. Pure CSS so it works
+   without a JS handler and respects native focus-visible. */
+.swatch[data-name]::after {
+    content: attr(data-name);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 3px 7px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.4px;
+    color: var(--teal);
+    background: rgba(8, 22, 28, 0.92);
+    border: 1px solid var(--teal-low);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    z-index: 4;
+}
+.swatch:hover::after,
+.swatch:focus-visible::after,
+.swatch.active::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 .stamp-btn {
@@ -2259,7 +2291,17 @@ a:focus-visible {
     align-items: center;
     gap: 10px;
     padding: 12px 14px;
-    border-top: 1px dashed var(--teal-low);
+    /* v1.1 polish — lip-gradient treatment echoing the pot rim's
+       light-to-shadow curve. Top edge picks up a faint teal glow
+       (the "catch light"), background fades to deeper bg-deep.
+       Replaces the previous dashed-top divider which read as
+       utilitarian against the canvas above. */
+    background:
+        linear-gradient(180deg,
+            rgba(0, 255, 204, 0.08) 0%,
+            rgba(0, 0, 0, 0)        14%,
+            rgba(0, 0, 0, 0.18)     100%);
+    border-top: 1px solid rgba(0, 255, 204, 0.18);
 }
 
 .detail-name-row .row-label {
@@ -2298,6 +2340,15 @@ a:focus-visible {
     flex-wrap: wrap;
     gap: 10px;
     padding: 12px 14px 14px;
+    /* v1.1 polish — continue the lip-gradient deepening downward
+       so the entire metadata strip reads as one polished surface
+       (titlebar > canvas > name-row > actions). Subtle bottom
+       glow hints at the pot inside being warm. */
+    background:
+        linear-gradient(180deg,
+            rgba(0, 0, 0, 0.18)        0%,
+            rgba(0, 0, 0, 0.28)        70%,
+            rgba(255, 46, 136, 0.08)   100%);
 }
 
 .detail-actions .btn-control {

@@ -2718,6 +2718,7 @@
         setClay(clayId);
         resetClay();
         SHAPE.needsLump = false;
+        SHAPE.wetSince = performance.now();   /* fresh lump = freshly wet */
         claySplat();                                /* recorded splat, synth fallback */
         /* Splat just landed — the wheel can start humming now. */
         wheelHumStart();
@@ -2783,6 +2784,7 @@
             SHAPE.pointerLastX = p.x;
             SHAPE.pointerLastY = p.y;
             SHAPE.pointerActive = true;
+            SHAPE.wetSince = performance.now();  /* refresh drying-ring timer */
             wetLoopStart();   /* sustained wet hum under the squelches */
             haptic(5);        /* light tap — "you grabbed the clay" */
         });
@@ -3183,6 +3185,37 @@
         const ctx = SHAPE.ctx;
         renderPotScene(ctx, SHAPE.needsLump ? { pot: false } : undefined);
         if (SHAPE.needsLump) drawDropTarget(ctx);
+        else drawWetRing(ctx);   /* drying halo at the pot's base */
+    }
+
+    /* Soft wet halo at the wheel base. Bigger + brighter right
+       after the kid touches the clay, shrinks + fades back to
+       its idle size over ~6 seconds. Pure visual — sells the
+       "wet clay on a wheel" mood without any new mechanic. */
+    function drawWetRing(ctx) {
+        const now = performance.now();
+        const wetMs = SHAPE.wetSince ? (now - SHAPE.wetSince) : Infinity;
+        const DRY_WINDOW = 6000;
+        /* freshness goes 1 (just touched) -> 0 (fully dried),
+           clamped + eased so the drop is gentle. */
+        const fresh = Math.max(0, 1 - Math.min(1, wetMs / DRY_WINDOW));
+        const cx = SHAPE.centerX;
+        const cy = SHAPE.baseY + 4;
+        const baseRx = 110;
+        const baseRy = 14;
+        const rx = baseRx + fresh * 22;   /* 110 idle, 132 fresh */
+        const ry = baseRy + fresh * 4;    /*  14 idle,  18 fresh */
+        const alpha = 0.07 + fresh * 0.11;  /* 0.07 idle, 0.18 fresh */
+        ctx.save();
+        const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+        halo.addColorStop(0,   "rgba(140, 220, 220, " + alpha.toFixed(3) + ")");
+        halo.addColorStop(0.6, "rgba(140, 220, 220, " + (alpha * 0.45).toFixed(3) + ")");
+        halo.addColorStop(1,   "rgba(140, 220, 220, 0)");
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     function drawDropTarget(ctx) {
@@ -4632,6 +4665,10 @@
                 "#5f8d5d",   /* sage */
                 "#1a0e08"    /* ink */
             ],
+            glazeNames: [
+                "DARK CLAY", "SIENNA", "TERRACOTTA", "AMBER",
+                "MILK WHITE", "SAGE", "INK"
+            ],
             patterns: ["dot", "ring", "star", "chevron", "wave"]
         },
         {
@@ -4648,6 +4685,11 @@
                 "#4a230b",   /* root beer brown */
                 "#ff7a00",   /* orange creamsicle */
                 "#9534d8"    /* grape soda */
+            ],
+            glazeNames: [
+                "CHERRY RED", "BLUE RASPBERRY", "SOUR GREEN",
+                "COTTON CANDY", "ROOT BEER", "CREAMSICLE",
+                "GRAPE SODA"
             ],
             patterns: ["candy/jawbreaker", "candy/hardcandy",
                        "candy/licorice", "candy/gummybear",
@@ -4668,6 +4710,10 @@
                 "#ffd5b8",   /* peach */
                 "#c8efd1"    /* mint */
             ],
+            glazeNames: [
+                "TEDDY BROWN", "PASTEL PINK", "SOFT CREAM",
+                "LAVENDER", "SKY BLUE", "PEACH", "MINT"
+            ],
             patterns: ["plush/heart", "plush/kidney", "plush/button",
                        "plush/patch", "plush/ear"]
         },
@@ -4685,6 +4731,11 @@
                 "#0a0a0a",      /* black ops */
                 "#c8c8c8",      /* brushed aluminum */
                 "#b347ff"       /* cyber violet */
+            ],
+            glazeNames: [
+                "RGB CYCLE", "NEON GREEN", "HOT PINK",
+                "ELECTRIC BLUE", "BLACK OPS",
+                "BRUSHED ALUMINUM", "CYBER VIOLET"
             ],
             patterns: ["modded/robotic", "modded/disc", "modded/icon",
                        "modded/reader", "modded/laptop"]
@@ -4704,6 +4755,11 @@
                 "#6b1da6",   /* pixel purple */
                 "#6e3713"    /* atari brown */
             ],
+            glazeNames: [
+                "CRT GREEN", "RETRO ORANGE", "ARCADE PINK",
+                "SCANLINE GRAY", "HI-SCORE YELLOW",
+                "PIXEL PURPLE", "ATARI BROWN"
+            ],
             patterns: ["gamer/click", "gamer/glove", "gamer/dpad",
                        "gamer/heart", "gamer/star"]
         },
@@ -4721,6 +4777,11 @@
                 "#f4f6ea",   /* starfield white */
                 "#ffd700",   /* quasar gold */
                 "#00d4ff"    /* comet cyan */
+            ],
+            glazeNames: [
+                "COSMIC VOID", "NEBULA VIOLET", "GALACTIC PURPLE",
+                "SUPERNOVA BLUE", "STARFIELD WHITE",
+                "QUASAR GOLD", "COMET CYAN"
             ],
             patterns: ["space/galaxy", "space/star", "space/meteor",
                        "space/comet", "space/moon"]
@@ -4752,6 +4813,11 @@
                 "#2c1810",   /* swamp shadow */
                 "#c84a3a"    /* t-rex red */
             ],
+            glazeNames: [
+                "FOSSIL BONE", "AMBER SAND", "AMBER",
+                "JUNGLE GREEN", "DIRT BROWN",
+                "SWAMP SHADOW", "T-REX RED"
+            ],
             patterns: ["dinosaur/paws", "dinosaur/scales",
                        "dinosaur/teeth", "dinosaur/nostrils",
                        "dinosaur/eyes"]
@@ -4771,6 +4837,10 @@
                 "#cdb98a",   /* oat */
                 "#a07050"    /* toast */
             ],
+            glazeNames: [
+                "MAPLE SYRUP", "GOLDEN BUTTER", "BERRY JAM",
+                "ESPRESSO", "CREAM", "OAT", "TOAST"
+            ],
             patterns: ["breakfast/bigbowl", "breakfast/waffles",
                        "breakfast/pancakes", "breakfast/frenchtoast",
                        "breakfast/fruitbowl"]
@@ -4789,6 +4859,11 @@
                 "#33ff66",   /* neon green */
                 "#ffea00",   /* amp yellow */
                 "#c0c0c0"    /* mic chrome */
+            ],
+            glazeNames: [
+                "VINYL BLACK", "BRASS", "STAGE PINK",
+                "SPOTLIGHT BLUE", "NEON GREEN",
+                "AMP YELLOW", "MIC CHROME"
             ],
             patterns: ["music/blue", "music/orange", "music/red",
                        "music/pink", "music/green"]
@@ -4814,6 +4889,13 @@
                 "#1a0e08",      /* deep ink */
                 "#ffa6c9",      /* cotton */
                 "#c8e2a8"       /* soft sage */
+            ],
+            glazeNames: [
+                "RGB CYCLE", "GOLD", "SILVER", "COPPER",
+                "GUNMETAL", "ELECTRIC MAGENTA", "ELECTRIC MINT",
+                "ELECTRIC LIME", "ELECTRIC ORANGE",
+                "ELECTRIC VIOLET", "CHALK", "DEEP INK",
+                "COTTON", "SOFT SAGE"
             ],
             patterns: ["mega/icecream", "mega/penguins", "mega/dolphin",
                        "mega/candy", "mega/gumballs", "mega/candydog",
@@ -5504,13 +5586,31 @@
     function drawSticker(ctx, s) {
         const fn = PATTERN_DRAWERS[s.pattern];
         if (!fn) return;
+
+        /* Landing pop — for ~110ms after a fresh placement the
+           sticker draws scaled-up from 1.12 back to 1.00 via
+           easeOutCubic. Gives a tactile "thunk" feel without
+           any audio overlap (stampClick already covered that).
+           Skipped for saved entries (placedAt absent or stale). */
+        const STAMP_POP_MS = 110;
+        let scaleBoost = 1;
+        if (s.placedAt) {
+            const t = (performance.now() - s.placedAt) / STAMP_POP_MS;
+            if (t >= 0 && t < 1) {
+                const eased = 1 - Math.pow(1 - t, 3);   /* easeOutCubic */
+                scaleBoost = 1.12 - 0.12 * eased;        /* 1.12 -> 1.00 */
+            }
+        }
+
         const rotated = !!s.rot;
         const flipped = !!s.flipH;
-        if (rotated || flipped) {
+        const scaled  = scaleBoost !== 1;
+        if (rotated || flipped || scaled) {
             ctx.save();
             ctx.translate(s.x, s.y);
             if (rotated) ctx.rotate(s.rot);
             if (flipped) ctx.scale(-1, 1);
+            if (scaled)  ctx.scale(scaleBoost, scaleBoost);
             fn(ctx, 0, 0, s.r, s.color || "#fff");
             ctx.restore();
         } else {
@@ -6015,7 +6115,11 @@
             r: r,
             rot: D.stampRotation || 0,
             flipH: !!D.stampFlipH,
-            color: color
+            color: color,
+            /* placedAt drives a short 110%->100% pop animation
+               in drawSticker. Cleared on save/load so re-opened
+               pots don't replay the landing pop. */
+            placedAt: performance.now()
         });
         renderStickerLayer();
         stampClick();
@@ -6147,23 +6251,30 @@
            matching tab; just call it. */
         renderPackTabs();
 
-        /* Glaze swatches */
+        /* Glaze swatches. Each glaze gets a friendly name from the
+           pack's parallel glazeNames array (BLUE RASPBERRY,
+           SCANLINE GRAY, etc.) — shown as a tooltip on desktop
+           hover, an aria-label for screen readers, and a small
+           floating chip via the .data-name attr on long-press /
+           focus (CSS-driven for mobile-friendliness). */
         const gp = document.getElementById("glazePalette");
         if (gp) {
             gp.innerHTML = "";
-            pack.glazes.forEach(function (gid) {
+            pack.glazes.forEach(function (gid, idx) {
+                const name = (pack.glazeNames && pack.glazeNames[idx]) ||
+                             (gid === "@rgb-cycle" ? "RGB CYCLE" : gid);
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.className = "swatch";
                 btn.dataset.glaze = gid;
+                btn.dataset.name  = name;
+                btn.title = name;
+                btn.setAttribute("aria-label", "Glaze: " + name);
                 if (gid === "@rgb-cycle") {
                     /* CSS handles the animated rainbow background. */
                     btn.classList.add("dynamic-rgb");
-                    btn.setAttribute("aria-label", "RGB cycle glaze");
-                    btn.title = "RGB CYCLE";
                 } else {
                     btn.style.background = gid;
-                    btn.setAttribute("aria-label", "Glaze " + gid);
                 }
                 if (gid === D.glaze) btn.classList.add("active");
                 btn.addEventListener("click", function () {
@@ -6412,6 +6523,24 @@
         if (!D.lastT) D.lastT = t;
         const dt = Math.min(48, t - D.lastT);
         D.lastT = t;
+
+        /* Stamp landing pop — rebuild the sticker layer every
+           frame while any sticker is mid-animation (110ms
+           window after placement). stickerCanvas is cached
+           between placements normally; we just punch through
+           the cache here. Cheap because there are usually
+           only a handful of stickers and one rebuild costs
+           <1ms even with 30+ records. */
+        if (D.stickers && D.stickers.length > 0) {
+            const now = performance.now();
+            for (let i = 0; i < D.stickers.length; i++) {
+                const pa = D.stickers[i].placedAt;
+                if (pa && (now - pa) < 110) {
+                    renderStickerLayer();
+                    break;
+                }
+            }
+        }
 
         /* Wheel is FROZEN in decorate so the pot reads as "off
            the wheel" while you paint. drawPot also keys off
