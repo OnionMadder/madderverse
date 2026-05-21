@@ -1353,6 +1353,42 @@ a:focus-visible {
     outline: none;
 }
 
+/* Flip-horizontal toggle — same chassis as .rotate-reset so the
+   row reads as a single control cluster. .is-active is added in
+   game.js whenever D.stampFlipH is true so the button lights up
+   teal while the next stamp is mirrored. */
+.rotate-flip {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--bg-panel);
+    border: 1px solid var(--teal-low);
+    color: var(--teal-dim);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.12s ease, border-color 0.12s ease,
+                background 0.12s ease;
+}
+.rotate-flip:hover,
+.rotate-flip:focus-visible {
+    color: var(--pink-bright);
+    border-color: var(--pink-bright);
+    outline: none;
+}
+.rotate-flip.is-active {
+    color: var(--teal);
+    border-color: var(--teal);
+    background: rgba(0, 255, 204, 0.16);
+    box-shadow: 0 0 8px rgba(0, 255, 204, 0.35);
+}
+.rotate-flip.is-active:hover,
+.rotate-flip.is-active:focus-visible {
+    color: #fff;
+    border-color: var(--teal);
+}
+
 .decorate-stack {
     display: flex;
     flex-direction: column;

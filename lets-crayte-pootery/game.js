@@ -2483,6 +2483,8 @@
         resetClay();
         SHAPE.needsLump = false;
         claySplat();                                /* recorded splat, synth fallback */
+        /* Splat just landed — the wheel can start humming now. */
+        wheelHumStart();
         haptic([6, 26, 12]);
         /* Splat burst at the wheel where the clay lands (emitParticles
            is sparse + randomly no-ops, so fire a few for a real pop). */
@@ -3281,7 +3283,13 @@
                 sizeShapeCanvas();
             }
             startShapeLoop();
-            wheelHumStart();   /* wheel is spinning */
+            /* Wheel only hums during the SHAPING phase, and only
+               after the clay has been plopped onto the wheel. If
+               the user is still in the "drag a lump" state the
+               wheel is silent — placeLump() will kick the hum on
+               the moment the splat lands. Re-entering shape with
+               clay already on the wheel resumes the hum. */
+            if (!SHAPE.needsLump) wheelHumStart();
             /* Sync hint + tray prompt with whether a lump is still
                needed (set by the new-pot entry points). */
             refreshShapeMode();
@@ -3294,9 +3302,10 @@
         },
         onLeave: function () {
             stopShapeLoop();
-            /* Don't stop the hum here — decorate/kiln may follow
-               and the wheel keeps spinning across all three. The
-               title/gallery onEnter handlers stop it. */
+            /* Decorate + kiln are silent on the wheel front, so
+               we stop the hum here. Title / gallery handlers
+               already stop it defensively too. */
+            wheelHumStop();
         }
     });
 
@@ -4391,6 +4400,11 @@
         size:    14,          /* logical-px stroke half-thickness */
         pattern: "dot",
         stampRotation: 0,     /* radians — applied in stampAt */
+        stampFlipH: false,    /* horizontal mirror — applied in stampAt
+                                 alongside rotation. Sheet-backed stamps
+                                 like a left-facing dolphin become a
+                                 right-facing dolphin without authoring
+                                 a separate frame. */
 
         pointer: null,
         pointerActive: false,
@@ -4911,6 +4925,24 @@
             applyRotation(parseInt(slider.value, 10) || 0);
         });
         if (reset) reset.addEventListener("click", function () { applyRotation(0); });
+
+        /* Flip-horizontal toggle — lives in the same .rotate-row as
+           the ROT slider. Mirrors the next stamp on the X axis;
+           click again to flip back. Persists across stamps until
+           the user toggles it off (matches the rotation behavior). */
+        const flipBtn = document.getElementById("stampFlipH");
+        function syncFlipBtn() {
+            if (!flipBtn) return;
+            flipBtn.classList.toggle("is-active", !!D.stampFlipH);
+            flipBtn.setAttribute("aria-pressed", D.stampFlipH ? "true" : "false");
+        }
+        if (flipBtn) {
+            flipBtn.addEventListener("click", function () {
+                D.stampFlipH = !D.stampFlipH;
+                syncFlipBtn();
+            });
+            syncFlipBtn();
+        }
     }
 
     function sizeDecorateCanvas() {
@@ -5344,12 +5376,16 @@
         const r = effectiveBrushSize() * 1.7;
         const color = currentPaintColor();
         const ctx = D.paintCtx;
-        if (D.stampRotation) {
-            /* Rotate around the stamp's center: translate to (p.x,
-               p.y), rotate, then draw the stamp at (0,0). */
+        if (D.stampRotation || D.stampFlipH) {
+            /* Translate to the stamp's center, then rotate +
+               mirror in any order (the stamp draws at 0,0). The
+               scale(-1, 1) flips the X axis -- for asymmetric
+               sheet stamps this is the difference between a
+               left-facing dolphin and a right-facing one. */
             ctx.save();
             ctx.translate(p.x, p.y);
-            ctx.rotate(D.stampRotation);
+            if (D.stampRotation) ctx.rotate(D.stampRotation);
+            if (D.stampFlipH)    ctx.scale(-1, 1);
             fn(ctx, 0, 0, r, color);
             ctx.restore();
         } else {
@@ -5718,7 +5754,10 @@
             resetZoom();
             wireZoomControls();
             startDecorateLoop();
-            wheelHumStart();
+            /* Wheel hum belongs to the shape screen only — the user
+               is decorating a static, fired-yet-unglazed pot here,
+               so the wheel-spinning audio would be misleading. The
+               shape onLeave handler already stopped it. */
             if (typeof refreshRemixInProgressChip === "function") {
                 refreshRemixInProgressChip();
             }
@@ -6637,11 +6676,10 @@
                 KILN.glowIntensity = 1.0 - (t01 - 0.80) / 0.20 * 0.55;
             }
             if (Math.random() < 0.6) emitKilnSpark();
-            KILN.crackleTimer += dt;
-            if (KILN.crackleTimer > 160 + Math.random() * 240) {
-                kilnCrackle();
-                KILN.crackleTimer = 0;
-            }
+            /* Synth crackle pops removed — the recorded
+               kiln-sequence.mp3 now includes its own ticking, so
+               doubling it up would muddy the mix. Sparks (visual)
+               keep their pace; only the audio popper is gone. */
             /* Pre-emptive kaboom at the peak (~60% in) — gives
                the explosion time to play its full 2.5s window
                before the user clicks anything. The else branch
@@ -6701,7 +6739,9 @@
             hideCelebrate();
             kilnEnter("intro");
             startKilnLoop();
-            wheelHumStart();
+            /* No wheel hum on the kiln page — the pot is fixed in
+               the kiln, the wheel isn't spinning. The shape
+               onLeave handler already stopped it. */
         },
         onLeave: function () {
             stopKilnLoop();
