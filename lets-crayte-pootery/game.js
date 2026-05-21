@@ -3065,6 +3065,15 @@
             }, opts.surfaceTexturePackId);
         }
 
+        /* Light catches — sheen + rim painted on TOP of the
+           surface texture so the 3D-lit feel survives even when
+           a pack skin is wrapped over the bare clay. Below the
+           paint canvas + stickers so the kid's decorations stay
+           crisp against the lit surface. */
+        if (typeof paintLightCatches === "function") {
+            paintLightCatches(ctx);
+        }
+
         /* Paint layer (decorate mode) — clipped to the pot silhouette
            so strokes outside the body never show. Sits ABOVE the
            surface texture so stickers + brush stay visible. */
@@ -3362,65 +3371,12 @@
             h: SHAPE.baseY - clay[N - 1].y + 14
         });
 
-        /* Light catches — two passes that sell a 3D cylinder lit
-           from the upper-left:
-
-           1. SPECULAR SHEEN: a wide, soft, clay-tinted highlight
-              centered at x = 32% of the pot width (matching the
-              bright stop in the base gradient). Smooth falloff
-              across ~45% of maxR per side so the transition reads
-              as gentle light wash, not the old flat-fill stripe.
-
-           2. RIM LIGHT: a faint warm catch on the FAR right edge
-              of the pot — the "reflected light from the room"
-              that makes the dark side of a cylinder pop instead
-              of vanishing into the background. Tiny alpha; just
-              enough to define the silhouette without painting it.
-
-           Both clip to the pot path so neither bleeds beyond the
-           silhouette. The clay's mat.highlight color tints both
-           catches per material — porcelain gets a cool cream
-           highlight, basalt gets a warm grey, etc. */
-        ctx.save();
-        buildPotPath(ctx);
-        ctx.clip();
-        const hlColor = mat.highlight;
-        const hlEdge  = hlColor.replace(/[\d.]+\)\s*$/, "0)");
-
-        /* Specular sheen — soft + wide, peak matches the body
-           gradient's new bright spot (0.40). Alpha pulled from
-           0.32 to 0.18 — close-range macro lighting has hot
-           specular, mid-distance studio lighting has gentle
-           wash. Also removed the alpha plateau in the middle so
-           the peak is a single point with smooth bell-curve
-           falloff (no flat top — that read as a painted band). */
-        const sheenX = cx - maxR * 0.20;   /* matches gradient peak at ~0.40 */
-        const sheenW = maxR * 0.55;
-        const sheen  = ctx.createLinearGradient(
-            sheenX - sheenW, 0, sheenX + sheenW, 0);
-        sheen.addColorStop(0.00, hlEdge);
-        sheen.addColorStop(0.50, hlColor.replace(/[\d.]+\)\s*$/, "0.18)"));
-        sheen.addColorStop(1.00, hlEdge);
-        ctx.fillStyle = sheen;
-        ctx.fillRect(sheenX - sheenW, clay[N - 1].y - 4,
-                     sheenW * 2, SHAPE.baseY - clay[N - 1].y + 14);
-
-        /* Rim light — kept but pulled WAY back. A distant
-           cylinder's rim catch is barely visible; what was 0.16
-           alpha read as "the light is wrapping around the object
-           inches from my face". 0.06 is just enough to define
-           the silhouette against the dark teal backdrop without
-           announcing itself. */
-        const rimRight = cx + maxR * 0.95;
-        const rim      = ctx.createLinearGradient(
-            rimRight - 30, 0, rimRight + 4, 0);
-        rim.addColorStop(0.00, hlEdge);
-        rim.addColorStop(1.00, hlColor.replace(/[\d.]+\)\s*$/, "0.06)"));
-        ctx.fillStyle = rim;
-        ctx.fillRect(rimRight - 30, clay[N - 1].y - 4,
-                     34, SHAPE.baseY - clay[N - 1].y + 14);
-
-        ctx.restore();
+        /* Light catches (sheen + rim) moved OUT of drawPot into
+           paintLightCatches() below — they're now called from
+           renderPotScene AFTER paintSurfaceTexture so the
+           cylindrical 3D-lit feel survives even when a pack
+           skin (plush fur, candy stripes, etc.) is wrapped over
+           the bare clay. */
 
         /* (Cartoony silhouette outline removed — on a textured
            clay surface the 1.5px black stroke read as an ink
@@ -3468,6 +3424,65 @@
                 ctx.fill();
             }
         }
+    }
+
+    /* ---- Light catches ----
+       Specular sheen + rim light, painted on TOP of whatever
+       surface is showing (bare clay OR an applied pack skin).
+       Called from renderPotScene AFTER paintSurfaceTexture so
+       the highlight always reads, regardless of whether the
+       kid has applied a texture — the 3D-lit feel survives.
+
+         1. Specular sheen — wide, soft, clay-tinted highlight
+            peaking at x = ~0.40 of pot width (matches the
+            body gradient's bright spot). 0.18 alpha for the
+            mid-distance studio feel.
+
+         2. Rim light — narrow warm catch on the right cylinder
+            edge. Tiny 0.06 alpha; just enough to define the
+            silhouette against the dark backdrop.
+
+       Both clay-tinted via mat.highlight — porcelain stays
+       cream, basalt stays warm grey, etc. Both clip to the
+       pot path so neither bleeds past the silhouette.        */
+    function paintLightCatches(ctx) {
+        const mat = currentClay();
+        const cx = SHAPE.centerX;
+        const clay = SHAPE.clay;
+        const N = clay.length;
+        if (!N) return;
+        let maxR = 0;
+        for (let i = 0; i < N; i++) if (clay[i].radius > maxR) maxR = clay[i].radius;
+
+        ctx.save();
+        buildPotPath(ctx);
+        ctx.clip();
+        const hlColor = mat.highlight;
+        const hlEdge  = hlColor.replace(/[\d.]+\)\s*$/, "0)");
+
+        /* Specular sheen */
+        const sheenX = cx - maxR * 0.20;
+        const sheenW = maxR * 0.55;
+        const sheen  = ctx.createLinearGradient(
+            sheenX - sheenW, 0, sheenX + sheenW, 0);
+        sheen.addColorStop(0.00, hlEdge);
+        sheen.addColorStop(0.50, hlColor.replace(/[\d.]+\)\s*$/, "0.18)"));
+        sheen.addColorStop(1.00, hlEdge);
+        ctx.fillStyle = sheen;
+        ctx.fillRect(sheenX - sheenW, clay[N - 1].y - 4,
+                     sheenW * 2, SHAPE.baseY - clay[N - 1].y + 14);
+
+        /* Rim light */
+        const rimRight = cx + maxR * 0.95;
+        const rim      = ctx.createLinearGradient(
+            rimRight - 30, 0, rimRight + 4, 0);
+        rim.addColorStop(0.00, hlEdge);
+        rim.addColorStop(1.00, hlColor.replace(/[\d.]+\)\s*$/, "0.06)"));
+        ctx.fillStyle = rim;
+        ctx.fillRect(rimRight - 30, clay[N - 1].y - 4,
+                     34, SHAPE.baseY - clay[N - 1].y + 14);
+
+        ctx.restore();
     }
 
     /* ---- Pot rim / mouth ----
@@ -7593,6 +7608,13 @@
                     w: (maxR + 4) * 2,
                     h: SHAPE.baseY - clay[N - 1].y + 14
                 }, entry.surfaceTexturePackId);
+            }
+            /* Light catches on TOP of the surface texture so saved
+               pots with skins still read as 3D-lit. Same layering
+               as live renderPotScene: lighting then paint then
+               stickers then fired overlay then rim. */
+            if (typeof paintLightCatches === "function") {
+                paintLightCatches(ctx);
             }
             if (entry._paintImg) {
                 ctx.save();
