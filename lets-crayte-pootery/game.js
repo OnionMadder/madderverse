@@ -2268,7 +2268,11 @@
         if (!pat) return;
 
         let dx = 0;
-        if (currentScreen !== "decorate" &&
+        /* Only scroll the surface texture while the wheel is
+           actively spinning. Decorate freezes the wheel; kiln
+           has the pot locked inside a closed oven — neither
+           should look like a rotating cylinder. */
+        if (currentScreen === "shape" &&
                 typeof DOMMatrix === "function" &&
                 typeof pat.setTransform === "function") {
             /* maxR derived from the bounds the caller passed in
@@ -3229,16 +3233,21 @@
         const baseAlpha = hlAlphaMatch ? parseFloat(hlAlphaMatch[1]) : 0.34;
         const hlEdge = hlColor.replace(/[\d.]+\)\s*$/, "0)");
 
-        let hlX, alphaMult;
-        if (currentScreen === "decorate") {
-            hlX = cx - 11;          /* original static position */
-            alphaMult = 1.0;
-        } else {
-            const phase = SHAPE.wheelPhase;
-            const visibility = Math.max(0, Math.cos(phase));
-            hlX = cx + Math.sin(phase) * (maxR * 0.55);
-            alphaMult = visibility;
-        }
+        /* Highlight is a FIXED light catch — like sunlight from
+           the user's upper-left. The previous version swept the
+           highlight back and forth with wheelPhase to "sell the
+           spin", but with real clay textures scrolling underneath
+           that double-motion read as fake. A real spinning
+           cylinder has the highlight stay PUT (it's a function of
+           the light direction, not the surface) — the surface
+           texture flows past it. We keep that natural look on
+           every screen.
+
+           Decorate + kiln were already using the static position;
+           shape now joins them. The wheel-phase-driven texture
+           scroll (in paintClayTexture) is what conveys rotation. */
+        const hlX = cx - 11;
+        const alphaMult = 1.0;
 
         if (alphaMult > 0.02) {
             const dynamicAlpha = (baseAlpha * alphaMult).toFixed(3);
@@ -5851,9 +5860,19 @@
             }
         }
 
-        /* Tool-mode buttons */
+        /* Tool-mode buttons. data-tool="texture" is wired as a
+           friendly stub until we pick the interaction model
+           (one-tap full-pot skin? brush-style texture paint?).
+           Clicking it explains itself; nothing else breaks. */
         document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
             b.addEventListener("click", function () {
+                if (b.dataset.tool === "texture") {
+                    alert("TEXTURE mode is coming soon — each pack will " +
+                          "ship its own surface skin (plush velvet, " +
+                          "dinosaur scales, candy glitter, etc.) that you " +
+                          "apply over the whole pot at once.");
+                    return;
+                }
                 setTool(b.dataset.tool);
             });
             b.classList.toggle("active", b.dataset.tool === D.tool);
@@ -6861,8 +6880,13 @@
         const dt = Math.min(48, t - KILN.lastT);
         KILN.lastT = t;
 
-        SHAPE.wheelPhase += (2 * Math.PI * SHAPE.WHEEL_RPM / 60) * (dt / 1000);
-        if (SHAPE.wheelPhase > Math.PI * 2) SHAPE.wheelPhase -= Math.PI * 2;
+        /* Don't advance the wheel phase in the kiln — the pot
+           is locked inside the oven. (Previously this ticked
+           wheelPhase so the procedural wedge animation kept
+           moving; with real clay textures + a static highlight
+           that motion read as the pot spinning inside the kiln,
+           which it isn't.) The wedge rotation comes back the
+           moment the user re-enters shape. */
 
         KILN.stateT += dt;
         KILN.glowPhase += dt / 100;

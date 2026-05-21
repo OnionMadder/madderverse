@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=11" />
+    <link rel="stylesheet" href="style.css?v=12" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -442,7 +442,18 @@
                 <button class="tool-btn" data-tool="spray"    type="button">SPRAY</button>
                 <button class="tool-btn" data-tool="splatter" type="button">SPLAT</button>
                 <button class="tool-btn" data-tool="stamp"    type="button">STAMP</button>
+            </div>
+
+            <!-- Secondary mode row: TEXTURE applies the active
+                 pack's surface skin (placeholder for now — wiring
+                 lands once we pick the interaction model);
+                 ERASE switches to the eraser tool; CLEAR wipes
+                 the paint layer (was previously a separate button
+                 in .decorate-controls below the tray). -->
+            <div class="tool-row tool-modes" role="tablist" aria-label="Mode">
+                <button class="tool-btn" data-tool="texture"  id="decTexture" type="button">TEXTURE</button>
                 <button class="tool-btn" data-tool="eraser"   type="button">ERASE</button>
+                <button class="tool-btn"                       id="decClear" type="button">CLEAR</button>
             </div>
 
             <!-- SIZE — slider matching the ROT row so the
@@ -493,11 +504,10 @@
 
         </div>
 
-        <div class="decorate-controls">
-            <button class="btn-control" id="decClear" type="button">
-                <span class="btn-label">CLEAR</span>
-            </button>
-        </div>
+        <!-- (Old .decorate-controls CLEAR button moved into the
+             tool-modes row above so all paint controls live in
+             one cluster. The btn-control styling is retained for
+             other action buttons that may want it.) -->
 
         </div><!-- /.decorate-side-rail -->
 
@@ -1165,7 +1175,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=11"></script>
+<script src="game.js?v=12"></script>
 
 </body>
 </html>
