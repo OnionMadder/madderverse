@@ -3311,19 +3311,31 @@
         ctx.fill();
         ctx.restore();
 
-        /* Fill pot body — gradient stops come from the active clay
-           material so porcelain reads cream, basalt reads charcoal,
-           galaxy reads deep-blue, etc.                              */
+        /* Fill pot body — asymmetric gradient biased toward the
+           upper-left so the cylinder reads as 3D from the fill
+           alone. Previous version was symmetric (brightest at
+           x=0.50), which made the pot look flat-lit. New stops:
+             0.00 silhouette dark      (left silhouette edge)
+             0.12 ramping              (lit cylindrical curve)
+             0.32 BRIGHTEST            (light catch — matches
+                                        upper-left key light)
+             0.55 mid                  (rolling into shadow)
+             0.80 shadow mid           (shadow side of cylinder)
+             1.00 silhouette dark      (right silhouette edge)
+           The falloff is steeper on the LEFT (12% width from
+           dark to bright) than on the RIGHT (45% width from
+           bright back to dark), which is what a real cylinder
+           looks like lit from one side. */
         const mat = currentClay();
         buildPotPath(ctx);
         const grad = ctx.createLinearGradient(cx - maxR, 0, cx + maxR, 0);
         const stops = mat.unfired;
         grad.addColorStop(0.00, stops[0]);
-        grad.addColorStop(0.18, stops[1]);
-        grad.addColorStop(0.42, stops[2]);
-        grad.addColorStop(0.55, stops[3]);
-        grad.addColorStop(0.78, stops[4]);
-        grad.addColorStop(1.00, stops[5]);
+        grad.addColorStop(0.12, stops[2]);
+        grad.addColorStop(0.32, stops[3]);
+        grad.addColorStop(0.55, stops[2]);
+        grad.addColorStop(0.80, stops[1]);
+        grad.addColorStop(1.00, stops[0]);
         ctx.fillStyle = grad;
         ctx.fill();
 
@@ -3338,53 +3350,54 @@
             h: SHAPE.baseY - clay[N - 1].y + 14
         });
 
-        /* Highlight strip — rolls left/right as the wheel spins
-           in SHAPE mode (sells the rotation that a symmetric
-           silhouette can't show by itself). In DECORATE the
-           wheel is conceptually stopped so we render the
-           highlight at its original static offset. In KILN it
-           animates with the kiln's spin.                       */
+        /* Light catches — two passes that sell a 3D cylinder lit
+           from the upper-left:
+
+           1. SPECULAR SHEEN: a wide, soft, clay-tinted highlight
+              centered at x = 32% of the pot width (matching the
+              bright stop in the base gradient). Smooth falloff
+              across ~45% of maxR per side so the transition reads
+              as gentle light wash, not the old flat-fill stripe.
+
+           2. RIM LIGHT: a faint warm catch on the FAR right edge
+              of the pot — the "reflected light from the room"
+              that makes the dark side of a cylinder pop instead
+              of vanishing into the background. Tiny alpha; just
+              enough to define the silhouette without painting it.
+
+           Both clip to the pot path so neither bleeds beyond the
+           silhouette. The clay's mat.highlight color tints both
+           catches per material — porcelain gets a cool cream
+           highlight, basalt gets a warm grey, etc. */
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
         const hlColor = mat.highlight;
-        const hlAlphaMatch = hlColor.match(/([\d.]+)\)\s*$/);
-        const baseAlpha = hlAlphaMatch ? parseFloat(hlAlphaMatch[1]) : 0.34;
-        const hlEdge = hlColor.replace(/[\d.]+\)\s*$/, "0)");
+        const hlEdge  = hlColor.replace(/[\d.]+\)\s*$/, "0)");
 
-        /* Highlight is a FIXED light catch — like sunlight from
-           the user's upper-left. The previous version swept the
-           highlight back and forth with wheelPhase to "sell the
-           spin", but with real clay textures scrolling underneath
-           that double-motion read as fake. A real spinning
-           cylinder has the highlight stay PUT (it's a function of
-           the light direction, not the surface) — the surface
-           texture flows past it. We keep that natural look on
-           every screen.
+        /* Specular sheen — wider + softer than the old strip. */
+        const sheenX = cx - maxR * 0.36;
+        const sheenW = maxR * 0.50;
+        const sheen  = ctx.createLinearGradient(
+            sheenX - sheenW, 0, sheenX + sheenW, 0);
+        sheen.addColorStop(0.00, hlEdge);
+        sheen.addColorStop(0.45, hlColor.replace(/[\d.]+\)\s*$/, "0.32)"));
+        sheen.addColorStop(0.55, hlColor.replace(/[\d.]+\)\s*$/, "0.32)"));
+        sheen.addColorStop(1.00, hlEdge);
+        ctx.fillStyle = sheen;
+        ctx.fillRect(sheenX - sheenW, clay[N - 1].y - 4,
+                     sheenW * 2, SHAPE.baseY - clay[N - 1].y + 14);
 
-           Decorate + kiln were already using the static position;
-           shape now joins them. The wheel-phase-driven texture
-           scroll (in paintClayTexture) is what conveys rotation. */
-        const hlX = cx - 11;
-        const alphaMult = 1.0;
+        /* Rim light — narrow band on the right cylindrical edge. */
+        const rimRight = cx + maxR * 0.95;
+        const rim      = ctx.createLinearGradient(
+            rimRight - 34, 0, rimRight + 4, 0);
+        rim.addColorStop(0.00, hlEdge);
+        rim.addColorStop(1.00, hlColor.replace(/[\d.]+\)\s*$/, "0.16)"));
+        ctx.fillStyle = rim;
+        ctx.fillRect(rimRight - 34, clay[N - 1].y - 4,
+                     38, SHAPE.baseY - clay[N - 1].y + 14);
 
-        if (alphaMult > 0.02) {
-            const dynamicAlpha = (baseAlpha * alphaMult).toFixed(3);
-            const fullColor = hlColor.replace(/[\d.]+\)\s*$/,
-                                              dynamicAlpha + ")");
-            const hl = ctx.createLinearGradient(hlX - 25, 0, hlX + 25, 0);
-            hl.addColorStop(0,   hlEdge);
-            hl.addColorStop(0.5, fullColor);
-            hl.addColorStop(1,   hlEdge);
-            ctx.fillStyle = hl;
-            ctx.fillRect(hlX - 30, clay[N - 1].y - 4,
-                         60, SHAPE.baseY - clay[N - 1].y + 14);
-        }
-
-        /* (Throwing rings removed — the per-clay surface texture
-           added by paintClayTexture above provides plenty of
-           natural grain; the synthetic horizontal lines fought
-           the photographic texture and looked artificial.) */
         ctx.restore();
 
         /* (Cartoony silhouette outline removed — on a textured
