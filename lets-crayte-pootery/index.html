@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=24" />
+    <link rel="stylesheet" href="style.css?v=25" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -520,7 +520,14 @@
 
     <!-- FIRE IT mirrors the shape-screen FINISH FORM pattern —
          floating action outside the drawer, hidden when the
-         decorate drawer is open. -->
+         decorate drawer is open. SAVE DRAFT sits to its left
+         so the kid has a "come back later" out without committing
+         to firing. Same hidden-when-drawer-open behavior so the
+         tools aren't crowded. -->
+    <button class="float-action decorate-float-save" id="decSaveDraft" type="button">
+        <span class="btn-label">SAVE</span>
+        <span class="btn-glyph" aria-hidden="true">&#9712;</span>
+    </button>
     <button class="float-action decorate-float-fire" id="decFire" type="button">
         <span class="btn-label">FIRE IT</span>
         <span class="btn-glyph" aria-hidden="true">&#9656;</span>
@@ -936,6 +943,13 @@
                 <button class="btn-control" id="detailDelete" type="button">
                     <span class="btn-label">DELETE</span>
                 </button>
+                <!-- CONTINUE — visible ONLY on draft entries.
+                     Loads the saved state back into decorate so
+                     the kid can keep working. -->
+                <button class="btn-control primary" id="detailContinue" type="button" hidden>
+                    <span class="btn-label">CONTINUE</span>
+                    <span class="btn-glyph" aria-hidden="true">&#9656;</span>
+                </button>
                 <button class="btn-control" id="detailSubmit" type="button">
                     <span class="btn-label">SHARE TO EVERYONE</span>
                     <span class="btn-glyph" aria-hidden="true">&#x1F310;</span>
@@ -1180,7 +1194,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=24"></script>
+<script src="game.js?v=25"></script>
 
 </body>
 </html>

@@ -5037,6 +5037,16 @@
            even if the file name -> pack mapping changes. */
         surfaceTexturePackId: null,
 
+        /* Draft tracking — when the kid hits SAVE in decorate
+           without firing, the entry is stored with draft:true
+           and its id is captured here so subsequent SAVEs update
+           the SAME entry (instead of producing five copies).
+           Cleared on CLEAR + on fresh-pot flows + on successful
+           firing (the draft becomes a fired pot, mutated in
+           place). Set by resumeDraft() when the user re-opens
+           a draft from the gallery. */
+        draftId: null,
+
         pointer: null,
         pointerActive: false,
         lastPaintPos: null,
@@ -5748,6 +5758,9 @@
         /* CLEAR also strips any applied surface texture skin —
            the kid's intent is "start over on bare clay". */
         D.surfaceTexturePackId = null;
+        /* And drops the link to any draft being edited — a fully
+           cleared pot is a fresh canvas, not the same draft. */
+        D.draftId = null;
         if (typeof refreshTextureButton === "function") {
             refreshTextureButton();
         }
@@ -6561,6 +6574,26 @@
         const back  = document.getElementById("decBack");
         const clear = document.getElementById("decClear");
         const fire  = document.getElementById("decFire");
+        const save  = document.getElementById("decSaveDraft");
+
+        if (save) save.addEventListener("click", function () {
+            const id = saveDraftPot();
+            flashButton(save);
+            if (id) {
+                /* Briefly flip the label to confirm the save —
+                   reassuring to the kid that something happened,
+                   especially since there's no screen change. */
+                const lbl = save.querySelector(".btn-label");
+                if (lbl) {
+                    const orig = lbl.textContent;
+                    lbl.textContent = "SAVED!";
+                    setTimeout(function () { lbl.textContent = orig; }, 1200);
+                }
+            } else {
+                alert("Couldn't save the draft. Your gallery might be full " +
+                      "(50 pot cap) — try deleting an old one first.");
+            }
+        });
 
         if (back) back.addEventListener("click", function () {
             /* Re-shape escape hatch: unlock clay; paint persists so
@@ -6904,66 +6937,106 @@
 
     /* ----- 7C. Auto-save (chunk 6 reads from the same key) ----- */
 
+    /* Build a gallery entry from the current live state. Shared by
+       autoSaveFiredPot (fired:true) + saveDraftPot (fired:false,
+       draft:true). prevEntry, if passed, supplies an existing id
+       + createdAt so we mutate in place instead of generating a
+       fresh entry — used both for re-saving a draft and for
+       firing a previously-saved draft. */
+    function buildPotEntry(opts) {
+        opts = opts || {};
+        const fired = !!opts.fired;
+        const prev  = opts.prevEntry || null;
+        const entry = {
+            id: prev ? prev.id : (
+                "pot-" + Date.now() + "-" +
+                Math.random().toString(36).slice(2, 8)
+            ),
+            createdAt: prev ? prev.createdAt : Date.now(),
+            updatedAt: Date.now(),
+            clay: SHAPE.clay.map(function (c) {
+                return { y: c.y, radius: c.radius };
+            }),
+            clayTypeId: SHAPE.clayTypeId,
+            paintDataUrl: (D.paintCanvas)
+                ? D.paintCanvas.toDataURL("image/png")
+                : null,
+            packId: D.activePackId,
+            fired: fired,
+            draft: !fired,
+            /* Chunk-8 egg: overheated pots get an extra-crispy
+               render in the gallery + a tag. Only meaningful for
+               fired entries; draft entries leave them false. */
+            overfired: fired && EGG.overheatTriggered === true,
+            overfiredSeed: fired ? (EGG.overheatSeed || 0) : 0,
+            /* Day-4 chunk B: exploded pots saved as shattered
+               trophies rather than thrown out. Drafts can't have
+               exploded yet (they haven't been to the kiln). */
+            exploded: fired && KILN.exploded === true,
+            /* Local-only UGC flag — any imported PNG sticker
+               used on this pot taints the entry and blocks it
+               from public battle submission. Carries forward
+               on remix so a tainted source can't be laundered.
+               Drafts also carry the flag so re-opening + firing
+               doesn't accidentally clear it. */
+            usedCustomSticker: !!D.usedCustomSticker ||
+                !!(REMIX.pending && REMIX.pending.usedCustomSticker) ||
+                !!(prev && prev.usedCustomSticker),
+            /* Surface texture (TEXTURE button) — the pack id
+               whose tilable skin is currently wrapped around
+               the pot, or null/undefined. */
+            surfaceTexturePackId: D.surfaceTexturePackId || null,
+            /* Sticker records (vector). */
+            stickers: (D.stickers || []).map(function (s) {
+                return {
+                    pattern: s.pattern,
+                    x: s.x, y: s.y, r: s.r,
+                    rot: s.rot || 0,
+                    flipH: !!s.flipH,
+                    color: s.color || null
+                };
+            })
+        };
+        /* Carry forward the user's name on a re-save. */
+        if (prev && prev.name) entry.name = prev.name;
+        return entry;
+    }
+
+    /* Read/write helpers around localStorage gallery so the save
+       paths can update an existing entry in place by id. */
+    function readGalleryArr() {
+        try {
+            const arr = JSON.parse(localStorage.getItem("crayte-gallery") || "[]");
+            return Array.isArray(arr) ? arr : [];
+        } catch (_) { return []; }
+    }
+    function writeGalleryArr(arr) {
+        /* Cap at 50 — keep newest. Brief calls for the "you have
+           a lot of pots" celebration at ~50. */
+        while (arr.length > 50) arr.shift();
+        localStorage.setItem("crayte-gallery", JSON.stringify(arr));
+    }
+
     function autoSaveFiredPot() {
         try {
-            const key = "crayte-gallery";
-            let existing = [];
-            try {
-                existing = JSON.parse(localStorage.getItem(key) || "[]");
-                if (!Array.isArray(existing)) existing = [];
-            } catch (_) { existing = []; }
+            const existing = readGalleryArr();
+            /* If we're firing a previously-saved DRAFT (D.draftId
+               set by resumeDraft), mutate that entry in place so
+               the gallery position + id are preserved. Otherwise
+               create a fresh fired entry. */
+            let prevEntry = null;
+            let prevIdx = -1;
+            if (D.draftId) {
+                for (let i = 0; i < existing.length; i++) {
+                    if (existing[i].id === D.draftId) {
+                        prevEntry = existing[i];
+                        prevIdx = i;
+                        break;
+                    }
+                }
+            }
+            const entry = buildPotEntry({ fired: true, prevEntry: prevEntry });
 
-            const entry = {
-                id: "pot-" + Date.now() + "-" +
-                    Math.random().toString(36).slice(2, 8),
-                createdAt: Date.now(),
-                clay: SHAPE.clay.map(function (c) {
-                    return { y: c.y, radius: c.radius };
-                }),
-                clayTypeId: SHAPE.clayTypeId,
-                paintDataUrl: (D.paintCanvas)
-                    ? D.paintCanvas.toDataURL("image/png")
-                    : null,
-                packId: D.activePackId,
-                fired: true,
-                /* Chunk-8 egg: overheated pots get an extra-crispy
-                   render in the gallery + a tag. */
-                overfired: EGG.overheatTriggered === true,
-                /* Stable seed so the saved char pattern matches
-                   what the user saw in the kiln. */
-                overfiredSeed: EGG.overheatSeed || 0,
-                /* Day-4 chunk B: exploded pots saved as shattered
-                   trophies rather than thrown out. */
-                exploded: KILN.exploded === true,
-                /* Local-only UGC flag — any imported PNG sticker
-                   used on this pot taints the entry and blocks it
-                   from public battle submission. Carries forward
-                   on remix so a tainted source can't be laundered. */
-                usedCustomSticker: !!D.usedCustomSticker ||
-                    !!(REMIX.pending && REMIX.pending.usedCustomSticker),
-                /* Surface texture (TEXTURE button) — the pack id
-                   whose tilable skin is currently wrapped around
-                   the pot, or null/undefined. Loaded back when
-                   the user re-opens the pot from gallery. */
-                surfaceTexturePackId: D.surfaceTexturePackId || null,
-                /* Sticker records (v1.1 move-tool refactor) —
-                   stamps used to bake into paintDataUrl as pixels;
-                   now they're persisted as a vector array so a
-                   re-opened pot can still pick + drag them. Legacy
-                   entries without this field render the same way
-                   they always have (their stickers are still in
-                   the paintDataUrl bake). Stripped to just the
-                   fields we need at re-render time. */
-                stickers: (D.stickers || []).map(function (s) {
-                    return {
-                        pattern: s.pattern,
-                        x: s.x, y: s.y, r: s.r,
-                        rot: s.rot || 0,
-                        flipH: !!s.flipH,
-                        color: s.color || null
-                    };
-                })
-            };
             /* If this firing was started via REMIX, bake the
                lineage in. Cleared after consumption so a follow-up
                un-remixed firing doesn't get the stale credit. */
@@ -6973,31 +7046,55 @@
                 entry.remixedFromHandle = REMIX.pending.remixedFromHandle;
                 entry.remixedFromName   = REMIX.pending.remixedFromName;
                 REMIX.pending = null;
-                /* Hide the persistent chip now that the remix is
-                   committed to a real local pot. */
                 if (typeof refreshRemixInProgressChip === "function") {
                     refreshRemixInProgressChip();
                 }
             }
-            existing.push(entry);
-            /* Cap at 50 — keep newest. Brief calls for the "you have
-               a lot of pots" celebration screen at ~50.            */
-            while (existing.length > 50) existing.shift();
-            localStorage.setItem(key, JSON.stringify(existing));
+
+            if (prevIdx >= 0) existing[prevIdx] = entry;
+            else              existing.push(entry);
+            writeGalleryArr(existing);
             KILN.savedId = entry.id;
-            /* Day-4 chunk C — every new pot may complete an
-               achievement; run the check after the save lands. */
+            /* Draft is now a real fired pot — clear the tracker so
+               subsequent New-Pot flows don't accidentally write
+               back into this slot. */
+            D.draftId = null;
             checkAchievements();
-            /* Chunk W3 — first fired pot is the earned moment to
-               surface the push opt-in. maybeShowPushOptIn() is a
-               no-op if we've already prompted, are still inside
-               a "maybe later" window, or push isn't supported.   */
             maybeShowPushOptIn();
             return true;
         } catch (e) {
             console.warn("[CRAYte] auto-save failed", e);
             KILN.savedId = null;
             return false;
+        }
+    }
+
+    /* Save the in-progress decorate state as a DRAFT entry. New
+       saves push to the gallery; subsequent saves of the same
+       draft (D.draftId set) mutate the existing row in place. */
+    function saveDraftPot() {
+        try {
+            const existing = readGalleryArr();
+            let prevEntry = null;
+            let prevIdx = -1;
+            if (D.draftId) {
+                for (let i = 0; i < existing.length; i++) {
+                    if (existing[i].id === D.draftId) {
+                        prevEntry = existing[i];
+                        prevIdx = i;
+                        break;
+                    }
+                }
+            }
+            const entry = buildPotEntry({ fired: false, prevEntry: prevEntry });
+            if (prevIdx >= 0) existing[prevIdx] = entry;
+            else              existing.push(entry);
+            writeGalleryArr(existing);
+            D.draftId = entry.id;   /* subsequent saves update this one */
+            return entry.id;
+        } catch (e) {
+            console.warn("[CRAYte] draft save failed", e);
+            return null;
         }
     }
 
@@ -7962,13 +8059,22 @@
            real <button> nested inside without invalid HTML. The
            div gets role=button + keyboard handlers for a11y. */
         const card = document.createElement("div");
-        card.className = "pot-card";
+        card.className = "pot-card" + (entry.draft ? " is-draft" : "");
         card.dataset.id = entry.id;
         card.setAttribute("role", "button");
         card.setAttribute("tabindex", "0");
 
         const thumb = document.createElement("div");
         thumb.className = "pot-thumb " + potAgeClass(entry.createdAt);
+        /* Drafts get a DRAFT badge in the top-right of the thumb
+           — distinct from the trophy + shared-globe corners. */
+        if (entry.draft) {
+            const draftFlag = document.createElement("span");
+            draftFlag.className = "pot-draft-flag";
+            draftFlag.textContent = "DRAFT";
+            draftFlag.title = "Unfired draft — tap to continue working";
+            thumb.appendChild(draftFlag);
+        }
         const canvas = document.createElement("canvas");
         canvas.width = 200;
         canvas.height = 300;
@@ -9205,11 +9311,16 @@
         if (themeEl) themeEl.textContent = battle.theme;
         grid.innerHTML = "";
 
-        /* Hide tainted pots (custom-sticker UGC) from the picker
-           entirely — they're private and the gate downstream would
-           reject them anyway. Cleaner to not offer the choice. */
+        /* Hide tainted pots (custom-sticker UGC) + unfired drafts
+           from the picker entirely — battles only accept fired
+           public-safe pots, the gate downstream would reject them
+           anyway. Cleaner to not offer the choice. */
         const mine = loadGalleryEntries()
-            .filter(function (e) { return !e.usedCustomSticker; })
+            .filter(function (e) {
+                if (e.usedCustomSticker) return false;
+                if (e.draft) return false;
+                return true;
+            })
             .slice()
             .reverse();
         if (mine.length === 0) {
@@ -9542,6 +9653,89 @@
         const panel = document.getElementById("potDetail");
         if (panel) panel.hidden = true;
         clearPotURLParam();
+    }
+
+    /* Resume a saved DRAFT entry — load its shape + paint + sticker
+       state back into the live D/SHAPE objects and jump to
+       decorate. D.draftId tracks the entry id so the next SAVE
+       updates this row instead of creating another copy.
+
+       Called from the gallery detail modal's CONTINUE button for
+       entries with draft:true. */
+    function resumeDraft(entry) {
+        if (!entry || !entry.draft) return;
+
+        /* Restore shape geometry — clay vertices + clay material. */
+        if (Array.isArray(entry.clay) && entry.clay.length > 0) {
+            SHAPE.clay = entry.clay.map(function (c) {
+                return { y: c.y, radius: c.radius };
+            });
+            SHAPE.N = SHAPE.clay.length;
+        }
+        if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
+
+        /* Clay is already shaped + locked (decorate-screen mode). */
+        SHAPE.clayLocked = true;
+        SHAPE.needsLump = false;
+
+        /* Restore decorate state — pack, glaze fallback, paint
+           canvas pixels (via dataURL), sticker records, surface
+           texture choice, custom-sticker taint flag. */
+        if (entry.packId) D.activePackId = entry.packId;
+        const pack = (typeof activePack === "function") ? activePack() : null;
+        if (pack) {
+            D.glaze   = pack.glazes[0];
+            D.pattern = pack.patterns[0];
+        }
+        D.surfaceTexturePackId = entry.surfaceTexturePackId || null;
+        D.usedCustomSticker    = !!entry.usedCustomSticker;
+        D.stickers = Array.isArray(entry.stickers)
+            ? entry.stickers.map(function (s) {
+                return {
+                    pattern: s.pattern,
+                    x: s.x, y: s.y, r: s.r,
+                    rot: s.rot || 0,
+                    flipH: !!s.flipH,
+                    color: s.color || null
+                };
+            })
+            : [];
+        /* Mark this as the draft we're editing — saveDraftPot
+           will mutate this id, and a later FIRE IT will replace
+           it in place as a fired pot. */
+        D.draftId = entry.id;
+        D.usedCustomSticker = !!entry.usedCustomSticker;
+
+        /* Hop into decorate. The screen's onEnter rebuilds the
+           tool UI + sizes the canvases; we paint the saved
+           paintDataUrl into the brush layer once decorate has
+           done its init. */
+        closeDetail();
+        showScreen("decorate");
+        /* Defer the paint restore + sticker render until the
+           decorate canvases exist + are sized. requestAnimationFrame
+           runs after the screen's onEnter handlers + first layout. */
+        requestAnimationFrame(function () {
+            if (entry.paintDataUrl && D.paintCtx) {
+                const img = new Image();
+                img.onload = function () {
+                    D.paintCtx.save();
+                    D.paintCtx.setTransform(1, 0, 0, 1, 0, 0);
+                    D.paintCtx.clearRect(0, 0,
+                        D.paintCanvas.width, D.paintCanvas.height);
+                    D.paintCtx.drawImage(img, 0, 0,
+                        D.paintCanvas.width, D.paintCanvas.height);
+                    D.paintCtx.restore();
+                };
+                img.src = entry.paintDataUrl;
+            }
+            if (typeof renderStickerLayer === "function") {
+                renderStickerLayer();
+            }
+            if (typeof refreshTextureButton === "function") {
+                refreshTextureButton();
+            }
+        });
     }
 
     /* "X people remixed this" strip on the pot-detail modal.
@@ -9994,6 +10188,14 @@
         const unshare = document.getElementById("detailUnshare");
         if (unshare) unshare.addEventListener("click", unshareCurrent);
 
+        /* CONTINUE — drafts only. Loads the entry into D/SHAPE
+           and routes to decorate via resumeDraft. */
+        const cont = document.getElementById("detailContinue");
+        if (cont) cont.addEventListener("click", function () {
+            const entry = GALLERY.detailEntry;
+            if (entry && entry.draft) resumeDraft(entry);
+        });
+
         const copyLink = document.getElementById("detailCopyLink");
         if (copyLink) copyLink.addEventListener("click", copyDetailLink);
 
@@ -10307,8 +10509,23 @@
     function refreshDetailSubmitButton() {
         const submit = document.getElementById("detailSubmit");
         const del    = document.getElementById("detailDelete");
+        const cont   = document.getElementById("detailContinue");
         const entry  = GALLERY.detailEntry;
         if (!submit) return;
+
+        /* DRAFTS get a totally different action set — no share,
+           no copy link, no remix. The kid's choices are: keep
+           working (CONTINUE), throw it away (DELETE), or export
+           the current preview. Public-network actions are
+           reserved for fired pots. */
+        if (entry && entry.draft) {
+            submit.hidden = true;
+            if (del)  del.hidden = false;
+            if (cont) cont.hidden = false;
+            return;
+        }
+        if (cont) cont.hidden = true;
+
         if (!entry || entry._isPublic) {
             submit.hidden = true;
             if (del) del.hidden = !!(entry && entry._isPublic);

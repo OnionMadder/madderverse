@@ -2105,6 +2105,43 @@ a:focus-visible {
         0 0 12px rgba(184, 115, 51, 0.55);
 }
 
+/* DRAFT badge on unfired-pot thumbnails. Top-right corner so it
+   doesn't conflict with the trophy (top-left) or the shared
+   globe (also top-right but only one of these states applies to
+   any given card — drafts can't be shared). The whole card also
+   gets a slightly muted look via .is-draft below. */
+.pot-draft-flag {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 3px 7px;
+    border-radius: var(--radius-sm);
+    background: rgba(0, 255, 204, 0.18);
+    border: 1px solid var(--teal);
+    color: var(--teal);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1.4px;
+    text-shadow: 0 0 4px rgba(0, 255, 204, 0.5);
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* Drafts feel slightly "in progress" via mild desaturation + a
+   teal border accent. Hover restores full brightness so the kid
+   can preview the pot at its real color before continuing. */
+.pot-card.is-draft {
+    border-color: var(--teal-low);
+}
+.pot-card.is-draft .pot-thumb {
+    filter: saturate(0.85) brightness(0.95);
+    transition: filter 0.16s ease;
+}
+.pot-card.is-draft:hover .pot-thumb,
+.pot-card.is-draft:focus-visible .pot-thumb {
+    filter: none;
+}
+
 .pot-meta {
     display: flex;
     flex-direction: column;
@@ -5301,6 +5338,29 @@ html.is-native #btnInstall {
     line-height: 1;
 }
 
+/* SAVE DRAFT button — sits to the LEFT of FIRE IT with a calmer
+   teal treatment so the kid reads pink-FIRE as the primary
+   action + teal-SAVE as the "come back later" secondary. Right
+   offset accounts for FIRE IT's width + a gap. */
+.decorate-float-save {
+    right: calc(140px + env(safe-area-inset-right, 0px));
+    background: linear-gradient(180deg, var(--teal) 0%, #00b890 100%);
+    border-color: var(--teal);
+    color: #002b22;
+    text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.2);
+    box-shadow:
+        0 0 0 1px #000,
+        0 6px 14px rgba(0, 0, 0, 0.55),
+        0 0 18px rgba(0, 255, 204, 0.35);
+}
+.decorate-float-save:hover,
+.decorate-float-save:focus-visible {
+    box-shadow:
+        0 0 0 1px #000,
+        0 6px 14px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(0, 255, 204, 0.55);
+}
+
 /* Hide when the matching drawer is open. :has() is supported in
    modern Chromium (Capacitor's WebView) + Safari + Firefox 121+,
    so this works in every target. On desktop the drawer never has
@@ -5308,7 +5368,8 @@ html.is-native #btnInstall {
    floating button stays visible — which is the intended behavior:
    no separate desktop variant needed. */
 #screen-shape:has(.shape-side-rail.is-open) .shape-float-finish,
-#screen-decorate:has(.decorate-side-rail.is-open) .decorate-float-fire {
+#screen-decorate:has(.decorate-side-rail.is-open) .decorate-float-fire,
+#screen-decorate:has(.decorate-side-rail.is-open) .decorate-float-save {
     opacity: 0;
     pointer-events: none;
     transform: translateY(8px);
