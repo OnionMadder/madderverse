@@ -359,38 +359,91 @@
             .catch(function () { return rows; });
     }
 
+    /* Compose a single flat dataURL combining the entry's brush
+       layer + its sticker records. Used for public uploads
+       (public_pots + battle_entries) because the server schema
+       has only paint_data_url — no separate stickers column. The
+       v1.1 move-tool refactor split stickers out into a vector
+       array, so without this composite the EVERYONE gallery
+       would render shared pots with brush only + no stickers.
+
+       Returns a Promise<string|null>. Resolves to the original
+       paintDataUrl unchanged when the entry has no stickers
+       (legacy entries already bake everything into one image). */
+    function composePublicPaintDataUrl(entry) {
+        return new Promise(function (resolve) {
+            if (!entry) return resolve(null);
+            const hasStickers = Array.isArray(entry.stickers) &&
+                                entry.stickers.length > 0;
+            if (!hasStickers) {
+                /* Nothing to add — keep the existing image. */
+                return resolve(entry.paintDataUrl || null);
+            }
+            const w = SHAPE.W, h = SHAPE.H;
+            const tmp = document.createElement("canvas");
+            tmp.width = w; tmp.height = h;
+            const ctx = tmp.getContext("2d");
+
+            const finish = function () {
+                /* Render each sticker via the shared drawSticker
+                   so rotation + flipH bake in identically to the
+                   live render path. Sequentially in array order
+                   so later placements sit visually above earlier. */
+                for (let i = 0; i < entry.stickers.length; i++) {
+                    drawSticker(ctx, entry.stickers[i]);
+                }
+                try { resolve(tmp.toDataURL("image/png")); }
+                catch (_) { resolve(entry.paintDataUrl || null); }
+            };
+
+            if (entry.paintDataUrl) {
+                const img = new Image();
+                img.onload  = function () {
+                    ctx.drawImage(img, 0, 0, w, h);
+                    finish();
+                };
+                img.onerror = finish;   /* still composite stickers */
+                img.src = entry.paintDataUrl;
+            } else {
+                finish();
+            }
+        });
+    }
+
     /* Submit one local pot to the public gallery. Returns the
        inserted row (with .id and .created_at) on success, null
        on failure. */
     function submitPublicPot(entry, author) {
         if (!supabaseEnabled()) return Promise.resolve(null);
         const url = SUPABASE_URL + "/rest/v1/public_pots";
-        const body = {
-            name:           entry.name || "UNNAMED POT",
-            author:         (author || "anonymous").slice(0, 40),
-            pack_id:        entry.packId       || null,
-            clay_type_id:   entry.clayTypeId   || null,
-            fired:          !!entry.fired,
-            overfired:      !!entry.overfired,
-            exploded:       !!entry.exploded,
-            clay:           entry.clay         || null,
-            paint_data_url: entry.paintDataUrl || null,
-            /* Phase 1 chunk 1d: tag the pot with the signed-in
-               user's id if any, so it shows up on their profile
-               and they can rename/claim it later. Anon submits
-               leave this NULL — same RLS behavior as before. */
-            user_id:        currentUserId()
-        };
-        /* Remix lineage -- only include the keys if the entry
-           actually carries them. PostgREST drops unknown columns
-           gracefully when the request body omits them, but
-           explicitly sending nulls when SUPABASE_REMIX.sql hasn't
-           run yet would 400. */
-        if (entry.remixedFrom) {
-            body.remixed_from        = entry.remixedFrom;
-            body.remixed_from_author = entry.remixedFromAuthor || "anonymous";
-        }
-        return submitWithRemixFallback(url, body);
+        return composePublicPaintDataUrl(entry).then(function (flatDataUrl) {
+            const body = {
+                name:           entry.name || "UNNAMED POT",
+                author:         (author || "anonymous").slice(0, 40),
+                pack_id:        entry.packId       || null,
+                clay_type_id:   entry.clayTypeId   || null,
+                fired:          !!entry.fired,
+                overfired:      !!entry.overfired,
+                exploded:       !!entry.exploded,
+                clay:           entry.clay         || null,
+                paint_data_url: flatDataUrl        || null,
+                /* Phase 1 chunk 1d: tag the pot with the signed-in
+                   user's id if any, so it shows up on their profile
+                   and they can rename/claim it later. Anon submits
+                   leave this NULL — same RLS behavior as before. */
+                user_id:        currentUserId()
+            };
+            /* Remix lineage -- only include the keys if the entry
+               actually carries them. PostgREST drops unknown columns
+               gracefully when the request body omits them, but
+               explicitly sending nulls when SUPABASE_REMIX.sql hasn't
+               run yet would 400. */
+            if (entry.remixedFrom) {
+                body.remixed_from        = entry.remixedFrom;
+                body.remixed_from_author = entry.remixedFromAuthor || "anonymous";
+            }
+            return submitWithRemixFallback(url, body);
+        });
     }
 
     /* POST + on a 400 that smells like "remixed_from column not
@@ -1052,37 +1105,45 @@
 
     function submitBattleEntry(battleId, entry, author) {
         if (!supabaseEnabled()) return Promise.resolve(null);
-        const body = {
-            battle_id:      battleId,
-            name:           entry.name || "UNNAMED",
-            author:         (author || "anonymous").slice(0, 40),
-            pack_id:        entry.packId       || null,
-            clay_type_id:   entry.clayTypeId   || null,
-            fired:          !!entry.fired,
-            overfired:      !!entry.overfired,
-            exploded:       !!entry.exploded,
-            clay:           entry.clay         || null,
-            paint_data_url: entry.paintDataUrl || null,
-            user_id:        currentUserId()
-        };
-        return fetch(SUPABASE_URL + "/rest/v1/battle_entries", {
-            method: "POST",
-            headers: supabaseHeaders({
-                "Content-Type": "application/json",
-                "Prefer":       "return=representation"
-            }),
-            body: JSON.stringify(body)
-        })
-            .then(function (r) {
-                if (!r.ok) return null;
-                return r.json().then(function (rows) {
-                    return Array.isArray(rows) && rows[0] ? rows[0] : null;
-                });
+        /* Compose stickers into paint_data_url before upload so
+           battle viewers see the kid's full pot — without this
+           the EVERYONE-side battle card just shows the brush
+           layer (no stamps) because the v1.1 move-tool refactor
+           split stickers out into a vector array we don't have
+           a column for. */
+        return composePublicPaintDataUrl(entry).then(function (flatDataUrl) {
+            const body = {
+                battle_id:      battleId,
+                name:           entry.name || "UNNAMED",
+                author:         (author || "anonymous").slice(0, 40),
+                pack_id:        entry.packId       || null,
+                clay_type_id:   entry.clayTypeId   || null,
+                fired:          !!entry.fired,
+                overfired:      !!entry.overfired,
+                exploded:       !!entry.exploded,
+                clay:           entry.clay         || null,
+                paint_data_url: flatDataUrl        || null,
+                user_id:        currentUserId()
+            };
+            return fetch(SUPABASE_URL + "/rest/v1/battle_entries", {
+                method: "POST",
+                headers: supabaseHeaders({
+                    "Content-Type": "application/json",
+                    "Prefer":       "return=representation"
+                }),
+                body: JSON.stringify(body)
             })
-            .catch(function (e) {
-                console.warn("[CRAYte] battle submit failed", e);
-                return null;
-            });
+                .then(function (r) {
+                    if (!r.ok) return null;
+                    return r.json().then(function (rows) {
+                        return Array.isArray(rows) && rows[0] ? rows[0] : null;
+                    });
+                })
+                .catch(function (e) {
+                    console.warn("[CRAYte] battle submit failed", e);
+                    return null;
+                });
+        });
     }
 
     function voteForEntry(entryId) {
