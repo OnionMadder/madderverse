@@ -359,23 +359,31 @@
             .catch(function () { return rows; });
     }
 
-    /* Compose a single flat dataURL combining the entry's brush
-       layer + its sticker records. Used for public uploads
-       (public_pots + battle_entries) because the server schema
-       has only paint_data_url — no separate stickers column. The
-       v1.1 move-tool refactor split stickers out into a vector
-       array, so without this composite the EVERYONE gallery
-       would render shared pots with brush only + no stickers.
+    /* Compose a single flat dataURL combining the entry's surface
+       texture skin + brush layer + sticker records. Used for
+       public uploads (public_pots + battle_entries) because the
+       server schema has only paint_data_url — no columns for the
+       v1.1 additions (vector stickers, surfaceTexturePackId).
+       Without this composite the EVERYONE gallery + battle cards
+       render shared pots missing their texture skin AND stamps.
+
+       Layer order matches the live render (bottom -> top):
+         1. surface texture skin (the TEXTURE button's pack skin)
+         2. brush / spray / splat paint
+         3. stickers
+       The whole thing is drawn clipped-to-pot at render time
+       (renderSavedPot clips _paintImg), so we don't clip here.
 
        Returns a Promise<string|null>. Resolves to the original
-       paintDataUrl unchanged when the entry has no stickers
-       (legacy entries already bake everything into one image). */
+       paintDataUrl unchanged when there's nothing extra to bake
+       (legacy entries already have everything in one image). */
     function composePublicPaintDataUrl(entry) {
         return new Promise(function (resolve) {
             if (!entry) return resolve(null);
             const hasStickers = Array.isArray(entry.stickers) &&
                                 entry.stickers.length > 0;
-            if (!hasStickers) {
+            const hasSurface  = !!entry.surfaceTexturePackId;
+            if (!hasStickers && !hasSurface) {
                 /* Nothing to add — keep the existing image. */
                 return resolve(entry.paintDataUrl || null);
             }
@@ -384,25 +392,42 @@
             tmp.width = w; tmp.height = h;
             const ctx = tmp.getContext("2d");
 
+            /* ---- Layer 1: surface texture skin (bottom) ---- */
+            if (hasSurface && typeof resolveSurfaceTexturePack === "function") {
+                const pack = resolveSurfaceTexturePack(entry.surfaceTexturePackId);
+                if (pack && pack.surfaceTexture) {
+                    const pat = getSurfacePattern(ctx, pack.surfaceTexture);
+                    if (pat) {
+                        ctx.save();
+                        ctx.globalAlpha = 0.92;   /* matches paintSurfaceTexture */
+                        ctx.fillStyle = pat;
+                        ctx.fillRect(0, 0, w, h);
+                        ctx.restore();
+                    }
+                }
+            }
+
             const finish = function () {
-                /* Render each sticker via the shared drawSticker
-                   so rotation + flipH bake in identically to the
-                   live render path. Sequentially in array order
-                   so later placements sit visually above earlier. */
-                for (let i = 0; i < entry.stickers.length; i++) {
-                    drawSticker(ctx, entry.stickers[i]);
+                /* ---- Layer 3: stickers (top) ---- via shared
+                   drawSticker so rotation + flipH bake in
+                   identically to the live render path. */
+                if (hasStickers) {
+                    for (let i = 0; i < entry.stickers.length; i++) {
+                        drawSticker(ctx, entry.stickers[i]);
+                    }
                 }
                 try { resolve(tmp.toDataURL("image/png")); }
                 catch (_) { resolve(entry.paintDataUrl || null); }
             };
 
+            /* ---- Layer 2: brush paint (middle) ---- */
             if (entry.paintDataUrl) {
                 const img = new Image();
                 img.onload  = function () {
                     ctx.drawImage(img, 0, 0, w, h);
                     finish();
                 };
-                img.onerror = finish;   /* still composite stickers */
+                img.onerror = finish;   /* still composite the rest */
                 img.src = entry.paintDataUrl;
             } else {
                 finish();
