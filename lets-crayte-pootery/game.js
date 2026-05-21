@@ -3076,6 +3076,18 @@
             ctx.restore();
         }
 
+        /* Sticker layer — stamps moved out of paintCanvas in the
+           v1.1 move-tool refactor so they can be picked back up
+           and dragged. Same clip-to-pot as paintCanvas so they
+           never overhang the silhouette. */
+        if (opts.stickerCanvas) {
+            ctx.save();
+            buildPotPath(ctx);
+            ctx.clip();
+            ctx.drawImage(opts.stickerCanvas, 0, 0, SHAPE.W, SHAPE.H);
+            ctx.restore();
+        }
+
         /* Fired overlay — warm-tone "overlay" composite that pumps
            midtone saturation and shifts toward kiln-orange. Brief
            calls for "deeper / richer glaze color (slight color shift
@@ -4769,8 +4781,30 @@
     const D = {
         canvas: null,
         ctx: null,
-        paintCanvas: null,   /* offscreen — accumulates strokes / stamps */
+        paintCanvas: null,   /* offscreen — accumulates brush/spray/splat
+                                strokes ONLY. Stamps moved to D.stickers
+                                + D.stickerCanvas in the v1.1 move-tool
+                                refactor so they can be picked back up
+                                and dragged after placement. */
         paintCtx: null,
+
+        /* Sticker layer — vector records + a derived raster canvas.
+           D.stickers is the source of truth (x, y, r, rot, flipH,
+           pattern, color); D.stickerCanvas is just a cached raster
+           of those records, re-rendered whenever the array changes.
+           Render order in renderPotScene: paintCanvas -> stickerCanvas.
+           MOVE tool hit-tests against D.stickers (reverse order so
+           the top-most sticker picks first). */
+        stickers: [],
+        stickerCanvas: null,
+        stickerCtx: null,
+
+        /* MOVE-tool drag state — non-null only between pointerdown
+           on a sticker and the following pointerup. Holds the
+           sticker reference + the pointer-to-sticker offset so the
+           drag doesn't snap to the cursor center. */
+        movingSticker: null,
+
         dpr: 1,
 
         activePackId: "core",
@@ -4843,19 +4877,38 @@
 
     function snapshotPaint() {
         if (!D.paintCanvas) return null;
-        try { return D.paintCanvas.toDataURL("image/png"); }
-        catch (e) {
+        try {
+            /* v1.1 — snapshot captures BOTH layers so undo
+               restores the full decorate state, not just the
+               brush pixels. The sticker array is shallow-cloned
+               (deep enough for our flat records). */
+            return {
+                paint: D.paintCanvas.toDataURL("image/png"),
+                stickers: (D.stickers || []).map(function (s) {
+                    return {
+                        pattern: s.pattern, x: s.x, y: s.y, r: s.r,
+                        rot: s.rot || 0, flipH: !!s.flipH,
+                        color: s.color || null
+                    };
+                })
+            };
+        } catch (e) {
             console.warn("[CRAYte] snapshot failed", e);
             return null;
         }
     }
 
-    /* Replace the paint canvas pixels with a dataURL snapshot.
-       Transform is reset before drawImage so the snapshot lands
-       in pixel coords (it was taken at native res via toDataURL),
-       not in the DPR-scaled logical space the brush uses. */
-    function restorePaintFromDataURL(dataUrl, onDone) {
-        if (!dataUrl || !D.paintCtx) { if (onDone) onDone(); return; }
+    /* Replace BOTH layers from a snapshot taken via snapshotPaint:
+         - paint:    dataURL goes into D.paintCanvas (raster brush)
+         - stickers: array goes into D.stickers (vector records)
+       The dataURL paste is paint-only; the sticker layer is then
+       re-rendered from the restored records. */
+    function restorePaintFromDataURL(snapshot, onDone) {
+        if (!snapshot || !D.paintCtx) { if (onDone) onDone(); return; }
+        /* Backward-compat: pre-v1.1 callers passed a plain dataURL
+           string instead of a {paint, stickers} object. Wrap it
+           so the same code path handles both. */
+        if (typeof snapshot === "string") snapshot = { paint: snapshot, stickers: [] };
         const img = new Image();
         img.onload = function () {
             D.paintCtx.save();
@@ -4864,9 +4917,17 @@
                 D.paintCanvas.width, D.paintCanvas.height);
             D.paintCtx.drawImage(img, 0, 0);
             D.paintCtx.restore();
+            D.stickers = (snapshot.stickers || []).map(function (s) {
+                return {
+                    pattern: s.pattern, x: s.x, y: s.y, r: s.r,
+                    rot: s.rot || 0, flipH: !!s.flipH,
+                    color: s.color || null
+                };
+            });
+            if (typeof renderStickerLayer === "function") renderStickerLayer();
             if (onDone) onDone();
         };
-        img.src = dataUrl;
+        img.src = snapshot.paint;
     }
 
     function pushUndoSnapshot() {
@@ -4980,6 +5041,16 @@
            through a temp canvas. */
         D.paintCanvas = document.createElement("canvas");
         D.paintCtx = D.paintCanvas.getContext("2d");
+
+        /* Sticker layer — separate offscreen so stamps can be
+           rebuilt from D.stickers[] records whenever the array
+           changes (move-tool drag, undo, gallery load) without
+           disturbing the persistent brush/spray/splat pixels in
+           paintCanvas. Same DPR + transform as paintCanvas; sized
+           in sizeDecorateCanvas. */
+        D.stickerCanvas = document.createElement("canvas");
+        D.stickerCtx = D.stickerCanvas.getContext("2d");
+
         sizeDecorateCanvas();
 
         D.paintCtx.lineCap = "round";
@@ -5359,6 +5430,78 @@
                 D.paintCtx.drawImage(tmp, 0, 0, SHAPE.W, SHAPE.H);
             }
         }
+        /* Sticker layer — match paint canvas size + DPR. Unlike
+           paintCanvas, we don't bother preserving raster pixels
+           across resize because the layer is fully rebuilt from
+           D.stickers[] (the source of truth). */
+        if (D.stickerCanvas && (D.stickerCanvas.width !== bw ||
+                                D.stickerCanvas.height !== bh)) {
+            D.stickerCanvas.width  = bw;
+            D.stickerCanvas.height = bh;
+            D.stickerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            if (typeof renderStickerLayer === "function") renderStickerLayer();
+        }
+    }
+
+    /* ---- Sticker layer rendering ----
+       D.stickers is the source of truth. drawSticker / renderStickerLayer
+       walk it in array order so later placements visually sit on
+       top of earlier ones (consistent with the in-place stamp
+       behavior they replaced). Called whenever the array changes —
+       new placement, move-tool drag tick, undo, clear, gallery
+       load. drawSticker is also reused by renderSavedPot to paint
+       a saved entry's stickers into a one-shot canvas (no separate
+       offscreen needed). */
+    function drawSticker(ctx, s) {
+        const fn = PATTERN_DRAWERS[s.pattern];
+        if (!fn) return;
+        const rotated = !!s.rot;
+        const flipped = !!s.flipH;
+        if (rotated || flipped) {
+            ctx.save();
+            ctx.translate(s.x, s.y);
+            if (rotated) ctx.rotate(s.rot);
+            if (flipped) ctx.scale(-1, 1);
+            fn(ctx, 0, 0, s.r, s.color || "#fff");
+            ctx.restore();
+        } else {
+            fn(ctx, s.x, s.y, s.r, s.color || "#fff");
+        }
+    }
+
+    function renderStickerLayer() {
+        if (!D.stickerCtx || !D.stickerCanvas) return;
+        D.stickerCtx.save();
+        D.stickerCtx.setTransform(1, 0, 0, 1, 0, 0);
+        D.stickerCtx.clearRect(0, 0,
+            D.stickerCanvas.width, D.stickerCanvas.height);
+        D.stickerCtx.restore();
+        D.stickerCtx.save();
+        D.stickerCtx.setTransform(D.dpr, 0, 0, D.dpr, 0, 0);
+        for (let i = 0; i < D.stickers.length; i++) {
+            drawSticker(D.stickerCtx, D.stickers[i]);
+        }
+        D.stickerCtx.restore();
+    }
+
+    /* Hit-test the sticker stack for the MOVE tool. Walks in
+       REVERSE so the visually-topmost sticker is picked first
+       (matches what the eye expects when stickers overlap).
+       The hit radius is the sticker's render r plus a small
+       finger-friendly padding so kids don't need pixel-perfect
+       taps. */
+    function hitTestSticker(p) {
+        const PAD = 6;
+        for (let i = D.stickers.length - 1; i >= 0; i--) {
+            const s = D.stickers[i];
+            const dx = p.x - s.x;
+            const dy = p.y - s.y;
+            const reach = (s.r || 14) + PAD;
+            if (dx * dx + dy * dy <= reach * reach) {
+                return { sticker: s, index: i, offsetX: dx, offsetY: dy };
+            }
+        }
+        return null;
     }
 
     function clearPaint() {
@@ -5367,6 +5510,9 @@
         D.paintCtx.setTransform(1, 0, 0, 1, 0, 0);
         D.paintCtx.clearRect(0, 0, D.paintCanvas.width, D.paintCanvas.height);
         D.paintCtx.restore();
+        /* CLEAR also wipes the sticker layer + records. */
+        D.stickers = [];
+        if (typeof renderStickerLayer === "function") renderStickerLayer();
         /* Clearing wipes any prior custom-sticker pixels too — flag
            starts fresh until a new sticker lands. */
         D.usedCustomSticker = false;
@@ -5496,6 +5642,25 @@
             D.pointerActive = true;
             D.lastPaintPos = p;
             D.strokedThisGesture = false;
+
+            /* MOVE tool — hit-test against existing stickers
+               (reverse iteration in hitTestSticker so the visual
+               topmost picks first). If nothing's under the
+               pointer, the gesture is a no-op; the kid sees the
+               grab cursor turn into "nope" without anything
+               being created. Drag updates happen in pointermove
+               below. NO undo snapshot is pushed on miss, so
+               aimless poking doesn't fill the undo stack. */
+            if (D.tool === "move") {
+                const hit = hitTestSticker(p);
+                if (hit) {
+                    pushUndoSnapshot();
+                    D.movingSticker = hit;
+                    D.canvas.style.cursor = "grabbing";
+                }
+                return;
+            }
+
             /* Snapshot BEFORE the gesture so undo restores the
                canvas to its pre-gesture state. One snapshot per
                gesture = one undo per stroke / stamp / eraser
@@ -5599,6 +5764,19 @@
             /* Single-finger -- normal paint flow */
             if (!D.pointerActive) return;
             const p = decPointerPos(e);
+            /* MOVE tool drag — track the active sticker. We preserve
+               the pointer-to-sticker offset captured on pointerdown
+               so the drag doesn't snap to the cursor center; the
+               sticker maintains the grab point throughout the drag. */
+            if (D.tool === "move" && D.movingSticker) {
+                const s = D.movingSticker.sticker;
+                s.x = p.x - D.movingSticker.offsetX;
+                s.y = p.y - D.movingSticker.offsetY;
+                renderStickerLayer();
+                D.lastPaintPos = p;
+                D.pointer = p;
+                return;
+            }
             if (D.tool !== "stamp") paintStrokeTo(p);
             D.lastPaintPos = p;
             D.pointer = p;
@@ -5613,6 +5791,12 @@
                 if (D.pointerActive) {
                     D.pointerActive = false;
                     D.lastPaintPos = null;
+                }
+                /* End any MOVE-tool drag in progress and restore
+                   the idle grab cursor. */
+                if (D.movingSticker) {
+                    D.movingSticker = null;
+                    if (D.tool === "move") D.canvas.style.cursor = "grab";
                 }
                 D.gestureStart = null;
             } else if (D.activePointers.size === 1 && D.gestureStart) {
@@ -5767,22 +5951,24 @@
            the brush so a zoomed-in view stamps smaller details. */
         const r = effectiveBrushSize() * 1.7;
         const color = currentPaintColor();
-        const ctx = D.paintCtx;
-        if (D.stampRotation || D.stampFlipH) {
-            /* Translate to the stamp's center, then rotate +
-               mirror in any order (the stamp draws at 0,0). The
-               scale(-1, 1) flips the X axis -- for asymmetric
-               sheet stamps this is the difference between a
-               left-facing dolphin and a right-facing one. */
-            ctx.save();
-            ctx.translate(p.x, p.y);
-            if (D.stampRotation) ctx.rotate(D.stampRotation);
-            if (D.stampFlipH)    ctx.scale(-1, 1);
-            fn(ctx, 0, 0, r, color);
-            ctx.restore();
-        } else {
-            fn(ctx, p.x, p.y, r, color);
-        }
+        /* Push a vector record (NOT baked pixels). The MOVE tool
+           hit-tests + drags these records; renderStickerLayer
+           re-builds the sticker canvas from the array, and
+           autoSaveFiredPot serializes the array on the entry so
+           a saved pot can be re-opened and its stickers picked
+           back up. The render is reusable: drawSticker(ctx, s)
+           handles the rotation + flip transforms identically to
+           how this site used to do it inline. */
+        D.stickers.push({
+            pattern: D.pattern,
+            x: p.x,
+            y: p.y,
+            r: r,
+            rot: D.stampRotation || 0,
+            flipH: !!D.stampFlipH,
+            color: color
+        });
+        renderStickerLayer();
         stampClick();
         haptic(15);
         noteGlazeUsed(D.glaze);
@@ -6075,11 +6261,14 @@
             b.classList.toggle("active", b.dataset.tool === tool);
         });
         if (D.canvas) {
-            /* Cursor mapping — pointer (hand) reads as "interactive
-               surface" for the painting tools; eraser keeps its
-               crosshair-ish "cell" cursor so the kid can see what
-               they're removing precisely. */
-            D.canvas.style.cursor = (tool === "eraser") ? "cell" : "pointer";
+            /* Cursor mapping:
+                 - eraser : "cell" (so the kid sees what they're erasing)
+                 - move   : "grab" (drag-to-reposition stickers)
+                 - others : "pointer" (interactive surface) */
+            D.canvas.style.cursor =
+                (tool === "eraser") ? "cell" :
+                (tool === "move")   ? "grab" :
+                                       "pointer";
         }
     }
 
@@ -6179,7 +6368,11 @@
            the wheel" while you paint. drawPot also keys off
            currentScreen to pin the highlight strip to a static
            offset instead of animating it. */
-        renderPotScene(D.ctx, { paintCanvas: D.paintCanvas, particles: false });
+        renderPotScene(D.ctx, {
+            paintCanvas:   D.paintCanvas,
+            stickerCanvas: D.stickerCanvas,
+            particles:     false
+        });
         D.rafId = requestAnimationFrame(decorateFrame);
     }
 
@@ -6494,7 +6687,24 @@
                    whose tilable skin is currently wrapped around
                    the pot, or null/undefined. Loaded back when
                    the user re-opens the pot from gallery. */
-                surfaceTexturePackId: D.surfaceTexturePackId || null
+                surfaceTexturePackId: D.surfaceTexturePackId || null,
+                /* Sticker records (v1.1 move-tool refactor) —
+                   stamps used to bake into paintDataUrl as pixels;
+                   now they're persisted as a vector array so a
+                   re-opened pot can still pick + drag them. Legacy
+                   entries without this field render the same way
+                   they always have (their stickers are still in
+                   the paintDataUrl bake). Stripped to just the
+                   fields we need at re-render time. */
+                stickers: (D.stickers || []).map(function (s) {
+                    return {
+                        pattern: s.pattern,
+                        x: s.x, y: s.y, r: s.r,
+                        rot: s.rot || 0,
+                        flipH: !!s.flipH,
+                        color: s.color || null
+                    };
+                })
             };
             /* If this firing was started via REMIX, bake the
                lineage in. Cleared after consumption so a follow-up
@@ -7029,9 +7239,10 @@
             ctx.save();
             ctx.translate(0, KILN.potOffsetY);
             renderPotScene(ctx, {
-                paintCanvas: D.paintCanvas,
-                particles:   false,
-                background:  false,
+                paintCanvas:   D.paintCanvas,
+                stickerCanvas: D.stickerCanvas,
+                particles:     false,
+                background:    false,
                 wheel:       false,
                 corners:     false,
                 fired:       KILN.fired,
@@ -7388,6 +7599,19 @@
                 buildPotPath(ctx);
                 ctx.clip();
                 ctx.drawImage(entry._paintImg, 0, 0, SHAPE.W, SHAPE.H);
+                ctx.restore();
+            }
+            /* Sticker records (v1.1+ entries). Legacy entries
+               without a stickers array had stamps baked into
+               paintDataUrl, so they render correctly above
+               without any extra work. */
+            if (entry.stickers && entry.stickers.length > 0) {
+                ctx.save();
+                buildPotPath(ctx);
+                ctx.clip();
+                for (let i = 0; i < entry.stickers.length; i++) {
+                    drawSticker(ctx, entry.stickers[i]);
+                }
                 ctx.restore();
             }
             if (entry.fired) {

@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=17" />
+    <link rel="stylesheet" href="style.css?v=18" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -448,13 +448,15 @@
             </div>
 
             <!-- Secondary mode row: TEXTURE applies the active
-                 pack's surface skin (placeholder for now — wiring
-                 lands once we pick the interaction model);
-                 ERASE switches to the eraser tool; CLEAR wipes
-                 the paint layer (was previously a separate button
-                 in .decorate-controls below the tray). -->
+                 pack's surface skin; MOVE picks existing stickers
+                 up to drag-reposition them; ERASE switches to
+                 the eraser tool; CLEAR wipes everything. (CLEAR
+                 was previously in .decorate-controls below the
+                 tray; consolidated here so all paint-related
+                 controls live in one cluster.) -->
             <div class="tool-row tool-modes" role="tablist" aria-label="Mode">
                 <button class="tool-btn" data-tool="texture"  id="decTexture" type="button">TEXTURE</button>
+                <button class="tool-btn" data-tool="move"     id="decMove"    type="button">MOVE</button>
                 <button class="tool-btn" data-tool="eraser"   type="button">ERASE</button>
                 <button class="tool-btn"                       id="decClear" type="button">CLEAR</button>
             </div>
@@ -1178,7 +1180,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=17"></script>
+<script src="game.js?v=18"></script>
 
 </body>
 </html>
