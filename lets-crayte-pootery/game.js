@@ -1771,6 +1771,23 @@
 
     let currentScreen = "title";
 
+    /* Screens that survive a refresh. Listed here so a tab the
+       user is browsing (battles, gallery, etc.) doesn't bounce
+       back to title when they pull-to-refresh. Mid-pot screens
+       (shape, decorate, kiln) are intentionally NOT here because
+       the live D/SHAPE state would be lost on reload anyway and
+       the user's safer landing point in that case is the title
+       with their draft saved in gallery. */
+    const PERSISTENT_SCREENS = {
+        battles:  true,
+        gallery:  true,
+        stats:    true,
+        shop:     true,
+        account:  true,
+        profile:  true,
+        trophies: true
+    };
+
     function showScreen(id) {
         const target = document.getElementById("screen-" + id);
         if (!target) {
@@ -1798,6 +1815,20 @@
             try { next.onEnter(); }
             catch (e) { console.error("[CRAYte] onEnter " + id, e); }
         }
+
+        /* Persist the screen choice in the URL so a refresh on
+           battles / gallery / etc. doesn't dump the user back
+           on the title. Title itself clears the param so the
+           bare URL stays clean. */
+        try {
+            const url = new URL(window.location.href);
+            if (PERSISTENT_SCREENS[id]) {
+                url.searchParams.set("screen", id);
+            } else {
+                url.searchParams.delete("screen");
+            }
+            history.replaceState(null, "", url.toString());
+        } catch (_) {}
 
         window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
     }
@@ -9549,7 +9580,15 @@
         GALLERY.publicLoading = true;
         fetchPublicPots(50).then(function (rows) {
             GALLERY.publicLoading = false;
-            GALLERY.publicCache = rows.map(normalizePublicRow);
+            /* Client-side filter: hide rows the user already
+               deleted but whose server delete failed (most
+               commonly because the row was shared anonymously
+               and RLS won't let the now-signed-in user remove
+               it). The hidden set lives in localStorage. */
+            const hidden = loadHiddenPublic();
+            GALLERY.publicCache = rows
+                .filter(function (r) { return !hidden.has(r.id); })
+                .map(normalizePublicRow);
             GALLERY.publicLastFetch = Date.now();
             /* Only paint if user is still on the public tab */
             if (currentScreen === "gallery" && GALLERY.tab === "public") {
@@ -10174,7 +10213,27 @@
         if (wasShared && pubId && typeof deletePublicPot === "function") {
             deletePublicPot(pubId).then(function (success) {
                 if (!success) {
-                    console.warn("[CRAYte] public unshare failed for", pubId);
+                    /* Server-side delete failed (most commonly:
+                       RLS denied because the pot was shared
+                       anonymously before sign-in). Hide locally
+                       so EVERYONE / battle views don't show it
+                       anymore from THIS device, and tell the
+                       user honestly. The pot still exists on the
+                       server until it can be claimed + deleted;
+                       contacting support is the fallback. */
+                    hideFromPublic(pubId);
+                    setTimeout(function () {
+                        alert(
+                            "Removed from your gallery + hidden from " +
+                            "your view of EVERYONE.\n\n" +
+                            "We couldn't fully delete the server copy " +
+                            "(usually because the pot was first shared " +
+                            "before you signed in — the system can't " +
+                            "tell it's yours). Email " +
+                            "pootery@madderverse.org with your @handle " +
+                            "and we'll clean it up server-side."
+                        );
+                    }, 200);
                 }
                 cleanup();
             });
@@ -10537,14 +10596,66 @@
         if (!supabaseEnabled() || !publicId) return Promise.resolve(false);
         const url = SUPABASE_URL + "/rest/v1/public_pots?id=eq." +
                     encodeURIComponent(publicId);
+        /* return=representation makes PostgREST echo the rows it
+           ACTUALLY deleted. A 204 / 200 with an empty array means
+           RLS silently denied (most often: the pot was shared
+           anonymously so user_id IS NULL on the row, and the
+           current authed user isn't the "owner" per the policy).
+           Without this we'd treat a no-op delete as success and
+           the kid would see her pot still on the EVERYONE tab. */
         return fetch(url, {
             method: "DELETE",
             headers: supabaseHeaders({
-                "Prefer": "return=minimal"
+                "Prefer": "return=representation"
             })
         }).then(function (r) {
-            return r.ok;
+            if (!r.ok) {
+                console.warn("[CRAYte] deletePublicPot HTTP " + r.status +
+                             " for id=" + publicId);
+                return false;
+            }
+            return r.json().then(function (rows) {
+                const deleted = Array.isArray(rows) && rows.length > 0;
+                if (!deleted) {
+                    console.warn("[CRAYte] deletePublicPot: 0 rows for id=" +
+                                 publicId + " — likely RLS / user_id mismatch " +
+                                 "(pot may have been shared anonymously before " +
+                                 "sign-in).");
+                }
+                return deleted;
+            }).catch(function () { return r.ok; });
         }).catch(function () { return false; });
+    }
+
+    /* Client-side hide-list for public pots whose server-side
+       delete failed (most common cause: pot was shared while
+       signed-out, so RLS won't let the now-signed-in user delete
+       it). We honor the user's intent locally by hiding the row
+       from EVERYONE / battles even if the server still has it.
+       Persisted so a refresh doesn't un-hide. */
+    const HIDDEN_PUBLIC_KEY = "crayte-hidden-public";
+
+    function loadHiddenPublic() {
+        try {
+            const arr = JSON.parse(localStorage.getItem(HIDDEN_PUBLIC_KEY) || "[]");
+            return new Set(Array.isArray(arr) ? arr : []);
+        } catch (_) { return new Set(); }
+    }
+    function saveHiddenPublic(set) {
+        try {
+            localStorage.setItem(HIDDEN_PUBLIC_KEY,
+                JSON.stringify(Array.from(set)));
+        } catch (_) {}
+    }
+    function hideFromPublic(publicId) {
+        if (!publicId) return;
+        const s = loadHiddenPublic();
+        s.add(publicId);
+        saveHiddenPublic(s);
+    }
+    function isHiddenPublic(publicId) {
+        if (!publicId) return false;
+        return loadHiddenPublic().has(publicId);
     }
 
     /* Show/hide STOP SHARING based on whether this entry has a
@@ -11927,6 +12038,16 @@
                 PROFILE.previousScreen = "title";
                 showScreen("profile");
                 loadProfile(handle);
+                return;
+            }
+
+            /* No pot/profile deep-link — honor ?screen= if it's
+               one of the persistent screens we set on navigation.
+               This is what makes pull-to-refresh on the battles
+               tab actually keep the user on battles. */
+            const screen = params.get("screen");
+            if (screen && PERSISTENT_SCREENS[screen]) {
+                showScreen(screen);
             }
         } catch (_) {}
     }
