@@ -2309,6 +2309,101 @@
         ctx.restore();
     }
 
+    /* ============================================================
+       SURFACE TEXTURES — one per asset pack, applied via the
+       TEXTURE button in decorate.
+       ============================================================
+       Different concept from clay textures above. Clay textures
+       are part of the pot's BODY (always on, soft-light over the
+       gradient). Surface textures are a kid-controlled SKIN
+       applied during decorate as a one-tap toggle — e.g., tap
+       TEXTURE on the PLUSH pack and the pot looks like fur.
+
+       Each pack with a texture has surfaceTexture: "<filename>"
+       in GLAZE_PACKS. The file lives at assets/textures/<n>.png
+       (same folder as clay textures — they're all tilable PNGs).
+
+       D.surfaceTexturePackId tracks which pack's skin is applied
+       (null if none). Persisted on the saved pot's entry.
+
+       Render: painted INSIDE the pot-path clip, AFTER the user's
+       paint canvas (so the kid's glaze/stickers can still influence
+       what bleeds through), BEFORE the fired overlay + rim. Uses
+       source-over at 0.92 alpha so it reads as a skin replacing
+       the clay color (with a hint of underlying paint peeking
+       through at high-contrast spots).
+       ============================================================ */
+    const SURFACE_TEXTURES = Object.create(null);          /* fileId -> Image */
+    const SURFACE_PATTERN_CACHE = new WeakMap();           /* ctx -> {fileId:Pattern} */
+
+    function loadSurfaceTextures(packs) {
+        packs.forEach(function (p) {
+            if (!p.surfaceTexture) return;
+            const id = p.surfaceTexture;
+            if (SURFACE_TEXTURES[id]) return;   /* already loading */
+            const img = new Image();
+            img.src = "assets/textures/" + id + ".png";
+            SURFACE_TEXTURES[id] = img;
+        });
+    }
+
+    function getSurfacePattern(ctx, fileId) {
+        if (!ctx || !fileId) return null;
+        let cache = SURFACE_PATTERN_CACHE.get(ctx);
+        if (!cache) {
+            cache = Object.create(null);
+            SURFACE_PATTERN_CACHE.set(ctx, cache);
+        }
+        if (cache[fileId]) return cache[fileId];
+        const img = SURFACE_TEXTURES[fileId];
+        if (!img || !img.complete || img.naturalWidth === 0) return null;
+        try {
+            const pat = ctx.createPattern(img, "repeat");
+            cache[fileId] = pat;
+            return pat;
+        } catch (_) { return null; }
+    }
+
+    /* Resolve a pack id (defaults to D.surfaceTexturePackId for
+       the live decorate session) to its GLAZE_PACKS entry. The
+       gallery renderer passes a saved entry's id explicitly so
+       thumbnails honor whatever skin was on the pot when it
+       fired. Returns null if the id doesn't match any pack
+       (e.g., the user opened an old pot whose pack hasn't
+       shipped yet — graceful degrade to no skin). */
+    function resolveSurfaceTexturePack(packId) {
+        const id = (packId === undefined)
+            ? (D && D.surfaceTexturePackId)
+            : packId;
+        if (!id) return null;
+        for (let i = 0; i < GLAZE_PACKS.length; i++) {
+            if (GLAZE_PACKS[i].id === id) return GLAZE_PACKS[i];
+        }
+        return null;
+    }
+
+    /* Render the surface texture for the given pack id. Called
+       from renderPotScene right after the paint canvas composite,
+       so the skin layers over the user's stickers (the texture
+       is what the OUTSIDE of the pot looks like, after all).
+       No-op when no skin is selected or the asset isn't decoded.
+       packId defaults to D.surfaceTexturePackId; pass an explicit
+       id (gallery thumbnails, etc.) to override. */
+    function paintSurfaceTexture(ctx, bounds, packId) {
+        const pack = resolveSurfaceTexturePack(packId);
+        if (!pack || !pack.surfaceTexture) return;
+        const pat = getSurfacePattern(ctx, pack.surfaceTexture);
+        if (!pat) return;
+        ctx.save();
+        buildPotPath(ctx);
+        ctx.clip();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 0.92;
+        ctx.fillStyle = pat;
+        ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+        ctx.restore();
+    }
+
     const SHAPE = {
         /* Logical canvas size. Display scales via CSS aspect-ratio;
            backing store is W*dpr × H*dpr. */
@@ -2955,6 +3050,29 @@
             ctx.clip();
             ctx.drawImage(opts.paintCanvas, 0, 0, SHAPE.W, SHAPE.H);
             ctx.restore();
+        }
+
+        /* Surface texture (TEXTURE button) — layered AFTER the
+           paint so the kid's skin choice overrides their stickers
+           where the skin opacity bites. No-op if no skin is
+           selected or the active pack has no surfaceTexture.
+           opts.surfaceTexturePackId lets gallery thumbnails pass
+           the entry's saved skin id; absent, the live D state
+           drives the decorate-screen render. */
+        if (typeof paintSurfaceTexture === "function") {
+            const clay = SHAPE.clay;
+            const N = clay.length;
+            const maxR = (function () {
+                let m = 0;
+                for (let i = 0; i < N; i++) if (clay[i].radius > m) m = clay[i].radius;
+                return m;
+            }());
+            paintSurfaceTexture(ctx, {
+                x: SHAPE.centerX - maxR - 4,
+                y: clay[N - 1].y - 4,
+                w: (maxR + 4) * 2,
+                h: SHAPE.baseY - clay[N - 1].y + 14
+            }, opts.surfaceTexturePackId);
         }
 
         /* Fired overlay — warm-tone "overlay" composite that pumps
@@ -4434,6 +4552,7 @@
         {
             id: "candy", label: "CANDY",
             sheet: "candy",
+            surfaceTexture: "candy",   /* assets/textures/candy.png */
             description: "Cherry red, blue raspberry, root beer brown.",
             coverEmoji: "\u{1F36C}",   /* candy */
             glazes: [
@@ -4452,6 +4571,7 @@
         {
             id: "plushie", label: "PLUSH",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
+            surfaceTexture: "plush",   /* assets/textures/plush.png */
             description: "Teddy brown, pastel pink, soft plush palette.",
             coverEmoji: "\u{1F9F8}",   /* teddy bear */
             glazes: [
@@ -4469,6 +4589,7 @@
         {
             id: "modded", label: "MODDED",
             sheet: "modded",
+            surfaceTexture: "modded",   /* assets/textures/modded.png */
             description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
             coverEmoji: "\u{1F5A5}",   /* desktop computer */
             glazes: [
@@ -4486,6 +4607,7 @@
         {
             id: "gamer", label: "GAMER",
             sheet: "gamer",
+            surfaceTexture: "gamer",   /* assets/textures/gamer.png */
             description: "CRT green, scanline gray, PRESS START.",
             coverEmoji: "\u{1F3AE}",   /* video game */
             glazes: [
@@ -4503,6 +4625,7 @@
         {
             id: "space", label: "SPACE",
             sheet: "space",
+            surfaceTexture: "space",   /* assets/textures/space.png */
             description: "Cosmic void, nebula violet, supernova white.",
             coverEmoji: "\u{1F680}",   /* rocket */
             glazes: [
@@ -4614,6 +4737,11 @@
         }
     ];
 
+    /* Kick off async loading of every pack's surface texture PNG
+       now that GLAZE_PACKS is populated. Packs without a
+       surfaceTexture field are silently skipped. */
+    loadSurfaceTextures(GLAZE_PACKS);
+
     const D = {
         canvas: null,
         ctx: null,
@@ -4632,6 +4760,13 @@
                                  like a left-facing dolphin become a
                                  right-facing dolphin without authoring
                                  a separate frame. */
+
+        /* Surface texture (TEXTURE button) — applies the named
+           pack's tilable PNG over the entire pot's painted body.
+           Null = no skin applied. Stored as the source pack id
+           (not file name) so save/load picks up the right asset
+           even if the file name -> pack mapping changes. */
+        surfaceTexturePackId: null,
 
         pointer: null,
         pointerActive: false,
@@ -5211,6 +5346,12 @@
         /* Clearing wipes any prior custom-sticker pixels too — flag
            starts fresh until a new sticker lands. */
         D.usedCustomSticker = false;
+        /* CLEAR also strips any applied surface texture skin —
+           the kid's intent is "start over on bare clay". */
+        D.surfaceTexturePackId = null;
+        if (typeof refreshTextureButton === "function") {
+            refreshTextureButton();
+        }
     }
 
     /* ----- 6D. Pointer / paint ----- */
@@ -5860,23 +6001,28 @@
             }
         }
 
-        /* Tool-mode buttons. data-tool="texture" is wired as a
-           friendly stub until we pick the interaction model
-           (one-tap full-pot skin? brush-style texture paint?).
-           Clicking it explains itself; nothing else breaks. */
+        /* Tool-mode buttons. data-tool="texture" is special — it
+           doesn't change D.tool; it toggles whether the active
+           pack's surface texture is applied over the whole pot
+           (one-tap full skin). Everything else routes through
+           setTool. buildToolUI re-runs on every pack swap, so
+           we gate the wiring with _wired to avoid stacking N
+           listeners that flip the toggle even/odd times. */
         document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
-            b.addEventListener("click", function () {
-                if (b.dataset.tool === "texture") {
-                    alert("TEXTURE mode is coming soon — each pack will " +
-                          "ship its own surface skin (plush velvet, " +
-                          "dinosaur scales, candy glitter, etc.) that you " +
-                          "apply over the whole pot at once.");
-                    return;
+            if (b.dataset.tool === "texture") {
+                if (!b._wired) {
+                    b.addEventListener("click", function () { toggleSurfaceTexture(); });
+                    b._wired = true;
                 }
-                setTool(b.dataset.tool);
-            });
+                return;
+            }
+            if (!b._wired) {
+                b.addEventListener("click", function () { setTool(b.dataset.tool); });
+                b._wired = true;
+            }
             b.classList.toggle("active", b.dataset.tool === D.tool);
         });
+        refreshTextureButton();
 
         /* Size slider (matches the ROT slider pattern so all
            tool-row inputs share one control vocabulary). */
@@ -5898,11 +6044,58 @@
     function setTool(tool) {
         D.tool = tool;
         document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
+            /* The TEXTURE button doesn't represent a tool — its
+               active state mirrors D.surfaceTexturePackId via
+               refreshTextureButton, not D.tool. Skip it here. */
+            if (b.dataset.tool === "texture") return;
             b.classList.toggle("active", b.dataset.tool === tool);
         });
         if (D.canvas) {
             D.canvas.style.cursor = (tool === "eraser") ? "cell" : "crosshair";
         }
+    }
+
+    /* Toggle the active pack's surface texture on / off. If a
+       DIFFERENT pack's skin is currently applied, this swaps to
+       the active pack's skin (one-tap to override). If the active
+       pack has no surfaceTexture, this is a no-op + the button
+       stays disabled-looking. */
+    function toggleSurfaceTexture() {
+        const pack = activePack();
+        if (!pack || !pack.surfaceTexture) {
+            /* Button shouldn't be enabled when there's no skin to
+               apply, but be defensive against rapid taps + race
+               conditions during pack switches. */
+            refreshTextureButton();
+            return;
+        }
+        if (D.surfaceTexturePackId === pack.id) {
+            D.surfaceTexturePackId = null;
+        } else {
+            D.surfaceTexturePackId = pack.id;
+        }
+        refreshTextureButton();
+    }
+
+    /* Sync the TEXTURE button's visual state to D + the active
+       pack's surfaceTexture availability. Called whenever the
+       active pack changes, the toggle fires, a fresh decorate
+       mount happens, or a gallery pot is loaded back in. */
+    function refreshTextureButton() {
+        const btn = document.getElementById("decTexture");
+        if (!btn) return;
+        const pack = activePack();
+        const hasSkin = !!(pack && pack.surfaceTexture);
+        const isApplied = !!(D.surfaceTexturePackId &&
+                             pack && D.surfaceTexturePackId === pack.id);
+        btn.classList.toggle("active",   isApplied);
+        btn.classList.toggle("disabled", !hasSkin);
+        btn.disabled = !hasSkin;
+        btn.setAttribute("aria-pressed", isApplied ? "true" : "false");
+        btn.title = hasSkin
+            ? (isApplied ? "Remove the " + pack.label + " skin"
+                          : "Apply the " + pack.label + " skin to the whole pot")
+            : "This pack has no surface texture";
     }
 
     /* ----- 6F. Buttons ----- */
@@ -5997,6 +6190,13 @@
                shape onLeave handler already stopped it. */
             if (typeof refreshRemixInProgressChip === "function") {
                 refreshRemixInProgressChip();
+            }
+            /* TEXTURE button state depends on the active pack
+               (some have a surfaceTexture, some don't). Re-sync
+               on every entry so swapping packs in the shop and
+               coming back here updates the button correctly. */
+            if (typeof refreshTextureButton === "function") {
+                refreshTextureButton();
             }
         },
         onLeave: function () {
@@ -6230,7 +6430,12 @@
                    from public battle submission. Carries forward
                    on remix so a tainted source can't be laundered. */
                 usedCustomSticker: !!D.usedCustomSticker ||
-                    !!(REMIX.pending && REMIX.pending.usedCustomSticker)
+                    !!(REMIX.pending && REMIX.pending.usedCustomSticker),
+                /* Surface texture (TEXTURE button) — the pack id
+                   whose tilable skin is currently wrapped around
+                   the pot, or null/undefined. Loaded back when
+                   the user re-opens the pot from gallery. */
+                surfaceTexturePackId: D.surfaceTexturePackId || null
             };
             /* If this firing was started via REMIX, bake the
                lineage in. Cleared after consumption so a follow-up
@@ -7102,6 +7307,25 @@
                 ctx.clip();
                 ctx.drawImage(entry._paintImg, 0, 0, SHAPE.W, SHAPE.H);
                 ctx.restore();
+            }
+            /* Surface texture skin (TEXTURE button) — apply the
+               saved entry's skin if it had one. Matches the live
+               renderPotScene layering: AFTER the paint canvas,
+               BEFORE the fired overlay + rim. */
+            if (entry.surfaceTexturePackId &&
+                    typeof paintSurfaceTexture === "function") {
+                const clay = SHAPE.clay;
+                const N = clay.length;
+                let maxR = 0;
+                for (let i = 0; i < N; i++) {
+                    if (clay[i].radius > maxR) maxR = clay[i].radius;
+                }
+                paintSurfaceTexture(ctx, {
+                    x: SHAPE.centerX - maxR - 4,
+                    y: clay[N - 1].y - 4,
+                    w: (maxR + 4) * 2,
+                    h: SHAPE.baseY - clay[N - 1].y + 14
+                }, entry.surfaceTexturePackId);
             }
             if (entry.fired) {
                 ctx.save();

@@ -1548,6 +1548,18 @@ a:focus-visible {
         0 0 12px rgba(255, 46, 136, 0.5);
 }
 
+/* TEXTURE button — disabled when the active pack has no
+   surfaceTexture asset (e.g., BASIC, DINOSAUR, BREAKFAST, MUSIC,
+   MEGA at time of writing). Reads grayed-out so the user knows
+   it's there but inert. Click is also blocked via DOM disabled. */
+.tool-btn.disabled,
+.tool-btn[disabled] {
+    opacity: 0.35;
+    cursor: not-allowed;
+    pointer-events: none;
+    filter: grayscale(0.6);
+}
+
 /* SIZE was three discrete .size-btn pucks; now a .tool-slider
    matching ROT, so the styles here were removed. */
 
