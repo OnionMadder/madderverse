@@ -3042,23 +3042,13 @@
            still empty (waiting for a lump drop) — opts.pot:false. */
         if (opts.pot !== false) drawPot(ctx);
 
-        /* Paint layer (decorate mode) — clipped to the pot silhouette
-           so strokes outside the body never show. */
-        if (opts.paintCanvas) {
-            ctx.save();
-            buildPotPath(ctx);
-            ctx.clip();
-            ctx.drawImage(opts.paintCanvas, 0, 0, SHAPE.W, SHAPE.H);
-            ctx.restore();
-        }
-
-        /* Surface texture (TEXTURE button) — layered AFTER the
-           paint so the kid's skin choice overrides their stickers
-           where the skin opacity bites. No-op if no skin is
-           selected or the active pack has no surfaceTexture.
-           opts.surfaceTexturePackId lets gallery thumbnails pass
-           the entry's saved skin id; absent, the live D state
-           drives the decorate-screen render. */
+        /* Surface texture (TEXTURE button) — applied to the bare
+           clay BEFORE the paint canvas so stickers, brush strokes,
+           and stamps the kid lays on top stay visible above the
+           skin. No-op if no skin is selected or the active pack
+           has no surfaceTexture. opts.surfaceTexturePackId lets
+           gallery thumbnails pass the entry's saved skin id;
+           absent, the live D state drives the decorate render. */
         if (typeof paintSurfaceTexture === "function") {
             const clay = SHAPE.clay;
             const N = clay.length;
@@ -3073,6 +3063,17 @@
                 w: (maxR + 4) * 2,
                 h: SHAPE.baseY - clay[N - 1].y + 14
             }, opts.surfaceTexturePackId);
+        }
+
+        /* Paint layer (decorate mode) — clipped to the pot silhouette
+           so strokes outside the body never show. Sits ABOVE the
+           surface texture so stickers + brush stay visible. */
+        if (opts.paintCanvas) {
+            ctx.save();
+            buildPotPath(ctx);
+            ctx.clip();
+            ctx.drawImage(opts.paintCanvas, 0, 0, SHAPE.W, SHAPE.H);
+            ctx.restore();
         }
 
         /* Fired overlay — warm-tone "overlay" composite that pumps
@@ -7301,17 +7302,10 @@
             }
             if (opts.wheel !== false) drawWheel(ctx);
             drawPot(ctx);
-            if (entry._paintImg) {
-                ctx.save();
-                buildPotPath(ctx);
-                ctx.clip();
-                ctx.drawImage(entry._paintImg, 0, 0, SHAPE.W, SHAPE.H);
-                ctx.restore();
-            }
             /* Surface texture skin (TEXTURE button) — apply the
                saved entry's skin if it had one. Matches the live
-               renderPotScene layering: AFTER the paint canvas,
-               BEFORE the fired overlay + rim. */
+               renderPotScene layering: BEFORE the paint canvas so
+               the kid's stickers stay visible above the skin. */
             if (entry.surfaceTexturePackId &&
                     typeof paintSurfaceTexture === "function") {
                 const clay = SHAPE.clay;
@@ -7326,6 +7320,13 @@
                     w: (maxR + 4) * 2,
                     h: SHAPE.baseY - clay[N - 1].y + 14
                 }, entry.surfaceTexturePackId);
+            }
+            if (entry._paintImg) {
+                ctx.save();
+                buildPotPath(ctx);
+                ctx.clip();
+                ctx.drawImage(entry._paintImg, 0, 0, SHAPE.W, SHAPE.H);
+                ctx.restore();
             }
             if (entry.fired) {
                 ctx.save();
