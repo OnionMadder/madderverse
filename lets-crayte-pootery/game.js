@@ -2249,28 +2249,56 @@
 
     /* Paint the clay's surface texture over the gradient fill.
        Caller must have already built the pot path + filled it
-       with the gradient. We clip to the path, multiply the
-       texture in (so the gradient shading still wins on dark/light
-       contrasts), then restore. */
+       with the gradient. We clip to the path, lay the pattern
+       in via soft-light + a faint color pass, then restore.
+
+       The pattern scrolls horizontally in sync with the wheel's
+       rotation phase so the surface appears to co-rotate with
+       the platform instead of being a static skin (a static skin
+       reads as "spinning the wrong way" because the eye picks
+       relative motion against the moving wheel wedges). The
+       scroll direction matches the existing highlight sweep
+       (Math.sin(phase)*maxR*0.55 — rightward as phase grows).
+
+       Decorate freezes the wheel, so we hold the pattern static
+       there too. */
     function paintClayTexture(ctx, mat, bounds) {
         if (!ctx || !mat) return;
         const pat = getClayPattern(ctx, mat.id);
         if (!pat) return;
+
+        let dx = 0;
+        if (currentScreen !== "decorate" &&
+                typeof DOMMatrix === "function" &&
+                typeof pat.setTransform === "function") {
+            /* maxR derived from the bounds the caller passed in
+               (bounds.w ~ 2*maxR + 8). Scrolling one circumference
+               per revolution would be 2π·maxR; we slow it to
+               ~maxR·0.55 per radian which visually matches the
+               highlight's amplitude and reads as natural rotation. */
+            const visibleRadius = bounds.w * 0.5 - 4;
+            dx = SHAPE.wheelPhase * visibleRadius * 0.55;
+            try { pat.setTransform(new DOMMatrix().translateSelf(dx, 0)); }
+            catch (_) { dx = 0; }
+        } else if (typeof pat.setTransform === "function") {
+            /* Reset any prior transform left over from shape so a
+               decorate / kiln render isn't seeded with stale dx. */
+            try { pat.setTransform(new DOMMatrix()); } catch (_) {}
+        }
+
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
         /* soft-light keeps the gradient's color + lighting intact
            and just adds the texture's value variation. multiply
            darkens too aggressively; source-over with reduced
-           alpha flattens the gradient. soft-light is the sweet
-           spot for "subtle grit". */
+           alpha flattens the gradient. */
         ctx.globalCompositeOperation = "soft-light";
         ctx.globalAlpha = 1.0;
         ctx.fillStyle = pat;
         ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
-        /* A faint second pass in source-over with low alpha
-           re-introduces the texture's color speckles (otherwise
-           soft-light leaves them too washed out). */
+        /* A faint source-over pass re-introduces the texture's
+           color so porcelain reads chalkier, basalt mattier. */
         ctx.globalCompositeOperation = "source-over";
         ctx.globalAlpha = 0.22;
         ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
@@ -3192,18 +3220,10 @@
                          60, SHAPE.baseY - clay[N - 1].y + 14);
         }
 
-        /* Faint horizontal throwing rings (potter's mark) — only
-           visible where the clay catches the light. */
-        ctx.globalAlpha = 0.12;
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 0.6;
-        const ringStep = 16;
-        for (let y = clay[N - 1].y + 12; y < SHAPE.baseY - 4; y += ringStep) {
-            ctx.beginPath();
-            ctx.moveTo(cx - maxR, y);
-            ctx.lineTo(cx + maxR, y);
-            ctx.stroke();
-        }
+        /* (Throwing rings removed — the per-clay surface texture
+           added by paintClayTexture above provides plenty of
+           natural grain; the synthetic horizontal lines fought
+           the photographic texture and looked artificial.) */
         ctx.restore();
 
         /* Outline */
