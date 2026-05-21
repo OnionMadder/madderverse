@@ -2394,6 +2394,25 @@
         if (!pack || !pack.surfaceTexture) return;
         const pat = getSurfacePattern(ctx, pack.surfaceTexture);
         if (!pat) return;
+
+        /* On the shape screen the wheel is spinning, so the
+           surface texture (the pack skin wrapping the cylinder)
+           needs to scroll in sync to read as a rotating object.
+           Mirrors the wheel-phase trick paintClayTexture uses:
+           shift the pattern's internal transform by phase * a
+           fraction of the visible radius. Decorate + kiln hold
+           the wheel still so we reset to no transform there. */
+        if (currentScreen === "shape" &&
+                typeof DOMMatrix === "function" &&
+                typeof pat.setTransform === "function") {
+            const visibleRadius = bounds.w * 0.5 - 4;
+            const dx = SHAPE.wheelPhase * visibleRadius * 0.55;
+            try { pat.setTransform(new DOMMatrix().translateSelf(dx, 0)); }
+            catch (_) {}
+        } else if (typeof pat.setTransform === "function") {
+            try { pat.setTransform(new DOMMatrix()); } catch (_) {}
+        }
+
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
@@ -3042,36 +3061,45 @@
            still empty (waiting for a lump drop) — opts.pot:false. */
         if (opts.pot !== false) drawPot(ctx);
 
-        /* Surface texture (TEXTURE button) — applied to the bare
-           clay BEFORE the paint canvas so stickers, brush strokes,
-           and stamps the kid lays on top stay visible above the
-           skin. No-op if no skin is selected or the active pack
-           has no surfaceTexture. opts.surfaceTexturePackId lets
-           gallery thumbnails pass the entry's saved skin id;
-           absent, the live D state drives the decorate render. */
-        if (typeof paintSurfaceTexture === "function") {
-            const clay = SHAPE.clay;
-            const N = clay.length;
-            const maxR = (function () {
-                let m = 0;
-                for (let i = 0; i < N; i++) if (clay[i].radius > m) m = clay[i].radius;
-                return m;
-            }());
-            paintSurfaceTexture(ctx, {
-                x: SHAPE.centerX - maxR - 4,
-                y: clay[N - 1].y - 4,
-                w: (maxR + 4) * 2,
-                h: SHAPE.baseY - clay[N - 1].y + 14
-            }, opts.surfaceTexturePackId);
-        }
+        /* Surface texture + light catches are pot-shape derived,
+           so they only run when the pot itself is being drawn.
+           This is what kept the empty-wheel state ghosting a
+           cylindrical silhouette before a lump landed — the
+           texture / sheen / rim were painting against the
+           default SHAPE.clay path even with opts.pot:false. */
+        if (opts.pot !== false) {
+            /* Surface texture (TEXTURE button) — applied to the
+               bare clay BEFORE the paint canvas so stickers,
+               brush strokes, and stamps the kid lays on top stay
+               visible above the skin. No-op if no skin is
+               selected or the active pack has no surfaceTexture.
+               opts.surfaceTexturePackId lets gallery thumbnails
+               pass the entry's saved skin id; absent, the live
+               D state drives the decorate render. */
+            if (typeof paintSurfaceTexture === "function") {
+                const clay = SHAPE.clay;
+                const N = clay.length;
+                const maxR = (function () {
+                    let m = 0;
+                    for (let i = 0; i < N; i++) if (clay[i].radius > m) m = clay[i].radius;
+                    return m;
+                }());
+                paintSurfaceTexture(ctx, {
+                    x: SHAPE.centerX - maxR - 4,
+                    y: clay[N - 1].y - 4,
+                    w: (maxR + 4) * 2,
+                    h: SHAPE.baseY - clay[N - 1].y + 14
+                }, opts.surfaceTexturePackId);
+            }
 
-        /* Light catches — sheen + rim painted on TOP of the
-           surface texture so the 3D-lit feel survives even when
-           a pack skin is wrapped over the bare clay. Below the
-           paint canvas + stickers so the kid's decorations stay
-           crisp against the lit surface. */
-        if (typeof paintLightCatches === "function") {
-            paintLightCatches(ctx);
+            /* Light catches — sheen + rim painted on TOP of the
+               surface texture so the 3D-lit feel survives even
+               when a pack skin is wrapped over the bare clay.
+               Below the paint canvas + stickers so the kid's
+               decorations stay crisp against the lit surface. */
+            if (typeof paintLightCatches === "function") {
+                paintLightCatches(ctx);
+            }
         }
 
         /* Paint layer (decorate mode) — clipped to the pot silhouette
