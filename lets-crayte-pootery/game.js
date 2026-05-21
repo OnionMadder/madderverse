@@ -2398,15 +2398,21 @@
         /* On the shape screen the wheel is spinning, so the
            surface texture (the pack skin wrapping the cylinder)
            needs to scroll in sync to read as a rotating object.
-           Mirrors the wheel-phase trick paintClayTexture uses:
-           shift the pattern's internal transform by phase * a
-           fraction of the visible radius. Decorate + kiln hold
-           the wheel still so we reset to no transform there. */
+           Mirrors the wheel-phase trick paintClayTexture uses
+           but at LESS THAN HALF the scroll rate — busy patterns
+           like the SPACE nebula or CANDY swirl were dizzying at
+           the clay layer's 0.55 multiplier. 0.22 reads as a
+           gentle rotation that still sells the spin without
+           making anyone seasick. The clay layer underneath
+           keeps its 0.55 (the grain is subtle enough that the
+           higher rate doesn't compound visually). Decorate +
+           kiln reset the transform so wheel-stopped screens
+           stay still. */
         if (currentScreen === "shape" &&
                 typeof DOMMatrix === "function" &&
                 typeof pat.setTransform === "function") {
             const visibleRadius = bounds.w * 0.5 - 4;
-            const dx = SHAPE.wheelPhase * visibleRadius * 0.55;
+            const dx = SHAPE.wheelPhase * visibleRadius * 0.22;
             try { pat.setTransform(new DOMMatrix().translateSelf(dx, 0)); }
             catch (_) {}
         } else if (typeof pat.setTransform === "function") {
