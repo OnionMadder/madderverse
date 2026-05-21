@@ -435,39 +435,82 @@
         });
     }
 
+    /* Common public-pot fields shared by the recipe + baked tiers.
+       Excludes the image + the v1.1 recipe columns (those differ
+       per tier). */
+    function publicPotCommonBody(entry, author) {
+        const b = {
+            name:         entry.name || "UNNAMED POT",
+            author:       (author || "anonymous").slice(0, 40),
+            pack_id:      entry.packId     || null,
+            clay_type_id: entry.clayTypeId || null,
+            fired:        !!entry.fired,
+            overfired:    !!entry.overfired,
+            exploded:     !!entry.exploded,
+            clay:         entry.clay       || null,
+            /* Phase 1 chunk 1d: tag the pot with the signed-in
+               user's id if any. Anon submits leave this NULL. */
+            user_id:      currentUserId()
+        };
+        if (entry.remixedFrom) {
+            b.remixed_from        = entry.remixedFrom;
+            b.remixed_from_author = entry.remixedFromAuthor || "anonymous";
+        }
+        return b;
+    }
+
+    function rawPostPot(url, body) {
+        return fetch(url, {
+            method: "POST",
+            headers: supabaseHeaders({
+                "Content-Type": "application/json",
+                "Prefer":       "return=representation"
+            }),
+            body: JSON.stringify(body)
+        }).then(function (r) {
+            if (!r.ok) return null;
+            return r.json().then(function (rows) {
+                return Array.isArray(rows) && rows[0] ? rows[0] : null;
+            });
+        }).catch(function () { return null; });
+    }
+
     /* Submit one local pot to the public gallery. Returns the
        inserted row (with .id and .created_at) on success, null
-       on failure. */
+       on failure.
+
+       Two-tier "recipe first, bake on fallback" strategy:
+         TIER 1 stores the recipe — brush-only paint_data_url +
+           surface_texture_pack_id + stickers (jsonb) in their own
+           columns. Public pots then render through the SAME live
+           pipeline as local pots: texture lit correctly, stickers
+           spin in the detail view. Requires SUPABASE_POTS_V11.sql.
+         TIER 2 (columns missing → tier 1 returns null) bakes the
+           texture + stickers flat into paint_data_url and drops
+           the new columns, routing through submitWithRemixFallback
+           for remix-column compatibility too. Keeps sharing
+           working BEFORE the migration runs — it just renders
+           flat (the pre-v1.1 behavior). */
     function submitPublicPot(entry, author) {
         if (!supabaseEnabled()) return Promise.resolve(null);
         const url = SUPABASE_URL + "/rest/v1/public_pots";
-        return composePublicPaintDataUrl(entry).then(function (flatDataUrl) {
-            const body = {
-                name:           entry.name || "UNNAMED POT",
-                author:         (author || "anonymous").slice(0, 40),
-                pack_id:        entry.packId       || null,
-                clay_type_id:   entry.clayTypeId   || null,
-                fired:          !!entry.fired,
-                overfired:      !!entry.overfired,
-                exploded:       !!entry.exploded,
-                clay:           entry.clay         || null,
-                paint_data_url: flatDataUrl        || null,
-                /* Phase 1 chunk 1d: tag the pot with the signed-in
-                   user's id if any, so it shows up on their profile
-                   and they can rename/claim it later. Anon submits
-                   leave this NULL — same RLS behavior as before. */
-                user_id:        currentUserId()
-            };
-            /* Remix lineage -- only include the keys if the entry
-               actually carries them. PostgREST drops unknown columns
-               gracefully when the request body omits them, but
-               explicitly sending nulls when SUPABASE_REMIX.sql hasn't
-               run yet would 400. */
-            if (entry.remixedFrom) {
-                body.remixed_from        = entry.remixedFrom;
-                body.remixed_from_author = entry.remixedFromAuthor || "anonymous";
-            }
-            return submitWithRemixFallback(url, body);
+
+        const recipe = Object.assign(publicPotCommonBody(entry, author), {
+            paint_data_url:          entry.paintDataUrl || null,
+            surface_texture_pack_id: entry.surfaceTexturePackId || null,
+            stickers: (entry.stickers && entry.stickers.length)
+                ? entry.stickers : null
+        });
+
+        return rawPostPot(url, recipe).then(function (row) {
+            if (row) return row;
+            /* Tier 2 — bake + drop the v1.1 columns. */
+            return composePublicPaintDataUrl(entry).then(function (flat) {
+                const baked = Object.assign(publicPotCommonBody(entry, author), {
+                    paint_data_url: flat || null
+                });
+                return submitWithRemixFallback(url, baked);
+            });
         });
     }
 
@@ -1130,44 +1173,43 @@
 
     function submitBattleEntry(battleId, entry, author) {
         if (!supabaseEnabled()) return Promise.resolve(null);
-        /* Compose stickers into paint_data_url before upload so
-           battle viewers see the kid's full pot — without this
-           the EVERYONE-side battle card just shows the brush
-           layer (no stamps) because the v1.1 move-tool refactor
-           split stickers out into a vector array we don't have
-           a column for. */
-        return composePublicPaintDataUrl(entry).then(function (flatDataUrl) {
-            const body = {
-                battle_id:      battleId,
-                name:           entry.name || "UNNAMED",
-                author:         (author || "anonymous").slice(0, 40),
-                pack_id:        entry.packId       || null,
-                clay_type_id:   entry.clayTypeId   || null,
-                fired:          !!entry.fired,
-                overfired:      !!entry.overfired,
-                exploded:       !!entry.exploded,
-                clay:           entry.clay         || null,
-                paint_data_url: flatDataUrl        || null,
-                user_id:        currentUserId()
+        const url = SUPABASE_URL + "/rest/v1/battle_entries";
+
+        function commonBody() {
+            return {
+                battle_id:    battleId,
+                name:         entry.name || "UNNAMED",
+                author:       (author || "anonymous").slice(0, 40),
+                pack_id:      entry.packId     || null,
+                clay_type_id: entry.clayTypeId || null,
+                fired:        !!entry.fired,
+                overfired:    !!entry.overfired,
+                exploded:     !!entry.exploded,
+                clay:         entry.clay       || null,
+                user_id:      currentUserId()
             };
-            return fetch(SUPABASE_URL + "/rest/v1/battle_entries", {
-                method: "POST",
-                headers: supabaseHeaders({
-                    "Content-Type": "application/json",
-                    "Prefer":       "return=representation"
-                }),
-                body: JSON.stringify(body)
-            })
-                .then(function (r) {
-                    if (!r.ok) return null;
-                    return r.json().then(function (rows) {
-                        return Array.isArray(rows) && rows[0] ? rows[0] : null;
-                    });
-                })
-                .catch(function (e) {
-                    console.warn("[CRAYte] battle submit failed", e);
-                    return null;
+        }
+
+        /* Same recipe-first / bake-fallback strategy as
+           submitPublicPot — store the texture id + sticker
+           records in their own columns when SUPABASE_POTS_V11.sql
+           has run (so battle cards render lit + spinnable), else
+           bake everything flat into paint_data_url. */
+        const recipe = Object.assign(commonBody(), {
+            paint_data_url:          entry.paintDataUrl || null,
+            surface_texture_pack_id: entry.surfaceTexturePackId || null,
+            stickers: (entry.stickers && entry.stickers.length)
+                ? entry.stickers : null
+        });
+
+        return rawPostPot(url, recipe).then(function (row) {
+            if (row) return row;
+            return composePublicPaintDataUrl(entry).then(function (flat) {
+                const baked = Object.assign(commonBody(), {
+                    paint_data_url: flat || null
                 });
+                return rawPostPot(url, baked);
+            });
         });
     }
 
@@ -3699,6 +3741,16 @@
        Both clay-tinted via mat.highlight — porcelain stays
        cream, basalt stays warm grey, etc. Both clip to the
        pot path so neither bleeds past the silhouette.        */
+    /* GALLERY DISPLAY LIGHTING
+       renderSavedPot flips this on so gallery thumbnails + the
+       detail modal get a more dramatic "display case" light than
+       the calm working-screen light: a stronger side key plus a
+       bright rim tracing the silhouette + a soft fill rim on the
+       far edge. It makes a finished pot read as "lit on a shelf"
+       rather than "wet on the wheel". null = the normal mid-
+       distance studio light used on shape / decorate / kiln. */
+    let _galleryLighting = false;
+
     function paintLightCatches(ctx) {
         const mat = currentClay();
         const cx = SHAPE.centerX;
@@ -3708,33 +3760,71 @@
         let maxR = 0;
         for (let i = 0; i < N; i++) if (clay[i].radius > maxR) maxR = clay[i].radius;
 
+        const topY = clay[N - 1].y - 4;
+        const colH = SHAPE.baseY - clay[N - 1].y + 14;
+        const hlColor = mat.highlight;
+        const hlEdge  = hlColor.replace(/[\d.]+\)\s*$/, "0)");
+        const tint = function (a) {
+            return hlColor.replace(/[\d.]+\)\s*$/, a.toFixed(3) + ")");
+        };
+
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
-        const hlColor = mat.highlight;
-        const hlEdge  = hlColor.replace(/[\d.]+\)\s*$/, "0)");
 
-        /* Specular sheen */
-        const sheenX = cx - maxR * 0.20;
-        const sheenW = maxR * 0.55;
-        const sheen  = ctx.createLinearGradient(
-            sheenX - sheenW, 0, sheenX + sheenW, 0);
-        sheen.addColorStop(0.00, hlEdge);
-        sheen.addColorStop(0.50, hlColor.replace(/[\d.]+\)\s*$/, "0.18)"));
-        sheen.addColorStop(1.00, hlEdge);
-        ctx.fillStyle = sheen;
-        ctx.fillRect(sheenX - sheenW, clay[N - 1].y - 4,
-                     sheenW * 2, SHAPE.baseY - clay[N - 1].y + 14);
+        if (_galleryLighting) {
+            /* ---- DISPLAY-CASE light ---- */
+            /* Key sheen — pushed further left + a touch hotter so
+               the form reads sculpted from the side. */
+            const sheenX = cx - maxR * 0.34;
+            const sheenW = maxR * 0.52;
+            const sheen  = ctx.createLinearGradient(
+                sheenX - sheenW, 0, sheenX + sheenW, 0);
+            sheen.addColorStop(0.00, hlEdge);
+            sheen.addColorStop(0.50, tint(0.26));
+            sheen.addColorStop(1.00, hlEdge);
+            ctx.fillStyle = sheen;
+            ctx.fillRect(sheenX - sheenW, topY, sheenW * 2, colH);
 
-        /* Rim light */
-        const rimRight = cx + maxR * 0.95;
-        const rim      = ctx.createLinearGradient(
-            rimRight - 30, 0, rimRight + 4, 0);
-        rim.addColorStop(0.00, hlEdge);
-        rim.addColorStop(1.00, hlColor.replace(/[\d.]+\)\s*$/, "0.06)"));
-        ctx.fillStyle = rim;
-        ctx.fillRect(rimRight - 30, clay[N - 1].y - 4,
-                     34, SHAPE.baseY - clay[N - 1].y + 14);
+            /* Bright key-side rim — traces the LEFT silhouette
+               edge, the classic product-shot separator. */
+            const rimL = ctx.createLinearGradient(
+                cx - maxR - 4, 0, cx - maxR + 26, 0);
+            rimL.addColorStop(0.00, tint(0.30));
+            rimL.addColorStop(1.00, hlEdge);
+            ctx.fillStyle = rimL;
+            ctx.fillRect(cx - maxR - 4, topY, 30, colH);
+
+            /* Soft fill rim — far RIGHT edge, dimmer, so the
+               shadow side doesn't vanish into the backdrop. */
+            const rimR = ctx.createLinearGradient(
+                cx + maxR - 22, 0, cx + maxR + 4, 0);
+            rimR.addColorStop(0.00, hlEdge);
+            rimR.addColorStop(1.00, tint(0.14));
+            ctx.fillStyle = rimR;
+            ctx.fillRect(cx + maxR - 22, topY, 26, colH);
+        } else {
+            /* ---- Normal mid-distance studio light ---- */
+            /* Specular sheen */
+            const sheenX = cx - maxR * 0.20;
+            const sheenW = maxR * 0.55;
+            const sheen  = ctx.createLinearGradient(
+                sheenX - sheenW, 0, sheenX + sheenW, 0);
+            sheen.addColorStop(0.00, hlEdge);
+            sheen.addColorStop(0.50, tint(0.18));
+            sheen.addColorStop(1.00, hlEdge);
+            ctx.fillStyle = sheen;
+            ctx.fillRect(sheenX - sheenW, topY, sheenW * 2, colH);
+
+            /* Rim light */
+            const rimRight = cx + maxR * 0.95;
+            const rim = ctx.createLinearGradient(
+                rimRight - 30, 0, rimRight + 4, 0);
+            rim.addColorStop(0.00, hlEdge);
+            rim.addColorStop(1.00, tint(0.06));
+            ctx.fillStyle = rim;
+            ctx.fillRect(rimRight - 30, topY, 34, colH);
+        }
 
         ctx.restore();
     }
@@ -8192,6 +8282,13 @@
            value. */
         const savedSpinDx = _viewSpinDx;
         if (typeof opts.spinDx === "number") _viewSpinDx = opts.spinDx;
+        /* GALLERY LIGHTING: every saved-pot render (thumbnails +
+           detail modal + battle cards) gets the dramatic display-
+           case light unless the caller opts out (opts.galleryLight
+           === false). Restored in finally so the live working
+           screens keep their calm studio light. */
+        const savedGalleryLight = _galleryLighting;
+        _galleryLighting = (opts.galleryLight !== false);
         try {
             if (opts.background !== false) {
                 ctx.fillStyle = "#0c1f25";
@@ -8279,6 +8376,7 @@
             SHAPE.clay = savedClay;
             SHAPE.clayTypeId = savedClayTypeId;
             _viewSpinDx = savedSpinDx;
+            _galleryLighting = savedGalleryLight;
         }
     }
 
@@ -8484,7 +8582,16 @@
                columns + values. May be undefined on rows shared
                before SUPABASE_REMIX.sql ran. */
             remixedFrom:       row.remixed_from        || null,
-            remixedFromAuthor: row.remixed_from_author || null
+            remixedFromAuthor: row.remixed_from_author || null,
+            /* v1.1 "store the recipe" columns. Present once
+               SUPABASE_POTS_V11.sql has run + the pot was shared
+               after. surfaceTexturePackId drives the live texture
+               render; stickers is the vector array (jsonb) so
+               public pots spin + light identically to local ones.
+               Rows shared before the migration have these null and
+               fall back to whatever's baked in paint_data_url. */
+            surfaceTexturePackId: row.surface_texture_pack_id || null,
+            stickers:     Array.isArray(row.stickers) ? row.stickers : null
         };
     }
 
