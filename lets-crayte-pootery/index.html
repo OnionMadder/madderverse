@@ -50,7 +50,10 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
-    <link rel="stylesheet" href="style.css" />
+    <!-- ?v= cache-buster: bump this every release that ships a
+         style.css change so browsers don't hold the old file.
+         Keep in sync with sw.js CACHE_VERSION. -->
+    <link rel="stylesheet" href="style.css?v=7" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -1149,7 +1152,10 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="game.js"></script>
+<!-- ?v= cache-buster: bump every release alongside the stylesheet
+     so browsers grab the new game.js. Keep in sync with sw.js
+     CACHE_VERSION + the style.css ?v=. -->
+<script src="game.js?v=7"></script>
 
 </body>
 </html>
