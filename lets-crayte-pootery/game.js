@@ -3311,31 +3311,31 @@
         ctx.fill();
         ctx.restore();
 
-        /* Fill pot body — asymmetric gradient biased toward the
-           upper-left so the cylinder reads as 3D from the fill
-           alone. Previous version was symmetric (brightest at
-           x=0.50), which made the pot look flat-lit. New stops:
-             0.00 silhouette dark      (left silhouette edge)
-             0.12 ramping              (lit cylindrical curve)
-             0.32 BRIGHTEST            (light catch — matches
-                                        upper-left key light)
-             0.55 mid                  (rolling into shadow)
-             0.80 shadow mid           (shadow side of cylinder)
-             1.00 silhouette dark      (right silhouette edge)
-           The falloff is steeper on the LEFT (12% width from
-           dark to bright) than on the RIGHT (45% width from
-           bright back to dark), which is what a real cylinder
-           looks like lit from one side. */
+        /* Fill pot body — gently asymmetric gradient tuned for a
+           mid-distance studio feel (vs the previous close/macro
+           feel). Pull-back changes from v16:
+             - Bright peak moved 0.32 -> 0.40 (less extreme
+               off-center; still reads as upper-left lighting
+               but the dramatic "spotlight on a tiny object" is
+               gone)
+             - Silhouette edges lifted from stops[0] (darkest) to
+               stops[1] (mid-dark) so the pot edges don't go
+               pitch-black against the backdrop — far-away
+               cylinders never lose their edges to total black
+             - Shadow side stops[1] (was stops[1]) carried out to
+               1.00 — the cylinder's dark edge stays in the same
+               value family as the shadow mid instead of dropping
+               into pure dark like a close-range falloff would */
         const mat = currentClay();
         buildPotPath(ctx);
         const grad = ctx.createLinearGradient(cx - maxR, 0, cx + maxR, 0);
         const stops = mat.unfired;
-        grad.addColorStop(0.00, stops[0]);
-        grad.addColorStop(0.12, stops[2]);
-        grad.addColorStop(0.32, stops[3]);
-        grad.addColorStop(0.55, stops[2]);
-        grad.addColorStop(0.80, stops[1]);
-        grad.addColorStop(1.00, stops[0]);
+        grad.addColorStop(0.00, stops[1]);
+        grad.addColorStop(0.18, stops[2]);
+        grad.addColorStop(0.40, stops[3]);
+        grad.addColorStop(0.62, stops[2]);
+        grad.addColorStop(0.85, stops[1]);
+        grad.addColorStop(1.00, stops[1]);
         ctx.fillStyle = grad;
         ctx.fill();
 
@@ -3375,28 +3375,38 @@
         const hlColor = mat.highlight;
         const hlEdge  = hlColor.replace(/[\d.]+\)\s*$/, "0)");
 
-        /* Specular sheen — wider + softer than the old strip. */
-        const sheenX = cx - maxR * 0.36;
-        const sheenW = maxR * 0.50;
+        /* Specular sheen — soft + wide, peak matches the body
+           gradient's new bright spot (0.40). Alpha pulled from
+           0.32 to 0.18 — close-range macro lighting has hot
+           specular, mid-distance studio lighting has gentle
+           wash. Also removed the alpha plateau in the middle so
+           the peak is a single point with smooth bell-curve
+           falloff (no flat top — that read as a painted band). */
+        const sheenX = cx - maxR * 0.20;   /* matches gradient peak at ~0.40 */
+        const sheenW = maxR * 0.55;
         const sheen  = ctx.createLinearGradient(
             sheenX - sheenW, 0, sheenX + sheenW, 0);
         sheen.addColorStop(0.00, hlEdge);
-        sheen.addColorStop(0.45, hlColor.replace(/[\d.]+\)\s*$/, "0.32)"));
-        sheen.addColorStop(0.55, hlColor.replace(/[\d.]+\)\s*$/, "0.32)"));
+        sheen.addColorStop(0.50, hlColor.replace(/[\d.]+\)\s*$/, "0.18)"));
         sheen.addColorStop(1.00, hlEdge);
         ctx.fillStyle = sheen;
         ctx.fillRect(sheenX - sheenW, clay[N - 1].y - 4,
                      sheenW * 2, SHAPE.baseY - clay[N - 1].y + 14);
 
-        /* Rim light — narrow band on the right cylindrical edge. */
+        /* Rim light — kept but pulled WAY back. A distant
+           cylinder's rim catch is barely visible; what was 0.16
+           alpha read as "the light is wrapping around the object
+           inches from my face". 0.06 is just enough to define
+           the silhouette against the dark teal backdrop without
+           announcing itself. */
         const rimRight = cx + maxR * 0.95;
         const rim      = ctx.createLinearGradient(
-            rimRight - 34, 0, rimRight + 4, 0);
+            rimRight - 30, 0, rimRight + 4, 0);
         rim.addColorStop(0.00, hlEdge);
-        rim.addColorStop(1.00, hlColor.replace(/[\d.]+\)\s*$/, "0.16)"));
+        rim.addColorStop(1.00, hlColor.replace(/[\d.]+\)\s*$/, "0.06)"));
         ctx.fillStyle = rim;
-        ctx.fillRect(rimRight - 34, clay[N - 1].y - 4,
-                     38, SHAPE.baseY - clay[N - 1].y + 14);
+        ctx.fillRect(rimRight - 30, clay[N - 1].y - 4,
+                     34, SHAPE.baseY - clay[N - 1].y + 14);
 
         ctx.restore();
 
