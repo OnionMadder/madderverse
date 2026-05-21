@@ -908,7 +908,7 @@ a:focus-visible {
     background: #0c1f25;
     border-radius: var(--radius-md);
     touch-action: none;       /* prevent page scroll while shaping */
-    cursor: crosshair;
+    cursor: grab;             /* hand reads as "this surface is grabbable / shapeable" */
     user-select: none;
     -webkit-user-select: none;
 }
@@ -5123,6 +5123,25 @@ a:focus-visible {
     .shape-side-rail .shape-hint {
         text-align: left;
     }
+
+    /* Kiln-specific override: center the kiln canvas on screen
+       even though the side rail occupies space on the right.
+       Without this, justify-content:center on the canvas+rail
+       pair pushes the canvas ~190px LEFT of the true viewport
+       center (the rail's 360px+gap pulls the pair left). Switch
+       kiln-stack to a 3-column grid where the canvas takes the
+       center column and the side-rail sits in the right; the
+       phantom left column balances the layout so the canvas
+       lands on the screen's centerline regardless of whether
+       the rail's controls are visible (firing vs reveal). */
+    .kiln-stack {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: flex-start;
+        gap: 28px;
+    }
+    .kiln-stack > .canvas-wrap   { grid-column: 2; justify-self: center; }
+    .kiln-stack > .kiln-side-rail { grid-column: 3; justify-self: start; }
 }
 
 /* ----- 15. Responsive nudges ----- */

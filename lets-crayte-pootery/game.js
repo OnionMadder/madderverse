@@ -6052,7 +6052,11 @@
             b.classList.toggle("active", b.dataset.tool === tool);
         });
         if (D.canvas) {
-            D.canvas.style.cursor = (tool === "eraser") ? "cell" : "crosshair";
+            /* Cursor mapping — pointer (hand) reads as "interactive
+               surface" for the painting tools; eraser keeps its
+               crosshair-ish "cell" cursor so the kid can see what
+               they're removing precisely. */
+            D.canvas.style.cursor = (tool === "eraser") ? "cell" : "pointer";
         }
     }
 
@@ -6247,16 +6251,35 @@
     const KILN_DUR = {
         intro:    500,
         closing:  700,
-        /* Firing extended from 3500ms -> 5000ms. The longer window
-           gives the kid more time to click during firing, which
-           feeds the overheat / burnt-pot mechanic. Recorded
-           kiln-fire.mp3 is sized to this 5s window. */
+        /* The firing window now matches the kiln-sequence.mp3's
+           actual length (probed below when the metadata loads).
+           The 5000ms default is a fallback in case the metadata
+           probe hasn't completed by the first fire (rare — the
+           audio element starts loading on module eval). Capped
+           at 9000ms so an unexpectedly long audio file can't
+           make a kid sit through a 30-second firing. */
         firing:   5000,
         opening:  700,
         reveal:   1500,
         exploded: 2500,   /* shards-fly window after a kaboom */
         done:     Infinity
     };
+
+    /* Probe the kiln-sequence audio's actual duration and clamp
+       KILN_DUR.firing to it the moment metadata is available. A
+       separate Audio() is used (not the playback pool) so we
+       don't disturb the pool's pre-warmed instances. */
+    (function syncFiringWindowToAudio() {
+        try {
+            const probe = new Audio();
+            probe.preload = "metadata";
+            probe.addEventListener("loadedmetadata", function () {
+                const ms = Math.floor((probe.duration || 0) * 1000);
+                if (ms > 500 && ms < 9000) KILN_DUR.firing = ms;
+            }, { once: true });
+            probe.src = "assets/audio/kiln-sequence.mp3";
+        } catch (_) { /* fall back to the 5000ms default */ }
+    }());
 
     /* ~3% chance any given firing ends in tears. The reward
        loop is that exploded pots still save to the gallery as
@@ -6293,6 +6316,18 @@
         KILN.ctx = c.getContext("2d");
         sizeKilnCanvas();
         wireKilnButtons();
+
+        /* Tap-to-explode: the only way a pot blows up now is if
+           the user pokes the kiln during firing. Arms willExplode
+           + jumps state straight to "exploded" so the kaboom is
+           immediate rather than waiting for the 60% mark (which
+           was an artifact of the old random-roll model). Outside
+           the firing state, taps are ignored. */
+        c.addEventListener("pointerdown", function () {
+            if (KILN.state !== "firing") return;
+            KILN.willExplode = true;
+            kilnEnter("exploded");
+        });
 
         if (typeof ResizeObserver === "function") {
             const ro = new ResizeObserver(function () { sizeKilnCanvas(); });
@@ -7013,12 +7048,16 @@
             KILN.fired = false;
             KILN.exploded = false;
             KILN.shards.length = 0;
-            /* Roll the 3% kaboom now so the kiln knows whether
-               it's heading for FIRED or EXPLODED before doors
-               close. EGG.oneFrameFire skips the roll (devs want
-               predictable behavior). */
-            KILN.willExplode = !EGG.oneFrameFire &&
-                               Math.random() < EXPLODE_CHANCE;
+            /* Explosions are now USER-TRIGGERED ONLY — tap the
+               kiln during firing and the pot blows up. The old
+               3% random roll was frustrating for kids who spent
+               20 minutes decorating only to lose the pot to a
+               coin flip. willExplode starts false; the tap
+               handler in kilnPointerDown flips it true and jumps
+               state to "exploded" mid-firing. (EGG.oneFrameFire
+               keeps its dev-shortcut path below; it still skips
+               the firing animation entirely.) */
+            KILN.willExplode = false;
             clearOverheat();
             hideCelebrate();
             /* 1-FRAME EXPLOSION ON FIRE (dev egg) — skip every
@@ -9596,29 +9635,43 @@
             if (lbl) lbl.textContent = "STOPPING...";
         }
 
-        deletePublicPot(entry.publicId).then(function (success) {
-            if (btn) btn.disabled = false;
-            const lbl = btn && btn.querySelector(".btn-label");
+        /* Clear LOCAL state first so the UI reflects the unshare
+           immediately + the user can re-share fresh if the server
+           call fails. Without this, a failed DELETE used to leave
+           the button stuck on "TRY AGAIN" indefinitely with no
+           clear path forward. The public copy is best-effort
+           cleaned server-side after. */
+        const publicIdSnapshot = entry.publicId;
+        entry.publicId = null;
+        const arr = loadGalleryEntries();
+        for (let i = 0; i < arr.length; i++) {
+            if (arr[i].id === entry.id) {
+                delete arr[i].publicId;
+                break;
+            }
+        }
+        saveGalleryEntries(arr);
+        GALLERY.publicCache = null;
+        refreshDetailSubmitButton();
+        refreshDetailCopyLink();
+        refreshDetailUnshareButton();
+        if (currentScreen === "gallery" && GALLERY.tab === "mine") {
+            refreshGalleryGrid();
+        }
+
+        /* Fire-and-forget server delete. If it fails (network
+           hiccup, auth expiry, RLS edge case), the user's local
+           view is already in the right state and they can
+           re-share later if needed. */
+        deletePublicPot(publicIdSnapshot).then(function (success) {
+            if (btn) {
+                btn.disabled = false;
+                const lbl = btn.querySelector(".btn-label");
+                if (lbl) lbl.textContent = "STOP SHARING";
+            }
             if (!success) {
-                if (lbl) lbl.textContent = "TRY AGAIN";
-                return;
-            }
-            if (lbl) lbl.textContent = "STOP SHARING";
-            entry.publicId = null;
-            const arr = loadGalleryEntries();
-            for (let i = 0; i < arr.length; i++) {
-                if (arr[i].id === entry.id) {
-                    delete arr[i].publicId;
-                    break;
-                }
-            }
-            saveGalleryEntries(arr);
-            GALLERY.publicCache = null;
-            refreshDetailSubmitButton();
-            refreshDetailCopyLink();
-            refreshDetailUnshareButton();
-            if (currentScreen === "gallery" && GALLERY.tab === "mine") {
-                refreshGalleryGrid();
+                console.warn("[CRAYte] unshare server delete failed for " +
+                             publicIdSnapshot + " — local state is clean.");
             }
         });
     }

@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=14" />
+    <link rel="stylesheet" href="style.css?v=15" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -354,12 +354,15 @@
 
     </div>
 
-    <!-- FINISH FORM lives outside the drawer as a floating button
-         so it's reachable while the kid is shaping with the tray
-         collapsed. Hidden when the drawer is open (.is-open) so
-         it doesn't compete visually with the in-drawer tools. -->
+    <!-- "DECORATE IT" — moves the user out of the shape phase into
+         decorate. Lives outside the drawer as a floating button
+         so it's reachable while shaping with the tray collapsed.
+         Hidden when the drawer is open (.is-open) so it doesn't
+         compete visually with the in-drawer tools. Originally
+         labeled "FINISH FORM" but "DECORATE IT" reads as a
+         clearer next-step verb. -->
     <button class="float-action shape-float-finish" id="shapeFinish" type="button">
-        <span class="btn-label">FINISH FORM</span>
+        <span class="btn-label">DECORATE IT</span>
         <span class="btn-glyph" aria-hidden="true">&#9656;</span>
     </button>
 
@@ -1175,7 +1178,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=14"></script>
+<script src="game.js?v=15"></script>
 
 </body>
 </html>
