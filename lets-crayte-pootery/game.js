@@ -2444,6 +2444,54 @@
         ctx.restore();
     }
 
+    /* ============================================================
+       PACK BACKGROUNDS — per-pack SVG scene wash
+       ============================================================
+       Optional per-pack vibe-setter that paints inside the pot-box
+       behind the wheel + pot. Lightweight SVGs at
+       assets/backgrounds/<n>.svg (filename comes from each
+       pack's optional `backgroundSvg` field).
+
+       Same lazy-image pattern as the wheel.png + clay/surface
+       texture loaders: an Image is constructed once on demand,
+       cached, drawn when complete. Packs without a background
+       file skip silently — no warning, no fallback art needed.
+       Painted at low alpha (0.32) so it acts as a soft accent
+       rather than a competing layer; only shows on shape +
+       decorate where the pack identity is the user's focus.
+       ============================================================ */
+    const PACK_BACKGROUNDS = Object.create(null);          /* file -> Image */
+
+    function getPackBackgroundImg(file) {
+        if (!file) return null;
+        let img = PACK_BACKGROUNDS[file];
+        if (img) return img;
+        img = new Image();
+        img._loaded = false;
+        img._failed = false;
+        img.addEventListener("load",  function () { img._loaded = true; });
+        img.addEventListener("error", function () { img._failed = true; });
+        img.src = "assets/backgrounds/" + file + ".svg";
+        PACK_BACKGROUNDS[file] = img;
+        return img;
+    }
+
+    function paintPackBackground(ctx) {
+        /* Only paint on screens that "belong to" the active pack
+           — shape (you picked this pack to shape with) + decorate
+           (you're painting in this pack's style). Kiln has its
+           own dramatic chrome that would fight the wash. */
+        if (currentScreen !== "shape" && currentScreen !== "decorate") return;
+        const pack = (typeof activePack === "function") ? activePack() : null;
+        if (!pack || !pack.backgroundSvg) return;
+        const img = getPackBackgroundImg(pack.backgroundSvg);
+        if (!img || !img._loaded || img._failed) return;
+        ctx.save();
+        ctx.globalAlpha = 0.32;
+        ctx.drawImage(img, 0, 0, SHAPE.W, SHAPE.H);
+        ctx.restore();
+    }
+
     const SHAPE = {
         /* Logical canvas size. Display scales via CSS aspect-ratio;
            backing store is W*dpr × H*dpr. */
@@ -3074,6 +3122,13 @@
             ctx.fillStyle = "#0c1f25";
             ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
             drawShapeBackdrop(ctx);
+            /* Pack vibe wash — paints between the backdrop and the
+               wheel so the SVG sits in the deep background, not
+               competing with the foreground composition. No-op
+               unless the active pack has a backgroundSvg file. */
+            if (typeof paintPackBackground === "function") {
+                paintPackBackground(ctx);
+            }
         }
 
         /* Wheel platform — drawn first so the pot covers the front
@@ -4669,6 +4724,7 @@
            ============================================================ */
         {
             id: "core",  label: "BASIC",
+            backgroundSvg: "core",    /* assets/backgrounds/core.svg (optional) */
             description: "The starter set. Earth, sage, sky, and ink.",
             coverEmoji: "\u{1FAB4}",   /* potted plant */
             glazes: [
@@ -4690,6 +4746,7 @@
             id: "candy", label: "CANDY",
             sheet: "candy",
             surfaceTexture: "candy",   /* assets/textures/candy.png */
+            backgroundSvg: "candy",    /* assets/backgrounds/candy.svg (optional) */
             description: "Cherry red, blue raspberry, root beer brown.",
             coverEmoji: "\u{1F36C}",   /* candy */
             glazes: [
@@ -4714,6 +4771,7 @@
             id: "plushie", label: "PLUSH",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
             surfaceTexture: "plush",   /* assets/textures/plush.png */
+            backgroundSvg: "plush",    /* assets/backgrounds/plush.svg (optional) */
             description: "Teddy brown, pastel pink, soft plush palette.",
             coverEmoji: "\u{1F9F8}",   /* teddy bear */
             glazes: [
@@ -4736,6 +4794,7 @@
             id: "modded", label: "MODDED",
             sheet: "modded",
             surfaceTexture: "modded",   /* assets/textures/modded.png */
+            backgroundSvg: "modded",   /* assets/backgrounds/modded.svg (optional) */
             description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
             coverEmoji: "\u{1F5A5}",   /* desktop computer */
             glazes: [
@@ -4759,6 +4818,7 @@
             id: "gamer", label: "GAMER",
             sheet: "gamer",
             surfaceTexture: "gamer",   /* assets/textures/gamer.png */
+            backgroundSvg: "gamer",    /* assets/backgrounds/gamer.svg (optional) */
             description: "CRT green, scanline gray, PRESS START.",
             coverEmoji: "\u{1F3AE}",   /* video game */
             glazes: [
@@ -4782,6 +4842,7 @@
             id: "space", label: "SPACE",
             sheet: "space",
             surfaceTexture: "space",   /* assets/textures/space.png */
+            backgroundSvg: "space",    /* assets/backgrounds/space.svg (optional) */
             description: "Cosmic void, nebula violet, supernova white.",
             coverEmoji: "\u{1F680}",   /* rocket */
             glazes: [
@@ -4816,6 +4877,7 @@
         {
             id: "dinosaur", label: "DINOSAUR",
             sheet: "dinosaur",
+            backgroundSvg: "dinosaur", /* assets/backgrounds/dinosaur.svg (optional) */
             description: "Fossil bone, amber, jurassic jungle greens, T-rex red.",
             coverEmoji: "\u{1F996}",   /* T-Rex */
             priceCents: 99,
@@ -4840,6 +4902,7 @@
         {
             id: "breakfast", label: "BREAKFAST",
             sheet: "breakfast",
+            backgroundSvg: "breakfast",/* assets/backgrounds/breakfast.svg (optional) */
             description: "Maple syrup, golden butter, berry jam, espresso.",
             coverEmoji: "\u{1F95E}",   /* pancakes */
             priceCents: 99,
@@ -4863,6 +4926,7 @@
         {
             id: "music", label: "MUSIC",
             sheet: "music",
+            backgroundSvg: "music",    /* assets/backgrounds/music.svg (optional) */
             description: "Vinyl black, brass, neon stage lights.",
             coverEmoji: "\u{1F3B5}",   /* musical note */
             priceCents: 99,
@@ -4886,6 +4950,7 @@
         {
             id: "mega", label: "MEGA",
             sheet: "mega",
+            backgroundSvg: "mega",     /* assets/backgrounds/mega.svg (optional) */
             description: "Double-size pack: 14 metallics + electrics + RGB, 10 custom stamps.",
             coverEmoji: "\u{1F31F}",   /* glowing star */
             priceCents: 199,
