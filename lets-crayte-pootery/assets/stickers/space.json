@@ -1,0 +1,135 @@
+{
+  "frames": {
+    "galaxy": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 506,
+        "h": 379
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 506,
+        "h": 379
+      },
+      "sourceSize": {
+        "w": 506,
+        "h": 379
+      }
+    },
+    "star": {
+      "frame": {
+        "x": 510,
+        "y": 2,
+        "w": 329,
+        "h": 329
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 329,
+        "h": 329
+      },
+      "sourceSize": {
+        "w": 329,
+        "h": 329
+      }
+    },
+    "meteor": {
+      "frame": {
+        "x": 841,
+        "y": 2,
+        "w": 393,
+        "h": 393
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 393,
+        "h": 393
+      },
+      "sourceSize": {
+        "w": 393,
+        "h": 393
+      }
+    },
+    "comet": {
+      "frame": {
+        "x": 1236,
+        "y": 2,
+        "w": 456,
+        "h": 456
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 456,
+        "h": 456
+      },
+      "sourceSize": {
+        "w": 456,
+        "h": 456
+      }
+    },
+    "moon": {
+      "frame": {
+        "x": 1694,
+        "y": 2,
+        "w": 300,
+        "h": 300
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 300,
+        "h": 300
+      },
+      "sourceSize": {
+        "w": 300,
+        "h": 300
+      }
+    },
+    "space": {
+      "frame": {
+        "x": 1996,
+        "y": 2,
+        "w": 318,
+        "h": 318
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 318,
+        "h": 318
+      },
+      "sourceSize": {
+        "w": 318,
+        "h": 318
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 2316,
+      "h": 460
+    },
+    "scale": "1"
+  }
+}

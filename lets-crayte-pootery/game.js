@@ -4067,10 +4067,118 @@
                         but isn't purchasable yet. omit = available now.
          coverEmoji -- single emoji used as shop-card cover until
                        real art lands. */
+    /* ============================================================
+       STICKER SHEETS — sprite-sheet stamps + shop-card icons
+       ============================================================
+       Each themed pack has a single PNG + JSON in assets/stickers/:
+         <sheetName>.png  — the sprite sheet (TexturePacker layout)
+         <sheetName>.json — frame coords keyed by frame name
+       The frame named after the sheet's theme is the SHOP CARD
+       ICON; every other frame in the sheet is a BANK STAMP. The
+       loader registers a PATTERN_DRAWERS entry per non-icon frame
+       under a namespaced id "<sheet>/<frameId>" so two sheets can
+       both have a frame called "heart" or "star" without
+       colliding. GLAZE_PACKS.patterns arrays reference those
+       namespaced ids. BASIC has no sheet — its stamps stay
+       procedural (geometric outlines).
+       ============================================================ */
+
+    const STICKER_SHEETS = Object.create(null); /* sheetName -> {img, frames, iconFrame} */
+
+    function makeSheetDrawer(rec, frameId) {
+        return function (ctx, x, y, r, _color) {
+            if (!rec || !rec.img || !rec.frames) return;
+            if (!rec.img.complete || rec.img.naturalWidth === 0) return;
+            const fr = rec.frames[frameId];
+            if (!fr || !fr.frame) return;
+            const sx = fr.frame.x, sy = fr.frame.y;
+            const sw = fr.frame.w, sh = fr.frame.h;
+            /* Fit into a 2r x 2r box, preserve sprite aspect. */
+            const max = r * 2;
+            const aspect = sw / sh;
+            let dw = max, dh = max;
+            if (aspect > 1) dh = max / aspect;
+            else if (aspect < 1) dw = max * aspect;
+            ctx.drawImage(rec.img, sx, sy, sw, sh,
+                          x - dw / 2, y - dh / 2, dw, dh);
+        };
+    }
+
+    function loadStickerSheets() {
+        const sheets = [
+            "candy", "plush", "modded", "gamer", "space",
+            "breakfast", "music", "dinosaur", "mega"
+        ];
+        sheets.forEach(function (name) {
+            const img = new Image();
+            img.src = "assets/stickers/" + name + ".png";
+            const rec = { img: img, frames: null, iconFrame: name };
+            STICKER_SHEETS[name] = rec;
+            fetch("assets/stickers/" + name + ".json")
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (manifest) {
+                    if (!manifest || !manifest.frames) return;
+                    rec.frames = manifest.frames;
+                    Object.keys(manifest.frames).forEach(function (frameId) {
+                        if (frameId === name) return;   /* icon, not a bank stamp */
+                        PATTERN_DRAWERS[name + "/" + frameId] = makeSheetDrawer(rec, frameId);
+                    });
+                    if (currentScreen === "decorate" &&
+                        typeof buildToolUI === "function") {
+                        buildToolUI();
+                    }
+                    if (currentScreen === "shop" &&
+                        typeof refreshShopScreen === "function") {
+                        refreshShopScreen();
+                    }
+                })
+                .catch(function (e) {
+                    console.warn("[CRAYte] sticker manifest failed: " + name, e);
+                });
+        });
+    }
+
+    /* Paint the icon frame from a sheet onto a small canvas and
+       drop it into a shop-card cover element. Called from
+       buildShopCard; no-op if the pack has no sheet (BASIC) OR
+       the sheet hasn't loaded yet (the emoji fallback stays
+       visible until the upgrade happens). */
+    function applyPackIconToCover(coverEl, pack) {
+        if (!coverEl || !pack || !pack.sheet) return;
+        const rec = STICKER_SHEETS[pack.sheet];
+        if (!rec) return;
+        function paint() {
+            if (!rec.img.complete || !rec.frames) return false;
+            const fr = rec.frames[rec.iconFrame];
+            if (!fr || !fr.frame) return false;
+            const SIZE = 56;   /* matches .shop-cover (48px on phones, both fit) */
+            const c = document.createElement("canvas");
+            c.width = SIZE; c.height = SIZE;
+            const ctx = c.getContext("2d");
+            const sw = fr.frame.w, sh = fr.frame.h;
+            const aspect = sw / sh;
+            let dw = SIZE, dh = SIZE;
+            if (aspect > 1) dh = SIZE / aspect;
+            else if (aspect < 1) dw = SIZE * aspect;
+            ctx.drawImage(rec.img, fr.frame.x, fr.frame.y, sw, sh,
+                          (SIZE - dw) / 2, (SIZE - dh) / 2, dw, dh);
+            c.style.width = "100%";
+            c.style.height = "100%";
+            c.style.objectFit = "contain";
+            coverEl.textContent = "";
+            coverEl.appendChild(c);
+            return true;
+        }
+        if (!paint()) {
+            rec.img.addEventListener("load", paint, { once: true });
+        }
+    }
+
+    loadStickerSheets();
+
     const GLAZE_PACKS = [
         /* ============================================================
            6 FREE PACKS — 7 glazes + 5 stamps each.
-           User finalizes stamps as custom PNGs pre-release.
            ============================================================ */
         {
             id: "core",  label: "BASIC",
@@ -4089,6 +4197,7 @@
         },
         {
             id: "candy", label: "CANDY",
+            sheet: "candy",
             description: "Cherry red, blue raspberry, root beer brown.",
             coverEmoji: "\u{1F36C}",   /* candy */
             glazes: [
@@ -4100,10 +4209,13 @@
                 "#ff7a00",   /* orange creamsicle */
                 "#9534d8"    /* grape soda */
             ],
-            patterns: ["lollipop", "candy-cane", "gumballs", "drip", "dot"]
+            patterns: ["candy/jawbreaker", "candy/hardcandy",
+                       "candy/licorice", "candy/gummybear",
+                       "candy/jellybean"]
         },
         {
             id: "plushie", label: "PLUSH",
+            sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
             description: "Teddy brown, pastel pink, soft plush palette.",
             coverEmoji: "\u{1F9F8}",   /* teddy bear */
             glazes: [
@@ -4115,10 +4227,12 @@
                 "#ffd5b8",   /* peach */
                 "#c8efd1"    /* mint */
             ],
-            patterns: ["teddy", "paw", "button", "plush-grain", "heart"]
+            patterns: ["plush/heart", "plush/kidney", "plush/button",
+                       "plush/patch", "plush/ear"]
         },
         {
             id: "modded", label: "MODDED",
+            sheet: "modded",
             description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
             coverEmoji: "\u{1F5A5}",   /* desktop computer */
             glazes: [
@@ -4130,10 +4244,12 @@
                 "#c8c8c8",      /* brushed aluminum */
                 "#b347ff"       /* cyber violet */
             ],
-            patterns: ["circuit", "fan-hex", "rgb-strip", "power", "reset"]
+            patterns: ["modded/robotic", "modded/disc", "modded/icon",
+                       "modded/reader", "modded/laptop"]
         },
         {
             id: "gamer", label: "GAMER",
+            sheet: "gamer",
             description: "CRT green, scanline gray, PRESS START.",
             coverEmoji: "\u{1F3AE}",   /* video game */
             glazes: [
@@ -4145,11 +4261,12 @@
                 "#6b1da6",   /* pixel purple */
                 "#6e3713"    /* atari brown */
             ],
-            patterns: ["pixel-heart", "controller", "game-over",
-                       "pixel-skull", "press-start"]
+            patterns: ["gamer/click", "gamer/glove", "gamer/dpad",
+                       "gamer/heart", "gamer/star"]
         },
         {
             id: "space", label: "SPACE",
+            sheet: "space",
             description: "Cosmic void, nebula violet, supernova white.",
             coverEmoji: "\u{1F680}",   /* rocket */
             glazes: [
@@ -4161,7 +4278,8 @@
                 "#ffd700",   /* quasar gold */
                 "#00d4ff"    /* comet cyan */
             ],
-            patterns: ["star", "ring", "triangle", "dot", "chevron"]
+            patterns: ["space/galaxy", "space/star", "space/meteor",
+                       "space/comet", "space/moon"]
         },
 
         /* ============================================================
@@ -4171,14 +4289,13 @@
            10 stamps). releaseDate omitted = available now (no
            "DROPS <date>" gate on the shop card).
 
-           Stamp lists are placeholder ids (core-set stamp ids) until
-           user authors the bespoke PNGs for each pack. MEGA's stamps
-           are loaded dynamically from MEGA_STAMP_FILES below — its
-           patterns array starts empty and gets populated as PNGs
-           land.
+           Stamp ids reference frames in assets/stickers/<sheet>.json
+           via the namespaced "<sheet>/<frame>" form. Sheets are
+           loaded by loadStickerSheets() above.
            ============================================================ */
         {
             id: "dinosaur", label: "DINOSAUR",
+            sheet: "dinosaur",
             description: "Fossil bone, amber, jurassic jungle greens, T-rex red.",
             coverEmoji: "\u{1F996}",   /* T-Rex */
             priceCents: 99,
@@ -4191,42 +4308,50 @@
                 "#2c1810",   /* swamp shadow */
                 "#c84a3a"    /* t-rex red */
             ],
-            patterns: ["triangle", "star", "x", "dot", "ring"]
+            patterns: ["dinosaur/paws", "dinosaur/scales",
+                       "dinosaur/teeth", "dinosaur/nostrils",
+                       "dinosaur/eyes"]
         },
         {
-            id: "unicorn", label: "UNICORN",
-            description: "Cotton-candy pastels, holo sparkle, magic gold.",
-            coverEmoji: "\u{1F984}",   /* unicorn */
+            id: "breakfast", label: "BREAKFAST",
+            sheet: "breakfast",
+            description: "Maple syrup, golden butter, berry jam, espresso.",
+            coverEmoji: "\u{1F95E}",   /* pancakes */
             priceCents: 99,
             glazes: [
-                "#ffc8e0",   /* cotton pink */
-                "#c8aedb",   /* lilac */
-                "#b8d8ed",   /* sky */
+                "#7a3a18",   /* maple syrup */
+                "#e4b13e",   /* golden butter */
+                "#c84a3a",   /* berry jam */
+                "#3a1e10",   /* espresso */
                 "#fff4e0",   /* cream */
-                "#ff8cd0",   /* hot pink */
-                "#cce8c8",   /* mint */
-                "#ffd700"    /* magic gold */
+                "#cdb98a",   /* oat */
+                "#a07050"    /* toast */
             ],
-            patterns: ["heart", "star", "triangle", "dot", "ring"]
+            patterns: ["breakfast/bigbowl", "breakfast/waffles",
+                       "breakfast/pancakes", "breakfast/frenchtoast",
+                       "breakfast/fruitbowl"]
         },
         {
-            id: "onioncore", label: "ONIONCORE",
-            description: "Pootery's own palette. Hot pink + teal, dark teal frame.",
-            coverEmoji: "\u{1F9C5}",   /* onion */
+            id: "music", label: "MUSIC",
+            sheet: "music",
+            description: "Vinyl black, brass, neon stage lights.",
+            coverEmoji: "\u{1F3B5}",   /* musical note */
             priceCents: 99,
             glazes: [
-                "#00ffcc",   /* teal */
-                "#ff2e88",   /* hot pink */
-                "#ff5cab",   /* pink bright */
-                "#143842",   /* frame teal */
-                "#b81866",   /* deep pink */
-                "#06141a",   /* near black */
-                "#eaf6f4"    /* chalk white */
+                "#0a0a0a",   /* vinyl black */
+                "#b87333",   /* brass */
+                "#ff2a8a",   /* stage pink */
+                "#2b6fff",   /* spotlight blue */
+                "#33ff66",   /* neon green */
+                "#ffea00",   /* amp yellow */
+                "#c0c0c0"    /* mic chrome */
             ],
-            patterns: ["dot", "ring", "x", "chevron", "heart"]
+            patterns: ["music/blue", "music/orange", "music/red",
+                       "music/pink", "music/green"]
         },
         {
             id: "mega", label: "MEGA",
+            sheet: "mega",
             description: "Double-size pack: 14 metallics + electrics + RGB, 10 custom stamps.",
             coverEmoji: "\u{1F31F}",   /* glowing star */
             priceCents: 199,
@@ -4246,9 +4371,10 @@
                 "#ffa6c9",      /* cotton */
                 "#c8e2a8"       /* soft sage */
             ],
-            /* Empty — populated by loadMegaStamps() from
-               MEGA_STAMP_FILES below. Target: 10 stamps. */
-            patterns: []
+            patterns: ["mega/icecream", "mega/penguins", "mega/dolphin",
+                       "mega/candy", "mega/gumballs", "mega/candydog",
+                       "mega/husky", "mega/bigdog", "mega/cat",
+                       "mega/toucan"]
         }
     ];
 
@@ -4404,113 +4530,12 @@
         return GLAZE_PACKS[0];
     }
 
-    /* ============================================================
-       MEGA PACK custom stamps — Day 5 chunk D
-       ============================================================
-       MEGA is now defined as a paid pack in GLAZE_PACKS above; this
-       block just populates its patterns[] array dynamically from
-       PNGs committed to assets/patterns/. To add a stamp:
-         1. Drop a PNG (transparent bg recommended) into
-            lets-crayte-pootery/assets/patterns/
-         2. Add an entry to MEGA_STAMP_FILES below with a unique id
-            (becomes the pattern id) + the filename
-         3. Commit + push — next page load shows it in the MEGA tab.
-       Target: 10 stamps for the launch MEGA pack.
-       ============================================================ */
-
-    /* Locate the MEGA pack inside GLAZE_PACKS so loadMegaStamps
-       can push pattern ids into its patterns array. */
-    const MEGA_PACK = (function () {
-        for (let i = 0; i < GLAZE_PACKS.length; i++) {
-            if (GLAZE_PACKS[i].id === "mega") return GLAZE_PACKS[i];
-        }
-        return null;
-    }());
-
-    /* Stamp manifest. Add entries here as you commit PNGs.
-       Example (uncomment AFTER the file lands in the folder):
-
-           { id: "shrek",     file: "shrek.png" },
-           { id: "doge",      file: "doge.png" },
-           { id: "rare-pepe", file: "rare-pepe.png" }
-    */
-    const MEGA_STAMP_FILES = [
-        { id: "arrows",     file: "arrows.png" },
-        { id: "hatchmark",  file: "hatchmark.png" },
-        { id: "kokopelli",  file: "kokopelli.png" },
-        { id: "mountains",  file: "mountains.png" },
-        { id: "triangles",  file: "triangles.png" }
-    ];
-
-    /* Image cache — populated by loadMegaStamps so the PATTERN
-       drawer can reach the HTMLImageElement on each render. */
-    const MEGA_IMAGES = Object.create(null);
-
-    function megaStampDrawer(id) {
-        return function (ctx, x, y, r, _c) {
-            const img = MEGA_IMAGES[id];
-            const size = r * 1.9;
-            if (img && img.complete && img.naturalWidth > 0) {
-                ctx.save();
-                /* Preserve aspect ratio: fit the image within a
-                   2r x 2r box and center. */
-                const ratio = img.naturalWidth / img.naturalHeight;
-                let w = size * 2;
-                let h = size * 2;
-                if (ratio > 1) h = w / ratio;
-                else if (ratio < 1) w = h * ratio;
-                ctx.drawImage(img, x - w / 2, y - h / 2, w, h);
-                ctx.restore();
-            } else {
-                /* Not loaded yet — placeholder ring so the stamp
-                   doesn't render as a void. Replaced once onload
-                   fires + the UI rebuilds. */
-                ctx.strokeStyle = "rgba(255, 46, 136, 0.55)";
-                ctx.lineWidth = 2;
-                ctx.setLineDash([4, 3]);
-                ctx.beginPath();
-                ctx.arc(x, y, r * 0.85, 0, Math.PI * 2);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            }
-        };
-    }
-
-    function loadMegaStamps() {
-        if (!MEGA_PACK) return;
-        if (!MEGA_STAMP_FILES || MEGA_STAMP_FILES.length === 0) return;
-
-        MEGA_STAMP_FILES.forEach(function (entry) {
-            if (!entry || !entry.id || !entry.file) return;
-            if (MEGA_PACK.patterns.indexOf(entry.id) >= 0) return;
-
-            const img = new Image();
-            /* Same-origin requests don't need CORS; if a user ever
-               moves PNGs to an external host they should set
-               img.crossOrigin = "anonymous" here. */
-            img.onload = function () {
-                /* Rebuild the decorate palette so the placeholder
-                   icon swaps to the real image. */
-                if (currentScreen === "decorate" &&
-                    typeof buildToolUI === "function") {
-                    buildToolUI();
-                }
-            };
-            img.onerror = function () {
-                console.warn("[CRAYte] mega stamp missing: " + entry.file);
-            };
-            img.src = "assets/patterns/" + entry.file;
-            MEGA_IMAGES[entry.id] = img;
-
-            PATTERN_DRAWERS[entry.id] = megaStampDrawer(entry.id);
-            MEGA_PACK.patterns.push(entry.id);
-        });
-    }
-
-    /* Register on module eval — happens after PATTERN_DRAWERS is
-       defined and before init() so the MEGA pack is ready when
-       decorate first mounts. */
-    loadMegaStamps();
+    /* MEGA pack stamps + every themed pack's stamps now load via
+       the unified STICKER_SHEETS / loadStickerSheets() module above
+       (PATTERN_DRAWERS["<sheet>/<frame>"] entries are registered as
+       each TexturePacker manifest finishes parsing). The old
+       per-PNG MEGA_STAMP_FILES manifest in assets/patterns/ is
+       retired. */
 
     /* The MODDED pack's "@rgb-cycle" glaze cycles through HSL in
        real time. Strokes / stamps placed with it capture the
@@ -4639,8 +4664,8 @@
          2. Set RC_PUBLIC_API_KEY below
          3. Create products in Play Console with these EXACT IDs:
               pack_dinosaur   $0.99
-              pack_unicorn    $0.99
-              pack_onioncore  $0.99
+              pack_breakfast  $0.99
+              pack_music      $0.99
               pack_mega       $1.99
          4. Mirror them in RC dashboard with matching identifiers
          5. Create an entitlement in RC named the same as each
@@ -4663,8 +4688,8 @@
        its own entitlement). */
     const PACK_ENTITLEMENTS = {
         dinosaur:  "pack_dinosaur",
-        unicorn:   "pack_unicorn",
-        onioncore: "pack_onioncore",
+        breakfast: "pack_breakfast",
+        music:     "pack_music",
         mega:      "pack_mega"
     };
 
@@ -9459,6 +9484,10 @@
         const cover = document.createElement("div");
         cover.className = "shop-cover";
         cover.textContent = p.coverEmoji || "\u{1FAB4}";
+        /* Upgrade emoji to the pack's sheet-icon frame when ready
+           (no-op for BASIC, which has no sheet). Paints async if
+           the sheet PNG hasn't loaded yet. */
+        applyPackIconToCover(cover, p);
         card.appendChild(cover);
 
         const meta = document.createElement("div");

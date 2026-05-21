@@ -21,7 +21,7 @@
      current version.
    ============================================================ */
 
-const CACHE_VERSION = "pootery-v5";
+const CACHE_VERSION = "pootery-v6";
 const SCOPE = "/lets-crayte-pootery/";
 
 const PRECACHE_URLS = [

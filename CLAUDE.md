@@ -112,8 +112,8 @@ Under your Pootery app → **Monetize** → **In-app products**, create **four p
 | Product ID | Price | Label |
 |------------|-------|-------|
 | `pack_dinosaur`  | $0.99 | DINOSAUR |
-| `pack_unicorn`   | $0.99 | UNICORN |
-| `pack_onioncore` | $0.99 | ONIONCORE |
+| `pack_breakfast` | $0.99 | BREAKFAST |
+| `pack_music`     | $0.99 | MUSIC |
 | `pack_mega`      | $1.99 | MEGA |
 
 Each must be **Active** and have a price set.
@@ -123,7 +123,7 @@ Each must be **Active** and have a price set.
 Back in the RC dashboard:
 
 1. **Products** → add 4 products, identifiers matching the Play Console IDs above
-2. **Entitlements** → create 4 entitlements with the same identifiers (`pack_dinosaur`, `pack_unicorn`, `pack_onioncore`, `pack_mega`)
+2. **Entitlements** → create 4 entitlements with the same identifiers (`pack_dinosaur`, `pack_breakfast`, `pack_music`, `pack_mega`)
 3. For each entitlement, attach its matching product (1:1)
 4. **Offerings** → create a "current" offering containing all 4 products
 

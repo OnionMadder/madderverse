@@ -1,0 +1,235 @@
+{
+  "frames": {
+    "icecream": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 293,
+        "h": 379
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 293,
+        "h": 379
+      },
+      "sourceSize": {
+        "w": 293,
+        "h": 379
+      }
+    },
+    "penguins": {
+      "frame": {
+        "x": 297,
+        "y": 2,
+        "w": 308,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 308,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 308,
+        "h": 400
+      }
+    },
+    "dolphin": {
+      "frame": {
+        "x": 607,
+        "y": 2,
+        "w": 308,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 308,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 308,
+        "h": 400
+      }
+    },
+    "candy": {
+      "frame": {
+        "x": 917,
+        "y": 2,
+        "w": 239,
+        "h": 310
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 239,
+        "h": 310
+      },
+      "sourceSize": {
+        "w": 239,
+        "h": 310
+      }
+    },
+    "gumballs": {
+      "frame": {
+        "x": 1158,
+        "y": 2,
+        "w": 308,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 308,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 308,
+        "h": 400
+      }
+    },
+    "candydog": {
+      "frame": {
+        "x": 1468,
+        "y": 2,
+        "w": 247,
+        "h": 320
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 247,
+        "h": 320
+      },
+      "sourceSize": {
+        "w": 247,
+        "h": 320
+      }
+    },
+    "husky": {
+      "frame": {
+        "x": 1717,
+        "y": 2,
+        "w": 292,
+        "h": 378
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 292,
+        "h": 378
+      },
+      "sourceSize": {
+        "w": 292,
+        "h": 378
+      }
+    },
+    "bigdog": {
+      "frame": {
+        "x": 2011,
+        "y": 2,
+        "w": 308,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 308,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 308,
+        "h": 400
+      }
+    },
+    "cat": {
+      "frame": {
+        "x": 2321,
+        "y": 2,
+        "w": 254,
+        "h": 328
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 254,
+        "h": 328
+      },
+      "sourceSize": {
+        "w": 254,
+        "h": 328
+      }
+    },
+    "toucan": {
+      "frame": {
+        "x": 2577,
+        "y": 2,
+        "w": 308,
+        "h": 400
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 308,
+        "h": 400
+      },
+      "sourceSize": {
+        "w": 308,
+        "h": 400
+      }
+    },
+    "mega": {
+      "frame": {
+        "x": 2887,
+        "y": 2,
+        "w": 210,
+        "h": 168
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 210,
+        "h": 168
+      },
+      "sourceSize": {
+        "w": 210,
+        "h": 168
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 3099,
+      "h": 404
+    },
+    "scale": "1"
+  }
+}
