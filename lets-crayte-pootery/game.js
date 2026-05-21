@@ -3054,59 +3054,92 @@
         ctx.stroke();
     }
 
+    /* ---- Wheel asset hook ----
+       If assets/wheel.png exists + decodes, drawWheel uses it
+       in place of the procedural disc/wedges. The PNG should be:
+         - a CIRCULAR top-down view of a potter's wheel
+         - square (e.g., 600x600 or 800x800)
+         - transparent background
+         - centered on the canvas
+       It gets rotated by SHAPE.wheelPhase BEFORE being flattened
+       to an ellipse (scale 1, ry/rx), so a circular asset spins
+       like a circle and reads correctly under perspective.
+       Until the file lands, we fall back to the procedural disc
+       + alternating wedge slices that shipped originally. */
+    const WHEEL_IMG = (function () {
+        const img = new Image();
+        img._loaded = false;
+        img.addEventListener("load", function () { img._loaded = true; });
+        img.addEventListener("error", function () {/* no-op — fallback runs */});
+        img.src = "assets/wheel.png";
+        return img;
+    }());
+
     function drawWheel(ctx) {
         const cx = SHAPE.centerX;
         const cy = SHAPE.baseY;
         const rx = 150;
         const ry = 22;
 
-        /* Disc body */
-        const disc = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy);
-        disc.addColorStop(0,    "#0d2228");
-        disc.addColorStop(0.5,  "#2a626c");
-        disc.addColorStop(1,    "#0d2228");
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-        ctx.fillStyle = disc;
-        ctx.fill();
+        const useAsset = WHEEL_IMG && WHEEL_IMG._loaded &&
+                         WHEEL_IMG.naturalWidth > 0;
 
-        /* Rotating wedges — sells the spin without literally rotating
-           the symmetric pot. Six wedges, alternating light/dark. */
-        ctx.save();
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx - 2, ry - 2, 0, 0, Math.PI * 2);
-        ctx.clip();
-        ctx.translate(cx, cy);
-        ctx.scale(1, ry / rx);
-        ctx.rotate(SHAPE.wheelPhase);
-        const segs = 6;
-        for (let i = 0; i < segs; i++) {
-            const a0 = (i / segs) * Math.PI * 2;
-            const a1 = ((i + 1) / segs) * Math.PI * 2;
+        if (useAsset) {
+            /* Asset path — rotate in circular space, then squash
+               to ellipse. drawImage is sized as a 2*rx square so
+               the asset's edges line up with the procedural rim. */
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.scale(1, ry / rx);
+            ctx.rotate(SHAPE.wheelPhase);
+            ctx.drawImage(WHEEL_IMG, -rx, -rx, rx * 2, rx * 2);
+            ctx.restore();
+        } else {
+            /* Procedural fallback — original disc + wedges. */
+            const disc = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy);
+            disc.addColorStop(0,    "#0d2228");
+            disc.addColorStop(0.5,  "#2a626c");
+            disc.addColorStop(1,    "#0d2228");
             ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.arc(0, 0, rx, a0, a1);
-            ctx.closePath();
-            ctx.fillStyle = (i % 2 === 0)
-                ? "rgba(255, 255, 255, 0.05)"
-                : "rgba(0, 0, 0, 0.18)";
+            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fillStyle = disc;
             ctx.fill();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx - 2, ry - 2, 0, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.translate(cx, cy);
+            ctx.scale(1, ry / rx);
+            ctx.rotate(SHAPE.wheelPhase);
+            const segs = 6;
+            for (let i = 0; i < segs; i++) {
+                const a0 = (i / segs) * Math.PI * 2;
+                const a1 = ((i + 1) / segs) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, rx, a0, a1);
+                ctx.closePath();
+                ctx.fillStyle = (i % 2 === 0)
+                    ? "rgba(255, 255, 255, 0.05)"
+                    : "rgba(0, 0, 0, 0.18)";
+                ctx.fill();
+            }
+            ctx.restore();
+
+            /* Rim ring + front-edge highlight only on the
+               procedural wheel — a real asset carries its own. */
+            ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = "rgba(0, 255, 204, 0.18)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx - 1, ry - 1, 0, 0.1, Math.PI - 0.1);
+            ctx.stroke();
         }
-        ctx.restore();
-
-        /* Rim ring */
-        ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-        ctx.stroke();
-
-        /* Subtle highlight stripe on the front edge */
-        ctx.strokeStyle = "rgba(0, 255, 204, 0.18)";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, rx - 1, ry - 1, 0, 0.1, Math.PI - 0.1);
-        ctx.stroke();
     }
 
     function buildPotPath(ctx) {
@@ -3226,11 +3259,11 @@
            the photographic texture and looked artificial.) */
         ctx.restore();
 
-        /* Outline */
-        buildPotPath(ctx);
-        ctx.strokeStyle = mat.outline;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
+        /* (Cartoony silhouette outline removed — on a textured
+           clay surface the 1.5px black stroke read as an ink
+           cartoon. The texture + gradient + the dark backdrop
+           give enough edge contrast on their own. mat.outline
+           is still used by the rim and the wheel rim ring.) */
 
         /* SENTIENT POT — dev-menu egg. A single blinking eye on the
            front of the pot. Tracks the centerline at the middle of
@@ -3274,31 +3307,101 @@
         }
     }
 
+    /* ---- Pot rim / mouth ----
+       The old version drew a flat dark ellipse + two strokes (one
+       on the back of the rim, one on the outer perimeter). That
+       reads as a cartoon hole. A more natural rim has THICKNESS
+       — there's an outer wall, a top ring, and an inner wall, and
+       each catches light differently.
+
+       Layers (back-to-front):
+       1. Inner cavity — radial fade from a darker inner-clay tone
+          at the front lip down to near-black at the bottom of the
+          hole; sells depth instead of a flat black disc.
+       2. Lip ring — the visible top surface of the rim, an
+          annulus between outer and inner ellipses. Filled with a
+          lateral light->shadow gradient using the active clay's
+          highlight + outline colors. This is the bit that makes
+          the pot look thick.
+       3. Front-lip catchlight — a thin warm stroke on the front
+          arc of the inner ellipse where the rim catches the
+          imaginary key light.
+       (No more hard outer stroke; the lip-ring's gradient + the
+       cavity fade carry the rim's edges.)                       */
     function drawRim(ctx) {
         const cx = SHAPE.centerX;
         const top = SHAPE.clay[SHAPE.N - 1];
+        const mat = currentClay();
+        const ry = top.radius * 0.20;
+        const rxOuter = top.radius;
+        const ryOuter = ry;
+        /* Wall thickness — scales with pot size so wide pots get a
+           proportional lip, narrow pots stay subtle. Clamped so
+           tiny necks don't lose their hole entirely. */
+        const wall = Math.max(2.5, Math.min(6, top.radius * 0.10));
+        const rxInner = Math.max(2, rxOuter - wall);
+        const ryInner = Math.max(0.8, ryOuter - wall * 0.20);
 
-        /* Inner cavity (the dark hole at the top of the pot) */
+        /* ---- 1. Inner cavity ----
+           Radial gradient from a clay-tinted lip color (top) down
+           to near-black (center bottom of the hole). Falls inside
+           the inner ellipse so the lip ring on top sits cleanly. */
+        const cavityCx = cx;
+        const cavityCy = top.y + ryInner * 0.35;   /* "bottom of hole" */
+        const cavityGrad = ctx.createRadialGradient(
+            cavityCx, cavityCy, 0,
+            cavityCx, cavityCy, rxInner
+        );
+        cavityGrad.addColorStop(0,   "#08060a");
+        cavityGrad.addColorStop(0.55, mat.outline);
+        cavityGrad.addColorStop(1,    mat.unfired[1]);   /* inner wall tone */
         ctx.beginPath();
-        ctx.ellipse(cx, top.y, top.radius - 3, (top.radius - 3) * 0.20,
-                    0, 0, Math.PI * 2);
-        ctx.fillStyle = "#1a0904";
+        ctx.ellipse(cx, top.y, rxInner, ryInner, 0, 0, Math.PI * 2);
+        ctx.fillStyle = cavityGrad;
         ctx.fill();
 
-        /* Highlight on the back of the rim */
-        ctx.strokeStyle = "rgba(255, 200, 150, 0.45)";
-        ctx.lineWidth = 1.2;
+        /* ---- 2. Lip ring ----
+           Painted as a single ellipse fill (outer), then the inner
+           ellipse cut out via destination-out. The fill uses a
+           horizontal gradient mixing the clay's highlight (light
+           side) and its outline tone (shadow side) so the lip
+           reads as a 3D ring with a key light from the left. */
+        ctx.save();
+        const lipGrad = ctx.createLinearGradient(
+            cx - rxOuter, top.y, cx + rxOuter, top.y
+        );
+        const hl = mat.highlight;
+        /* Bump highlight alpha to ~0.7 for the lip — the body uses
+           a subtler version, but the rim is where you'd see a
+           wet-clay shine sharpest. */
+        const lipLight = hl.replace(/[\d.]+\)\s*$/, "0.78)");
+        const lipMid   = mat.unfired[2];
+        const lipShade = mat.outline;
+        lipGrad.addColorStop(0.00, lipLight);
+        lipGrad.addColorStop(0.35, lipMid);
+        lipGrad.addColorStop(1.00, lipShade);
         ctx.beginPath();
-        ctx.ellipse(cx, top.y - 0.5, top.radius - 3, (top.radius - 3) * 0.20,
-                    0, Math.PI + 0.1, Math.PI * 2 - 0.1);
-        ctx.stroke();
+        ctx.ellipse(cx, top.y, rxOuter, ryOuter, 0, 0, Math.PI * 2);
+        ctx.fillStyle = lipGrad;
+        ctx.fill();
+        /* Cut the cavity hole back out of the lip ring. */
+        ctx.globalCompositeOperation = "destination-out";
+        ctx.beginPath();
+        ctx.ellipse(cx, top.y, rxInner, ryInner, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "#000";
+        ctx.fill();
+        ctx.restore();
 
-        /* Slight rim thickness (outer ellipse stroke) */
-        ctx.strokeStyle = "rgba(60, 24, 6, 0.7)";
-        ctx.lineWidth = 1;
+        /* ---- 3. Front-lip catchlight ----
+           Thin warm arc on the front (lower-half) of the inner
+           ellipse where the lip would catch a key light. Keeps
+           the rim visually crisp without resorting to a hard
+           cartoon stroke. */
+        ctx.strokeStyle = hl.replace(/[\d.]+\)\s*$/, "0.55)");
+        ctx.lineWidth = 1.1;
         ctx.beginPath();
-        ctx.ellipse(cx, top.y, top.radius, top.radius * 0.20,
-                    0, 0, Math.PI * 2);
+        ctx.ellipse(cx, top.y + 0.6, rxInner, ryInner,
+                    0, 0.15, Math.PI - 0.15);
         ctx.stroke();
     }
 
