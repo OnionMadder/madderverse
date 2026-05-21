@@ -11381,16 +11381,13 @@
         return card;
     }
 
-    /* Pack-type chip label. Builder packs name what they build
-       (BUILD A BEAR) when buildSubject is set; otherwise just
-       the type word. */
+    /* Pack-type chip label — one word per tag (CRAFTER / BUILDER
+       / SPECIAL). buildSubject is still kept on the pack data for
+       use in descriptions / the modal, but the card tag stays a
+       single clean word. */
     function packTypeLabel(p) {
         if (!p || !p.packType) return "";
-        if (p.packType === "builder") {
-            return p.buildSubject
-                ? ("BUILD: " + p.buildSubject.toUpperCase())
-                : "BUILDER";
-        }
+        if (p.packType === "builder") return "BUILDER";
         if (p.packType === "special") return "SPECIAL";
         return "CRAFTER";
     }
