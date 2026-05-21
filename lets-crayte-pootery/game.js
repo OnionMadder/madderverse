@@ -10620,6 +10620,160 @@
        ACCOUNT screen (Phase 1)
        ============================================================ */
 
+    /* ============================================================
+       DATA & PRIVACY — Play Store Data Safety compliance
+       ============================================================
+       Two operations:
+
+       wipeLocalData(): clears every crayte-* localStorage key on
+         THIS device. Gallery, drafts, owned packs, achievements,
+         egg flags, push prefs — all gone. Server data untouched.
+         Available signed-in or signed-out.
+
+       deleteAccount(): full GDPR/CCPA right-to-be-forgotten —
+         cascades a hard delete across every server-side row tied
+         to the user's id, then deletes the auth user itself, then
+         wipes local. Order is important: server rows go FIRST
+         while the user's JWT still has RLS access; auth user goes
+         LAST because after that we lose the bearer token.
+
+       Both functions update a status line in the data-privacy
+       card so the user gets reassuring feedback while the (slow)
+       network calls run.
+       ============================================================ */
+
+    function dataPrivacyStatus(msg, isError) {
+        const el = document.getElementById("dataPrivacyStatus");
+        if (!el) return;
+        if (!msg) { el.hidden = true; el.textContent = ""; return; }
+        el.hidden = false;
+        el.textContent = msg;
+        el.classList.toggle("is-error", !!isError);
+    }
+
+    /* Iterate localStorage + drop every key that belongs to Pootery
+       (crayte-* prefix). Other apps on the same origin are
+       untouched. Returns the count cleared. */
+    function clearLocalCrayteKeys() {
+        const toDelete = [];
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.indexOf("crayte-") === 0) toDelete.push(k);
+            }
+            toDelete.forEach(function (k) {
+                try { localStorage.removeItem(k); } catch (_) {}
+            });
+        } catch (_) {}
+        return toDelete.length;
+    }
+
+    function confirmWipeLocalData() {
+        const ok = window.confirm(
+            "Wipe Pootery from this device?\n\n" +
+            "This deletes your gallery, drafts, owned packs cache, " +
+            "achievements, and settings — ON THIS DEVICE.\n\n" +
+            "If you're signed in, anything saved on the server stays " +
+            "(use DELETE MY ACCOUNT below to remove that too).\n\n" +
+            "This cannot be undone."
+        );
+        if (!ok) return;
+        const wiped = clearLocalCrayteKeys();
+        dataPrivacyStatus(
+            wiped + " local key(s) wiped. Reloading…", false);
+        setTimeout(function () { location.reload(); }, 1200);
+    }
+
+    /* Server cascade — best-effort DELETE on each table the user
+       has RLS access to via owner-only policies. Each table is
+       independent so a 404 / 403 on one doesn't block the rest.
+       Resolves to true on overall success (auth user deletion
+       worked), false otherwise. */
+    function cascadeDeleteServerData() {
+        if (!supabaseEnabled() || !isSignedIn()) return Promise.resolve(true);
+        const uid = currentUserId();
+        if (!uid) return Promise.resolve(true);
+
+        const base = SUPABASE_URL + "/rest/v1/";
+        const headers = supabaseHeaders({ "Prefer": "return=minimal" });
+
+        /* Tables owned by the user, deleted in reverse-dependency
+           order (votes -> battles -> public/battle entries ->
+           profile). PostgREST returns 204 No Content on success
+           regardless of how many rows were deleted (including 0).
+           A 404 means the table doesn't exist in this Supabase
+           project (e.g., remix/profile migrations not run) — we
+           treat that as success and move on. */
+        const deletes = [
+            base + "votes?user_id=eq."          + uid,
+            base + "battle_entries?user_id=eq." + uid,
+            base + "battles?created_by=eq."     + uid,
+            base + "public_pots?user_id=eq."    + uid,
+            base + "profiles?id=eq."            + uid
+        ];
+
+        return deletes.reduce(function (chain, url) {
+            return chain.then(function () {
+                return fetch(url, { method: "DELETE", headers: headers })
+                    .catch(function () { return null; });
+            });
+        }, Promise.resolve()).then(function () {
+            /* Finally delete the auth user itself. After this the
+               session is dead and subsequent requests with the
+               same JWT will 401. */
+            return fetch(SUPABASE_URL + "/auth/v1/user", {
+                method: "DELETE",
+                headers: {
+                    "apikey":        SUPABASE_KEY,
+                    "Authorization": "Bearer " + AUTH.session.access_token
+                }
+            }).then(function (r) { return r.ok; })
+              .catch(function () { return false; });
+        });
+    }
+
+    function confirmDeleteAccount() {
+        if (!isSignedIn()) return;
+        const ok = window.confirm(
+            "Delete your Pootery account?\n\n" +
+            "This permanently removes:\n" +
+            "  • your profile (handle, name, bio)\n" +
+            "  • every pot you shared to the EVERYONE gallery\n" +
+            "  • every battle you started\n" +
+            "  • every pot you entered in battles\n" +
+            "  • every vote you cast\n" +
+            "  • your sign-in identity\n" +
+            "\nIt also wipes everything on this device.\n\n" +
+            "This CANNOT be undone."
+        );
+        if (!ok) return;
+
+        const btn = document.getElementById("deleteAccountBtn");
+        if (btn) {
+            btn.disabled = true;
+            const lbl = btn.querySelector(".btn-label");
+            if (lbl) lbl.textContent = "DELETING…";
+        }
+        dataPrivacyStatus("Removing server data…", false);
+
+        cascadeDeleteServerData().then(function (success) {
+            /* Wipe local regardless of server outcome — the user
+               asked to be forgotten and we don't want their
+               device hanging on to gallery pots if the server
+               call partially failed. */
+            clearLocalCrayteKeys();
+            if (success) {
+                dataPrivacyStatus("Account deleted. Reloading…", false);
+            } else {
+                dataPrivacyStatus(
+                    "Local data wiped. Server cleanup may be " +
+                    "incomplete — email pootery@madderverse.org " +
+                    "to finish the job. Reloading…", true);
+            }
+            setTimeout(function () { location.reload(); }, 2000);
+        });
+    }
+
     function initAccountScreen() {
         const back = document.getElementById("accountBack");
         if (back) back.addEventListener("click", function () {
@@ -10677,6 +10831,13 @@
             });
         });
 
+        /* DATA & PRIVACY — wipe local + delete account. */
+        const wipeBtn = document.getElementById("wipeLocalBtn");
+        if (wipeBtn) wipeBtn.addEventListener("click", confirmWipeLocalData);
+
+        const delAcct = document.getElementById("deleteAccountBtn");
+        if (delAcct) delAcct.addEventListener("click", confirmDeleteAccount);
+
         const saveBtn = document.getElementById("profileSaveBtn");
         if (saveBtn) saveBtn.addEventListener("click", function () {
             const username = (document.getElementById("profileUsername").value || "")
@@ -10732,6 +10893,11 @@
         if (outView) outView.hidden = signed;
         if (inView)  inView.hidden  = !signed;
         if (status)  status.textContent = signed ? "SIGNED IN" : "SIGNED OUT";
+        /* DELETE MY ACCOUNT only makes sense when there IS an
+           account. Hidden for signed-out users — they can still
+           wipe local data via the always-visible button above. */
+        const delBtn = document.getElementById("deleteAccountBtn");
+        if (delBtn) delBtn.hidden = !signed;
         if (signed) {
             const p = AUTH.profile || {};
             const u = (AUTH.session && AUTH.session.user) || {};

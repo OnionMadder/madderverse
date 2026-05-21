@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+    <title>Delete my Pootery data — The Madderverse</title>
+    <meta name="description" content="Request deletion of your Let's CRAYte! Pootery account and data." />
+    <meta name="robots" content="noindex" />
+
+    <link rel="canonical" href="https://madderverse.org/lets-crayte-pootery/delete-my-account/" />
+    <link rel="icon" type="image/png" sizes="192x192" href="../icons/icon-192.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="../style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<!--
+    Public account-deletion request page. Linked from the Play
+    Console Data Safety form so users who can't sign in (lost
+    password, deleted local account, never installed Pootery on
+    a current device) still have a path to right-to-be-forgotten.
+
+    For users who CAN sign in, the Account screen in-app has a
+    DELETE MY ACCOUNT button that runs the full cascade
+    automatically — this page is just the out-of-app fallback.
+-->
+<body class="kids-hub">
+
+<header class="hub-header">
+    <h1 class="hub-title">DELETE MY POOTERY DATA</h1>
+    <p class="hub-blurb">
+        Right to be forgotten — your data, your call.
+    </p>
+</header>
+
+<main class="screen" style="max-width:680px;">
+
+    <section class="account-stack" style="margin-top:0;">
+        <div class="account-card">
+            <h3 class="account-headline">FASTEST WAY: IN-APP</h3>
+            <p class="account-blurb">
+                If you can still sign in to Pootery on a phone, the
+                quickest path is the in-app button:
+            </p>
+            <ol class="account-blurb" style="padding-left:22px;">
+                <li>Open Pootery on your phone</li>
+                <li>Tap the menu → <strong>ACCOUNT</strong></li>
+                <li>Scroll to <strong>DATA &amp; PRIVACY</strong></li>
+                <li>Tap <strong>DELETE MY ACCOUNT</strong></li>
+            </ol>
+            <p class="account-blurb">
+                It removes your profile, every pot you shared, every
+                battle entry, and every vote — server-side and on
+                your device — in one tap. Takes about 5 seconds.
+            </p>
+        </div>
+    </section>
+
+    <section class="account-stack">
+        <div class="account-card">
+            <h3 class="account-headline">CAN'T SIGN IN? EMAIL US</h3>
+            <p class="account-blurb">
+                Lost access to your phone or your sign-in? Email the
+                address below from the email you used to register
+                for Pootery. We'll confirm it's you and delete
+                everything within 30 days, usually within a few.
+            </p>
+            <p style="font-size:18px; letter-spacing:1px; color:var(--teal); text-align:center; margin:18px 0;">
+                <a href="mailto:pootery@madderverse.org?subject=Pootery%20data%20deletion%20request&amp;body=Please%20delete%20the%20Pootery%20account%20associated%20with%20this%20email%20address.%20Thank%20you."
+                   style="color:var(--teal);">
+                    pootery@madderverse.org
+                </a>
+            </p>
+            <p class="account-blurb">
+                What to include:
+            </p>
+            <ul class="account-blurb" style="padding-left:22px;">
+                <li>The email address tied to your account (so we
+                    can match it).</li>
+                <li>Your Pootery handle (e.g., <code>@yourname</code>),
+                    if you remember it.</li>
+                <li>Anything else that helps us confirm it's you
+                    (a public pot's name, a battle you started,
+                    etc.) — optional but helpful for accounts where
+                    the email alone is ambiguous.</li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="account-stack">
+        <div class="account-card">
+            <h3 class="account-headline">WHAT GETS DELETED</h3>
+            <p class="account-blurb">
+                Hard delete — not hidden, not anonymized. Includes:
+            </p>
+            <ul class="account-blurb" style="padding-left:22px;">
+                <li>Your profile (handle, display name, bio)</li>
+                <li>Every pot you shared to the EVERYONE gallery</li>
+                <li>Every battle you started</li>
+                <li>Every pot you entered in battles</li>
+                <li>Every vote you cast</li>
+                <li>Your sign-in identity (Google / magic-link record)</li>
+            </ul>
+            <p class="account-blurb">
+                Other users' votes on your pots vanish along with the
+                pots themselves (cascade). Other users' battles you
+                voted in keep their other entries; only your votes
+                are removed.
+            </p>
+            <p class="account-blurb" style="margin-top:10px;">
+                Anything saved only on your device (gallery, drafts,
+                achievements) requires the in-app
+                <strong>WIPE THIS DEVICE</strong> button, since we
+                can't reach into your phone from here. Email-based
+                deletion handles server-side only.
+            </p>
+        </div>
+    </section>
+
+    <section class="account-stack">
+        <div class="account-card">
+            <h3 class="account-headline">QUESTIONS?</h3>
+            <p class="account-blurb">
+                Same email — <a href="mailto:pootery@madderverse.org"
+                   style="color:var(--teal);">pootery@madderverse.org</a>.
+                Real human reads it. We answer in plain English.
+            </p>
+            <p class="account-blurb" style="margin-top:12px;">
+                <a href="../" style="color:var(--teal); letter-spacing:1px;">
+                    &larr; BACK TO POOTERY
+                </a>
+            </p>
+        </div>
+    </section>
+
+</main>
+
+<footer class="hub-footer">
+    <span id="year"></span> &middot;
+    <a href="https://madderverse.org">The Madderverse</a>
+</footer>
+
+<script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>

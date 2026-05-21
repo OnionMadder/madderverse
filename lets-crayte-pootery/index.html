@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=26" />
+    <link rel="stylesheet" href="style.css?v=27" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -743,6 +743,53 @@
             </div>
         </div>
     </section>
+
+    <!-- DATA & PRIVACY — required for Play Store Data Safety
+         compliance + general best practice. Two paths:
+
+         1. WIPE LOCAL DATA — clears the gallery + owned packs +
+            achievements + drafts on THIS device. Always available
+            (signed in or not). Doesn't touch the server.
+
+         2. DELETE MY ACCOUNT — only shown when signed in. Cascades
+            deletion of every server-side row tied to the user's id
+            (public_pots, battles, battle_entries, votes, profile),
+            deletes the auth user itself, then wipes local data and
+            signs out. Irreversible.
+
+         The plain-text public deletion request URL is in the foot
+         note so users who can't sign in still have a path. -->
+    <section class="account-stack" id="dataPrivacyCard">
+        <div class="account-card">
+            <h3 class="account-headline">DATA &amp; PRIVACY</h3>
+            <p class="account-blurb">
+                Pootery stores pots + progress on this device.
+                Signed-in players also store a profile, shared
+                pots, and battle entries on Pootery's server.
+                Take any of it back any time.
+            </p>
+
+            <button class="btn-control" id="wipeLocalBtn" type="button">
+                <span class="btn-label">WIPE THIS DEVICE</span>
+                <span class="btn-glyph" aria-hidden="true">&#x2717;</span>
+            </button>
+
+            <button class="btn-control" id="deleteAccountBtn" type="button" hidden>
+                <span class="btn-label">DELETE MY ACCOUNT</span>
+                <span class="btn-glyph" aria-hidden="true">&#x26A0;</span>
+            </button>
+
+            <p class="account-foot" id="dataPrivacyStatus" hidden></p>
+
+            <p class="account-blurb" style="margin-top:14px; font-size:11px;">
+                Can't sign in but need data removed?
+                Email <a href="mailto:pootery@madderverse.org?subject=Pootery%20data%20deletion%20request"
+                        style="color:var(--teal);">pootery@madderverse.org</a>
+                from the address you used to register and we'll
+                process it within 30 days.
+            </p>
+        </div>
+    </section>
 </main>
 
 <!-- ============================================================
@@ -1194,7 +1241,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=26"></script>
+<script src="game.js?v=27"></script>
 
 </body>
 </html>
