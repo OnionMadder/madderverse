@@ -6351,43 +6351,77 @@
             D.pointerActive = true;
             D.lastPaintPos = p;
             D.strokedThisGesture = false;
+            /* MOBILE-ZOOM GUARD: we no longer paint/stamp on this
+               first pointerdown. A pinch begins with ONE finger
+               touching, so acting here dropped a stamp (or a stray
+               brush dab) before the second finger could be seen — the
+               "zoom places a stamp" bug. Instead we DEFER: record the
+               start point and commit only once we're sure this is a
+               genuine single-finger action — a drag (first
+               pointermove) or a clean tap (pointerup with no 2nd
+               finger). The size===2 branch below clears this pending
+               state so a pinch commits nothing. */
+            D.gestureCommitted = false;
+            D.multiTouched = false;
+            D.pendingPos = p;
 
-            /* MOVE tool — hit-test against existing stickers
-               (reverse iteration in hitTestSticker so the visual
-               topmost picks first). If nothing's under the
-               pointer, the gesture is a no-op; the kid sees the
-               grab cursor turn into "nope" without anything
-               being created. Drag updates happen in pointermove
-               below. NO undo snapshot is pushed on miss, so
-               aimless poking doesn't fill the undo stack. */
+            /* MOVE tool still grabs on down — it only acts when the
+               pointer actually hits an existing sticker, so a pinch
+               that happens to start on a sticker is released by the
+               size===2 branch (which nulls movingSticker). */
             if (D.tool === "move") {
                 const hit = hitTestSticker(p);
                 if (hit) {
                     pushUndoSnapshot();
                     D.movingSticker = hit;
                     D.canvas.style.cursor = "grabbing";
+                    D.gestureCommitted = true;   /* a real grab, not a tap */
                 }
                 return;
             }
+        };
 
-            /* Snapshot BEFORE the gesture so undo restores the
-               canvas to its pre-gesture state. One snapshot per
-               gesture = one undo per stroke / stamp / eraser
-               action — natural Ctrl+Z behavior. */
+        /* Commit the deferred paint START (brush / spray / splatter /
+           eraser). Fires on the first single-finger move OR on a clean
+           tap-up. One undo snapshot per gesture. */
+        const commitPaintStart = function () {
+            if (D.gestureCommitted) return;
             pushUndoSnapshot();
-            if (D.tool === "stamp") { stampAt(p); }
-            else                    { paintDot(p); }
+            paintDot(D.pendingPos);
+            D.gestureCommitted = true;
             D.strokedThisGesture = true;
+        };
+
+        /* Commit a STAMP tap (deferred from pointerdown). The 2nd tap
+           of a double-tap (within the window + radius) is treated as a
+           "zoom" intent: it removes the 1st tap's sticker and places
+           nothing, so a double-tap nets ZERO stamps instead of two. */
+        const STAMP_DBLTAP_MS = 300;
+        const STAMP_DBLTAP_PX = 30;
+        const handleStampTap = function (p) {
+            const now  = performance.now();
+            const last = D.lastStampTap;
+            if (last && (now - last.t) < STAMP_DBLTAP_MS &&
+                Math.hypot(p.x - last.x, p.y - last.y) < STAMP_DBLTAP_PX) {
+                /* Pop the 1st tap's sticker record + drop its now-
+                   meaningless undo snapshot so both stacks stay sane. */
+                if (D.undoStack.length) D.undoStack.pop();
+                if (D.stickers.length) { D.stickers.pop(); renderStickerLayer(); }
+                updateUndoRedoButtons();
+                D.lastStampTap = null;        /* a 3rd tap starts fresh */
+                return;
+            }
+            pushUndoSnapshot();
+            stampAt(p);
+            D.lastStampTap = { t: now, x: p.x, y: p.y };
         };
 
         const cancelPaint = function () {
             if (!D.pointerActive) return;
             D.pointerActive = false;
             D.lastPaintPos = null;
-            /* The undo snapshot already landed but the gesture
-               is being interrupted by a second finger -- that's
-               fine, the snapshot still represents the pre-paint
-               state if the user undoes. */
+            /* Nothing was painted yet (placement is deferred), so
+               there's no stray mark or undo snapshot to roll back. */
         };
 
         const beginGesture = function () {
@@ -6453,9 +6487,16 @@
             if (D.activePointers.size === 1) {
                 startPaintAt(decPointerPos(e));
             } else if (D.activePointers.size === 2) {
-                /* Second finger landed -- cancel paint, start
-                   pinch/pan gesture. */
+                /* Second finger landed -> this is a pinch/pan, NOT a
+                   placement. Drop the deferred paint/stamp + release
+                   any grabbed sticker so the gesture leaves no marks. */
                 cancelPaint();
+                D.pendingPos = null;
+                D.multiTouched = true;
+                if (D.movingSticker) {
+                    D.movingSticker = null;
+                    if (D.tool === "move") D.canvas.style.cursor = "grab";
+                }
                 beginGesture();
             }
         });
@@ -6486,7 +6527,17 @@
                 D.pointer = p;
                 return;
             }
-            if (D.tool !== "stamp") paintStrokeTo(p);
+            /* Stamps are tap-only: dragging never paints a trail of
+               stamps. The actual placement happens on tap-up. */
+            if (D.tool === "stamp") {
+                D.lastPaintPos = p;
+                D.pointer = p;
+                return;
+            }
+            /* Paint tools: the first single-finger move commits the
+               deferred start dab, then we stroke from there. */
+            if (!D.gestureCommitted) commitPaintStart();
+            paintStrokeTo(p);
             D.lastPaintPos = p;
             D.pointer = p;
         });
@@ -6496,7 +6547,20 @@
             try { c.releasePointerCapture(e.pointerId); } catch (_) {}
 
             if (D.activePointers.size === 0) {
-                /* All fingers lifted */
+                /* All fingers lifted. A clean single-finger TAP — one
+                   that never escalated to a pinch and never committed
+                   as a drag — commits its deferred action HERE. This
+                   is what makes a tap place a stamp / single dab while
+                   a pinch (multiTouched) places nothing. */
+                if (D.pointerActive && !D.gestureCommitted &&
+                        !D.multiTouched && D.pendingPos) {
+                    if (D.tool === "stamp") {
+                        handleStampTap(D.pendingPos);
+                    } else if (D.tool !== "move") {
+                        pushUndoSnapshot();
+                        paintDot(D.pendingPos);
+                    }
+                }
                 if (D.pointerActive) {
                     D.pointerActive = false;
                     D.lastPaintPos = null;
@@ -6508,6 +6572,9 @@
                     if (D.tool === "move") D.canvas.style.cursor = "grab";
                 }
                 D.gestureStart = null;
+                D.gestureCommitted = false;
+                D.multiTouched = false;
+                D.pendingPos = null;
             } else if (D.activePointers.size === 1 && D.gestureStart) {
                 /* Was a 2-finger gesture, now down to 1. Don't
                    resume painting mid-stroke -- wait for full
@@ -6842,8 +6909,12 @@
                     gp.querySelectorAll(".swatch").forEach(function (s) {
                         s.classList.toggle("active", s.dataset.glaze === gid);
                     });
-                    /* Picking a glaze while on eraser snaps back to brush. */
-                    if (D.tool === "eraser") setTool("brush");
+                    /* Picking a color while on a NON-painting tool
+                       (eraser or move) implies "I want to paint with
+                       this" -> snap to brush. On a painting tool
+                       (brush/spray/splatter/stamp) the color just
+                       re-tints the current tool, so we leave it. */
+                    if (D.tool === "eraser" || D.tool === "move") setTool("brush");
                 });
                 gp.appendChild(btn);
             });
