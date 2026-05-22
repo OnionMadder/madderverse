@@ -5454,11 +5454,19 @@ html.is-native #btnInstall {
     display: flex;
     align-items: center;
     gap: 12px;
+    /* CRITICAL: the wrapper is a layout box only — it must NOT catch
+       taps. It's fixed at the bottom-right, directly over the stamp
+       palette (the bottom-most row of the open decorate drawer), so
+       an interactive wrapper swallowed every tap there ("can't pick
+       a different stamp"). Pass-through on the wrapper; only the
+       actual buttons re-enable pointer events. */
+    pointer-events: none;
 }
 .decorate-float-actions .float-action {
     position: static;
     bottom: auto;
     right: auto;
+    pointer-events: auto;
 }
 
 /* SAVE DRAFT button — sits to the LEFT of FIRE IT with a calmer
