@@ -1073,6 +1073,14 @@ a:focus-visible {
     height: 22px;
     border-radius: 50%;
     border: 1px solid rgba(0, 0, 0, 0.55);
+    /* Same clay-grain layering as the lump balls (set per-clay in
+       buildClayPicker): texture soft-lit over the swatch color. */
+    background-image: var(--lump-texture, none);
+    background-color: var(--lump-color, #a25a2c);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-blend-mode: soft-light;
     box-shadow: inset -2px -3px 4px rgba(0, 0, 0, 0.4),
                 inset 2px 2px 3px rgba(255, 255, 255, 0.18);
 }
@@ -5433,12 +5441,30 @@ html.is-native #btnInstall {
     line-height: 1;
 }
 
+/* SAVE + FIRE IT live in a fixed flex ROW so they auto-space and
+   never overlap regardless of label width (the old hard-coded
+   right:140px assumed a FIRE-IT width that the real button exceeds,
+   so they collided). The row owns the fixed positioning; the
+   buttons inside drop back to static flow. */
+.decorate-float-actions {
+    position: fixed;
+    bottom: calc(72px + var(--safe-bottom));
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    z-index: 85;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.decorate-float-actions .float-action {
+    position: static;
+    bottom: auto;
+    right: auto;
+}
+
 /* SAVE DRAFT button — sits to the LEFT of FIRE IT with a calmer
    teal treatment so the kid reads pink-FIRE as the primary
-   action + teal-SAVE as the "come back later" secondary. Right
-   offset accounts for FIRE IT's width + a gap. */
+   action + teal-SAVE as the "come back later" secondary. */
 .decorate-float-save {
-    right: calc(140px + env(safe-area-inset-right, 0px));
     background: linear-gradient(180deg, var(--teal) 0%, #00b890 100%);
     border-color: var(--teal);
     color: #002b22;
@@ -5529,12 +5555,23 @@ html.is-native #btnInstall {
     /* Irregular blob so it reads as a hand-pinched wet lump,
        not a tidy disc. */
     border-radius: 48% 52% 56% 44% / 60% 58% 42% 40%;
-    background:
+    /* Layer order top->bottom: shine highlight, clay grain texture,
+       then the swatch color underneath. The texture soft-lights
+       over the color (same blend the rendered pot uses) so the lump
+       shows the real clay grain, not a flat fill. --lump-texture is
+       set per-clay in JS (buildLumpTray / attachLumpDrag); falls
+       back to `none` for any clay with no texture file. */
+    background-image:
         radial-gradient(circle at 38% 32%,
             rgba(255, 255, 255, 0.45) 0%,
             rgba(255, 255, 255, 0.12) 22%,
             transparent 46%),
-        var(--lump-color, #a25a2c);
+        var(--lump-texture, none);
+    background-color: var(--lump-color, #a25a2c);
+    background-size: auto, cover;
+    background-position: center, center;
+    background-repeat: no-repeat, no-repeat;
+    background-blend-mode: screen, soft-light;
     box-shadow:
         inset -5px -7px 10px rgba(0, 0, 0, 0.45),
         inset 3px 4px 7px rgba(255, 255, 255, 0.22),

@@ -2384,6 +2384,15 @@
     const CLAY_TEXTURES = Object.create(null);          /* matId -> Image */
     const CLAY_PATTERN_CACHE = new WeakMap();           /* ctx -> {matId:Pattern} */
 
+    /* CSS-side helper: the texture PNG url for a clay id (or "" if
+       the clay has no texture file). Used so the drag-a-lump balls
+       + clay-picker discs show the same grain as the rendered pot,
+       not a flat swatch color. */
+    function clayTextureUrl(matId) {
+        const file = CLAY_TEXTURE_FILES[matId];
+        return file ? ("assets/textures/clay/" + file + ".png") : "";
+    }
+
     function loadClayTextures() {
         Object.keys(CLAY_TEXTURE_FILES).forEach(function (matId) {
             const img = new Image();
@@ -2787,7 +2796,10 @@
 
             const disc = document.createElement("span");
             disc.className = "clay-disc";
-            disc.style.background = mat.swatch;
+            disc.style.setProperty("--lump-color", mat.swatch);
+            const discTex = clayTextureUrl(mat.id);
+            disc.style.setProperty("--lump-texture",
+                discTex ? ("url('" + discTex + "')") : "none");
             btn.appendChild(disc);
 
             const name = document.createElement("span");
@@ -2854,6 +2866,9 @@
             const ball = document.createElement("span");
             ball.className = "lump-ball";
             ball.style.setProperty("--lump-color", mat.swatch);
+            const lumpTex = clayTextureUrl(mat.id);
+            ball.style.setProperty("--lump-texture",
+                lumpTex ? ("url('" + lumpTex + "')") : "none");
             lump.appendChild(ball);
 
             const name = document.createElement("span");
@@ -2937,6 +2952,9 @@
             ghost = document.createElement("div");
             ghost.className = "clay-lump-ghost";
             ghost.style.setProperty("--lump-color", mat.swatch);
+            const ghostTex = clayTextureUrl(mat.id);
+            ghost.style.setProperty("--lump-texture",
+                ghostTex ? ("url('" + ghostTex + "')") : "none");
             ghost.style.transform =
                 "translate(" + e.clientX + "px," + e.clientY +
                 "px) translate(-50%,-50%) scale(1.12)";
@@ -3682,13 +3700,19 @@
         }
         if (maxR < 1) maxR = 1;
 
-        /* Soft shadow under the pot */
-        ctx.save();
-        ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-        ctx.beginPath();
-        ctx.ellipse(cx, SHAPE.baseY + 6, maxR * 1.05, 10, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        /* Soft shadow under the pot — only on the working screens
+           (shape/decorate/kiln). The gallery skips it: the display
+           plinth (display.png) carries its own baked contact shadow,
+           and a second dark ellipse just muddies the side-lit
+           display-case look. */
+        if (!_galleryLighting) {
+            ctx.save();
+            ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+            ctx.beginPath();
+            ctx.ellipse(cx, SHAPE.baseY + 6, maxR * 1.05, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
 
         /* Fill pot body — gently asymmetric gradient tuned for a
            mid-distance studio feel (vs the previous close/macro
@@ -3709,12 +3733,27 @@
         buildPotPath(ctx);
         const grad = ctx.createLinearGradient(cx - maxR, 0, cx + maxR, 0);
         const stops = mat.unfired;
-        grad.addColorStop(0.00, stops[1]);
-        grad.addColorStop(0.18, stops[2]);
-        grad.addColorStop(0.40, stops[3]);
-        grad.addColorStop(0.62, stops[2]);
-        grad.addColorStop(0.85, stops[1]);
-        grad.addColorStop(1.00, stops[1]);
+        if (_galleryLighting) {
+            /* GALLERY: explicit side key. The bright peak is pulled
+               hard to the LEFT (0.22) and the right side rolls down
+               to the dark mid, so the form reads unmistakably "lit
+               from one side" on its display plinth — no ambiguous
+               near-symmetric studio fill. */
+            grad.addColorStop(0.00, stops[2]);
+            grad.addColorStop(0.22, stops[3]);
+            grad.addColorStop(0.52, stops[2]);
+            grad.addColorStop(0.80, stops[1]);
+            grad.addColorStop(1.00, stops[1]);
+        } else {
+            /* Working screens: gently asymmetric mid-distance studio
+               light (peak ~0.40), softer than the gallery key. */
+            grad.addColorStop(0.00, stops[1]);
+            grad.addColorStop(0.18, stops[2]);
+            grad.addColorStop(0.40, stops[3]);
+            grad.addColorStop(0.62, stops[2]);
+            grad.addColorStop(0.85, stops[1]);
+            grad.addColorStop(1.00, stops[1]);
+        }
         ctx.fillStyle = grad;
         ctx.fill();
 
