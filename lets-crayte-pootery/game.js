@@ -8465,6 +8465,11 @@
                 ctx.restore();
             }
             if (entry.fired) {
+                /* Warm "baked" tint so fired pots read hotter than
+                   greenware. The old top->bottom glaze-sheen gradient
+                   (light at the top, dark at the bottom) was stripped:
+                   it imposed a vertical light direction that fought
+                   the gallery's explicit side-key lighting. */
                 ctx.save();
                 buildPotPath(ctx);
                 ctx.clip();
@@ -8472,12 +8477,6 @@
                 ctx.fillStyle = "rgba(180, 70, 22, 0.20)";
                 ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
                 ctx.globalCompositeOperation = "source-over";
-                const g = ctx.createLinearGradient(0, 80, 0, 510);
-                g.addColorStop(0,    "rgba(255, 245, 220, 0.10)");
-                g.addColorStop(0.35, "rgba(255, 245, 220, 0.00)");
-                g.addColorStop(1,    "rgba(0, 0, 0, 0.12)");
-                ctx.fillStyle = g;
-                ctx.fillRect(0, 0, SHAPE.W, SHAPE.H);
                 ctx.restore();
             }
             /* Overfired-tag entries get the burnt char overlay too —
