@@ -3502,25 +3502,40 @@
     }
 
     /* ---- Wheel asset hook ----
-       If assets/wheel.png exists + decodes, drawWheel uses it
-       in place of the procedural disc/wedges. The PNG should be:
-         - a CIRCULAR top-down view of a potter's wheel
-         - square (e.g., 600x600 or 800x800)
-         - transparent background
-         - centered on the canvas
-       It gets rotated by SHAPE.wheelPhase BEFORE being flattened
-       to an ellipse (scale 1, ry/rx), so a circular asset spins
-       like a circle and reads correctly under perspective.
-       Until the file lands, we fall back to the procedural disc
-       + alternating wedge slices that shipped originally. */
+       If assets/img/wheel.png exists + decodes, drawWheel uses it
+       in place of the procedural disc/wedges. Two asset shapes are
+       supported, picked automatically from the image's aspect:
+
+         • SQUARE (w≈h) — a top-down circular wheel head. It is
+           rotated by SHAPE.wheelPhase, then flattened to an
+           ellipse, so it spins like a real wheel under perspective.
+
+         • LANDSCAPE (w noticeably > h) — a pre-rendered 3D /
+           perspective wheel (already shows the side wall + an
+           elliptical top, baked lighting). You CANNOT rotate this
+           in circular space — that would spin the whole 3D body
+           every frame and look broken. So it's drawn STATIC at its
+           native aspect, centred on the pot, with its top surface
+           parked at SHAPE.baseY. The spin is decorative anyway (the
+           pot silhouette never visually rotates either), so a still
+           wheel reads fine.
+
+       Until the file lands, we fall back to the procedural disc +
+       alternating wedge slices that shipped originally. */
     const WHEEL_IMG = (function () {
         const img = new Image();
         img._loaded = false;
         img.addEventListener("load", function () { img._loaded = true; });
         img.addEventListener("error", function () {/* no-op — fallback runs */});
-        img.src = "assets/wheel.png";
+        img.src = "assets/img/wheel.png";
         return img;
     }());
+
+    /* Fraction of a perspective wheel image's HEIGHT that sits ABOVE
+       the visible top surface (the ellipse the pot rests on). Tune if
+       a future wheel render has its top surface higher/lower in frame.
+       For the shipped wood wheel the top-surface centre is ~30% down. */
+    const WHEEL_ASSET_TOP_FRAC = 0.30;
 
     function drawWheel(ctx) {
         const cx = SHAPE.centerX;
@@ -3530,11 +3545,25 @@
 
         const useAsset = WHEEL_IMG && WHEEL_IMG._loaded &&
                          WHEEL_IMG.naturalWidth > 0;
+        const aspect = useAsset
+            ? WHEEL_IMG.naturalWidth / WHEEL_IMG.naturalHeight
+            : 1;
+        const isPerspective = useAsset && aspect > 1.3;
 
-        if (useAsset) {
-            /* Asset path — rotate in circular space, then squash
-               to ellipse. drawImage is sized as a 2*rx square so
-               the asset's edges line up with the procedural rim. */
+        if (isPerspective) {
+            /* Perspective asset — draw static at native aspect. Width
+               keyed to the procedural rim (slightly wider so the wood
+               edge reads past the pot base, like the old disc). Top
+               surface parked at baseY via WHEEL_ASSET_TOP_FRAC. */
+            const drawW = rx * 2.1;
+            const drawH = drawW / aspect;
+            const x = cx - drawW / 2;
+            const y = cy - drawH * WHEEL_ASSET_TOP_FRAC;
+            ctx.drawImage(WHEEL_IMG, x, y, drawW, drawH);
+        } else if (useAsset) {
+            /* Square asset path — rotate in circular space, then
+               squash to ellipse. drawImage is sized as a 2*rx square
+               so the asset's edges line up with the procedural rim. */
             ctx.save();
             ctx.translate(cx, cy);
             ctx.scale(1, ry / rx);
