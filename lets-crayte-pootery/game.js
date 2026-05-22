@@ -2367,12 +2367,19 @@
        are cached per (ctx, clayId) the first time they paint, so
        there's no per-frame allocation in the render hot path.
        ============================================================ */
+    /* Clay textures live in assets/textures/clay/, named to match
+       each clay material (earth / porcy / stone / basalt / galaxy
+       / void) rather than the old color-based names. void is the
+       MASTER_POTTER unlock clay; its texture loads alongside the
+       rest (the clay itself stays hidden in the picker until
+       earned, but pre-loading the texture costs nothing). */
     const CLAY_TEXTURE_FILES = {
-        earthenware: "terra",
-        porcelain:   "white",
-        stoneware:   "gray",
-        basalt:      "black",
-        galaxy:      "blue"
+        earthenware: "earth",
+        porcelain:   "porcy",
+        stoneware:   "stone",
+        basalt:      "basalt",
+        galaxy:      "galaxy",
+        void:        "void"
     };
     const CLAY_TEXTURES = Object.create(null);          /* matId -> Image */
     const CLAY_PATTERN_CACHE = new WeakMap();           /* ctx -> {matId:Pattern} */
@@ -2380,7 +2387,7 @@
     function loadClayTextures() {
         Object.keys(CLAY_TEXTURE_FILES).forEach(function (matId) {
             const img = new Image();
-            img.src = "assets/textures/" +
+            img.src = "assets/textures/clay/" +
                       CLAY_TEXTURE_FILES[matId] + ".png";
             CLAY_TEXTURES[matId] = img;
         });
@@ -4863,6 +4870,17 @@
         dinosaur: "builder packs/"
     };
 
+    /* Override for sheets whose shop-card ICON frame is named
+       differently from the sheet file. Most sheets name their
+       icon frame after the sheet (candy.json has a "candy"
+       frame); chickens.json's icon frame is the singular
+       "chicken". The override tells the loader which frame to
+       treat as the icon (skip from the stamp bank) + tells
+       applyPackIconToCover which frame to paint. */
+    const STICKER_ICON_FRAMES = {
+        chickens: "chicken"
+    };
+
     function stickerSheetPath(name, ext) {
         const dir = STICKER_SHEET_DIRS[name] || "";
         return encodeURI("assets/stickers/" + dir + name + "." + ext);
@@ -4880,7 +4898,8 @@
         sheets.forEach(function (name) {
             const img = new Image();
             img.src = stickerSheetPath(name, "png");
-            const rec = { img: img, frames: null, iconFrame: name };
+            const iconFrame = STICKER_ICON_FRAMES[name] || name;
+            const rec = { img: img, frames: null, iconFrame: iconFrame };
             STICKER_SHEETS[name] = rec;
             fetch(stickerSheetPath(name, "json"))
                 .then(function (r) { return r.ok ? r.json() : null; })
@@ -4888,7 +4907,7 @@
                     if (!manifest || !manifest.frames) return;
                     rec.frames = manifest.frames;
                     Object.keys(manifest.frames).forEach(function (frameId) {
-                        if (frameId === name) return;   /* icon, not a bank stamp */
+                        if (frameId === iconFrame) return;   /* icon, not a bank stamp */
                         PATTERN_DRAWERS[name + "/" + frameId] = makeSheetDrawer(rec, frameId);
                     });
                     if (currentScreen === "decorate" &&
@@ -5117,6 +5136,7 @@
             packType: "builder",   /* parts build a dinosaur */
             buildSubject: "dino",
             sheet: "dinosaur",
+            surfaceTexture: "dinosaur", /* assets/textures/dinosaur.png */
             backgroundSvg: "dinosaur", /* assets/backgrounds/dinosaur.svg (optional) */
             description: "Fossil bone, amber, jurassic jungle greens, T-rex red.",
             coverEmoji: "\u{1F996}",   /* T-Rex */
@@ -5168,6 +5188,7 @@
             id: "music", label: "MUSIC",
             packType: "crafter",
             sheet: "music",
+            surfaceTexture: "music",   /* assets/textures/music.png */
             backgroundSvg: "music",    /* assets/backgrounds/music.svg (optional) */
             description: "Vinyl black, brass, neon stage lights.",
             coverEmoji: "\u{1F3B5}",   /* musical note */
@@ -5237,8 +5258,9 @@
             id: "chickens", label: "CHICKENS",
             packType: "special",
             sheet: "chickens",
+            surfaceTexture: "chicken",  /* assets/textures/chicken.png */
             backgroundSvg: "chickens", /* assets/backgrounds/chickens.svg (optional) */
-            description: "PLACEHOLDER — twelve costumed chickens. " +
+            description: "PLACEHOLDER — eleven costumed chickens. " +
                          "Kelly writes the real copy.",
             coverEmoji: "\u{1F414}",   /* chicken */
             priceCents: 199,
@@ -5257,20 +5279,19 @@
                 "ROOSTER BLACK"
             ],
             patterns: [
-                "chickens/costume (1)", "chickens/costume (2)",
-                "chickens/costume (3)", "chickens/costume (4)",
-                "chickens/costume (5)", "chickens/costume (6)",
-                "chickens/costume (7)", "chickens/costume (8)",
-                "chickens/costume (9)", "chickens/costume (10)",
-                "chickens/costume (11)", "chickens/costume (12)"
+                "chickens/magician", "chickens/ninja", "chickens/gears",
+                "chickens/pirate", "chickens/neon", "chickens/robocluck",
+                "chickens/cyborg", "chickens/christmas", "chickens/halloween",
+                "chickens/astronaut", "chickens/comboy"
             ]
         },
         {
             id: "aliens", label: "ALIENS",
             packType: "special",
             sheet: "aliens",
+            surfaceTexture: "aliens",   /* assets/textures/aliens.png */
             backgroundSvg: "aliens",   /* assets/backgrounds/aliens.svg (optional) */
-            description: "PLACEHOLDER — nine little visitors. " +
+            description: "PLACEHOLDER — eight little visitors. " +
                          "Kelly writes the real copy.",
             coverEmoji: "\u{1F47D}",   /* alien */
             priceCents: 199,
@@ -5292,14 +5313,14 @@
                 "aliens/alien-one", "aliens/alien-two",
                 "aliens/alien-three", "aliens/alien-four",
                 "aliens/alien-five", "aliens/alien-six",
-                "aliens/alien-seven", "aliens/alien-eight",
-                "aliens/alien-nine"
+                "aliens/alien-seven", "aliens/alien-eight"
             ]
         },
         {
             id: "moons", label: "MOONS",
             packType: "special",
             sheet: "literally-moons",   /* sheet file is hyphenated */
+            surfaceTexture: "literally-moons", /* assets/textures/literally-moons.png */
             backgroundSvg: "moons",    /* assets/backgrounds/moons.svg (optional) */
             description: "PLACEHOLDER — literally moons. And comets. " +
                          "Kelly writes the real copy.",
@@ -5322,8 +5343,8 @@
             patterns: [
                 "literally-moons/moon-violet", "literally-moons/moon-orange",
                 "literally-moons/moon-pink", "literally-moons/moon-red",
-                "literally-moons/moon-yellow", "literally-moons/moon-cyan",
-                "literally-moons/moon-blue", "literally-moons/moon-green",
+                "literally-moons/moon-cyan", "literally-moons/moon-blue",
+                "literally-moons/moon-green",
                 "literally-moons/comet-yellow", "literally-moons/comet-blue",
                 "literally-moons/comet-purple", "literally-moons/comet-red"
             ]
@@ -12745,9 +12766,37 @@
         sync("devInfiniteClay", "infiniteClay");
         sync("devSentientPot",  "sentientPot");
         sync("devOneFrameFire", "oneFrameFire");
+        /* Unlock-all reflects whether every paid pack is currently
+           in the owned cache. */
+        const up = document.getElementById("devUnlockPacks");
+        if (up) up.checked = allPaidPacksOwned();
         poot(); poot();   /* victory chord */
         EGG.konamiTriggered = true;
         checkAchievements();
+    }
+
+    /* Dev testing helper — every paid pack id (priceCents set). */
+    function paidPackIds() {
+        return GLAZE_PACKS
+            .filter(function (p) { return !!p.priceCents; })
+            .map(function (p) { return p.id; });
+    }
+    function allPaidPacksOwned() {
+        const owned = loadOwnedPacks();
+        return paidPackIds().every(function (id) { return owned.has(id); });
+    }
+    function setAllPacksUnlocked(on) {
+        const owned = loadOwnedPacks();
+        paidPackIds().forEach(function (id) {
+            if (on) owned.add(id);
+            else    owned.delete(id);
+        });
+        saveOwnedPacks(owned);
+        /* Refresh whatever's on screen so the change shows now. */
+        if (currentScreen === "shop" &&
+                typeof refreshShopScreen === "function") refreshShopScreen();
+        if (currentScreen === "decorate" &&
+                typeof renderPackTabs === "function") renderPackTabs();
     }
 
     function closeDevMenu() {
@@ -12773,6 +12822,10 @@
         });
         if (of) of.addEventListener("change", function () {
             EGG.oneFrameFire = of.checked;
+        });
+        const up = document.getElementById("devUnlockPacks");
+        if (up) up.addEventListener("change", function () {
+            setAllPacksUnlocked(up.checked);
         });
     }
 
