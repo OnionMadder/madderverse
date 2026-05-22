@@ -3123,6 +3123,11 @@
         let didShape = false;
         const minR = EGG.infiniteClay ? 0   : SHAPE.MIN_R;
         const maxR = EGG.infiniteClay ? 9999 : SHAPE.MAX_R;
+        /* Base-width cap: the pot rests ON the wheel head, so its bottom
+           can't be pushed wider than the wheel (WHEEL_RX). The cap
+           relaxes over the first few samples so the body above is still
+           free to flare to MAX_R. clay[0] is the base, clay[N-1] the rim. */
+        const RAMP = 4;
         for (let i = 0; i < N; i++) {
             const d = i - centerIdx;
             const w = Math.exp(-d * d / sigma2);
@@ -3131,7 +3136,11 @@
                then we ease toward that desired over the frame. */
             const desired = clay[i].radius + (targetR - clay[i].radius) * w;
             const next = clay[i].radius + (desired - clay[i].radius) * ease;
-            const clamped = Math.max(minR, Math.min(maxR, next));
+            let hiR = maxR;
+            if (!EGG.infiniteClay && i <= RAMP) {
+                hiR = Math.min(maxR, WHEEL_RX + (maxR - WHEEL_RX) * (i / RAMP));
+            }
+            const clamped = Math.max(minR, Math.min(hiR, next));
             if (Math.abs(clamped - clay[i].radius) > 0.04) didShape = true;
             clay[i].radius = clamped;
         }
@@ -3556,8 +3565,8 @@
         img.src = src;
         return img;
     }
-    /* Spinning top-down wheel head used while sculpting. */
-    const WHEEL_IMG = loadWheelImg("assets/img/wheel.png");
+    /* (wheel.png removed — the shape-screen wheel head is now drawn as
+       generated metal chrome; see drawWheelHeadMetal.) */
     /* Static perspective wood plinth the finished pot sits on in the
        gallery / saved-pot renders (used when _displayWheel is on). */
     const DISPLAY_IMG = loadWheelImg("assets/img/display.png");
@@ -3569,97 +3578,160 @@
        ~30% down. */
     const WHEEL_ASSET_TOP_FRAC = 0.30;
 
+    /* Throwing-wheel geometry. WHEEL_RX also CAPS the pot's base radius
+       in applyShaping — the base can't spill wider than the wheel head
+       it sits on (the body above is free to flare). */
+    const WHEEL_RX = 132, WHEEL_RY = 30;
+
+    /* Finishes shared with the KILN-9000 chrome (see drawKilnChrome):
+       dark steel body, bright copper trim, steel rivets — so the wheel
+       + stand read as the same machined appliance family. */
+    function steelFill(ctx, y0, y1) {
+        const g = ctx.createLinearGradient(0, y0, 0, y1);
+        g.addColorStop(0,    "#1f2e36");
+        g.addColorStop(0.55, "#101c22");
+        g.addColorStop(1,    "#0a1418");
+        return g;
+    }
+    function copperBand(ctx, x0, x1) {
+        const g = ctx.createLinearGradient(x0, 0, x1, 0);
+        g.addColorStop(0,   "#5a3010");
+        g.addColorStop(0.5, "#c08040");
+        g.addColorStop(1,   "#5a3010");
+        return g;
+    }
+
     function drawWheel(ctx) {
         const cx = SHAPE.centerX;
         const cy = SHAPE.baseY;
-        const rx = 150;
-        const ry = 22;
 
-        /* Gallery display path — sit the pot on the static perspective
-           plinth. Drawn at native aspect, centred, with its top
-           surface parked at baseY (the body extends below). */
+        /* Gallery display path — pot on the perspective plinth. (This
+           becomes a CSS display cabinet in a later pass.) */
         const useDisplay = _displayWheel && DISPLAY_IMG &&
                            DISPLAY_IMG._loaded && DISPLAY_IMG.naturalWidth > 0;
         if (useDisplay) {
             const aspectD = DISPLAY_IMG.naturalWidth / DISPLAY_IMG.naturalHeight;
-            const drawW = rx * 2.1;
+            const drawW = 150 * 2.1;
             const drawH = drawW / aspectD;
             ctx.drawImage(DISPLAY_IMG, cx - drawW / 2,
                           cy - drawH * WHEEL_ASSET_TOP_FRAC, drawW, drawH);
             return;
         }
 
-        const useAsset = WHEEL_IMG && WHEEL_IMG._loaded &&
-                         WHEEL_IMG.naturalWidth > 0;
-        const aspect = useAsset
-            ? WHEEL_IMG.naturalWidth / WHEEL_IMG.naturalHeight
-            : 1;
-        const isPerspective = useAsset && aspect > 1.3;
+        /* SHAPE / DECORATE: a generated metal throwing wheel + stand,
+           finished to match the KILN-9000 chrome (replaces wheel.png). */
+        drawWheelStand(ctx, cx, cy);
+        drawWheelHeadMetal(ctx, cx, cy, SHAPE.wheelPhase);
+    }
 
-        if (isPerspective) {
-            /* Perspective asset in the wheel.png slot — draw static at
-               native aspect (back-compat for a landscape wheel.png). */
-            const drawW = rx * 2.1;
-            const drawH = drawW / aspect;
-            const x = cx - drawW / 2;
-            const y = cy - drawH * WHEEL_ASSET_TOP_FRAC;
-            ctx.drawImage(WHEEL_IMG, x, y, drawW, drawH);
-        } else if (useAsset) {
-            /* Square asset path — rotate in circular space, then
-               squash to ellipse. drawImage is sized as a 2*rx square
-               so the asset's edges line up with the procedural rim. */
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.scale(1, ry / rx);
-            ctx.rotate(SHAPE.wheelPhase);
-            ctx.drawImage(WHEEL_IMG, -rx, -rx, rx * 2, rx * 2);
-            ctx.restore();
-        } else {
-            /* Procedural fallback — original disc + wedges. */
-            const disc = ctx.createLinearGradient(cx - rx, cy, cx + rx, cy);
-            disc.addColorStop(0,    "#0d2228");
-            disc.addColorStop(0.5,  "#2a626c");
-            disc.addColorStop(1,    "#0d2228");
+    /* The cabinet/stand the wheel head is mounted in — a steel pedestal
+       flaring slightly to the floor, with a copper top band + rivets. */
+    function drawWheelStand(ctx, cx, cy) {
+        const top = cy - 2;
+        const bot = SHAPE.H;
+        /* Near-vertical sides + rounded base = a cabinet, not a splayed
+           stool. (The old version flared wider at the floor, which read
+           as stool legs.) */
+        const half = WHEEL_RX * 0.92;
+        const r = 22;   /* rounded bottom corners */
+
+        ctx.beginPath();
+        ctx.moveTo(cx - half, top);
+        ctx.lineTo(cx + half, top);
+        ctx.lineTo(cx + half, bot - r);
+        ctx.quadraticCurveTo(cx + half, bot, cx + half - r, bot);
+        ctx.lineTo(cx - half + r, bot);
+        ctx.quadraticCurveTo(cx - half, bot, cx - half, bot - r);
+        ctx.closePath();
+        ctx.fillStyle = steelFill(ctx, top, bot);
+        ctx.fill();
+
+        /* copper trim down the sides, following the rounded corners */
+        ctx.strokeStyle = copperBand(ctx, cx - half, cx + half);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(cx - half, top);
+        ctx.lineTo(cx - half, bot - r);
+        ctx.quadraticCurveTo(cx - half, bot, cx - half + r, bot);
+        ctx.moveTo(cx + half, top);
+        ctx.lineTo(cx + half, bot - r);
+        ctx.quadraticCurveTo(cx + half, bot, cx + half - r, bot);
+        ctx.stroke();
+
+        /* copper band + rivet row just below the wheel head */
+        const bandY = cy + WHEEL_RY + 3;
+        const bandHalf = WHEEL_RX * 0.86;
+        ctx.fillStyle = copperBand(ctx, cx - bandHalf, cx + bandHalf);
+        ctx.fillRect(cx - bandHalf, bandY, bandHalf * 2, 5);
+        ctx.fillStyle = "#4a5860";
+        for (let x = cx - bandHalf + 12; x < cx + bandHalf - 6; x += 26) {
             ctx.beginPath();
-            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-            ctx.fillStyle = disc;
+            ctx.arc(x, bandY + 2.5, 2.2, 0, Math.PI * 2);
             ctx.fill();
+        }
+    }
 
-            ctx.save();
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, rx - 2, ry - 2, 0, 0, Math.PI * 2);
-            ctx.clip();
-            ctx.translate(cx, cy);
-            ctx.scale(1, ry / rx);
-            ctx.rotate(SHAPE.wheelPhase);
-            const segs = 6;
-            for (let i = 0; i < segs; i++) {
-                const a0 = (i / segs) * Math.PI * 2;
-                const a1 = ((i + 1) / segs) * Math.PI * 2;
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.arc(0, 0, rx, a0, a1);
-                ctx.closePath();
-                ctx.fillStyle = (i % 2 === 0)
-                    ? "rgba(255, 255, 255, 0.05)"
-                    : "rgba(0, 0, 0, 0.18)";
-                ctx.fill();
-            }
-            ctx.restore();
+    /* The spinning metal wheel head: turned-steel disc, concentric
+       grooves, copper rim, a few copper bolts that rotate to sell the
+       spin, and a center spindle cap. */
+    function drawWheelHeadMetal(ctx, cx, cy, phase) {
+        const rx = WHEEL_RX, ry = WHEEL_RY;
 
-            /* Rim ring + front-edge highlight only on the
-               procedural wheel — a real asset carries its own. */
-            ctx.strokeStyle = "rgba(0, 0, 0, 0.7)";
-            ctx.lineWidth = 2;
+        const g = ctx.createRadialGradient(cx, cy - ry * 0.3, 4, cx, cy, rx);
+        g.addColorStop(0,    "#3c4e57");
+        g.addColorStop(0.5,  "#243741");
+        g.addColorStop(1,    "#0e1a20");
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.clip();
+        /* concentric turn-grooves */
+        ctx.strokeStyle = "rgba(0, 0, 0, 0.28)";
+        ctx.lineWidth = 1;
+        for (let r = rx - 10; r > 8; r -= 12) {
             ctx.beginPath();
-            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
-            ctx.stroke();
-            ctx.strokeStyle = "rgba(0, 255, 204, 0.18)";
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, rx - 1, ry - 1, 0, 0.1, Math.PI - 0.1);
+            ctx.ellipse(cx, cy, r, r * (ry / rx), 0, 0, Math.PI * 2);
             ctx.stroke();
         }
+        /* rotating copper bolts near the rim — the spin cue */
+        ctx.translate(cx, cy);
+        ctx.scale(1, ry / rx);
+        ctx.rotate(phase);
+        ctx.fillStyle = "#c08040";
+        for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.arc(Math.cos(a) * (rx - 14), Math.sin(a) * (rx - 14), 3.2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+
+        /* copper rim trim */
+        ctx.strokeStyle = copperBand(ctx, cx - rx, cx + rx);
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        /* teal sheen on the front lip */
+        ctx.strokeStyle = "rgba(0, 255, 204, 0.16)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rx - 1, ry - 1, 0, 0.12, Math.PI - 0.12);
+        ctx.stroke();
+
+        /* center spindle cap */
+        ctx.fillStyle = "#3c4e57";
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, 9, 9 * (ry / rx), 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = copperBand(ctx, cx - 9, cx + 9);
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
     }
 
     function buildPotPath(ctx) {
@@ -3700,19 +3772,10 @@
         }
         if (maxR < 1) maxR = 1;
 
-        /* Soft shadow under the pot — only on the working screens
-           (shape/decorate/kiln). The gallery skips it: the display
-           plinth (display.png) carries its own baked contact shadow,
-           and a second dark ellipse just muddies the side-lit
-           display-case look. */
-        if (!_galleryLighting) {
-            ctx.save();
-            ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-            ctx.beginPath();
-            ctx.ellipse(cx, SHAPE.baseY + 6, maxR * 1.05, 10, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.restore();
-        }
+        /* (Overhead contact shadow removed — the symmetric dark ellipse
+           directly under the pot read as high-noon lighting, fighting
+           the left-and-behind key light. The pot now sits straight on
+           the metal wheel head, which grounds it on its own.) */
 
         /* Fill pot body — gently asymmetric gradient tuned for a
            mid-distance studio feel (vs the previous close/macro
@@ -3767,6 +3830,35 @@
             w: (maxR + 4) * 2,
             h: SHAPE.baseY - clay[N - 1].y + 14
         });
+
+        /* Foot ring — now that the base is capped to the wheel, give the
+           pot a turned foot: the body tucks in just above the base to a
+           narrower foot rim it stands on. An undercut shadow marks where
+           the base overhangs, then a darker clay foot band sits on the
+           wheel. Skipped when the base is pinched near minimum. */
+        const footBaseR = clay[0].radius;
+        if (footBaseR > SHAPE.MIN_R + 8) {
+            const footR = footBaseR * 0.80;
+            const footY = SHAPE.baseY;
+            ctx.save();
+            /* undercut shadow where the wider base overhangs the foot */
+            ctx.fillStyle = "rgba(0, 0, 0, 0.30)";
+            ctx.beginPath();
+            ctx.ellipse(cx, footY - 5, footBaseR * 0.93, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            /* the foot rim the pot stands on — darker clay tone */
+            ctx.fillStyle = stops[1];
+            ctx.beginPath();
+            ctx.ellipse(cx, footY, footR, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+            /* front-left sheen on the foot (matches the key light) */
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.ellipse(cx, footY, footR, 6, 0, Math.PI * 0.05, Math.PI * 0.62);
+            ctx.stroke();
+            ctx.restore();
+        }
 
         /* Light catches (sheen + rim) moved OUT of drawPot into
            paintLightCatches() below — they're now called from

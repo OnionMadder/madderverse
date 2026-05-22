@@ -915,73 +915,10 @@ a:focus-visible {
     z-index: 1;
 }
 
-/* ---- Wheel housing / splash-pan table ----
-   The spinning wheel head (assets/img/wheel.png) is a flat top-down
-   disc drawn in the lower canvas, so on its own it floats with no
-   sense of depth. This CSS housing fakes a potter's-wheel splash pan
-   + cabinet by overlaying the LOWER canvas (the wheel sits at
-   baseY = 510/600 ≈ 85% down; everything below that is pure wheel,
-   the pot base rests on the line and grows upward — so the overlay
-   never covers the pot).
-
-     • ::after  — the cabinet apron: a steel band from ~85% to the
-       canvas bottom that masks the flat front/underside of the disc
-       and reads as the table the wheel is mounted in.
-     • ::before — the pan rim: a shallow steel ellipse whose top arc
-       crosses just at the wheel line, so the disc reads as sitting
-       DOWN INTO the pan. Teal top-edge glow ties it to the framed
-       panel aesthetic used on the rest of the app.
-
-   isolation:isolate keeps the z-index local; pointer-events:none so
-   shaping drags still hit the canvas underneath. Tunable via the
-   `top`/`height` percentages if the line wants to ride higher/lower. */
-.shape-canvas-wrap {
-    isolation: isolate;
-}
-
-.shape-canvas-wrap::after {
-    content: "";
-    position: absolute;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    height: 15%;          /* top edge ≈ 85% — the wheel line (baseY) */
-    z-index: 2;
-    pointer-events: none;
-    border-radius: 0 0 var(--radius-md) var(--radius-md);
-    background: linear-gradient(180deg,
-        #33474e 0%,
-        #1d2f35 38%,
-        #0c181c 100%);
-    box-shadow:
-        inset 0 2px 0 rgba(0, 255, 204, 0.16),
-        inset 0 12px 18px rgba(0, 0, 0, 0.45);
-}
-
-.shape-canvas-wrap::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    /* A SHALLOW pan lip seated AT the wheel line — top arc rests on
-       baseY (~85%), same width as the wheel disc, so it rims the
-       wheel's front edge instead of floating below it as a 2nd plate.
-       bottom:9% + height:6% => spans ~85%–91%, riding on the apron. */
-    bottom: 9%;
-    width: 76%;
-    height: 6%;
-    z-index: 3;
-    pointer-events: none;
-    border-radius: 50%;
-    background: radial-gradient(ellipse at 50% 30%,
-        #5a6e76 0%,
-        #38494f 48%,
-        #1b2a30 100%);
-    box-shadow:
-        inset 0 2px 5px rgba(255, 255, 255, 0.24),
-        inset 0 -5px 9px rgba(0, 0, 0, 0.5),
-        0 0 10px rgba(0, 255, 204, 0.10);
-}
+/* The throwing wheel + stand are now drawn entirely in the canvas
+   (see drawWheelStand / drawWheelHeadMetal in game.js), finished to
+   match the KILN-9000 chrome. The old CSS splash-pan/cabinet housing
+   pseudo-elements were removed — they're fully superseded. */
 
 .shape-hint {
     margin: 2px 8px 0;
