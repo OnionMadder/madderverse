@@ -5157,8 +5157,13 @@
                 "ELECTRIC BLUE", "BLACK OPS",
                 "BRUSHED ALUMINUM", "CYBER VIOLET"
             ],
-            patterns: ["modded/robotic", "modded/disc", "modded/icon",
-                       "modded/reader", "modded/laptop"]
+            /* Frame names match modded.json's re-exported sheet
+               (cap/ic/led/resistors/wires; "modded" is the shop
+               icon, excluded from the bank). The old robotic/disc/
+               icon/reader/laptop names no longer exist in the sheet,
+               so they resolved to undefined drawers = blank stamps. */
+            patterns: ["modded/cap", "modded/ic", "modded/led",
+                       "modded/resistors", "modded/wires"]
         },
         {
             id: "gamer", label: "GAMER",
