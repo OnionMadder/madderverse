@@ -2438,6 +2438,14 @@
        paths are unaffected. null = use wheel phase as before. */
     let _viewSpinDx = null;
 
+    /* DISPLAY WHEEL: gallery / saved-pot renders sit the finished
+       pot on the perspective wood plinth (assets/img/display.png)
+       instead of the spinning top-down wheel head used while
+       sculpting. renderSavedPot flips this on before painting and
+       restores it after, so the live shape phase keeps wheel.png.
+       false = use the spinning wheel.png as before. */
+    let _displayWheel = false;
+
     function paintClayTexture(ctx, mat, bounds) {
         if (!ctx || !mat) return;
         const pat = getClayPattern(ctx, mat.id);
@@ -3522,19 +3530,25 @@
 
        Until the file lands, we fall back to the procedural disc +
        alternating wedge slices that shipped originally. */
-    const WHEEL_IMG = (function () {
+    function loadWheelImg(src) {
         const img = new Image();
         img._loaded = false;
         img.addEventListener("load", function () { img._loaded = true; });
         img.addEventListener("error", function () {/* no-op — fallback runs */});
-        img.src = "assets/img/wheel.png";
+        img.src = src;
         return img;
-    }());
+    }
+    /* Spinning top-down wheel head used while sculpting. */
+    const WHEEL_IMG = loadWheelImg("assets/img/wheel.png");
+    /* Static perspective wood plinth the finished pot sits on in the
+       gallery / saved-pot renders (used when _displayWheel is on). */
+    const DISPLAY_IMG = loadWheelImg("assets/img/display.png");
 
     /* Fraction of a perspective wheel image's HEIGHT that sits ABOVE
        the visible top surface (the ellipse the pot rests on). Tune if
-       a future wheel render has its top surface higher/lower in frame.
-       For the shipped wood wheel the top-surface centre is ~30% down. */
+       a future plinth render has its top surface higher/lower in
+       frame. For the shipped wood plinth the top-surface centre is
+       ~30% down. */
     const WHEEL_ASSET_TOP_FRAC = 0.30;
 
     function drawWheel(ctx) {
@@ -3542,6 +3556,20 @@
         const cy = SHAPE.baseY;
         const rx = 150;
         const ry = 22;
+
+        /* Gallery display path — sit the pot on the static perspective
+           plinth. Drawn at native aspect, centred, with its top
+           surface parked at baseY (the body extends below). */
+        const useDisplay = _displayWheel && DISPLAY_IMG &&
+                           DISPLAY_IMG._loaded && DISPLAY_IMG.naturalWidth > 0;
+        if (useDisplay) {
+            const aspectD = DISPLAY_IMG.naturalWidth / DISPLAY_IMG.naturalHeight;
+            const drawW = rx * 2.1;
+            const drawH = drawW / aspectD;
+            ctx.drawImage(DISPLAY_IMG, cx - drawW / 2,
+                          cy - drawH * WHEEL_ASSET_TOP_FRAC, drawW, drawH);
+            return;
+        }
 
         const useAsset = WHEEL_IMG && WHEEL_IMG._loaded &&
                          WHEEL_IMG.naturalWidth > 0;
@@ -3551,10 +3579,8 @@
         const isPerspective = useAsset && aspect > 1.3;
 
         if (isPerspective) {
-            /* Perspective asset — draw static at native aspect. Width
-               keyed to the procedural rim (slightly wider so the wood
-               edge reads past the pot base, like the old disc). Top
-               surface parked at baseY via WHEEL_ASSET_TOP_FRAC. */
+            /* Perspective asset in the wheel.png slot — draw static at
+               native aspect (back-compat for a landscape wheel.png). */
             const drawW = rx * 2.1;
             const drawH = drawW / aspect;
             const x = cx - drawW / 2;
@@ -8339,6 +8365,12 @@
            screens keep their calm studio light. */
         const savedGalleryLight = _galleryLighting;
         _galleryLighting = (opts.galleryLight !== false);
+        /* DISPLAY WHEEL: saved pots sit on the perspective wood plinth
+           (display.png) unless the caller opts out (opts.displayWheel
+           === false). Restored in finally so the live shape phase
+           keeps the spinning top-down wheel.png. */
+        const savedDisplayWheel = _displayWheel;
+        _displayWheel = (opts.displayWheel !== false);
         try {
             if (opts.background !== false) {
                 ctx.fillStyle = "#0c1f25";
@@ -8427,6 +8459,7 @@
             SHAPE.clayTypeId = savedClayTypeId;
             _viewSpinDx = savedSpinDx;
             _galleryLighting = savedGalleryLight;
+            _displayWheel = savedDisplayWheel;
         }
     }
 
