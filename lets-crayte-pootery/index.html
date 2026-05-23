@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=42" />
+    <link rel="stylesheet" href="style.css?v=43" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -387,7 +387,7 @@
 
         <div class="canvas-wrap">
             <canvas id="decorateCanvas" width="400" height="600"
-                    aria-label="Locked pot. Drag to paint, tap to stamp. Pinch to zoom, two-finger drag to pan."></canvas>
+                    aria-label="Locked pot. Tap to paint, tap to thwack a stamp. Pinch to zoom, two-finger drag to pan."></canvas>
             <!-- Floating command ribbon — ERASE / CLEAR / UNDO /
                  REDO pulled OUT of the tool tray. These act on the
                  whole painting (commands), not paint modes, so they
@@ -398,16 +398,16 @@
                  the eraser tool (lights up while active). -->
             <div class="canvas-cmd-ribbon" aria-label="Canvas commands">
                 <button class="cmd-btn cmd-erase" id="decErase" type="button"
-                        title="Eraser — tap the pot to rub paint off"
+                        title="Undid — tap the pot to rub paint off"
                         aria-label="Eraser" aria-pressed="false">
                     <span class="cmd-glyph" aria-hidden="true">&#x232B;</span>
-                    <span class="cmd-label">ERASE</span>
+                    <span class="cmd-label">UNDID</span>
                 </button>
                 <button class="cmd-btn cmd-clear" id="decClear" type="button"
-                        title="Clear the whole pot"
+                        title="Nuke the whole pot"
                         aria-label="Clear the whole pot">
                     <span class="cmd-glyph" aria-hidden="true">&#x2715;</span>
-                    <span class="cmd-label">CLEAR</span>
+                    <span class="cmd-label">NUKE</span>
                 </button>
                 <button class="cmd-btn" id="undoBtn" type="button"
                         title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
@@ -451,7 +451,7 @@
         <button class="drawer-handle" type="button"
                 aria-expanded="false" aria-label="Show tools">
             <span class="drawer-pull" aria-hidden="true">&#9650;</span>
-            <span class="drawer-label">TOOLS</span>
+            <span class="drawer-label">MESS TOOLS</span>
         </button>
 
         <div class="decorate-tools">
@@ -459,7 +459,7 @@
             <!-- STASH header sits above the pack strip so the kid
                  reads the horizontal row as "which box of glazes +
                  stamps am I digging in". -->
-            <span class="row-label stash-label">PACK</span>
+            <span class="row-label stash-label">STASH</span>
 
             <!-- Pack tabs are rendered dynamically from GLAZE_PACKS
                  filtered by ownership (renderPackTabs). The strip
@@ -480,11 +480,11 @@
                  (syncToolContext in game.js). -->
             <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
                 <button class="tool-btn" data-tool="brush"    type="button">BRUSH</button>
-                <button class="tool-btn" data-tool="spray"    type="button">SPRAY</button>
-                <button class="tool-btn" data-tool="splatter" type="button">SPLAT</button>
-                <button class="tool-btn" data-tool="stamp"    type="button">STAMP</button>
-                <button class="tool-btn" data-tool="texture"  id="decTexture" type="button">TEXTURE</button>
-                <button class="tool-btn" data-tool="move"     id="decMove"    type="button">MOVE</button>
+                <button class="tool-btn" data-tool="spray"    type="button">SPRTZ</button>
+                <button class="tool-btn" data-tool="splatter" type="button">SPLORTCH</button>
+                <button class="tool-btn" data-tool="stamp"    type="button">THWACK</button>
+                <button class="tool-btn" data-tool="texture"  id="decTexture" type="button">CRUNCH</button>
+                <button class="tool-btn" data-tool="move"     id="decMove"    type="button">SCOOT</button>
             </div>
 
             <!-- ===== Contextual control blocks (.ctx-block) =====
@@ -496,7 +496,7 @@
             <!-- SIZE — paint/erase/stamp scale. -->
             <div class="tool-row size-row ctx-block"
                  data-ctx="brush spray splatter stamp eraser">
-                <span class="row-label">SIZE</span>
+                <span class="row-label">CHONK</span>
                 <input type="range" min="4" max="32" step="1" value="14"
                        id="brushSize" class="tool-slider"
                        aria-label="Brush size in pixels" />
@@ -507,7 +507,7 @@
                  ignore it). 15deg steps so the slider has 24 detents
                  around the circle. -->
             <div class="tool-row rotate-row ctx-block" data-ctx="stamp">
-                <span class="row-label">ROT</span>
+                <span class="row-label">SPIN</span>
                 <input type="range" min="0" max="345" step="15" value="0"
                        id="stampRotate" class="tool-slider"
                        aria-label="Stamp rotation in degrees" />
@@ -531,13 +531,13 @@
             <!-- GLAZE — paint + stamp tint. Hidden for MOVE. -->
             <div class="tool-row palette-row glaze-row ctx-block"
                  data-ctx="brush spray splatter stamp">
-                <span class="row-label">GLAZE</span>
+                <span class="row-label">GOO</span>
                 <div class="palette glaze-palette" id="glazePalette" role="listbox" aria-label="Glaze colors"></div>
             </div>
 
             <!-- STAMPS — stamp tool only. -->
             <div class="tool-row palette-row stamps-row ctx-block" data-ctx="stamp">
-                <span class="row-label">STAMPS</span>
+                <span class="row-label">THWACKS</span>
                 <div class="palette pattern-palette" id="patternPalette" role="listbox" aria-label="Stamp patterns"></div>
             </div>
 
@@ -1277,7 +1277,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=42"></script>
+<script src="game.js?v=43"></script>
 
 </body>
 </html>
