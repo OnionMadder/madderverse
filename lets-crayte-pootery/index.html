@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=46" />
+    <link rel="stylesheet" href="style.css?v=47" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -389,14 +389,13 @@
             <canvas id="decorateCanvas" width="400" height="600"
                     aria-label="Locked pot. Tap to paint, tap to thwack a stamp. Pinch to zoom, two-finger drag to pan."></canvas>
             <!-- Floating command ribbon — NUKE (clear) / UNDID (step
-                 back). These act on the whole painting (commands), not
-                 paint modes, so they live on the canvas instead of
-                 sitting in the tool tray. Pinned top-right, clear of
-                 the bottom-left zoom cluster. UNDID keeps its Ctrl/Cmd+Z
-                 shortcut and disables when the stack is empty. (REDO is
-                 still reachable via Ctrl/Cmd+Shift+Z; the redo button
-                 was dropped at the user's request. BALEET is now a tool
-                 in the tray, not a ribbon command.) -->
+                 back) / REDO. These act on the whole painting
+                 (commands), not paint modes, so they live on the canvas
+                 instead of sitting in the tool tray. Pinned top-right,
+                 clear of the bottom-left zoom cluster. UNDID/REDO keep
+                 their Ctrl/Cmd+Z shortcuts and disable when their stack
+                 is empty. (BALEET is now a tool in the tray, not a
+                 ribbon command.) -->
             <div class="canvas-cmd-ribbon" aria-label="Canvas commands">
                 <button class="cmd-btn cmd-clear" id="decClear" type="button"
                         title="Nuke the whole pot"
@@ -408,6 +407,11 @@
                         title="Undid — step back (Ctrl+Z)" aria-label="Undo" disabled>
                     <span class="cmd-glyph" aria-hidden="true">&#x21B6;</span>
                     <span class="cmd-label">UNDID</span>
+                </button>
+                <button class="cmd-btn" id="redoBtn" type="button"
+                        title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
+                    <span class="cmd-glyph" aria-hidden="true">&#x21B7;</span>
+                    <span class="cmd-label">REDO</span>
                 </button>
             </div>
 
@@ -1283,7 +1287,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=46"></script>
+<script src="game.js?v=47"></script>
 
 </body>
 </html>
