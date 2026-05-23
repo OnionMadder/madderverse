@@ -6170,7 +6170,6 @@
         /* Rotation slider */
         const slider = document.getElementById("stampRotate");
         const valEl  = document.getElementById("stampRotateValue");
-        const reset  = document.getElementById("stampRotateReset");
 
         function applyRotation(deg) {
             const d = ((deg % 360) + 360) % 360;
@@ -6182,7 +6181,6 @@
         if (slider) slider.addEventListener("input", function () {
             applyRotation(parseInt(slider.value, 10) || 0);
         });
-        if (reset) reset.addEventListener("click", function () { applyRotation(0); });
 
         /* Flip-horizontal toggle — lives in the same .rotate-row as
            the ROT slider. Mirrors the next stamp on the X axis;

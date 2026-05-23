@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=43" />
+    <link rel="stylesheet" href="style.css?v=44" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -388,20 +388,21 @@
         <div class="canvas-wrap">
             <canvas id="decorateCanvas" width="400" height="600"
                     aria-label="Locked pot. Tap to paint, tap to thwack a stamp. Pinch to zoom, two-finger drag to pan."></canvas>
-            <!-- Floating command ribbon — ERASE / CLEAR / UNDO /
-                 REDO pulled OUT of the tool tray. These act on the
-                 whole painting (commands), not paint modes, so they
-                 live on the canvas instead of sitting beside BRUSH.
-                 Pinned top-right, clear of the bottom-left zoom
-                 cluster. Undo/redo keep their Ctrl/Cmd+Z shortcuts
-                 and disable when their stack is empty; ERASE selects
-                 the eraser tool (lights up while active). -->
+            <!-- Floating command ribbon — BALEET (eraser) / NUKE
+                 (clear) / UNDID (step back) / REDO pulled OUT of the
+                 tool tray. These act on the whole painting (commands),
+                 not paint modes, so they live on the canvas instead
+                 of sitting beside BRUSH. Pinned top-right, clear of
+                 the bottom-left zoom cluster. UNDID/REDO keep their
+                 Ctrl/Cmd+Z shortcuts and disable when their stack is
+                 empty; BALEET selects the eraser tool (lights up
+                 while active). -->
             <div class="canvas-cmd-ribbon" aria-label="Canvas commands">
                 <button class="cmd-btn cmd-erase" id="decErase" type="button"
-                        title="Undid — tap the pot to rub paint off"
+                        title="Baleet — tap the pot to rub paint off"
                         aria-label="Eraser" aria-pressed="false">
                     <span class="cmd-glyph" aria-hidden="true">&#x232B;</span>
-                    <span class="cmd-label">UNDID</span>
+                    <span class="cmd-label">BALEET</span>
                 </button>
                 <button class="cmd-btn cmd-clear" id="decClear" type="button"
                         title="Nuke the whole pot"
@@ -410,9 +411,9 @@
                     <span class="cmd-label">NUKE</span>
                 </button>
                 <button class="cmd-btn" id="undoBtn" type="button"
-                        title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+                        title="Undid — step back (Ctrl+Z)" aria-label="Undo" disabled>
                     <span class="cmd-glyph" aria-hidden="true">&#x21B6;</span>
-                    <span class="cmd-label">UNDO</span>
+                    <span class="cmd-label">UNDID</span>
                 </button>
                 <button class="cmd-btn" id="redoBtn" type="button"
                         title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
@@ -481,7 +482,7 @@
             <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
                 <button class="tool-btn" data-tool="brush"    type="button">BRUSH</button>
                 <button class="tool-btn" data-tool="spray"    type="button">SPRTZ</button>
-                <button class="tool-btn" data-tool="splatter" type="button">SPLORTCH</button>
+                <button class="tool-btn" data-tool="splatter" type="button">SPLAT</button>
                 <button class="tool-btn" data-tool="stamp"    type="button">THWACK</button>
                 <button class="tool-btn" data-tool="texture"  id="decTexture" type="button">CRUNCH</button>
                 <button class="tool-btn" data-tool="move"     id="decMove"    type="button">SCOOT</button>
@@ -512,10 +513,6 @@
                        id="stampRotate" class="tool-slider"
                        aria-label="Stamp rotation in degrees" />
                 <span class="rotate-value" id="stampRotateValue">0&deg;</span>
-                <button class="rotate-reset" id="stampRotateReset" type="button"
-                        title="Reset rotation" aria-label="Reset rotation">
-                    <span aria-hidden="true">&#x21BA;</span>
-                </button>
                 <!-- Flip-horizontal toggle. Wired in wireUndoAndRotate;
                      applies a scale(-1, 1) on top of any rotation when
                      the next stamp lands. Stays toggled across stamps
@@ -528,9 +525,10 @@
                 </button>
             </div>
 
-            <!-- GLAZE — paint + stamp tint. Hidden for MOVE. -->
+            <!-- GOO (glaze) — paint tools only (BRUSH/SPRTZ/SPLAT).
+                 Hidden for THWACK/CRUNCH/SCOOT/eraser. -->
             <div class="tool-row palette-row glaze-row ctx-block"
-                 data-ctx="brush spray splatter stamp">
+                 data-ctx="brush spray splatter">
                 <span class="row-label">GOO</span>
                 <div class="palette glaze-palette" id="glazePalette" role="listbox" aria-label="Glaze colors"></div>
             </div>
@@ -1277,7 +1275,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=43"></script>
+<script src="game.js?v=44"></script>
 
 </body>
 </html>
