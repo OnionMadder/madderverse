@@ -2823,10 +2823,10 @@
         });
     }
 
-    /* ----- 5A2. Clay-lump tray (drag a lump onto the wheel) ----- */
+    /* ----- 5A2. Clay-lump tray (tap a lump to plop it on the wheel) ----- */
 
-    const SHAPE_HINT_DROP  = "Grab a lump of clay and plop it on the wheel!";
-    const SHAPE_HINT_SHAPE = "Drag the clay. Pinch in to NARROW. Push out to WIDEN.";
+    const SHAPE_HINT_DROP  = "TAP a lump. SMACK it on the wheel. POTTERY HAPPENS.";
+    const SHAPE_HINT_SHAPE = "TAP to boss the clay. PINCH = skinnier. PUSH = THICCER.";
 
     function setShapeHint(text) {
         const el = document.getElementById("shapeHint");
@@ -2839,7 +2839,7 @@
         setShapeHint(SHAPE.needsLump ? SHAPE_HINT_DROP : SHAPE_HINT_SHAPE);
         const prompt = document.querySelector(".clay-lump-prompt");
         if (prompt) {
-            prompt.textContent = SHAPE.needsLump ? "DRAG A LUMP →"
+            prompt.textContent = SHAPE.needsLump ? "PLOP A LUMP →"
                                                  : "SWAP CLAY →";
         }
     }
@@ -2861,7 +2861,7 @@
             lump.dataset.clay = mat.id;
             lump.title = mat.flavor;
             lump.setAttribute("aria-label",
-                "Drag " + mat.label + " clay onto the wheel — " + mat.flavor);
+                "Tap " + mat.label + " clay to plop it on the wheel — " + mat.flavor);
 
             const ball = document.createElement("span");
             ball.className = "lump-ball";
