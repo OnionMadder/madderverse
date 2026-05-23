@@ -5943,14 +5943,14 @@
        Setup checklist (in CLAUDE.md "RevenueCat billing setup"):
          1. Create RC account, add Android app, get public SDK key
          2. Set RC_PUBLIC_API_KEY below
-         3. Create products in Play Console with these EXACT IDs:
+         3. Create products in Play Console with these EXACT IDs
+            (the CURRENT paid set — breakfast moved to the points
+            unlock, and the old generic "mega" pack was removed):
               pack_dinosaur   $0.99   (builder — dino)
-              pack_breakfast  $0.99   (crafter)
               pack_music      $0.99   (crafter)
-              pack_mega       $1.99   (special)
-              pack_chickens   $1.99   (special)
-              pack_aliens     $1.99   (special)
-              pack_moons      $1.99   (special)
+              pack_chickens   $1.99   (mega)
+              pack_aliens     $1.99   (mega)
+              pack_moons      $1.99   (mega)
          4. Mirror them in RC dashboard with matching identifiers
          5. Create an entitlement in RC named the same as each
             product id and attach the matching product to it
@@ -5972,9 +5972,7 @@
        its own entitlement). */
     const PACK_ENTITLEMENTS = {
         dinosaur:  "pack_dinosaur",
-        breakfast: "pack_breakfast",
         music:     "pack_music",
-        mega:      "pack_mega",
         chickens:  "pack_chickens",
         aliens:    "pack_aliens",
         moons:     "pack_moons"
