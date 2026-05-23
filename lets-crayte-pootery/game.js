@@ -2563,7 +2563,9 @@
        Drop it in assets/textures/<id>.png, add it to a pack's
        surfaceTextures array, and list its id here with translucent:true. */
     const SURFACE_TEXTURE_FLAGS = {
-        "tint-purple": { translucent: true },
+        /* List a texture id here with translucent:true to let its PNG
+           alpha show the clay through (frosted/stained-plastic look).
+           Default (unlisted) = opaque skin at 0.92 alpha. */
     };
     function isTranslucentTexture(id) {
         const f = id && SURFACE_TEXTURE_FLAGS[id];
@@ -5201,11 +5203,7 @@
             id: "core",  label: "BASIC",
             packType: "crafter",
             backgroundSvg: "core",    /* assets/backgrounds/core.svg (optional) */
-            /* tint-purple is the translucent-texture smoke test: a 50%-
-               alpha purple PNG that lets the clay color show through (see
-               SURFACE_TEXTURE_FLAGS). Lives on BASIC so it's reachable on
-               a porcelain pot without owning a paid pack. */
-            surfaceTextures: ["tint-purple"],
+            surfaceTextures: ["basic", "basic-feathers", "basic-pattern"],
             description: "The starter set. Earth, sage, sky, and ink.",
             coverEmoji: "\u{1FAB4}",   /* potted plant */
             glazes: [
@@ -5254,7 +5252,8 @@
             packType: "builder",   /* parts build a teddy bear */
             buildSubject: "bear",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
-            surfaceTextures: ["plushie", "plushie-blue", "plushie-pink"],
+            surfaceTextures: ["builder/plushie", "builder/plushie-blue", "builder/plushie-pink"],
+            unlock: "points",   /* coming soon — unlocked with earned points (economy TBD) */
             backgroundSvg: "plush",    /* assets/backgrounds/plush.svg (optional) */
             description: "Teddy brown, pastel pink, soft plush palette.",
             coverEmoji: "\u{1F9F8}",   /* teddy bear */
@@ -5281,6 +5280,7 @@
             packType: "crafter",
             sheet: "modded",
             surfaceTextures: ["modded", "modded-aluminum", "modded-led"],
+            unlock: "points",   /* coming soon — unlocked with earned points (economy TBD) */
             backgroundSvg: "modded",   /* assets/backgrounds/modded.svg (optional) */
             description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
             coverEmoji: "\u{1F5A5}",   /* desktop computer */
@@ -5311,7 +5311,7 @@
             packType: "builder",   /* parts build a handheld console */
             buildSubject: "handheld console",
             sheet: "gamer",
-            surfaceTextures: ["gamer", "gamer-black"],   /* TODO: add a 3rd gamer texture file */
+            surfaceTextures: ["builder/gamer", "builder/gamer-black", "builder/gamer-crt"],
             backgroundSvg: "gamer",    /* assets/backgrounds/gamer.svg (optional) */
             description: "CRT green, scanline gray, PRESS START.",
             coverEmoji: "\u{1F3AE}",   /* video game */
@@ -5376,7 +5376,7 @@
             packType: "builder",   /* parts build a dinosaur */
             buildSubject: "dino",
             sheet: "dinosaur",
-            surfaceTextures: ["dinosaur", "dinosaur-blue", "dinosaur-purpleorange"],
+            surfaceTextures: ["builder/dinosaur", "builder/dinosaur-blue", "builder/dinosaur-purpleorange"],
             backgroundSvg: "dinosaur", /* assets/backgrounds/dinosaur.svg (optional) */
             description: "Fossil bone, amber, jurassic jungle greens, T-rex red.",
             coverEmoji: "\u{1F996}",   /* T-Rex */
@@ -5403,10 +5403,11 @@
             id: "breakfast", label: "BREAKFAST",
             packType: "crafter",
             sheet: "breakfast",
+            surfaceTextures: ["breakfast-egg", "breakfast-pancake", "breakfast-strawberry"],
+            unlock: "points",   /* coming soon — unlocked with earned points (economy TBD) */
             backgroundSvg: "breakfast",/* assets/backgrounds/breakfast.svg (optional) */
             description: "Maple syrup, golden butter, berry jam, espresso.",
             coverEmoji: "\u{1F95E}",   /* pancakes */
-            priceCents: 99,
             glazes: [
                 "#7a3a18",   /* maple syrup */
                 "#e4b13e",   /* golden butter */
@@ -5428,7 +5429,7 @@
             id: "music", label: "MUSIC",
             packType: "crafter",
             sheet: "music",
-            surfaceTextures: ["music"],   /* TODO: add 2 more music texture files */
+            surfaceTextures: ["music", "music-neon", "music-vinyl"],
             backgroundSvg: "music",    /* assets/backgrounds/music.svg (optional) */
             description: "Vinyl black, brass, neon stage lights.",
             coverEmoji: "\u{1F3B5}",   /* musical note */
@@ -5450,58 +5451,19 @@
             patterns: ["music/blue", "music/orange", "music/red",
                        "music/pink", "music/green"]
         },
-        {
-            id: "mega", label: "MEGA",
-            packType: "special",
-            sheet: "mega",
-            backgroundSvg: "mega",     /* assets/backgrounds/mega.svg (optional) */
-            description: "Double-size pack: 14 metallics + electrics + RGB, 10 custom stamps.",
-            coverEmoji: "\u{1F31F}",   /* glowing star */
-            priceCents: 199,
-            glazes: [
-                "@rgb-cycle",   /* animated rainbow */
-                "#ffd700",      /* gold */
-                "#c0c0c0",      /* silver */
-                "#b87333",      /* copper */
-                "#4a4a4a",      /* gunmetal */
-                "#ff0080",      /* electric magenta */
-                "#00ff80",      /* electric mint */
-                "#80ff00",      /* electric lime */
-                "#ff8000",      /* electric orange */
-                "#8000ff",      /* electric violet */
-                "#f5f5f5",      /* chalk */
-                "#1a0e08",      /* deep ink */
-                "#ffa6c9",      /* cotton */
-                "#c8e2a8"       /* soft sage */
-            ],
-            glazeNames: [
-                "RGB CYCLE", "GOLD", "SILVER", "COPPER",
-                "GUNMETAL", "ELECTRIC MAGENTA", "ELECTRIC MINT",
-                "ELECTRIC LIME", "ELECTRIC ORANGE",
-                "ELECTRIC VIOLET", "CHALK", "DEEP INK",
-                "COTTON", "SOFT SAGE"
-            ],
-            patterns: ["mega/icecream", "mega/penguins", "mega/dolphin",
-                       "mega/candy", "mega/gumballs", "mega/candydog",
-                       "mega/husky", "mega/bigdog", "mega/cat",
-                       "mega/toucan"]
-        },
-
         /* ============================================================
-           SPECIAL PACKS — chickens / aliens / moons. $1.99 each,
-           matching MEGA's tier. Bigger / more elaborate stamp sets.
-           Descriptions are PLACEHOLDERS — Kelly writes the final
-           copy. Glaze palettes are reasonable starters keyed to
-           each theme; tweak freely.
+           MEGA PACKS — chickens / aliens / moons. $1.99 each. Bigger
+           sets: 10 glazes + 8+ stamps + 3 textures. (The old generic
+           "MEGA" pack was removed; these themed packs ARE the mega
+           tier now.) Descriptions are placeholders — final copy TBD.
            ============================================================ */
         {
             id: "chickens", label: "CHICKENS",
             packType: "special",
             sheet: "chickens",
-            surfaceTextures: ["chicken"],  /* TODO: add 2 more chicken texture files */
+            surfaceTextures: ["chickens", "chickens-clay", "chickens-skin"],
             backgroundSvg: "chickens", /* assets/backgrounds/chickens.svg (optional) */
-            description: "PLACEHOLDER — eleven costumed chickens. " +
-                         "Kelly writes the real copy.",
+            description: "Final description coming soon.",
             coverEmoji: "\u{1F414}",   /* chicken */
             priceCents: 199,
             glazes: [
@@ -5511,12 +5473,16 @@
                 "#ffb000",   /* beak orange */
                 "#6b4a2a",   /* coop brown */
                 "#3f8a4a",   /* pasture green */
-                "#2a2a2a"    /* rooster black */
+                "#2a2a2a",   /* rooster black */
+                "#8fb8d6",   /* coop sky — costume range */
+                "#b6ff3a",   /* neon cluck */
+                "#8a4fff"    /* cyber violet */
             ],
             glazeNames: [
                 "HEN WHITE", "FEED GOLD", "COMB RED",
                 "BEAK ORANGE", "COOP BROWN", "PASTURE GREEN",
-                "ROOSTER BLACK"
+                "ROOSTER BLACK", "COOP SKY", "NEON CLUCK",
+                "CYBER VIOLET"
             ],
             patterns: [
                 "chickens/magician", "chickens/ninja", "chickens/gears",
@@ -5529,10 +5495,9 @@
             id: "aliens", label: "ALIENS",
             packType: "special",
             sheet: "aliens",
-            surfaceTextures: ["aliens"],   /* TODO: add 2 more aliens texture files */
+            surfaceTextures: ["aliens", "aliens-mars", "aliens-venus"],
             backgroundSvg: "aliens",   /* assets/backgrounds/aliens.svg (optional) */
-            description: "PLACEHOLDER — eight little visitors. " +
-                         "Kelly writes the real copy.",
+            description: "Final description coming soon.",
             coverEmoji: "\u{1F47D}",   /* alien */
             priceCents: 199,
             glazes: [
@@ -5542,12 +5507,16 @@
                 "#ff2e88",   /* nebula pink */
                 "#c0c0c0",   /* saucer chrome */
                 "#1b1b3a",   /* deep space */
-                "#ffe600"    /* tractor-beam yellow */
+                "#ffe600",   /* tractor-beam yellow */
+                "#c8472e",   /* martian red — matches aliens-mars */
+                "#e6c15c",   /* venus gold — matches aliens-venus */
+                "#4fe0a0"    /* slime green */
             ],
             glazeNames: [
                 "ALIEN GREEN", "COSMIC VIOLET", "RAY CYAN",
                 "NEBULA PINK", "SAUCER CHROME", "DEEP SPACE",
-                "BEAM YELLOW"
+                "BEAM YELLOW", "MARTIAN RED", "VENUS GOLD",
+                "SLIME GREEN"
             ],
             patterns: [
                 "aliens/alien-one", "aliens/alien-two",
@@ -5560,10 +5529,9 @@
             id: "moons", label: "MOONS",
             packType: "special",
             sheet: "literally-moons",   /* sheet file is hyphenated */
-            surfaceTextures: ["literally-moons"], /* TODO: add 2 more moons texture files */
+            surfaceTextures: ["literally-moons", "literally-moons-sponge", "literally-moons-stars"],
             backgroundSvg: "moons",    /* assets/backgrounds/moons.svg (optional) */
-            description: "PLACEHOLDER — literally moons. And comets. " +
-                         "Kelly writes the real copy.",
+            description: "Final description coming soon.",
             coverEmoji: "\u{1F319}",   /* crescent moon */
             priceCents: 199,
             glazes: [
@@ -5573,12 +5541,16 @@
                 "#ff7ab0",   /* moon pink */
                 "#39c0d8",   /* moon cyan */
                 "#3a6fff",   /* moon blue */
-                "#0a0a1f"    /* void black */
+                "#0a0a1f",   /* void black */
+                "#e0524a",   /* moon red — matches moon-red stamp */
+                "#5ad07a",   /* moon green — matches moon-green stamp */
+                "#f2c84b"    /* comet gold */
             ],
             glazeNames: [
                 "LUNAR GREY", "MOON VIOLET", "MOON ORANGE",
                 "MOON PINK", "MOON CYAN", "MOON BLUE",
-                "VOID BLACK"
+                "VOID BLACK", "MOON RED", "MOON GREEN",
+                "COMET GOLD"
             ],
             patterns: [
                 "literally-moons/moon-violet", "literally-moons/moon-orange",
@@ -5929,8 +5901,17 @@
 
     function isPackOwned(pack) {
         if (!pack) return false;
+        /* Points-unlock packs (plush/modded/breakfast) are "coming
+           soon": owned only once bought with earned points — not yet
+           possible, so they stay locked despite having no price. */
+        if (pack.unlock === "points") return loadOwnedPacks().has(pack.id);
         if (!pack.priceCents) return true;   /* free */
         return loadOwnedPacks().has(pack.id);
+    }
+
+    /* True for the not-yet-purchasable points packs. */
+    function isPackComingSoon(pack) {
+        return !!(pack && pack.unlock === "points" && !isPackOwned(pack));
     }
 
     function isPackReleased(pack) {
@@ -5944,6 +5925,7 @@
     function isPackUsable(pack) {
         if (!pack) return false;
         if (!isPackReleased(pack)) return false;
+        if (pack.unlock === "points") return isPackOwned(pack);  /* locked until points-unlock */
         if (!pack.priceCents) return true;
         return isPackOwned(pack);
     }
@@ -11775,10 +11757,14 @@
         card.dataset.pack = p.id;
         const owned    = isPackOwned(p);
         const released = isPackReleased(p);
-        const free     = !p.priceCents;
-        if (owned)         card.classList.add("is-owned");
-        if (!released)     card.classList.add("is-queued");
-        if (free)          card.classList.add("is-free");
+        const free     = !p.priceCents && p.unlock !== "points";
+        if (owned)                    card.classList.add("is-owned");
+        if (!released)                card.classList.add("is-queued");
+        if (free)                     card.classList.add("is-free");
+        if (isPackComingSoon(p))      card.classList.add("is-coming-soon");
+        /* MEGA tier (the $1.99 "special" themed packs) gets the pink
+           glow, matching shared pots in the vault. */
+        if (p.packType === "special") card.classList.add("is-mega");
 
         const cover = document.createElement("div");
         cover.className = "shop-cover";
@@ -11835,11 +11821,12 @@
     function packTypeLabel(p) {
         if (!p || !p.packType) return "";
         if (p.packType === "builder") return "BUILDER";
-        if (p.packType === "special") return "SPECIAL";
+        if (p.packType === "special") return "MEGA";
         return "CRAFTER";
     }
 
     function shopStatusText(p) {
+        if (p.unlock === "points") return isPackOwned(p) ? "OWNED" : "COMING SOON";
         if (!p.priceCents) return "FREE";
         if (isPackOwned(p)) return "OWNED";
         if (!isPackReleased(p)) {
@@ -11853,6 +11840,7 @@
     }
 
     function shopCtaText(p) {
+        if (p.unlock === "points")    return isPackOwned(p) ? "PLAY" : "COMING SOON";
         if (!p.priceCents)            return "PLAY";
         if (isPackOwned(p))           return "PLAY";
         if (!isPackReleased(p))       return "NOTIFY ME";
@@ -11876,6 +11864,13 @@
        inline shop-card CTA used to do. */
     function performPackAction(p) {
         if (!p) return;
+        /* Points packs aren't purchasable yet — friendly "coming soon". */
+        if (isPackComingSoon(p)) {
+            alert(p.label + " is coming soon!\n\n" +
+                  "Earn points by making pots, finding secrets, sharing your " +
+                  "pots, and voting — then you'll be able to unlock it.");
+            return;
+        }
         const free  = !p.priceCents;
         const owned = isPackOwned(p);
         if (free || owned) {

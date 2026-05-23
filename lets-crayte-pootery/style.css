@@ -3207,6 +3207,29 @@ a:focus-visible {
     box-shadow: 0 6px 16px rgba(255, 46, 136, 0.25);
 }
 
+/* MEGA tier ($1.99 themed packs) — pink glow, matching shared pots
+   in the vault. */
+.shop-card.is-mega {
+    border-color: var(--pink-bright);
+    box-shadow:
+        0 0 0 1px rgba(255, 46, 136, 0.4),
+        0 0 16px rgba(255, 46, 136, 0.5);
+}
+.shop-card.is-mega:hover {
+    transform: translateY(-2px);
+    box-shadow:
+        0 0 0 1px rgba(255, 46, 136, 0.55),
+        0 0 22px rgba(255, 46, 136, 0.65);
+}
+
+/* Coming-soon (points-unlock) packs — subdued + dashed so they read
+   as "not yet available." */
+.shop-card.is-coming-soon {
+    opacity: 0.8;
+    border-style: dashed;
+}
+.shop-card.is-coming-soon .shop-status { color: var(--teal-dim); }
+
 .shop-cover {
     width: 56px;
     height: 56px;
