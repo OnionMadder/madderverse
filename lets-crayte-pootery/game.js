@@ -5584,6 +5584,12 @@
         stickerCanvas: null,
         stickerCtx: null,
 
+        /* SCOOT (move) drag state — non-null only between a pointerdown
+           on a sticker and the following pointerup. Holds the sticker
+           reference + the pointer-to-sticker offset so the drag doesn't
+           snap to the cursor center. */
+        movingSticker: null,
+
         dpr: 1,
 
         activePackId: "core",
@@ -6472,7 +6478,23 @@
 
             /* BALEET (eraser) sticker-delete is resolved on tap-up in
                endPointer (so a drag-from-sticker still rubs paint
-               instead of deleting). Nothing to grab on down. */
+               instead of deleting). Nothing to grab on down for it. */
+
+            /* SCOOT (move) grabs a sticker on down for drag-reposition.
+               It only acts when the pointer actually hits an existing
+               sticker, so a pinch that happens to start on a sticker is
+               released by the size===2 branch (which nulls
+               movingSticker). */
+            if (D.tool === "move") {
+                const hit = hitTestSticker(p);
+                if (hit) {
+                    pushUndoSnapshot();
+                    D.movingSticker = hit;
+                    D.canvas.style.cursor = "grabbing";
+                    D.gestureCommitted = true;   /* a real grab, not a tap */
+                }
+                return;
+            }
         };
 
         /* Commit the deferred paint START (brush / spray / splatter /
@@ -6582,11 +6604,15 @@
                 startPaintAt(decPointerPos(e));
             } else if (D.activePointers.size === 2) {
                 /* Second finger landed -> this is a pinch/pan, NOT a
-                   placement. Drop the deferred paint/stamp so the
-                   gesture leaves no marks. */
+                   placement. Drop the deferred paint/stamp + release
+                   any grabbed sticker so the gesture leaves no marks. */
                 cancelPaint();
                 D.pendingPos = null;
                 D.multiTouched = true;
+                if (D.movingSticker) {
+                    D.movingSticker = null;
+                    if (D.tool === "move") D.canvas.style.cursor = "grab";
+                }
                 beginGesture();
             }
         });
@@ -6604,6 +6630,19 @@
             /* Single-finger -- normal paint flow */
             if (!D.pointerActive) return;
             const p = decPointerPos(e);
+            /* SCOOT (move) drag — track the active sticker. We preserve
+               the pointer-to-sticker offset captured on pointerdown so
+               the drag doesn't snap to the cursor center; the sticker
+               keeps its grab point throughout the drag. */
+            if (D.tool === "move" && D.movingSticker) {
+                const s = D.movingSticker.sticker;
+                s.x = p.x - D.movingSticker.offsetX;
+                s.y = p.y - D.movingSticker.offsetY;
+                renderStickerLayer();
+                D.lastPaintPos = p;
+                D.pointer = p;
+                return;
+            }
             /* Stamps are tap-only: dragging never paints a trail of
                stamps. The actual placement happens on tap-up. */
             if (D.tool === "stamp") {
@@ -6645,7 +6684,9 @@
                         } else {
                             paintDot(D.pendingPos);
                         }
-                    } else {
+                    } else if (D.tool !== "move") {
+                        /* SCOOT (move) only acts on a drag — a clean tap
+                           with nothing grabbed places/erases nothing. */
                         pushUndoSnapshot();
                         paintDot(D.pendingPos);
                     }
@@ -6653,6 +6694,12 @@
                 if (D.pointerActive) {
                     D.pointerActive = false;
                     D.lastPaintPos = null;
+                }
+                /* End any SCOOT drag in progress + restore the idle
+                   grab cursor. */
+                if (D.movingSticker) {
+                    D.movingSticker = null;
+                    if (D.tool === "move") D.canvas.style.cursor = "grab";
                 }
                 D.gestureStart = null;
                 D.gestureCommitted = false;
@@ -6992,11 +7039,12 @@
                     gp.querySelectorAll(".swatch").forEach(function (s) {
                         s.classList.toggle("active", s.dataset.glaze === gid);
                     });
-                    /* Picking a color while on BALEET (eraser) implies
-                       "I want to paint with this" -> snap to brush. On a
-                       painting tool (brush/spray/splatter/stamp) the
-                       color just re-tints the current tool, so leave it. */
-                    if (D.tool === "eraser") setTool("brush");
+                    /* Picking a color while on a non-painting tool
+                       (BALEET/eraser or SCOOT/move) implies "I want to
+                       paint with this" -> snap to brush. On a painting
+                       tool (brush/spray/splatter/stamp) the color just
+                       re-tints the current tool, so leave it. */
+                    if (D.tool === "eraser" || D.tool === "move") setTool("brush");
                 });
                 gp.appendChild(btn);
             });
@@ -7154,10 +7202,13 @@
             b.classList.toggle("active", b.dataset.tool === tool);
         });
         if (D.canvas) {
-            /* BALEET (eraser) gets the "cell" cursor so the kid sees
-               what they're about to remove; everything else uses the
-               interactive pointer. */
-            D.canvas.style.cursor = (tool === "eraser") ? "cell" : "pointer";
+            /* Cursor: BALEET (eraser) -> "cell" so the kid sees what
+               they're removing; SCOOT (move) -> "grab"; everything
+               else -> the interactive pointer. */
+            D.canvas.style.cursor =
+                (tool === "eraser") ? "cell" :
+                (tool === "move")   ? "grab" :
+                                       "pointer";
         }
         syncToolContext();
     }
