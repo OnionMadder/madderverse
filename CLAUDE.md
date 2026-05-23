@@ -18,7 +18,21 @@ python3 -m http.server 8000   # then open http://localhost:8000/
 
 Open a specific game directly at `http://localhost:8000/<game-dir>/`. Opening `index.html` via `file://` will break asset paths in some games and is not a valid test of behavior.
 
-Deployment: pushing to `main` publishes via GitHub Pages — there is no staging environment. Do **not** push speculative changes to `main`; the working branch for Claude-driven changes is `claude/add-claude-documentation-aByyj` (see the development-branch instructions in your task setup).
+Deployment: pushing to `main` publishes via GitHub Pages (through a GitHub Actions workflow — see **Deployment** below) — there is no staging environment. Do **not** push speculative changes to `main`; the working branch for Claude-driven changes is `claude/add-claude-documentation-aByyj` (see the development-branch instructions in your task setup).
+
+## Deployment
+
+The site deploys to GitHub Pages via a **GitHub Actions workflow**, not the legacy "deploy from a branch" mode. Some of this is invisible from the code alone:
+
+- **Source = "GitHub Actions"** is set in the repo's Settings → Pages (a GitHub web-UI setting, not a file in the repo). The deploy is driven by **`.github/workflows/deploy-pages.yml`**, which runs on every push to `main` (or manually via *Actions → Deploy to GitHub Pages → Run workflow*).
+- **Do not delete or rename `.github/workflows/deploy-pages.yml`** — there is no branch-deploy fallback anymore, so removing it silently stops all deploys. It uploads the repo root (`path: '.'`), which keeps `CNAME` (the madderverse.org custom domain) intact.
+- **Intermittent `Bad credentials` (HTTP 401) failures are a known transient GitHub-side blip**, not a misconfiguration. If a deploy fails with that error at the *Setup Pages* or *Deploy to GitHub Pages* step, just re-run it — an identical re-run usually passes:
+  ```bash
+  gh run list --repo OnionMadder/madderverse --limit 5   # find the failed run id (needs `gh auth login` first)
+  gh run rerun <run-id> --repo OnionMadder/madderverse
+  ```
+  Confirm live status with `gh api repos/OnionMadder/madderverse/pages` → expect `"status":"built"` and `"build_type":"workflow"`.
+- This replaced the old auto *pages-build-deployment* workflow on 2026-05-23, after that began failing with `401 Bad credentials` and updates stopped reaching the live site.
 
 ## Repository layout
 
