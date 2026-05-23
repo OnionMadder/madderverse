@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=48" />
+    <link rel="stylesheet" href="style.css?v=49" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -1031,40 +1031,46 @@
                 </h4>
                 <div class="detail-remixes-row" id="detailRemixesRow"></div>
             </section>
+            <!-- Action buttons grouped into rows. Each .detail-action-row
+                 is a flex pair; conditionally-hidden buttons collapse
+                 (CSS [hidden] override) and a row with nothing visible
+                 hides itself (:has). Pairing: DELETE|SAVE, SHARE|STOP-
+                 SHARING (mutually exclusive), REMIX|EXPORT. -->
             <div class="detail-actions">
-                <button class="btn-control" id="detailDelete" type="button">
-                    <span class="btn-label">DELETE</span>
-                </button>
-                <!-- CONTINUE — visible ONLY on draft entries.
-                     Loads the saved state back into decorate so
-                     the kid can keep working. -->
-                <button class="btn-control primary" id="detailContinue" type="button" hidden>
-                    <span class="btn-label">CONTINUE</span>
-                    <span class="btn-glyph" aria-hidden="true">&#9656;</span>
-                </button>
-                <button class="btn-control" id="detailSubmit" type="button">
-                    <span class="btn-label">SHARE TO EVERYONE</span>
-                    <span class="btn-glyph" aria-hidden="true">&#x1F310;</span>
-                </button>
-                <button class="btn-control" id="detailUnshare" type="button" hidden>
-                    <span class="btn-label">STOP SHARING</span>
-                    <span class="btn-glyph" aria-hidden="true">&times;</span>
-                </button>
-                <button class="btn-control" id="detailCopyLink" type="button" hidden>
-                    <span class="btn-label">COPY LINK</span>
-                    <span class="btn-glyph" aria-hidden="true">&#x1F517;</span>
-                </button>
-                <!-- REMIX -- visible on public pots only; clones the
-                     clay silhouette (not the paint) into a fresh
-                     shape session so the user can morph + repaint. -->
-                <button class="btn-control" id="detailRemix" type="button" hidden>
-                    <span class="btn-label">REMIX THIS POT</span>
-                    <span class="btn-glyph" aria-hidden="true">&#x1F501;</span>
-                </button>
-                <button class="btn-control primary" id="detailExport" type="button">
-                    <span class="btn-label">EXPORT PNG</span>
-                    <span class="btn-glyph" aria-hidden="true">&darr;</span>
-                </button>
+                <div class="detail-action-row">
+                    <button class="btn-control" id="detailDelete" type="button">
+                        <span class="btn-label">DELETE</span>
+                        <span class="btn-glyph" aria-hidden="true">&times;</span>
+                    </button>
+                    <!-- SAVE (was CONTINUE) — visible ONLY on draft
+                         entries. Loads the saved state back into
+                         decorate so the kid can keep working. -->
+                    <button class="btn-control primary" id="detailContinue" type="button" hidden>
+                        <span class="btn-label">SAVE</span>
+                    </button>
+                </div>
+                <div class="detail-action-row">
+                    <button class="btn-control" id="detailSubmit" type="button">
+                        <span class="btn-label">SHARE TO EVERYONE</span>
+                        <span class="btn-glyph" aria-hidden="true">&#10003;</span>
+                    </button>
+                    <button class="btn-control" id="detailUnshare" type="button" hidden>
+                        <span class="btn-label">STOP SHARING</span>
+                    </button>
+                </div>
+                <div class="detail-action-row">
+                    <!-- REMIX -- visible on public pots only; clones the
+                         clay silhouette (not the paint) into a fresh
+                         shape session so the user can morph + repaint. -->
+                    <button class="btn-control" id="detailRemix" type="button" hidden>
+                        <span class="btn-label">REMIX POOT</span>
+                        <span class="btn-glyph" aria-hidden="true">&#x1F501;</span>
+                    </button>
+                    <button class="btn-control primary" id="detailExport" type="button">
+                        <span class="btn-label">EXPORT POOT</span>
+                        <span class="btn-glyph" aria-hidden="true">&darr;</span>
+                    </button>
+                </div>
             </div>
         </div>
     </aside>
@@ -1286,7 +1292,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=48"></script>
+<script src="game.js?v=49"></script>
 
 </body>
 </html>

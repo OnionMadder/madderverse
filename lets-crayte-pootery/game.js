@@ -8761,6 +8761,15 @@
         if (canvas.width !== bw)  canvas.width  = bw;
         if (canvas.height !== bh) canvas.height = bh;
         const ctx = canvas.getContext("2d");
+        /* Always clear the full bitmap first. The detail modal re-uses
+           ONE canvas across opens and renders with background:false
+           (transparent — the CSS pedestal shows behind), so without an
+           explicit clear each opened pot composites on top of the last
+           one ("stacking pots" bug, made obvious by translucent skins).
+           Resizing clears implicitly, but same-size re-opens don't
+           resize — hence the unconditional clear here. */
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, bw, bh);
         ctx.setTransform(dpr * (cssW / SHAPE.W), 0, 0,
                          dpr * (cssH / SHAPE.H), 0, 0);
         renderSavedPot(ctx, entry, opts || {});
@@ -8812,19 +8821,9 @@
         canvas.height = 300;
         thumb.appendChild(canvas);
 
-        /* Shared indicator -- on the user's own pot that they've
-           also pushed to the EVERYONE gallery. Reads as "this is
-           ALSO out there," not "this is gone." Hidden on public-tab
-           rows (which are themselves the "out there" copy) so we
-           don't double-flag.                                    */
-        if (entry.publicId && !entry._isPublic) {
-            const flag = document.createElement("span");
-            flag.className = "pot-shared-flag";
-            flag.setAttribute("aria-label", "Shared to Everyone gallery");
-            flag.title = "Shared to Everyone gallery";
-            flag.textContent = "\u{1F310}";   /* globe */
-            thumb.appendChild(flag);
-        }
+        /* (The shared-to-Everyone globe badge was removed from cards
+           at the user's request — the shared state still drives the
+           detail modal's STOP SHARING action.) */
 
         /* Trophy emblem -- when this local pot's battle entry has
            won a trophy. Sits in the top-left corner so it doesn't
@@ -10409,6 +10408,15 @@
         clearPotURLParam();
     }
 
+    /* Guarded close — pops a confirm before exiting the detail modal
+       so a stray tap on the X / backdrop / Escape doesn't drop the
+       kid out of a pot unexpectedly. Direct closeDetail() is still
+       used by the explicit nav actions (back, delete, resume). */
+    function requestCloseDetail() {
+        if (!window.confirm("Exit without saving?")) return;
+        closeDetail();
+    }
+
     /* Resume a saved DRAFT entry — load its shape + paint + sticker
        state back into the live D/SHAPE objects and jump to
        decorate. D.draftId tracks the entry id so the next SAVE
@@ -10954,7 +10962,7 @@
             showScreen("shape");
         });
 
-        if (close)  close.addEventListener("click", closeDetail);
+        if (close)  close.addEventListener("click", requestCloseDetail);
         if (del)    del.addEventListener("click",   deleteCurrentEntry);
         if (expt)   expt.addEventListener("click",  exportCurrentEntry);
         if (submit) submit.addEventListener("click", startShareFlow);
@@ -10991,12 +10999,12 @@
 
         if (panel) {
             panel.addEventListener("click", function (e) {
-                if (e.target === panel) closeDetail();
+                if (e.target === panel) requestCloseDetail();
             });
         }
 
         document.addEventListener("keydown", function (e) {
-            if (e.key === "Escape" && panel && !panel.hidden) closeDetail();
+            if (e.key === "Escape" && panel && !panel.hidden) requestCloseDetail();
         });
 
         /* Gallery tabs (Day 5 chunk E — MINE / EVERYONE,

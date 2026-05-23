@@ -2556,8 +2556,9 @@ a:focus-visible {
 
 .detail-actions {
     display: flex;
-    /* Wrap so 3 wide buttons (DELETE / SHARE TO EVERYONE / STOP
-       SHARING) don't push the popup horizontally past its width. */
+    /* Wrap so wide buttons don't push the popup past its width.
+       (Shared by the account + submit-picker action rows; the
+       gallery detail modal overrides this to stacked rows below.) */
     flex-wrap: wrap;
     gap: 10px;
     padding: 12px 14px 14px;
@@ -2573,12 +2574,37 @@ a:focus-visible {
 }
 
 .detail-actions .btn-control {
-    /* Don't GROW (otherwise each button takes a full wrapped row
-       and the actions block becomes comically tall on narrow
-       viewports). Can shrink down to a min that still reads. */
     flex: 0 1 auto;
     min-width: 90px;
     padding: 12px 10px;
+}
+
+/* ===== Gallery detail modal action rows (scoped to #potDetail so
+   the account + submit-picker .detail-actions keep their layout). */
+#potDetail .detail-actions {
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+#potDetail .detail-action-row {
+    display: flex;
+    gap: 10px;
+}
+#potDetail .detail-actions .btn-control {
+    flex: 1;
+    min-width: 0;
+}
+/* CRITICAL: .btn-control sets display:flex, which (author origin)
+   overrides the UA [hidden]{display:none}, so the conditionally-
+   hidden detail buttons (SAVE / STOP-SHARING / REMIX) were all
+   showing at once. Restore the hide so the show/hide logic works
+   AND so empty rows can be detected below. */
+#potDetail .detail-actions .btn-control[hidden] { display: none !important; }
+
+/* A row whose buttons are all hidden collapses so it leaves no dead
+   gap (e.g. SHARE|STOP-SHARING on a public pot, DELETE|SAVE on a
+   non-draft public pot). */
+#potDetail .detail-action-row:not(:has(> .btn-control:not([hidden]))) {
+    display: none;
 }
 
 /* ----- 12. Easter eggs (chunk 8 — Konami dev menu, PINGAS flash, OVERCLOCKED toast) ----- */
