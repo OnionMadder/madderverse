@@ -392,18 +392,17 @@
             tmp.width = w; tmp.height = h;
             const ctx = tmp.getContext("2d");
 
-            /* ---- Layer 1: surface texture skin (bottom) ---- */
-            if (hasSurface && typeof resolveSurfaceTexturePack === "function") {
-                const pack = resolveSurfaceTexturePack(entry.surfaceTexturePackId);
-                if (pack && pack.surfaceTexture) {
-                    const pat = getSurfacePattern(ctx, pack.surfaceTexture);
-                    if (pat) {
-                        ctx.save();
-                        ctx.globalAlpha = 0.92;   /* matches paintSurfaceTexture */
-                        ctx.fillStyle = pat;
-                        ctx.fillRect(0, 0, w, h);
-                        ctx.restore();
-                    }
+            /* ---- Layer 1: surface texture skin (bottom) ----
+               surfaceTexturePackId holds the texture FILE id now
+               (old saves stored a pack id == the base texture file). */
+            if (hasSurface) {
+                const pat = getSurfacePattern(ctx, entry.surfaceTexturePackId);
+                if (pat) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.92;   /* matches paintSurfaceTexture */
+                    ctx.fillStyle = pat;
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.restore();
                 }
             }
 
@@ -2518,12 +2517,18 @@
        applied during decorate as a one-tap toggle — e.g., tap
        TEXTURE on the PLUSH pack and the pot looks like fur.
 
-       Each pack with a texture has surfaceTexture: "<filename>"
-       in GLAZE_PACKS. The file lives at assets/textures/<n>.png
-       (same folder as clay textures — they're all tilable PNGs).
+       Each pack with textures has surfaceTextures: ["<file>", ...]
+       in GLAZE_PACKS (up to 3 skins). The files live at
+       assets/textures/<n>.png (same folder as clay textures —
+       all tilable PNGs).
 
-       D.surfaceTexturePackId tracks which pack's skin is applied
-       (null if none). Persisted on the saved pot's entry.
+       D.surfaceTexturePackId tracks the applied skin. NOTE: despite
+       the historical name, it now holds the specific TEXTURE FILE id
+       (e.g., "candy-lemon"), not a pack id. Old saved pots stored a
+       pack id, which equals each pack's base texture filename, so
+       they still resolve to that pack's first skin. Null = no skin.
+       Persisted on the saved pot's entry + surface_texture_pack_id
+       column (column name kept for back-compat).
 
        Render: painted INSIDE the pot-path clip, AFTER the user's
        paint canvas (so the kid's glaze/stickers can still influence
@@ -2537,12 +2542,12 @@
 
     function loadSurfaceTextures(packs) {
         packs.forEach(function (p) {
-            if (!p.surfaceTexture) return;
-            const id = p.surfaceTexture;
-            if (SURFACE_TEXTURES[id]) return;   /* already loading */
-            const img = new Image();
-            img.src = "assets/textures/" + id + ".png";
-            SURFACE_TEXTURES[id] = img;
+            (p.surfaceTextures || []).forEach(function (id) {
+                if (!id || SURFACE_TEXTURES[id]) return;   /* already loading */
+                const img = new Image();
+                img.src = "assets/textures/" + id + ".png";
+                SURFACE_TEXTURES[id] = img;
+            });
         });
     }
 
@@ -2563,35 +2568,19 @@
         } catch (_) { return null; }
     }
 
-    /* Resolve a pack id (defaults to D.surfaceTexturePackId for
-       the live decorate session) to its GLAZE_PACKS entry. The
-       gallery renderer passes a saved entry's id explicitly so
-       thumbnails honor whatever skin was on the pot when it
-       fired. Returns null if the id doesn't match any pack
-       (e.g., the user opened an old pot whose pack hasn't
-       shipped yet — graceful degrade to no skin). */
-    function resolveSurfaceTexturePack(packId) {
-        const id = (packId === undefined)
+    /* Render the surface texture skin. Called from renderPotScene
+       right after the paint canvas composite, so the skin layers
+       over the user's stickers (the texture is what the OUTSIDE of
+       the pot looks like, after all). No-op when no skin is selected
+       or the asset isn't decoded. textureId defaults to the live
+       D.surfaceTexturePackId (a texture FILE id); gallery thumbnails
+       pass the saved entry's id explicitly to override. */
+    function paintSurfaceTexture(ctx, bounds, textureId) {
+        const id = (textureId === undefined)
             ? (D && D.surfaceTexturePackId)
-            : packId;
-        if (!id) return null;
-        for (let i = 0; i < GLAZE_PACKS.length; i++) {
-            if (GLAZE_PACKS[i].id === id) return GLAZE_PACKS[i];
-        }
-        return null;
-    }
-
-    /* Render the surface texture for the given pack id. Called
-       from renderPotScene right after the paint canvas composite,
-       so the skin layers over the user's stickers (the texture
-       is what the OUTSIDE of the pot looks like, after all).
-       No-op when no skin is selected or the asset isn't decoded.
-       packId defaults to D.surfaceTexturePackId; pass an explicit
-       id (gallery thumbnails, etc.) to override. */
-    function paintSurfaceTexture(ctx, bounds, packId) {
-        const pack = resolveSurfaceTexturePack(packId);
-        if (!pack || !pack.surfaceTexture) return;
-        const pat = getSurfacePattern(ctx, pack.surfaceTexture);
+            : textureId;
+        if (!id) return;
+        const pat = getSurfacePattern(ctx, id);
         if (!pat) return;
 
         /* SPIN-VIEW override: gallery detail modal sets _viewSpinDx
@@ -5194,7 +5183,7 @@
             id: "candy", label: "CANDY",
             packType: "crafter",
             sheet: "candy",
-            surfaceTexture: "candy",   /* assets/textures/candy.png */
+            surfaceTextures: ["candy", "candy-chocolate", "candy-lemon"],
             backgroundSvg: "candy",    /* assets/backgrounds/candy.svg (optional) */
             description: "Cherry red, blue raspberry, root beer brown.",
             coverEmoji: "\u{1F36C}",   /* candy */
@@ -5221,7 +5210,7 @@
             packType: "builder",   /* parts build a teddy bear */
             buildSubject: "bear",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
-            surfaceTexture: "plush",   /* assets/textures/plush.png */
+            surfaceTextures: ["plushie", "plushie-blue", "plushie-pink"],
             backgroundSvg: "plush",    /* assets/backgrounds/plush.svg (optional) */
             description: "Teddy brown, pastel pink, soft plush palette.",
             coverEmoji: "\u{1F9F8}",   /* teddy bear */
@@ -5247,7 +5236,7 @@
             id: "modded", label: "MODDED",
             packType: "crafter",
             sheet: "modded",
-            surfaceTexture: "modded",   /* assets/textures/modded.png */
+            surfaceTextures: ["modded", "modded-aluminum", "modded-led"],
             backgroundSvg: "modded",   /* assets/backgrounds/modded.svg (optional) */
             description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
             coverEmoji: "\u{1F5A5}",   /* desktop computer */
@@ -5278,7 +5267,7 @@
             packType: "builder",   /* parts build a handheld console */
             buildSubject: "handheld console",
             sheet: "gamer",
-            surfaceTexture: "gamer",   /* assets/textures/gamer.png */
+            surfaceTextures: ["gamer", "gamer-black"],   /* TODO: add a 3rd gamer texture file */
             backgroundSvg: "gamer",    /* assets/backgrounds/gamer.svg (optional) */
             description: "CRT green, scanline gray, PRESS START.",
             coverEmoji: "\u{1F3AE}",   /* video game */
@@ -5305,7 +5294,7 @@
             id: "space", label: "SPACE",
             packType: "crafter",
             sheet: "space",
-            surfaceTexture: "space",   /* assets/textures/space.png */
+            surfaceTextures: ["space", "space-galaxy", "space-blackhole"],
             backgroundSvg: "space",    /* assets/backgrounds/space.svg (optional) */
             description: "Cosmic void, nebula violet, supernova white.",
             coverEmoji: "\u{1F680}",   /* rocket */
@@ -5343,7 +5332,7 @@
             packType: "builder",   /* parts build a dinosaur */
             buildSubject: "dino",
             sheet: "dinosaur",
-            surfaceTexture: "dinosaur", /* assets/textures/dinosaur.png */
+            surfaceTextures: ["dinosaur", "dinosaur-blue", "dinosaur-purpleorange"],
             backgroundSvg: "dinosaur", /* assets/backgrounds/dinosaur.svg (optional) */
             description: "Fossil bone, amber, jurassic jungle greens, T-rex red.",
             coverEmoji: "\u{1F996}",   /* T-Rex */
@@ -5395,7 +5384,7 @@
             id: "music", label: "MUSIC",
             packType: "crafter",
             sheet: "music",
-            surfaceTexture: "music",   /* assets/textures/music.png */
+            surfaceTextures: ["music"],   /* TODO: add 2 more music texture files */
             backgroundSvg: "music",    /* assets/backgrounds/music.svg (optional) */
             description: "Vinyl black, brass, neon stage lights.",
             coverEmoji: "\u{1F3B5}",   /* musical note */
@@ -5465,7 +5454,7 @@
             id: "chickens", label: "CHICKENS",
             packType: "special",
             sheet: "chickens",
-            surfaceTexture: "chicken",  /* assets/textures/chicken.png */
+            surfaceTextures: ["chicken"],  /* TODO: add 2 more chicken texture files */
             backgroundSvg: "chickens", /* assets/backgrounds/chickens.svg (optional) */
             description: "PLACEHOLDER — eleven costumed chickens. " +
                          "Kelly writes the real copy.",
@@ -5496,7 +5485,7 @@
             id: "aliens", label: "ALIENS",
             packType: "special",
             sheet: "aliens",
-            surfaceTexture: "aliens",   /* assets/textures/aliens.png */
+            surfaceTextures: ["aliens"],   /* TODO: add 2 more aliens texture files */
             backgroundSvg: "aliens",   /* assets/backgrounds/aliens.svg (optional) */
             description: "PLACEHOLDER — eight little visitors. " +
                          "Kelly writes the real copy.",
@@ -5527,7 +5516,7 @@
             id: "moons", label: "MOONS",
             packType: "special",
             sheet: "literally-moons",   /* sheet file is hyphenated */
-            surfaceTexture: "literally-moons", /* assets/textures/literally-moons.png */
+            surfaceTextures: ["literally-moons"], /* TODO: add 2 more moons texture files */
             backgroundSvg: "moons",    /* assets/backgrounds/moons.svg (optional) */
             description: "PLACEHOLDER — literally moons. And comets. " +
                          "Kelly writes the real copy.",
@@ -6339,8 +6328,8 @@
         /* And drops the link to any draft being edited — a fully
            cleared pot is a fresh canvas, not the same draft. */
         D.draftId = null;
-        if (typeof refreshTextureButton === "function") {
-            refreshTextureButton();
+        if (typeof buildTexturePalette === "function") {
+            buildTexturePalette();
         }
     }
 
@@ -7140,20 +7129,13 @@
            we gate the wiring with _wired to avoid stacking N
            listeners that flip the toggle even/odd times. */
         document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
-            if (b.dataset.tool === "texture") {
-                if (!b._wired) {
-                    b.addEventListener("click", function () { toggleSurfaceTexture(); });
-                    b._wired = true;
-                }
-                return;
-            }
             if (!b._wired) {
                 b.addEventListener("click", function () { setTool(b.dataset.tool); });
                 b._wired = true;
             }
             b.classList.toggle("active", b.dataset.tool === D.tool);
         });
-        refreshTextureButton();
+        buildTexturePalette();
 
         /* Size slider (matches the ROT slider pattern so all
            tool-row inputs share one control vocabulary). */
@@ -7195,10 +7177,6 @@
     function setTool(tool) {
         D.tool = tool;
         document.querySelectorAll(".tool-btn[data-tool]").forEach(function (b) {
-            /* The TEXTURE button doesn't represent a tool — its
-               active state mirrors D.surfaceTexturePackId via
-               refreshTextureButton, not D.tool. Skip it here. */
-            if (b.dataset.tool === "texture") return;
             b.classList.toggle("active", b.dataset.tool === tool);
         });
         if (D.canvas) {
@@ -7213,47 +7191,41 @@
         syncToolContext();
     }
 
-    /* Toggle the active pack's surface texture on / off. If a
-       DIFFERENT pack's skin is currently applied, this swaps to
-       the active pack's skin (one-tap to override). If the active
-       pack has no surfaceTexture, this is a no-op + the button
-       stays disabled-looking. */
-    function toggleSurfaceTexture() {
+    /* Build the CRUNCH texture-skin palette for the active pack.
+       Each swatch shows a tilable skin; tap to apply it over the
+       whole pot, re-tap the active one to remove it (one skin at a
+       time). The whole CRUNCH row hides when the pack has no skins
+       (e.g., BASIC). Re-run on pack swap, fresh decorate mount, CLEAR,
+       and gallery loads so the active swatch tracks D.
+       surfaceTexturePackId (which holds a texture FILE id). */
+    function buildTexturePalette() {
+        const tp = document.getElementById("texturePalette");
+        if (!tp) return;
+        const row = tp.closest(".crunch-row");
         const pack = activePack();
-        if (!pack || !pack.surfaceTexture) {
-            /* Button shouldn't be enabled when there's no skin to
-               apply, but be defensive against rapid taps + race
-               conditions during pack switches. */
-            refreshTextureButton();
-            return;
-        }
-        if (D.surfaceTexturePackId === pack.id) {
-            D.surfaceTexturePackId = null;
-        } else {
-            D.surfaceTexturePackId = pack.id;
-        }
-        refreshTextureButton();
-    }
-
-    /* Sync the TEXTURE button's visual state to D + the active
-       pack's surfaceTexture availability. Called whenever the
-       active pack changes, the toggle fires, a fresh decorate
-       mount happens, or a gallery pot is loaded back in. */
-    function refreshTextureButton() {
-        const btn = document.getElementById("decTexture");
-        if (!btn) return;
-        const pack = activePack();
-        const hasSkin = !!(pack && pack.surfaceTexture);
-        const isApplied = !!(D.surfaceTexturePackId &&
-                             pack && D.surfaceTexturePackId === pack.id);
-        btn.classList.toggle("active",   isApplied);
-        btn.classList.toggle("disabled", !hasSkin);
-        btn.disabled = !hasSkin;
-        btn.setAttribute("aria-pressed", isApplied ? "true" : "false");
-        btn.title = hasSkin
-            ? (isApplied ? "Remove the " + pack.label + " skin"
-                          : "Apply the " + pack.label + " skin to the whole pot")
-            : "This pack has no surface texture";
+        const textures = (pack && pack.surfaceTextures) || [];
+        tp.innerHTML = "";
+        textures.forEach(function (tid) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "texture-swatch";
+            btn.dataset.texture = tid;
+            btn.style.backgroundImage = 'url("assets/textures/' + tid + '.png")';
+            btn.title = tid;
+            btn.setAttribute("aria-label", "Texture skin: " + tid);
+            if (tid === D.surfaceTexturePackId) btn.classList.add("active");
+            btn.addEventListener("click", function () {
+                /* Tap to apply; re-tap the active skin to clear it. */
+                D.surfaceTexturePackId =
+                    (D.surfaceTexturePackId === tid) ? null : tid;
+                tp.querySelectorAll(".texture-swatch").forEach(function (s) {
+                    s.classList.toggle("active",
+                        s.dataset.texture === D.surfaceTexturePackId);
+                });
+            });
+            tp.appendChild(btn);
+        });
+        if (row) row.classList.toggle("ctx-empty", textures.length === 0);
     }
 
     /* ----- 6F. Buttons ----- */
@@ -7395,8 +7367,8 @@
                (some have a surfaceTexture, some don't). Re-sync
                on every entry so swapping packs in the shop and
                coming back here updates the button correctly. */
-            if (typeof refreshTextureButton === "function") {
-                refreshTextureButton();
+            if (typeof buildTexturePalette === "function") {
+                buildTexturePalette();
             }
         },
         onLeave: function () {
@@ -10456,8 +10428,8 @@
             if (typeof renderStickerLayer === "function") {
                 renderStickerLayer();
             }
-            if (typeof refreshTextureButton === "function") {
-                refreshTextureButton();
+            if (typeof buildTexturePalette === "function") {
+                buildTexturePalette();
             }
         });
     }
@@ -12062,6 +12034,27 @@
             paintStampPreview(cv, id);
         });
         card.appendChild(stamps);
+
+        /* Textures strip --------------------------------------- */
+        const texList = p.surfaceTextures || [];
+        if (texList.length) {
+            const texTitle = document.createElement("h3");
+            texTitle.className = "pack-modal-section";
+            texTitle.textContent = "TEXTURES";
+            card.appendChild(texTitle);
+
+            const textures = document.createElement("div");
+            textures.className = "pack-modal-textures";
+            texList.forEach(function (tid) {
+                const tile = document.createElement("div");
+                tile.className = "pack-modal-texture";
+                tile.style.backgroundImage =
+                    'url("assets/textures/' + tid + '.png")';
+                tile.title = tid;
+                textures.appendChild(tile);
+            });
+            card.appendChild(textures);
+        }
 
         /* Action button --------------------------------------- */
         const action = document.createElement("button");

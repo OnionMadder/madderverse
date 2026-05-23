@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=47" />
+    <link rel="stylesheet" href="style.css?v=48" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -527,18 +527,17 @@
                 <div class="palette pattern-palette" id="patternPalette" role="listbox" aria-label="Stamp patterns"></div>
             </div>
 
-            <!-- CRUNCH (surface texture) — folded under THWACK since
+            <!-- CRUNCH (surface textures) — folded under THWACK since
                  textures + stamps are both tap-to-apply surface
-                 decoration. One-tap toggle of the active pack's skin
-                 (same toggleSurfaceTexture behavior as the old
-                 top-level CRUNCH tool); disabled when the pack has no
-                 skin. id/class/data-tool preserved so the existing
-                 buildToolUI + refreshTextureButton wiring still finds
-                 it. -->
-            <div class="tool-row crunch-row ctx-block" data-ctx="stamp">
+                 decoration. A palette of the active pack's skins (up
+                 to 3); tap to apply over the whole pot, re-tap to
+                 remove. Built by buildTexturePalette() from the pack's
+                 surfaceTextures; the whole row hides (ctx-empty) when
+                 the pack has no skins (e.g., BASIC). -->
+            <div class="tool-row palette-row crunch-row ctx-block" data-ctx="stamp">
                 <span class="row-label">CRUNCH</span>
-                <button class="tool-btn crunch-btn" data-tool="texture"
-                        id="decTexture" type="button">SKIN</button>
+                <div class="palette texture-palette" id="texturePalette"
+                     role="listbox" aria-label="Texture skins"></div>
             </div>
 
             <!-- GOO (glaze) — paint tools + THWACK. Stamps are tinted
@@ -1287,7 +1286,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=47"></script>
+<script src="game.js?v=48"></script>
 
 </body>
 </html>
