@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=44" />
+    <link rel="stylesheet" href="style.css?v=45" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -388,22 +388,15 @@
         <div class="canvas-wrap">
             <canvas id="decorateCanvas" width="400" height="600"
                     aria-label="Locked pot. Tap to paint, tap to thwack a stamp. Pinch to zoom, two-finger drag to pan."></canvas>
-            <!-- Floating command ribbon — BALEET (eraser) / NUKE
-                 (clear) / UNDID (step back) / REDO pulled OUT of the
-                 tool tray. These act on the whole painting (commands),
-                 not paint modes, so they live on the canvas instead
-                 of sitting beside BRUSH. Pinned top-right, clear of
-                 the bottom-left zoom cluster. UNDID/REDO keep their
-                 Ctrl/Cmd+Z shortcuts and disable when their stack is
-                 empty; BALEET selects the eraser tool (lights up
-                 while active). -->
+            <!-- Floating command ribbon — NUKE (clear) / UNDID (step
+                 back) / REDO. These act on the whole painting
+                 (commands), not paint modes, so they live on the
+                 canvas instead of sitting in the tool tray. Pinned
+                 top-right, clear of the bottom-left zoom cluster.
+                 UNDID/REDO keep their Ctrl/Cmd+Z shortcuts and disable
+                 when their stack is empty. (BALEET used to live here
+                 but is now a proper tool in the tray.) -->
             <div class="canvas-cmd-ribbon" aria-label="Canvas commands">
-                <button class="cmd-btn cmd-erase" id="decErase" type="button"
-                        title="Baleet — tap the pot to rub paint off"
-                        aria-label="Eraser" aria-pressed="false">
-                    <span class="cmd-glyph" aria-hidden="true">&#x232B;</span>
-                    <span class="cmd-label">BALEET</span>
-                </button>
                 <button class="cmd-btn cmd-clear" id="decClear" type="button"
                         title="Nuke the whole pot"
                         aria-label="Clear the whole pot">
@@ -473,19 +466,20 @@
                 <button class="pack-tab" data-pack="core" type="button">BASIC</button>
             </div>
 
-            <!-- TOOL row — always visible. The six paint/place modes.
-                 TEXTURE is a one-tap surface-skin toggle (it doesn't
-                 set D.tool); MOVE re-positions placed stamps. ERASE +
-                 CLEAR moved OUT to the floating canvas ribbon. The
-                 contextual rows below show/hide per the active tool
-                 (syncToolContext in game.js). -->
+            <!-- TOOL row — always visible. CRUNCH (TEXTURE) is a
+                 one-tap surface-skin toggle (it doesn't set D.tool).
+                 BALEET is the eraser tool: tap a sticker to delete it,
+                 or tap/drag bare clay to rub paint off. NUKE/UNDID/REDO
+                 live in the floating canvas ribbon. The contextual rows
+                 below show/hide per the active tool (syncToolContext in
+                 game.js). -->
             <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
                 <button class="tool-btn" data-tool="brush"    type="button">BRUSH</button>
                 <button class="tool-btn" data-tool="spray"    type="button">SPRTZ</button>
                 <button class="tool-btn" data-tool="splatter" type="button">SPLAT</button>
                 <button class="tool-btn" data-tool="stamp"    type="button">THWACK</button>
                 <button class="tool-btn" data-tool="texture"  id="decTexture" type="button">CRUNCH</button>
-                <button class="tool-btn" data-tool="move"     id="decMove"    type="button">SCOOT</button>
+                <button class="tool-btn" data-tool="eraser"   id="decBaleet"  type="button">BALEET</button>
             </div>
 
             <!-- ===== Contextual control blocks (.ctx-block) =====
@@ -526,7 +520,7 @@
             </div>
 
             <!-- GOO (glaze) — paint tools only (BRUSH/SPRTZ/SPLAT).
-                 Hidden for THWACK/CRUNCH/SCOOT/eraser. -->
+                 Hidden for THWACK/CRUNCH/BALEET. -->
             <div class="tool-row palette-row glaze-row ctx-block"
                  data-ctx="brush spray splatter">
                 <span class="row-label">GOO</span>
@@ -1275,7 +1269,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=44"></script>
+<script src="game.js?v=45"></script>
 
 </body>
 </html>

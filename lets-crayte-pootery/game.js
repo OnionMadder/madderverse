@@ -5584,12 +5584,6 @@
         stickerCanvas: null,
         stickerCtx: null,
 
-        /* MOVE-tool drag state — non-null only between pointerdown
-           on a sticker and the following pointerup. Holds the
-           sticker reference + the pointer-to-sticker offset so the
-           drag doesn't snap to the cursor center. */
-        movingSticker: null,
-
         dpr: 1,
 
         activePackId: "core",
@@ -6476,20 +6470,9 @@
             D.multiTouched = false;
             D.pendingPos = p;
 
-            /* MOVE tool still grabs on down — it only acts when the
-               pointer actually hits an existing sticker, so a pinch
-               that happens to start on a sticker is released by the
-               size===2 branch (which nulls movingSticker). */
-            if (D.tool === "move") {
-                const hit = hitTestSticker(p);
-                if (hit) {
-                    pushUndoSnapshot();
-                    D.movingSticker = hit;
-                    D.canvas.style.cursor = "grabbing";
-                    D.gestureCommitted = true;   /* a real grab, not a tap */
-                }
-                return;
-            }
+            /* BALEET (eraser) sticker-delete is resolved on tap-up in
+               endPointer (so a drag-from-sticker still rubs paint
+               instead of deleting). Nothing to grab on down. */
         };
 
         /* Commit the deferred paint START (brush / spray / splatter /
@@ -6599,15 +6582,11 @@
                 startPaintAt(decPointerPos(e));
             } else if (D.activePointers.size === 2) {
                 /* Second finger landed -> this is a pinch/pan, NOT a
-                   placement. Drop the deferred paint/stamp + release
-                   any grabbed sticker so the gesture leaves no marks. */
+                   placement. Drop the deferred paint/stamp so the
+                   gesture leaves no marks. */
                 cancelPaint();
                 D.pendingPos = null;
                 D.multiTouched = true;
-                if (D.movingSticker) {
-                    D.movingSticker = null;
-                    if (D.tool === "move") D.canvas.style.cursor = "grab";
-                }
                 beginGesture();
             }
         });
@@ -6625,19 +6604,6 @@
             /* Single-finger -- normal paint flow */
             if (!D.pointerActive) return;
             const p = decPointerPos(e);
-            /* MOVE tool drag — track the active sticker. We preserve
-               the pointer-to-sticker offset captured on pointerdown
-               so the drag doesn't snap to the cursor center; the
-               sticker maintains the grab point throughout the drag. */
-            if (D.tool === "move" && D.movingSticker) {
-                const s = D.movingSticker.sticker;
-                s.x = p.x - D.movingSticker.offsetX;
-                s.y = p.y - D.movingSticker.offsetY;
-                renderStickerLayer();
-                D.lastPaintPos = p;
-                D.pointer = p;
-                return;
-            }
             /* Stamps are tap-only: dragging never paints a trail of
                stamps. The actual placement happens on tap-up. */
             if (D.tool === "stamp") {
@@ -6667,7 +6633,19 @@
                         !D.multiTouched && D.pendingPos) {
                     if (D.tool === "stamp") {
                         handleStampTap(D.pendingPos);
-                    } else if (D.tool !== "move") {
+                    } else if (D.tool === "eraser") {
+                        /* BALEET tap: if it landed on a sticker, delete
+                           that sticker; otherwise rub off paint at the
+                           tap point (eraser dab). */
+                        const hit = hitTestSticker(D.pendingPos);
+                        pushUndoSnapshot();
+                        if (hit) {
+                            D.stickers.splice(hit.index, 1);
+                            renderStickerLayer();
+                        } else {
+                            paintDot(D.pendingPos);
+                        }
+                    } else {
                         pushUndoSnapshot();
                         paintDot(D.pendingPos);
                     }
@@ -6675,12 +6653,6 @@
                 if (D.pointerActive) {
                     D.pointerActive = false;
                     D.lastPaintPos = null;
-                }
-                /* End any MOVE-tool drag in progress and restore
-                   the idle grab cursor. */
-                if (D.movingSticker) {
-                    D.movingSticker = null;
-                    if (D.tool === "move") D.canvas.style.cursor = "grab";
                 }
                 D.gestureStart = null;
                 D.gestureCommitted = false;
@@ -7020,12 +6992,11 @@
                     gp.querySelectorAll(".swatch").forEach(function (s) {
                         s.classList.toggle("active", s.dataset.glaze === gid);
                     });
-                    /* Picking a color while on a NON-painting tool
-                       (eraser or move) implies "I want to paint with
-                       this" -> snap to brush. On a painting tool
-                       (brush/spray/splatter/stamp) the color just
-                       re-tints the current tool, so we leave it. */
-                    if (D.tool === "eraser" || D.tool === "move") setTool("brush");
+                    /* Picking a color while on BALEET (eraser) implies
+                       "I want to paint with this" -> snap to brush. On a
+                       painting tool (brush/spray/splatter/stamp) the
+                       color just re-tints the current tool, so leave it. */
+                    if (D.tool === "eraser") setTool("brush");
                 });
                 gp.appendChild(btn);
             });
@@ -7182,23 +7153,11 @@
             if (b.dataset.tool === "texture") return;
             b.classList.toggle("active", b.dataset.tool === tool);
         });
-        /* ERASE is a floating ribbon command, not a .tool-btn, so
-           light it up here when the eraser mode is active. */
-        const eraseBtn = document.getElementById("decErase");
-        if (eraseBtn) {
-            const on = tool === "eraser";
-            eraseBtn.classList.toggle("is-active", on);
-            eraseBtn.setAttribute("aria-pressed", on ? "true" : "false");
-        }
         if (D.canvas) {
-            /* Cursor mapping:
-                 - eraser : "cell" (so the kid sees what they're erasing)
-                 - move   : "grab" (drag-to-reposition stickers)
-                 - others : "pointer" (interactive surface) */
-            D.canvas.style.cursor =
-                (tool === "eraser") ? "cell" :
-                (tool === "move")   ? "grab" :
-                                       "pointer";
+            /* BALEET (eraser) gets the "cell" cursor so the kid sees
+               what they're about to remove; everything else uses the
+               interactive pointer. */
+            D.canvas.style.cursor = (tool === "eraser") ? "cell" : "pointer";
         }
         syncToolContext();
     }
@@ -7253,14 +7212,6 @@
         const clear = document.getElementById("decClear");
         const fire  = document.getElementById("decFire");
         const save  = document.getElementById("decSaveDraft");
-        const erase = document.getElementById("decErase");
-
-        /* ERASE moved to the floating canvas ribbon — it's no longer
-           a .tool-btn[data-tool] picked up by buildToolUI's loop, so
-           wire it directly to the eraser tool here. */
-        if (erase) erase.addEventListener("click", function () {
-            setTool("eraser");
-        });
 
         if (save) save.addEventListener("click", function () {
             const id = saveDraftPot();
