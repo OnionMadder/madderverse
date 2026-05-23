@@ -7153,6 +7153,26 @@
                 }
             });
         }
+
+        /* Reflect the active tool's contextual rows on mount + on
+           every pack swap (buildToolUI re-runs then). */
+        syncToolContext();
+    }
+
+    /* Progressive disclosure: show only the contextual rows the
+       active tool actually uses. Each .ctx-block in the tray lists
+       its applicable tools in data-ctx; we toggle .ctx-hidden so
+       CSS can animate the collapse. ERASE lives in the floating
+       ribbon now but is still the "eraser" tool internally, so it
+       participates in the size context like the paint tools. */
+    function syncToolContext() {
+        const tool = D.tool;
+        document.querySelectorAll(".decorate-tools .ctx-block").forEach(
+            function (row) {
+                const ctx = (row.dataset.ctx || "").split(/\s+/);
+                row.classList.toggle("ctx-hidden", ctx.indexOf(tool) === -1);
+            }
+        );
     }
 
     function setTool(tool) {
@@ -7164,6 +7184,14 @@
             if (b.dataset.tool === "texture") return;
             b.classList.toggle("active", b.dataset.tool === tool);
         });
+        /* ERASE is a floating ribbon command, not a .tool-btn, so
+           light it up here when the eraser mode is active. */
+        const eraseBtn = document.getElementById("decErase");
+        if (eraseBtn) {
+            const on = tool === "eraser";
+            eraseBtn.classList.toggle("is-active", on);
+            eraseBtn.setAttribute("aria-pressed", on ? "true" : "false");
+        }
         if (D.canvas) {
             /* Cursor mapping:
                  - eraser : "cell" (so the kid sees what they're erasing)
@@ -7174,6 +7202,7 @@
                 (tool === "move")   ? "grab" :
                                        "pointer";
         }
+        syncToolContext();
     }
 
     /* Toggle the active pack's surface texture on / off. If a
@@ -7226,6 +7255,14 @@
         const clear = document.getElementById("decClear");
         const fire  = document.getElementById("decFire");
         const save  = document.getElementById("decSaveDraft");
+        const erase = document.getElementById("decErase");
+
+        /* ERASE moved to the floating canvas ribbon — it's no longer
+           a .tool-btn[data-tool] picked up by buildToolUI's loop, so
+           wire it directly to the eraser tool here. */
+        if (erase) erase.addEventListener("click", function () {
+            setTool("eraser");
+        });
 
         if (save) save.addEventListener("click", function () {
             const id = saveDraftPot();

@@ -388,18 +388,38 @@
         <div class="canvas-wrap">
             <canvas id="decorateCanvas" width="400" height="600"
                     aria-label="Locked pot. Drag to paint, tap to stamp. Pinch to zoom, two-finger drag to pan."></canvas>
-            <!-- Floating UNDO / REDO pair — pinned to the top-right
-                 of the canvas frame. Ctrl/Cmd+Z + Ctrl/Cmd+Shift+Z
-                 (or Ctrl/Cmd+Y) also work. Both disable when their
-                 stack is empty. -->
-            <button class="canvas-overlay-btn" id="undoBtn" type="button"
-                    title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
-                <span aria-hidden="true">&#x21B6;</span>
-            </button>
-            <button class="canvas-overlay-btn is-redo" id="redoBtn" type="button"
-                    title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
-                <span aria-hidden="true">&#x21B7;</span>
-            </button>
+            <!-- Floating command ribbon — ERASE / CLEAR / UNDO /
+                 REDO pulled OUT of the tool tray. These act on the
+                 whole painting (commands), not paint modes, so they
+                 live on the canvas instead of sitting beside BRUSH.
+                 Pinned top-right, clear of the bottom-left zoom
+                 cluster. Undo/redo keep their Ctrl/Cmd+Z shortcuts
+                 and disable when their stack is empty; ERASE selects
+                 the eraser tool (lights up while active). -->
+            <div class="canvas-cmd-ribbon" aria-label="Canvas commands">
+                <button class="cmd-btn cmd-erase" id="decErase" type="button"
+                        title="Eraser — tap the pot to rub paint off"
+                        aria-label="Eraser" aria-pressed="false">
+                    <span class="cmd-glyph" aria-hidden="true">&#x232B;</span>
+                    <span class="cmd-label">ERASE</span>
+                </button>
+                <button class="cmd-btn cmd-clear" id="decClear" type="button"
+                        title="Clear the whole pot"
+                        aria-label="Clear the whole pot">
+                    <span class="cmd-glyph" aria-hidden="true">&#x2715;</span>
+                    <span class="cmd-label">CLEAR</span>
+                </button>
+                <button class="cmd-btn" id="undoBtn" type="button"
+                        title="Undo (Ctrl+Z)" aria-label="Undo" disabled>
+                    <span class="cmd-glyph" aria-hidden="true">&#x21B6;</span>
+                    <span class="cmd-label">UNDO</span>
+                </button>
+                <button class="cmd-btn" id="redoBtn" type="button"
+                        title="Redo (Ctrl+Shift+Z)" aria-label="Redo" disabled>
+                    <span class="cmd-glyph" aria-hidden="true">&#x21B7;</span>
+                    <span class="cmd-label">REDO</span>
+                </button>
+            </div>
 
             <!-- Zoom controls. Pinch + two-finger pan work on touch;
                  these buttons + wheel handle desktop / non-pinch. -->
@@ -436,39 +456,46 @@
 
         <div class="decorate-tools">
 
+            <!-- STASH header sits above the pack strip so the kid
+                 reads the horizontal row as "which box of glazes +
+                 stamps am I digging in". -->
+            <span class="row-label stash-label">PACK</span>
+
             <!-- Pack tabs are rendered dynamically from GLAZE_PACKS
-                 filtered by ownership (renderPackTabs). The fallback
-                 children below are only seen if JS fails to boot. -->
+                 filtered by ownership (renderPackTabs). The strip
+                 scrolls horizontally (momentum on touch) so every
+                 pack stays one swipe away instead of wrapping into a
+                 tall block. The fallback child below is only seen if
+                 JS fails to boot. -->
             <div class="tool-row pack-tabs" id="packTabs"
                  role="tablist" aria-label="Glaze pack">
                 <button class="pack-tab" data-pack="core" type="button">BASIC</button>
             </div>
 
+            <!-- TOOL row — always visible. The six paint/place modes.
+                 TEXTURE is a one-tap surface-skin toggle (it doesn't
+                 set D.tool); MOVE re-positions placed stamps. ERASE +
+                 CLEAR moved OUT to the floating canvas ribbon. The
+                 contextual rows below show/hide per the active tool
+                 (syncToolContext in game.js). -->
             <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
                 <button class="tool-btn" data-tool="brush"    type="button">BRUSH</button>
                 <button class="tool-btn" data-tool="spray"    type="button">SPRAY</button>
                 <button class="tool-btn" data-tool="splatter" type="button">SPLAT</button>
                 <button class="tool-btn" data-tool="stamp"    type="button">STAMP</button>
-            </div>
-
-            <!-- Secondary mode row: TEXTURE applies the active
-                 pack's surface skin; MOVE picks existing stickers
-                 up to drag-reposition them; ERASE switches to
-                 the eraser tool; CLEAR wipes everything. (CLEAR
-                 was previously in .decorate-controls below the
-                 tray; consolidated here so all paint-related
-                 controls live in one cluster.) -->
-            <div class="tool-row tool-modes" role="tablist" aria-label="Mode">
                 <button class="tool-btn" data-tool="texture"  id="decTexture" type="button">TEXTURE</button>
                 <button class="tool-btn" data-tool="move"     id="decMove"    type="button">MOVE</button>
-                <button class="tool-btn" data-tool="eraser"   type="button">ERASE</button>
-                <button class="tool-btn"                       id="decClear" type="button">CLEAR</button>
             </div>
 
-            <!-- SIZE — slider matching the ROT row so the
-                 control vocabulary is consistent (was three
-                 discrete pucks before). -->
-            <div class="tool-row size-row">
+            <!-- ===== Contextual control blocks (.ctx-block) =====
+                 Each carries data-ctx listing the tools it applies to.
+                 syncToolContext() toggles .ctx-hidden so only the
+                 controls the active tool actually uses are shown; the
+                 collapse animates via max-height/opacity in CSS. -->
+
+            <!-- SIZE — paint/erase/stamp scale. -->
+            <div class="tool-row size-row ctx-block"
+                 data-ctx="brush spray splatter stamp eraser">
                 <span class="row-label">SIZE</span>
                 <input type="range" min="4" max="32" step="1" value="14"
                        id="brushSize" class="tool-slider"
@@ -476,10 +503,10 @@
                 <span class="rotate-value" id="brushSizeValue">14</span>
             </div>
 
-            <!-- Stamp rotation (applied to stamp placement only;
-                 brush + eraser ignore it). 15deg steps so the
-                 slider has 24 detents around the circle. -->
-            <div class="tool-row rotate-row">
+            <!-- Stamp rotation — stamp tool only (brush + eraser
+                 ignore it). 15deg steps so the slider has 24 detents
+                 around the circle. -->
+            <div class="tool-row rotate-row ctx-block" data-ctx="stamp">
                 <span class="row-label">ROT</span>
                 <input type="range" min="0" max="345" step="15" value="0"
                        id="stampRotate" class="tool-slider"
@@ -501,12 +528,15 @@
                 </button>
             </div>
 
-            <div class="tool-row palette-row">
+            <!-- GLAZE — paint + stamp tint. Hidden for MOVE. -->
+            <div class="tool-row palette-row glaze-row ctx-block"
+                 data-ctx="brush spray splatter stamp">
                 <span class="row-label">GLAZE</span>
                 <div class="palette glaze-palette" id="glazePalette" role="listbox" aria-label="Glaze colors"></div>
             </div>
 
-            <div class="tool-row palette-row">
+            <!-- STAMPS — stamp tool only. -->
+            <div class="tool-row palette-row stamps-row ctx-block" data-ctx="stamp">
                 <span class="row-label">STAMPS</span>
                 <div class="palette pattern-palette" id="patternPalette" role="listbox" aria-label="Stamp patterns"></div>
             </div>

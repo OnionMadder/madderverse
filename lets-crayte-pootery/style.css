@@ -1218,30 +1218,33 @@ a:focus-visible {
     border-radius: 3px;
 }
 
-.canvas-overlay-btn {
+/* Floating command ribbon — ERASE / CLEAR / UNDO / REDO. A
+   vertical strip pinned to the canvas top-right (clear of the
+   bottom-left zoom cluster). Commands act on the whole painting,
+   so they're deliberately NOT siblings of the BRUSH tool row. */
+.canvas-cmd-ribbon {
     position: absolute;
-    top: 14px;
-    /* Undo sits at the far right; redo (.is-redo) sits to its
-       left so the natural reading order is "redo  undo" from
-       left-to-right, with undo as the primary action closer to
-       the user's thumb. */
-    right: 14px;
+    top: 12px;
+    right: 12px;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.canvas-overlay-btn.is-redo {
-    right: calc(14px + 38px + 8px);   /* one button + gap left of undo */
-}
-
-.canvas-overlay-btn {
-    width: 38px;
-    height: 38px;
-    padding: 0;
-    border-radius: 50%;
+.cmd-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    width: 52px;
+    min-height: 44px;          /* thumb-friendly touch target */
+    padding: 5px 3px;
+    border-radius: 11px;
     background: rgba(12, 31, 37, 0.85);
     border: 1px solid var(--teal-low);
     color: var(--teal);
-    font-size: 20px;
-    line-height: 1;
     cursor: pointer;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
@@ -1253,26 +1256,54 @@ a:focus-visible {
     text-shadow: 0 0 6px rgba(0, 255, 204, 0.3);
 }
 
-.canvas-overlay-btn:hover,
-.canvas-overlay-btn:focus-visible {
-    background: rgba(20, 64, 74, 0.9);
+.cmd-glyph {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.cmd-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 1px;
+    line-height: 1;
+}
+
+.cmd-btn:hover,
+.cmd-btn:focus-visible {
+    background: rgba(20, 64, 74, 0.92);
     border-color: var(--teal);
     color: var(--pink-bright);
     outline: none;
     box-shadow: 0 0 14px rgba(255, 46, 136, 0.35);
 }
 
-.canvas-overlay-btn:active {
+.cmd-btn:active {
     transform: translateY(1px);
 }
 
-.canvas-overlay-btn[disabled] {
+.cmd-btn[disabled] {
     opacity: 0.35;
     cursor: not-allowed;
     color: var(--ink-low);
     border-color: var(--ink-low);
     text-shadow: none;
     box-shadow: none;
+}
+
+/* ERASE lights up pink while the eraser tool is the active mode
+   (toggled in setTool). CLEAR keeps a faint danger tint so it
+   reads as the "wipe everything" command. */
+.cmd-btn.is-active {
+    background: linear-gradient(180deg, #ff3d96 0%, #b81866 100%);
+    border-color: var(--pink-bright);
+    color: #fff;
+    box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 0.18),
+        0 0 12px rgba(255, 46, 136, 0.5);
+}
+
+.cmd-clear .cmd-glyph {
+    color: #ff6b6b;
 }
 
 /* Stamp rotation row */
@@ -1417,7 +1448,10 @@ a:focus-visible {
     max-width: 420px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    /* Row spacing is per-row margin (not flex gap) so a collapsed
+       .ctx-block can animate its margin to zero and leave NO dead
+       space between the rows that remain visible. */
+    gap: 0;
     padding: 12px;
     background:
         repeating-linear-gradient(0deg,
@@ -1437,6 +1471,48 @@ a:focus-visible {
     gap: 8px;
 }
 
+/* Per-row spacing (see .decorate-tools gap:0 note). Every row but
+   the first gets a top margin; the STASH label hugs the strip
+   below it. */
+.decorate-tools > .tool-row,
+.decorate-tools > .stash-label {
+    margin-top: 10px;
+}
+.decorate-tools > .stash-label:first-child {
+    margin-top: 0;
+}
+.decorate-tools > .stash-label + .pack-tabs {
+    margin-top: 4px;
+}
+
+/* Progressive disclosure: contextual rows collapse smoothly when
+   the active tool doesn't use them. max-height + opacity animate
+   (display:none can't), and margin-top -> 0 removes the row's
+   spacing so no dead-space lingers. */
+.ctx-block {
+    overflow: hidden;
+    max-height: 240px;
+    opacity: 1;
+    transition: max-height 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+                opacity 0.18s ease,
+                margin-top 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.decorate-tools > .ctx-block.ctx-hidden {
+    max-height: 0;
+    opacity: 0;
+    margin-top: 0;
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ctx-block { transition: none; }
+}
+
+/* STASH header above the pack strip. */
+.stash-label {
+    align-self: flex-start;
+}
+
 .row-label {
     font-family: var(--font-mono);
     font-size: 10px;
@@ -1452,20 +1528,38 @@ a:focus-visible {
     gap: 6px;
 }
 
-/* Pack tabs — wrap to as many rows as needed so every pack is
-   visible on any screen without scrollbars or hidden-swipe
-   gestures. Same UX desktop + mobile. */
+/* Pack tabs — single horizontal strip that scrolls (momentum on
+   touch) instead of wrapping into a tall block. Selected pack
+   keeps the pink-fill .active style. Desktop: fits if there's
+   room, otherwise scrolls the same way. */
 .pack-tabs {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 4px;
-    padding-bottom: 4px;
+    padding-bottom: 6px;
     margin-bottom: 2px;
     border-bottom: 1px dashed var(--teal-low);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--teal-low) transparent;
+}
+.pack-tabs::-webkit-scrollbar {
+    height: 5px;
+}
+.pack-tabs::-webkit-scrollbar-thumb {
+    background: var(--teal-low);
+    border-radius: 3px;
+}
+.pack-tabs::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .pack-tab {
     flex: 0 0 auto;
-    padding: 7px 9px;
+    min-height: 44px;          /* thumb-friendly touch target */
+    padding: 7px 12px;
     font-family: var(--font-mono);
     font-size: 10px;
     letter-spacing: 1.4px;
@@ -1527,6 +1621,8 @@ a:focus-visible {
 
 .tool-btn {
     flex: 1;
+    min-width: 30%;            /* 6 tools wrap 3-up on phones */
+    min-height: 44px;          /* thumb-friendly touch target */
     padding: 10px 6px;
     font-family: var(--font-mono);
     font-size: 11px;
@@ -5333,11 +5429,18 @@ a:focus-visible {
     .shape-controls { gap: 10px; }
     .btn-control { padding: 12px 10px; }
 
-    .decorate-tools { padding: 10px 8px; gap: 8px; }
+    .decorate-tools { padding: 10px 8px; }
+    .decorate-tools > .tool-row,
+    .decorate-tools > .stash-label { margin-top: 8px; }
     .row-label { font-size: 9px; min-width: 44px; }
     .tool-btn { font-size: 10px; padding: 8px 4px; letter-spacing: 1.2px; }
     .swatch { width: 28px; height: 28px; }
     .stamp-btn { width: 36px; height: 36px; }
+
+    /* Trim the command ribbon a touch on small phones so it doesn't
+       crowd the pot, while staying >=44px tall for thumbs. */
+    .cmd-btn { width: 46px; padding: 4px 2px; }
+    .cmd-glyph { font-size: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
