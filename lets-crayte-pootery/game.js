@@ -2173,8 +2173,12 @@
             setTimeout(function () { openDetail(entry); }, 200);
         });
 
+        /* Match the vault's "display cabinet" look: render the pot on
+           a TRANSPARENT canvas (no baked wheel/background) so the CSS
+           display niche + steel shelf on .featured-thumb show through,
+           exactly like #screen-gallery .pot-thumb. */
         loadEntryPaint(entry).then(function () {
-            renderEntryIntoCanvas(canvas, entry);
+            renderEntryIntoCanvas(canvas, entry, { background: false, wheel: false });
         });
         return card;
     }

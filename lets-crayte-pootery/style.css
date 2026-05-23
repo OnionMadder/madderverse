@@ -472,11 +472,14 @@ a:focus-visible {
     background: #06141a;
     border-radius: var(--radius-sm);
     overflow: hidden;
+    position: relative;   /* above the niche + shelf pseudo-element */
 }
 .featured-thumb canvas {
     display: block;
     width: 100%;
     height: 100%;
+    position: relative;
+    z-index: 1;
 }
 
 .featured-meta {
@@ -532,6 +535,8 @@ a:focus-visible {
     background-size: 200% 100%;
     animation: featured-shimmer 1.6s ease-in-out infinite;
 }
+/* No display-niche shelf on the loading skeletons. */
+.featured-skeleton .featured-thumb::before { content: none; }
 
 .featured-skeleton .skeleton-line {
     display: block;
@@ -2133,10 +2138,12 @@ a:focus-visible {
 /* ---- Gallery display niche + pedestal (CSS "display cabinet") ----
    Gallery + detail pots render on a TRANSPARENT canvas (no wood
    plinth), so each pot sits in a lit recessed niche on a steel
-   pedestal finished to match the KILN-9000 / wheel chrome. Scoped to
-   the gallery grid + detail modal; profile/battle/featured keep the
-   plain flat thumb. */
-#screen-gallery .pot-thumb {
+   pedestal finished to match the KILN-9000 / wheel chrome. Used by
+   the gallery grid + detail modal AND the title-page "FRESH FROM
+   EVERYONE" strip (.featured-thumb), so the preview matches the vault;
+   profile/battle keep the plain flat thumb. */
+#screen-gallery .pot-thumb,
+.featured-thumb {
     background:
         radial-gradient(ellipse 72% 56% at 50% 20%,
             rgba(0, 255, 204, 0.11) 0%,
@@ -2147,7 +2154,8 @@ a:focus-visible {
         inset 0 9px 22px rgba(0, 0, 0, 0.55),
         inset 0 -2px 6px rgba(0, 0, 0, 0.40);
 }
-#screen-gallery .pot-thumb::before {
+#screen-gallery .pot-thumb::before,
+.featured-thumb::before {
     content: "";
     position: absolute;
     left: 10%;
