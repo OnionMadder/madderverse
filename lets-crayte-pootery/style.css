@@ -2099,6 +2099,20 @@ a:focus-visible {
     transform: translateY(-2px);
 }
 
+/* Shared-to-Everyone pots glow pink (replaces the old globe badge). */
+.pot-card.is-shared {
+    border-color: var(--pink-bright);
+    box-shadow:
+        0 0 0 1px rgba(255, 46, 136, 0.4),
+        0 0 16px rgba(255, 46, 136, 0.5);
+}
+.pot-card.is-shared:hover,
+.pot-card.is-shared:focus-visible {
+    box-shadow:
+        0 0 0 1px rgba(255, 46, 136, 0.55),
+        0 0 22px rgba(255, 46, 136, 0.65);
+}
+
 .pot-thumb {
     aspect-ratio: 400 / 600;
     background: #06141a;
@@ -2444,6 +2458,16 @@ a:focus-visible {
         0 0 30px rgba(0, 255, 204, 0.35);
 }
 
+/* Shared pots glow pink in the detail modal too, matching the
+   vault card. Overrides the teal frame so "this is shared" reads
+   at a glance. */
+.pot-detail-card.is-shared {
+    border-color: var(--pink-bright);
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 34px rgba(255, 46, 136, 0.6);
+}
+
 .detail-titlebar {
     display: flex;
     align-items: center;
@@ -2605,6 +2629,21 @@ a:focus-visible {
    non-draft public pot). */
 #potDetail .detail-action-row:not(:has(> .btn-control:not([hidden]))) {
     display: none;
+}
+
+/* "SHARED" status button (the SHARE slot once a pot is shared). It's
+   disabled but should read as a positive pink badge, not a greyed-out
+   dead button. */
+#potDetail .detail-actions .btn-control.is-shared-status,
+#potDetail .detail-actions .btn-control.is-shared-status[disabled] {
+    background: linear-gradient(180deg, #ff3d96 0%, #b81866 100%);
+    border-color: var(--pink-bright);
+    color: #fff;
+    opacity: 1;
+    cursor: default;
+    box-shadow:
+        inset 0 0 8px rgba(255, 255, 255, 0.18),
+        0 0 12px rgba(255, 46, 136, 0.45);
 }
 
 /* ----- 12. Easter eggs (chunk 8 — Konami dev menu, PINGAS flash, OVERCLOCKED toast) ----- */

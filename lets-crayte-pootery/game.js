@@ -8821,9 +8821,13 @@
         canvas.height = 300;
         thumb.appendChild(canvas);
 
-        /* (The shared-to-Everyone globe badge was removed from cards
-           at the user's request — the shared state still drives the
-           detail modal's STOP SHARING action.) */
+        /* Shared-to-Everyone pots get a pink glow (replaces the old
+           globe badge). Only on the user's own shared pots — public-
+           tab rows ARE the "out there" copy, so flagging them is
+           redundant. */
+        if (entry.publicId && !entry._isPublic) {
+            card.classList.add("is-shared");
+        }
 
         /* Trophy emblem -- when this local pot's battle entry has
            won a trophy. Sits in the top-left corner so it doesn't
@@ -10308,6 +10312,7 @@
         refreshDetailRemixButton();
         refreshDetailRemixChip();
         refreshDetailRemixesStrip();
+        refreshDetailGlow();
         setPotURLParam(entry);
 
         panel.hidden = false;
@@ -11156,7 +11161,11 @@
             saveGalleryEntries(arr);
             GALLERY.publicCache = null;
             refreshDetailSubmitButton();
+            refreshDetailUnshareButton();
             refreshDetailCopyLink();
+            if (currentScreen === "gallery" && GALLERY.tab === "mine") {
+                refreshGalleryGrid();
+            }
             return true;
         });
     }
@@ -11366,13 +11375,34 @@
             return;
         }
         if (del) del.hidden = false;
-        /* Already-shared local entries hide SHARE; STOP SHARING
-           shows up instead (refreshDetailUnshareButton handles
-           that side). */
-        submit.hidden = !!entry.publicId;
-        submit.disabled = false;
+        /* Already-shared local entries flip the button to a
+           non-interactive "SHARED" status (STOP SHARING, handled by
+           refreshDetailUnshareButton, sits beside it to revert).
+           Unshared pots show the tappable "SHARE TO EVERYONE". */
         const lbl = submit.querySelector(".btn-label");
-        if (lbl) lbl.textContent = "SHARE TO EVERYONE";
+        submit.hidden = false;
+        if (entry.publicId) {
+            submit.disabled = true;
+            submit.classList.add("is-shared-status");
+            if (lbl) lbl.textContent = "SHARED";
+        } else {
+            submit.disabled = false;
+            submit.classList.remove("is-shared-status");
+            if (lbl) lbl.textContent = "SHARE TO EVERYONE";
+        }
+        refreshDetailGlow();
+    }
+
+    /* Pink "this is out in the world" glow on the detail-modal card
+       when the open pot is shared (own pot with a publicId, or a
+       public-gallery copy). Mirrors the .pot-card.is-shared glow in
+       the vault grid. */
+    function refreshDetailGlow() {
+        const card = document.querySelector("#potDetail .pot-detail-card");
+        if (!card) return;
+        const e = GALLERY.detailEntry;
+        const shared = !!(e && (e.publicId || (e._isPublic && e._publicId)));
+        card.classList.toggle("is-shared", shared);
     }
 
     registerScreen("gallery", {
