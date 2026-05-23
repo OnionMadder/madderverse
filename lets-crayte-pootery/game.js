@@ -399,7 +399,8 @@
                 const pat = getSurfacePattern(ctx, entry.surfaceTexturePackId);
                 if (pat) {
                     ctx.save();
-                    ctx.globalAlpha = 0.92;   /* matches paintSurfaceTexture */
+                    ctx.globalAlpha =          /* matches paintSurfaceTexture */
+                        surfaceTextureAlpha(entry.surfaceTexturePackId);
                     ctx.fillStyle = pat;
                     ctx.fillRect(0, 0, w, h);
                     ctx.restore();
@@ -2540,6 +2541,36 @@
     const SURFACE_TEXTURES = Object.create(null);          /* fileId -> Image */
     const SURFACE_PATTERN_CACHE = new WeakMap();           /* ctx -> {fileId:Pattern} */
 
+    /* Per-texture render flags, keyed by texture FILE id. The default
+       (a texture NOT listed here) is the original opaque-skin behavior:
+       painted at 0.92 alpha so it reads as a solid color replacing the
+       clay. Setting translucent:true opts a texture into the "let the
+       PNG's own alpha decide" path — we paint at full alpha so a half-
+       transparent PNG (e.g. a 50%-alpha purple) only covers the clay by
+       its authored amount, and the clay tint (terracotta, porcelain,
+       basalt, ...) shows through. This is what unlocks looks like the
+       "atomic purple Gameboy" stained-plastic shell, frosted acrylic,
+       gauze, oil slick, stained glass, etc.
+
+       Authoring a translucent texture (see commit body for the full
+       note): export a 128x128 (or 256x256) seamless RGBA PNG that
+       actually carries an alpha channel — partial-alpha pixels are the
+       whole point, so do NOT flatten to JPG or strip alpha on export.
+       Drop it in assets/textures/<id>.png, add it to a pack's
+       surfaceTextures array, and list its id here with translucent:true. */
+    const SURFACE_TEXTURE_FLAGS = {
+        "tint-purple": { translucent: true },
+    };
+    function isTranslucentTexture(id) {
+        const f = id && SURFACE_TEXTURE_FLAGS[id];
+        return !!(f && f.translucent);
+    }
+    /* Alpha to paint a given texture at: translucent textures honor
+       their PNG alpha (paint at 1.0), opaque skins keep the 0.92 clamp. */
+    function surfaceTextureAlpha(id) {
+        return isTranslucentTexture(id) ? 1 : 0.92;
+    }
+
     function loadSurfaceTextures(packs) {
         packs.forEach(function (p) {
             (p.surfaceTextures || []).forEach(function (id) {
@@ -2609,8 +2640,12 @@
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
+        /* source-over + the PNG pattern preserves the source PNG's alpha
+           channel, so translucent textures composite over the clay below.
+           Opaque skins get the 0.92 clamp; translucent ones paint at full
+           alpha and let their own PNG alpha control how much clay shows. */
         ctx.globalCompositeOperation = "source-over";
-        ctx.globalAlpha = 0.92;
+        ctx.globalAlpha = surfaceTextureAlpha(id);
         ctx.fillStyle = pat;
         ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
         ctx.restore();
@@ -5162,6 +5197,11 @@
             id: "core",  label: "BASIC",
             packType: "crafter",
             backgroundSvg: "core",    /* assets/backgrounds/core.svg (optional) */
+            /* tint-purple is the translucent-texture smoke test: a 50%-
+               alpha purple PNG that lets the clay color show through (see
+               SURFACE_TEXTURE_FLAGS). Lives on BASIC so it's reachable on
+               a porcelain pot without owning a paid pack. */
+            surfaceTextures: ["tint-purple"],
             description: "The starter set. Earth, sage, sky, and ink.",
             coverEmoji: "\u{1FAB4}",   /* potted plant */
             glazes: [
@@ -7209,8 +7249,26 @@
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "texture-swatch";
+            /* Translucent textures get a checker backing so the swatch
+               reads as see-through (not flat purple on the dark panel) —
+               the PNG's alpha lets the checker show, just like the clay
+               shows through on the pot. */
             btn.dataset.texture = tid;
-            btn.style.backgroundImage = 'url("assets/textures/' + tid + '.png")';
+            const texUrl = 'url("assets/textures/' + tid + '.png")';
+            if (isTranslucentTexture(tid)) {
+                /* Stack the texture over a light checker so the swatch
+                   reads as see-through (not flat purple on the dark
+                   panel). Inline background-image wins over CSS, so the
+                   checker has to be layered here, beneath the texture. */
+                btn.classList.add("translucent");
+                btn.style.backgroundImage = texUrl +
+                    ", linear-gradient(45deg, #c9c9c9 25%, transparent 25%, transparent 75%, #c9c9c9 75%)" +
+                    ", linear-gradient(45deg, #c9c9c9 25%, transparent 25%, transparent 75%, #c9c9c9 75%)";
+                btn.style.backgroundSize = "cover, 12px 12px, 12px 12px";
+                btn.style.backgroundPosition = "center, 0 0, 6px 6px";
+            } else {
+                btn.style.backgroundImage = texUrl;
+            }
             btn.title = tid;
             btn.setAttribute("aria-label", "Texture skin: " + tid);
             if (tid === D.surfaceTexturePackId) btn.classList.add("active");

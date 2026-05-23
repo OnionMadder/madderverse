@@ -1789,6 +1789,9 @@ a:focus-visible {
     transition: border-color 0.12s ease, box-shadow 0.12s ease,
                 transform 0.06s ease;
 }
+/* Translucent skins back their texture with a white tile so the
+   checker layered in JS reads as "see-through" rather than dim. */
+.texture-swatch.translucent { background-color: #f4f4f4; }
 .texture-swatch:hover,
 .texture-swatch:focus-visible {
     border-color: var(--teal);
