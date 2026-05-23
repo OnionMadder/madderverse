@@ -53,7 +53,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=50" />
+    <link rel="stylesheet" href="style.css?v=51" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -563,15 +563,11 @@
 
     <!-- FIRE IT mirrors the shape-screen FINISH FORM pattern —
          floating action outside the drawer, hidden when the
-         decorate drawer is open. SAVE DRAFT sits to its left
-         so the kid has a "come back later" out without committing
-         to firing. Same hidden-when-drawer-open behavior so the
-         tools aren't crowded. -->
+         decorate drawer is open. Firing is the only path into the
+         gallery (a pot takes only a few minutes; the old SAVE-draft
+         "come back later" flow was dropped — pots are named in the
+         vault after firing). -->
     <div class="decorate-float-actions">
-        <button class="float-action decorate-float-save" id="decSaveDraft" type="button">
-            <span class="btn-label">SAVE</span>
-            <span class="btn-glyph" aria-hidden="true">&#9712;</span>
-        </button>
         <button class="float-action decorate-float-fire" id="decFire" type="button">
             <span class="btn-label">FIRE IT</span>
             <span class="btn-glyph" aria-hidden="true">&#9656;</span>
@@ -1042,11 +1038,12 @@
                         <span class="btn-label">DELETE</span>
                         <span class="btn-glyph" aria-hidden="true">&times;</span>
                     </button>
-                    <!-- SAVE (was CONTINUE) — visible ONLY on draft
-                         entries. Loads the saved state back into
-                         decorate so the kid can keep working. -->
-                    <button class="btn-control primary" id="detailContinue" type="button" hidden>
-                        <span class="btn-label">SAVE</span>
+                    <!-- NAME POOT — saves the typed name to this pot
+                         (the pot itself is already saved by firing).
+                         Shown for the user's own pots; enabled only
+                         once the name differs from what's stored. -->
+                    <button class="btn-control primary" id="detailNameSave" type="button" hidden disabled>
+                        <span class="btn-label">NAME POOT</span>
                     </button>
                 </div>
                 <div class="detail-action-row">
@@ -1292,7 +1289,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=50"></script>
+<script src="game.js?v=51"></script>
 
 </body>
 </html>

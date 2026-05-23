@@ -7292,26 +7292,6 @@
         const back  = document.getElementById("decBack");
         const clear = document.getElementById("decClear");
         const fire  = document.getElementById("decFire");
-        const save  = document.getElementById("decSaveDraft");
-
-        if (save) save.addEventListener("click", function () {
-            const id = saveDraftPot();
-            flashButton(save);
-            if (id) {
-                /* Briefly flip the label to confirm the save —
-                   reassuring to the kid that something happened,
-                   especially since there's no screen change. */
-                const lbl = save.querySelector(".btn-label");
-                if (lbl) {
-                    const orig = lbl.textContent;
-                    lbl.textContent = "SAVED!";
-                    setTimeout(function () { lbl.textContent = orig; }, 1200);
-                }
-            } else {
-                alert("Couldn't save the draft. Your gallery might be full " +
-                      "(50 pot cap) — try deleting an old one first.");
-            }
-        });
 
         if (back) back.addEventListener("click", function () {
             /* Re-shape escape hatch: unlock clay; paint persists so
@@ -7787,34 +7767,8 @@
         }
     }
 
-    /* Save the in-progress decorate state as a DRAFT entry. New
-       saves push to the gallery; subsequent saves of the same
-       draft (D.draftId set) mutate the existing row in place. */
-    function saveDraftPot() {
-        try {
-            const existing = readGalleryArr();
-            let prevEntry = null;
-            let prevIdx = -1;
-            if (D.draftId) {
-                for (let i = 0; i < existing.length; i++) {
-                    if (existing[i].id === D.draftId) {
-                        prevEntry = existing[i];
-                        prevIdx = i;
-                        break;
-                    }
-                }
-            }
-            const entry = buildPotEntry({ fired: false, prevEntry: prevEntry });
-            if (prevIdx >= 0) existing[prevIdx] = entry;
-            else              existing.push(entry);
-            writeGalleryArr(existing);
-            D.draftId = entry.id;   /* subsequent saves update this one */
-            return entry.id;
-        } catch (e) {
-            console.warn("[CRAYte] draft save failed", e);
-            return null;
-        }
-    }
+    /* (saveDraftPot removed — the SAVE-draft / "come back later" flow
+       was dropped. Firing is the only path into the gallery now.) */
 
     /* ----- 7D. Audio (Web Audio, all synthesized) ----- */
 
@@ -8800,22 +8754,13 @@
            real <button> nested inside without invalid HTML. The
            div gets role=button + keyboard handlers for a11y. */
         const card = document.createElement("div");
-        card.className = "pot-card" + (entry.draft ? " is-draft" : "");
+        card.className = "pot-card";
         card.dataset.id = entry.id;
         card.setAttribute("role", "button");
         card.setAttribute("tabindex", "0");
 
         const thumb = document.createElement("div");
         thumb.className = "pot-thumb " + potAgeClass(entry.createdAt);
-        /* Drafts get a DRAFT badge in the top-right of the thumb
-           — distinct from the trophy + shared-globe corners. */
-        if (entry.draft) {
-            const draftFlag = document.createElement("span");
-            draftFlag.className = "pot-draft-flag";
-            draftFlag.textContent = "DRAFT";
-            draftFlag.title = "Unfired draft — tap to continue working";
-            thumb.appendChild(draftFlag);
-        }
         const canvas = document.createElement("canvas");
         canvas.width = 200;
         canvas.height = 300;
@@ -10313,6 +10258,7 @@
         refreshDetailRemixChip();
         refreshDetailRemixesStrip();
         refreshDetailGlow();
+        refreshNameSaveButton();
         setPotURLParam(entry);
 
         panel.hidden = false;
@@ -10418,92 +10364,18 @@
        kid out of a pot unexpectedly. Direct closeDetail() is still
        used by the explicit nav actions (back, delete, resume). */
     function requestCloseDetail() {
-        if (!window.confirm("Exit without saving?")) return;
+        /* Only nag if there's an unsaved name edit — otherwise the
+           pot is fully saved and closing is harmless. */
+        if (detailNameDirty() &&
+                !window.confirm("Exit without saving the name?")) {
+            return;
+        }
         closeDetail();
     }
 
-    /* Resume a saved DRAFT entry — load its shape + paint + sticker
-       state back into the live D/SHAPE objects and jump to
-       decorate. D.draftId tracks the entry id so the next SAVE
-       updates this row instead of creating another copy.
-
-       Called from the gallery detail modal's CONTINUE button for
-       entries with draft:true. */
-    function resumeDraft(entry) {
-        if (!entry || !entry.draft) return;
-
-        /* Restore shape geometry — clay vertices + clay material. */
-        if (Array.isArray(entry.clay) && entry.clay.length > 0) {
-            SHAPE.clay = entry.clay.map(function (c) {
-                return { y: c.y, radius: c.radius };
-            });
-            SHAPE.N = SHAPE.clay.length;
-        }
-        if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
-
-        /* Clay is already shaped + locked (decorate-screen mode). */
-        SHAPE.clayLocked = true;
-        SHAPE.needsLump = false;
-
-        /* Restore decorate state — pack, glaze fallback, paint
-           canvas pixels (via dataURL), sticker records, surface
-           texture choice, custom-sticker taint flag. */
-        if (entry.packId) D.activePackId = entry.packId;
-        const pack = (typeof activePack === "function") ? activePack() : null;
-        if (pack) {
-            D.glaze   = pack.glazes[0];
-            D.pattern = pack.patterns[0];
-        }
-        D.surfaceTexturePackId = entry.surfaceTexturePackId || null;
-        D.usedCustomSticker    = !!entry.usedCustomSticker;
-        D.stickers = Array.isArray(entry.stickers)
-            ? entry.stickers.map(function (s) {
-                return {
-                    pattern: s.pattern,
-                    x: s.x, y: s.y, r: s.r,
-                    rot: s.rot || 0,
-                    flipH: !!s.flipH,
-                    color: s.color || null
-                };
-            })
-            : [];
-        /* Mark this as the draft we're editing — saveDraftPot
-           will mutate this id, and a later FIRE IT will replace
-           it in place as a fired pot. */
-        D.draftId = entry.id;
-        D.usedCustomSticker = !!entry.usedCustomSticker;
-
-        /* Hop into decorate. The screen's onEnter rebuilds the
-           tool UI + sizes the canvases; we paint the saved
-           paintDataUrl into the brush layer once decorate has
-           done its init. */
-        closeDetail();
-        showScreen("decorate");
-        /* Defer the paint restore + sticker render until the
-           decorate canvases exist + are sized. requestAnimationFrame
-           runs after the screen's onEnter handlers + first layout. */
-        requestAnimationFrame(function () {
-            if (entry.paintDataUrl && D.paintCtx) {
-                const img = new Image();
-                img.onload = function () {
-                    D.paintCtx.save();
-                    D.paintCtx.setTransform(1, 0, 0, 1, 0, 0);
-                    D.paintCtx.clearRect(0, 0,
-                        D.paintCanvas.width, D.paintCanvas.height);
-                    D.paintCtx.drawImage(img, 0, 0,
-                        D.paintCanvas.width, D.paintCanvas.height);
-                    D.paintCtx.restore();
-                };
-                img.src = entry.paintDataUrl;
-            }
-            if (typeof renderStickerLayer === "function") {
-                renderStickerLayer();
-            }
-            if (typeof buildTexturePalette === "function") {
-                buildTexturePalette();
-            }
-        });
-    }
+    /* (resumeDraft removed — the drafting/"continue editing" phase was
+       a parked half-feature. Pots are made in one sitting, fired, then
+       named in the vault; there's nothing to resume.) */
 
     /* "X people remixed this" strip on the pot-detail modal.
        Only renders on PUBLIC pots that have one or more remixes
@@ -10975,12 +10847,21 @@
         const unshare = document.getElementById("detailUnshare");
         if (unshare) unshare.addEventListener("click", unshareCurrent);
 
-        /* CONTINUE — drafts only. Loads the entry into D/SHAPE
-           and routes to decorate via resumeDraft. */
-        const cont = document.getElementById("detailContinue");
-        if (cont) cont.addEventListener("click", function () {
-            const entry = GALLERY.detailEntry;
-            if (entry && entry.draft) resumeDraft(entry);
+        /* NAME POOT — commit the typed name to the pot (explicit;
+           the pot itself is already saved by firing). */
+        const nameSave = document.getElementById("detailNameSave");
+        if (nameSave) nameSave.addEventListener("click", function () {
+            if (!detailNameDirty()) return;
+            saveDetailName();
+            flashButton(nameSave);
+            const lbl = nameSave.querySelector(".btn-label");
+            if (lbl) {
+                const orig = lbl.textContent;
+                lbl.textContent = "NAMED!";
+                setTimeout(function () { lbl.textContent = orig; }, 1200);
+            }
+            refreshNameSaveButton();   /* now matches saved -> disabled */
+            if (currentScreen === "gallery") refreshGalleryGrid();
         });
 
         const copyLink = document.getElementById("detailCopyLink");
@@ -10998,8 +10879,16 @@
         wireDetailTrophyBadge();
 
         if (name) {
-            name.addEventListener("change", saveDetailName);
-            name.addEventListener("blur",   saveDetailName);
+            /* Explicit save now (no auto-save): typing just re-checks
+               the dirty state to enable/disable NAME POOT. Enter is a
+               shortcut for the button. */
+            name.addEventListener("input", refreshNameSaveButton);
+            name.addEventListener("keydown", function (e) {
+                if (e.key !== "Enter") return;
+                e.preventDefault();
+                const b = document.getElementById("detailNameSave");
+                if (b && detailNameDirty()) b.click();
+            });
         }
 
         if (panel) {
@@ -11352,22 +11241,8 @@
     function refreshDetailSubmitButton() {
         const submit = document.getElementById("detailSubmit");
         const del    = document.getElementById("detailDelete");
-        const cont   = document.getElementById("detailContinue");
         const entry  = GALLERY.detailEntry;
         if (!submit) return;
-
-        /* DRAFTS get a totally different action set — no share,
-           no copy link, no remix. The kid's choices are: keep
-           working (CONTINUE), throw it away (DELETE), or export
-           the current preview. Public-network actions are
-           reserved for fired pots. */
-        if (entry && entry.draft) {
-            submit.hidden = true;
-            if (del)  del.hidden = false;
-            if (cont) cont.hidden = false;
-            return;
-        }
-        if (cont) cont.hidden = true;
 
         if (!entry || entry._isPublic) {
             submit.hidden = true;
@@ -11403,6 +11278,27 @@
         const e = GALLERY.detailEntry;
         const shared = !!(e && (e.publicId || (e._isPublic && e._publicId)));
         card.classList.toggle("is-shared", shared);
+    }
+
+    /* NAME POOT — the pot is already saved (firing does that); this
+       button just commits the typed name. Only the user's own pots
+       are nameable (public copies are read-only). The button enables
+       only when the field differs from the stored name, so closing
+       with an unsaved edit is what the "Exit without saving?" guard
+       protects. */
+    function detailNameDirty() {
+        const entry = GALLERY.detailEntry;
+        const input = document.getElementById("detailName");
+        if (!entry || !input || entry._isPublic) return false;
+        return input.value.trim() !== (entry.name || "");
+    }
+
+    function refreshNameSaveButton() {
+        const btn = document.getElementById("detailNameSave");
+        if (!btn) return;
+        const entry = GALLERY.detailEntry;
+        btn.hidden = !(entry && !entry._isPublic);
+        btn.disabled = !detailNameDirty();
     }
 
     registerScreen("gallery", {
