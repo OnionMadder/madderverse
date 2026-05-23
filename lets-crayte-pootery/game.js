@@ -8712,7 +8712,16 @@
         ctx.clearRect(0, 0, bw, bh);
         ctx.setTransform(dpr * (cssW / SHAPE.W), 0, 0,
                          dpr * (cssH / SHAPE.H), 0, 0);
-        renderSavedPot(ctx, entry, opts || {});
+        /* The "display cabinet" look is the default for EVERY saved-pot
+           surface (gallery grid, profile, battle cards, featured strip,
+           detail modal, etc.): render on a TRANSPARENT canvas with no
+           baked wood plinth or background fill, so the CSS display niche
+           behind the thumb shows through. A caller can still opt back
+           into the old look with background:true / wheel:true. */
+        const o = opts || {};
+        if (o.background === undefined) o.background = false;
+        if (o.wheel === undefined)      o.wheel = false;
+        renderSavedPot(ctx, entry, o);
     }
 
     /* ----- 8B. Grid building ----- */

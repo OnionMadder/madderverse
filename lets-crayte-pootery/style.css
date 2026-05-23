@@ -2142,8 +2142,10 @@ a:focus-visible {
    the gallery grid + detail modal AND the title-page "FRESH FROM
    EVERYONE" strip (.featured-thumb), so the preview matches the vault;
    profile/battle keep the plain flat thumb. */
-#screen-gallery .pot-thumb,
-.featured-thumb {
+.pot-thumb,
+.featured-thumb,
+.battle-entry-thumb {
+    position: relative;
     background:
         radial-gradient(ellipse 72% 56% at 50% 20%,
             rgba(0, 255, 204, 0.11) 0%,
@@ -2154,8 +2156,16 @@ a:focus-visible {
         inset 0 9px 22px rgba(0, 0, 0, 0.55),
         inset 0 -2px 6px rgba(0, 0, 0, 0.40);
 }
-#screen-gallery .pot-thumb::before,
-.featured-thumb::before {
+/* Pot canvas sits above the niche + shelf pseudo-elements. */
+.pot-thumb canvas,
+.featured-thumb canvas,
+.battle-entry-thumb canvas {
+    position: relative;
+    z-index: 1;
+}
+.pot-thumb::before,
+.featured-thumb::before,
+.battle-entry-thumb::before {
     content: "";
     position: absolute;
     left: 10%;
@@ -5084,7 +5094,7 @@ a:focus-visible {
 
 .battle-entry-thumb {
     aspect-ratio: 400 / 600;
-    background: #06141a;
+    /* background comes from the shared display-niche rule above. */
     border-radius: 3px;
     overflow: hidden;
 }
