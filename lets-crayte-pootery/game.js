@@ -3354,8 +3354,12 @@
                selected or the active pack has no surfaceTexture.
                opts.surfaceTexturePackId lets gallery thumbnails
                pass the entry's saved skin id; absent, the live
-               D state drives the decorate render. */
-            if (typeof paintSurfaceTexture === "function") {
+               D state drives the decorate render.
+               Suppressed during the SCULPTING phase — only the clay's
+               own material texture shows while throwing; pack surface
+               skins are a decorate-phase choice. */
+            if (currentScreen !== "shape" &&
+                    typeof paintSurfaceTexture === "function") {
                 const clay = SHAPE.clay;
                 const N = clay.length;
                 const maxR = (function () {
@@ -3996,6 +4000,18 @@
             rimR.addColorStop(1.00, tint(0.14));
             ctx.fillStyle = rimR;
             ctx.fillRect(cx + maxR - 22, topY, 26, colH);
+
+            /* Top spotlight — agrees with the CSS niche's overhead
+               glow: brightest at the pot's shoulder, falling off
+               downward so each pot reads as lit from the display
+               case's spotlight above. */
+            const spotH = colH * 0.66;
+            const spot = ctx.createLinearGradient(0, topY, 0, topY + spotH);
+            spot.addColorStop(0.00, tint(0.24));
+            spot.addColorStop(0.55, tint(0.07));
+            spot.addColorStop(1.00, hlEdge);
+            ctx.fillStyle = spot;
+            ctx.fillRect(cx - maxR, topY, maxR * 2, spotH);
         } else {
             /* ---- Normal mid-distance studio light ---- */
             /* Specular sheen */
@@ -8839,9 +8855,12 @@
             }
         });
 
-        /* Render async — paint may be a dataURL that needs loading. */
+        /* Render async — paint may be a dataURL that needs loading.
+           background:false + wheel:false render the pot on a TRANSPARENT
+           canvas with no wood plinth, so the CSS display niche + pedestal
+           (#screen-gallery .pot-thumb) show through behind it. */
         loadEntryPaint(entry).then(function () {
-            renderEntryIntoCanvas(canvas, entry);
+            renderEntryIntoCanvas(canvas, entry, { background: false, wheel: false });
         });
 
         return card;
@@ -10239,7 +10258,9 @@
         const entry  = GALLERY.detailEntry;
         if (!canvas || !entry) return;
         renderEntryIntoCanvas(canvas, entry, {
-            spinDx: GALLERY.detailSpin || 0
+            spinDx: GALLERY.detailSpin || 0,
+            background: false,   /* CSS display niche shows behind */
+            wheel: false         /* no wood plinth — pedestal is CSS */
         });
     }
 
