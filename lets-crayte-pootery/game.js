@@ -2588,8 +2588,30 @@
         });
     }
 
+    /* Saved pots from before the texture reorg stored legacy ids:
+       the builder-pack textures lived at the root (they're now under
+       assets/textures/builder/), and "chicken" was renamed "chickens".
+       Remap those to the current file ids so old gallery + shared pots
+       keep their skins instead of rendering bare. Current pots already
+       store the new ids (e.g. "builder/plushie"), which pass through
+       untouched. */
+    const LEGACY_TEXTURE_ALIASES = {
+        "plush":                  "builder/plushie",
+        "plushie":                "builder/plushie",
+        "plushie-blue":           "builder/plushie-blue",
+        "plushie-pink":           "builder/plushie-pink",
+        "gamer":                  "builder/gamer",
+        "gamer-black":            "builder/gamer-black",
+        "gamer-crt":              "builder/gamer-crt",
+        "dinosaur":               "builder/dinosaur",
+        "dinosaur-blue":          "builder/dinosaur-blue",
+        "dinosaur-purpleorange":  "builder/dinosaur-purpleorange",
+        "chicken":                "chickens"
+    };
+
     function getSurfacePattern(ctx, fileId) {
         if (!ctx || !fileId) return null;
+        if (LEGACY_TEXTURE_ALIASES[fileId]) fileId = LEGACY_TEXTURE_ALIASES[fileId];
         let cache = SURFACE_PATTERN_CACHE.get(ctx);
         if (!cache) {
             cache = Object.create(null);
@@ -11117,6 +11139,14 @@
             }
         }
         saveGalleryEntries(arr);
+        /* Hide it from EVERYONE right away (the public-tab render filters
+           out loadHiddenPublic() ids). The server DELETE below is
+           best-effort and is denied by RLS for pots shared while
+           signed-out (user_id IS NULL), so without this the copy
+           lingered in Everyone — exactly the "stop sharing doesn't
+           remove it" bug. Hiding is idempotent + harmless even when
+           the server delete succeeds. */
+        hideFromPublic(publicIdSnapshot);
         GALLERY.publicCache = null;
         refreshDetailSubmitButton();
         refreshDetailCopyLink();
