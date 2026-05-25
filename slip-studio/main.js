@@ -133,6 +133,9 @@ function init() {
     window.addEventListener("resize", resize, { passive: true });
     bindSculpt(canvas);
 
+    const trimBtn = document.getElementById("trimFoot");
+    if (trimBtn) trimBtn.addEventListener("click", trimFoot);
+
     // First frame, then reveal the scene and start the loop.
     renderer.render(scene, camera);
     hideLoader();
@@ -142,7 +145,7 @@ function init() {
     // and inspect the sculpt during testing across the build.
     if (location.search.includes("dev")) {
         window.__slip = {
-            state, profile, radiusAt, sculptToward, maxRadiusAt,
+            state, profile, radiusAt, sculptToward, maxRadiusAt, trimFoot,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -362,6 +365,41 @@ function sculptToward(y, targetR) {
         profile[r] = THREE.MathUtils.lerp(profile[r], targetR, w);
     }
     clampProfile(); // the foot can't pull wider than the wheel
+    profileDirty = true;
+}
+
+function smoothstep(t) {
+    t = THREE.MathUtils.clamp(t, 0, 1);
+    return t * t * (3 - 2 * t);
+}
+
+// Finishing pass (like trimming a foot at the leather-hard stage):
+// shape the base into a flat contact ring, an undercut "ankle" just
+// above it, then a smooth blend into the body. The pot then visibly
+// stands on a foot. The bottom stays a closed solid form — the foot
+// is an outer-silhouette feature, which is what's seen on the wheel.
+function trimFoot() {
+    const baseTopY  = 0.022; // flat contact base up to here
+    const ankleY    = 0.058; // deepest point of the undercut
+    const blendTopY = 0.16;  // foot rejoins the body here
+    const bodyR = radiusAt(blendTopY);
+    const rFoot = THREE.MathUtils.clamp(bodyR * 0.96, 0.20, BASE_MAX);
+    const rTuck = Math.max(MIN_R + 0.02, rFoot * 0.74);
+
+    for (let r = 0; r <= ROWS; r++) {
+        const y = (r / ROWS) * TOP;
+        if (y > blendTopY) break;
+        if (y <= baseTopY) {
+            profile[r] = rFoot;
+        } else if (y <= ankleY) {
+            profile[r] = THREE.MathUtils.lerp(
+                rFoot, rTuck, smoothstep((y - baseTopY) / (ankleY - baseTopY)));
+        } else {
+            profile[r] = THREE.MathUtils.lerp(
+                rTuck, bodyR, smoothstep((y - ankleY) / (blendTopY - ankleY)));
+        }
+    }
+    clampProfile(); // keeps the center cap + the wheel limit
     profileDirty = true;
 }
 
