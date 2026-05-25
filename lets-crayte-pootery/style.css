@@ -1,5 +1,5 @@
 /* ============================================================
-   Let's CRAYte! Pootery — main stylesheet
+   Pootery — main stylesheet
    ============================================================
    Palette: ONIONCORE (dark teal + hot pink) for UI / chrome.
    The pot and kiln come in chunks 2+ in clay browns + kiln
@@ -275,11 +275,6 @@ a:focus-visible {
         4px 4px 0 var(--pink-deep),
         -2px -2px 0 #fff,
         0 0 36px rgba(0, 255, 204, 0.5);
-}
-
-.big-title .crayte {
-    color: var(--pink-bright);
-    -webkit-text-stroke: 1px #fff;
 }
 
 .big-title .oo {

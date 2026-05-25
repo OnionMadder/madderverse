@@ -1,5 +1,5 @@
 /* ============================================================
-   Let's CRAYte! Pootery — main script
+   Pootery — main script
    ============================================================
    Single IIFE. Chunk 1 covers the title screen + screen-switching
    scaffold. Chunks 2-3 (shape + decorate) bolt onto SCREENS via
@@ -7503,7 +7503,7 @@
         "HOT STUFF",
         "VERY WAS POOTED",
         "CONGRATS DUDE",
-        "SO CRAYTED"
+        "BIG POT ENERGY"
     ];
 
     const EXPLODED_LINES = [
