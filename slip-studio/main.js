@@ -41,10 +41,20 @@ const TOP  = 1.40;  // pot height in world units; foot sits at y=0
 
 // --- Sculpt feel ------------------------------------------------
 const MIN_R       = 0.06; // clay can't pinch to nothing
-const MAX_R       = 0.95; // or balloon past the wheel
+const MAX_R       = 0.95; // belly may bulge this wide (wider than the wheel)
 const GRAB_TOL    = 0.30; // must start the drag this close to the surface
 const BRUSH_SIGMA = 0.13; // vertical softness of the pull, world units
 const STRENGTH    = 0.5;  // how hard each move pulls toward the finger
+
+// --- Physical limits of the wheel -------------------------------
+// The foot that rests on the wheel can never be wider than the wheel
+// head; the belly *above* it is free to bulge wider. So the allowed
+// radius is a height-dependent envelope: capped to the foot zone near
+// the base, opening up to MAX_R higher up.
+const WHEEL_TOP_R = 0.72; // wheel head radius (the contact surface)
+const BASE_MAX    = 0.66; // max foot radius — a margin inside the rim
+const FOOT_TOP    = 0.10; // height of the base/foot contact zone
+const FOOT_BLEND  = 0.14; // allowed width opens to MAX_R over this rise
 
 const state = {
     renderer: null,
@@ -132,7 +142,7 @@ function init() {
     // and inspect the sculpt during testing across the build.
     if (location.search.includes("dev")) {
         window.__slip = {
-            state, profile, radiusAt, sculptToward,
+            state, profile, radiusAt, sculptToward, maxRadiusAt,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -172,7 +182,7 @@ function buildLights(scene) {
 // pot's foot rests on it; the pot casts its shadow here.
 function buildWheel() {
     const height = 0.16;
-    const geo = new THREE.CylinderGeometry(0.72, 0.76, height, 96);
+    const geo = new THREE.CylinderGeometry(WHEEL_TOP_R, WHEEL_TOP_R + 0.04, height, 96);
     const mat = new THREE.MeshStandardMaterial({
         color: WHEEL_COLOR,
         roughness: 0.9,
@@ -260,7 +270,7 @@ function seedProfile() {
         const t = span > 1e-6 ? THREE.MathUtils.clamp((y - a.y) / span, 0, 1) : 0;
         profile[r] = a.x + (b.x - a.x) * t;
     }
-    profile[0] = 0; // keep the bottom capped at the axis
+    clampProfile(); // seed must obey the wheel envelope too
 }
 
 // Rewrite vertex positions + normals from the current profile.
@@ -318,6 +328,25 @@ function radiusAt(y) {
     return THREE.MathUtils.lerp(profile[lo], profile[hi], f - lo);
 }
 
+// The widest the clay may be at height `y`: capped to the wheel near
+// the foot, opening up to MAX_R above it. This is the physical wheel
+// constraint — the contact base can't overhang the wheel head.
+function maxRadiusAt(y) {
+    if (y <= FOOT_TOP) return BASE_MAX;
+    const t = THREE.MathUtils.clamp((y - FOOT_TOP) / FOOT_BLEND, 0, 1);
+    return THREE.MathUtils.lerp(BASE_MAX, MAX_R, t);
+}
+
+// Enforce the envelope across the whole profile.
+function clampProfile() {
+    for (let r = 0; r <= ROWS; r++) {
+        const y = (r / ROWS) * TOP;
+        const m = maxRadiusAt(y);
+        if (profile[r] > m) profile[r] = m;
+    }
+    profile[0] = 0; // keep the bottom capped at the axis
+}
+
 // Pull the silhouette toward `targetR` around height `y`, with a
 // Gaussian vertical falloff so the clay bulges instead of stepping.
 function sculptToward(y, targetR) {
@@ -332,7 +361,7 @@ function sculptToward(y, targetR) {
         const w = Math.exp(-0.5 * d * d) * STRENGTH;
         profile[r] = THREE.MathUtils.lerp(profile[r], targetR, w);
     }
-    profile[0] = 0;
+    clampProfile(); // the foot can't pull wider than the wheel
     profileDirty = true;
 }
 
