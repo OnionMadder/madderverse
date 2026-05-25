@@ -157,6 +157,41 @@ html, body {
 .brush-dot-m { width: 9px;  height: 9px;  }
 .brush-dot-l { width: 15px; height: 15px; }
 
+/* ---------- Glaze palette (bisque + glazed-raw) ---------- */
+.glaze-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(84px, calc(env(safe-area-inset-bottom, 0px) + 84px));
+    z-index: 35;
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    pointer-events: none;
+}
+.glaze-bar[hidden] { display: none; }
+.glaze-btn {
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.glaze-btn:hover,
+.glaze-btn:focus-visible { outline: none; transform: scale(1.08); }
+.glaze-btn.is-active {
+    border-color: var(--ink);
+    box-shadow: 0 0 0 2px rgba(243, 237, 230, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+    transform: scale(1.12);
+}
+
 /* ---------- Tool bar ---------- */
 .toolbar {
     position: fixed;
