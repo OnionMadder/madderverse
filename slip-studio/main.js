@@ -33,7 +33,7 @@ const SPIN_SPEED  = 0.3;      // radians / second — contemplative, not nervous
 
 // --- Pot surface resolution + bounds ----------------------------
 const ROWS = 160;   // height segments (vertical)
-const COLS = 96;    // radial segments (around)
+const COLS = 128;   // radial segments (around)
 const TOP  = 1.40;  // pot height in world units; foot sits at y=0
 
 // --- Sculpt feel ------------------------------------------------
@@ -176,6 +176,7 @@ function buildPot() {
 
     const vCount = (ROWS + 1) * (COLS + 1);
     const positions = new Float32Array(vCount * 3);
+    const normals = new Float32Array(vCount * 3);
     const uvs = new Float32Array(vCount * 2);
     const indices = [];
 
@@ -196,6 +197,7 @@ function buildPot() {
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(normals, 3));
     geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(indices);
 
@@ -238,24 +240,51 @@ function seedProfile() {
     profile[0] = 0; // keep the bottom capped at the axis
 }
 
-// Rewrite vertex positions from the current profile. Cheap enough
-// to call on every sculpting frame; normals are recomputed so
-// lighting tracks the new shape.
+// Rewrite vertex positions + normals from the current profile.
+// Normals are ANALYTIC (derived from the profile slope) rather than
+// face-averaged: a surface of revolution has an exact normal, which
+// is smooth around each ring (no radial facet banding) and identical
+// at angle 0 and 2π (no lighting seam where the lathe wraps). Cheap
+// enough to call on every sculpting frame.
 function writeProfileToGeometry(geo) {
     const pos = geo.attributes.position.array;
+    const nor = geo.attributes.normal.array;
+    const dyStep = TOP / ROWS;
     for (let r = 0; r <= ROWS; r++) {
-        const y = (r / ROWS) * TOP;
+        const y = r * dyStep;
         const rad = profile[r];
+
+        // 2D outward normal in the (radius, height) plane, from the
+        // local profile slope. Central difference inside, one-sided
+        // at the ends.
+        let dr, dy;
+        if (r === 0)         { dr = profile[1] - profile[0];           dy = dyStep; }
+        else if (r === ROWS) { dr = profile[ROWS] - profile[ROWS - 1]; dy = dyStep; }
+        else                 { dr = profile[r + 1] - profile[r - 1];   dy = 2 * dyStep; }
+        let n2x = dy;
+        let n2y = -dr;
+        const len = Math.hypot(n2x, n2y) || 1;
+        n2x /= len;
+        n2y /= len;
+        const cap = r === 0; // degenerate ring at the axis → faces down
+
         for (let c = 0; c <= COLS; c++) {
             const theta = (c / COLS) * Math.PI * 2;
+            const cos = Math.cos(theta);
+            const sin = Math.sin(theta);
             const i = (r * (COLS + 1) + c) * 3;
-            pos[i]     = rad * Math.cos(theta);
+            pos[i]     = rad * cos;
             pos[i + 1] = y;
-            pos[i + 2] = rad * Math.sin(theta);
+            pos[i + 2] = rad * sin;
+            if (cap) {
+                nor[i] = 0; nor[i + 1] = -1; nor[i + 2] = 0;
+            } else {
+                nor[i] = n2x * cos; nor[i + 1] = n2y; nor[i + 2] = n2x * sin;
+            }
         }
     }
     geo.attributes.position.needsUpdate = true;
-    geo.computeVertexNormals();
+    geo.attributes.normal.needsUpdate = true;
     geo.computeBoundingSphere();
 }
 
