@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Pootery">
+  <!-- PLACEHOLDER app icon — friendly clay pot ("oo" = the extra-Os wink).
+       Replace with final art before launch. Palette = onioncore. -->
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="44%" r="55%">
+      <stop offset="0%" stop-color="#ff2e88" stop-opacity="0.30"/>
+      <stop offset="68%" stop-color="#ff2e88" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="round"><rect width="512" height="512" rx="96"/></clipPath>
+  </defs>
+  <g clip-path="url(#round)">
+    <rect width="512" height="512" fill="#06141a"/>
+    <rect width="512" height="512" fill="url(#glow)"/>
+    <!-- wheel head -->
+    <ellipse cx="256" cy="410" rx="150" ry="30" fill="#0f2a32" stroke="#0a665a" stroke-width="4"/>
+    <!-- pot body (base narrower than belly) -->
+    <path d="M196,150 C182,178 210,188 210,205 C210,238 150,258 150,300 C150,352 182,378 216,406 L296,406 C330,378 362,352 362,300 C362,258 302,238 302,205 C302,188 330,178 316,150 Z" fill="#a05a2c"/>
+    <!-- foot -->
+    <ellipse cx="256" cy="405" rx="44" ry="9" fill="#6b3a1a"/>
+    <!-- rim opening (teal lip) -->
+    <ellipse cx="256" cy="150" rx="62" ry="15" fill="#00ffcc"/>
+    <ellipse cx="256" cy="150" rx="50" ry="10" fill="#06141a"/>
+    <!-- face: oo eyes + smile -->
+    <circle cx="228" cy="310" r="21" fill="#eaf6f4"/>
+    <circle cx="284" cy="310" r="21" fill="#eaf6f4"/>
+    <circle cx="231" cy="314" r="8.5" fill="#06141a"/>
+    <circle cx="287" cy="314" r="8.5" fill="#06141a"/>
+    <path d="M234,346 Q256,362 278,346" fill="none" stroke="#06141a" stroke-width="6" stroke-linecap="round"/>
+  </g>
+</svg>

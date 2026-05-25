@@ -1,5 +1,5 @@
 /* ============================================================
-   Let's CRAYte! Pootery — service worker
+   Pootery — service worker
    ============================================================
    Makes the app installable + offline-capable on phones.
 
