@@ -39,11 +39,20 @@ const COLS = 128;   // radial segments (around)
 const TOP  = 1.40;  // pot height in world units; foot sits at y=0
 
 // --- Sculpt feel ------------------------------------------------
-const MIN_R       = 0.06; // clay can't pinch to nothing
-const MAX_R       = 0.95; // belly may bulge this wide (wider than the wheel)
-const GRAB_TOL    = 0.30; // must start the drag this close to the surface
-const BRUSH_SIGMA = 0.13; // vertical softness of the pull, world units
-const STRENGTH    = 0.5;  // how hard each move pulls toward the finger
+const MIN_R    = 0.06; // clay can't pinch to nothing
+const MAX_R    = 0.95; // belly may bulge this wide (wider than the wheel)
+const GRAB_TOL = 0.26; // must start the drag this close to the surface
+const STRENGTH = 0.20; // gentle: the clay lags the finger, for fine control
+
+// Selectable brush sizes (vertical softness of the pull, world units).
+// A fine brush lets you shape small features like a foot or a crisp
+// rim; a broad one sweeps the whole belly.
+const BRUSHES = [
+    { label: "Fine",   sigma: 0.045 },
+    { label: "Medium", sigma: 0.090 },
+    { label: "Broad",  sigma: 0.160 },
+];
+const DEFAULT_BRUSH = 1;
 
 // --- Physical limits of the wheel -------------------------------
 // The foot that rests on the wheel can never be wider than the wheel
@@ -80,6 +89,8 @@ const state = {
     clayMaterial: null,
     clayState: INITIAL_STATE,   // wet | leather | bonedry | fired
     clayTarget: null,           // material params currently tweening toward
+    brushIndex: DEFAULT_BRUSH,  // index into BRUSHES
+    spin: SPIN_SPEED,           // current angular speed (eases to 0 while sculpting)
     clock: new THREE.Clock(),
 };
 
@@ -151,10 +162,13 @@ function init() {
     window.addEventListener("resize", resize, { passive: true });
     bindSculpt(canvas);
 
-    const trimBtn = document.getElementById("trimFoot");
-    if (trimBtn) trimBtn.addEventListener("click", trimFoot);
     const advanceBtn = document.getElementById("advanceBtn");
     if (advanceBtn) advanceBtn.addEventListener("click", advanceStage);
+    const backBtn = document.getElementById("backBtn");
+    if (backBtn) backBtn.addEventListener("click", stepBack);
+    document.querySelectorAll(".brush-btn").forEach((b, idx) =>
+        b.addEventListener("click", () => setBrush(idx)));
+    setBrush(DEFAULT_BRUSH);
     setClayState(INITIAL_STATE); // sets the tween target + toolbar
 
     // First frame, then reveal the scene and start the loop.
@@ -166,8 +180,8 @@ function init() {
     // and inspect the sculpt during testing across the build.
     if (location.search.includes("dev")) {
         window.__slip = {
-            state, profile, radiusAt, sculptToward, maxRadiusAt, trimFoot,
-            setClayState, advanceStage,
+            state, profile, radiusAt, sculptToward, maxRadiusAt,
+            setClayState, advanceStage, stepBack, setBrush,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -380,7 +394,7 @@ function clampProfile() {
 function sculptToward(y, targetR) {
     targetR = THREE.MathUtils.clamp(targetR, MIN_R, MAX_R);
     const centerRow = (y / TOP) * ROWS;
-    const sigmaRows = (BRUSH_SIGMA / TOP) * ROWS;
+    const sigmaRows = (BRUSHES[state.brushIndex].sigma / TOP) * ROWS;
     const reach = Math.ceil(sigmaRows * 3);
     const lo = Math.max(1, Math.floor(centerRow - reach));
     const hi = Math.min(ROWS, Math.ceil(centerRow + reach));
@@ -390,42 +404,6 @@ function sculptToward(y, targetR) {
         profile[r] = THREE.MathUtils.lerp(profile[r], targetR, w);
     }
     clampProfile(); // the foot can't pull wider than the wheel
-    profileDirty = true;
-}
-
-function smoothstep(t) {
-    t = THREE.MathUtils.clamp(t, 0, 1);
-    return t * t * (3 - 2 * t);
-}
-
-// Finishing pass (like trimming a foot at the leather-hard stage):
-// shape the base into a flat contact ring, an undercut "ankle" just
-// above it, then a smooth blend into the body. The pot then visibly
-// stands on a foot. The bottom stays a closed solid form — the foot
-// is an outer-silhouette feature, which is what's seen on the wheel.
-function trimFoot() {
-    if (state.clayState !== "leather") return; // trimmed at leather-hard
-    const baseTopY  = 0.022; // flat contact base up to here
-    const ankleY    = 0.058; // deepest point of the undercut
-    const blendTopY = 0.16;  // foot rejoins the body here
-    const bodyR = radiusAt(blendTopY);
-    const rFoot = THREE.MathUtils.clamp(bodyR * 0.96, 0.20, BASE_MAX);
-    const rTuck = Math.max(MIN_R + 0.02, rFoot * 0.74);
-
-    for (let r = 0; r <= ROWS; r++) {
-        const y = (r / ROWS) * TOP;
-        if (y > blendTopY) break;
-        if (y <= baseTopY) {
-            profile[r] = rFoot;
-        } else if (y <= ankleY) {
-            profile[r] = THREE.MathUtils.lerp(
-                rFoot, rTuck, smoothstep((y - baseTopY) / (ankleY - baseTopY)));
-        } else {
-            profile[r] = THREE.MathUtils.lerp(
-                rTuck, bodyR, smoothstep((y - ankleY) / (blendTopY - ankleY)));
-        }
-    }
-    clampProfile(); // keeps the center cap + the wheel limit
     profileDirty = true;
 }
 
@@ -440,8 +418,10 @@ function setClayState(name) {
     updateToolbar();
 }
 
-// The single forward control: advance to the next state, or — once
-// fired — start a fresh wet pot.
+const STATE_ORDER = ["wet", "leather", "bonedry", "fired"];
+
+// The forward control: advance to the next state, or — once fired —
+// start a fresh wet pot.
 function advanceStage() {
     const def = CLAY_STATES[state.clayState];
     if (def.next) {
@@ -451,6 +431,24 @@ function advanceStage() {
         profileDirty = true;
         setClayState(INITIAL_STATE);
     }
+}
+
+// Step the clay back one stage to keep editing (re-wet). Firing is a
+// commitment, so there's no going back from fired.
+function stepBack() {
+    if (state.clayState === "fired") return;
+    const i = STATE_ORDER.indexOf(state.clayState);
+    if (i > 0) setClayState(STATE_ORDER[i - 1]);
+}
+
+// Choose a brush size; reflect the active one in the brush bar.
+function setBrush(i) {
+    state.brushIndex = THREE.MathUtils.clamp(i, 0, BRUSHES.length - 1);
+    document.querySelectorAll(".brush-btn").forEach((b, idx) => {
+        const on = idx === state.brushIndex;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
 }
 
 // Ease the material toward the current state's look each frame, so
@@ -468,16 +466,19 @@ function tickMaterial(dt) {
     m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
 }
 
-// Reflect the current state in the toolbar: stage label, the
-// advance-button text, and whether "Trim foot" is offered.
+// Reflect the current state in the UI: stage label, advance-button
+// text, the back button (hidden at the ends), and the brush bar
+// (only while wet — the one state you can throw in).
 function updateToolbar() {
     const def = CLAY_STATES[state.clayState];
     const label = document.getElementById("stageLabel");
     const advance = document.getElementById("advanceBtn");
-    const trim = document.getElementById("trimFoot");
+    const back = document.getElementById("backBtn");
+    const brushBar = document.getElementById("brushBar");
     if (label) label.textContent = def.label;
     if (advance) advance.textContent = def.action;
-    if (trim) trim.hidden = state.clayState !== "leather"; // trim at leather-hard
+    if (back) back.hidden = state.clayState === "wet" || state.clayState === "fired";
+    if (brushBar) brushBar.hidden = state.clayState !== "wet";
 }
 
 // --- Pointer → clay ---------------------------------------------
@@ -539,7 +540,11 @@ function resize() {
 
 function tick() {
     const dt = state.clock.getDelta();
-    state.turntable.rotation.y += SPIN_SPEED * dt;
+    // The wheel eases to a stop while a finger is down, so you can
+    // target a band precisely, then drifts back up on release.
+    const targetSpin = sculpting ? 0 : SPIN_SPEED;
+    state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
+    state.turntable.rotation.y += state.spin * dt;
     if (profileDirty) {
         writeProfileToGeometry(state.pot.geometry);
         profileDirty = false;
