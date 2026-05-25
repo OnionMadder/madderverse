@@ -150,6 +150,30 @@ html, body {
 }
 .tool-btn:active { transform: scale(0.97); }
 
+/* The advance control reads as primary: warm clay accent. */
+.tool-btn-primary {
+    color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.tool-btn-primary:hover,
+.tool-btn-primary:focus-visible {
+    color: var(--bg);
+    background: #d89a74;
+    border-color: #d89a74;
+}
+
+/* Non-interactive stage label. */
+.stage-chip {
+    align-self: center;
+    pointer-events: none;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    padding: 0 4px;
+}
+
 /* ---------- Quiet footer ---------- */
 .footer {
     position: fixed;

@@ -30,7 +30,6 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const BG_COLOR    = 0x1b1815; // warm charcoal (matches CSS --bg)
-const CLAY_COLOR  = 0xb87a5e; // natural terracotta
 const WHEEL_COLOR = 0x2d2a26; // dark stone
 const SPIN_SPEED  = 0.3;      // radians / second — contemplative, not nervous
 
@@ -56,6 +55,21 @@ const BASE_MAX    = 0.66; // max foot radius — a margin inside the rim
 const FOOT_TOP    = 0.10; // height of the base/foot contact zone
 const FOOT_BLEND  = 0.14; // allowed width opens to MAX_R over this rise
 
+// --- Clay material states ---------------------------------------
+// The clay progresses wet → leather-hard → bone-dry → fired. Each
+// state has its own surface look and rules: you can only throw
+// (sculpt) wet clay, and only trim a foot at leather-hard. Colours
+// here are tunable placeholders. clearcoat is kept slightly > 0 in
+// every state so the shader define never toggles mid-tween (no
+// recompile hitch). `action` is the label that advances to `next`.
+const CLAY_STATES = {
+    wet:     { label: "Wet clay",     color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, action: "Firm up",   next: "leather" },
+    leather: { label: "Leather-hard", color: 0xb87a5e, roughness: 0.72, clearcoat: 0.05, clearcoatRoughness: 0.90, envMapIntensity: 0.60, action: "Dry",       next: "bonedry" },
+    bonedry: { label: "Bone-dry",     color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, action: "Fire",      next: "fired"   },
+    fired:   { label: "Fired",        color: 0xbf6a45, roughness: 0.66, clearcoat: 0.10, clearcoatRoughness: 0.75, envMapIntensity: 0.55, action: "New pot",   next: null      },
+};
+const INITIAL_STATE = "wet";
+
 const state = {
     renderer: null,
     scene: null,
@@ -64,8 +78,12 @@ const state = {
     turntable: null,
     pot: null,
     clayMaterial: null,
+    clayState: INITIAL_STATE,   // wet | leather | bonedry | fired
+    clayTarget: null,           // material params currently tweening toward
     clock: new THREE.Clock(),
 };
+
+const targetColor = new THREE.Color(); // scratch for the material tween
 
 // Editable silhouette: profile[r] = clay radius at height row r.
 const profile = new Float32Array(ROWS + 1);
@@ -135,6 +153,9 @@ function init() {
 
     const trimBtn = document.getElementById("trimFoot");
     if (trimBtn) trimBtn.addEventListener("click", trimFoot);
+    const advanceBtn = document.getElementById("advanceBtn");
+    if (advanceBtn) advanceBtn.addEventListener("click", advanceStage);
+    setClayState(INITIAL_STATE); // sets the tween target + toolbar
 
     // First frame, then reveal the scene and start the loop.
     renderer.render(scene, camera);
@@ -146,10 +167,12 @@ function init() {
     if (location.search.includes("dev")) {
         window.__slip = {
             state, profile, radiusAt, sculptToward, maxRadiusAt, trimFoot,
+            setClayState, advanceStage,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
                 writeProfileToGeometry(state.pot.geometry);
+                tickMaterial(10); // snap material to target (skip tween)
                 state.renderer.render(state.scene, state.camera);
             },
         };
@@ -231,15 +254,17 @@ function buildPot() {
     geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(indices);
 
-    // Raw, unfired clay: matte, no metalness, a soft sheen from the
-    // environment. Glaze (a clearcoat / higher-spec pass) arrives in
-    // its own phase; this stays deliberately bisque-matte. Kept on
-    // `state` so later phases (material states, glazing) can retune it.
-    const mat = new THREE.MeshStandardMaterial({
-        color: CLAY_COLOR,
-        roughness: 0.78,
+    // Clay surface. MeshPhysicalMaterial so the wet sheen (a subtle
+    // clearcoat) and a future glaze pass both work. Initialised from
+    // the starting state; material-state changes tween its props.
+    const s0 = CLAY_STATES[INITIAL_STATE];
+    const mat = new THREE.MeshPhysicalMaterial({
+        color: s0.color,
+        roughness: s0.roughness,
         metalness: 0.0,
-        envMapIntensity: 0.6,
+        clearcoat: s0.clearcoat,
+        clearcoatRoughness: s0.clearcoatRoughness,
+        envMapIntensity: s0.envMapIntensity,
         side: THREE.DoubleSide, // open vase — render the inner wall too
     });
     state.clayMaterial = mat;
@@ -379,6 +404,7 @@ function smoothstep(t) {
 // stands on a foot. The bottom stays a closed solid form — the foot
 // is an outer-silhouette feature, which is what's seen on the wheel.
 function trimFoot() {
+    if (state.clayState !== "leather") return; // trimmed at leather-hard
     const baseTopY  = 0.022; // flat contact base up to here
     const ankleY    = 0.058; // deepest point of the undercut
     const blendTopY = 0.16;  // foot rejoins the body here
@@ -403,6 +429,57 @@ function trimFoot() {
     profileDirty = true;
 }
 
+// --- Material states (wet → leather → bone-dry → fired) ---------
+
+// Switch to a clay state: point the material tween at its look and
+// refresh the toolbar (which gates sculpt/trim and labels the action).
+function setClayState(name) {
+    if (!CLAY_STATES[name]) return;
+    state.clayState = name;
+    state.clayTarget = CLAY_STATES[name];
+    updateToolbar();
+}
+
+// The single forward control: advance to the next state, or — once
+// fired — start a fresh wet pot.
+function advanceStage() {
+    const def = CLAY_STATES[state.clayState];
+    if (def.next) {
+        setClayState(def.next);
+    } else {
+        seedProfile();          // fresh silhouette
+        profileDirty = true;
+        setClayState(INITIAL_STATE);
+    }
+}
+
+// Ease the material toward the current state's look each frame, so
+// stage changes read as a calm transition rather than a hard cut.
+function tickMaterial(dt) {
+    const m = state.clayMaterial;
+    const t = state.clayTarget;
+    if (!m || !t) return;
+    const k = 1 - Math.exp(-dt * 5); // frame-rate-independent smoothing
+    targetColor.setHex(t.color);
+    m.color.lerp(targetColor, k);
+    m.roughness          += (t.roughness          - m.roughness)          * k;
+    m.clearcoat          += (t.clearcoat          - m.clearcoat)          * k;
+    m.clearcoatRoughness += (t.clearcoatRoughness - m.clearcoatRoughness) * k;
+    m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
+}
+
+// Reflect the current state in the toolbar: stage label, the
+// advance-button text, and whether "Trim foot" is offered.
+function updateToolbar() {
+    const def = CLAY_STATES[state.clayState];
+    const label = document.getElementById("stageLabel");
+    const advance = document.getElementById("advanceBtn");
+    const trim = document.getElementById("trimFoot");
+    if (label) label.textContent = def.label;
+    if (advance) advance.textContent = def.action;
+    if (trim) trim.hidden = state.clayState !== "leather"; // trim at leather-hard
+}
+
 // --- Pointer → clay ---------------------------------------------
 function bindSculpt(canvas) {
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -424,6 +501,7 @@ function pointerToProfile(ev) {
 }
 
 function onPointerDown(ev) {
+    if (state.clayState !== "wet") return; // only wet clay can be thrown
     const p = pointerToProfile(ev);
     if (!p) return;
     if (p.y < -0.05 || p.y > TOP + 0.15) return;
@@ -466,6 +544,7 @@ function tick() {
         writeProfileToGeometry(state.pot.geometry);
         profileDirty = false;
     }
+    tickMaterial(dt);
     state.renderer.render(state.scene, state.camera);
 }
 
