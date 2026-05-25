@@ -5,6 +5,8 @@
    Phase 1: a lathe-turned pot on a slowly spinning wheel.
    Phase 2: touch-to-sculpt — grab the pot's edge and the
             silhouette follows your finger, clay-soft falloff.
+   Phase 3: PBR clay + image-based lighting (procedural studio
+            environment via PMREM); soft reflections, warm fill.
 
    Architecture notes for future phases:
    - The pot is a hand-built lathe surface: a (ROWS+1)×(COLS+1)
@@ -25,6 +27,7 @@
    ============================================================ */
 
 import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const BG_COLOR    = 0x1b1815; // warm charcoal (matches CSS --bg)
 const CLAY_COLOR  = 0xb87a5e; // natural terracotta
@@ -50,6 +53,7 @@ const state = {
     canvas: null,
     turntable: null,
     pot: null,
+    clayMaterial: null,
     clock: new THREE.Clock(),
 };
 
@@ -79,7 +83,7 @@ function init() {
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.95;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     state.renderer = renderer;
@@ -88,6 +92,16 @@ function init() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(BG_COLOR);
     state.scene = scene;
+
+    // --- Image-based lighting -------------------------------------
+    // A procedural soft-studio environment (no external HDR file —
+    // keeps the app fast + asset-free) gives the clay realistic
+    // ambient + subtle reflections. Used for lighting only; the flat
+    // charcoal background is kept for the calm, minimal look.
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.5;
+    pmrem.dispose();
 
     // --- Camera ---------------------------------------------------
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
@@ -130,12 +144,14 @@ function init() {
 }
 
 function buildLights(scene) {
-    // Soft warm fill so shadowed clay never reads as black.
-    const ambient = new THREE.AmbientLight(0xfff1e0, 0.55);
+    // The environment map carries most of the fill now; a touch of
+    // warm ambient just biases the shadows warm rather than neutral.
+    const ambient = new THREE.AmbientLight(0xfff1e0, 0.15);
     scene.add(ambient);
 
-    // Key: one warm directional light, casting the pot's shadow.
-    const key = new THREE.DirectionalLight(0xfff0dc, 3.0);
+    // Key: one warm directional light, casting the pot's shadow and
+    // giving the clay its directional shaping over the soft IBL fill.
+    const key = new THREE.DirectionalLight(0xfff0dc, 2.2);
     key.position.set(2.6, 4.2, 3.0);
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
@@ -159,8 +175,9 @@ function buildWheel() {
     const geo = new THREE.CylinderGeometry(0.72, 0.76, height, 96);
     const mat = new THREE.MeshStandardMaterial({
         color: WHEEL_COLOR,
-        roughness: 0.85,
+        roughness: 0.9,
         metalness: 0.0,
+        envMapIntensity: 0.35, // matte stone — barely catches the room
     });
     const wheel = new THREE.Mesh(geo, mat);
     wheel.position.y = -height / 2; // top face flush with y=0
@@ -201,12 +218,18 @@ function buildPot() {
     geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     geo.setIndex(indices);
 
+    // Raw, unfired clay: matte, no metalness, a soft sheen from the
+    // environment. Glaze (a clearcoat / higher-spec pass) arrives in
+    // its own phase; this stays deliberately bisque-matte. Kept on
+    // `state` so later phases (material states, glazing) can retune it.
     const mat = new THREE.MeshStandardMaterial({
         color: CLAY_COLOR,
-        roughness: 0.72,
+        roughness: 0.78,
         metalness: 0.0,
+        envMapIntensity: 0.6,
         side: THREE.DoubleSide, // open vase — render the inner wall too
     });
+    state.clayMaterial = mat;
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
