@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Slip Studio</title>
+
+    <link rel="canonical" href="https://madderverse.org/slip-studio/" />
+    <meta property="og:url" content="https://madderverse.org/slip-studio/" />
+    <meta name="twitter:url" content="https://madderverse.org/slip-studio/" />
+    <meta name="title" content="Slip Studio — a calm space to shape clay" />
+    <meta name="description" content="A meditative 3D pottery studio. Shape, glaze, and keep your pieces." />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Slip Studio" />
+    <meta property="og:description" content="A meditative 3D pottery studio. Shape, glaze, and keep your pieces." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Slip Studio" />
+    <meta name="twitter:description" content="A meditative 3D pottery studio. Shape, glaze, and keep your pieces." />
+
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#1b1815" />
+    <meta name="apple-mobile-web-app-title" content="Slip Studio" />
+    <meta name="application-name" content="Slip Studio" />
+
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Modern Three.js (PBR + HDR + ACES tone mapping land in later phases). -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.165.0",
+        "three/addons/": "https://esm.sh/three@0.165.0/examples/jsm/"
+      }
+    }
+    </script>
+
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+    <a class="home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+
+    <canvas id="scene" aria-label="Pottery scene"></canvas>
+
+    <div id="loader" class="loader" role="status" aria-live="polite">
+        <div class="loader-ring" aria-hidden="true"></div>
+        <span class="loader-label">Slip Studio</span>
+    </div>
+
+    <footer class="footer" aria-label="Site info">
+        <span>&copy; <span data-year>2026</span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../">The Madderverse</a>
+    </footer>
+
+    <script type="module" src="main.js"></script>
+    <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
+</body>
+</html>
