@@ -71,11 +71,13 @@ const FOOT_BLEND  = 0.14; // allowed width opens to MAX_R over this rise
 // here are tunable placeholders. clearcoat is kept slightly > 0 in
 // every state so the shader define never toggles mid-tween (no
 // recompile hitch). `action` is the label that advances to `next`.
+// `bump` scales the procedural clay relief: wet clay reads smoother
+// (water fills the tooth), bone-dry shows the most grain.
 const CLAY_STATES = {
-    wet:     { label: "Wet clay",     color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, action: "Firm up",   next: "leather" },
-    leather: { label: "Leather-hard", color: 0xb87a5e, roughness: 0.72, clearcoat: 0.05, clearcoatRoughness: 0.90, envMapIntensity: 0.60, action: "Dry",       next: "bonedry" },
-    bonedry: { label: "Bone-dry",     color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, action: "Fire",      next: "fired"   },
-    fired:   { label: "Fired",        color: 0xbf6a45, roughness: 0.66, clearcoat: 0.10, clearcoatRoughness: 0.75, envMapIntensity: 0.55, action: "New pot",   next: null      },
+    wet:     { label: "Wet clay",     color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.008, action: "Firm up",   next: "leather" },
+    leather: { label: "Leather-hard", color: 0xb87a5e, roughness: 0.72, clearcoat: 0.05, clearcoatRoughness: 0.90, envMapIntensity: 0.60, bump: 0.018, action: "Dry",       next: "bonedry" },
+    bonedry: { label: "Bone-dry",     color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, bump: 0.024, action: "Fire",      next: "fired"   },
+    fired:   { label: "Fired",        color: 0xbf6a45, roughness: 0.66, clearcoat: 0.10, clearcoatRoughness: 0.75, envMapIntensity: 0.55, bump: 0.017, action: "New pot",   next: null      },
 };
 const INITIAL_STATE = "wet";
 
@@ -236,6 +238,56 @@ function buildWheel() {
     return wheel;
 }
 
+// --- Procedural clay surface ------------------------------------
+// A bump texture generated in code (no image asset): fine clay grain
+// (wrapping value noise) plus gentle spiral throwing lines. Because it
+// has angular variation, it also makes the wheel's rotation visible —
+// the grain and lines sweep past the light as the pot turns.
+function randGrid(n) {
+    const a = new Float32Array(n * n);
+    for (let i = 0; i < a.length; i++) a[i] = Math.random();
+    return a;
+}
+function valueNoise(g, n, u, v) {
+    const x = u * n, y = v * n;
+    const x0 = Math.floor(x) % n, y0 = Math.floor(y) % n;
+    const x1 = (x0 + 1) % n, y1 = (y0 + 1) % n;
+    const fx = x - Math.floor(x), fy = y - Math.floor(y);
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    const a = g[y0 * n + x0], b = g[y0 * n + x1];
+    const c = g[y1 * n + x0], d = g[y1 * n + x1];
+    return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
+}
+function makeClayTexture() {
+    const SIZE = 768;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = SIZE;
+    const ctx = canvas.getContext("2d");
+    const img = ctx.createImageData(SIZE, SIZE);
+    const data = img.data;
+    const g1 = randGrid(128), g2 = randGrid(48);
+    for (let y = 0; y < SIZE; y++) {
+        const v = y / SIZE;
+        for (let x = 0; x < SIZE; x++) {
+            const u = x / SIZE;
+            const grain = valueNoise(g1, 128, u, v) * 0.6 +
+                          valueNoise(g2, 48, u, v) * 0.4 - 0.5;
+            const lines = Math.sin((v * 22 + u * 1.5) * Math.PI * 2);
+            const h = 0.5 + grain * 0.5 + lines * 0.16;
+            const c = Math.max(0, Math.min(255, h * 255)) | 0;
+            const i = (y * SIZE + x) * 4;
+            data[i] = data[i + 1] = data[i + 2] = c;
+            data[i + 3] = 255;
+        }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.colorSpace = THREE.NoColorSpace; // data, not colour
+    tex.anisotropy = 4;
+    return tex;
+}
+
 // Build the editable lathe pot: seed the profile, then build a
 // vertex grid we can rewrite in place as the profile changes.
 function buildPot() {
@@ -279,7 +331,9 @@ function buildPot() {
         clearcoat: s0.clearcoat,
         clearcoatRoughness: s0.clearcoatRoughness,
         envMapIntensity: s0.envMapIntensity,
-        side: THREE.DoubleSide, // open vase — render the inner wall too
+        bumpMap: makeClayTexture(),     // clay grain + throwing lines
+        bumpScale: s0.bump,
+        side: THREE.DoubleSide,         // open vase — render the inner wall too
     });
     state.clayMaterial = mat;
 
@@ -464,6 +518,7 @@ function tickMaterial(dt) {
     m.clearcoat          += (t.clearcoat          - m.clearcoat)          * k;
     m.clearcoatRoughness += (t.clearcoatRoughness - m.clearcoatRoughness) * k;
     m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
+    m.bumpScale          += (t.bump               - m.bumpScale)          * k;
 }
 
 // Reflect the current state in the UI: stage label, advance-button
