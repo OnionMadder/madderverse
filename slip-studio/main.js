@@ -90,7 +90,7 @@ const ADVANCE_LABEL = { wet: "Dry", bonedry: "Fire", fired: "New pot" };
 // glossy vitrified result. Shared surface params, per-glaze colours
 // (tunable placeholders). The reveal is raw → fired on the glaze fire.
 const GLAZE_RAW   = { roughness: 0.92, clearcoat: 0.03, clearcoatRoughness: 0.95, envMapIntensity: 0.32, bump: 0.012 };
-const GLAZE_FIRED = { roughness: 0.26, clearcoat: 0.90, clearcoatRoughness: 0.10, envMapIntensity: 1.10, bump: 0.004 };
+const GLAZE_FIRED = { roughness: 0.30, clearcoat: 0.72, clearcoatRoughness: 0.14, envMapIntensity: 0.85, bump: 0.004 };
 function glaze(name, rawHex, firedHex) {
     return { name, raw: { ...GLAZE_RAW, color: rawHex }, fired: { ...GLAZE_FIRED, color: firedHex } };
 }
@@ -102,6 +102,16 @@ const GLAZES = {
     tenmoku: glaze("Tenmoku", 0x6e6258, 0x2c2320),
 };
 const GLAZE_IDS = ["celadon", "cobalt", "oatmeal", "honey", "tenmoku"];
+
+// --- Decoration -------------------------------------------------
+// Painted onto the surface (over the glaze) by dragging on the pot.
+// One unwrapped RGBA canvas wraps the pot via UVs; a shader overlays
+// it on the clay. Brush = soft dab; splatter = scattered droplets.
+const DECO_COLORS = [0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86];
+const DECO_W = 2048, DECO_H = 1024; // unwrapped surface (≈ circumference:height)
+const BRUSH_PX = 64;                // brush radius, canvas px
+const SPLATTER_SPREAD = 130;        // splatter scatter radius, canvas px
+const SPLATTER_DROPS = 9;
 
 const state = {
     renderer: null,
@@ -115,9 +125,14 @@ const state = {
     clayTarget: null,           // material params currently tweening toward
     glaze: null,                // chosen glaze id (once glazing), else null
     brushIndex: DEFAULT_BRUSH,  // index into BRUSHES
-    spin: SPIN_SPEED,           // current angular speed (eases to 0 while sculpting)
+    spin: SPIN_SPEED,           // current angular speed (eases to 0 while busy)
+    decoTool: "brush",          // brush | splatter
+    decoColor: null,            // paint colour (hex), or null = painting off
+    painting: false,
+    decoCanvas: null, decoCtx: null, decoTex: null,
     clock: new THREE.Clock(),
 };
+let lastPaintUV = null;         // for continuous paint strokes
 
 const targetColor = new THREE.Color(); // scratch for the material tween
 
@@ -195,6 +210,11 @@ function init() {
         b.addEventListener("click", () => setBrush(idx)));
     setBrush(DEFAULT_BRUSH);
     buildGlazeBar();
+    buildDecoBar();
+    document.getElementById("toolBrush")?.addEventListener("click", () => setDecoTool("brush"));
+    document.getElementById("toolSplatter")?.addEventListener("click", () => setDecoTool("splatter"));
+    document.getElementById("decoClear")?.addEventListener("click", clearDeco);
+    setDecoTool("brush");
     setPhase(INITIAL_STATE); // sets the tween target + toolbar
 
     // First frame, then reveal the scene and start the loop.
@@ -208,6 +228,7 @@ function init() {
         window.__slip = {
             state, profile, radiusAt, sculptToward, maxRadiusAt,
             setPhase, advanceStage, stepBack, setBrush, setGlaze,
+            setDecoColor, setDecoTool, paintAt, clearDeco,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -312,6 +333,95 @@ function makeClayTexture() {
     return tex;
 }
 
+// --- Decoration layer -------------------------------------------
+// A transparent RGBA canvas that wraps the pot (u around, v height).
+// Painting draws into it; a shader overlays it on the clay diffuse.
+function makeDecoLayer() {
+    const canvas = document.createElement("canvas");
+    canvas.width = DECO_W;
+    canvas.height = DECO_H;
+    state.decoCanvas = canvas;
+    state.decoCtx = canvas.getContext("2d");
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;        // wraps around the pot
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 4;
+    state.decoTex = tex;
+    return tex;
+}
+
+function rgba(hex, a) {
+    return `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${a})`;
+}
+
+// One soft dab (radial falloff).
+function dab(cx, cy, hex, radius, alpha) {
+    const ctx = state.decoCtx;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    g.addColorStop(0, rgba(hex, alpha));
+    g.addColorStop(0.55, rgba(hex, alpha * 0.9));
+    g.addColorStop(1, rgba(hex, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Dab, mirrored across the u=0/1 seam so strokes wrap cleanly.
+function dabWrap(cx, cy, hex, radius, alpha) {
+    dab(cx, cy, hex, radius, alpha);
+    if (cx < radius) dab(cx + DECO_W, cy, hex, radius, alpha);
+    else if (cx > DECO_W - radius) dab(cx - DECO_W, cy, hex, radius, alpha);
+}
+
+// Paint the current tool at a UV coordinate.
+function paintAt(u, v) {
+    if (state.decoColor == null) return;
+    const cx = u * DECO_W;
+    const cy = (1 - v) * DECO_H; // v=0 (foot) → canvas bottom
+    if (state.decoTool === "splatter") {
+        for (let i = 0; i < SPLATTER_DROPS; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const d = Math.random() * SPLATTER_SPREAD;
+            const r = 5 + Math.random() * 16;
+            dabWrap(cx + Math.cos(a) * d, cy + Math.sin(a) * d, state.decoColor, r, 0.85);
+        }
+    } else {
+        dabWrap(cx, cy, state.decoColor, BRUSH_PX, 0.9);
+    }
+    state.decoTex.needsUpdate = true;
+}
+
+// A continuous stroke between two UVs (skip if it crossed the seam).
+function paintStroke(au, av, bu, bv) {
+    if (Math.abs(bu - au) > 0.5) { paintAt(bu, bv); return; }
+    const dist = Math.hypot((bu - au) * DECO_W, (bv - av) * DECO_H);
+    const steps = Math.max(1, Math.floor(dist / (BRUSH_PX * 0.4)));
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        paintAt(au + (bu - au) * t, av + (bv - av) * t);
+    }
+}
+
+function clearDeco() {
+    if (!state.decoCtx) return;
+    state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
+    state.decoTex.needsUpdate = true;
+}
+
+// Raycast a pointer onto the pot and return the surface UV (or null).
+function pointerToUV(ev) {
+    const rect = state.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(ndc, state.camera);
+    const hits = raycaster.intersectObject(state.pot, false);
+    return hits.length && hits[0].uv ? hits[0].uv : null;
+}
+
 // Build the editable lathe pot: seed the profile, then build a
 // vertex grid we can rewrite in place as the profile changes.
 function buildPot() {
@@ -360,6 +470,23 @@ function buildPot() {
         side: THREE.DoubleSide,         // open vase — render the inner wall too
     });
     state.clayMaterial = mat;
+
+    // Overlay the painted decoration layer on the clay diffuse colour.
+    // (sRGB → linear via pow(2.2) before mixing into linear space.)
+    const decoTex = makeDecoLayer();
+    mat.onBeforeCompile = (shader) => {
+        shader.uniforms.decoMap = { value: decoTex };
+        shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
+            .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
+        shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", "uniform sampler2D decoMap;\nvarying vec2 vDecoUv;\n#include <common>")
+            .replace(
+                "#include <map_fragment>",
+                "#include <map_fragment>\n  vec4 _deco = texture2D( decoMap, vDecoUv );\n  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a );",
+            );
+    };
+    mat.customProgramCacheKey = () => "clay-deco-v1";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -536,6 +663,7 @@ function resetPot() {
     seedProfile();
     profileDirty = true;
     state.glaze = null;
+    clearDeco();
     setPhase(INITIAL_STATE);
     updateGlazeBar();
 }
@@ -586,9 +714,11 @@ function updateToolbar() {
     const glazeBar = document.getElementById("glazeBar");
     if (label) label.textContent = stageLabelText();
     if (advance) advance.textContent = ADVANCE_LABEL[cs];
+    const decoBar = document.getElementById("decoBar");
     if (back) back.hidden = cs === "wet" || cs === "fired";
     if (brushBar) brushBar.hidden = cs !== "wet";
     if (glazeBar) glazeBar.hidden = cs !== "bonedry";
+    if (decoBar) decoBar.hidden = cs !== "bonedry";
 }
 
 // Build the glaze palette once (swatches coloured by each glaze's
@@ -619,6 +749,49 @@ function updateGlazeBar() {
     });
 }
 
+// --- Decoration UI ----------------------------------------------
+function setDecoTool(name) {
+    state.decoTool = name;
+    [["toolBrush", "brush"], ["toolSplatter", "splatter"]].forEach(([id, t]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const on = name === t;
+        el.classList.toggle("is-active", on);
+        el.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+}
+
+// Pick a paint colour (tap the active one again to stop painting).
+function setDecoColor(hex) {
+    state.decoColor = state.decoColor === hex ? null : hex;
+    updateDecoSwatches();
+}
+
+function buildDecoBar() {
+    const wrap = document.getElementById("decoColors");
+    if (!wrap) return;
+    DECO_COLORS.forEach((hex) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "deco-swatch";
+        b.style.background = "#" + hex.toString(16).padStart(6, "0");
+        b.setAttribute("aria-label", "Paint colour");
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", () => setDecoColor(hex));
+        wrap.appendChild(b);
+    });
+}
+
+function updateDecoSwatches() {
+    const wrap = document.getElementById("decoColors");
+    if (!wrap) return;
+    Array.from(wrap.children).forEach((b, i) => {
+        const on = DECO_COLORS[i] === state.decoColor;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+}
+
 // --- Pointer → clay ---------------------------------------------
 function bindSculpt(canvas) {
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -640,30 +813,50 @@ function pointerToProfile(ev) {
 }
 
 function onPointerDown(ev) {
-    if (state.clayState !== "wet") return; // only wet clay can be thrown
-    const p = pointerToProfile(ev);
-    if (!p) return;
-    if (p.y < -0.05 || p.y > TOP + 0.15) return;
-    // Must grab near the current surface — taps in empty space, or
-    // on the pot's front face well inside the silhouette, are ignored.
-    if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
-
-    sculpting = true;
-    try { state.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
-    sculptToward(p.y, p.r);
-    ev.preventDefault();
+    if (state.clayState === "wet") {
+        // Throw: grab near the silhouette and pull.
+        const p = pointerToProfile(ev);
+        if (!p) return;
+        if (p.y < -0.05 || p.y > TOP + 0.15) return;
+        if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
+        sculpting = true;
+        try { state.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+        sculptToward(p.y, p.r);
+        ev.preventDefault();
+    } else if (state.clayState === "bonedry" && state.decoColor != null) {
+        // Decorate: paint onto the surface where the pointer hits.
+        state.painting = true;
+        try { state.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
+        const uv = pointerToUV(ev);
+        if (uv) { paintAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
+        else lastPaintUV = null;
+        ev.preventDefault();
+    }
 }
 
 function onPointerMove(ev) {
-    if (!sculpting) return;
-    const p = pointerToProfile(ev);
-    if (p) sculptToward(p.y, p.r);
-    ev.preventDefault();
+    if (sculpting) {
+        const p = pointerToProfile(ev);
+        if (p) sculptToward(p.y, p.r);
+        ev.preventDefault();
+    } else if (state.painting) {
+        const uv = pointerToUV(ev);
+        if (uv) {
+            if (lastPaintUV) paintStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
+            else paintAt(uv.x, uv.y);
+            lastPaintUV = { x: uv.x, y: uv.y };
+        } else {
+            lastPaintUV = null;
+        }
+        ev.preventDefault();
+    }
 }
 
 function onPointerUp(ev) {
-    if (!sculpting) return;
+    if (!sculpting && !state.painting) return;
     sculpting = false;
+    state.painting = false;
+    lastPaintUV = null;
     try { state.canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
 }
 
@@ -678,9 +871,9 @@ function resize() {
 
 function tick() {
     const dt = state.clock.getDelta();
-    // The wheel eases to a stop while a finger is down, so you can
-    // target a band precisely, then drifts back up on release.
-    const targetSpin = sculpting ? 0 : SPIN_SPEED;
+    // The wheel eases to a stop while a finger is down (throwing or
+    // painting), so you can work precisely, then drifts back up.
+    const targetSpin = (sculpting || state.painting) ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
     if (profileDirty) {
