@@ -115,8 +115,11 @@ const GLAZE_IDS = ["celadon", "cobalt", "oatmeal", "honey", "tenmoku"];
 // it on the clay. Brush = soft dab; splatter = scattered droplets.
 const DECO_COLORS = [0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86];
 const DECO_W = 2048, DECO_H = 1024; // unwrapped surface (≈ circumference:height)
-const BRUSH_PX = 64;                // brush radius, canvas px
-const SPLATTER_SPREAD = 130;        // splatter scatter radius, canvas px
+// Brush radii in canvas px (at zoom 1). The effective radius is divided
+// by the zoom, so the brush keeps a constant on-screen size — zoom in
+// for finer detail.
+const DECO_SIZES = [{ label: "S", px: 30 }, { label: "M", px: 62 }, { label: "L", px: 108 }];
+const DEFAULT_DECO_SIZE = 1;
 const SPLATTER_DROPS = 9;
 
 const state = {
@@ -134,6 +137,7 @@ const state = {
     spin: SPIN_SPEED,           // current angular speed (eases to 0 while busy)
     decoTool: "brush",          // brush | splatter
     decoColor: null,            // paint colour (hex), or null = painting off
+    decoSizeIndex: DEFAULT_DECO_SIZE,
     painting: false,
     decoCanvas: null, decoCtx: null, decoTex: null,
     zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
@@ -221,7 +225,10 @@ function init() {
     document.getElementById("toolBrush")?.addEventListener("click", () => setDecoTool("brush"));
     document.getElementById("toolSplatter")?.addEventListener("click", () => setDecoTool("splatter"));
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
+    document.querySelectorAll(".deco-size").forEach((b, idx) =>
+        b.addEventListener("click", () => setDecoSize(idx)));
     setDecoTool("brush");
+    setDecoSize(DEFAULT_DECO_SIZE);
     setPhase(INITIAL_STATE); // sets the tween target + toolbar
 
     // First frame, then reveal the scene and start the loop.
@@ -235,7 +242,7 @@ function init() {
         window.__slip = {
             state, profile, radiusAt, sculptToward, maxRadiusAt,
             setPhase, advanceStage, stepBack, setBrush, setGlaze,
-            setDecoColor, setDecoTool, paintAt, clearDeco,
+            setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setZoom, zoomBy, rotateBy,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
@@ -383,20 +390,28 @@ function dabWrap(cx, cy, hex, radius, alpha) {
     else if (cx > DECO_W - radius) dab(cx - DECO_W, cy, hex, radius, alpha);
 }
 
+// Effective brush radius (canvas px): base size shrunk by the zoom so
+// the brush stays a constant size on screen — zoom in for fine detail.
+function decoRadius() {
+    return Math.max(3, DECO_SIZES[state.decoSizeIndex].px / state.zoom);
+}
+
 // Paint the current tool at a UV coordinate.
 function paintAt(u, v) {
     if (state.decoColor == null) return;
     const cx = u * DECO_W;
     const cy = (1 - v) * DECO_H; // v=0 (foot) → canvas bottom
+    const size = decoRadius();
     if (state.decoTool === "splatter") {
+        const spread = size * 2.2;
         for (let i = 0; i < SPLATTER_DROPS; i++) {
             const a = Math.random() * Math.PI * 2;
-            const d = Math.random() * SPLATTER_SPREAD;
-            const r = 5 + Math.random() * 16;
+            const d = Math.random() * spread;
+            const r = Math.max(2, size * (0.18 + Math.random() * 0.42));
             dabWrap(cx + Math.cos(a) * d, cy + Math.sin(a) * d, state.decoColor, r, 0.85);
         }
     } else {
-        dabWrap(cx, cy, state.decoColor, BRUSH_PX, 0.9);
+        dabWrap(cx, cy, state.decoColor, size, 0.9);
     }
     state.decoTex.needsUpdate = true;
 }
@@ -405,7 +420,7 @@ function paintAt(u, v) {
 function paintStroke(au, av, bu, bv) {
     if (Math.abs(bu - au) > 0.5) { paintAt(bu, bv); return; }
     const dist = Math.hypot((bu - au) * DECO_W, (bv - av) * DECO_H);
-    const steps = Math.max(1, Math.floor(dist / (BRUSH_PX * 0.4)));
+    const steps = Math.max(1, Math.floor(dist / (decoRadius() * 0.4)));
     for (let i = 1; i <= steps; i++) {
         const t = i / steps;
         paintAt(au + (bu - au) * t, av + (bv - av) * t);
@@ -766,6 +781,16 @@ function setDecoTool(name) {
         const on = name === t;
         el.classList.toggle("is-active", on);
         el.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+}
+
+// Pick a brush size (S/M/L).
+function setDecoSize(i) {
+    state.decoSizeIndex = THREE.MathUtils.clamp(i, 0, DECO_SIZES.length - 1);
+    document.querySelectorAll(".deco-size").forEach((b, idx) => {
+        const on = idx === state.decoSizeIndex;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
     });
 }
 

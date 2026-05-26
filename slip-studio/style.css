@@ -197,6 +197,33 @@ html, body {
     border-color: var(--accent);
     background: rgba(201, 138, 100, 0.18);
 }
+.deco-sizes {
+    display: inline-flex;
+    gap: 6px;
+}
+.deco-size {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1px solid var(--ink-faint);
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+.deco-size.is-active {
+    border-color: var(--accent);
+    background: rgba(201, 138, 100, 0.18);
+}
+.deco-size.is-active .brush-dot { background: var(--accent); }
+
 .deco-colors {
     display: inline-flex;
     gap: 6px;
