@@ -65,32 +65,26 @@ const FOOT_TOP    = 0.10; // height of the base/foot contact zone
 const FOOT_BLEND  = 0.14; // allowed width opens to MAX_R over this rise
 
 // --- Clay material states ---------------------------------------
-// The clay progresses wet → leather-hard → bone-dry → fired. Each
-// state has its own surface look and rules: you can only throw
-// (sculpt) wet clay, and only trim a foot at leather-hard. Colours
-// here are tunable placeholders. clearcoat is kept slightly > 0 in
-// every state so the shader define never toggles mid-tween (no
-// recompile hitch). `action` is the label that advances to `next`.
-// Bare-clay "looks" for each lifecycle phase up to bisque. `bump`
-// scales the procedural relief: wet reads smoother (water fills the
-// tooth), bone-dry shows the most grain.
+// The clay progresses wet → bone-dry (decorate) → fired. You can only
+// throw (sculpt) wet clay; you decorate (pick a glaze) bone-dry.
+// Colours here are tunable placeholders. clearcoat is kept slightly
+// > 0 in every state so the shader define never toggles mid-tween (no
+// recompile hitch).
+// Bare-clay "looks" per phase. `bump` scales the procedural relief:
+// wet reads smoother (water fills the tooth), bone-dry shows the most
+// grain. `fired` is the bare (unglazed) fired earthenware look.
 const CLAY_STATES = {
-    wet:     { label: "Wet clay",     color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.008 },
-    leather: { label: "Leather-hard", color: 0xb87a5e, roughness: 0.72, clearcoat: 0.05, clearcoatRoughness: 0.90, envMapIntensity: 0.60, bump: 0.018 },
-    bonedry: { label: "Bone-dry",     color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, bump: 0.024 },
-    bisque:  { label: "Bisque",       color: 0xbf6a45, roughness: 0.66, clearcoat: 0.10, clearcoatRoughness: 0.75, envMapIntensity: 0.55, bump: 0.017 },
+    wet:     { label: "Wet clay", color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.008 },
+    bonedry: { label: "Bone-dry", color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, bump: 0.024 },
+    fired:   { label: "Fired",    color: 0xbf6a45, roughness: 0.60, clearcoat: 0.15, clearcoatRoughness: 0.70, envMapIntensity: 0.62, bump: 0.014 },
 };
 const INITIAL_STATE = "wet";
 
-// Full phase order. glazedRaw/glazed are only reached once a glaze is
-// chosen on the bisque pot.
-const PHASES = ["wet", "leather", "bonedry", "bisque", "glazedRaw", "glazed"];
-// Forward-button label per phase; null hides the button (at bisque the
-// glaze palette is the action).
-const ADVANCE_LABEL = {
-    wet: "Firm up", leather: "Dry", bonedry: "Fire",
-    bisque: null, glazedRaw: "Glaze fire", glazed: "New pot",
-};
+// Three-step arc: shape it wet, decorate it bone-dry (pick a glaze),
+// fire it. Glazing is optional — a bare bone-dry pot fires to plain
+// earthenware.
+const PHASES = ["wet", "bonedry", "fired"];
+const ADVANCE_LABEL = { wet: "Dry", bonedry: "Fire", fired: "New pot" };
 
 // Glazes. `raw` is the chalky matte coat before firing; `fired` is the
 // glossy vitrified result. Shared surface params, per-glaze colours
@@ -491,15 +485,16 @@ function sculptToward(y, targetR) {
     profileDirty = true;
 }
 
-// --- Material states (wet → leather → bone-dry → bisque → glaze) -
+// --- Material states (wet → bone-dry/decorate → fired) ----------
 
-// The material look for the current phase: a glaze (raw/fired) once
-// glazing, otherwise the bare-clay state.
+// The material look for the current phase. A chosen glaze shows as a
+// matte raw coat while bone-dry, then glossy once fired; with no glaze
+// it's bare clay (and plain fired earthenware).
 function currentLook() {
     const cs = state.clayState;
-    if (cs === "glazed" && state.glaze) return GLAZES[state.glaze].fired;
-    if (cs === "glazedRaw" && state.glaze) return GLAZES[state.glaze].raw;
-    return CLAY_STATES[cs] || CLAY_STATES.bisque;
+    if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].fired : CLAY_STATES.fired;
+    if (cs === "bonedry") return state.glaze ? GLAZES[state.glaze].raw   : CLAY_STATES.bonedry;
+    return CLAY_STATES.wet;
 }
 
 // Enter a phase: point the material tween at its look, refresh the UI.
@@ -509,35 +504,30 @@ function setPhase(name) {
     updateToolbar();
 }
 
-// The forward control. Bisque has no forward action (you pick a glaze
-// swatch); glaze-fire happens from glazedRaw; New pot resets.
+// The forward control: dry → fire → new pot.
 function advanceStage() {
     switch (state.clayState) {
-        case "wet":       setPhase("leather"); break;
-        case "leather":   setPhase("bonedry"); break;
-        case "bonedry":   setPhase("bisque");  break;
-        case "glazedRaw": setPhase("glazed");  break; // glaze fire — the reveal
-        case "glazed":    resetPot();          break;
+        case "wet":     setPhase("bonedry"); break;
+        case "bonedry": setPhase("fired");   break; // fire — the glaze reveal
+        case "fired":   resetPot();          break;
     }
 }
 
-// Pick a glaze on the bisque pot (or change it before firing).
+// Decorate: pick a glaze on the bone-dry pot (tap the active one again
+// to clear it and fire bare).
 function setGlaze(id) {
     if (!GLAZES[id]) return;
-    state.glaze = id;
-    if (state.clayState === "bisque") setPhase("glazedRaw");
-    else if (state.clayState === "glazedRaw") setPhase("glazedRaw");
+    state.glaze = state.glaze === id ? null : id;
+    if (state.clayState === "bonedry") setPhase("bonedry"); // refresh the raw look
     updateGlazeBar();
 }
 
-// Step back one phase to keep editing. The two ends are commitments:
-// wet (start) and glazed (fired). Leaving glazedRaw drops the glaze.
+// Step back one phase to keep editing. The ends are commitments: wet
+// (start) and fired. The glaze choice is kept across a re-wet.
 function stepBack() {
     const cs = state.clayState;
-    if (cs === "wet" || cs === "glazed") return;
-    const prev = PHASES[PHASES.indexOf(cs) - 1];
-    if (cs === "glazedRaw") state.glaze = null; // wipe the unfired glaze
-    setPhase(prev);
+    if (cs === "wet" || cs === "fired") return;
+    setPhase(PHASES[PHASES.indexOf(cs) - 1]);
     updateGlazeBar();
 }
 
@@ -576,19 +566,17 @@ function tickMaterial(dt) {
     m.bumpScale          += (t.bump               - m.bumpScale)          * k;
 }
 
-// The stage label, including the glaze name once glazing.
+// The stage label, including the glaze name once chosen.
 function stageLabelText() {
     const cs = state.clayState;
-    if (cs === "bisque") return "Pick a glaze";
-    if (cs === "glazedRaw") return GLAZES[state.glaze].name + " · raw";
-    if (cs === "glazed") return GLAZES[state.glaze].name + " glaze";
-    return CLAY_STATES[cs].label;
+    if (cs === "bonedry") return state.glaze ? GLAZES[state.glaze].name + " · raw" : "Decorate";
+    if (cs === "fired") return state.glaze ? GLAZES[state.glaze].name + " glaze" : "Fired";
+    return CLAY_STATES.wet.label;
 }
 
-// Reflect the current phase in the UI: stage label, advance button
-// (hidden where there's no forward action), back button (hidden at the
-// ends), the brush bar (only while wet), and the glaze palette (bisque
-// + glazedRaw).
+// Reflect the current phase in the UI: stage label, advance button,
+// back button (hidden at the ends), the brush bar (only while wet),
+// and the glaze palette (only while bone-dry / decorating).
 function updateToolbar() {
     const cs = state.clayState;
     const label = document.getElementById("stageLabel");
@@ -597,14 +585,10 @@ function updateToolbar() {
     const brushBar = document.getElementById("brushBar");
     const glazeBar = document.getElementById("glazeBar");
     if (label) label.textContent = stageLabelText();
-    const adv = ADVANCE_LABEL[cs];
-    if (advance) {
-        advance.hidden = !adv;
-        if (adv) advance.textContent = adv;
-    }
-    if (back) back.hidden = cs === "wet" || cs === "glazed";
+    if (advance) advance.textContent = ADVANCE_LABEL[cs];
+    if (back) back.hidden = cs === "wet" || cs === "fired";
     if (brushBar) brushBar.hidden = cs !== "wet";
-    if (glazeBar) glazeBar.hidden = !(cs === "bisque" || cs === "glazedRaw");
+    if (glazeBar) glazeBar.hidden = cs !== "bonedry";
 }
 
 // Build the glaze palette once (swatches coloured by each glaze's

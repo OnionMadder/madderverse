@@ -157,7 +157,7 @@ html, body {
 .brush-dot-m { width: 9px;  height: 9px;  }
 .brush-dot-l { width: 15px; height: 15px; }
 
-/* ---------- Glaze palette (bisque + glazed-raw) ---------- */
+/* ---------- Glaze palette (bone-dry / decorate) ---------- */
 .glaze-bar {
     position: fixed;
     left: 0;
