@@ -122,6 +122,24 @@ const DECO_SIZES = [{ label: "S", px: 30 }, { label: "M", px: 62 }, { label: "L"
 const DEFAULT_DECO_SIZE = 1;
 const SPLATTER_DROPS = 9;
 
+// Stamp shapes (tap/drag to place) and overlay patterns (one tap fills
+// the whole surface). Both reuse the paint layer + current colour/size.
+const STAMP_SHAPES = [
+    { id: "dot",    glyph: "●" },
+    { id: "ring",   glyph: "◯" },
+    { id: "star",   glyph: "★" },
+    { id: "heart",  glyph: "♥" },
+    { id: "flower", glyph: "✿" },
+    { id: "cross",  glyph: "✚" },
+];
+const OVERLAY_PATTERNS = [
+    { id: "dots",    label: "Dots" },
+    { id: "rings",   label: "Rings" },
+    { id: "stripes", label: "Stripes" },
+    { id: "grid",    label: "Grid" },
+    { id: "scatter", label: "Scatter" },
+];
+
 const state = {
     renderer: null,
     scene: null,
@@ -135,9 +153,10 @@ const state = {
     glaze: null,                // chosen glaze id (once glazing), else null
     brushIndex: DEFAULT_BRUSH,  // index into BRUSHES
     spin: SPIN_SPEED,           // current angular speed (eases to 0 while busy)
-    decoTool: "brush",          // brush | splatter
+    decoTool: "brush",          // brush | splatter | stamp | overlay
     decoColor: null,            // paint colour (hex), or null = painting off
     decoSizeIndex: DEFAULT_DECO_SIZE,
+    stampShape: "dot",
     painting: false,
     decoCanvas: null, decoCtx: null, decoTex: null,
     zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
@@ -224,6 +243,8 @@ function init() {
     buildDecoBar();
     document.getElementById("toolBrush")?.addEventListener("click", () => setDecoTool("brush"));
     document.getElementById("toolSplatter")?.addEventListener("click", () => setDecoTool("splatter"));
+    document.getElementById("toolStamp")?.addEventListener("click", () => setDecoTool("stamp"));
+    document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
     document.querySelectorAll(".deco-size").forEach((b, idx) =>
         b.addEventListener("click", () => setDecoSize(idx)));
@@ -243,6 +264,7 @@ function init() {
             state, profile, radiusAt, sculptToward, maxRadiusAt,
             setPhase, advanceStage, stepBack, setBrush, setGlaze,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
+            setStampShape, stampAt, applyOverlay,
             setZoom, zoomBy, rotateBy,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
@@ -431,6 +453,112 @@ function clearDeco() {
     if (!state.decoCtx) return;
     state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
     state.decoTex.needsUpdate = true;
+}
+
+// --- Stamps -----------------------------------------------------
+function starPath(ctx, r, points = 5) {
+    ctx.beginPath();
+    for (let i = 0; i < points * 2; i++) {
+        const rad = i % 2 === 0 ? r : r * 0.45;
+        const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+        const fn = i === 0 ? "moveTo" : "lineTo";
+        ctx[fn](Math.cos(a) * rad, Math.sin(a) * rad);
+    }
+    ctx.closePath();
+}
+function heartPath(ctx, r) {
+    const s = r / 16;
+    ctx.beginPath();
+    ctx.moveTo(0, 6 * s);
+    ctx.bezierCurveTo(0, 1 * s, -8 * s, -6 * s, -13 * s, -1 * s);
+    ctx.bezierCurveTo(-18 * s, 5 * s, -8 * s, 12 * s, 0, 17 * s);
+    ctx.bezierCurveTo(8 * s, 12 * s, 18 * s, 5 * s, 13 * s, -1 * s);
+    ctx.bezierCurveTo(8 * s, -6 * s, 0, 1 * s, 0, 6 * s);
+    ctx.closePath();
+}
+function drawStamp(cx, cy, r, shape, hex) {
+    const ctx = state.decoCtx;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.fillStyle = rgba(hex, 0.95);
+    ctx.strokeStyle = rgba(hex, 0.95);
+    if (shape === "dot") {
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+    } else if (shape === "ring") {
+        ctx.lineWidth = r * 0.34; ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2); ctx.stroke();
+    } else if (shape === "star") {
+        starPath(ctx, r); ctx.fill();
+    } else if (shape === "heart") {
+        heartPath(ctx, r); ctx.fill();
+    } else if (shape === "flower") {
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.42, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.beginPath(); ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2); ctx.fill();
+    } else if (shape === "cross") {
+        const w = r * 0.5, l = r * 1.7;
+        ctx.fillRect(-w / 2, -l / 2, w, l);
+        ctx.fillRect(-l / 2, -w / 2, l, w);
+    }
+    ctx.restore();
+}
+function stampAt(u, v) {
+    if (state.decoColor == null) return;
+    const r = decoRadius() * 1.25;
+    const cx = u * DECO_W, cy = (1 - v) * DECO_H;
+    drawStamp(cx, cy, r, state.stampShape, state.decoColor);
+    if (cx < r * 2) drawStamp(cx + DECO_W, cy, r, state.stampShape, state.decoColor);
+    else if (cx > DECO_W - r * 2) drawStamp(cx - DECO_W, cy, r, state.stampShape, state.decoColor);
+    state.decoTex.needsUpdate = true;
+}
+
+// --- Overlays (one tap fills the whole surface) -----------------
+function applyOverlay(id) {
+    if (state.decoColor == null) return;
+    const ctx = state.decoCtx, hex = state.decoColor;
+    const cell = DECO_SIZES[state.decoSizeIndex].px * 2.4;
+    ctx.save();
+    ctx.fillStyle = rgba(hex, 0.85);
+    if (id === "dots") {
+        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols;
+        const rows = Math.max(3, Math.round(DECO_H / cw)), rh = DECO_H / rows, dr = cw * 0.22;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+            let x = c * cw + cw * 0.5 + (r % 2 ? cw * 0.5 : 0);
+            if (x > DECO_W) x -= DECO_W;
+            const y = r * rh + rh * 0.5;
+            ctx.beginPath(); ctx.arc(x, y, dr, 0, Math.PI * 2); ctx.fill();
+            if (x < dr * 2) { ctx.beginPath(); ctx.arc(x + DECO_W, y, dr, 0, Math.PI * 2); ctx.fill(); }
+        }
+    } else if (id === "rings") {
+        const rows = Math.max(3, Math.round(DECO_H / cell)), rh = DECO_H / rows, sh = rh * 0.32;
+        for (let r = 0; r < rows; r++) ctx.fillRect(0, r * rh + (rh - sh) / 2, DECO_W, sh);
+    } else if (id === "stripes") {
+        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols, sw = cw * 0.4;
+        for (let c = 0; c < cols; c++) ctx.fillRect(c * cw, 0, sw, DECO_H);
+    } else if (id === "grid") {
+        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols, lw = Math.max(2, cw * 0.08);
+        const rows = Math.max(3, Math.round(DECO_H / cw)), rh = DECO_H / rows;
+        for (let c = 0; c < cols; c++) ctx.fillRect(c * cw, 0, lw, DECO_H);
+        for (let r = 0; r < rows; r++) ctx.fillRect(0, r * rh, DECO_W, lw);
+    } else if (id === "scatter") {
+        const n = Math.round((DECO_W * DECO_H) / (cell * cell * 1.4));
+        for (let i = 0; i < n; i++) {
+            const x = Math.random() * DECO_W, y = Math.random() * DECO_H;
+            const dr = DECO_SIZES[state.decoSizeIndex].px * (0.12 + Math.random() * 0.28);
+            ctx.beginPath(); ctx.arc(x, y, dr, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+    ctx.restore();
+    state.decoTex.needsUpdate = true;
+}
+
+// Dispatch a pot-touch to the active decorate tool.
+function decoApplyAt(u, v) {
+    if (state.decoTool === "stamp") stampAt(u, v);
+    else paintAt(u, v); // brush / splatter
 }
 
 // Raycast a pointer onto the pot and return the surface UV (or null).
@@ -734,14 +862,13 @@ function updateToolbar() {
     const advance = document.getElementById("advanceBtn");
     const back = document.getElementById("backBtn");
     const brushBar = document.getElementById("brushBar");
-    const glazeBar = document.getElementById("glazeBar");
+    const decoStack = document.getElementById("decoStack");
     if (label) label.textContent = stageLabelText();
     if (advance) advance.textContent = ADVANCE_LABEL[cs];
-    const decoBar = document.getElementById("decoBar");
     if (back) back.hidden = cs === "wet" || cs === "fired";
     if (brushBar) brushBar.hidden = cs !== "wet";
-    if (glazeBar) glazeBar.hidden = cs !== "bonedry";
-    if (decoBar) decoBar.hidden = cs !== "bonedry";
+    if (decoStack) decoStack.hidden = cs !== "bonedry";
+    if (cs === "bonedry") updateDecoSub(); // contextual sub-palette
 }
 
 // Build the glaze palette once (swatches coloured by each glaze's
@@ -775,13 +902,57 @@ function updateGlazeBar() {
 // --- Decoration UI ----------------------------------------------
 function setDecoTool(name) {
     state.decoTool = name;
-    [["toolBrush", "brush"], ["toolSplatter", "splatter"]].forEach(([id, t]) => {
+    [["toolBrush", "brush"], ["toolSplatter", "splatter"],
+     ["toolStamp", "stamp"], ["toolOverlay", "overlay"]].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
         const on = name === t;
         el.classList.toggle("is-active", on);
         el.setAttribute("aria-pressed", on ? "true" : "false");
     });
+    updateDecoSub();
+}
+
+// Pick which stamp shape to place.
+function setStampShape(id) {
+    state.stampShape = id;
+    updateDecoSub();
+}
+
+// Build the contextual sub-palette: stamp shapes, or overlay patterns,
+// or nothing (brush/splatter).
+function updateDecoSub() {
+    const sub = document.getElementById("decoSub");
+    if (!sub) return;
+    if (state.decoTool === "stamp") {
+        sub.hidden = false;
+        sub.innerHTML = "";
+        STAMP_SHAPES.forEach((sh) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "deco-sub-btn";
+            b.textContent = sh.glyph;
+            b.setAttribute("aria-label", sh.id + " stamp");
+            b.classList.toggle("is-active", sh.id === state.stampShape);
+            b.addEventListener("click", () => setStampShape(sh.id));
+            sub.appendChild(b);
+        });
+    } else if (state.decoTool === "overlay") {
+        sub.hidden = false;
+        sub.innerHTML = "";
+        OVERLAY_PATTERNS.forEach((p) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "deco-sub-btn deco-sub-text";
+            b.textContent = p.label;
+            b.setAttribute("aria-label", p.label + " overlay");
+            b.addEventListener("click", () => applyOverlay(p.id));
+            sub.appendChild(b);
+        });
+    } else {
+        sub.hidden = true;
+        sub.innerHTML = "";
+    }
 }
 
 // Pick a brush size (S/M/L).
@@ -899,10 +1070,10 @@ function onPointerDown(ev) {
         sculpting = true;
         sculptToward(p.y, p.r);
         ev.preventDefault();
-    } else if (state.clayState === "bonedry" && state.decoColor != null) {
+    } else if (state.clayState === "bonedry" && state.decoColor != null && state.decoTool !== "overlay") {
         state.painting = true;
         const uv = pointerToUV(ev);
-        if (uv) { paintAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
+        if (uv) { decoApplyAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
         else lastPaintUV = null;
         ev.preventDefault();
     } else {
@@ -936,9 +1107,16 @@ function onPointerMove(ev) {
     } else if (state.painting) {
         const uv = pointerToUV(ev);
         if (uv) {
-            if (lastPaintUV) paintStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
-            else paintAt(uv.x, uv.y);
-            lastPaintUV = { x: uv.x, y: uv.y };
+            if (state.decoTool === "stamp") {
+                // Place spaced stamps along the drag.
+                const moved = !lastPaintUV ? Infinity : Math.hypot(
+                    (uv.x - lastPaintUV.x) * DECO_W, (uv.y - lastPaintUV.y) * DECO_H);
+                if (moved > decoRadius() * 1.8) { stampAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
+            } else {
+                if (lastPaintUV) paintStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
+                else paintAt(uv.x, uv.y);
+                lastPaintUV = { x: uv.x, y: uv.y };
+            }
         } else {
             lastPaintUV = null;
         }

@@ -59,19 +59,28 @@
         <button class="brush-btn" type="button" aria-label="Broad brush" aria-pressed="false"><span class="brush-dot brush-dot-l"></span></button>
     </div>
 
-    <div class="deco-bar" id="decoBar" role="group" aria-label="Decorate" hidden>
-        <button class="deco-tool" id="toolBrush" type="button" aria-pressed="true">Brush</button>
-        <button class="deco-tool" id="toolSplatter" type="button" aria-pressed="false">Splatter</button>
-        <span class="deco-sizes">
-            <button class="deco-size" type="button" aria-label="Small brush" aria-pressed="false"><span class="brush-dot brush-dot-s"></span></button>
-            <button class="deco-size" type="button" aria-label="Medium brush" aria-pressed="false"><span class="brush-dot brush-dot-m"></span></button>
-            <button class="deco-size" type="button" aria-label="Large brush" aria-pressed="false"><span class="brush-dot brush-dot-l"></span></button>
-        </span>
-        <span class="deco-colors" id="decoColors"></span>
-        <button class="deco-tool deco-clear" id="decoClear" type="button">Clear</button>
-    </div>
+    <div class="deco-stack" id="decoStack" hidden>
+        <div class="deco-sub" id="decoSub" role="group" aria-label="Shape or pattern" hidden></div>
 
-    <div class="glaze-bar" id="glazeBar" role="group" aria-label="Glaze" hidden></div>
+        <div class="deco-bar" role="group" aria-label="Decorate tools">
+            <button class="deco-tool" id="toolBrush" type="button" aria-pressed="true">Brush</button>
+            <button class="deco-tool" id="toolSplatter" type="button" aria-pressed="false">Splatter</button>
+            <button class="deco-tool" id="toolStamp" type="button" aria-pressed="false">Stamp</button>
+            <button class="deco-tool" id="toolOverlay" type="button" aria-pressed="false">Overlay</button>
+            <span class="deco-sizes" id="decoSizes">
+                <button class="deco-size" type="button" aria-label="Small" aria-pressed="false"><span class="brush-dot brush-dot-s"></span></button>
+                <button class="deco-size" type="button" aria-label="Medium" aria-pressed="false"><span class="brush-dot brush-dot-m"></span></button>
+                <button class="deco-size" type="button" aria-label="Large" aria-pressed="false"><span class="brush-dot brush-dot-l"></span></button>
+            </span>
+            <button class="deco-tool deco-clear" id="decoClear" type="button">Clear</button>
+        </div>
+
+        <div class="deco-bar" role="group" aria-label="Paint colour">
+            <span class="deco-colors" id="decoColors"></span>
+        </div>
+
+        <div class="glaze-bar" id="glazeBar" role="group" aria-label="Glaze"></div>
+    </div>
 
     <div class="toolbar" role="toolbar" aria-label="Pottery stage">
         <button id="backBtn" class="tool-btn" type="button" hidden>&larr; Re-wet</button>
