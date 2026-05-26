@@ -33,6 +33,12 @@ const BG_COLOR    = 0x1b1815; // warm charcoal (matches CSS --bg)
 const WHEEL_COLOR = 0x2d2a26; // dark stone
 const SPIN_SPEED  = 0.3;      // radians / second — contemplative, not nervous
 
+// --- View (dolly-zoom toward the pot + manual spin) -------------
+const CAM_BASE    = new THREE.Vector3(0, 1.15, 4.1); // camera at zoom = 1
+const CAM_TARGET  = new THREE.Vector3(0, 0.66, 0);
+const ZOOM_MIN    = 1, ZOOM_MAX = 3.2;
+const ROTATE_SENS = 0.009;    // radians of pot spin per px of drag
+
 // --- Pot surface resolution + bounds ----------------------------
 const ROWS = 160;   // height segments (vertical)
 const COLS = 128;   // radial segments (around)
@@ -130,6 +136,8 @@ const state = {
     decoColor: null,            // paint colour (hex), or null = painting off
     painting: false,
     decoCanvas: null, decoCtx: null, decoTex: null,
+    zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
+    userRotating: false,        // manually spinning the pot
     clock: new THREE.Clock(),
 };
 let lastPaintUV = null;         // for continuous paint strokes
@@ -184,9 +192,8 @@ function init() {
 
     // --- Camera ---------------------------------------------------
     const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-    camera.position.set(0, 1.15, 4.1);
-    camera.lookAt(0, 0.66, 0);
     state.camera = camera;
+    applyCamera(); // position from zoom + target
 
     buildLights(scene);
 
@@ -229,6 +236,7 @@ function init() {
             state, profile, radiusAt, sculptToward, maxRadiusAt,
             setPhase, advanceStage, stepBack, setBrush, setGlaze,
             setDecoColor, setDecoTool, paintAt, clearDeco,
+            setZoom, zoomBy, rotateBy,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -792,12 +800,42 @@ function updateDecoSwatches() {
     });
 }
 
-// --- Pointer → clay ---------------------------------------------
+// --- Pointer: tools + view gestures -----------------------------
+// One finger = the active tool (sculpt wet / paint bone-dry), or a
+// drag-to-spin when there's no tool (fired). Two fingers = view
+// control: pinch to zoom, drag to spin. Any zoom pauses the auto-spin.
+const pointers = new Map(); // active pointerId -> {x, y}
+let pinchPrevDist = 0;      // last two-finger distance (px)
+let viewPrevX = 0;          // last drag x for manual spin (px)
+
 function bindSculpt(canvas) {
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+}
+
+// --- View control -----------------------------------------------
+function applyCamera() {
+    const f = 1 / state.zoom; // higher zoom → camera closer to the target
+    state.camera.position.set(
+        CAM_TARGET.x + (CAM_BASE.x - CAM_TARGET.x) * f,
+        CAM_TARGET.y + (CAM_BASE.y - CAM_TARGET.y) * f,
+        CAM_TARGET.z + (CAM_BASE.z - CAM_TARGET.z) * f,
+    );
+    state.camera.lookAt(CAM_TARGET);
+}
+function setZoom(z) {
+    state.zoom = THREE.MathUtils.clamp(z, ZOOM_MIN, ZOOM_MAX);
+    applyCamera();
+}
+function zoomBy(factor) { setZoom(state.zoom * factor); }
+function rotateBy(rad) { state.turntable.rotation.y += rad; }
+
+function onWheel(ev) {
+    ev.preventDefault();
+    zoomBy(ev.deltaY < 0 ? 1.1 : 1 / 1.1);
 }
 
 // Map a pointer event onto the axis plane → {y: height, r: radius}.
@@ -813,28 +851,59 @@ function pointerToProfile(ev) {
 }
 
 function onPointerDown(ev) {
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    if (pointers.size >= 2) {
+        // Two fingers → view gesture; abandon any in-progress stroke.
+        sculpting = false;
+        state.painting = false;
+        lastPaintUV = null;
+        state.userRotating = true;
+        const [a, b] = [...pointers.values()];
+        pinchPrevDist = Math.hypot(a.x - b.x, a.y - b.y);
+        viewPrevX = (a.x + b.x) / 2;
+        ev.preventDefault();
+        return;
+    }
+
     if (state.clayState === "wet") {
-        // Throw: grab near the silhouette and pull.
         const p = pointerToProfile(ev);
         if (!p) return;
         if (p.y < -0.05 || p.y > TOP + 0.15) return;
         if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
         sculpting = true;
-        try { state.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
         sculptToward(p.y, p.r);
         ev.preventDefault();
     } else if (state.clayState === "bonedry" && state.decoColor != null) {
-        // Decorate: paint onto the surface where the pointer hits.
         state.painting = true;
-        try { state.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
         const uv = pointerToUV(ev);
         if (uv) { paintAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
         else lastPaintUV = null;
+        ev.preventDefault();
+    } else {
+        // No tool here (e.g. fired) → drag to spin and inspect.
+        state.userRotating = true;
+        viewPrevX = ev.clientX;
         ev.preventDefault();
     }
 }
 
 function onPointerMove(ev) {
+    if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    if (pointers.size >= 2) {
+        // Pinch → zoom, centroid drift → manual spin.
+        const [a, b] = [...pointers.values()];
+        const dist = Math.hypot(a.x - b.x, a.y - b.y);
+        if (pinchPrevDist > 0) zoomBy(dist / pinchPrevDist);
+        pinchPrevDist = dist;
+        const cx = (a.x + b.x) / 2;
+        rotateBy((cx - viewPrevX) * ROTATE_SENS);
+        viewPrevX = cx;
+        ev.preventDefault();
+        return;
+    }
+
     if (sculpting) {
         const p = pointerToProfile(ev);
         if (p) sculptToward(p.y, p.r);
@@ -849,15 +918,25 @@ function onPointerMove(ev) {
             lastPaintUV = null;
         }
         ev.preventDefault();
+    } else if (state.userRotating) {
+        rotateBy((ev.clientX - viewPrevX) * ROTATE_SENS);
+        viewPrevX = ev.clientX;
+        ev.preventDefault();
     }
 }
 
 function onPointerUp(ev) {
-    if (!sculpting && !state.painting) return;
-    sculpting = false;
-    state.painting = false;
-    lastPaintUV = null;
-    try { state.canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
+    pointers.delete(ev.pointerId);
+    if (pointers.size < 2) pinchPrevDist = 0;
+    if (pointers.size === 0) {
+        sculpting = false;
+        state.painting = false;
+        state.userRotating = false;
+        lastPaintUV = null;
+    } else {
+        // Dropped from two fingers to one — stop spinning to avoid a jump.
+        state.userRotating = false;
+    }
 }
 
 function resize() {
@@ -871,9 +950,12 @@ function resize() {
 
 function tick() {
     const dt = state.clock.getDelta();
-    // The wheel eases to a stop while a finger is down (throwing or
-    // painting), so you can work precisely, then drifts back up.
-    const targetSpin = (sculpting || state.painting) ? 0 : SPIN_SPEED;
+    // The auto-spin eases to a stop while you work (throwing/painting),
+    // while you manually spin, and whenever zoomed in — then drifts
+    // back up once you're idle at the default framing.
+    const zoomed = state.zoom > 1.02;
+    const busy = sculpting || state.painting || state.userRotating || zoomed;
+    const targetSpin = busy ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
     if (profileDirty) {
