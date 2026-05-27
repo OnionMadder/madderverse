@@ -906,3 +906,6 @@ body.in-game #game-container { cursor: none; }
     }
 }
 
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

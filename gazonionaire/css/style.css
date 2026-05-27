@@ -1150,3 +1150,6 @@ input[type="number"]:focus, input[type="text"]:focus, .win95-input:focus {
 }
 #leaderboard-panel li.lb-self .lb-net   { color: var(--ink-bright); }
 #leaderboard-panel li.lb-self .lb-rank  { color: var(--accent); }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

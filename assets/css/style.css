@@ -313,3 +313,6 @@ body.kids-hub {
     font-size: 1.2rem;
     margin-bottom: 2rem;
 }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

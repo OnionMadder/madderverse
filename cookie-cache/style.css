@@ -1278,3 +1278,6 @@ footer a { color: var(--accent-cyan); pointer-events: auto; }
         display: flex;
     }
 }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

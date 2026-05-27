@@ -184,3 +184,6 @@ html, body {
     transition: opacity 90ms ease-out;
 }
 .fall-flash.show { opacity: 1; transition: none; }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }
