@@ -184,3 +184,34 @@ Add a Google account as a **License tester** in Play Console (`Setup` → `Licen
 
 - ❌ Gallery pots syncing across devices (still localStorage-only; v1.1 work)
 - ❌ Refund-handling UI flow if RC reports a previously-owned entitlement is no longer active (current behavior: the cache keeps it; harmless drift until next purchase)
+
+---
+
+## Slip Studio — Android **paid app** build & publish
+
+**Model:** a **paid app** (one-time price). Google Play handles the purchase at the store, so there is **NO in-app billing code, NO RevenueCat, NO product catalog** — the opposite of Pootery. Don't add billing.
+
+**Capacitor wrap:** `slip-studio-app/` — a SIBLING of the web app `slip-studio/`, **outside git** (untracked, like `pootery-app/`). Minimal deps: `@capacitor/core` + `@capacitor/android` only.
+- **Package id:** `org.madderverse.slipstudio` · **App name:** "Slip Studio"
+- **Web source of truth** is the git repo's `slip-studio/`. Edits there do NOT reach the AAB until synced (see rebuild steps).
+- **Three.js is vendored locally** at `slip-studio/vendor/` (import map points there, NOT esm.sh) so the app runs offline. Re-vendor if bumping the Three version.
+- **Immersive fullscreen:** `MainActivity.java` hides the status + navigation bars (the bottom button row) via `WindowInsetsControllerCompat`, swipe-to-reveal. Keep this — it's a product requirement.
+
+**Release keystore** (safe to keep here): `slip-studio-app/android/app/slip-studio-release.keystore` · store/key password `slipstudio_2026_release` · alias `slipstudio` · PKCS12, 10000 days · DN `CN=Slip Studio, OU=Mad Sundar LLC, O=Mad Sundar LLC, L=Minneapolis, ST=Minnesota, C=US`.
+
+**Rebuild the signed AAB after a web change:**
+1. Edit web source in `slip-studio/`, commit, push.
+2. `cp -r slip-studio/index.html slip-studio/main.js slip-studio/style.css slip-studio/vendor slip-studio-app/www/`
+3. From `slip-studio-app/`: `npx cap copy android`
+4. **Bump `versionCode` (+ `versionName`)** in `slip-studio-app/android/app/build.gradle` before every Play upload.
+5. From `slip-studio-app/android/`, build with **JDK 21** (machine default is 17 → `invalid source release: 21` otherwise):
+   ```
+   JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot" ./gradlew bundleRelease \
+     -PSLIP_STORE_FILE=slip-studio-release.keystore -PSLIP_STORE_PASSWORD=slipstudio_2026_release \
+     -PSLIP_KEY_ALIAS=slipstudio -PSLIP_KEY_PASSWORD=slipstudio_2026_release --console=plain
+   ```
+6. Output: `slip-studio-app/android/app/build/outputs/bundle/release/app-release.aab`. (ANDROID_HOME must point at the SDK — already set on this machine.)
+
+**TODO before publishing (user-side / final art):**
+- **App icon + splash** are still the default Capacitor icon. Drop a 1024×1024 `slip-studio-app/assets/icon.png` (+ `splash.png`), then `npx @capacitor/assets generate --android` and rebuild.
+- **Google Play Console (user only):** create the app → upload the AAB → set it as a **Paid app + price** → store listing (title, short/full description, screenshots, feature graphic) → content rating questionnaire → privacy policy URL → select countries → submit for review. First Play upload extracts the signing cert from this keystore (or enroll in Play App Signing).
