@@ -55,6 +55,10 @@
        bottom:0 must pad by this or it sits under the system bar
        and becomes untappable. Resolves to 0 on desktop. */
     --safe-bottom:  env(safe-area-inset-bottom, 0px);
+    /* Top inset — Android 15 edge-to-edge + iOS notch/hole-punch.
+       Pads the top of screen content so a camera cutout doesn't sit
+       over the title / titlebars. Resolves to 0 on desktop + tabs. */
+    --safe-top:     env(safe-area-inset-top, 0px);
 }
 
 /* ----- 2. Reset / base ----- */
@@ -179,7 +183,7 @@ a:focus-visible {
 .screen {
     max-width: var(--content-max);
     margin: 0 auto;
-    padding: 24px 16px 60px;
+    padding: calc(24px + var(--safe-top)) 16px 60px;
     min-height: calc(100vh - 110px); /* keep footer near the bottom */
     min-height: calc(100dvh - 110px);
     display: flex;
