@@ -1201,6 +1201,7 @@ async function dbDelete(id) {
 // device (unlike toDataURL on the live canvas, which returns blank on
 // some mobile GPUs). Framed square at the default (zoom-1) view.
 function captureThumb(size = 320) {
+    tickMaterial(10); // snap the glaze to its final look (skip the tween)
     const cam = state.camera;
     const prevAspect = cam.aspect;
     const prevPos = cam.position.clone();
