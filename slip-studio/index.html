@@ -28,23 +28,23 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style.css?v=4" />
 
-    <!-- Modern Three.js (PBR + HDR + ACES tone mapping land in later phases). -->
+    <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
     {
       "imports": {
-        "three": "https://esm.sh/three@0.165.0",
-        "three/addons/": "https://esm.sh/three@0.165.0/examples/jsm/"
+        "three": "./vendor/three.module.js",
+        "three/addons/": "./vendor/addons/"
       }
     }
     </script>
 
-    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 
 <body>
     <a class="home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+    <button class="gallery-open" id="galleryBtn" type="button" aria-label="Your pots" title="Your pots">&#x25A6;</button>
 
     <canvas id="scene" aria-label="Pottery scene"></canvas>
 
@@ -53,25 +53,63 @@
         <span class="loader-label">Slip Studio</span>
     </div>
 
+    <div id="landing" class="landing" hidden>
+        <h1 class="landing-title">Slip Studio</h1>
+        <p class="landing-tag">a calm place to shape clay</p>
+        <button id="beginBtn" class="landing-btn" type="button">Begin</button>
+        <button id="landingGallery" class="landing-link" type="button">Your pots</button>
+    </div>
+
     <div class="brush-bar" id="brushBar" role="group" aria-label="Brush size">
         <button class="brush-btn" type="button" aria-label="Fine brush" aria-pressed="false"><span class="brush-dot brush-dot-s"></span></button>
         <button class="brush-btn" type="button" aria-label="Medium brush" aria-pressed="false"><span class="brush-dot brush-dot-m"></span></button>
         <button class="brush-btn" type="button" aria-label="Broad brush" aria-pressed="false"><span class="brush-dot brush-dot-l"></span></button>
     </div>
 
-    <div class="deco-bar" id="decoBar" role="group" aria-label="Decorate" hidden>
-        <button class="deco-tool" id="toolBrush" type="button" aria-pressed="true">Brush</button>
-        <button class="deco-tool" id="toolSplatter" type="button" aria-pressed="false">Splatter</button>
-        <span class="deco-colors" id="decoColors"></span>
-        <button class="deco-tool deco-clear" id="decoClear" type="button">Clear</button>
-    </div>
+    <div class="deco-stack" id="decoStack" hidden>
+        <div class="deco-tabs" role="tablist">
+            <button class="deco-tab is-active" id="tabGlaze" type="button" role="tab" aria-selected="true">Glaze</button>
+            <button class="deco-tab" id="tabDecorate" type="button" role="tab" aria-selected="false">Decorate</button>
+        </div>
 
-    <div class="glaze-bar" id="glazeBar" role="group" aria-label="Glaze" hidden></div>
+        <div class="deco-panel" id="panelGlaze">
+            <div class="deco-strip" id="glazeBar" role="group" aria-label="Glaze"></div>
+        </div>
+
+        <div class="deco-panel" id="panelDecorate" hidden>
+            <div class="deco-row" role="group" aria-label="Decorate tools">
+                <button class="deco-tool" id="toolBrush" type="button" aria-pressed="true">Brush</button>
+                <button class="deco-tool" id="toolSplatter" type="button" aria-pressed="false">Splatter</button>
+                <button class="deco-tool" id="toolStamp" type="button" aria-pressed="false">Stamp</button>
+                <button class="deco-tool" id="toolOverlay" type="button" aria-pressed="false">Overlay</button>
+                <button class="deco-tool deco-clear" id="decoClear" type="button">Clear</button>
+            </div>
+            <div class="deco-strip" id="decoOptions">
+                <span class="deco-sizes" id="decoSizes">
+                    <button class="deco-size" type="button" aria-label="Small" aria-pressed="false"><span class="brush-dot brush-dot-s"></span></button>
+                    <button class="deco-size" type="button" aria-label="Medium" aria-pressed="false"><span class="brush-dot brush-dot-m"></span></button>
+                    <button class="deco-size" type="button" aria-label="Large" aria-pressed="false"><span class="brush-dot brush-dot-l"></span></button>
+                </span>
+                <span class="deco-sub" id="decoSub" role="group" aria-label="Shape or pattern" hidden></span>
+            </div>
+            <div class="deco-strip" id="decoColors" role="group" aria-label="Paint colour"></div>
+        </div>
+    </div>
 
     <div class="toolbar" role="toolbar" aria-label="Pottery stage">
         <button id="backBtn" class="tool-btn" type="button" hidden>&larr; Re-wet</button>
         <span id="stageLabel" class="stage-chip" aria-live="polite">Wet clay</span>
+        <button id="saveBtn" class="tool-btn" type="button" hidden>Save</button>
         <button id="advanceBtn" class="tool-btn tool-btn-primary" type="button">Dry</button>
+    </div>
+
+    <div class="gallery" id="gallery" role="dialog" aria-label="Your pots" hidden>
+        <div class="gallery-bar">
+            <span class="gallery-title">Your pots</span>
+            <button class="tool-btn" id="galleryClose" type="button">Close</button>
+        </div>
+        <div class="gallery-grid" id="galleryGrid"></div>
+        <p class="gallery-empty" id="galleryEmpty">No pots yet — shape one, fire it, and tap Save.</p>
     </div>
 
     <footer class="footer" aria-label="Site info">
@@ -80,7 +118,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js"></script>
+    <script type="module" src="main.js?v=4"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
