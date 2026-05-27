@@ -1650,7 +1650,12 @@
                     if (p && typeof p.catch === "function") {
                         p.catch(function () {});
                     }
-                    return true;
+                    /* Return the element (not just true) so a caller that
+                       needs to track the actual playback — e.g. the kiln
+                       sequence syncing its visual window to the clip — can
+                       read duration / hook "ended". Still truthy, so
+                       boolean-only callers are unaffected. */
+                    return pick;
                 } catch (_) { return false; }
             }
         };
@@ -1674,8 +1679,37 @@
     /* Recorded fire sequence preferred; synth kilnRoar kept as
        fallback. */
     function kilnSequencePlay(durationSec) {
-        if (KILN_SFX.sequence && KILN_SFX.sequence.play(1.0)) return;
+        const el = KILN_SFX.sequence && KILN_SFX.sequence.play(1.0);
+        if (el) { syncFiringWindowToClip(el); return; }
         if (typeof kilnRoar === "function") kilnRoar(durationSec);
+    }
+
+    /* Lock the firing VISUAL to the clip that is actually playing.
+       The module-eval probe (syncFiringWindowToAudio) reads duration
+       off a preload="metadata" element, which is unreliable in the
+       Android WebView — metadata often never resolves there, so on the
+       packaged app KILN_DUR.firing stayed at the 5000ms default while
+       the real clip is shorter, and the animation outlasted the sound
+       (desktop was fine because the probe resolves there). The pool's
+       elements are preload="auto", so the one we just started has a
+       valid duration; read it here, and also end firing on the clip's
+       own "ended" event so the visual can never run past the audio on
+       any platform. */
+    function syncFiringWindowToClip(el) {
+        function applyDur() {
+            const ms = Math.floor((el.duration || 0) * 1000);
+            if (ms > 500 && ms < 9000) KILN_DUR.firing = ms;
+        }
+        if (el.duration && isFinite(el.duration)) applyDur();
+        else {
+            el.addEventListener("loadedmetadata", applyDur, { once: true });
+            el.addEventListener("durationchange", applyDur, { once: true });
+        }
+        el.addEventListener("ended", function () {
+            /* Only the normal (non-explode) firing path is still in
+               "firing" when the clip ends; a kaboom already advanced. */
+            if (KILN.state === "firing") kilnAdvance();
+        }, { once: true });
     }
 
     /* Ambient looping spinning-wheel — plays underneath squelches
@@ -6537,7 +6571,7 @@
         const commitPaintStart = function () {
             if (D.gestureCommitted) return;
             pushUndoSnapshot();
-            paintDot(D.pendingPos);
+            paintDot(D.pendingPos, true);   /* true = stroke start -> taper the head */
             D.gestureCommitted = true;
             D.strokedThisGesture = true;
         };
@@ -6726,6 +6760,11 @@
                     }
                 }
                 if (D.pointerActive) {
+                    /* Finish a brush DRAG with a thin lift-off tail so the
+                       stroke ends in a point, not a blunt full-width stop. */
+                    if (D.strokedThisGesture && D.tool === "brush" && D.lastPaintPos) {
+                        brushTaperEnd(D.lastPaintPos);
+                    }
                     D.pointerActive = false;
                     D.lastPaintPos = null;
                 }
@@ -6812,7 +6851,91 @@
         return Math.max(0.6, D.size / z);
     }
 
-    function paintDot(p) {
+    /* ---- Soft brush tip (cached) ----
+       A real-feeling paintbrush instead of a flat monotone stripe: we
+       stamp a soft, feathered, translucent tip densely along the stroke
+       so colour BUILDS UP (like glaze thickness) and the edges feather
+       out. The stroke tapers THIN at both ends (light head via a live
+       ramp; light lift-off tail on release) and stays HEAVY through the
+       middle. Tunables live here so the feel is easy to dial in. */
+    const BRUSH_ALPHA = 0.10;   /* per-dab opacity — low so it's translucent + builds up */
+    const BRUSH_STEP  = 0.25;   /* dab spacing as a fraction of the radius */
+    const BRUSH_TAPER = 2.6;    /* taper length at each end, in radii */
+
+    let _brushTipCanvas = null;
+    function brushTip() {
+        if (_brushTipCanvas) return _brushTipCanvas;
+        const S = 64;
+        const c = document.createElement("canvas");
+        c.width = S; c.height = S;
+        const g = c.getContext("2d");
+        const grad = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+        /* Gentle falloff — no hard core. Feathering starts early (30%)
+           so even a single dab has a soft edge. */
+        grad.addColorStop(0,    "rgba(255,255,255,1)");
+        grad.addColorStop(0.30, "rgba(255,255,255,0.82)");
+        grad.addColorStop(0.70, "rgba(255,255,255,0.30)");
+        grad.addColorStop(1,    "rgba(255,255,255,0)");
+        g.fillStyle = grad;
+        g.fillRect(0, 0, S, S);
+        _brushTipCanvas = c;
+        return c;
+    }
+
+    /* The white soft tip recoloured to the active glaze. Rebuilt only
+       when the colour changes, so a stroke is just cheap drawImage calls. */
+    let _brushTintColor = null, _brushTintCanvas = null;
+    function brushTinted(color) {
+        if (_brushTintCanvas && _brushTintColor === color) return _brushTintCanvas;
+        const tip = brushTip();
+        const c = document.createElement("canvas");
+        c.width = tip.width; c.height = tip.height;
+        const g = c.getContext("2d");
+        g.drawImage(tip, 0, 0);
+        g.globalCompositeOperation = "source-in";
+        g.fillStyle = color;
+        g.fillRect(0, 0, c.width, c.height);
+        _brushTintColor = color;
+        _brushTintCanvas = c;
+        return c;
+    }
+
+    /* One soft dab. `r` and `alpha` already carry any taper scaling; we
+       just add light per-dab jitter so the stroke reads as hand-painted
+       glaze, not a printed line. Caller wraps runs in ctx.save/restore. */
+    function brushDab(ctx, tinted, x, y, r, alpha) {
+        if (r <= 0.2 || alpha <= 0.003) return;
+        const jr = r * (0.85 + Math.random() * 0.30);
+        const jx = (Math.random() - 0.5) * r * 0.40;
+        const jy = (Math.random() - 0.5) * r * 0.40;
+        ctx.globalAlpha = Math.min(1, alpha * (0.8 + Math.random() * 0.4));
+        ctx.drawImage(tinted, x + jx - jr, y + jy - jr, jr * 2, jr * 2);
+    }
+
+    /* Lift-off tail: on release, continue a few shrinking, fading dabs
+       along the last travel direction so the stroke ends in a thin point
+       (a brush lifting off) instead of a blunt full-width stop. Additive
+       + translucent, so it never gouges the art underneath the way an
+       eraser-style trim would. */
+    function brushTaperEnd(p) {
+        const dir = D._lastBrushDir;
+        if (!dir) return;
+        const r = effectiveBrushSize();
+        const tinted = brushTinted(currentPaintColor());
+        const taperLen = r * BRUSH_TAPER;
+        const step = Math.max(1, r * BRUSH_STEP);
+        const ctx = D.paintCtx;
+        ctx.save();
+        for (let d = step; d <= taperLen; d += step) {
+            const t  = d / taperLen;            /* 0..1 along the tail */
+            const rs = r * (1 - t) * (1 - t);   /* radius eases to 0 */
+            const as = BRUSH_ALPHA * (1 - t);   /* alpha fades to 0 */
+            brushDab(ctx, tinted, p.x + dir.x * d, p.y + dir.y * d, rs, as);
+        }
+        ctx.restore();
+    }
+
+    function paintDot(p, isStrokeStart) {
         const ctx = D.paintCtx;
         if (D.tool === "spray") {
             spraySplat(p, "spray");
@@ -6829,13 +6952,27 @@
         if (D.tool === "eraser") {
             ctx.globalCompositeOperation = "destination-out";
             ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, effectiveBrushSize(), 0, Math.PI * 2);
+            ctx.fill();
         } else {
-            ctx.fillStyle = currentPaintColor();
+            /* brush: (re)start this stroke's taper + spacing bookkeeping.
+               A TAP lays a full soft dab of glaze; a stroke START
+               (isStrokeStart) draws nothing here — paintStrokeTo lays the
+               thin, ramping-up head the moment the finger moves. */
+            const r = effectiveBrushSize();
+            D._strokeDist   = 0;
+            D._lastBrushDir = null;
+            D._dabResidual  = Math.max(1, r * BRUSH_STEP);
+            if (!isStrokeStart) {
+                const tinted = brushTinted(currentPaintColor());
+                const n = 3 + Math.floor(Math.random() * 2);
+                for (let i = 0; i < n; i++) {
+                    brushDab(ctx, tinted, p.x, p.y, r, BRUSH_ALPHA);
+                }
+            }
             noteGlazeUsed(D.glaze);
         }
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, effectiveBrushSize(), 0, Math.PI * 2);
-        ctx.fill();
         ctx.restore();
     }
 
@@ -6859,26 +6996,56 @@
             return;
         }
 
-        ctx.save();
         if (D.tool === "eraser") {
+            ctx.save();
             ctx.globalCompositeOperation = "destination-out";
             ctx.strokeStyle = "#000";
-        } else {
-            ctx.strokeStyle = currentPaintColor();
+            ctx.lineWidth = effectiveBrushSize() * 2;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.beginPath();
+            ctx.moveTo(last.x, last.y);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+            ctx.restore();
+            return;
         }
-        ctx.lineWidth = effectiveBrushSize() * 2;
-        ctx.lineCap = "round";
-        ctx.lineJoin = "round";
-        ctx.beginPath();
-        ctx.moveTo(last.x, last.y);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
+
+        /* BRUSH — stamp soft, translucent dabs evenly along the segment,
+           building up like glaze. Distance-based spacing keeps it smooth
+           at any speed and stops a held-still spot from caking. A live
+           taper ramps the HEAD up from thin->full over the first stretch
+           (BRUSH_TAPER radii of travel); the matching thin TAIL is added
+           on release by brushTaperEnd. Net: heavy middle, light ends. */
+        const r = effectiveBrushSize();
+        const tinted = brushTinted(currentPaintColor());
+        const dx = p.x - last.x, dy = p.y - last.y;
+        const dist = Math.hypot(dx, dy);
+        const step = Math.max(1, r * BRUSH_STEP);
+        const taperLen = r * BRUSH_TAPER;
+        ctx.save();
+        if (dist < 0.001) {
+            const tIn = Math.min(1, (D._strokeDist || 0) / taperLen);
+            brushDab(ctx, tinted, p.x, p.y,
+                     r * (0.25 + 0.75 * tIn), BRUSH_ALPHA * (0.4 + 0.6 * tIn));
+        } else {
+            const ux = dx / dist, uy = dy / dist;
+            D._lastBrushDir = { x: ux, y: uy };
+            let d = (D._dabResidual != null) ? D._dabResidual : step;
+            for (; d <= dist; d += step) {
+                const sd  = (D._strokeDist || 0) + d;
+                const tIn = Math.min(1, sd / taperLen);   /* thin-head ramp */
+                brushDab(ctx, tinted, last.x + ux * d, last.y + uy * d,
+                         r * (0.25 + 0.75 * tIn), BRUSH_ALPHA * (0.4 + 0.6 * tIn));
+            }
+            D._dabResidual = d - dist;                    /* carry remainder */
+            D._strokeDist  = (D._strokeDist || 0) + dist;
+        }
         ctx.restore();
-        /* Soft "shh" on a fraction of moves — a long stroke
-           becomes a stream of brushy puffs, not a constant hiss.
-           Only for brush (eraser stays silent — it's destructive
-           and the user wants to focus on what they're removing). */
-        if (D.tool === "brush" && Math.random() < 0.18) brushStroke();
+
+        /* Soft "shh" on a fraction of moves — a long stroke becomes a
+           stream of brushy puffs, not a constant hiss. */
+        if (Math.random() < 0.18) brushStroke();
     }
 
     function stampAt(p) {
