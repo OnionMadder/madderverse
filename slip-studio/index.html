@@ -30,7 +30,7 @@
 
     <link rel="stylesheet" href="style.css" />
 
-    <!-- Modern Three.js (PBR + HDR + ACES tone mapping land in later phases). -->
+    <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
     {
       "imports": {
@@ -40,7 +40,6 @@
     }
     </script>
 
-    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 
 <body>
@@ -52,6 +51,13 @@
     <div id="loader" class="loader" role="status" aria-live="polite">
         <div class="loader-ring" aria-hidden="true"></div>
         <span class="loader-label">Slip Studio</span>
+    </div>
+
+    <div id="landing" class="landing" hidden>
+        <h1 class="landing-title">Slip Studio</h1>
+        <p class="landing-tag">a calm place to shape clay</p>
+        <button id="beginBtn" class="landing-btn" type="button">Begin</button>
+        <button id="landingGallery" class="landing-link" type="button">Your pots</button>
     </div>
 
     <div class="brush-bar" id="brushBar" role="group" aria-label="Brush size">

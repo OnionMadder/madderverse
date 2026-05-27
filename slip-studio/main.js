@@ -190,7 +190,6 @@ function init() {
         canvas,
         antialias: true,
         powerPreference: "high-performance",
-        preserveDrawingBuffer: true, // so we can grab gallery thumbnails
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -261,6 +260,15 @@ function init() {
     hideLoader();
     renderer.setAnimationLoop(tick);
 
+    // Title screen sits over the (already-spinning) studio until "Begin".
+    const landing = document.getElementById("landing");
+    if (landing) landing.hidden = false;
+    document.getElementById("beginBtn")?.addEventListener("click", dismissLanding);
+    document.getElementById("landingGallery")?.addEventListener("click", () => {
+        dismissLanding();
+        openGallery();
+    });
+
     // Dev handle (inert unless the URL carries ?dev) — used to drive
     // and inspect the sculpt during testing across the build.
     if (location.search.includes("dev")) {
@@ -270,7 +278,7 @@ function init() {
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             setZoom, zoomBy, rotateBy,
-            savePot, loadPot, openGallery, closeGallery, dbAll, dbDelete,
+            savePot, loadPot, openGallery, closeGallery, dbAll, dbDelete, dismissLanding,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -1188,20 +1196,44 @@ async function dbDelete(id) {
     });
 }
 
-// A square thumbnail from the live render (centre-cropped on the pot).
+// A square thumbnail of the pot. Rendered into an offscreen render
+// target and read back with readRenderTargetPixels — reliable on every
+// device (unlike toDataURL on the live canvas, which returns blank on
+// some mobile GPUs). Framed square at the default (zoom-1) view.
 function captureThumb(size = 320) {
-    state.renderer.render(state.scene, state.camera); // fresh frame
-    const src = state.renderer.domElement;
+    const cam = state.camera;
+    const prevAspect = cam.aspect;
+    const prevPos = cam.position.clone();
+    cam.aspect = 1;
+    cam.position.copy(CAM_BASE);
+    cam.lookAt(CAM_TARGET);
+    cam.updateProjectionMatrix();
+
+    const rt = new THREE.WebGLRenderTarget(size, size);
+    state.renderer.setRenderTarget(rt);
+    state.renderer.render(state.scene, cam);
+    const buf = new Uint8Array(size * size * 4);
+    state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
+    state.renderer.setRenderTarget(null);
+    rt.dispose();
+
+    // restore the live camera
+    cam.aspect = prevAspect;
+    cam.position.copy(prevPos);
+    cam.lookAt(CAM_TARGET);
+    cam.updateProjectionMatrix();
+
+    // GL pixels are bottom-up; flip into a 2D canvas, then encode.
     const c = document.createElement("canvas");
     c.width = c.height = size;
-    const cx = c.getContext("2d");
-    cx.fillStyle = "#1b1815";
-    cx.fillRect(0, 0, size, size);
-    const s = Math.min(src.width, src.height);
-    const sx = (src.width - s) / 2;
-    const sy = Math.max(0, (src.height - s) / 2 - src.height * 0.04);
-    cx.drawImage(src, sx, sy, s, s, 0, 0, size, size);
-    return c.toDataURL("image/jpeg", 0.82);
+    const ctx = c.getContext("2d");
+    const img = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+        const src = (size - 1 - y) * size * 4;
+        img.data.set(buf.subarray(src, src + size * 4), y * size * 4);
+    }
+    ctx.putImageData(img, 0, 0);
+    return c.toDataURL("image/jpeg", 0.85);
 }
 
 async function savePot() {
@@ -1246,6 +1278,11 @@ async function loadPot(entry) {
     });
     setPhase("fired");
     updateGlazeBar();
+    // Force an immediate frame so the piece shows right away.
+    writeProfileToGeometry(state.pot.geometry);
+    profileDirty = false;
+    tickMaterial(10); // snap material to the fired look
+    state.renderer.render(state.scene, state.camera);
 }
 
 async function openGallery() {
@@ -1311,4 +1348,9 @@ function tick() {
 function hideLoader() {
     const loader = document.getElementById("loader");
     if (loader) loader.classList.add("is-hidden");
+}
+
+function dismissLanding() {
+    const l = document.getElementById("landing");
+    if (l) l.classList.add("is-gone");
 }
