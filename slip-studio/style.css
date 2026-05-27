@@ -379,6 +379,107 @@ html, body {
     padding: 0 4px;
 }
 
+/* ---------- Gallery open button (top-right) ---------- */
+.gallery-open {
+    position: fixed;
+    top:   max(16px, env(safe-area-inset-top, 0px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    z-index: 40;
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--ink-faint);
+    color: var(--ink-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.gallery-open:hover,
+.gallery-open:focus-visible {
+    color: var(--ink);
+    border-color: var(--ink-dim);
+    background: rgba(255, 255, 255, 0.07);
+    outline: none;
+}
+
+/* ---------- Gallery overlay ---------- */
+.gallery {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    background: rgba(20, 18, 16, 0.96);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    flex-direction: column;
+    padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px;
+}
+.gallery[hidden] { display: none; }
+.gallery-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+.gallery-title {
+    font-size: 0.82rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+}
+.gallery-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+    gap: 12px;
+    align-content: start;
+}
+.gallery-item {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--ink-faint);
+    background: var(--bg);
+}
+.gallery-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    cursor: pointer;
+}
+.gallery-del {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.gallery-empty {
+    margin: auto;
+    color: var(--ink-faint);
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 0 2rem;
+}
+.gallery-grid:not(:empty) + .gallery-empty { display: none; }
+
 /* ---------- Quiet footer ---------- */
 .footer {
     position: fixed;

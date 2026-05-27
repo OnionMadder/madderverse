@@ -190,6 +190,7 @@ function init() {
         canvas,
         antialias: true,
         powerPreference: "high-performance",
+        preserveDrawingBuffer: true, // so we can grab gallery thumbnails
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -246,6 +247,9 @@ function init() {
     document.getElementById("toolStamp")?.addEventListener("click", () => setDecoTool("stamp"));
     document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
+    document.getElementById("saveBtn")?.addEventListener("click", () => savePot());
+    document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
+    document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
     document.querySelectorAll(".deco-size").forEach((b, idx) =>
         b.addEventListener("click", () => setDecoSize(idx)));
     setDecoTool("brush");
@@ -266,6 +270,7 @@ function init() {
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             setZoom, zoomBy, rotateBy,
+            savePot, loadPot, openGallery, closeGallery, dbAll, dbDelete,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -865,9 +870,11 @@ function updateToolbar() {
     const decoStack = document.getElementById("decoStack");
     if (label) label.textContent = stageLabelText();
     if (advance) advance.textContent = ADVANCE_LABEL[cs];
+    const saveBtn = document.getElementById("saveBtn");
     if (back) back.hidden = cs === "wet" || cs === "fired";
     if (brushBar) brushBar.hidden = cs !== "wet";
     if (decoStack) decoStack.hidden = cs !== "bonedry";
+    if (saveBtn) saveBtn.hidden = cs !== "fired"; // save finished pieces
     if (cs === "bonedry") updateDecoSub(); // contextual sub-palette
 }
 
@@ -1140,6 +1147,138 @@ function onPointerUp(ev) {
         // Dropped from two fingers to one — stop spinning to avoid a jump.
         state.userRotating = false;
     }
+}
+
+// --- Persistence + gallery (local, IndexedDB) -------------------
+const DB_NAME = "slip-studio", DB_STORE = "pots";
+
+function openDB() {
+    return new Promise((res, rej) => {
+        const r = indexedDB.open(DB_NAME, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore(DB_STORE, { keyPath: "id" });
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+    });
+}
+async function dbPut(entry) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).put(entry);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+    });
+}
+async function dbAll() {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+        const tx = db.transaction(DB_STORE, "readonly");
+        const rq = tx.objectStore(DB_STORE).getAll();
+        rq.onsuccess = () => res(rq.result || []);
+        rq.onerror = () => rej(rq.error);
+    });
+}
+async function dbDelete(id) {
+    const db = await openDB();
+    return new Promise((res, rej) => {
+        const tx = db.transaction(DB_STORE, "readwrite");
+        tx.objectStore(DB_STORE).delete(id);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+    });
+}
+
+// A square thumbnail from the live render (centre-cropped on the pot).
+function captureThumb(size = 320) {
+    state.renderer.render(state.scene, state.camera); // fresh frame
+    const src = state.renderer.domElement;
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const cx = c.getContext("2d");
+    cx.fillStyle = "#1b1815";
+    cx.fillRect(0, 0, size, size);
+    const s = Math.min(src.width, src.height);
+    const sx = (src.width - s) / 2;
+    const sy = Math.max(0, (src.height - s) / 2 - src.height * 0.04);
+    cx.drawImage(src, sx, sy, s, s, 0, 0, size, size);
+    return c.toDataURL("image/jpeg", 0.82);
+}
+
+async function savePot() {
+    const entry = {
+        id: Date.now().toString(36),
+        ts: Date.now(),
+        profile: Array.from(profile, (x) => +x.toFixed(4)),
+        glaze: state.glaze,
+        deco: state.decoCanvas.toDataURL("image/png"),
+        thumb: captureThumb(),
+    };
+    try {
+        await dbPut(entry);
+        flashSaved();
+    } catch (e) {
+        console.warn("save failed", e);
+    }
+}
+
+function flashSaved() {
+    const b = document.getElementById("saveBtn");
+    if (!b) return;
+    b.textContent = "Saved ✓";
+    setTimeout(() => { b.textContent = "Save"; }, 1300);
+}
+
+// Restore a saved pot into the scene as a finished (fired) piece.
+async function loadPot(entry) {
+    for (let i = 0; i < profile.length; i++) profile[i] = entry.profile?.[i] ?? 0;
+    profileDirty = true;
+    state.glaze = entry.glaze || null;
+    await new Promise((res) => {
+        const img = new Image();
+        img.onload = () => {
+            state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
+            state.decoCtx.drawImage(img, 0, 0, DECO_W, DECO_H);
+            state.decoTex.needsUpdate = true;
+            res();
+        };
+        img.onerror = () => { clearDeco(); res(); };
+        img.src = entry.deco;
+    });
+    setPhase("fired");
+    updateGlazeBar();
+}
+
+async function openGallery() {
+    const grid = document.getElementById("galleryGrid");
+    const empty = document.getElementById("galleryEmpty");
+    if (!grid) return;
+    grid.innerHTML = "";
+    let pots = [];
+    try { pots = await dbAll(); } catch (_) {}
+    pots.sort((a, b) => b.ts - a.ts);
+    if (empty) empty.hidden = pots.length > 0;
+    pots.forEach((p) => {
+        const item = document.createElement("div");
+        item.className = "gallery-item";
+        const img = document.createElement("img");
+        img.src = p.thumb;
+        img.alt = "Saved pot";
+        img.loading = "lazy";
+        img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
+        const del = document.createElement("button");
+        del.className = "gallery-del";
+        del.type = "button";
+        del.textContent = "×";
+        del.setAttribute("aria-label", "Delete pot");
+        del.addEventListener("click", async (e) => { e.stopPropagation(); await dbDelete(p.id); openGallery(); });
+        item.append(img, del);
+        grid.appendChild(item);
+    });
+    document.getElementById("gallery").hidden = false;
+}
+function closeGallery() {
+    const g = document.getElementById("gallery");
+    if (g) g.hidden = true;
 }
 
 function resize() {
