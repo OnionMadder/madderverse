@@ -2344,3 +2344,6 @@ body.react-mode-active .horror-munki { pointer-events: auto; cursor: pointer; }
     .flying-creep.flying-creep-dying .flying-creep-frame { animation: none; }
     .stage-slot.creep-struck .char-art { animation: none; }
 }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

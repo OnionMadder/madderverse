@@ -536,3 +536,6 @@ footer {
     z-index: 6;
 }
 footer a { color: #fff; pointer-events: auto; }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

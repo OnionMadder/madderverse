@@ -637,3 +637,6 @@ input[type=range]:focus-visible,
   .transport { grid-template-columns: 1fr 1fr; }
   .transport .panic { grid-column: 1 / -1; }
 }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

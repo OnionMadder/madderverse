@@ -1971,3 +1971,6 @@ body:not(.dancing) .dance-dock { display: none; }
     border-radius: 6px;
     font-size: 12px;
 }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }

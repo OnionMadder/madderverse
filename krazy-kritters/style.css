@@ -867,3 +867,6 @@ body.scene-gameover #frame { filter: blur(2px) brightness(0.7); pointer-events: 
 .overlay::-webkit-scrollbar { width: 6px; }
 .overlay::-webkit-scrollbar-track { background: transparent; }
 .overlay::-webkit-scrollbar-thumb { background: var(--neon-purple); border-radius: 3px; }
+
+/* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
+* { touch-action: manipulation; }
