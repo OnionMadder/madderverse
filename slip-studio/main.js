@@ -106,14 +106,19 @@ const GLAZES = {
     oatmeal: glaze("Oatmeal", 0xd8d2c4, 0xe7ddca),
     honey:   glaze("Honey",   0xc2a274, 0xb27a33),
     tenmoku: glaze("Tenmoku", 0x6e6258, 0x2c2320),
+    blush:   glaze("Blush",   0xd9c2c0, 0xc98a86),
+    forest:  glaze("Forest",  0x9fb0a0, 0x3f5e4a),
+    slate:   glaze("Slate",   0xb0b6bd, 0x4a5a68),
+    plum:    glaze("Plum",    0xbcaebe, 0x6e4a6b),
+    sand:    glaze("Sand",    0xd8cbb0, 0xc2a35e),
 };
-const GLAZE_IDS = ["celadon", "cobalt", "oatmeal", "honey", "tenmoku"];
+const GLAZE_IDS = ["celadon", "cobalt", "oatmeal", "honey", "tenmoku", "blush", "forest", "slate", "plum", "sand"];
 
 // --- Decoration -------------------------------------------------
 // Painted onto the surface (over the glaze) by dragging on the pot.
 // One unwrapped RGBA canvas wraps the pot via UVs; a shader overlays
 // it on the clay. Brush = soft dab; splatter = scattered droplets.
-const DECO_COLORS = [0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86];
+const DECO_COLORS = [0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86, 0x6e4a6b, 0x4a5a68];
 const DECO_W = 2048, DECO_H = 1024; // unwrapped surface (≈ circumference:height)
 // Brush radii in canvas px (at zoom 1). The effective radius is divided
 // by the zoom, so the brush keeps a constant on-screen size — zoom in
@@ -125,19 +130,26 @@ const SPLATTER_DROPS = 9;
 // Stamp shapes (tap/drag to place) and overlay patterns (one tap fills
 // the whole surface). Both reuse the paint layer + current colour/size.
 const STAMP_SHAPES = [
-    { id: "dot",    glyph: "●" },
-    { id: "ring",   glyph: "◯" },
-    { id: "star",   glyph: "★" },
-    { id: "heart",  glyph: "♥" },
-    { id: "flower", glyph: "✿" },
-    { id: "cross",  glyph: "✚" },
+    { id: "dot",      glyph: "●" },
+    { id: "ring",     glyph: "◯" },
+    { id: "star",     glyph: "★" },
+    { id: "spark",    glyph: "✦" },
+    { id: "heart",    glyph: "♥" },
+    { id: "flower",   glyph: "✿" },
+    { id: "cross",    glyph: "✚" },
+    { id: "triangle", glyph: "▲" },
+    { id: "diamond",  glyph: "◆" },
+    { id: "square",   glyph: "■" },
 ];
 const OVERLAY_PATTERNS = [
-    { id: "dots",    label: "Dots" },
-    { id: "rings",   label: "Rings" },
-    { id: "stripes", label: "Stripes" },
-    { id: "grid",    label: "Grid" },
-    { id: "scatter", label: "Scatter" },
+    { id: "dots",     label: "Dots" },
+    { id: "rings",    label: "Rings" },
+    { id: "stripes",  label: "Stripes" },
+    { id: "grid",     label: "Grid" },
+    { id: "scatter",  label: "Scatter" },
+    { id: "checker",  label: "Checker" },
+    { id: "waves",    label: "Waves" },
+    { id: "diagonal", label: "Diagonal" },
 ];
 
 const state = {
@@ -246,6 +258,8 @@ function init() {
     document.getElementById("toolStamp")?.addEventListener("click", () => setDecoTool("stamp"));
     document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
+    document.getElementById("tabGlaze")?.addEventListener("click", () => setDecoTab("glaze"));
+    document.getElementById("tabDecorate")?.addEventListener("click", () => setDecoTab("decorate"));
     document.getElementById("saveBtn")?.addEventListener("click", () => savePot());
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
@@ -501,6 +515,20 @@ function drawStamp(cx, cy, r, shape, hex) {
         ctx.lineWidth = r * 0.34; ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2); ctx.stroke();
     } else if (shape === "star") {
         starPath(ctx, r); ctx.fill();
+    } else if (shape === "spark") {
+        starPath(ctx, r, 4); ctx.fill();
+    } else if (shape === "triangle") {
+        ctx.beginPath();
+        ctx.moveTo(0, -r);
+        ctx.lineTo(r * 0.92, r * 0.7);
+        ctx.lineTo(-r * 0.92, r * 0.7);
+        ctx.closePath(); ctx.fill();
+    } else if (shape === "diamond") {
+        ctx.beginPath();
+        ctx.moveTo(0, -r); ctx.lineTo(r * 0.8, 0); ctx.lineTo(0, r); ctx.lineTo(-r * 0.8, 0);
+        ctx.closePath(); ctx.fill();
+    } else if (shape === "square") {
+        ctx.fillRect(-r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
     } else if (shape === "heart") {
         heartPath(ctx, r); ctx.fill();
     } else if (shape === "flower") {
@@ -563,6 +591,37 @@ function applyOverlay(id) {
             const dr = DECO_SIZES[state.decoSizeIndex].px * (0.12 + Math.random() * 0.28);
             ctx.beginPath(); ctx.arc(x, y, dr, 0, Math.PI * 2); ctx.fill();
         }
+    } else if (id === "checker") {
+        const cols = Math.max(4, Math.round(DECO_W / cell)), cw = DECO_W / cols;
+        const rows = Math.max(4, Math.round(DECO_H / cw)), rh = DECO_H / rows;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+            if ((r + c) % 2 === 0) ctx.fillRect(c * cw, r * rh, cw + 1, rh + 1);
+        }
+    } else if (id === "waves") {
+        const rows = Math.max(3, Math.round(DECO_H / cell)), rh = DECO_H / rows;
+        const amp = rh * 0.28, lw = Math.max(3, rh * 0.12);
+        ctx.strokeStyle = rgba(hex, 0.85);
+        ctx.lineWidth = lw;
+        for (let r = 0; r < rows; r++) {
+            const y = r * rh + rh * 0.5;
+            ctx.beginPath();
+            for (let x = 0; x <= DECO_W; x += 12) {
+                const yy = y + Math.sin((x / DECO_W) * Math.PI * 8) * amp;
+                x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+            }
+            ctx.stroke();
+        }
+    } else if (id === "diagonal") {
+        const step = cell, lw = step * 0.4;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, DECO_W, DECO_H);
+        ctx.clip();
+        ctx.translate(DECO_W / 2, DECO_H / 2);
+        ctx.rotate(Math.PI / 4);
+        ctx.translate(-DECO_W, -DECO_H);
+        for (let x = 0; x < DECO_W * 2; x += step) ctx.fillRect(x, 0, lw, DECO_H * 2);
+        ctx.restore();
     }
     ctx.restore();
     state.decoTex.needsUpdate = true;
@@ -926,6 +985,19 @@ function setDecoTool(name) {
         el.setAttribute("aria-pressed", on ? "true" : "false");
     });
     updateDecoSub();
+}
+
+// Switch the tray between the Glaze and Decorate panels.
+function setDecoTab(name) {
+    const glaze = name === "glaze";
+    const pG = document.getElementById("panelGlaze");
+    const pD = document.getElementById("panelDecorate");
+    const tG = document.getElementById("tabGlaze");
+    const tD = document.getElementById("tabDecorate");
+    if (pG) pG.hidden = !glaze;
+    if (pD) pD.hidden = glaze;
+    if (tG) { tG.classList.toggle("is-active", glaze); tG.setAttribute("aria-selected", glaze ? "true" : "false"); }
+    if (tD) { tD.classList.toggle("is-active", !glaze); tD.setAttribute("aria-selected", !glaze ? "true" : "false"); }
 }
 
 // Pick which stamp shape to place.
