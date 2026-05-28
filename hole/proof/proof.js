@@ -182,15 +182,24 @@ function updateCamera() {
     camera.lookAt(camTarget);
 }
 
-let dragging = false, px = 0, py = 0;
-canvas.addEventListener("pointerdown", e => { dragging = true; px = e.clientX; py = e.clientY; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} });
+// Orbit — locked to a SINGLE pointer (a second finger can't fling it)
+// and scaled to viewport size (same speed on a big tablet as on desktop:
+// a full-width drag ~= 125 deg, full-height ~= 90 deg).
+let dragId = null, px = 0, py = 0;
+canvas.addEventListener("pointerdown", e => {
+    if (dragId !== null) return;          // ignore extra fingers
+    dragId = e.pointerId; px = e.clientX; py = e.clientY;
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+});
 canvas.addEventListener("pointermove", e => {
-    if (!dragging) return;
-    camAz   -= (e.clientX - px) * 0.01;
-    camPolar = Math.max(0.12, Math.min(1.35, camPolar - (e.clientY - py) * 0.01));
+    if (e.pointerId !== dragId) return;   // only the finger that started the drag
+    camAz   -= (e.clientX - px) / window.innerWidth  * 2.2;
+    camPolar = Math.max(0.12, Math.min(1.4, camPolar - (e.clientY - py) / window.innerHeight * 1.6));
     px = e.clientX; py = e.clientY;
 });
-addEventListener("pointerup", () => { dragging = false; });
+function endOrbit(e) { if (e.pointerId === dragId) dragId = null; }
+canvas.addEventListener("pointerup", endOrbit);
+canvas.addEventListener("pointercancel", endOrbit);
 
 // ---- Sync + loop -----------------------------------------------
 function syncOne(c) {
@@ -245,6 +254,7 @@ window.__proof = {
         }));
     },
     count() { return cubes.length; },
+    get camAngles() { return { az: +camAz.toFixed(3), polar: +camPolar.toFixed(3) }; },
     spawnTest, dropCluster, reset, clearCubes,
     cubes, world, scene, camera, THREE, CANNON,
 };
