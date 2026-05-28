@@ -19,6 +19,7 @@ const MAX_PULL = 145;     // how far back you can stretch the sling
 const LAUNCH_K = 0.205;   // pull distance -> launch speed
 
 let target = null;        // the current glass trinket (an offscreen canvas)
+let basket = null;        // catch-basket for skill levels (null when none)
 let shards = [];          // flying + settled shards (the settled ones are the pile)
 let ball = null;
 let aiming = false;
@@ -180,11 +181,38 @@ function drawGlass(g, shape, w, h) {
    channel to find every separated opaque blob, and use those as the roster
    of random trinkets. Image-agnostic: each item just becomes a source-rect
    crop drawn into the same offscreen as the procedural placeholders. */
-const SHEET_FILES = ["assets/trinkets/vacation.png"];
+// Each set is <material>-<theme>.png; the prefix (material) drives break + hits.
+const TRINKET_SHEETS = [
+  "glass-cute.png", "crystal-vaporwave.png", "jelly-tropical.png",
+  "metal-goth.png", "paint-blob.png", "wax-watchcraft.png", "jumbo-fish.png"
+];
 const MIN_ITEM_AREA = 400;       // discard noise-blobs smaller than this
 const ALPHA_THRESHOLD = 20;      // pixels below this alpha count as transparent
 
-let ROSTER = [];                 // [{ img, sx, sy, sw, sh }, ...]
+// material -> how it breaks + how many hits it takes. Break styles other than
+// "shatter" (the Voronoi fracture) are STUBBED to shatter for now.
+// TODO: real disintegrate (metal), blobs/droplets (paint), soft globs (jelly), melt (wax).
+const MATERIALS = {
+  glass:   { break: "shatter",      hp: 1 },
+  crystal: { break: "shatter",      hp: 1 },
+  jelly:   { break: "shatter",      hp: 1 },
+  metal:   { break: "disintegrate", hp: 3 },   // heavier shooter clears it faster
+  paint:   { break: "blobs",        hp: 1 },
+  wax:     { break: "melt",         hp: 2 },
+  jumbo:   { break: "shatter",      hp: 6 }     // big, post-tutorial, many hits
+};
+const DEFAULT_MATERIAL = { break: "shatter", hp: 1 };
+
+// shooter type -> marble sprite + damage one hit deals (heavier = more).
+const SHOOTERS = {
+  glass:    { sprite: "assets/shooters/glass.png",    power: 1 },
+  metal:    { sprite: "assets/shooters/metal.png",    power: 2 },
+  electric: { sprite: "assets/shooters/electric.png", power: 1 }   // TODO: special ability
+};
+let activeShooter = "glass";
+
+let ROSTER = [];                 // normal trinkets: [{ img, sw, sh, material }, ...]
+let JUMBO = [];                  // jumbo trinkets, kept OUT of the random pool (level-gated)
 let assetsReady = false;
 
 function loadImage(src) {
@@ -258,14 +286,18 @@ function extractItems(img) {
 }
 
 async function loadAssets() {
-  for (const path of SHEET_FILES) {
+  for (const file of TRINKET_SHEETS) {
+    const material = file.split("-")[0];          // "metal-goth.png" -> "metal"
     try {
-      const img = await loadImage(path);
+      const img = await loadImage("assets/trinkets/" + file);
       const items = extractItems(img);
-      for (const it of items) ROSTER.push(it);
-      console.log("glass-gallery:", path, "→", items.length, "items");
+      for (const it of items) {
+        it.material = material;
+        (material === "jumbo" ? JUMBO : ROSTER).push(it);
+      }
+      console.log("glass-gallery:", file, "→", items.length, material, "items");
     } catch (e) {
-      console.warn("glass-gallery: skipping", path + " —", e.message);
+      console.warn("glass-gallery: skipping", file + " —", e.message);
     }
   }
   assetsReady = ROSTER.length > 0;
@@ -278,10 +310,12 @@ async function loadBackground() {
   catch (e) { console.warn("glass-gallery: no background —", e.message); }
 }
 
-let marbleImg = null;
-async function loadMarble() {
-  try { marbleImg = await loadImage("assets/trinkets/shooter.png"); }
-  catch (e) { console.warn("glass-gallery: no marble sprite —", e.message); }
+const shooterImgs = {};          // type -> Image
+async function loadShooters() {
+  for (const type in SHOOTERS) {
+    try { shooterImgs[type] = await loadImage(SHOOTERS[type].sprite); }
+    catch (e) { console.warn("glass-gallery: no shooter sprite " + type + " —", e.message); }
+  }
 }
 
 function makeTarget() {
@@ -290,18 +324,20 @@ function makeTarget() {
   const displaySide = clamp(Math.min(W, H) * 0.15, 50, 150);
   const pad = Math.round(displaySide * 0.14);   // breathing room for the shatter box
 
-  let dw, dh, paint;
+  let dw, dh, paint, material = "glass";
   if (assetsReady && ROSTER.length) {
     const it = ROSTER[(Math.random() * ROSTER.length) | 0];
+    material = it.material || "glass";
     const scale = Math.sqrt((displaySide * displaySide) / (it.sw * it.sh));
     dw = Math.round(it.sw * scale);
     dh = Math.round(it.sh * scale);
     paint = octx => octx.drawImage(it.img, pad, pad, dw, dh);
   } else {
-    // procedural fallback — keeps the prototype playable until the sheet PNG lands
+    // procedural fallback — keeps the prototype playable until the sheets land
     dw = dh = Math.round(displaySide);
     paint = (octx, ow, oh) => drawGlass(octx, SHAPES[(Math.random() * SHAPES.length) | 0], ow, oh);
   }
+  const mat = MATERIALS[material] || DEFAULT_MATERIAL;
 
   const ow = dw + pad * 2, oh = dh + pad * 2;
   const oc = document.createElement("canvas");
@@ -317,7 +353,11 @@ function makeTarget() {
     x: clamp(W * 0.52 - ow / 2 + (Math.random() - 0.5) * W * 0.3, W * 0.12, W - ow - 18),
     y: Math.round(shelfY - oh + pad + 3),   // item's bottom edge sits on the shelf
     data: octx.getImageData(0, 0, ow, oh).data,   // cached alpha for hit-test + cull
-    born: performance.now()
+    born: performance.now(),
+    material,
+    hp: mat.hp,
+    maxHp: mat.hp,
+    hitFlash: 0
   };
 }
 function spawnTarget() { target = makeTarget(); }
@@ -326,6 +366,15 @@ function spawnTarget() { target = makeTarget(); }
 function alphaAt(t, lx, ly) {
   if (lx < 0 || ly < 0 || lx >= t.w || ly >= t.h) return 0;
   return t.data[((ly | 0) * t.w + (lx | 0)) * 4 + 3];
+}
+
+/* a hit: heavier shooters deal more damage; the trinket breaks only when hp runs out */
+function damageTarget(ix, iy) {
+  const t = target;
+  if (!t || phase !== "playing") return;
+  t.hp -= (SHOOTERS[activeShooter] || { power: 1 }).power;
+  if (t.hp <= 0) shatter(ix, iy);                          // TODO: dispatch on material.break
+  else { t.hitFlash = performance.now(); playClink(); }    // survived — crack feedback
 }
 
 /* ---------- the smash ---------- */
@@ -376,6 +425,7 @@ function shatter(ix, iy) {
   playShatter();
   target = null;
   respawnAt = performance.now() + 850;
+  onTrinketBroken();   // count it toward the level goal
 }
 
 /* ---------- per-frame updates ---------- */
@@ -388,7 +438,7 @@ function updateBall() {
     ball.y += ball.vy / STEPS;
     if (target) {
       const lx = ball.x - target.x, ly = ball.y - target.y;
-      if (alphaAt(target, lx, ly) > 40) { shatter(ball.x, ball.y); resetBall(); return; }
+      if (alphaAt(target, lx, ly) > 40) { damageTarget(ball.x, ball.y); resetBall(); return; }
     }
   }
   if (ball.x < -50 || ball.x > W + 50 || ball.y > H + 60) resetBall();
@@ -398,7 +448,19 @@ function updateShards() {
     if (s.settled) continue;
     s.vy += SHARD_GRAV;
     s.vx *= 0.992;
+    const py = s.y;
     s.x += s.vx; s.y += s.vy; s.ang += s.va;
+    // skill catch: a falling shard drops through the basket's mouth
+    if (basket && !s.caught && s.vy > 0) {
+      const rimY = basket.y - basket.h;
+      if (py < rimY && s.y >= rimY && s.x > basket.x - basket.w / 2 && s.x < basket.x + basket.w / 2) {
+        s.caught = true;
+        s.vx *= 0.3;
+        s.x = clamp(s.x, basket.x - basket.w * 0.38, basket.x + basket.w * 0.38);
+        s.rest = basket.y - 8 - Math.random() * 26;   // settle inside the basket
+        onShardCaught();
+      }
+    }
     if (s.y >= s.rest) {
       s.y = s.rest;
       if (s.vy > 1.2) { s.vy *= -0.34; s.vx *= 0.6; s.va *= 0.5; }   // small bounce
@@ -430,12 +492,16 @@ function drawTarget() {
   const age = (performance.now() - t.born) / 260;
   const s = age < 1 ? 0.6 + 0.4 * easeOut(age) : 1;   // little pop-in
   const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
+  // brief shake when a hit lands but the trinket survives (multi-hit materials)
+  const shake = Math.max(0, 1 - (performance.now() - t.hitFlash) / 220);
+  const jx = (Math.random() - 0.5) * 11 * shake;
+  const jy = (Math.random() - 0.5) * 11 * shake;
   ctx.save();
   ctx.globalAlpha = age < 1 ? easeOut(age) : 1;
   ctx.shadowColor = "rgba(0,0,0,0.4)";
   ctx.shadowBlur = 20;
   ctx.shadowOffsetY = 10;
-  ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+  ctx.translate(cx + jx, cy + jy); ctx.scale(s, s); ctx.translate(-cx, -cy);
   ctx.drawImage(t.img, t.x, t.y);
   ctx.restore();
 }
@@ -473,10 +539,11 @@ function drawSling() {
   }
 }
 function drawBall() {
-  if (marbleImg) {
+  const sprite = shooterImgs[activeShooter];
+  if (sprite) {
     const d = ball.r * 2.6;                       // a touch wider than the hit point
-    const dh = d * marbleImg.naturalHeight / marbleImg.naturalWidth;
-    ctx.drawImage(marbleImg, ball.x - d / 2, ball.y - dh / 2, d, dh);
+    const dh = d * sprite.naturalHeight / sprite.naturalWidth;
+    ctx.drawImage(sprite, ball.x - d / 2, ball.y - dh / 2, d, dh);
   } else {
     const g = ctx.createRadialGradient(ball.x - 4, ball.y - 4, 2, ball.x, ball.y, ball.r);
     g.addColorStop(0, "#ffffff");
@@ -517,6 +584,36 @@ function drawCover(img) {
   ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
 }
 
+function makeBasket() {
+  const w = clamp(Math.min(W, H) * 0.17, 95, 150);
+  return { x: W * 0.62, y: groundY - 4, w, h: 72 };   // mouth spans [x±w/2] at (y - h)
+}
+function drawBasket() {            // body + dark opening, drawn BEHIND the shards
+  const b = basket, topY = b.y - b.h, halfTop = b.w / 2, halfBot = b.w * 0.34;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
+  ctx.fillStyle = "#7a4a22";
+  ctx.beginPath();
+  ctx.moveTo(b.x - halfTop, topY);
+  ctx.lineTo(b.x + halfTop, topY);
+  ctx.lineTo(b.x + halfBot, b.y);
+  ctx.lineTo(b.x - halfBot, b.y);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "#311e0e";
+  ctx.beginPath();
+  ctx.ellipse(b.x, topY, halfTop, b.h * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+function drawBasketFront() {       // near lip, drawn OVER the shards = "contained"
+  const b = basket, topY = b.y - b.h, halfTop = b.w / 2;
+  ctx.strokeStyle = "#9a5f2e";
+  ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.ellipse(b.x, topY, halfTop, b.h * 0.15, 0, 0.05 * Math.PI, 0.95 * Math.PI);
+  ctx.stroke();
+}
+
 function render() {
   if (bgImage) {
     drawCover(bgImage);
@@ -537,7 +634,9 @@ function render() {
   }
 
   drawShelf();
+  if (basket) drawBasket();
   drawShards();
+  if (basket) drawBasketFront();
   if (target) drawTarget();
   drawSling();
   if (ball) drawBall();
@@ -583,13 +682,32 @@ function endAim() { if (aiming) { aiming = false; launch(); } }
 canvas.addEventListener("pointerup", endAim);
 canvas.addEventListener("pointercancel", endAim);
 
-/* ---------- audio (synthesized, no asset files) ---------- */
+/* ---------- audio: real break SFX (assets/sounds/) with a synth fallback ---------- */
 let actx = null;
+let breakBuffers = [];   // decoded break-1..8.mp3
 function resumeAudio() {
   if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
   if (actx.state === "suspended") actx.resume();
 }
+async function loadSounds() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  for (let i = 1; i <= 8; i++) {
+    try {
+      const res = await fetch("assets/sounds/break-" + i + ".mp3");
+      breakBuffers.push(await actx.decodeAudioData(await res.arrayBuffer()));
+    } catch (e) { console.warn("glass-gallery: sound failed break-" + i + " —", e.message); }
+  }
+}
 function playShatter() {
+  if (breakBuffers.length && actx) {
+    const src = actx.createBufferSource();
+    src.buffer = breakBuffers[(Math.random() * breakBuffers.length) | 0];
+    const g = actx.createGain();
+    g.gain.value = 0.9;
+    src.connect(g); g.connect(actx.destination);
+    src.start();
+    return;
+  }
   if (!actx) return;
   const a = actx, t = a.currentTime;
   // noise burst = the crash
@@ -626,27 +744,156 @@ function playThwip() {
   o.connect(g); g.connect(a.destination);
   o.start(t); o.stop(t + 0.16);
 }
+function playClink() {
+  // reuse a break sample, pitched up + quiet = "cracked, but didn't break yet"
+  if (!breakBuffers.length || !actx) return;
+  const src = actx.createBufferSource();
+  src.buffer = breakBuffers[(Math.random() * breakBuffers.length) | 0];
+  src.playbackRate.value = 1.5;
+  const g = actx.createGain();
+  g.gain.value = 0.3;
+  src.connect(g); g.connect(actx.destination);
+  src.start();
+}
+function playCatch() {
+  // pleasant two-note chime when a shard lands in the basket — the skill reward
+  if (!actx) return;
+  const a = actx, t = a.currentTime;
+  [880, 1320].forEach((f, i) => {
+    const o = a.createOscillator(); o.type = "sine"; o.frequency.value = f;
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t + i * 0.05);
+    g.gain.exponentialRampToValueAtTime(0.16, t + i * 0.05 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.05 + 0.2);
+    o.connect(g); g.connect(a.destination);
+    o.start(t + i * 0.05); o.stop(t + i * 0.05 + 0.22);
+  });
+}
+
+/* ---------- levels + progression ----------
+   The 5-level tutorial. The SPINE (goal count, timer, win/lose, advance, HUD)
+   works for every level now; the per-level MODIFIERS (moving / specific /
+   basket) are flags here but not implemented yet — those are the next step,
+   so L2–L5 currently play as "break N in time". */
+const LEVELS = [
+  { name: "Smash!",        goal: 5, time: 30, hint: "Break 5 trinkets!" },
+  { name: "Moving Day",    goal: 5, time: 35, moving: true,   hint: "Break 5 — they're moving!" },
+  { name: "Take Aim",      goal: 5, time: 40, specific: true, hint: "Break only the right ones" },
+  { name: "In the Basket", goal: 12, time: 45, basket: true, goalType: "catch", hint: "Knock 12 shards into the basket" },
+  { name: "Showtime",      goal: 15, time: 60, moving: true, basket: true, goalType: "catch", hint: "Shards in the basket — on the move!" }
+];
+let levelIndex = 0, goalTotal = 0, goalDone = 0, timeLeft = 0, score = 0, phase = "playing";
+
+const hud = {
+  level: document.getElementById("hudLevel"),
+  goal:  document.getElementById("hudGoal"),
+  timer: document.getElementById("hudTimer"),
+  score: document.getElementById("hudScore")
+};
+const overlayEl = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlayTitle");
+const overlayBtn = document.getElementById("overlayBtn");
+let overlayAction = null;
+
+function updateHUD() {
+  hud.level.textContent = "Lvl " + (levelIndex + 1);
+  hud.goal.textContent = goalDone + " / " + goalTotal;
+  hud.score.textContent = "★ " + score;
+}
+function showOverlay(title, btnLabel, action) {
+  overlayTitle.textContent = title;
+  overlayBtn.textContent = btnLabel;
+  overlayAction = action;
+  overlayEl.hidden = false;
+}
+function hideOverlay() { overlayEl.hidden = true; }
+overlayBtn.addEventListener("click", () => { const a = overlayAction; overlayAction = null; if (a) a(); });
+
+function loadLevel(i) {
+  levelIndex = ((i % LEVELS.length) + LEVELS.length) % LEVELS.length;
+  const L = LEVELS[levelIndex];
+  if (levelIndex === 0) score = 0;          // fresh run resets score
+  goalTotal = L.goal; goalDone = 0; timeLeft = L.time; phase = "playing";
+  if (L.shooter) activeShooter = L.shooter;
+  shards = []; target = null; respawnAt = 0;
+  basket = L.basket ? makeBasket() : null;
+  resetBall();
+  spawnTarget();
+  hintEl.textContent = L.hint; hintEl.style.opacity = "1"; launched = false;
+  hideOverlay();
+  updateHUD();
+}
+function onTrinketBroken() {
+  if (phase !== "playing") return;
+  score += 10;
+  if ((LEVELS[levelIndex].goalType || "break") === "break") {
+    goalDone++;
+    if (goalDone >= goalTotal) winLevel();
+  }
+  updateHUD();
+}
+let lastCatchSound = 0;
+function onShardCaught() {
+  score += 5;   // the skill reward
+  if (phase === "playing" && LEVELS[levelIndex].goalType === "catch") {
+    goalDone++;
+    if (goalDone >= goalTotal) winLevel();
+  }
+  const now = performance.now();
+  if (now - lastCatchSound > 70) { playCatch(); lastCatchSound = now; }
+  updateHUD();
+}
+function winLevel() {
+  phase = "won";
+  const last = levelIndex >= LEVELS.length - 1;
+  showOverlay(last ? "You cleared them all! 🎉" : "Level " + (levelIndex + 1) + " cleared!",
+              last ? "Play again" : "Next level",
+              () => loadLevel(last ? 0 : levelIndex + 1));
+}
+function loseLevel() {
+  phase = "lost";
+  showOverlay("Out of time!", "Try again", () => loadLevel(levelIndex));
+}
 
 /* ---------- loop ---------- */
+let lastTick = performance.now();
 function tick(now) {
-  if (!target && respawnAt && now >= respawnAt) { spawnTarget(); respawnAt = 0; }
+  const dt = Math.min(0.05, (now - lastTick) / 1000);   // clamp for tab-switch gaps
+  lastTick = now;
+  if (phase === "playing") {
+    timeLeft -= dt;
+    if (timeLeft <= 0) { timeLeft = 0; loseLevel(); }
+    if (!target && respawnAt && now >= respawnAt && goalDone < goalTotal) { spawnTarget(); respawnAt = 0; }
+  }
   updateBall();
   updateShards();
   render();
+  hud.timer.textContent = "⏱ " + Math.ceil(Math.max(0, timeLeft));
   requestAnimationFrame(tick);
 }
 
 resize();
-resetBall();
-spawnTarget();
+loadLevel(0);
 requestAnimationFrame(tick);
-loadAssets();   // async; when the sheet lands, ROSTER fills and the next spawn uses it
+loadAssets();   // async; when the sheets land, ROSTER fills and the next spawn uses them
 loadBackground();
-loadMarble();
+loadShooters();
+loadSounds();
 
-// poke from the console: __glass.shatter(x, y), __glass.shards, __glass.target
+// TEMP dev control: number keys 1/2/3 switch shooter until the picker UI ships
+const SHOOTER_KEYS = { "1": "glass", "2": "metal", "3": "electric" };
+window.addEventListener("keydown", e => { if (SHOOTER_KEYS[e.key]) activeShooter = SHOOTER_KEYS[e.key]; });
+
+// poke from the console: __glass.shatter(x,y), __glass.shards, __glass.target, __glass.setShooter('metal')
 window.__glass = {
   get target() { return target; },
   get shards() { return shards; },
+  get shooter() { return activeShooter; },
+  get roster() { return ROSTER; },
+  get jumbo() { return JUMBO; },
+  get level() { return { i: levelIndex, phase, done: goalDone, total: goalTotal, time: timeLeft, score }; },
+  get basket() { return basket; },
+  setShooter(t) { if (SHOOTERS[t]) activeShooter = t; },
+  loadLevel,
   shatter
 };
