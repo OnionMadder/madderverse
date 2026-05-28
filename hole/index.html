@@ -7,11 +7,12 @@
 
     <link rel="stylesheet" href="style.css" />
 
-    <!-- Three.js, vendored locally so the prototype runs fully offline. -->
+    <!-- Three.js + cannon-es, vendored locally so the prototype runs offline. -->
     <script type="importmap">
     {
       "imports": {
-        "three": "./vendor/three.module.js"
+        "three": "./vendor/three.module.js",
+        "cannon-es": "./vendor/cannon-es.js"
       }
     }
     </script>
@@ -23,7 +24,7 @@
     <canvas id="scene" aria-label="Hole game"></canvas>
 
     <div class="hud" aria-live="polite">
-        <span class="hud-item">Size <b id="hudSize">1.0</b></span>
+        <span class="hud-item">Size <b id="hudSize">0.9</b></span>
         <span class="hud-item">Eaten <b id="hudEaten">0</b></span>
     </div>
 
@@ -31,18 +32,18 @@
 
     <div id="devPanel" class="dev-panel" hidden aria-label="Dev controls">
         <div class="dev-row">
-            <label for="devSens">SENSITIVITY <span id="devSensOut">1.0</span></label>
-            <input id="devSens" type="range" min="0.4" max="2.5" step="0.1" value="1">
+            <label for="devSpeed">STEER <span id="devSpeedOut">0.045</span></label>
+            <input id="devSpeed" type="range" min="0.01" max="0.12" step="0.005" value="0.045">
         </div>
         <div class="dev-row">
-            <label for="devFit">FIT_SLACK <span id="devFitOut">0.30</span></label>
-            <input id="devFit" type="range" min="0" max="1" step="0.05" value="0.3">
+            <label for="devGrow">GROWTH <span id="devGrowOut">0.045</span></label>
+            <input id="devGrow" type="range" min="0.01" max="0.15" step="0.005" value="0.045">
         </div>
         <button id="devCopy" class="dev-btn" type="button">Copy values</button>
         <span id="devCopyMsg" class="dev-msg" aria-live="polite"></span>
     </div>
 
-    <p class="hint" id="hint">Drag to move the hole. Swallow small things to grow.</p>
+    <p class="hint" id="hint">Drag to move the hole. Swallow things to grow — then you can eat bigger things!</p>
 
     <script type="module" src="main.js"></script>
 </body>

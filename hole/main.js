@@ -1,50 +1,50 @@
 /* ============================================================
-   Hole — prototype (hole.io-style)
+   Hole — the real game (chunk 1: core loop)
    ------------------------------------------------------------
-   "Faked" hole: the ground is a solid plane and the hole is just
-   a flat dark disk drawn on top of it. When a prop is swallowed it
-   is pulled to the hole's centre, shrinks, spins, and sinks below
-   y=0 — the opaque ground (and the dark disk over the centre) hide
-   it on the way down, so it reads as falling into a pit. No stencil
-   buffer, no physics engine.
+   REAL hole + REAL physics (cannon-es). The round pit is a
+   KINEMATIC floor (NSEG wedge boxes, inner faces at radius R ->
+   clean circle) that follows the hole position H every frame,
+   sliding under a field of dynamic props. Props rest until the
+   hole's gap reaches them, then teeter on the round rim and tumble
+   in — emergent, no scripting. Eating a prop grows the hole.
 
-   Control = relative drag: grab anywhere and the hole moves with
-   your finger. It moves ONLY while you are actively dragging, so it
-   halts the instant you stop moving or lift off (no glide / inertia).
+   The "right size to enter" rule is FREE: a wide prop bridges a
+   small hole (rests on the rim all around) and only falls once the
+   hole is wider than it. Steering = instant-halt screen drag. The
+   camera follows H, so the hole stays centred and the world scrolls
+   past it (hole.io look).
 
-   Size gate: a prop drops only when its whole footprint fits inside
-   the opening (dist + propRadius <= holeR). A prop too big to fit is
-   a SOLID BLOCK — the hole can't slide its centre under it, so it
-   sits on the rim until the hole grows enough to swallow it.
-
-   To use real 3D models later, swap the body of makeProp() to load
-   a GLB with THREE's GLTFLoader and return the model instead of a
-   cube. Nothing else in the eat/grow loop needs to change.
+   Placeholder cubes for now — swap makeMesh() to load .glb later.
+   Tunables live in `dev`; add ?dev to the URL for live sliders.
    ============================================================ */
 
 import * as THREE from "three";
+import * as CANNON from "cannon-es";
 
 // ---- Tunables --------------------------------------------------
-const GROUND      = 64;     // ground plane is GROUND x GROUND world units
-const SPAWN_HALF  = 28;     // props scatter within +/- this from centre
-const HOLE_START  = 1.1;    // starting hole radius
-const GROWTH      = 0.10;   // hole radius gained per unit of prop size
-// Feel tuning lives in `dev` so the ?dev slider panel can live-edit it.
+const R0    = 0.9;   // starting hole radius
+const ROUT  = 70;    // floor annulus outer radius (huge: always covers the field)
+const NSEG  = 56;    // wedge count -> roundness of the rim
+const PIT   = 10;    // pit depth
+const G     = -22;   // gravity
+const FIELD = 26;    // props scatter within this radius
+const HMAX  = 26;    // hole roams within this radius
+const RMAX  = 14;    // hole can't grow past this
+
 const dev = {
-    SENSITIVITY: 1.0,  // hole movement per unit of drag (1.0 = tracks finger 1:1)
-    FIT_SLACK:   0.30, // how forgiving the "it fits" test is (world units)
+    SENS:   0.045,  // steer sensitivity (world units per screen px, at base zoom)
+    GROWTH: 0.045,  // hole radius gained per unit of swallowed prop size
 };
 
-// Prop tiers: bigger props need a bigger hole before they can be
-// swallowed, which is the whole game loop — eat small, grow, eat big.
+// Prop tiers (size = cube edge; a prop falls once R exceeds ~its half-width).
 const TIERS = [
-    { size: 0.8, color: 0x7bc86c, count: 64 }, // green  — tiny
-    { size: 1.5, color: 0xf2b134, count: 30 }, // amber  — small
-    { size: 2.6, color: 0xe8633a, count: 16 }, // orange — medium
-    { size: 4.2, color: 0x8a63d2, count: 6  }, // purple — big
+    { size: 1.0, color: 0x7bc86c, count: 80 }, // tiny   — eat from the start
+    { size: 2.0, color: 0xf2b134, count: 40 }, // small
+    { size: 3.4, color: 0xe8633a, count: 18 }, // medium
+    { size: 5.4, color: 0x8a63d2, count: 8  }, // large  — need to grow a lot
 ];
 
-// ---- Renderer / scene / camera ---------------------------------
+// ---- Three: renderer / scene / camera --------------------------
 const canvas   = document.getElementById("scene");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -55,250 +55,237 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fd3ff);
 
-const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
-camera.position.set(0, 16, 14);
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 600);
 
-// ---- Lights ----------------------------------------------------
-scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x6b8f4e, 0.75));
-const sun = new THREE.DirectionalLight(0xfff4e0, 2.0);
+scene.add(new THREE.HemisphereLight(0xcfeaff, 0x4a6b3a, 0.75));
+const sun = new THREE.DirectionalLight(0xfff3df, 2.0);
 sun.castShadow = true;
-sun.shadow.mapSize.set(1024, 1024);
-sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 90;
-sun.shadow.camera.left = -22;
-sun.shadow.camera.right = 22;
-sun.shadow.camera.top = 22;
-sun.shadow.camera.bottom = -22;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { near: 1, far: 120, left: -30, right: 30, top: 30, bottom: -30 });
 scene.add(sun, sun.target);
 
-// ---- Ground ----------------------------------------------------
-const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(GROUND, GROUND),
-    new THREE.MeshStandardMaterial({ color: 0x8fcf6f })
-);
-ground.rotation.x = -Math.PI / 2;
-ground.receiveShadow = true;
-scene.add(ground);
+// ---- Materials -------------------------------------------------
+const groundMat   = new THREE.MeshStandardMaterial({ color: 0x86c96a, roughness: 1, side: THREE.DoubleSide });
+const wallMat     = new THREE.MeshStandardMaterial({ color: 0x161a24, roughness: 1, side: THREE.BackSide });
+const pitFloorMat = new THREE.MeshStandardMaterial({ color: 0x0b0d13, roughness: 1 });
 
-// ---- The hole (flat dark disk that sits just above the ground) -
-const hole = new THREE.Mesh(
-    new THREE.CircleGeometry(1, 64),
-    new THREE.MeshBasicMaterial({ color: 0x0c0e14 })
-);
-hole.rotation.x = -Math.PI / 2;
-hole.position.y = 0.03; // hair above the ground so it wins the depth test
-scene.add(hole);
+// ---- Hole state ------------------------------------------------
+const H = new THREE.Vector3(0, 0, 0);
+let R = R0;        // current (target) hole radius
+let Rbuilt = -1;   // radius the floor/visual were last built at
+let eaten = 0;
 
-const lim = GROUND / 2 - 1; // keep the hole inside the ground
-let holeR  = HOLE_START;
-let eaten  = 0;
+// ---- cannon-es world -------------------------------------------
+const world = new CANNON.World({ gravity: new CANNON.Vec3(0, G, 0) });
+world.broadphase = new CANNON.SAPBroadphase(world);
+world.solver.iterations = 16;
+world.allowSleep = true;
 
-function clampHole() {
-    hole.position.x = Math.max(-lim, Math.min(lim, hole.position.x));
-    hole.position.z = Math.max(-lim, Math.min(lim, hole.position.z));
+const cGround = new CANNON.Material("g");
+const cBox    = new CANNON.Material("b");
+world.addContactMaterial(new CANNON.ContactMaterial(cGround, cBox, { friction: 0.5, restitution: 0.0 }));
+world.addContactMaterial(new CANNON.ContactMaterial(cBox,    cBox, { friction: 0.3, restitution: 0.0 }));
+
+// ---- Round floor (kinematic) + visual, rebuilt as R grows ------
+const holeGroup = new THREE.Group();
+scene.add(holeGroup);
+let ringMesh, wallMesh, pitFloorMesh, floorBody;
+
+function rebuild(r) {
+    // visual
+    for (const m of [ringMesh, wallMesh, pitFloorMesh]) if (m) { holeGroup.remove(m); m.geometry.dispose(); }
+    ringMesh = new THREE.Mesh(new THREE.RingGeometry(r, ROUT, 120), groundMat);
+    ringMesh.rotation.x = -Math.PI / 2;
+    ringMesh.receiveShadow = true;
+    wallMesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.78, PIT, 96, 1, true), wallMat);
+    wallMesh.position.y = -PIT / 2;
+    pitFloorMesh = new THREE.Mesh(new THREE.CircleGeometry(r * 0.78, 96), pitFloorMat);
+    pitFloorMesh.rotation.x = -Math.PI / 2;
+    pitFloorMesh.position.y = -PIT;
+    holeGroup.add(ringMesh, wallMesh, pitFloorMesh);
+
+    // physics
+    if (floorBody) world.removeBody(floorBody);
+    floorBody = new CANNON.Body({ type: CANNON.Body.KINEMATIC, material: cGround });
+    const seg = (Math.PI * 2) / NSEG;
+    const rMid = (r + ROUT) / 2;
+    const radialHalf = (ROUT - r) / 2;
+    const tangHalf = ROUT * Math.tan(seg / 2) * 1.12;
+    for (let i = 0; i < NSEG; i++) {
+        const a = i * seg;
+        const q = new CANNON.Quaternion();
+        q.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), -a);
+        floorBody.addShape(
+            new CANNON.Box(new CANNON.Vec3(radialHalf, 1, tangHalf)),
+            new CANNON.Vec3(Math.cos(a) * rMid, -1, Math.sin(a) * rMid),
+            q
+        );
+    }
+    floorBody.position.set(H.x, 0, H.z);
+    world.addBody(floorBody);
+    Rbuilt = r;
 }
 
 // ---- Props -----------------------------------------------------
-// Shared geometry + material per tier (cheap; props never mutate them).
-const tierAssets = TIERS.map(t => ({
-    geo: new THREE.BoxGeometry(t.size, t.size, t.size),
-    mat: new THREE.MeshStandardMaterial({ color: t.color, roughness: 0.85 }),
-    size: t.size,
-}));
-
+const tierGeo = TIERS.map(t => new THREE.BoxGeometry(t.size, t.size, t.size));
+const tierMat = TIERS.map(t => new THREE.MeshStandardMaterial({ color: t.color, roughness: 0.7 }));
 let props = [];
 
-function makeProp(tierIndex, x, z) {
-    const a = tierAssets[tierIndex];
-    const mesh = new THREE.Mesh(a.geo, a.mat);
-    mesh.castShadow = true;
-    mesh.position.set(x, a.size / 2, z); // rest flat on the ground
-    mesh.rotation.y = Math.random() * Math.PI * 2;
-    scene.add(mesh);
-    // half = footprint radius. The hole must be at least this wide to
-    // admit the prop; until then the prop is a solid block.
-    return { mesh, size: a.size, half: a.size * 0.5, falling: false };
+// Swap THIS to load a .glb (return a mesh) when real models are ready.
+function makeMesh(tier) {
+    const m = new THREE.Mesh(tierGeo[tier], tierMat[tier]);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    return m;
 }
 
-function scatterProps() {
-    for (const p of props) scene.remove(p.mesh);
+function spawn(tier, x, z) {
+    const size = TIERS[tier].size;
+    const mesh = makeMesh(tier);
+    scene.add(mesh);
+    const body = new CANNON.Body({ mass: size, material: cBox, allowSleep: true });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2)));
+    body.position.set(x, size / 2 + 0.02, z);
+    body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.random() * Math.PI * 2);
+    body.sleepSpeedLimit = 0.4;
+    body.sleepTimeLimit = 0.5;
+    world.addBody(body);
+    props.push({ mesh, body, half: size / 2, size, counted: false });
+}
+
+function clearProps() {
+    for (const p of props) { scene.remove(p.mesh); world.removeBody(p.body); }
     props = [];
-    TIERS.forEach((t, i) => {
-        for (let n = 0; n < t.count; n++) {
-            let x, z;
-            do {
-                x = (Math.random() * 2 - 1) * SPAWN_HALF;
-                z = (Math.random() * 2 - 1) * SPAWN_HALF;
-            } while (Math.hypot(x, z) < 4); // keep the start clear
-            props.push(makeProp(i, x, z));
+}
+
+function scatter() {
+    TIERS.forEach((t, tier) => {
+        for (let i = 0; i < t.count; i++) {
+            let x, z, d;
+            do { x = (Math.random() * 2 - 1) * FIELD; z = (Math.random() * 2 - 1) * FIELD; d = Math.hypot(x, z); }
+            while (d < R0 + t.size); // keep the start clear
+            spawn(tier, x, z);
         }
     });
 }
 
 function reset() {
-    holeR = HOLE_START;
-    eaten = 0;
-    dragging = false;
-    hole.position.set(0, 0.03, 0);
-    scatterProps();
+    clearProps();
+    R = R0; eaten = 0;
+    H.set(0, 0, 0);
+    rebuild(R);
+    scatter();
+    camera.position.set(0, 6 + R * 4, 5 + R * 3.2);
+    hideHint(true);
 }
 
-// ---- Pointer → relative drag -----------------------------------
-// The hole moves by the change in the pointer's ground position while
-// a drag is active. No drag motion = no movement, so releasing or
-// holding still brings the hole to an immediate halt.
-const ray         = new THREE.Raycaster();
-const ndc         = new THREE.Vector2();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const _g          = new THREE.Vector3(); // scratch: pointer ground point this event
-const _last       = new THREE.Vector3(); // pointer ground point at the previous event
-let   dragging    = false;
-
-function groundAt(e, out) {
-    ndc.x = (e.clientX / window.innerWidth) * 2 - 1;
-    ndc.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    ray.setFromCamera(ndc, camera);
-    return ray.ray.intersectPlane(groundPlane, out) ? out : null;
-}
-
+// ---- Steering: instant-halt screen drag (single pointer) -------
+let dragId = null, px = 0, py = 0;
+let camHeight = 6 + R0 * 4;
+const BASE_H = 6 + R0 * 4;
 canvas.addEventListener("pointerdown", e => {
-    if (!groundAt(e, _last)) return;
-    dragging = true;
+    if (dragId !== null) return;
+    dragId = e.pointerId; px = e.clientX; py = e.clientY;
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     hideHint();
 });
 canvas.addEventListener("pointermove", e => {
-    if (!dragging) return;                 // only moves during an active drag
-    if (!groundAt(e, _g)) return;
-    hole.position.x += (_g.x - _last.x) * dev.SENSITIVITY;
-    hole.position.z += (_g.z - _last.z) * dev.SENSITIVITY;
-    clampHole();
-    _last.copy(_g);
+    if (e.pointerId !== dragId) return;           // single pointer; only moves while dragging
+    const k = dev.SENS * (camHeight / BASE_H);    // keep the feel consistent as we zoom out
+    H.x += (e.clientX - px) * k;
+    H.z += (e.clientY - py) * k;
+    const d = Math.hypot(H.x, H.z);
+    if (d > HMAX) { H.x *= HMAX / d; H.z *= HMAX / d; }
+    px = e.clientX; py = e.clientY;
 });
-function endDrag(e) {
-    if (!dragging) return;
-    dragging = false;                      // immediate halt on release
-    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
-}
+function endDrag(e) { if (e.pointerId === dragId) dragId = null; }
 canvas.addEventListener("pointerup", endDrag);
 canvas.addEventListener("pointercancel", endDrag);
 
+// ---- Hint ------------------------------------------------------
 const hintEl = document.getElementById("hint");
 let hintGone = false;
-function hideHint() {
+function hideHint(reShow) {
+    if (reShow) { hintGone = false; hintEl.classList.remove("is-hidden"); return; }
     if (hintGone) return;
     hintGone = true;
     hintEl.classList.add("is-hidden");
 }
 
+// ---- HUD + reset ----------------------------------------------
+const hudSize  = document.getElementById("hudSize");
+const hudEaten = document.getElementById("hudEaten");
 document.getElementById("resetBtn").addEventListener("click", reset);
 
-// ?dev tuning panel — hidden in normal play, shown when the URL has ?dev.
-// Lets you dial in SENSITIVITY / FIT_SLACK live, then copy the values.
+// ---- ?dev sliders ----------------------------------------------
 if (new URLSearchParams(location.search).has("dev")) {
-    const panel   = document.getElementById("devPanel");
-    const sens     = document.getElementById("devSens");
-    const sensOut  = document.getElementById("devSensOut");
-    const fit       = document.getElementById("devFit");
-    const fitOut    = document.getElementById("devFitOut");
-    const copy     = document.getElementById("devCopy");
-    const copyMsg  = document.getElementById("devCopyMsg");
-
+    const panel = document.getElementById("devPanel");
+    const sp = document.getElementById("devSpeed"), spOut = document.getElementById("devSpeedOut");
+    const gr = document.getElementById("devGrow"),  grOut = document.getElementById("devGrowOut");
+    const copy = document.getElementById("devCopy"), msg = document.getElementById("devCopyMsg");
     panel.hidden = false;
-    sens.value = dev.SENSITIVITY;
-    sensOut.textContent = dev.SENSITIVITY.toFixed(1);
-    fit.value = dev.FIT_SLACK;
-    fitOut.textContent = dev.FIT_SLACK.toFixed(2);
-
-    sens.addEventListener("input", e => {
-        dev.SENSITIVITY = parseFloat(e.target.value);
-        sensOut.textContent = dev.SENSITIVITY.toFixed(1);
-    });
-    fit.addEventListener("input", e => {
-        dev.FIT_SLACK = parseFloat(e.target.value);
-        fitOut.textContent = dev.FIT_SLACK.toFixed(2);
-    });
+    sp.value = dev.SENS;   spOut.textContent = dev.SENS.toFixed(3);
+    gr.value = dev.GROWTH; grOut.textContent = dev.GROWTH.toFixed(3);
+    sp.addEventListener("input", e => { dev.SENS = parseFloat(e.target.value); spOut.textContent = dev.SENS.toFixed(3); });
+    gr.addEventListener("input", e => { dev.GROWTH = parseFloat(e.target.value); grOut.textContent = dev.GROWTH.toFixed(3); });
     copy.addEventListener("click", async () => {
-        const txt = `SENSITIVITY=${dev.SENSITIVITY}, FIT_SLACK=${dev.FIT_SLACK}`;
-        try { await navigator.clipboard.writeText(txt); copyMsg.textContent = "copied"; }
-        catch (_) { copyMsg.textContent = txt; }
-        setTimeout(() => { copyMsg.textContent = ""; }, 2500);
+        const t = `SENS=${dev.SENS}, GROWTH=${dev.GROWTH}`;
+        try { await navigator.clipboard.writeText(t); msg.textContent = "copied"; } catch (_) { msg.textContent = t; }
+        setTimeout(() => { msg.textContent = ""; }, 2500);
     });
 }
 
-// ---- HUD -------------------------------------------------------
-const hudSize  = document.getElementById("hudSize");
-const hudEaten = document.getElementById("hudEaten");
+// ---- Loop ------------------------------------------------------
+function moveHole() { floorBody.position.set(H.x, 0, H.z); holeGroup.position.set(H.x, 0, H.z); }
 
-// ---- Per-frame simulation + render -----------------------------
 function frame(dt) {
-    hole.scale.set(holeR, holeR, 1);
+    moveHole();
 
-    for (let i = props.length - 1; i >= 0; i--) {
-        const p = props[i];
-
-        if (!p.falling) {
-            const dxp = p.mesh.position.x - hole.position.x;
-            const dzp = p.mesh.position.z - hole.position.z;
-            const d = Math.hypot(dxp, dzp);
-
-            if (holeR >= p.half && d + p.half <= holeR + dev.FIT_SLACK) {
-                // The whole footprint fits inside the opening → it drops.
-                p.falling = true;
-                holeR += p.size * GROWTH;
-                eaten++;
-            } else if (holeR < p.half && d < p.half) {
-                // Too big to fit → solid block: shove the hole's centre
-                // back out to the prop's rim so it can't slide under.
-                let nx = dxp, nz = dzp, nd = d;
-                if (nd < 1e-4) { nx = 1; nz = 0; nd = 1; } // degenerate: pick a dir
-                const push = p.half - d;
-                hole.position.x -= (nx / nd) * push;
-                hole.position.z -= (nz / nd) * push;
-                clampHole();
-            }
-            continue;
-        }
-
-        // Falling: drag to centre, sink, shrink, tumble.
-        const f = Math.min(1, dt * 10);
-        p.mesh.position.x += (hole.position.x - p.mesh.position.x) * f;
-        p.mesh.position.z += (hole.position.z - p.mesh.position.z) * f;
-        p.mesh.position.y -= dt * 6;
-        p.mesh.rotation.x += dt * 5;
-        p.mesh.rotation.y += dt * 4;
-        const s = p.mesh.scale.x - dt * 1.8;
-        if (s <= 0.02 || p.mesh.position.y < -4) {
-            scene.remove(p.mesh);
-            props.splice(i, 1);
-        } else {
-            p.mesh.scale.setScalar(s);
-        }
+    // Wake props near the hole so they react when their support leaves.
+    const wakeR = R + 5;
+    for (const p of props) {
+        if (Math.hypot(p.body.position.x - H.x, p.body.position.z - H.z) < wakeR) p.body.wakeUp();
     }
 
-    // Camera trails the hole and pulls back as it grows.
-    const desiredH = 12 + holeR * 3.2;
-    const desiredB = 8 + holeR * 2.6;
-    const cl = Math.min(1, dt * 4);
-    camera.position.x += (hole.position.x - camera.position.x) * cl;
-    camera.position.y += (desiredH - camera.position.y) * cl;
-    camera.position.z += (hole.position.z + desiredB - camera.position.z) * cl;
-    camera.lookAt(hole.position.x, 0, hole.position.z);
+    world.step(1 / 60, dt, 3);
 
-    // Keep the sun (and its shadow frustum) over the action.
-    sun.position.set(hole.position.x + 18, 32, hole.position.z + 12);
-    sun.target.position.set(hole.position.x, 0, hole.position.z);
+    // Sync meshes; count + grow on swallow; despawn at the bottom.
+    let grew = false;
+    for (let i = props.length - 1; i >= 0; i--) {
+        const p = props[i];
+        p.mesh.position.copy(p.body.position);
+        p.mesh.quaternion.copy(p.body.quaternion);
+        if (!p.counted && p.body.position.y < -1.5) {
+            p.counted = true;
+            eaten++;
+            R = Math.min(RMAX, R + p.size * dev.GROWTH);
+            grew = true;
+        }
+        if (p.body.position.y < -(PIT + 5)) { scene.remove(p.mesh); world.removeBody(p.body); props.splice(i, 1); }
+    }
+    if (grew && R - Rbuilt > 0.08) rebuild(R);
 
-    hudSize.textContent = holeR.toFixed(1);
+    // Camera follows H and pulls back as the hole grows.
+    camHeight = 6 + R * 4;
+    const camBack = 5 + R * 3.2;
+    const cl = Math.min(1, dt * 3);
+    camera.position.x += (H.x - camera.position.x) * cl;
+    camera.position.y += (camHeight - camera.position.y) * cl;
+    camera.position.z += (H.z + camBack - camera.position.z) * cl;
+    camera.lookAt(H.x, 0, H.z);
+
+    sun.position.set(H.x + 20, 36, H.z + 14);
+    sun.target.position.set(H.x, 0, H.z);
+
+    hudSize.textContent = R.toFixed(1);
     hudEaten.textContent = String(eaten);
 
     renderer.render(scene, camera);
 }
 
-// ---- Loop ------------------------------------------------------
 let last = performance.now();
 function loop(now) {
-    const dt = Math.min(0.05, (now - last) / 1000); // clamp big tab-switch gaps
+    const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     frame(dt);
     requestAnimationFrame(loop);
@@ -310,21 +297,24 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-scatterProps();
+rebuild(R);
+scatter();
+camera.position.set(0, 6 + R * 4, 5 + R * 3.2);
 requestAnimationFrame(loop);
 
-// ---- Debug handle (numeric verification; rAF is paused in hidden tabs) ----
+// ---- Debug handle (numeric verification) -----------------------
+const _q = new THREE.Quaternion(), _up = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+function tiltOf(b) { _q.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w); _up.set(0, 1, 0).applyQuaternion(_q); return _up.angleTo(UP); }
 window.__hole = {
-    get size() { return holeR; },
-    set size(r) { holeR = r; },             // force hole radius for testing the gate
+    get size() { return R; },
+    set size(r) { R = Math.min(RMAX, r); rebuild(R); },
     get eaten() { return eaten; },
     get remaining() { return props.length; },
-    get pos() { return { x: +hole.position.x.toFixed(3), z: +hole.position.z.toFixed(3) }; },
-    moveTo(x, z) { hole.position.x = x; hole.position.z = z; clampHole(); },
-    drag(dx, dz) { hole.position.x += dx; hole.position.z += dz; clampHole(); }, // world-unit nudge
-    list() { return props.map(p => ({ x: +p.mesh.position.x.toFixed(2), z: +p.mesh.position.z.toFixed(2), size: p.size, half: p.half, falling: p.falling })); },
-    tick(dt = 0.016) { frame(dt); },
-    step(n = 60, dt = 0.016) { for (let i = 0; i < n; i++) frame(dt); },
-    reset,
-    THREE, scene, camera, dev,
+    get hole() { return { x: +H.x.toFixed(2), z: +H.z.toFixed(2), r: +R.toFixed(2) }; },
+    get cam() { return { x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) }; },
+    setHole(x, z) { H.set(x, 0, z); const d = Math.hypot(H.x, H.z); if (d > HMAX) { H.x *= HMAX / d; H.z *= HMAX / d; } },
+    nearest(tierSize) { let best = null, bd = 1e9; for (const p of props) { if (tierSize && p.size !== tierSize) continue; const d = Math.hypot(p.body.position.x - H.x, p.body.position.z - H.z); if (d < bd) { bd = d; best = p; } } return best ? { x: +best.body.position.x.toFixed(2), z: +best.body.position.z.toFixed(2), size: best.size, y: +best.body.position.y.toFixed(2) } : null; },
+    step(n = 60, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); },
+    spawn, clearProps, reset, dev,
+    props, world, scene, camera, THREE, CANNON,
 };
