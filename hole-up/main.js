@@ -26,7 +26,7 @@ import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-const VERSION = "holeup2";   // cache-buster for fetched data + dynamic imports
+const VERSION = "holeup3";   // cache-buster for fetched data + dynamic imports
 
 // ---- Tunables --------------------------------------------------
 const R0    = 0.9;   // starting hole radius
@@ -61,14 +61,16 @@ const DEFAULT_LEVEL = {
 // Live-tunable feel knobs. DEV_TUNABLES drives the self-building ?dev panel,
 // so adding a knob = one row here + read dev.KEY where you need it.
 const dev = {
-    STEER:   1.0,   // 1.0 = the grabbed ground point stays under your finger (1:1)
+    STICK:   20,    // how tightly the hole rides under the cursor (higher = glued)
+    SCROLL:  2,     // how fast the view chases the hole = your travel speed
     GROWTH:  0.01,  // hole radius gained per unit of swallowed footprint
     SUCTION: 25,    // pull toward the hole (constant force -> light food zips in, heavy resists)
     REACH:   3,     // suction radius as a multiple of the hole radius
     GRAVITY: 22,    // fall acceleration
 };
 const DEV_TUNABLES = [
-    { key: "STEER",   label: "Steer",   min: 0.3,   max: 3,    step: 0.05 },
+    { key: "STICK",   label: "Stick",   min: 5,     max: 40,   step: 1 },
+    { key: "SCROLL",  label: "Scroll",  min: 0.5,   max: 8,    step: 0.25 },
     { key: "GROWTH",  label: "Growth",  min: 0.005, max: 0.15, step: 0.005 },
     { key: "SUCTION", label: "Suction", min: 0,     max: 100,  step: 1 },
     { key: "REACH",   label: "Reach",   min: 1,     max: 6,    step: 0.25 },
@@ -290,6 +292,10 @@ function loadLevel(level) {
     clearProps();
     R = R0; eaten = 0;
     H.set(0, 0, 0);
+    target.set(0, 0, 0);
+    camFocus.set(0, 0, 0);
+    steerActive = false;
+    camHeight = 6 + R * 4;
     rebuild(R);
     const fieldR = currentLevel.field ?? FIELD;
     if (Array.isArray(currentLevel.items))
@@ -309,46 +315,40 @@ async function fetchLevel(id) {
 
 function reset() { loadLevel(currentLevel); }
 
-// ---- Steering: 1:1 ground tracking (hole stays under the finger) -
-// Each move, raycast the PREVIOUS and CURRENT cursor positions to the ground
-// with the live camera and shift the hole by that exact ground delta. Both
-// rays use the same camera, so the camera-follow can't feed back into the
-// drag (no runaway drift), and a still finger gives a zero delta (instant
-// halt). STEER multiplies it: 1.0 keeps the grabbed point under your finger.
-let dragId = null, px = 0, py = 0;
+// ---- Steering: the hole RIDES UNDER THE CURSOR ------------------
+// `target` = the ground point under the cursor, recomputed every frame (in
+// frame()), and the hole eases to it (STICK) — so it sits under your cursor
+// with no clicking. The camera focus chases the hole (SCROLL), so pointing
+// off-centre keeps the world scrolling that way; point at the hole (centre)
+// to stop. Mouse steers on hover; touch steers while a finger is down.
 let camHeight = 6 + R0 * 4;
+let steerActive = false, cx = 0, cy = 0;
 const steerRay = new THREE.Raycaster();
 const steerNDC = new THREE.Vector2();
 const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-const _gA = new THREE.Vector3(), _gB = new THREE.Vector3();
-function groundAtScreen(cx, cy, out) {
-    steerNDC.x = (cx / window.innerWidth) * 2 - 1;
-    steerNDC.y = -(cy / window.innerHeight) * 2 + 1;
+const target = new THREE.Vector3();
+const camFocus = new THREE.Vector3();
+const _t = new THREE.Vector3();
+function groundAtScreen(sx, sy, out) {
+    steerNDC.set((sx / window.innerWidth) * 2 - 1, -(sy / window.innerHeight) * 2 + 1);
     steerRay.setFromCamera(steerNDC, camera);
     return steerRay.ray.intersectPlane(groundPlane, out) ? out : null;
 }
 if (!EDITOR) {
-    canvas.addEventListener("pointerdown", e => {
-        if (dragId !== null) return;
-        dragId = e.pointerId; px = e.clientX; py = e.clientY;
-        try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    canvas.addEventListener("pointermove", e => {
+        cx = e.clientX; cy = e.clientY;
+        if (e.pointerType === "mouse") steerActive = true;   // hover steers
         hideHint();
     });
-    canvas.addEventListener("pointermove", e => {
-        if (e.pointerId !== dragId) return;
-        const a = groundAtScreen(px, py, _gA);
-        const b = groundAtScreen(e.clientX, e.clientY, _gB);
-        if (a && b) {
-            H.x += (b.x - a.x) * dev.STEER;
-            H.z += (b.z - a.z) * dev.STEER;
-            const d = Math.hypot(H.x, H.z);
-            if (d > HMAX) { H.x *= HMAX / d; H.z *= HMAX / d; }
-        }
-        px = e.clientX; py = e.clientY;
+    canvas.addEventListener("pointerdown", e => {
+        cx = e.clientX; cy = e.clientY; steerActive = true;
+        if (e.pointerType !== "mouse") { try { canvas.setPointerCapture(e.pointerId); } catch (_) {} }
+        hideHint();
     });
-    const endDrag = e => { if (e.pointerId === dragId) dragId = null; };
-    canvas.addEventListener("pointerup", endDrag);
-    canvas.addEventListener("pointercancel", endDrag);
+    const stop = e => { if (e.pointerType !== "mouse") steerActive = false; };   // touch: stop on lift
+    canvas.addEventListener("pointerup", stop);
+    canvas.addEventListener("pointercancel", stop);
+    canvas.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") steerActive = false; });
 }
 
 // ---- Hint ------------------------------------------------------
@@ -395,6 +395,15 @@ function moveHole() { floorBody.position.set(H.x, 0, H.z); holeGroup.position.se
 
 const _suck = new CANNON.Vec3();
 function frame(dt) {
+    // Steer: keep the hole under the cursor. target = cursor's ground point,
+    // recomputed each frame so HOLDING the cursor off-centre keeps travelling
+    // (the camera scrolls under it). Centre the cursor on the hole to stop.
+    if (steerActive) { const g = groundAtScreen(cx, cy, _t); if (g) target.copy(g); }
+    H.x += (target.x - H.x) * Math.min(1, dev.STICK * dt);
+    H.z += (target.z - H.z) * Math.min(1, dev.STICK * dt);
+    const hd = Math.hypot(H.x, H.z);
+    if (hd > HMAX) { H.x *= HMAX / hd; H.z *= HMAX / hd; }
+
     moveHole();
     world.gravity.y = -dev.GRAVITY;
 
@@ -443,13 +452,14 @@ function frame(dt) {
         if (k >= 1) { scene.remove(L.obj); lingerers.splice(i, 1); }
     }
 
-    camHeight = 6 + R * 4;
+    // The view focus eases toward the hole; that chase IS your travel speed
+    // (SCROLL). The hole leads the focus, riding under the cursor.
+    camFocus.x += (H.x - camFocus.x) * Math.min(1, dev.SCROLL * dt);
+    camFocus.z += (H.z - camFocus.z) * Math.min(1, dev.SCROLL * dt);
+    camHeight += ((6 + R * 4) - camHeight) * Math.min(1, dt * 3);
     const camBack = 5 + R * 3.2;
-    const cl = Math.min(1, dt * 3);
-    camera.position.x += (H.x - camera.position.x) * cl;
-    camera.position.y += (camHeight - camera.position.y) * cl;
-    camera.position.z += (H.z + camBack - camera.position.z) * cl;
-    camera.lookAt(H.x, 0, H.z);
+    camera.position.set(camFocus.x, camHeight, camFocus.z + camBack);
+    camera.lookAt(camFocus.x, 0, camFocus.z);
 
     sun.position.set(H.x + 20, 36, H.z + 14);
     sun.target.position.set(H.x, 0, H.z);
@@ -496,7 +506,7 @@ requestAnimationFrame(loop);
     } else {
         const level = await fetchLevel(LEVEL_ID);
         loadLevel(level || DEFAULT_LEVEL);
-        hintEl.innerHTML = "Drag to move the hole. Swallow food to grow &mdash; then you can eat bigger food!";
+        hintEl.innerHTML = "Move to steer &mdash; the hole follows your cursor. Eat food to grow, then bigger food!";
     }
 })();
 
