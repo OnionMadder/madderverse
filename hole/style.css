@@ -1,0 +1,94 @@
+:root {
+    --ink: #10131a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #9fd3ff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #fff;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* The canvas owns all pointer gestures — no scroll/zoom hijacking the drag. */
+#scene {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    touch-action: none;
+}
+
+.home {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 10;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    line-height: 1;
+    text-decoration: none;
+    color: #fff;
+    background: rgba(16, 19, 26, 0.45);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+}
+
+.hud {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    gap: 18px;
+    padding: 8px 16px;
+    background: rgba(16, 19, 26, 0.45);
+    border-radius: 14px;
+    backdrop-filter: blur(4px);
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+.hud b { font-variant-numeric: tabular-nums; }
+
+.reset-btn {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 10;
+    padding: 9px 16px;
+    font: inherit;
+    font-size: 14px;
+    color: #fff;
+    background: rgba(16, 19, 26, 0.45);
+    border: none;
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+}
+.reset-btn:active { transform: scale(0.96); }
+
+.hint {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    margin: 0;
+    padding: 8px 16px;
+    max-width: 90vw;
+    text-align: center;
+    font-size: 14px;
+    background: rgba(16, 19, 26, 0.4);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    transition: opacity 0.6s ease;
+}
+.hint.is-hidden { opacity: 0; pointer-events: none; }

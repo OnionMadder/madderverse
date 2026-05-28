@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Hole (prototype)</title>
+
+    <link rel="stylesheet" href="style.css" />
+
+    <!-- Three.js, vendored locally so the prototype runs fully offline. -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three.module.js"
+      }
+    }
+    </script>
+</head>
+
+<body>
+    <a class="home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+
+    <canvas id="scene" aria-label="Hole game"></canvas>
+
+    <div class="hud" aria-live="polite">
+        <span class="hud-item">Size <b id="hudSize">1.0</b></span>
+        <span class="hud-item">Eaten <b id="hudEaten">0</b></span>
+    </div>
+
+    <button id="resetBtn" class="reset-btn" type="button">Reset</button>
+
+    <p class="hint" id="hint">Drag to move the hole. Swallow small things to grow.</p>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
