@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Hole — physics proof</title>
+    <style>
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0; height: 100%; overflow: hidden;
+            background: #9fd3ff;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            color: #fff; -webkit-tap-highlight-color: transparent;
+        }
+        #scene { display: block; width: 100vw; height: 100vh; touch-action: none; }
+        .home {
+            position: fixed; top: 14px; left: 14px; z-index: 10;
+            width: 40px; height: 40px; display: grid; place-items: center;
+            font-size: 20px; color: #fff; text-decoration: none;
+            background: rgba(16,19,26,.45); border-radius: 12px; backdrop-filter: blur(4px);
+        }
+        .bar {
+            position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 10;
+            display: flex; gap: 10px;
+        }
+        .btn {
+            padding: 9px 16px; font: inherit; font-size: 14px; color: #fff;
+            background: rgba(16,19,26,.5); border: none; border-radius: 12px;
+            backdrop-filter: blur(4px); cursor: pointer;
+        }
+        .btn:active { transform: scale(.96); }
+        .note {
+            position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+            margin: 0; padding: 8px 14px; font-size: 13px; text-align: center; max-width: 92vw;
+            background: rgba(16,19,26,.4); border-radius: 12px; backdrop-filter: blur(4px);
+        }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "../vendor/three.module.js",
+        "cannon-es": "../vendor/cannon-es.js"
+      }
+    }
+    </script>
+</head>
+<body>
+    <a class="home" href="../../" aria-label="Madderverse" title="Madderverse">&#x2302;</a>
+    <canvas id="scene"></canvas>
+    <div class="bar">
+        <button id="dropBtn" class="btn" type="button">Drop cubes</button>
+        <button id="resetBtn" class="btn" type="button">Reset</button>
+    </div>
+    <p class="note">Physics proof — cubes teeter on the rim and tumble into a real pit. Drag to look around. (throwaway test)</p>
+    <script type="module" src="proof.js"></script>
+</body>
+</html>
