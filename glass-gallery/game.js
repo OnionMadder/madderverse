@@ -20,6 +20,7 @@ const LAUNCH_K = 0.205;   // pull distance -> launch speed
 
 let trinkets = [];        // every trinket on the shelves (broken ones removed — no respawn)
 let basket = null;        // catch-basket for skill levels (null when none)
+let beltSpan = 0;         // conveyor wrap distance for moving levels (0 = static)
 let shards = [];          // flying + settled shards (the settled ones are the pile)
 let ball = null;
 let aiming = false;
@@ -372,21 +373,43 @@ function makeTrinket(cx, shy, moving, isDuck) {
 // fill all three full-width shelves with trinkets for the current level
 function populateLevel() {
   trinkets = [];
+  beltSpan = 0;
   const L = LEVELS[levelIndex] || {};
   const moving = !!L.moving;
   const displaySide = clamp(Math.min(W, H) * 0.12, 44, 120);
   const cellW = displaySide * 1.3 + 8;                         // approx footprint + gap
   const perShelf = Math.max(4, Math.floor(W / cellW));
   const gap = W / perShelf;
+  const duckLevel = L.specific === "duck" && duckItem;
+
+  // Build the slot list. Moving levels are a CONVEYOR: each row gets 2 extra
+  // trinkets (so one is always off-stage entering/exiting) and a direction —
+  // the middle row runs opposite the top & bottom. Static levels just fill.
   const slots = [];
-  for (const shy of shelfYs) for (let i = 0; i < perShelf; i++) slots.push([gap * (i + 0.5), shy]);
-  // duck levels: scatter enough ducks among the regular trinkets to clear the goal
+  if (moving) {
+    const nPer = perShelf + 2;
+    beltSpan = nPer * gap;                                      // wrap distance (seamless loop)
+    const baseDir = Math.random() < 0.5 ? 1 : -1;
+    shelfYs.forEach((shy, r) => {
+      const dir = (r === 1 ? -baseDir : baseDir);
+      for (let k = 0; k < nPer; k++) slots.push({ cx: (k - 1) * gap + gap / 2, shy, dir });
+    });
+  } else {
+    for (const shy of shelfYs) for (let i = 0; i < perShelf; i++) slots.push({ cx: gap * (i + 0.5), shy, dir: 0 });
+  }
+
+  // scatter enough ducks among the slots to clear a duck-level goal
   const duckIdx = new Set();
-  if (L.specific === "duck" && duckItem) {
+  if (duckLevel) {
     const want = Math.min(slots.length, (L.goal || 5) + 4);
     while (duckIdx.size < want) duckIdx.add((Math.random() * slots.length) | 0);
   }
-  slots.forEach(([cx, shy], i) => trinkets.push(makeTrinket(cx, shy, moving, duckIdx.has(i))));
+  const speed = clamp(W * 0.0045, 1.8, 4.5);
+  slots.forEach((s, i) => {
+    const t = makeTrinket(s.cx, s.shy, false, duckIdx.has(i));
+    if (s.dir) t.vx = s.dir * speed;                           // conveyor velocity
+    trinkets.push(t);
+  });
 }
 
 /* alpha at an offscreen pixel (0..255) */
@@ -458,9 +481,10 @@ function updateTrinkets() {
   for (const t of trinkets) {
     if (!t.vx) continue;
     t.x += t.vx;
-    const minX = W * 0.06, maxX = W - t.w - W * 0.06;
-    if (t.x < minX) { t.x = minX; t.vx = Math.abs(t.vx); }
-    else if (t.x > maxX) { t.x = maxX; t.vx = -Math.abs(t.vx); }
+    if (beltSpan) {                                  // conveyor: exit one side, re-enter the other
+      if (t.vx > 0 && t.x > W) t.x -= beltSpan;
+      else if (t.vx < 0 && t.x + t.w < 0) t.x += beltSpan;
+    }
   }
 }
 
