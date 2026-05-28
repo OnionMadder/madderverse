@@ -29,6 +29,19 @@
 
     <button id="resetBtn" class="reset-btn" type="button">Reset</button>
 
+    <div id="devPanel" class="dev-panel" hidden aria-label="Dev controls">
+        <div class="dev-row">
+            <label for="devMove">MOVE_SPEED <span id="devMoveOut">5.0</span></label>
+            <input id="devMove" type="range" min="1" max="20" step="0.5" value="5">
+        </div>
+        <div class="dev-row">
+            <label for="devGrow">SPEED_GROWTH <span id="devGrowOut">0.35</span></label>
+            <input id="devGrow" type="range" min="0" max="2" step="0.05" value="0.35">
+        </div>
+        <button id="devCopy" class="dev-btn" type="button">Copy values</button>
+        <span id="devCopyMsg" class="dev-msg" aria-live="polite"></span>
+    </div>
+
     <p class="hint" id="hint">Drag to move the hole. Swallow small things to grow.</p>
 
     <script type="module" src="main.js"></script>

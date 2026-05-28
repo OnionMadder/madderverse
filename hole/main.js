@@ -20,8 +20,11 @@ const GROUND      = 64;     // ground plane is GROUND x GROUND world units
 const SPAWN_HALF  = 28;     // props scatter within +/- this from centre
 const HOLE_START  = 1.1;    // starting hole radius
 const GROWTH      = 0.10;   // hole radius gained per unit of prop size
-const MOVE_SPEED  = 5;      // hole travel speed (world units / second) — calm, kid-paced
-const SPEED_GROWTH= 0.35;   // gentle speed gain as the hole grows
+// Movement tuning lives in `dev` so the ?dev slider panel can live-edit it.
+const dev = {
+    MOVE_SPEED:   5,    // hole travel speed (world units/sec) — calm, kid-paced
+    SPEED_GROWTH: 0.35, // gentle speed gain as the hole grows
+};
 
 // Prop tiers: bigger props need a bigger hole before they can be
 // swallowed, which is the whole game loop — eat small, grow, eat big.
@@ -151,6 +154,39 @@ function hideHint() {
 
 document.getElementById("resetBtn").addEventListener("click", reset);
 
+// ?dev tuning panel — hidden in normal play, shown when the URL has ?dev.
+// Lets you dial in MOVE_SPEED / SPEED_GROWTH live, then copy the values.
+if (new URLSearchParams(location.search).has("dev")) {
+    const panel   = document.getElementById("devPanel");
+    const move    = document.getElementById("devMove");
+    const moveOut = document.getElementById("devMoveOut");
+    const grow    = document.getElementById("devGrow");
+    const growOut = document.getElementById("devGrowOut");
+    const copy    = document.getElementById("devCopy");
+    const copyMsg = document.getElementById("devCopyMsg");
+
+    panel.hidden = false;
+    move.value = dev.MOVE_SPEED;
+    moveOut.textContent = dev.MOVE_SPEED.toFixed(1);
+    grow.value = dev.SPEED_GROWTH;
+    growOut.textContent = dev.SPEED_GROWTH.toFixed(2);
+
+    move.addEventListener("input", e => {
+        dev.MOVE_SPEED = parseFloat(e.target.value);
+        moveOut.textContent = dev.MOVE_SPEED.toFixed(1);
+    });
+    grow.addEventListener("input", e => {
+        dev.SPEED_GROWTH = parseFloat(e.target.value);
+        growOut.textContent = dev.SPEED_GROWTH.toFixed(2);
+    });
+    copy.addEventListener("click", async () => {
+        const txt = `MOVE_SPEED=${dev.MOVE_SPEED}, SPEED_GROWTH=${dev.SPEED_GROWTH}`;
+        try { await navigator.clipboard.writeText(txt); copyMsg.textContent = "copied"; }
+        catch { copyMsg.textContent = txt; }
+        setTimeout(() => { copyMsg.textContent = ""; }, 2500);
+    });
+}
+
 // ---- HUD -------------------------------------------------------
 const hudSize  = document.getElementById("hudSize");
 const hudEaten = document.getElementById("hudEaten");
@@ -165,7 +201,7 @@ function frame(dt) {
     const dz = target.z - hole.position.z;
     const dist = Math.hypot(dx, dz);
     if (dist > 1e-4) {
-        const step = Math.min(dist, (MOVE_SPEED + holeR * SPEED_GROWTH) * dt);
+        const step = Math.min(dist, (dev.MOVE_SPEED + holeR * dev.SPEED_GROWTH) * dt);
         hole.position.x += (dx / dist) * step;
         hole.position.z += (dz / dist) * step;
     }
@@ -249,5 +285,5 @@ window.__hole = {
     tick(dt = 0.016) { frame(dt); },
     step(n = 60, dt = 0.016) { for (let i = 0; i < n; i++) frame(dt); },
     reset,
-    THREE, scene, camera,
+    THREE, scene, camera, dev,
 };

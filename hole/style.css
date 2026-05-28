@@ -92,3 +92,51 @@ html, body {
     transition: opacity 0.6s ease;
 }
 .hint.is-hidden { opacity: 0; pointer-events: none; }
+
+/* ?dev tuning panel — hidden in normal play, shown when the URL has ?dev. */
+.dev-panel {
+    position: fixed;
+    right: 14px;
+    bottom: 72px;
+    z-index: 12;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 220px;
+    max-width: 280px;
+    background: rgba(16, 19, 26, 0.6);
+    border-radius: 12px;
+    backdrop-filter: blur(4px);
+    font-size: 13px;
+}
+.dev-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.dev-row label {
+    display: flex;
+    justify-content: space-between;
+    font-variant-numeric: tabular-nums;
+}
+.dev-row input[type="range"] {
+    width: 100%;
+    margin: 0;
+}
+.dev-btn {
+    padding: 6px 10px;
+    font: inherit;
+    font-size: 13px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.14);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+.dev-btn:active { transform: scale(0.96); }
+.dev-msg {
+    min-height: 1em;
+    font-size: 12px;
+    opacity: 0.85;
+}
