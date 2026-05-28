@@ -6122,12 +6122,30 @@
                The offering on the RC dashboard must include all four
                pack products. */
             const offResult = await P.getOfferings();
-            const current = offResult && offResult.offerings && offResult.offerings.current;
-            const pkgs = (current && current.availablePackages) || [];
-            const pkg = pkgs.find(function (p) {
+            /* getOfferings() resolves to PurchasesOfferings DIRECTLY
+               ({ current, all }) — there is NO `.offerings` wrapper.
+               Reading offResult.offerings.current was the bug that made
+               every pack report "not available." */
+            const matches = function (p) {
                 return p && p.product && p.product.identifier === entId;
-            });
+            };
+            let pkgs = (offResult && offResult.current &&
+                        offResult.current.availablePackages) || [];
+            /* Fallback: if it's not in the "current" offering, scan all
+               offerings so a missing/misconfigured "current" pointer can't
+               block a product that really is set up to sell. */
+            if (!pkgs.some(matches) && offResult && offResult.all) {
+                Object.keys(offResult.all).forEach(function (k) {
+                    const o = offResult.all[k];
+                    if (o && o.availablePackages) pkgs = pkgs.concat(o.availablePackages);
+                });
+            }
+            const pkg = pkgs.find(matches);
             if (!pkg) {
+                console.warn("[CRAYte] no RC package for " + entId +
+                    " (current=" + (offResult && offResult.current ? "set" : "none") +
+                    ", offerings=" + (offResult && offResult.all ?
+                        Object.keys(offResult.all).length : 0) + ")");
                 alert("This pack isn't available right now. Try again later.");
                 return;
             }
