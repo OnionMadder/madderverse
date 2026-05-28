@@ -17,6 +17,9 @@
     --ink-dim:   rgba(243, 237, 230, 0.45);
     --ink-faint: rgba(243, 237, 230, 0.22);
     --accent:    #c98a64;   /* muted terracotta, used sparingly */
+    /* Dark translucent chip behind controls — readable over any backdrop. */
+    --chip:      rgba(24, 21, 18, 0.62);
+    --chip-hi:   rgba(44, 38, 32, 0.74);
     --font: "Quicksand", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -196,7 +199,7 @@ html, body {
     font-size: 0.8rem;
     letter-spacing: 0.03em;
     color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     border-radius: 999px;
     padding: 7px 16px;
@@ -218,7 +221,7 @@ html, body {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     color: var(--ink-dim);
     font-size: 18px;
@@ -231,7 +234,7 @@ html, body {
 .title-btn:focus-visible {
     color: var(--ink);
     border-color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--chip-hi);
     outline: none;
 }
 
@@ -247,7 +250,7 @@ html, body {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     color: var(--ink-dim);
     font-size: 20px;
@@ -260,7 +263,7 @@ html, body {
 .home:focus-visible {
     color: var(--ink);
     border-color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--chip-hi);
     outline: none;
 }
 
@@ -290,7 +293,7 @@ html, body {
     height: 38px;
     border-radius: 50%;
     border: 1px solid var(--ink-faint);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--chip);
     cursor: pointer;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -345,7 +348,7 @@ html, body {
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     border-radius: 999px;
     padding: 6px 18px;
@@ -417,7 +420,7 @@ html, body {
     font-size: 1rem;
     line-height: 1;
     color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     border-radius: 999px;
     cursor: pointer;
@@ -439,7 +442,7 @@ html, body {
     font-size: 0.72rem;
     letter-spacing: 0.03em;
     color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     border-radius: 999px;
     padding: 7px 13px;
@@ -468,7 +471,7 @@ html, body {
     height: 34px;
     border-radius: 50%;
     border: 1px solid var(--ink-faint);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--chip);
     cursor: pointer;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
@@ -552,7 +555,7 @@ html, body {
     font-size: 0.8rem;
     letter-spacing: 0.04em;
     color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     border-radius: 999px;
     padding: 9px 18px;
@@ -566,7 +569,7 @@ html, body {
 .tool-btn:focus-visible {
     color: var(--ink);
     border-color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.09);
+    background: var(--chip-hi);
     outline: none;
 }
 .tool-btn:active { transform: scale(0.97); }
@@ -591,8 +594,12 @@ html, body {
     font-size: 0.72rem;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--ink-dim);
-    padding: 0 4px;
+    color: rgba(243, 237, 230, 0.7);
+    background: var(--chip);
+    border-radius: 999px;
+    padding: 7px 14px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
 
 /* ---------- Gallery open button (top-right) ---------- */
@@ -607,7 +614,7 @@ html, body {
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     color: var(--ink-dim);
     font-size: 18px;
@@ -620,7 +627,7 @@ html, body {
 .gallery-open:focus-visible {
     color: var(--ink);
     border-color: var(--ink-dim);
-    background: rgba(255, 255, 255, 0.07);
+    background: var(--chip-hi);
     outline: none;
 }
 
@@ -709,9 +716,10 @@ html, body {
     gap: 0.5rem;
     padding: 6px 12px;
     padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
-    color: var(--ink-faint);
+    color: rgba(243, 237, 230, 0.5);
     font-size: 0.66rem;
     letter-spacing: 0.04em;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.75); /* readable over light backdrops */
     pointer-events: none;        /* let the scene own the space */
     user-select: none;
 }
