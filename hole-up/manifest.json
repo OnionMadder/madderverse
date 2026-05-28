@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "comment": "Hole-Up food catalog. Add a new food = drop a GLB into assets/Models/ and add one row here. 'weight' sets footprint (hence how big the hole must be to eat it, and how much it grows on eating). 'scale' is a per-item fine-tune on top of weight (default 1). 'eatAnimation' is single-piece (default) or multi-piece; multi-piece needs a 'parts' array naming child meshes that linger. 'unlock' is null (free) or { achievementId } / { price } for future cosmetic-pack gating — the purchase flow is NOT built yet.",
+  "weights": {
+    "comment": "Footprint (max horizontal size, world units) each weight tier is scaled to. The hole eats an item once it is wider than the item's footprint — that gate is emergent from the physics, not coded.",
+    "tiny": 1.2,
+    "small": 2.2,
+    "medium": 3.6,
+    "large": 5.6,
+    "giant": 8.5
+  },
+  "items": [
+    { "id": "strawberry",    "displayName": "Strawberry",   "modelPath": "assets/Models/strawberry.glb",    "scale": 1, "weight": "tiny",   "eatAnimation": "single-piece", "unlock": null },
+    { "id": "donut",         "displayName": "Donut",        "modelPath": "assets/Models/donut.glb",         "scale": 1, "weight": "tiny",   "eatAnimation": "single-piece", "unlock": null },
+    { "id": "cookie",        "displayName": "Cookie",       "modelPath": "assets/Models/cookie.glb",        "scale": 1, "weight": "tiny",   "eatAnimation": "single-piece", "unlock": null },
+    { "id": "egg",           "displayName": "Egg",          "modelPath": "assets/Models/egg.glb",           "scale": 1, "weight": "tiny",   "eatAnimation": "single-piece", "unlock": null },
+
+    { "id": "apple",         "displayName": "Apple",        "modelPath": "assets/Models/apple.glb",         "scale": 1, "weight": "small",  "eatAnimation": "single-piece", "unlock": null },
+    { "id": "banana",        "displayName": "Banana",       "modelPath": "assets/Models/banana.glb",        "scale": 1, "weight": "small",  "eatAnimation": "single-piece", "unlock": null },
+    { "id": "carrot",        "displayName": "Carrot",       "modelPath": "assets/Models/carrot.glb",        "scale": 1, "weight": "small",  "eatAnimation": "single-piece", "unlock": null },
+    { "id": "croissant",     "displayName": "Croissant",    "modelPath": "assets/Models/croissant.glb",     "scale": 1, "weight": "small",  "eatAnimation": "single-piece", "unlock": null },
+
+    { "id": "burger",        "displayName": "Burger",       "modelPath": "assets/Models/burger.glb",        "scale": 1, "weight": "medium", "eatAnimation": "single-piece", "unlock": null },
+    { "id": "taco",          "displayName": "Taco",         "modelPath": "assets/Models/taco.glb",          "scale": 1, "weight": "medium", "eatAnimation": "single-piece", "unlock": null },
+    { "id": "pie",           "displayName": "Pie",          "modelPath": "assets/Models/pie.glb",           "scale": 1, "weight": "medium", "eatAnimation": "single-piece", "unlock": null },
+    { "id": "sub",           "displayName": "Sub Sandwich", "modelPath": "assets/Models/sub.glb",           "scale": 1, "weight": "medium", "eatAnimation": "single-piece", "unlock": null },
+
+    { "id": "watermelon",    "displayName": "Watermelon",   "modelPath": "assets/Models/watermelon.glb",    "scale": 1, "weight": "large",  "eatAnimation": "single-piece", "unlock": null },
+    { "id": "cake-birthday", "displayName": "Birthday Cake","modelPath": "assets/Models/cake-birthday.glb", "scale": 1, "weight": "large",  "eatAnimation": "single-piece", "unlock": null },
+    { "id": "pumpkin",       "displayName": "Pumpkin",      "modelPath": "assets/Models/pumpkin.glb",       "scale": 1, "weight": "large",  "eatAnimation": "single-piece", "unlock": null },
+    { "id": "turkey",        "displayName": "Turkey",       "modelPath": "assets/Models/turkey.glb",        "scale": 1, "weight": "large",  "eatAnimation": "single-piece", "unlock": null }
+  ]
+}

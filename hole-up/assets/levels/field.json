@@ -1,0 +1,13 @@
+{
+  "id": "field",
+  "name": "Open Field",
+  "comment": "Default level. 'items' are hand-placed food (id + x/z + optional rot/scale) from the editor. 'scatter' procedurally fills the field with random food of each weight (this reproduces the original prototype's random field). A level can use either or both. 'field' overrides the scatter radius.",
+  "field": 26,
+  "items": [],
+  "scatter": [
+    { "weight": "tiny",   "count": 70 },
+    { "weight": "small",  "count": 38 },
+    { "weight": "medium", "count": 16 },
+    { "weight": "large",  "count": 7 }
+  ]
+}
