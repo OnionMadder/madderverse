@@ -11,14 +11,14 @@ const ctx = canvas.getContext("2d");
 const hintEl = document.getElementById("hint");
 
 let W = 0, H = 0, DPR = 1;
-let anchor, shelfY, groundY;
+let anchor, shelfY, shelfYs, groundY;
 
 const GRAV = 0.42;        // marble gravity (px / frame^2)
 const SHARD_GRAV = 0.34;  // shards fall a touch slower — reads as light "glass"
 const MAX_PULL = 145;     // how far back you can stretch the sling
 const LAUNCH_K = 0.205;   // pull distance -> launch speed
 
-let target = null;        // the current glass trinket (an offscreen canvas)
+let trinkets = [];        // every trinket on the shelves (broken ones removed — no respawn)
 let basket = null;        // catch-basket for skill levels (null when none)
 let shards = [];          // flying + settled shards (the settled ones are the pile)
 let ball = null;
@@ -38,8 +38,9 @@ function resize() {
   layout();
 }
 function layout() {
-  anchor = { x: Math.max(95, W * 0.13), y: H - 155 };
-  shelfY = H * 0.42;
+  anchor = { x: W / 2, y: H - 155 };          // slingshot centered: shoot left or right
+  shelfYs = [H * 0.22, H * 0.40, H * 0.58];   // three shelves spanning the full width
+  shelfY = shelfYs[1];                          // legacy single-shelf ref (slingshot/aim)
   groundY = H - 54;
   if (ball && !ball.flying) { ball.x = anchor.x; ball.y = anchor.y; }
 }
@@ -301,7 +302,7 @@ async function loadAssets() {
     }
   }
   assetsReady = ROSTER.length > 0;
-  if (assetsReady && target) spawnTarget();   // upgrade the on-screen trinket
+  if (assetsReady && trinkets.length) populateLevel();   // upgrade to real-image trinkets
 }
 
 let bgImage = null;
@@ -318,22 +319,33 @@ async function loadShooters() {
   }
 }
 
-function makeTarget() {
-  // displaySide sets a consistent visual AREA per item (scaled below), so a wide
-  // horse and a round flower read as similar-sized rather than fit-to-box.
-  const displaySide = clamp(Math.min(W, H) * 0.15, 50, 150);
-  const pad = Math.round(displaySide * 0.14);   // breathing room for the shatter box
+let duckItem = null;             // single duck sprite used as the L3/L4 target
+async function loadDuck() {
+  try {
+    const img = await loadImage("assets/trinkets/duck.png");
+    const items = extractItems(img);
+    if (items[0]) { duckItem = items[0]; duckItem.material = "duck"; }
+    if (duckItem && LEVELS[levelIndex] && LEVELS[levelIndex].specific === "duck") populateLevel();
+  } catch (e) { console.warn("glass-gallery: no duck —", e.message); }
+}
+
+// one trinket, bottom-aligned to shelf `shy`, centered at `cx`
+function makeTrinket(cx, shy, moving, isDuck) {
+  const displaySide = clamp(Math.min(W, H) * 0.12, 44, 120);   // smaller — shelves are packed
+  const pad = Math.round(displaySide * 0.14);
+
+  let it = null;
+  if (isDuck && duckItem) it = duckItem;                       // L3/L4 target
+  else if (assetsReady && ROSTER.length) it = ROSTER[(Math.random() * ROSTER.length) | 0];
 
   let dw, dh, paint, material = "glass";
-  if (assetsReady && ROSTER.length) {
-    const it = ROSTER[(Math.random() * ROSTER.length) | 0];
+  if (it) {
     material = it.material || "glass";
     const scale = Math.sqrt((displaySide * displaySide) / (it.sw * it.sh));
     dw = Math.round(it.sw * scale);
     dh = Math.round(it.sh * scale);
     paint = octx => octx.drawImage(it.img, pad, pad, dw, dh);
   } else {
-    // procedural fallback — keeps the prototype playable until the sheets land
     dw = dh = Math.round(displaySide);
     paint = (octx, ow, oh) => drawGlass(octx, SHAPES[(Math.random() * SHAPES.length) | 0], ow, oh);
   }
@@ -345,27 +357,37 @@ function makeTarget() {
   const octx = oc.getContext("2d", { willReadFrequently: true });
   paint(octx, ow, oh);
 
-  // moving levels: drift horizontally along the shelf (player must lead the shot)
-  const moving = !!(LEVELS[levelIndex] && LEVELS[levelIndex].moving);
   const driftSpeed = clamp(W * 0.0045, 1.8, 4.5);
-
   return {
-    img: oc,
-    octx,
-    w: ow,
-    h: oh,
-    x: clamp(W * 0.52 - ow / 2 + (Math.random() - 0.5) * W * 0.3, W * 0.12, W - ow - 18),
-    y: Math.round(shelfY - oh + pad + 3),   // item's bottom edge sits on the shelf
+    img: oc, octx, w: ow, h: oh,
+    x: Math.round(cx - ow / 2),
+    y: Math.round(shy - oh + pad + 3),       // bottom edge rests on the shelf
     vx: moving ? (Math.random() < 0.5 ? -driftSpeed : driftSpeed) : 0,
-    data: octx.getImageData(0, 0, ow, oh).data,   // cached alpha for hit-test + cull
+    data: octx.getImageData(0, 0, ow, oh).data,
     born: performance.now(),
-    material,
-    hp: mat.hp,
-    maxHp: mat.hp,
-    hitFlash: 0
+    material, hp: mat.hp, maxHp: mat.hp, hitFlash: 0
   };
 }
-function spawnTarget() { target = makeTarget(); }
+
+// fill all three full-width shelves with trinkets for the current level
+function populateLevel() {
+  trinkets = [];
+  const L = LEVELS[levelIndex] || {};
+  const moving = !!L.moving;
+  const displaySide = clamp(Math.min(W, H) * 0.12, 44, 120);
+  const cellW = displaySide * 1.3 + 8;                         // approx footprint + gap
+  const perShelf = Math.max(4, Math.floor(W / cellW));
+  const gap = W / perShelf;
+  const slots = [];
+  for (const shy of shelfYs) for (let i = 0; i < perShelf; i++) slots.push([gap * (i + 0.5), shy]);
+  // duck levels: scatter enough ducks among the regular trinkets to clear the goal
+  const duckIdx = new Set();
+  if (L.specific === "duck" && duckItem) {
+    const want = Math.min(slots.length, (L.goal || 5) + 4);
+    while (duckIdx.size < want) duckIdx.add((Math.random() * slots.length) | 0);
+  }
+  slots.forEach(([cx, shy], i) => trinkets.push(makeTrinket(cx, shy, moving, duckIdx.has(i))));
+}
 
 /* alpha at an offscreen pixel (0..255) */
 function alphaAt(t, lx, ly) {
@@ -374,17 +396,15 @@ function alphaAt(t, lx, ly) {
 }
 
 /* a hit: heavier shooters deal more damage; the trinket breaks only when hp runs out */
-function damageTarget(ix, iy) {
-  const t = target;
+function damageTrinket(t, ix, iy) {
   if (!t || phase !== "playing") return;
   t.hp -= (SHOOTERS[activeShooter] || { power: 1 }).power;
-  if (t.hp <= 0) shatter(ix, iy);                          // TODO: dispatch on material.break
+  if (t.hp <= 0) shatter(t, ix, iy);                       // TODO: dispatch on material.break
   else { t.hitFlash = performance.now(); playClink(); }    // survived — crack feedback
 }
 
 /* ---------- the smash ---------- */
-function shatter(ix, iy) {
-  const t = target;
+function shatter(t, ix, iy) {
   if (!t) return;
   const lix = ix - t.x, liy = iy - t.y;
 
@@ -428,18 +448,20 @@ function shatter(ix, iy) {
 
   if (shards.length > 170) shards.splice(0, shards.length - 170);  // cap the pile
   playShatter();
-  target = null;
-  respawnAt = performance.now() + 850;
-  onTrinketBroken();   // count it toward the level goal
+  const idx = trinkets.indexOf(t);
+  if (idx >= 0) trinkets.splice(idx, 1);   // broken trinkets do NOT respawn
+  onTrinketBroken(t);   // count it toward the level goal (duck levels: ducks only)
 }
 
 /* ---------- per-frame updates ---------- */
-function updateTarget() {
-  if (!target || !target.vx) return;
-  target.x += target.vx;
-  const minX = W * 0.06, maxX = W - target.w - W * 0.06;
-  if (target.x < minX) { target.x = minX; target.vx = Math.abs(target.vx); }
-  else if (target.x > maxX) { target.x = maxX; target.vx = -Math.abs(target.vx); }
+function updateTrinkets() {
+  for (const t of trinkets) {
+    if (!t.vx) continue;
+    t.x += t.vx;
+    const minX = W * 0.06, maxX = W - t.w - W * 0.06;
+    if (t.x < minX) { t.x = minX; t.vx = Math.abs(t.vx); }
+    else if (t.x > maxX) { t.x = maxX; t.vx = -Math.abs(t.vx); }
+  }
 }
 
 function updateBall() {
@@ -449,9 +471,8 @@ function updateBall() {
     ball.vy += GRAV / STEPS;
     ball.x += ball.vx / STEPS;
     ball.y += ball.vy / STEPS;
-    if (target) {
-      const lx = ball.x - target.x, ly = ball.y - target.y;
-      if (alphaAt(target, lx, ly) > 40) { damageTarget(ball.x, ball.y); resetBall(); return; }
+    for (const t of trinkets) {
+      if (alphaAt(t, ball.x - t.x, ball.y - t.y) > 40) { damageTrinket(t, ball.x, ball.y); resetBall(); return; }
     }
   }
   if (ball.x < -50 || ball.x > W + 50 || ball.y > H + 60) resetBall();
@@ -500,8 +521,7 @@ function drawShards() {
     ctx.restore();
   }
 }
-function drawTarget() {
-  const t = target;
+function drawTrinket(t) {
   const age = (performance.now() - t.born) / 260;
   const s = age < 1 ? 0.6 + 0.4 * easeOut(age) : 1;   // little pop-in
   const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
@@ -511,27 +531,29 @@ function drawTarget() {
   const jy = (Math.random() - 0.5) * 11 * shake;
   ctx.save();
   ctx.globalAlpha = age < 1 ? easeOut(age) : 1;
-  ctx.shadowColor = "rgba(0,0,0,0.4)";
-  ctx.shadowBlur = 20;
-  ctx.shadowOffsetY = 10;
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 7;
   ctx.translate(cx + jx, cy + jy); ctx.scale(s, s); ctx.translate(-cx, -cy);
   ctx.drawImage(t.img, t.x, t.y);
   ctx.restore();
 }
-function drawShelf() {
-  const x = W * 0.1, w = W * 0.8, y = shelfY, h = 18;
-  ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = 14;
-  ctx.shadowOffsetY = 6;
-  const g = ctx.createLinearGradient(0, y, 0, y + h);
-  g.addColorStop(0, "#b07a44");
-  g.addColorStop(1, "#6e431f");
-  ctx.fillStyle = g;
-  roundRect(ctx, x, y, w, h, 6); ctx.fill();
-  ctx.restore();
-  ctx.fillStyle = "rgba(255,255,255,0.2)";
-  roundRect(ctx, x, y, w, 5, 3); ctx.fill();
+function drawShelves() {
+  for (const y of shelfYs) {
+    const h = 16;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 5;
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, "#b07a44");
+    g.addColorStop(1, "#6e431f");
+    ctx.fillStyle = g;
+    roundRect(ctx, -6, y, W + 12, h, 4); ctx.fill();   // full width, slight overhang
+    ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    roundRect(ctx, -6, y, W + 12, 5, 2); ctx.fill();
+  }
 }
 function drawSling() {
   ctx.strokeStyle = "#3a2a1a";
@@ -646,11 +668,11 @@ function render() {
     ctx.fillRect(0, 0, W, H);
   }
 
-  drawShelf();
+  drawShelves();
   if (basket) drawBasket();
   drawShards();
   if (basket) drawBasketFront();
-  if (target) drawTarget();
+  for (const t of trinkets) drawTrinket(t);
   drawSling();
   if (ball) drawBall();
   if (aiming) drawAim();
@@ -784,16 +806,16 @@ function playCatch() {
 }
 
 /* ---------- levels + progression ----------
-   The 5-level tutorial. The SPINE (goal count, timer, win/lose, advance, HUD)
-   works for every level now; the per-level MODIFIERS (moving / specific /
-   basket) are flags here but not implemented yet — those are the next step,
-   so L2–L5 currently play as "break N in time". */
+   5-level tutorial across 3 full-width shelves (broken trinkets don't respawn).
+   WORKING: break-goal, timer, basket/skill scoring, moving drift.
+   STUBBED: `specific:"duck"` targeting (L3/L4 currently count ANY break) and the
+   L5 jumbo+hand boss (plays as a normal break level for now). */
 const LEVELS = [
-  { name: "Smash!",        goal: 5, time: 30, hint: "Break 5 trinkets!" },
-  { name: "Moving Day",    goal: 5, time: 35, moving: true,   hint: "Break 5 — they're moving!" },
-  { name: "Take Aim",      goal: 5, time: 40, specific: true, hint: "Break only the right ones" },
-  { name: "In the Basket", goal: 12, time: 45, basket: true, goalType: "catch", hint: "Knock 12 shards into the basket" },
-  { name: "Showtime",      goal: 15, time: 60, moving: true, basket: true, goalType: "catch", hint: "Shards in the basket — on the move!" }
+  { name: "Smash!",       goal: 5,  time: 60, hint: "Break 5 trinkets!" },
+  { name: "Moving Day",   goal: 5,  time: 60, moving: true, hint: "Break 5 — the shelves are moving!" },
+  { name: "Duck Hunt",    goal: 5,  time: 70, basket: true, specific: "duck", hint: "Break 5 ducks — land the pieces in the basket" },
+  { name: "Moving Ducks", goal: 5,  time: 70, moving: true, basket: true, specific: "duck", hint: "Break 5 moving ducks into the basket" },
+  { name: "The Big One",  goal: 10, time: 75, jumbo: true, hand: true, basket: true, hint: "Smash the jumbo 10× — dodge the hand!" }
 ];
 let levelIndex = 0, goalTotal = 0, goalDone = 0, timeLeft = 0, score = 0, phase = "playing";
 
@@ -828,18 +850,21 @@ function loadLevel(i) {
   if (levelIndex === 0) score = 0;          // fresh run resets score
   goalTotal = L.goal; goalDone = 0; timeLeft = L.time; phase = "playing";
   if (L.shooter) activeShooter = L.shooter;
-  shards = []; target = null; respawnAt = 0;
+  shards = [];
   basket = L.basket ? makeBasket() : null;
   resetBall();
-  spawnTarget();
+  populateLevel();
   hintEl.textContent = L.hint; hintEl.style.opacity = "1"; launched = false;
   hideOverlay();
   updateHUD();
 }
-function onTrinketBroken() {
+function onTrinketBroken(t) {
   if (phase !== "playing") return;
   score += 10;
-  if ((LEVELS[levelIndex].goalType || "break") === "break") {
+  const L = LEVELS[levelIndex];
+  const isBreakGoal = (L.goalType || "break") === "break";
+  const matchesTarget = !L.specific || (t && t.material === L.specific);   // duck levels: ducks only
+  if (isBreakGoal && matchesTarget) {
     goalDone++;
     if (goalDone >= goalTotal) winLevel();
   }
@@ -876,8 +901,7 @@ function tick(now) {
   if (phase === "playing") {
     timeLeft -= dt;
     if (timeLeft <= 0) { timeLeft = 0; loseLevel(); }
-    if (!target && respawnAt && now >= respawnAt && goalDone < goalTotal) { spawnTarget(); respawnAt = 0; }
-    updateTarget();
+    updateTrinkets();
   }
   updateBall();
   updateShards();
@@ -892,15 +916,16 @@ requestAnimationFrame(tick);
 loadAssets();   // async; when the sheets land, ROSTER fills and the next spawn uses them
 loadBackground();
 loadShooters();
+loadDuck();
 loadSounds();
 
 // TEMP dev control: number keys 1/2/3 switch shooter until the picker UI ships
 const SHOOTER_KEYS = { "1": "glass", "2": "metal", "3": "electric" };
 window.addEventListener("keydown", e => { if (SHOOTER_KEYS[e.key]) activeShooter = SHOOTER_KEYS[e.key]; });
 
-// poke from the console: __glass.shatter(x,y), __glass.shards, __glass.target, __glass.setShooter('metal')
+// poke from the console: __glass.trinkets, __glass.breakAt(0), __glass.loadLevel(i), __glass.setShooter('metal')
 window.__glass = {
-  get target() { return target; },
+  get trinkets() { return trinkets; },
   get shards() { return shards; },
   get shooter() { return activeShooter; },
   get roster() { return ROSTER; },
@@ -909,5 +934,5 @@ window.__glass = {
   get basket() { return basket; },
   setShooter(t) { if (SHOOTERS[t]) activeShooter = t; },
   loadLevel,
-  shatter
+  breakAt(n) { const t = trinkets[n || 0]; if (t) shatter(t, t.x + t.w / 2, t.y + t.h / 2); }
 };
