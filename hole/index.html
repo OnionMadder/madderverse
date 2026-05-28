@@ -3,11 +3,34 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Hole (prototype)</title>
+    <title>Hole</title>
 
-    <link rel="stylesheet" href="style.css" />
+    <link rel="canonical" href="https://madderverse.org/hole/" />
+    <meta property="og:url" content="https://madderverse.org/hole/" />
+    <meta name="twitter:url" content="https://madderverse.org/hole/" />
+    <meta name="title" content="Hole — gobble up the whole world" />
+    <meta name="description" content="Drag a hole around and swallow everything to grow — then eat even bigger things!" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Hole" />
+    <meta property="og:description" content="Drag a hole around and swallow everything to grow — then eat even bigger things!" />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Hole" />
+    <meta name="twitter:description" content="Drag a hole around and swallow everything to grow — then eat even bigger things!" />
 
-    <!-- Three.js + cannon-es, vendored locally so the prototype runs offline. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#9fd3ff" />
+    <meta name="apple-mobile-web-app-title" content="Hole" />
+    <meta name="application-name" content="Hole" />
+
+    <link rel="stylesheet" href="style.css?v=2" />
+
+    <!-- Three.js + cannon-es, vendored locally so the game runs offline. -->
     <script type="importmap">
     {
       "imports": {
@@ -17,6 +40,8 @@
       }
     }
     </script>
+
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 
 <body>
@@ -46,6 +71,13 @@
 
     <p class="hint" id="hint">Loading food&hellip;</p>
 
+    <footer class="footer" aria-label="Site info">
+        <span>&copy; <span data-year>2026</span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../">The Madderverse</a>
+    </footer>
+
     <script type="module" src="main.js"></script>
+    <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
