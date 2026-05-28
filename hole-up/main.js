@@ -26,7 +26,7 @@ import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-const VERSION = "holeup3";   // cache-buster for fetched data + dynamic imports
+const VERSION = "holeup4";   // cache-buster for fetched data + dynamic imports
 
 // ---- Tunables --------------------------------------------------
 const R0    = 0.9;   // starting hole radius
@@ -34,8 +34,8 @@ const ROUT  = 70;    // floor annulus outer radius (huge: always covers the fiel
 const NSEG  = 56;    // wedge count -> roundness of the rim
 const PIT   = 10;    // pit depth
 const G     = -22;   // gravity
-const FIELD = 26;    // props scatter within this radius (default; a level can override)
-const HMAX  = 26;    // hole roams within this radius
+const FIELD = 24;    // square scatter half-extent (a level can override; clamped to PLAY)
+const PLAY  = 24;    // SQUARE play boundary: hole clamps to +-PLAY, wall is drawn here, no spawns past it
 const RMAX  = 14;    // hole can't grow past this
 
 // Weight -> in-game footprint (max horizontal size the model is scaled to).
@@ -51,30 +51,30 @@ const DEFAULT_LEVEL = {
     field: FIELD,
     items: [],
     scatter: [
-        { weight: "tiny",   count: 70 },
-        { weight: "small",  count: 38 },
-        { weight: "medium", count: 16 },
-        { weight: "large",  count: 7 },
+        { weight: "tiny",   count: 140 },
+        { weight: "small",  count: 90 },
+        { weight: "medium", count: 48 },
+        { weight: "large",  count: 18 },
     ],
 };
 
 // Live-tunable feel knobs. DEV_TUNABLES drives the self-building ?dev panel,
 // so adding a knob = one row here + read dev.KEY where you need it.
 const dev = {
-    STICK:   20,    // how tightly the hole rides under the cursor (higher = glued)
-    SCROLL:  2,     // how fast the view chases the hole = your travel speed
+    STICK:   40,    // how tightly the hole rides under the cursor (higher = glued)
+    SCROLL:  0.75,  // edge-pan speed (only scrolls when you steer to the screen edge)
     GROWTH:  0.01,  // hole radius gained per unit of swallowed footprint
-    SUCTION: 25,    // pull toward the hole (constant force -> light food zips in, heavy resists)
-    REACH:   3,     // suction radius as a multiple of the hole radius
-    GRAVITY: 22,    // fall acceleration
+    SUCTION: 46,    // pull toward the hole (constant force -> light food zips in, heavy resists)
+    REACH:   3.25,  // suction radius as a multiple of the hole radius
+    GRAVITY: 50,    // fall acceleration
 };
 const DEV_TUNABLES = [
-    { key: "STICK",   label: "Stick",   min: 5,     max: 40,   step: 1 },
-    { key: "SCROLL",  label: "Scroll",  min: 0.5,   max: 8,    step: 0.25 },
+    { key: "STICK",   label: "Stick",   min: 5,     max: 80,   step: 1 },
+    { key: "SCROLL",  label: "Scroll",  min: 0.25,  max: 8,    step: 0.25 },
     { key: "GROWTH",  label: "Growth",  min: 0.005, max: 0.15, step: 0.005 },
     { key: "SUCTION", label: "Suction", min: 0,     max: 100,  step: 1 },
     { key: "REACH",   label: "Reach",   min: 1,     max: 6,    step: 0.25 },
-    { key: "GRAVITY", label: "Gravity", min: 5,     max: 50,   step: 1 },
+    { key: "GRAVITY", label: "Gravity", min: 5,     max: 100,  step: 1 },
 ];
 
 const params  = new URLSearchParams(location.search);
@@ -101,6 +101,24 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { near: 1, far: 120, left: -30, right: 30, top: 30, bottom: -30 });
 scene.add(sun, sun.target);
+
+// ---- Play-area wall: a visible boundary the hole can't cross ----
+// Fixed at the origin (the play square never moves); the hole roams inside
+// it and food only spawns inside it. Comes into view as you reach the edge.
+{
+    const wallMatB = new THREE.MeshStandardMaterial({ color: 0xe07a3c, roughness: 0.9 });
+    const wh = 2.4, wt = 0.8, span = PLAY * 2 + wt;
+    const wall = (w, d, x, z) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, wh, d), wallMatB);
+        m.position.set(x, wh / 2, z);
+        m.castShadow = true; m.receiveShadow = true;
+        scene.add(m);
+    };
+    wall(span, wt, 0,  PLAY);   // +Z edge
+    wall(span, wt, 0, -PLAY);   // -Z edge
+    wall(wt, span,  PLAY, 0);   // +X edge
+    wall(wt, span, -PLAY, 0);   // -X edge
+}
 
 // ---- Materials -------------------------------------------------
 const groundMat   = new THREE.MeshStandardMaterial({ color: 0x86c96a, roughness: 1, side: THREE.DoubleSide });
@@ -134,9 +152,11 @@ function rebuild(r) {
     ringMesh = new THREE.Mesh(new THREE.RingGeometry(r, ROUT, 120), groundMat);
     ringMesh.rotation.x = -Math.PI / 2;
     ringMesh.receiveShadow = true;
-    wallMesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.78, PIT, 96, 1, true), wallMat);
+    // Pit flares WIDER going down (a cone) so items spread out below the lip
+    // instead of bottlenecking at the opening.
+    wallMesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 2.2, PIT, 96, 1, true), wallMat);
     wallMesh.position.y = -PIT / 2;
-    pitFloorMesh = new THREE.Mesh(new THREE.CircleGeometry(r * 0.78, 96), pitFloorMat);
+    pitFloorMesh = new THREE.Mesh(new THREE.CircleGeometry(r * 2.2, 96), pitFloorMat);
     pitFloorMesh.rotation.x = -Math.PI / 2;
     pitFloorMesh.position.y = -PIT;
     holeGroup.add(ringMesh, wallMesh, pitFloorMesh);
@@ -236,7 +256,7 @@ function spawn(itemId, x, z, opts = {}) {
     body.sleepTimeLimit = 0.5;
     world.addBody(body);
 
-    const p = { mesh, body, size: target, itemId, weight: item.weight, eat: item.eatAnimation || "single-piece", parts: item.parts || null, counted: false };
+    const p = { mesh, body, size: target, itemId, weight: item.weight, eat: item.eatAnimation || "single-piece", parts: item.parts || null, counted: false, ghosted: false };
     props.push(p);
     return p;
 }
@@ -284,6 +304,19 @@ function runScatter(recipe, fieldR) {
     }
 }
 
+// Respawn one item of a weight at a random spot inside the play square, away
+// from the hole — called on each eat so the field never empties.
+function respawnLike(weight) {
+    const pool = itemsByWeight(weight);
+    if (!pool.length) return;
+    const id = pool[(Math.random() * pool.length) | 0];
+    const target = WEIGHT_FOOTPRINT[weight] ?? 1.2;
+    let x, z, tries = 0;
+    do { x = (Math.random() * 2 - 1) * PLAY; z = (Math.random() * 2 - 1) * PLAY; tries++; }
+    while (Math.hypot(x - H.x, z - H.z) < R + target + 4 && tries < 24);
+    spawn(id, x, z);
+}
+
 // ---- Levels ----------------------------------------------------
 let currentLevel = DEFAULT_LEVEL;
 
@@ -297,7 +330,7 @@ function loadLevel(level) {
     steerActive = false;
     camHeight = 6 + R * 4;
     rebuild(R);
-    const fieldR = currentLevel.field ?? FIELD;
+    const fieldR = Math.min(currentLevel.field ?? FIELD, PLAY);
     if (Array.isArray(currentLevel.items))
         for (const it of currentLevel.items) spawn(it.id, it.x, it.z, { rot: it.rot, scale: it.scale });
     if (Array.isArray(currentLevel.scatter)) runScatter(currentLevel.scatter, fieldR);
@@ -401,8 +434,8 @@ function frame(dt) {
     if (steerActive) { const g = groundAtScreen(cx, cy, _t); if (g) target.copy(g); }
     H.x += (target.x - H.x) * Math.min(1, dev.STICK * dt);
     H.z += (target.z - H.z) * Math.min(1, dev.STICK * dt);
-    const hd = Math.hypot(H.x, H.z);
-    if (hd > HMAX) { H.x *= HMAX / hd; H.z *= HMAX / hd; }
+    H.x = Math.max(-PLAY, Math.min(PLAY, H.x));   // square play boundary
+    H.z = Math.max(-PLAY, Math.min(PLAY, H.z));
 
     moveHole();
     world.gravity.y = -dev.GRAVITY;
@@ -432,12 +465,15 @@ function frame(dt) {
         const p = props[i];
         p.mesh.position.copy(p.body.position);
         p.mesh.quaternion.copy(p.body.quaternion);
+        // Past the lip -> go ghost so falling items don't jam each other.
+        if (!p.ghosted && p.body.position.y < -0.8) { p.body.collisionResponse = false; p.ghosted = true; }
         if (!p.counted && p.body.position.y < -1.5) {
             p.counted = true;
             eaten++;
             R = Math.min(RMAX, R + p.size * dev.GROWTH);
             grew = true;
             onEaten(p);
+            respawnLike(p.weight);   // keep the field full
         }
         if (p.body.position.y < -(PIT + 5)) { scene.remove(p.mesh); world.removeBody(p.body); props.splice(i, 1); }
     }
@@ -452,12 +488,20 @@ function frame(dt) {
         if (k >= 1) { scene.remove(L.obj); lingerers.splice(i, 1); }
     }
 
-    // The view focus eases toward the hole; that chase IS your travel speed
-    // (SCROLL). The hole leads the focus, riding under the cursor.
-    camFocus.x += (H.x - camFocus.x) * Math.min(1, dev.SCROLL * dt);
-    camFocus.z += (H.z - camFocus.z) * Math.min(1, dev.SCROLL * dt);
+    // Edge-pan: the view holds still while the hole is in the central dead
+    // zone and only scrolls once the hole nears the screen edge. The dead zone
+    // scales with zoom (a fraction of what's visible). SCROLL = pan speed.
     camHeight += ((6 + R * 4) - camHeight) * Math.min(1, dt * 3);
     const camBack = 5 + R * 3.2;
+    const visHalf = Math.hypot(camHeight, camBack) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const dead = visHalf * 0.6;
+    const ox = H.x - camFocus.x, oz = H.z - camFocus.z;
+    const od = Math.hypot(ox, oz);
+    if (od > dead) {
+        const pan = (od - dead) * Math.min(1, dev.SCROLL * dt);
+        camFocus.x += (ox / od) * pan;
+        camFocus.z += (oz / od) * pan;
+    }
     camera.position.set(camFocus.x, camHeight, camFocus.z + camBack);
     camera.lookAt(camFocus.x, 0, camFocus.z);
 
@@ -556,7 +600,7 @@ const handle = {
     get level() { return currentLevel; },
     get hole() { return { x: +H.x.toFixed(2), z: +H.z.toFixed(2), r: +R.toFixed(2) }; },
     get cam() { return { x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) }; },
-    setHole(x, z) { H.set(x, 0, z); const d = Math.hypot(H.x, H.z); if (d > HMAX) { H.x *= HMAX / d; H.z *= HMAX / d; } },
+    setHole(x, z) { H.set(x, 0, z); H.x = Math.max(-PLAY, Math.min(PLAY, H.x)); H.z = Math.max(-PLAY, Math.min(PLAY, H.z)); },
     nearest(maxSize) { let best = null, bd = 1e9; for (const p of props) { if (maxSize && p.size > maxSize) continue; const d = Math.hypot(p.body.position.x - H.x, p.body.position.z - H.z); if (d < bd) { bd = d; best = p; } } return best ? { x: +best.body.position.x.toFixed(2), z: +best.body.position.z.toFixed(2), size: best.size, id: best.itemId, y: +best.body.position.y.toFixed(2) } : null; },
     step(n = 60, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); },
     tiltOf,

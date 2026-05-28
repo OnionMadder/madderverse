@@ -1,13 +1,13 @@
 {
   "id": "field",
   "name": "Open Field",
-  "comment": "Default level. 'items' are hand-placed food (id + x/z + optional rot/scale) from the editor. 'scatter' procedurally fills the field with random food of each weight (this reproduces the original prototype's random field). A level can use either or both. 'field' overrides the scatter radius.",
-  "field": 26,
+  "comment": "Default level. 'items' are hand-placed food (id + x/z + optional rot/scale) from the editor. 'scatter' procedurally fills the square field with random food of each weight. 'field' is the square half-extent and is clamped to the play boundary (PLAY) in main.js. Eaten food respawns to keep the field full.",
+  "field": 24,
   "items": [],
   "scatter": [
-    { "weight": "tiny",   "count": 70 },
-    { "weight": "small",  "count": 38 },
-    { "weight": "medium", "count": 16 },
-    { "weight": "large",  "count": 7 }
+    { "weight": "tiny",   "count": 140 },
+    { "weight": "small",  "count": 90 },
+    { "weight": "medium", "count": 48 },
+    { "weight": "large",  "count": 18 }
   ]
 }
