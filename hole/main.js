@@ -1,25 +1,25 @@
 /* ============================================================
-   Hole — the real game (chunk 1: core loop)
+   Hole — the real game (chunk 2: real models)
    ------------------------------------------------------------
    REAL hole + REAL physics (cannon-es). The round pit is a
    KINEMATIC floor (NSEG wedge boxes, inner faces at radius R ->
    clean circle) that follows the hole position H every frame,
    sliding under a field of dynamic props. Props rest until the
    hole's gap reaches them, then teeter on the round rim and tumble
-   in — emergent, no scripting. Eating a prop grows the hole.
+   in — emergent. Eating a prop grows the hole; the "right size to
+   enter" rule is FREE (a prop bridges the rim until the hole is
+   wider than it). Steering = instant-halt screen drag; the camera
+   follows the hole so it stays centred and the world scrolls past.
 
-   The "right size to enter" rule is FREE: a wide prop bridges a
-   small hole (rests on the rim all around) and only falls once the
-   hole is wider than it. Steering = instant-halt screen drag. The
-   camera follows H, so the hole stays centred and the world scrolls
-   past it (hole.io look).
-
-   Placeholder cubes for now — swap makeMesh() to load .glb later.
-   Tunables live in `dev`; add ?dev to the URL for live sliders.
+   Props are Kenney "Food Kit" GLBs (CC0). Each model is loaded once,
+   recentred on its bounding box, then cloned per prop, scaled to its
+   tier's target footprint, with a box collider from the scaled bbox.
+   Tunables live in `dev`; add ?dev for live sliders.
    ============================================================ */
 
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 // ---- Tunables --------------------------------------------------
 const R0    = 0.9;   // starting hole radius
@@ -33,15 +33,16 @@ const RMAX  = 14;    // hole can't grow past this
 
 const dev = {
     SENS:   0.045,  // steer sensitivity (world units per screen px, at base zoom)
-    GROWTH: 0.045,  // hole radius gained per unit of swallowed prop size
+    GROWTH: 0.045,  // hole radius gained per unit of swallowed prop footprint
 };
 
-// Prop tiers (size = cube edge; a prop falls once R exceeds ~its half-width).
+// Prop tiers: target = in-game footprint (max horizontal size) the model
+// is scaled to; pool = which Food Kit models can appear at that size.
 const TIERS = [
-    { size: 1.0, color: 0x7bc86c, count: 80 }, // tiny   — eat from the start
-    { size: 2.0, color: 0xf2b134, count: 40 }, // small
-    { size: 3.4, color: 0xe8633a, count: 18 }, // medium
-    { size: 5.4, color: 0x8a63d2, count: 8  }, // large  — need to grow a lot
+    { target: 1.2, count: 70, pool: ["strawberry", "donut", "cookie", "egg"] },
+    { target: 2.2, count: 38, pool: ["apple", "banana", "carrot", "croissant"] },
+    { target: 3.6, count: 16, pool: ["burger", "taco", "pie", "sub"] },
+    { target: 5.6, count: 7,  pool: ["watermelon", "cake-birthday", "pumpkin", "turkey"] },
 ];
 
 // ---- Three: renderer / scene / camera --------------------------
@@ -51,13 +52,14 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fd3ff);
 
 const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 600);
 
-scene.add(new THREE.HemisphereLight(0xcfeaff, 0x4a6b3a, 0.75));
+scene.add(new THREE.HemisphereLight(0xcfeaff, 0x4a6b3a, 0.85));
 const sun = new THREE.DirectionalLight(0xfff3df, 2.0);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -71,8 +73,8 @@ const pitFloorMat = new THREE.MeshStandardMaterial({ color: 0x0b0d13, roughness:
 
 // ---- Hole state ------------------------------------------------
 const H = new THREE.Vector3(0, 0, 0);
-let R = R0;        // current (target) hole radius
-let Rbuilt = -1;   // radius the floor/visual were last built at
+let R = R0;
+let Rbuilt = -1;
 let eaten = 0;
 
 // ---- cannon-es world -------------------------------------------
@@ -92,7 +94,6 @@ scene.add(holeGroup);
 let ringMesh, wallMesh, pitFloorMesh, floorBody;
 
 function rebuild(r) {
-    // visual
     for (const m of [ringMesh, wallMesh, pitFloorMesh]) if (m) { holeGroup.remove(m); m.geometry.dispose(); }
     ringMesh = new THREE.Mesh(new THREE.RingGeometry(r, ROUT, 120), groundMat);
     ringMesh.rotation.x = -Math.PI / 2;
@@ -104,7 +105,6 @@ function rebuild(r) {
     pitFloorMesh.position.y = -PIT;
     holeGroup.add(ringMesh, wallMesh, pitFloorMesh);
 
-    // physics
     if (floorBody) world.removeBody(floorBody);
     floorBody = new CANNON.Body({ type: CANNON.Body.KINEMATIC, material: cGround });
     const seg = (Math.PI * 2) / NSEG;
@@ -126,31 +126,56 @@ function rebuild(r) {
     Rbuilt = r;
 }
 
-// ---- Props -----------------------------------------------------
-const tierGeo = TIERS.map(t => new THREE.BoxGeometry(t.size, t.size, t.size));
-const tierMat = TIERS.map(t => new THREE.MeshStandardMaterial({ color: t.color, roughness: 0.7 }));
-let props = [];
+// ---- Models (loaded once, recentred; cloned per prop) ----------
+const loader = new GLTFLoader().setPath("assets/models/");
+const protos = {};   // name -> { obj: centred Group, half: Vector3 (half-extents at scale 1) }
 
-// Swap THIS to load a .glb (return a mesh) when real models are ready.
-function makeMesh(tier) {
-    const m = new THREE.Mesh(tierGeo[tier], tierMat[tier]);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    return m;
+async function loadModels() {
+    const names = [...new Set(TIERS.flatMap(t => t.pool))];
+    const results = await Promise.allSettled(names.map(async name => {
+        const gltf = await loader.loadAsync(name + ".glb");
+        const obj = gltf.scene;
+        const box = new THREE.Box3().setFromObject(obj);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
+        obj.position.sub(center);                       // recentre on bbox centre
+        obj.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+        const wrap = new THREE.Group();
+        wrap.add(obj);
+        protos[name] = { obj: wrap, half: size.multiplyScalar(0.5) };
+    }));
+    // Drop any model that failed to load from its tier pool.
+    for (const t of TIERS) t.pool = t.pool.filter(n => protos[n]);
+    const failed = results.filter(r => r.status === "rejected").length;
+    if (failed) console.warn(`[hole] ${failed} model(s) failed to load`);
 }
 
+// ---- Props -----------------------------------------------------
+let props = [];
+
 function spawn(tier, x, z) {
-    const size = TIERS[tier].size;
-    const mesh = makeMesh(tier);
+    const t = TIERS[tier];
+    if (!t.pool.length) return;
+    const name = t.pool[(Math.random() * t.pool.length) | 0];
+    const proto = protos[name];
+
+    const footprint = Math.max(proto.half.x, proto.half.z) * 2;
+    const s = t.target / footprint;
+    const hx = proto.half.x * s, hy = proto.half.y * s, hz = proto.half.z * s;
+
+    const mesh = proto.obj.clone(true);
+    mesh.scale.setScalar(s);
     scene.add(mesh);
-    const body = new CANNON.Body({ mass: size, material: cBox, allowSleep: true });
-    body.addShape(new CANNON.Box(new CANNON.Vec3(size / 2, size / 2, size / 2)));
-    body.position.set(x, size / 2 + 0.02, z);
+
+    const body = new CANNON.Body({ mass: t.target, material: cBox, allowSleep: true });
+    body.addShape(new CANNON.Box(new CANNON.Vec3(hx, hy, hz)));
+    body.position.set(x, hy + 0.02, z);
     body.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), Math.random() * Math.PI * 2);
     body.sleepSpeedLimit = 0.4;
     body.sleepTimeLimit = 0.5;
     world.addBody(body);
-    props.push({ mesh, body, half: size / 2, size, counted: false });
+
+    props.push({ mesh, body, size: t.target, counted: false });
 }
 
 function clearProps() {
@@ -160,10 +185,11 @@ function clearProps() {
 
 function scatter() {
     TIERS.forEach((t, tier) => {
+        if (!t.pool.length) return;
         for (let i = 0; i < t.count; i++) {
             let x, z, d;
             do { x = (Math.random() * 2 - 1) * FIELD; z = (Math.random() * 2 - 1) * FIELD; d = Math.hypot(x, z); }
-            while (d < R0 + t.size); // keep the start clear
+            while (d < R0 + t.target);
             spawn(tier, x, z);
         }
     });
@@ -190,8 +216,8 @@ canvas.addEventListener("pointerdown", e => {
     hideHint();
 });
 canvas.addEventListener("pointermove", e => {
-    if (e.pointerId !== dragId) return;           // single pointer; only moves while dragging
-    const k = dev.SENS * (camHeight / BASE_H);    // keep the feel consistent as we zoom out
+    if (e.pointerId !== dragId) return;
+    const k = dev.SENS * (camHeight / BASE_H);
     H.x += (e.clientX - px) * k;
     H.z += (e.clientY - py) * k;
     const d = Math.hypot(H.x, H.z);
@@ -241,7 +267,6 @@ function moveHole() { floorBody.position.set(H.x, 0, H.z); holeGroup.position.se
 function frame(dt) {
     moveHole();
 
-    // Wake props near the hole so they react when their support leaves.
     const wakeR = R + 5;
     for (const p of props) {
         if (Math.hypot(p.body.position.x - H.x, p.body.position.z - H.z) < wakeR) p.body.wakeUp();
@@ -249,7 +274,6 @@ function frame(dt) {
 
     world.step(1 / 60, dt, 3);
 
-    // Sync meshes; count + grow on swallow; despawn at the bottom.
     let grew = false;
     for (let i = props.length - 1; i >= 0; i--) {
         const p = props[i];
@@ -265,7 +289,6 @@ function frame(dt) {
     }
     if (grew && R - Rbuilt > 0.08) rebuild(R);
 
-    // Camera follows H and pulls back as the hole grows.
     camHeight = 6 + R * 4;
     const camBack = 5 + R * 3.2;
     const cl = Math.min(1, dt * 3);
@@ -297,10 +320,14 @@ window.addEventListener("resize", () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// ---- Boot ------------------------------------------------------
 rebuild(R);
-scatter();
 camera.position.set(0, 6 + R * 4, 5 + R * 3.2);
 requestAnimationFrame(loop);
+loadModels().then(() => {
+    scatter();
+    hintEl.innerHTML = "Drag to move the hole. Swallow food to grow &mdash; then you can eat bigger food!";
+});
 
 // ---- Debug handle (numeric verification) -----------------------
 const _q = new THREE.Quaternion(), _up = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
@@ -310,11 +337,13 @@ window.__hole = {
     set size(r) { R = Math.min(RMAX, r); rebuild(R); },
     get eaten() { return eaten; },
     get remaining() { return props.length; },
+    get loaded() { return Object.keys(protos).length; },
+    get models() { return Object.keys(protos); },
     get hole() { return { x: +H.x.toFixed(2), z: +H.z.toFixed(2), r: +R.toFixed(2) }; },
     get cam() { return { x: +camera.position.x.toFixed(2), y: +camera.position.y.toFixed(2), z: +camera.position.z.toFixed(2) }; },
     setHole(x, z) { H.set(x, 0, z); const d = Math.hypot(H.x, H.z); if (d > HMAX) { H.x *= HMAX / d; H.z *= HMAX / d; } },
-    nearest(tierSize) { let best = null, bd = 1e9; for (const p of props) { if (tierSize && p.size !== tierSize) continue; const d = Math.hypot(p.body.position.x - H.x, p.body.position.z - H.z); if (d < bd) { bd = d; best = p; } } return best ? { x: +best.body.position.x.toFixed(2), z: +best.body.position.z.toFixed(2), size: best.size, y: +best.body.position.y.toFixed(2) } : null; },
+    nearest(maxSize) { let best = null, bd = 1e9; for (const p of props) { if (maxSize && p.size > maxSize) continue; const d = Math.hypot(p.body.position.x - H.x, p.body.position.z - H.z); if (d < bd) { bd = d; best = p; } } return best ? { x: +best.body.position.x.toFixed(2), z: +best.body.position.z.toFixed(2), size: best.size, y: +best.body.position.y.toFixed(2) } : null; },
     step(n = 60, dt = 1 / 60) { for (let i = 0; i < n; i++) frame(dt); },
-    spawn, clearProps, reset, dev,
+    spawn, clearProps, scatter, reset, dev,
     props, world, scene, camera, THREE, CANNON,
 };
