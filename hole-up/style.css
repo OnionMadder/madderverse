@@ -105,10 +105,17 @@ html, body {
     gap: 8px;
     min-width: 220px;
     max-width: 280px;
+    max-height: 72vh;
+    overflow-y: auto;
     background: rgba(16, 19, 26, 0.6);
     border-radius: 12px;
     backdrop-filter: blur(4px);
     font-size: 13px;
+}
+.dev-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 .dev-row {
     display: flex;

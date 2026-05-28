@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Hole-Up" />
     <meta name="application-name" content="Hole-Up" />
 
-    <link rel="stylesheet" href="style.css?v=holeup1" />
+    <link rel="stylesheet" href="style.css?v=holeup2" />
 
     <!-- Three.js + cannon-es, vendored locally so the game runs offline. -->
     <script type="importmap">
@@ -57,14 +57,7 @@
     <button id="resetBtn" class="reset-btn" type="button">Reset</button>
 
     <div id="devPanel" class="dev-panel" hidden aria-label="Dev controls">
-        <div class="dev-row">
-            <label for="devSpeed">STEER <span id="devSpeedOut">0.045</span></label>
-            <input id="devSpeed" type="range" min="0.01" max="0.12" step="0.005" value="0.045">
-        </div>
-        <div class="dev-row">
-            <label for="devGrow">GROWTH <span id="devGrowOut">0.045</span></label>
-            <input id="devGrow" type="range" min="0.01" max="0.15" step="0.005" value="0.045">
-        </div>
+        <div id="devRows" class="dev-rows"></div>
         <button id="devCopy" class="dev-btn" type="button">Copy values</button>
         <span id="devCopyMsg" class="dev-msg" aria-live="polite"></span>
     </div>
@@ -77,7 +70,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=holeup1"></script>
+    <script type="module" src="main.js?v=holeup2"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

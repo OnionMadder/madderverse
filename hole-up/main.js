@@ -26,7 +26,7 @@ import * as THREE from "three";
 import * as CANNON from "cannon-es";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-const VERSION = "holeup1";   // cache-buster for fetched data + dynamic imports
+const VERSION = "holeup2";   // cache-buster for fetched data + dynamic imports
 
 // ---- Tunables --------------------------------------------------
 const R0    = 0.9;   // starting hole radius
@@ -58,10 +58,22 @@ const DEFAULT_LEVEL = {
     ],
 };
 
+// Live-tunable feel knobs. DEV_TUNABLES drives the self-building ?dev panel,
+// so adding a knob = one row here + read dev.KEY where you need it.
 const dev = {
-    SENS:   0.045,  // steer sensitivity (world units per screen px, at base zoom)
-    GROWTH: 0.045,  // hole radius gained per unit of swallowed prop footprint
+    STEER:   1.0,   // 1.0 = the grabbed ground point stays under your finger (1:1)
+    GROWTH:  0.01,  // hole radius gained per unit of swallowed footprint
+    SUCTION: 25,    // pull toward the hole (constant force -> light food zips in, heavy resists)
+    REACH:   3,     // suction radius as a multiple of the hole radius
+    GRAVITY: 22,    // fall acceleration
 };
+const DEV_TUNABLES = [
+    { key: "STEER",   label: "Steer",   min: 0.3,   max: 3,    step: 0.05 },
+    { key: "GROWTH",  label: "Growth",  min: 0.005, max: 0.15, step: 0.005 },
+    { key: "SUCTION", label: "Suction", min: 0,     max: 100,  step: 1 },
+    { key: "REACH",   label: "Reach",   min: 1,     max: 6,    step: 0.25 },
+    { key: "GRAVITY", label: "Gravity", min: 5,     max: 50,   step: 1 },
+];
 
 const params  = new URLSearchParams(location.search);
 const EDITOR   = params.get("editor") === "1";
@@ -297,10 +309,24 @@ async function fetchLevel(id) {
 
 function reset() { loadLevel(currentLevel); }
 
-// ---- Steering: instant-halt screen drag (single pointer) -------
+// ---- Steering: 1:1 ground tracking (hole stays under the finger) -
+// Each move, raycast the PREVIOUS and CURRENT cursor positions to the ground
+// with the live camera and shift the hole by that exact ground delta. Both
+// rays use the same camera, so the camera-follow can't feed back into the
+// drag (no runaway drift), and a still finger gives a zero delta (instant
+// halt). STEER multiplies it: 1.0 keeps the grabbed point under your finger.
 let dragId = null, px = 0, py = 0;
 let camHeight = 6 + R0 * 4;
-const BASE_H = 6 + R0 * 4;
+const steerRay = new THREE.Raycaster();
+const steerNDC = new THREE.Vector2();
+const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const _gA = new THREE.Vector3(), _gB = new THREE.Vector3();
+function groundAtScreen(cx, cy, out) {
+    steerNDC.x = (cx / window.innerWidth) * 2 - 1;
+    steerNDC.y = -(cy / window.innerHeight) * 2 + 1;
+    steerRay.setFromCamera(steerNDC, camera);
+    return steerRay.ray.intersectPlane(groundPlane, out) ? out : null;
+}
 if (!EDITOR) {
     canvas.addEventListener("pointerdown", e => {
         if (dragId !== null) return;
@@ -310,11 +336,14 @@ if (!EDITOR) {
     });
     canvas.addEventListener("pointermove", e => {
         if (e.pointerId !== dragId) return;
-        const k = dev.SENS * (camHeight / BASE_H);
-        H.x += (e.clientX - px) * k;
-        H.z += (e.clientY - py) * k;
-        const d = Math.hypot(H.x, H.z);
-        if (d > HMAX) { H.x *= HMAX / d; H.z *= HMAX / d; }
+        const a = groundAtScreen(px, py, _gA);
+        const b = groundAtScreen(e.clientX, e.clientY, _gB);
+        if (a && b) {
+            H.x += (b.x - a.x) * dev.STEER;
+            H.z += (b.z - a.z) * dev.STEER;
+            const d = Math.hypot(H.x, H.z);
+            if (d > HMAX) { H.x *= HMAX / d; H.z *= HMAX / d; }
+        }
         px = e.clientX; py = e.clientY;
     });
     const endDrag = e => { if (e.pointerId === dragId) dragId = null; };
@@ -340,17 +369,23 @@ document.getElementById("resetBtn").addEventListener("click", reset);
 // ---- ?dev sliders ----------------------------------------------
 if (params.has("dev")) {
     const panel = document.getElementById("devPanel");
-    const sp = document.getElementById("devSpeed"), spOut = document.getElementById("devSpeedOut");
-    const gr = document.getElementById("devGrow"),  grOut = document.getElementById("devGrowOut");
-    const copy = document.getElementById("devCopy"), msg = document.getElementById("devCopyMsg");
+    const rows = document.getElementById("devRows");
+    const fmt = v => (Math.round(v * 1000) / 1000).toString();
+    for (const t of DEV_TUNABLES) {
+        const row = document.createElement("div"); row.className = "dev-row";
+        const out = document.createElement("span"); out.textContent = fmt(dev[t.key]);
+        const label = document.createElement("label"); label.textContent = t.label + " "; label.appendChild(out);
+        const input = document.createElement("input");
+        input.type = "range"; input.min = t.min; input.max = t.max; input.step = t.step; input.value = dev[t.key];
+        input.addEventListener("input", e => { dev[t.key] = parseFloat(e.target.value); out.textContent = fmt(dev[t.key]); });
+        row.append(label, input);
+        rows.appendChild(row);
+    }
     panel.hidden = false;
-    sp.value = dev.SENS;   spOut.textContent = dev.SENS.toFixed(3);
-    gr.value = dev.GROWTH; grOut.textContent = dev.GROWTH.toFixed(3);
-    sp.addEventListener("input", e => { dev.SENS = parseFloat(e.target.value); spOut.textContent = dev.SENS.toFixed(3); });
-    gr.addEventListener("input", e => { dev.GROWTH = parseFloat(e.target.value); grOut.textContent = dev.GROWTH.toFixed(3); });
-    copy.addEventListener("click", async () => {
-        const t = `SENS=${dev.SENS}, GROWTH=${dev.GROWTH}`;
-        try { await navigator.clipboard.writeText(t); msg.textContent = "copied"; } catch (_) { msg.textContent = t; }
+    const msg = document.getElementById("devCopyMsg");
+    document.getElementById("devCopy").addEventListener("click", async () => {
+        const txt = DEV_TUNABLES.map(t => `${t.key}=${dev[t.key]}`).join(", ");
+        try { await navigator.clipboard.writeText(txt); msg.textContent = "copied"; } catch (_) { msg.textContent = txt; }
         setTimeout(() => { msg.textContent = ""; }, 2500);
     });
 }
@@ -358,12 +393,27 @@ if (params.has("dev")) {
 // ---- Loop ------------------------------------------------------
 function moveHole() { floorBody.position.set(H.x, 0, H.z); holeGroup.position.set(H.x, 0, H.z); }
 
+const _suck = new CANNON.Vec3();
 function frame(dt) {
     moveHole();
+    world.gravity.y = -dev.GRAVITY;
 
+    // Wake nearby props + apply suction. Suction is a CONSTANT force toward
+    // the hole, so it's mass-responsive for free: friction is proportional to
+    // mass, so light food slides in while heavy food barely budges until the
+    // hole grows enough to physically reach it.
     const wakeR = R + 5;
+    const reach = R * dev.REACH;
     for (const p of props) {
-        if (Math.hypot(p.body.position.x - H.x, p.body.position.z - H.z) < wakeR) p.body.wakeUp();
+        const dx = H.x - p.body.position.x, dz = H.z - p.body.position.z;
+        const d = Math.hypot(dx, dz);
+        if (d < wakeR) p.body.wakeUp();
+        if (dev.SUCTION > 0 && d > 1e-3 && d < reach) {
+            const f = dev.SUCTION * (1 - d / reach);   // falloff: strong near centre
+            _suck.set((dx / d) * f, 0, (dz / d) * f);
+            p.body.applyForce(_suck);
+            p.body.wakeUp();
+        }
     }
 
     world.step(1 / 60, dt, 3);
