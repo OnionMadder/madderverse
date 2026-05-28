@@ -15,8 +15,8 @@ let anchor, shelfY, shelfYs, groundY;
 
 const GRAV = 0.42;        // marble gravity (px / frame^2)
 const SHARD_GRAV = 0.34;  // shards fall a touch slower — reads as light "glass"
-const MAX_PULL = 145;     // how far back you can stretch the sling
-const LAUNCH_K = 0.205;   // pull distance -> launch speed
+const MAX_PULL = 175;     // how far back you can stretch the sling (more arc range)
+const LAUNCH_K = 0.27;    // stronger launch so a high arc can reach the back rows
 
 let trinkets = [];        // every trinket on the shelves (broken ones removed — no respawn)
 let basket = null;        // catch-basket for skill levels (null when none)
@@ -377,8 +377,8 @@ function populateLevel() {
   const L = LEVELS[levelIndex] || {};
   const moving = !!L.moving;
   const displaySide = clamp(Math.min(W, H) * 0.12, 44, 120);
-  const cellW = displaySide * 1.3 + 8;                         // approx footprint + gap
-  const perShelf = Math.max(4, Math.floor(W / cellW));
+  const cellW = displaySide * 2.0 + 10;                        // wider gaps → lanes to thread to the back rows
+  const perShelf = Math.max(3, Math.floor(W / cellW));
   const gap = W / perShelf;
   const duckLevel = L.specific === "duck" && duckItem;
 
@@ -404,7 +404,7 @@ function populateLevel() {
     const want = Math.min(slots.length, (L.goal || 5) + 4);
     while (duckIdx.size < want) duckIdx.add((Math.random() * slots.length) | 0);
   }
-  const speed = clamp(W * 0.0045, 1.8, 4.5);
+  const speed = clamp(W * 0.00225, 0.9, 2.25);                 // conveyor: ~half the old speed
   slots.forEach((s, i) => {
     const t = makeTrinket(s.cx, s.shy, false, duckIdx.has(i));
     if (s.dir) t.vx = s.dir * speed;                           // conveyor velocity
@@ -627,12 +627,12 @@ function drawAim() {
   // dotted trajectory preview — the thing that makes aiming feel easy
   let sx = ball.x, sy = ball.y, vx = dx * LAUNCH_K, vy = dy * LAUNCH_K;
   ctx.fillStyle = "rgba(255,255,255,0.85)";
-  for (let i = 0; i < 36; i++) {
+  for (let i = 0; i < 70; i++) {
     vy += GRAV; sx += vx; sy += vy;
     if (sy > H || sx < 0 || sx > W) break;
     if (i % 2 === 0) {
       ctx.beginPath();
-      ctx.arc(sx, sy, Math.max(1, 3.4 - i * 0.06), 0, Math.PI * 2);
+      ctx.arc(sx, sy, Math.max(1, 3.4 - i * 0.035), 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -841,7 +841,7 @@ const LEVELS = [
   { name: "Moving Ducks", goal: 5,  time: 70, moving: true, basket: true, specific: "duck", hint: "Break 5 moving ducks into the basket" },
   { name: "The Big One",  goal: 10, time: 75, jumbo: true, hand: true, basket: true, hint: "Smash the jumbo 10× — dodge the hand!" }
 ];
-let levelIndex = 0, goalTotal = 0, goalDone = 0, timeLeft = 0, score = 0, phase = "playing";
+let levelIndex = 0, goalTotal = 0, goalDone = 0, timeLeft = 0, score = 0, phase = "title";
 
 const hud = {
   level: document.getElementById("hudLevel"),
@@ -935,13 +935,34 @@ function tick(now) {
 }
 
 resize();
-loadLevel(0);
+resetBall();
 requestAnimationFrame(tick);
-loadAssets();   // async; when the sheets land, ROSTER fills and the next spawn uses them
+loadAssets();   // async; when the sheets land, ROSTER fills and populateLevel uses them
 loadBackground();
 loadShooters();
 loadDuck();
 loadSounds();
+
+// title screen: stays up until the player taps Play (which also resumes audio),
+// giving assets time to load. Play enables once assets are ready (or after 8s).
+const titleEl = document.getElementById("title");
+const playBtn = document.getElementById("playBtn");
+playBtn.addEventListener("click", () => {
+  if (playBtn.disabled) return;
+  resumeAudio();
+  titleEl.hidden = true;
+  loadLevel(0);
+});
+let waited = 0;
+(function waitForAssets() {
+  if ((assetsReady && duckItem) || waited > 8000) {
+    playBtn.disabled = false;
+    playBtn.textContent = "Play";
+  } else {
+    waited += 200;
+    setTimeout(waitForAssets, 200);
+  }
+})();
 
 // TEMP dev control: number keys 1/2/3 switch shooter until the picker UI ships
 const SHOOTER_KEYS = { "1": "glass", "2": "metal", "3": "electric" };
