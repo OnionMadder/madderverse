@@ -41,6 +41,20 @@
     <div id="stage">
         <canvas id="game"></canvas>
         <div id="hint">drag the marble back &amp; let go — pop the glass</div>
+
+        <div id="hud">
+            <span id="hudLevel">Lvl 1</span>
+            <span id="hudGoal">0 / 5</span>
+            <span id="hudTimer">⏱ 30</span>
+            <span id="hudScore">★ 0</span>
+        </div>
+
+        <div id="overlay" hidden>
+            <div class="overlay-card">
+                <h2 id="overlayTitle"></h2>
+                <button id="overlayBtn" type="button">Next</button>
+            </div>
+        </div>
     </div>
 
     <footer class="site-footer-slim" aria-label="Site info">
