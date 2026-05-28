@@ -345,6 +345,10 @@ function makeTarget() {
   const octx = oc.getContext("2d", { willReadFrequently: true });
   paint(octx, ow, oh);
 
+  // moving levels: drift horizontally along the shelf (player must lead the shot)
+  const moving = !!(LEVELS[levelIndex] && LEVELS[levelIndex].moving);
+  const driftSpeed = clamp(W * 0.0045, 1.8, 4.5);
+
   return {
     img: oc,
     octx,
@@ -352,6 +356,7 @@ function makeTarget() {
     h: oh,
     x: clamp(W * 0.52 - ow / 2 + (Math.random() - 0.5) * W * 0.3, W * 0.12, W - ow - 18),
     y: Math.round(shelfY - oh + pad + 3),   // item's bottom edge sits on the shelf
+    vx: moving ? (Math.random() < 0.5 ? -driftSpeed : driftSpeed) : 0,
     data: octx.getImageData(0, 0, ow, oh).data,   // cached alpha for hit-test + cull
     born: performance.now(),
     material,
@@ -411,7 +416,7 @@ function shatter(ix, iy) {
 
     shards.push({
       x: wx, y: wy,
-      vx: (dx / d) * sp + (ball ? ball.vx * 0.12 : 0) + (Math.random() - 0.5) * 1.5,
+      vx: (dx / d) * sp + (ball ? ball.vx * 0.12 : 0) + (t.vx || 0) * 0.6 + (Math.random() - 0.5) * 1.5,
       vy: (dy / d) * sp + (ball ? ball.vy * 0.12 : 0) - 2 - Math.random() * 2,
       ang: 0,
       va: (Math.random() - 0.5) * 0.26,
@@ -429,6 +434,14 @@ function shatter(ix, iy) {
 }
 
 /* ---------- per-frame updates ---------- */
+function updateTarget() {
+  if (!target || !target.vx) return;
+  target.x += target.vx;
+  const minX = W * 0.06, maxX = W - target.w - W * 0.06;
+  if (target.x < minX) { target.x = minX; target.vx = Math.abs(target.vx); }
+  else if (target.x > maxX) { target.x = maxX; target.vx = -Math.abs(target.vx); }
+}
+
 function updateBall() {
   if (!ball || !ball.flying) return;
   const STEPS = 3;   // substep so a fast marble can't tunnel through a thin trinket
@@ -864,6 +877,7 @@ function tick(now) {
     timeLeft -= dt;
     if (timeLeft <= 0) { timeLeft = 0; loseLevel(); }
     if (!target && respawnAt && now >= respawnAt && goalDone < goalTotal) { spawnTarget(); respawnAt = 0; }
+    updateTarget();
   }
   updateBall();
   updateShards();
