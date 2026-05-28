@@ -31,12 +31,12 @@
 
     <div id="devPanel" class="dev-panel" hidden aria-label="Dev controls">
         <div class="dev-row">
-            <label for="devMove">MOVE_SPEED <span id="devMoveOut">5.0</span></label>
-            <input id="devMove" type="range" min="1" max="20" step="0.5" value="5">
+            <label for="devSens">SENSITIVITY <span id="devSensOut">1.0</span></label>
+            <input id="devSens" type="range" min="0.4" max="2.5" step="0.1" value="1">
         </div>
         <div class="dev-row">
-            <label for="devGrow">SPEED_GROWTH <span id="devGrowOut">0.35</span></label>
-            <input id="devGrow" type="range" min="0" max="2" step="0.05" value="0.35">
+            <label for="devFit">FIT_SLACK <span id="devFitOut">0.30</span></label>
+            <input id="devFit" type="range" min="0" max="1" step="0.05" value="0.3">
         </div>
         <button id="devCopy" class="dev-btn" type="button">Copy values</button>
         <span id="devCopyMsg" class="dev-msg" aria-live="polite"></span>
