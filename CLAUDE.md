@@ -42,11 +42,18 @@ Each game directory follows one of two shapes. **Match the existing shape of the
 - **Split shape** (`gazonionaire/` only): `index.html` at root, with `css/style.css`, and `js/` split into `data.js` (constants/economy tables), `game.js` (pure state + rules, no DOM), and `ui.js` (DOM/event layer). Load order in HTML is `data.js` → `game.js` → `ui.js`; preserve that ordering when editing.
 
 Other top-level entries:
-- `index.html` — hub page; the `<nav class="game-grid">` is the source of truth for which games are advertised. Add/remove a `.game-card` here when shipping/retiring a game.
+- `index.html` — hub page; the `<nav class="game-grid">` is the **source of truth for which games are advertised** (see "Advertised vs. unlisted games" below). Add/remove a `.game-card` here when shipping/retiring a game. The hub also carries JSON-LD (`WebSite`/`Organization`/`Person`/`CollectionPage`) and visible About/Promise sections used for SEO + AI discoverability — keep the JSON-LD `ItemList` in sync with the grid when games are added/removed.
 - `404.html` — GitHub Pages 404; uses the shared `assets/css/style.css`.
 - `assets/css/style.css` — **only** styles `index.html` and `404.html` (selectors are scoped under `body.kids-hub` and `.not-found-container`). It is not imported by any game; do not move game-specific styles here.
 - `assets/favi/` + `site.webmanifest` — site-wide favicon set referenced by absolute `https://madderverse.org/...` URLs from every page.
-- `giggle-gears` — currently a 1-byte placeholder file (not a directory). The hub links to `/giggle-gears/`, so this game is advertised but not yet implemented; treat the link as known-broken until the game ships.
+- `sitemap.xml`, `robots.txt`, `llms.txt` — site-wide discovery files at the repo root. `robots.txt` intentionally **allows** AI crawlers (GPTBot, ClaudeBot, Google-Extended, anthropic-ai, PerplexityBot, etc.) — we *want* them indexing. `sitemap.xml` lists only the advertised games + key pages. `llms.txt` is a plain-English studio/catalog summary for LLMs (per llmstxt.org). Keep all three in sync with the advertised game set.
+
+### Advertised vs. unlisted games
+
+The hub grid lists only finished, shipping games. **Every game directory that is NOT on the hub grid is a work-in-progress** — present on disk and sometimes reachable by direct URL, but deliberately not advertised, and intentionally excluded from `sitemap.xml`, `llms.txt`, and the hub's JSON-LD `ItemList`. Do not add a WIP game to the hub / sitemap / schema until the user says it's ready.
+
+- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, Slip Studio, All Munkis, Let's CRAYte! Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Krazy Kritters, Friend Picker.
+- **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `tiny-canvas/` (and any future dir not yet on the grid). `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
 
 ## Conventions worth knowing
 
