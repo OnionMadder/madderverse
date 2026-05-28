@@ -17,12 +17,15 @@ const GRAV = 0.42;        // marble gravity (px / frame^2)
 const SHARD_GRAV = 0.34;  // shards fall a touch slower — reads as light "glass"
 const MAX_PULL = 175;     // how far back you can stretch the sling (more arc range)
 const LAUNCH_K = 0.27;    // stronger launch so a high arc can reach the back rows
+const RELOAD_MS = 650;    // sling reloads this long after firing — no waiting for landing
 
 let trinkets = [];        // every trinket on the shelves (broken ones removed — no respawn)
 let basket = null;        // catch-basket for skill levels (null when none)
 let beltSpan = 0;         // conveyor wrap distance for moving levels (0 = static)
 let shards = [];          // flying + settled shards (the settled ones are the pile)
-let ball = null;
+let ball = null;          // the loaded, aimable marble at the sling (null while reloading)
+let flying = [];          // marbles in flight — multiple at once (fire without waiting)
+let reloadAt = 0;         // timestamp when the next marble loads into the sling
 let aiming = false;
 let launched = false;
 let pointer = { x: 0, y: 0 };
@@ -43,7 +46,7 @@ function layout() {
   shelfYs = [H * 0.22, H * 0.40, H * 0.58];   // three shelves spanning the full width
   shelfY = shelfYs[1];                          // legacy single-shelf ref (slingshot/aim)
   groundY = H - 54;
-  if (ball && !ball.flying) { ball.x = anchor.x; ball.y = anchor.y; }
+  if (ball) { ball.x = anchor.x; ball.y = anchor.y; }
 }
 window.addEventListener("resize", resize);
 
@@ -398,7 +401,8 @@ function populateLevel() {
     for (const shy of shelfYs) for (let i = 0; i < perShelf; i++) slots.push({ cx: gap * (i + 0.5), shy, dir: 0 });
   }
 
-  // scatter enough ducks among the slots to clear a duck-level goal
+  // Duck levels GUARANTEE enough ducks to clear the goal; normal levels get a
+  // rare 1-in-35 duck as a surprise.
   const duckIdx = new Set();
   if (duckLevel) {
     const want = Math.min(slots.length, (L.goal || 5) + 4);
@@ -406,7 +410,8 @@ function populateLevel() {
   }
   const speed = clamp(W * 0.00225, 0.9, 2.25);                 // conveyor: ~half the old speed
   slots.forEach((s, i) => {
-    const t = makeTrinket(s.cx, s.shy, false, duckIdx.has(i));
+    const isDuck = duckIdx.has(i) || (!duckLevel && duckItem && Math.random() < 1 / 35);
+    const t = makeTrinket(s.cx, s.shy, false, isDuck);
     if (s.dir) t.vx = s.dir * speed;                           // conveyor velocity
     trinkets.push(t);
   });
@@ -488,18 +493,21 @@ function updateTrinkets() {
   }
 }
 
-function updateBall() {
-  if (!ball || !ball.flying) return;
+function updateFlying() {
   const STEPS = 3;   // substep so a fast marble can't tunnel through a thin trinket
-  for (let k = 0; k < STEPS; k++) {
-    ball.vy += GRAV / STEPS;
-    ball.x += ball.vx / STEPS;
-    ball.y += ball.vy / STEPS;
-    for (const t of trinkets) {
-      if (alphaAt(t, ball.x - t.x, ball.y - t.y) > 40) { damageTrinket(t, ball.x, ball.y); resetBall(); return; }
+  for (let bi = flying.length - 1; bi >= 0; bi--) {
+    const b = flying[bi];
+    let gone = false;
+    for (let k = 0; k < STEPS && !gone; k++) {
+      b.vy += GRAV / STEPS;
+      b.x += b.vx / STEPS;
+      b.y += b.vy / STEPS;
+      for (const t of trinkets) {
+        if (alphaAt(t, b.x - t.x, b.y - t.y) > 40) { damageTrinket(t, b.x, b.y); gone = true; break; }
+      }
     }
+    if (gone || b.x < -50 || b.x > W + 50 || b.y > H + 60) flying.splice(bi, 1);
   }
-  if (ball.x < -50 || ball.x > W + 50 || ball.y > H + 60) resetBall();
 }
 function updateShards() {
   for (const s of shards) {
@@ -588,7 +596,7 @@ function drawSling() {
   ctx.moveTo(anchor.x, anchor.y + 6); ctx.lineTo(anchor.x - 15, anchor.y - 15);
   ctx.moveTo(anchor.x, anchor.y + 6); ctx.lineTo(anchor.x + 15, anchor.y - 15);
   ctx.stroke();
-  if (ball && !ball.flying && !aiming) {
+  if (ball && !aiming) {
     ctx.strokeStyle = "rgba(90,55,30,0.9)";
     ctx.lineWidth = 4;
     ctx.beginPath();
@@ -599,20 +607,23 @@ function drawSling() {
 }
 function drawBall() {
   const sprite = shooterImgs[activeShooter];
-  if (sprite) {
-    const d = ball.r * 2.6;                       // a touch wider than the hit point
-    const dh = d * sprite.naturalHeight / sprite.naturalWidth;
-    ctx.drawImage(sprite, ball.x - d / 2, ball.y - dh / 2, d, dh);
-  } else {
-    const g = ctx.createRadialGradient(ball.x - 4, ball.y - 4, 2, ball.x, ball.y, ball.r);
-    g.addColorStop(0, "#ffffff");
-    g.addColorStop(0.4, "#cfe3ff");
-    g.addColorStop(1, "#5a7bd6");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  const one = (bx, by, r) => {
+    if (sprite) {
+      const d = r * 2.6, dh = d * sprite.naturalHeight / sprite.naturalWidth;
+      ctx.drawImage(sprite, bx - d / 2, by - dh / 2, d, dh);
+    } else {
+      const g = ctx.createRadialGradient(bx - 4, by - 4, 2, bx, by, r);
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.4, "#cfe3ff");
+      g.addColorStop(1, "#5a7bd6");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(bx, by, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  for (const b of flying) one(b.x, b.y, b.r);
+  if (ball) one(ball.x, ball.y, ball.r);
 }
 function drawAim() {
   const dx = anchor.x - ball.x, dy = anchor.y - ball.y;
@@ -698,12 +709,12 @@ function render() {
   if (basket) drawBasketFront();
   for (const t of trinkets) drawTrinket(t);
   drawSling();
-  if (ball) drawBall();
+  drawBall();
   if (aiming) drawAim();
 }
 
 /* ---------- input ---------- */
-function resetBall() { ball = { x: anchor.x, y: anchor.y, vx: 0, vy: 0, flying: false, r: 13 }; }
+function resetBall() { ball = { x: anchor.x, y: anchor.y, r: 13 }; }   // loads a fresh aimable marble
 function eventPos(e) {
   const r = canvas.getBoundingClientRect();
   return { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -716,17 +727,17 @@ function dragBall() {
 }
 function launch() {
   const dx = anchor.x - ball.x, dy = anchor.y - ball.y;
-  if (Math.hypot(dx, dy) < 8) { resetBall(); return; }
-  ball.vx = dx * LAUNCH_K;
-  ball.vy = dy * LAUNCH_K;
-  ball.flying = true;
+  if (Math.hypot(dx, dy) < 8) { ball.x = anchor.x; ball.y = anchor.y; return; }   // too small — snap back
+  flying.push({ x: ball.x, y: ball.y, vx: dx * LAUNCH_K, vy: dy * LAUNCH_K, r: ball.r });
   playThwip();
+  ball = null;                                   // sling empties; reloads after RELOAD_MS
+  reloadAt = performance.now() + RELOAD_MS;
   if (!launched) { launched = true; hintEl.style.opacity = "0"; }
 }
 canvas.addEventListener("pointerdown", e => {
   e.preventDefault();
   resumeAudio();
-  if (!ball || ball.flying) return;
+  if (!ball) return;                             // reloading — nothing to aim yet
   aiming = true;
   pointer = eventPos(e);
   dragBall();
@@ -874,7 +885,7 @@ function loadLevel(i) {
   if (levelIndex === 0) score = 0;          // fresh run resets score
   goalTotal = L.goal; goalDone = 0; timeLeft = L.time; phase = "playing";
   if (L.shooter) activeShooter = L.shooter;
-  shards = [];
+  shards = []; flying = []; reloadAt = 0;
   basket = L.basket ? makeBasket() : null;
   resetBall();
   populateLevel();
@@ -926,8 +937,9 @@ function tick(now) {
     timeLeft -= dt;
     if (timeLeft <= 0) { timeLeft = 0; loseLevel(); }
     updateTrinkets();
+    if (!ball && reloadAt && now >= reloadAt) { resetBall(); reloadAt = 0; }   // reload the sling
   }
-  updateBall();
+  updateFlying();
   updateShards();
   render();
   hud.timer.textContent = "⏱ " + Math.ceil(Math.max(0, timeLeft));
@@ -977,6 +989,8 @@ window.__glass = {
   get jumbo() { return JUMBO; },
   get level() { return { i: levelIndex, phase, done: goalDone, total: goalTotal, time: timeLeft, score }; },
   get basket() { return basket; },
+  get ball() { return ball; },
+  get flying() { return flying; },
   setShooter(t) { if (SHOOTERS[t]) activeShooter = t; },
   loadLevel,
   breakAt(n) { const t = trinkets[n || 0]; if (t) shatter(t, t.x + t.w / 2, t.y + t.h / 2); }
