@@ -1,31 +1,31 @@
 /* ============================================================
-   Hole — physics proof (throwaway)
+   Hole — physics proof (throwaway), ROUND hole
    ------------------------------------------------------------
-   Proving the "do it right" approach: a REAL hole in the ground
-   (the floor literally has a pit) + a REAL physics engine
-   (cannon-es), so cubes lose support over the edge, teeter on the
-   rim, and tumble in on their own. No "suck to centre + shrink".
+   Real pit + real physics (cannon-es): cubes rest, teeter on the
+   rim, and tumble in — emergent, no scripting.
 
-   The hole is SQUARE here on purpose: the floor collider is four
-   static boxes around the opening, which uses cannon-es's rock-solid
-   box-vs-box path. (A first pass used a round Trimesh floor and every
-   cube fell straight through — cannon-es box-vs-Trimesh contacts are
-   unreliable.) A round hole is a follow-up once the FEEL is confirmed
-   — convex pie-slices or a fixed trimesh — and doesn't change the loop.
+   ROUND hole done with BOXES (cannon-es's reliable path — a round
+   Trimesh floor let every cube fall through). The floor is an
+   annulus built from NSEG wedge-boxes: each box spans the full
+   ring radius, rotated to its slice; their inner faces all sit at
+   radius R, so the uncovered centre is a near-perfect circle (rim
+   deviation < 0.3%). Robust box-vs-box contacts, clean round rim.
 
-   Cubes are dynamic boxes synced to meshes each frame.
+   Still FIXED + non-growing here — this proves the round opening +
+   teeter. Moving/growing a round hole is the next proof.
    ============================================================ */
 
 import * as THREE from "three";
 import * as CANNON from "cannon-es";
 
 // ---- Dimensions ------------------------------------------------
-const R    = 3;    // hole half-width (opening is 2R x 2R)
-const HALF = 10;   // floor is 2*HALF square
+const R    = 3;    // hole radius (round)
+const ROUT = 9;    // arena (annulus) outer radius
+const NSEG = 48;   // floor wedge count -> roundness of the rim
 const PIT  = 8;    // visual pit depth
-const CUBE = 1;    // cube edge
+const CUBE = 1;
 const HC   = CUBE / 2;
-const G    = -20;  // gravity (snappy)
+const G    = -20;
 
 // ---- Three: renderer / scene / camera --------------------------
 const canvas   = document.getElementById("scene");
@@ -48,46 +48,24 @@ sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { near: 1, far: 60, left: -14, right: 14, top: 14, bottom: -14 });
 scene.add(sun, sun.target);
 
-// ---- Ground with a real (square) hole, baked flat --------------
-const shape = new THREE.Shape();
-shape.moveTo(-HALF, -HALF);
-shape.lineTo( HALF, -HALF);
-shape.lineTo( HALF,  HALF);
-shape.lineTo(-HALF,  HALF);
-shape.closePath();
-const holePath = new THREE.Path();           // wound opposite to the outline
-holePath.moveTo(-R, -R);
-holePath.lineTo( R, -R);
-holePath.lineTo( R,  R);
-holePath.lineTo(-R,  R);
-holePath.closePath();
-shape.holes.push(holePath);
-
-const floorGeo = new THREE.ShapeGeometry(shape);
-floorGeo.rotateX(-Math.PI / 2);  // lay flat in XZ at y=0
-floorGeo.computeVertexNormals();
+// ---- Visual: round ground (annulus) + round pit ---------------
 const floorMesh = new THREE.Mesh(
-    floorGeo,
+    new THREE.RingGeometry(R, ROUT, 96),
     new THREE.MeshStandardMaterial({ color: 0x86c96a, roughness: 1, side: THREE.DoubleSide })
 );
+floorMesh.rotation.x = -Math.PI / 2;
 floorMesh.receiveShadow = true;
 scene.add(floorMesh);
 
-// Dark pit walls + floor (visual only — sells the depth).
-const pitMat = new THREE.MeshStandardMaterial({ color: 0x161a24, roughness: 1, side: THREE.DoubleSide });
-function addWall(x, z, ry) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2 * R, PIT), pitMat);
-    m.position.set(x, -PIT / 2, z);
-    m.rotation.y = ry;
-    m.receiveShadow = true;
-    scene.add(m);
-}
-addWall(0, -R, 0);              // -Z wall
-addWall(0,  R, Math.PI);       // +Z wall
-addWall(-R, 0, Math.PI / 2);   // -X wall
-addWall( R, 0, -Math.PI / 2);  // +X wall
+const pitWall = new THREE.Mesh(
+    new THREE.CylinderGeometry(R, R * 0.72, PIT, 96, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0x161a24, roughness: 1, side: THREE.BackSide })
+);
+pitWall.position.y = -PIT / 2;
+pitWall.receiveShadow = true;
+scene.add(pitWall);
 const pitFloor = new THREE.Mesh(
-    new THREE.PlaneGeometry(2 * R, 2 * R),
+    new THREE.CircleGeometry(R * 0.72, 96),
     new THREE.MeshStandardMaterial({ color: 0x0b0d13, roughness: 1 })
 );
 pitFloor.rotation.x = -Math.PI / 2;
@@ -105,17 +83,24 @@ const boxMat    = new CANNON.Material("box");
 world.addContactMaterial(new CANNON.ContactMaterial(groundMat, boxMat, { friction: 0.5, restitution: 0.0 }));
 world.addContactMaterial(new CANNON.ContactMaterial(boxMat,    boxMat, { friction: 0.3, restitution: 0.0 }));
 
-// Floor collider = four static boxes tiling the square MINUS the hole.
-// Tops sit at y=0; the inner edges (x=+-R, z=+-R) are the rim to teeter on.
+// Round floor = NSEG wedge boxes. Each box spans the ring radially
+// (R..ROUT) and is rotated to its slice; inner faces all land at
+// radius R, so the opening is a near-perfect circle. Tops at y=0.
 const floorBody = new CANNON.Body({ type: CANNON.Body.STATIC, material: groundMat });
-const SIDE = (HALF - R) / 2;          // half-depth of each border strip
-const MID  = (HALF + R) / 2;          // strip centre offset from origin
-const addStrip = (hx, hz, ox, oz) =>
-    floorBody.addShape(new CANNON.Box(new CANNON.Vec3(hx, 1, hz)), new CANNON.Vec3(ox, -1, oz));
-addStrip(HALF, SIDE, 0,  MID);   // +Z border  (x:-HALF..HALF, z:R..HALF)
-addStrip(HALF, SIDE, 0, -MID);   // -Z border
-addStrip(SIDE, R,  MID, 0);      // +X border  (z:-R..R, x:R..HALF)
-addStrip(SIDE, R, -MID, 0);      // -X border
+const seg        = (Math.PI * 2) / NSEG;
+const rMid       = (R + ROUT) / 2;
+const radialHalf = (ROUT - R) / 2;
+const tangHalf   = ROUT * Math.tan(seg / 2) * 1.12; // sized for the OUTER arc (+overlap) -> no gaps
+for (let i = 0; i < NSEG; i++) {
+    const a = i * seg;
+    const q = new CANNON.Quaternion();
+    q.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), -a); // local X -> radial direction at angle a
+    floorBody.addShape(
+        new CANNON.Box(new CANNON.Vec3(radialHalf, 1, tangHalf)),
+        new CANNON.Vec3(Math.cos(a) * rMid, -1, Math.sin(a) * rMid),
+        q
+    );
+}
 world.addBody(floorBody);
 
 // ---- Cubes (dynamic boxes <-> meshes) --------------------------
@@ -149,16 +134,16 @@ function clearCubes() {
     cubes = [];
 }
 
-// Four deterministic cubes that demonstrate the whole rule:
-//  A & D rest on solid ground, B drops straight through, C teeters in.
+// Four deterministic cubes demonstrating the rule on the ROUND rim:
+//  A & D rest on the ring, B drops straight through, C teeters in.
 function spawnTest() {
-    addCube(R + 1.3, HC + 0.02, 0,   false); // A: fully on the floor  -> rests
-    addCube(0,       HC + 0.02, 0,   false); // B: dead over the hole  -> falls in
-    addCube(R - 0.2, HC + 0.02, 0,   false); // C: straddling the rim  -> tips in
-    addCube(-R - 2,  HC + 0.02, 2.2, false); // D: out on the floor     -> rests
+    addCube(R + 1.3, HC + 0.02, 0,   false); // A: on the ring        -> rests
+    addCube(0,       HC + 0.02, 0,   false); // B: dead over the hole -> falls in
+    addCube(R - 0.2, HC + 0.02, 0,   false); // C: straddling the rim -> tips in
+    addCube(-R - 2,  HC + 0.02, 2.2, false); // D: out on the ring     -> rests
 }
 
-// A messy pile dropped from a height, spanning the hole + the ground.
+// A messy pile dropped from a height, spanning the hole + the ring.
 function dropCluster(n = 14) {
     for (let i = 0; i < n; i++) {
         addCube((Math.random() * 2 - 1) * (R + 2.6), 5 + Math.random() * 3, (Math.random() * 2 - 1) * (R + 2.6));
@@ -167,10 +152,10 @@ function dropCluster(n = 14) {
 
 function reset() { clearCubes(); spawnTest(); }
 
-// ---- Manual orbit camera (drag to look around) -----------------
+// ---- Orbit camera (single pointer, viewport-scaled) ------------
 const camTarget = new THREE.Vector3(0, 0, 0);
 let camAz = Math.PI * 0.16;
-let camPolar = Math.PI * 0.34; // from +Y (smaller = more top-down)
+let camPolar = Math.PI * 0.34;
 const camR = 18;
 function updateCamera() {
     const sp = Math.sin(camPolar);
@@ -182,9 +167,6 @@ function updateCamera() {
     camera.lookAt(camTarget);
 }
 
-// Orbit — locked to a SINGLE pointer (a second finger can't fling it)
-// and scaled to viewport size (same speed on a big tablet as on desktop:
-// a full-width drag ~= 125 deg, full-height ~= 90 deg).
 let dragId = null, px = 0, py = 0;
 canvas.addEventListener("pointerdown", e => {
     if (dragId !== null) return;          // ignore extra fingers
@@ -192,7 +174,7 @@ canvas.addEventListener("pointerdown", e => {
     try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
 });
 canvas.addEventListener("pointermove", e => {
-    if (e.pointerId !== dragId) return;   // only the finger that started the drag
+    if (e.pointerId !== dragId) return;
     camAz   -= (e.clientX - px) / window.innerWidth  * 2.2;
     camPolar = Math.max(0.12, Math.min(1.4, camPolar - (e.clientY - py) / window.innerHeight * 1.6));
     px = e.clientX; py = e.clientY;
@@ -215,7 +197,7 @@ function loop(now) {
     for (let i = cubes.length - 1; i >= 0; i--) {
         const c = cubes[i];
         syncOne(c);
-        if (c.body.position.y < -(PIT + 4)) { // fell through -> despawn
+        if (c.body.position.y < -(PIT + 4)) {
             scene.remove(c.mesh); world.removeBody(c.body); cubes.splice(i, 1);
         }
     }
@@ -241,7 +223,7 @@ const _q = new THREE.Quaternion(), _up = new THREE.Vector3(), UP = new THREE.Vec
 function tiltOf(body) {
     _q.set(body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w);
     _up.set(0, 1, 0).applyQuaternion(_q);
-    return _up.angleTo(UP); // radians from upright; ~0 rests, large = tipped
+    return _up.angleTo(UP);
 }
 window.__proof = {
     step(n = 60) { for (let i = 0; i < n; i++) world.step(1 / 60); cubes.forEach(syncOne); },
@@ -254,6 +236,7 @@ window.__proof = {
         }));
     },
     count() { return cubes.length; },
+    spawn(x, y, z) { return addCube(x, y, z, false); },
     get camAngles() { return { az: +camAz.toFixed(3), polar: +camPolar.toFixed(3) }; },
     spawnTest, dropCluster, reset, clearCubes,
     cubes, world, scene, camera, THREE, CANNON,
