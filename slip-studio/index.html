@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=4" />
+    <link rel="stylesheet" href="style.css?v=5" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -43,7 +43,10 @@
 </head>
 
 <body>
+    <div id="backdrop" class="backdrop"></div>
+
     <a class="home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+    <button class="title-btn" id="titleBtn" type="button" aria-label="Back to title" title="Title screen">&#x21A9;</button>
     <button class="gallery-open" id="galleryBtn" type="button" aria-label="Your pots" title="Your pots">&#x25A6;</button>
 
     <canvas id="scene" aria-label="Pottery scene"></canvas>
@@ -56,6 +59,8 @@
     <div id="landing" class="landing" hidden>
         <h1 class="landing-title">Slip Studio</h1>
         <p class="landing-tag">a calm place to shape clay</p>
+        <div class="bg-picker" id="bgPicker" role="group" aria-label="Backdrop"></div>
+        <button class="music-toggle" id="musicToggle" type="button" aria-pressed="true">&#9834; Music on</button>
         <button id="beginBtn" class="landing-btn" type="button">Begin</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
     </div>
@@ -118,7 +123,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=4"></script>
+    <script type="module" src="main.js?v=5"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

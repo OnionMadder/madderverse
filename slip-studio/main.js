@@ -152,6 +152,22 @@ const OVERLAY_PATTERNS = [
     { id: "diagonal", label: "Diagonal" },
 ];
 
+// --- Ambiance: backdrops + music --------------------------------
+// Backdrops are CSS images behind the (transparent) canvas; chosen on
+// the title screen and remembered. Music is one looping ambient track.
+const BACKGROUNDS = [
+    { id: "watercolor",     label: "Watercolor" },
+    { id: "dried-flowers",  label: "Dried flowers" },
+    { id: "shadow-flowers", label: "Shadow" },
+    { id: "clay-tunnel",    label: "Clay" },
+    { id: "waves",          label: "Waves" },
+    { id: "abstract",       label: "Abstract" },
+    { id: "cardboard",      label: "Cardboard" },
+    { id: "wireframe",      label: "Wireframe" },
+];
+const DEFAULT_BG = "watercolor";
+const MUSIC_SRC = "assets/audio/New Plan - Out To The World.mp3";
+
 const state = {
     renderer: null,
     scene: null,
@@ -173,9 +189,12 @@ const state = {
     decoCanvas: null, decoCtx: null, decoTex: null,
     zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
     userRotating: false,        // manually spinning the pot
+    background: DEFAULT_BG,
+    musicOn: true,
     clock: new THREE.Clock(),
 };
 let lastPaintUV = null;         // for continuous paint strokes
+let music = null;               // looping ambient track
 
 const targetColor = new THREE.Color(); // scratch for the material tween
 
@@ -201,6 +220,7 @@ function init() {
     const renderer = new THREE.WebGLRenderer({
         canvas,
         antialias: true,
+        alpha: true, // transparent canvas — the CSS backdrop shows behind
         powerPreference: "high-performance",
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -208,11 +228,13 @@ function init() {
     renderer.toneMappingExposure = 0.95;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setClearAlpha(0);
     state.renderer = renderer;
 
     // --- Scene ----------------------------------------------------
+    // No scene.background — the pot + wheel render over a transparent
+    // canvas, with the chosen backdrop image behind it (CSS).
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(BG_COLOR);
     state.scene = scene;
 
     // --- Image-based lighting -------------------------------------
@@ -273,6 +295,18 @@ function init() {
     renderer.render(scene, camera);
     hideLoader();
     renderer.setAnimationLoop(tick);
+
+    // Ambiance: backdrop + music. Restore saved choices.
+    initMusic();
+    buildBgPicker();
+    let savedBg = DEFAULT_BG, savedMusic = true;
+    try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
+    try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
+    setBackground(BACKGROUNDS.some((b) => b.id === savedBg) ? savedBg : DEFAULT_BG);
+    state.musicOn = savedMusic;
+    updateMusicToggle();
+    document.getElementById("musicToggle")?.addEventListener("click", () => setMusic(!state.musicOn));
+    document.getElementById("titleBtn")?.addEventListener("click", showLanding);
 
     // Title screen sits over the (already-spinning) studio until "Begin".
     const landing = document.getElementById("landing");
@@ -381,7 +415,7 @@ function makeClayTexture() {
             const u = x / SIZE;
             const grain = valueNoise(g1, 128, u, v) * 0.6 +
                           valueNoise(g2, 48, u, v) * 0.4 - 0.5;
-            const lines = Math.sin((v * 22 + u * 1.5) * Math.PI * 2);
+            const lines = Math.sin((v * 22 + u * 2) * Math.PI * 2); // u*2 = integer turns → seamless wrap
             const h = 0.5 + grain * 0.5 + lines * 0.16;
             const c = Math.max(0, Math.min(255, h * 255)) | 0;
             const i = (y * SIZE + x) * 4;
@@ -592,7 +626,9 @@ function applyOverlay(id) {
             ctx.beginPath(); ctx.arc(x, y, dr, 0, Math.PI * 2); ctx.fill();
         }
     } else if (id === "checker") {
-        const cols = Math.max(4, Math.round(DECO_W / cell)), cw = DECO_W / cols;
+        let cols = Math.max(4, Math.round(DECO_W / cell));
+        if (cols % 2) cols++; // even cols → parity wraps seamlessly at the u-seam
+        const cw = DECO_W / cols;
         const rows = Math.max(4, Math.round(DECO_H / cw)), rh = DECO_H / rows;
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
             if ((r + c) % 2 === 0) ctx.fillRect(c * cw, r * rh, cw + 1, rh + 1);
@@ -600,28 +636,33 @@ function applyOverlay(id) {
     } else if (id === "waves") {
         const rows = Math.max(3, Math.round(DECO_H / cell)), rh = DECO_H / rows;
         const amp = rh * 0.28, lw = Math.max(3, rh * 0.12);
+        const N = 256; // even segments; last point lands exactly on DECO_W
         ctx.strokeStyle = rgba(hex, 0.85);
         ctx.lineWidth = lw;
         for (let r = 0; r < rows; r++) {
             const y = r * rh + rh * 0.5;
             ctx.beginPath();
-            for (let x = 0; x <= DECO_W; x += 12) {
+            for (let i = 0; i <= N; i++) {
+                const x = (i / N) * DECO_W;
+                // 8 full cycles across the width → value matches at x=0 and x=DECO_W
                 const yy = y + Math.sin((x / DECO_W) * Math.PI * 8) * amp;
-                x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+                i === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
             }
             ctx.stroke();
         }
     } else if (id === "diagonal") {
-        const step = cell, lw = step * 0.4;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 0, DECO_W, DECO_H);
-        ctx.clip();
-        ctx.translate(DECO_W / 2, DECO_H / 2);
-        ctx.rotate(Math.PI / 4);
-        ctx.translate(-DECO_W, -DECO_H);
-        for (let x = 0; x < DECO_W * 2; x += step) ctx.fillRect(x, 0, lw, DECO_H * 2);
-        ctx.restore();
+        // Sheared vertical stripes: integer columns wrap in u, and the
+        // per-row x-shift (with wrap) makes it read diagonal but seamless.
+        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols, sw = cw * 0.45;
+        const slice = 3;
+        for (let y = 0; y < DECO_H; y += slice) {
+            const shift = y % DECO_W; // 45°: 1px of x per 1px of y
+            for (let c = 0; c < cols; c++) {
+                const x = (c * cw + shift) % DECO_W;
+                ctx.fillRect(x, y, sw, slice + 1);
+                if (x > DECO_W - sw) ctx.fillRect(x - DECO_W, y, sw, slice + 1); // wrap overflow
+            }
+        }
     }
     ctx.restore();
     state.decoTex.needsUpdate = true;
@@ -1284,10 +1325,13 @@ function captureThumb(size = 320) {
 
     const rt = new THREE.WebGLRenderTarget(size, size);
     state.renderer.setRenderTarget(rt);
+    state.renderer.setClearColor(BG_COLOR, 1); // opaque warm bg for the thumb
+    state.renderer.clear();
     state.renderer.render(state.scene, cam);
     const buf = new Uint8Array(size * size * 4);
     state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
     state.renderer.setRenderTarget(null);
+    state.renderer.setClearAlpha(0); // back to transparent for the live canvas
     rt.dispose();
 
     // restore the live camera
@@ -1426,4 +1470,63 @@ function hideLoader() {
 function dismissLanding() {
     const l = document.getElementById("landing");
     if (l) l.classList.add("is-gone");
+    // The Begin tap is a user gesture — safe to start audio here.
+    if (state.musicOn && music) music.play().catch(() => {});
+}
+
+// Return to the title screen (re-show the landing over the studio).
+function showLanding() {
+    const l = document.getElementById("landing");
+    if (l) { l.hidden = false; l.classList.remove("is-gone"); }
+}
+
+// --- Ambiance: backdrops + music --------------------------------
+function setBackground(id) {
+    state.background = id;
+    const bd = document.getElementById("backdrop");
+    if (bd) bd.style.backgroundImage = `url("assets/backgrounds/${id}.jpg")`;
+    try { localStorage.setItem("slip-bg", id); } catch (_) {}
+    updateBgPicker();
+}
+function buildBgPicker() {
+    const wrap = document.getElementById("bgPicker");
+    if (!wrap) return;
+    BACKGROUNDS.forEach((b) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "bg-swatch";
+        el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
+        el.setAttribute("aria-label", b.label + " background");
+        el.addEventListener("click", () => setBackground(b.id));
+        wrap.appendChild(el);
+    });
+}
+function updateBgPicker() {
+    const wrap = document.getElementById("bgPicker");
+    if (!wrap) return;
+    Array.from(wrap.children).forEach((el, i) => {
+        el.classList.toggle("is-active", BACKGROUNDS[i].id === state.background);
+    });
+}
+
+function initMusic() {
+    music = new Audio(MUSIC_SRC);
+    music.loop = true;
+    music.volume = 0.45;
+}
+function setMusic(on) {
+    state.musicOn = on;
+    try { localStorage.setItem("slip-music", on ? "1" : "0"); } catch (_) {}
+    if (music) {
+        if (on) music.play().catch(() => {});
+        else music.pause();
+    }
+    updateMusicToggle();
+}
+function updateMusicToggle() {
+    const btn = document.getElementById("musicToggle");
+    if (!btn) return;
+    btn.classList.toggle("is-on", state.musicOn);
+    btn.setAttribute("aria-pressed", state.musicOn ? "true" : "false");
+    btn.textContent = state.musicOn ? "♪ Music on" : "♪ Music off";
 }
