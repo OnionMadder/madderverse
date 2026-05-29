@@ -161,7 +161,7 @@ during a fanout.
 - [ ] `curl https://push.onionmadder.rocks/health` returns `{"ok":true}`.
 - [ ] Pasted VAPID **public** key into Pootery `game.js` (replace
       the `VAPID_PUBLIC_KEY = "REPLACE_WITH_VAPID_PUBLIC_KEY"`
-      constant near the top of `lets-crayte-pootery/game.js`).
+      constant near the top of `pootery/game.js`).
 - [ ] Sent a test push to a subscribed device using one of the
       curl recipes below.
 
@@ -182,7 +182,7 @@ curl -X POST https://push.onionmadder.rocks/send/pack-drop \
   -d '{
     "title": "NEW PACK: BLACKLIGHT",
     "body":  "Glow-in-the-dark glazes just dropped.",
-    "url":   "https://madderverse.org/lets-crayte-pootery/?pack=blacklight"
+    "url":   "https://madderverse.org/pootery/?pack=blacklight"
   }'
 ```
 
@@ -195,7 +195,7 @@ curl -X POST https://push.onionmadder.rocks/send/battle-start \
   -d '{
     "title": "BATTLE: HAUNTED VASE",
     "body":  "Round opens now. 24h to submit.",
-    "url":   "https://madderverse.org/lets-crayte-pootery/?battle=<battle-uuid>"
+    "url":   "https://madderverse.org/pootery/?battle=<battle-uuid>"
   }'
 ```
 
@@ -208,7 +208,7 @@ curl -X POST https://push.onionmadder.rocks/send/battle-end \
   -d '{
     "title": "RESULTS: HAUNTED VASE",
     "body":  "Voting is in -- see the winner.",
-    "url":   "https://madderverse.org/lets-crayte-pootery/?battle=<battle-uuid>"
+    "url":   "https://madderverse.org/pootery/?battle=<battle-uuid>"
   }'
 ```
 
@@ -268,12 +268,12 @@ in the pack bank.
 These are facts the W3 chunk relies on. Useful if you're ever
 porting the integration to another Madderverse game.
 
-- `lets-crayte-pootery/sw.js` registers the `push` +
+- `pootery/sw.js` registers the `push` +
   `notificationclick` handlers. The Pootery main page registers
   this SW once on `window.load`. Bumping the cache version forces
   a clean install on next visit (which is needed to pick up the
   new handlers).
-- `lets-crayte-pootery/game.js` section `0d. PUSH NOTIFICATIONS`
+- `pootery/game.js` section `0d. PUSH NOTIFICATIONS`
   owns the subscribe/unsubscribe flow + the in-app prompt + the
   settings toggle. The constant `VAPID_PUBLIC_KEY` near the top
   of that section must match the Worker's `VAPID_PUBLIC_KEY`

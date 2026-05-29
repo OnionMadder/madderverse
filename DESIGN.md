@@ -1,7 +1,7 @@
 # Madderverse Design System
 
-**Version:** v1.0 — extracted from `lets-crayte-pootery/` on 2026-05-13
-**Canonical source:** [Let's CRAYte! Pootery](lets-crayte-pootery/) (CSS + HTML + game.js)
+**Version:** v1.0 — extracted from `pootery/` on 2026-05-13
+**Canonical source:** [Pootery](pootery/) (CSS + HTML + game.js)
 **Maintainer:** Onion Madder / Mad Sundar LLC
 
 ---
@@ -10,7 +10,7 @@
 
 This is the **load-bearing reference for every Madderverse-branded product**, including new ones (e.g. Tiny Canvas on the App Store + Google Play). Future sessions building any Madderverse game or app should read this first and treat its tokens, patterns, and timings as defaults. **Match Pootery, don't reinvent.**
 
-When you need a color, a button shape, an animation timing, or a drawer pattern — look here first. If something is missing, look at Pootery's CSS (`lets-crayte-pootery/style.css`) and add the rule here in the same commit.
+When you need a color, a button shape, an animation timing, or a drawer pattern — look here first. If something is missing, look at Pootery's CSS (`pootery/style.css`) and add the rule here in the same commit.
 
 **Deviations are allowed but must be documented.** If a future product genuinely needs to diverge (e.g. Tiny Canvas needs a paper-white surface for coloring, not the dark onioncore deep), add an explicit **Exception** entry to the bottom of this doc with: (1) the product, (2) what it overrides, (3) why. The default for all unspecified surfaces is canon.
 
@@ -51,7 +51,7 @@ Every product page links back to **The Madderverse** hub via the floating home b
 
 ## 2. Color palette
 
-The canonical palette is **onioncore**: dark teal-blue base + hot-pink CTAs + neon-teal accents, with warm clay/kiln tones reserved for in-game content surfaces. All tokens below come from `lets-crayte-pootery/style.css:11-37`.
+The canonical palette is **onioncore**: dark teal-blue base + hot-pink CTAs + neon-teal accents, with warm clay/kiln tones reserved for in-game content surfaces. All tokens below come from `pootery/style.css:11-37`.
 
 ### Surfaces (cool side — UI chrome)
 
@@ -337,7 +337,7 @@ Icon-only buttons follow one of two shapes:
 - `border: 1px solid var(--teal-low)`, transitions to `var(--teal)` on hover, `var(--pink)` on focus-visible
 - Glyph in `var(--teal)`, shifts to `var(--pink-bright)` on hover
 - Subtle 0.85 base opacity, full on hover
-- See `.canvas-overlay-btn` in `lets-crayte-pootery/style.css:887` and `.madder-home` in `assets/css/site-footer.css:124`
+- See `.canvas-overlay-btn` in `pootery/style.css:887` and `.madder-home` in `assets/css/site-footer.css:124`
 
 **Inline icon button** (rotate-reset, dev-menu toggles):
 - 22-28px circle
@@ -767,7 +767,7 @@ Keep transitions short and snappy. Pootery's vocabulary:
 
 **Canon: all SFX synthesized in-browser via Web Audio. No audio files. No samples.** This is a deliberate choice — every product ships with zero audio assets so it's instant to install and zero kb over the wire.
 
-The full sound system lives in `lets-crayte-pootery/game.js` from `// ---------- 0. AUDIO BOOTSTRAP ----------` (line 653) onward. The pattern:
+The full sound system lives in `pootery/game.js` from `// ---------- 0. AUDIO BOOTSTRAP ----------` (line 653) onward. The pattern:
 
 ### Architecture
 
