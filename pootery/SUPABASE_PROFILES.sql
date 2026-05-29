@@ -12,7 +12,7 @@
 -- creates the table, RLS policies, the signup trigger, and
 -- backfills profile rows for any auth.users that predate it.
 --
--- Column set reconstructed from lets-crayte-pootery/game.js:
+-- Column set reconstructed from pootery/game.js:
 --   fetchProfile     -> select *
 --   updateProfile    -> patch {username, display_name, bio, updated_at}
 --   profile pages    -> select * where username = <handle>

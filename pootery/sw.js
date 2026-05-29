@@ -21,8 +21,8 @@
      current version.
    ============================================================ */
 
-const CACHE_VERSION = "pootery-v66";
-const SCOPE = "/lets-crayte-pootery/";
+const CACHE_VERSION = "pootery-v67";
+const SCOPE = "/pootery/";
 
 const PRECACHE_URLS = [
     SCOPE,
@@ -144,9 +144,9 @@ self.addEventListener("message", function (event) {
    kill subsequent push delivery on some browsers).
    ============================================================ */
 
-const DEFAULT_PUSH_ICON  = "/lets-crayte-pootery/icons/icon.svg";
-const DEFAULT_PUSH_BADGE = "/lets-crayte-pootery/icons/icon-maskable.svg";
-const DEFAULT_PUSH_URL   = "/lets-crayte-pootery/";
+const DEFAULT_PUSH_ICON  = "/pootery/icons/icon.svg";
+const DEFAULT_PUSH_BADGE = "/pootery/icons/icon-maskable.svg";
+const DEFAULT_PUSH_URL   = "/pootery/";
 
 self.addEventListener("push", function (event) {
     let data = {};
@@ -184,7 +184,7 @@ self.addEventListener("notificationclick", function (event) {
     const target = (event.notification.data && event.notification.data.url) ||
                    DEFAULT_PUSH_URL;
     /* Resolve target against the worker's origin so relative URLs
-       (we send /lets-crayte-pootery/?pot=… on Pootery sends) work
+       (we send /pootery/?pot=… on Pootery sends) work
        just as well as absolute https URLs. */
     const targetURL = new URL(target, self.location.origin).href;
 

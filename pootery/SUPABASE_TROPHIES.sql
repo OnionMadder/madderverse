@@ -11,7 +11,7 @@
 -- multi-row writes; placements lookup is fast enough since each
 -- battle has <100 entries in practice.
 --
--- The client (lets-crayte-pootery/game.js) is forward-compatible
+-- The client (pootery/game.js) is forward-compatible
 -- with these columns missing — trophy features just don't kick
 -- in until the migration runs.
 -- ============================================================

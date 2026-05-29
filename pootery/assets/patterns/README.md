@@ -10,7 +10,7 @@ tab of the decorate palette.
    the image is rendered into a roughly `2r × 2r` square
    centered on the cursor, aspect ratio preserved.
 
-2. Open `lets-crayte-pootery/game.js`, find the
+2. Open `pootery/game.js`, find the
    `MEGA_STAMP_FILES` array (search for "MEGA PACK — Day 5
    chunk D"), and add a line:
 

@@ -10847,7 +10847,7 @@
     }
 
     function potDeepLinkURL(publicId) {
-        return "https://madderverse.org/lets-crayte-pootery/?pot=" +
+        return "https://madderverse.org/pootery/?pot=" +
                encodeURIComponent(publicId);
     }
 

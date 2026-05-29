@@ -6,10 +6,12 @@ but parent-legible (keeps the wink; stays clear and reviewer-safe). Audience = *
 
 > **Distancing note:** the brand is **Pootery**, not "Let's CRAYte! Pootery." The
 > listing title drops the old "Let's CRAYte!" prefix so it no longer reads as a play on
-> the existing app "Let's Create Pottery." Keep the folder/URL (`/lets-crayte-pootery/`)
-> and the `crayte-*` storage keys as-is — those are invisible plumbing, and renaming them
-> would break installed PWAs + wipe saved pots. The distancing happens in the *visible*
-> name, not the internals.
+> the existing app "Let's Create Pottery." The full canonical name is **Pootery: Throw, Glaze, Fire**;
+> the under-the-icon / casual name is just **Pootery**. The folder/URL was renamed to `/pootery/`
+> (2026-05-29), with redirect stubs left at the old `/lets-crayte-pootery/` path so existing share
+> links + the published app's baked URLs keep resolving. Keep the `crayte-*` storage keys as-is —
+> those are invisible plumbing, and renaming them would wipe saved pots + paid packs. The distancing
+> (and the rename) happen in the *visible* name + URL, never the internal storage keys.
 
 ---
 
@@ -79,7 +81,7 @@ Where to change it (these live in `pootery-app/`, **outside this worktree** — 
 - `pootery-app/android/app/src/main/res/values/strings.xml` → `<string name="app_name">Pootery</string>`
 - Play Console → **App name** field → `Pootery`
 
-(CLAUDE.md still records the app name as "Let's CRAYte! Pootery" — update that line when you make this change so the doc matches.)
+(CLAUDE.md records the display name as **Pootery** and the canonical full name as **Pootery: Throw, Glaze, Fire**.)
 
 After editing, re-run the build recipe (JDK 21 + `npx cap copy android`, bump `versionCode`) and rebuild the AAB.
 
@@ -98,8 +100,8 @@ After editing, re-run the build recipe (JDK 21 + `npx cap copy android`, bump `v
 - **Developer / publisher:** Mad Sundar LLC
 - **Package name:** `org.madderverse.pootery`
 - **Email:** pootery@madderverse.org
-- **Privacy policy URL:** https://madderverse.org/lets-crayte-pootery/privacy.html
-- **Account deletion URL (Data safety form):** https://madderverse.org/lets-crayte-pootery/delete-my-account/
+- **Privacy policy URL:** https://madderverse.org/pootery/privacy.html
+- **Account deletion URL (Data safety form):** https://madderverse.org/pootery/delete-my-account/
 
 ---
 

@@ -1,7 +1,7 @@
 /* ============================================================
    Tiny Canvas — drawing engine, audio, gallery, screen switcher
    ============================================================
-   Pattern follows lets-crayte-pootery/game.js:
+   Pattern follows pootery/game.js:
      - Single IIFE, no globals beyond window.TINY_CANVAS_TEMPLATES.
      - DPR-aware canvas sized to a logical 800×800 box.
      - Web Audio synthesized SFX, lazy-init on first user gesture.

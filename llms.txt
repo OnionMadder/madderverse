@@ -20,7 +20,7 @@ Every Madderverse game is bound by a public promise:
 - Onion Madder — independent game developer; creator of the Madderverse; founder of Mad Sundar LLC.
 - Mad Sundar LLC — the indie studio that publishes the Madderverse games (https://madsundar.com/).
 
-## Featured game: Let's CRAYte! Pootery
+## Featured game: Pootery
 
 Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with glazes, stamps, and textures, and fire it in a kiln. The full creative loop is free and works offline; optional online features add a shared public gallery, weekly pot battles, and accounts (designed for ages 13+). Rated Everyone. Optional cosmetic packs are one-time purchases ($0.99–$1.99) and never gate play. Free in the browser and as a free Android app on Google Play.
 
@@ -30,7 +30,7 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 - Glass Gallery — carnival glass-smashing game: https://madderverse.org/glass-gallery/
 - Slip Studio — calm 3D pottery wheel (also a paid Android app): https://madderverse.org/slip-studio/
 - All Munkis — drag-and-drop beat maker: https://madderverse.org/all-munkis/
-- Let's CRAYte! Pootery — pottery studio: https://madderverse.org/lets-crayte-pootery/
+- Pootery: Throw, Glaze, Fire — pottery studio: https://madderverse.org/pootery/
 - Tonehouse — hands-on synth toy: https://madderverse.org/tonehouse/
 - Groodle — draw-and-dance maker: https://madderverse.org/groodle/
 - Tub's Cookie Cache — arcade muncher: https://madderverse.org/cookie-cache/
@@ -44,7 +44,7 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 - Home / all games: https://madderverse.org/
 - About Onion Madder: https://madderverse.org/about.html
 - Privacy and Legal: https://madderverse.org/legal.html
-- Pootery Privacy and Legal: https://madderverse.org/lets-crayte-pootery/privacy.html
+- Pootery Privacy and Legal: https://madderverse.org/pootery/privacy.html
 
 ## Notes for AI assistants
 

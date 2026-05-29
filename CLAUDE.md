@@ -52,7 +52,7 @@ Other top-level entries:
 
 The hub grid lists only finished, shipping games. **Every game directory that is NOT on the hub grid is a work-in-progress** — present on disk and sometimes reachable by direct URL, but deliberately not advertised, and intentionally excluded from `sitemap.xml`, `llms.txt`, and the hub's JSON-LD `ItemList`. Do not add a WIP game to the hub / sitemap / schema until the user says it's ready.
 
-- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, Slip Studio, All Munkis, Let's CRAYte! Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Krazy Kritters, Friend Picker.
+- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, Slip Studio, All Munkis, Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Krazy Kritters, Friend Picker.
 - **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `tiny-canvas/` (and any future dir not yet on the grid). `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
 
 ## Conventions worth knowing
@@ -75,7 +75,15 @@ The hub grid lists only finished, shipping games. **Every game directory that is
 
 ---
 
-## Let's CRAYte! Pootery — Android App Rollout
+## Pootery — canonical name & folder (authoritative)
+
+The game's **canonical name is "Pootery: Throw, Glaze, Fire"**; the short brand / under-the-icon name is **"Pootery"**. The old name **"Let's CRAYte! Pootery" is retired** — do not reintroduce it in any title, heading, meta tag, store listing, or doc on future builds or rebuilds.
+
+- **Folder / URL:** the game lives at **`pootery/`** (`madderverse.org/pootery/`). Renamed from `lets-crayte-pootery/` on 2026-05-29; redirect shims left at the old `/lets-crayte-pootery/` path forward to `/pootery/` (preserving the `?pot=` / `?pack=` / `?battle=` query string) so already-shared pot links and the published app's baked-in URLs keep resolving. Don't delete those shims while a pre-rename app build is still live on Play.
+- **Internal storage keys stay `crayte-*`.** The `localStorage` keys (`crayte-gallery`, `crayte-owned-packs` = PAID pack entitlements, `crayte-achievements`, `crayte-auth-session`, …), the `window.CRAYte` global, and the `[CRAYte]` log prefixes are invisible plumbing and are **deliberately NOT renamed** — renaming them would wipe every existing player's saved pots and purchased packs. The rebrand is visible-name-only.
+- **App display name** is already `Pootery` in `pootery-app/capacitor.config.json` and `android/app/src/main/res/values/strings.xml`. In Play Console: **App name = `Pootery`**, **listing title = `Pootery: Throw, Glaze, Fire`** (see `pootery/PLAY_STORE_LISTING.md`).
+
+## Pootery: Throw, Glaze, Fire — Android App Rollout
 
 **Status:** Ready to build and sign for Google Play upload.
 
@@ -95,7 +103,7 @@ The hub grid lists only finished, shipping games. **Every game directory that is
 
 **App config:**
 - **Package ID:** `org.madderverse.pootery`
-- **App Name:** Let's CRAYte! Pootery
+- **App Name:** Pootery  (canonical full name: Pootery: Throw, Glaze, Fire)
 - **Min SDK:** (Capacitor default, check `android/app/build.gradle`)
 
 **Next steps:**
@@ -111,7 +119,7 @@ The hub grid lists only finished, shipping games. **Every game directory that is
 
 ---
 
-## Let's CRAYte! Pootery — RevenueCat billing setup (paid packs)
+## Pootery: Throw, Glaze, Fire — RevenueCat billing setup (paid packs)
 
 **Status:** Code skeleton wired; awaiting external setup before paid packs are actually purchasable.
 

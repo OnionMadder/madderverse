@@ -6,7 +6,7 @@
 -- copy carries the credit + we can count "X people remixed this"
 -- on the original.
 --
--- Forward-compat: lets-crayte-pootery/game.js writes lineage on
+-- Forward-compat: pootery/game.js writes lineage on
 -- the LOCAL entry today (in localStorage) regardless of whether
 -- these columns exist. The columns only matter when the remix
 -- itself gets shared to public.
