@@ -14,7 +14,14 @@
     // Feature flag: Madballz mode is dormant in the 8-Munki redesign — code,
     // sprites, audio profiles, and the mode toggle are all preserved, but the
     // reveal button never appears. Flip to true to bring the bonus screen back.
-    const MADBALLZ_ENABLED = false;
+    const MADBALLZ_ENABLED = true;
+    // Dual Band Mode: code is preserved (see "DUAL BAND MODE (v1.1)" section
+    // below + ensureDualBandAudio / setDualBandMode / scheduler branches),
+    // but gated off for the v1.1 Play release — the audio independence and
+    // footswitch UX weren't finished to a shippable bar. Re-enable + finish
+    // for v1.2. Flag flip is all that's needed to bring it back; the rest
+    // of the wiring is intact.
+    const DUAL_BAND_ENABLED = false;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
     // ---------- FLYING CREEP CONFIG (all tunable, all in one place) ----
@@ -153,6 +160,7 @@
     let isPlaying = false;
     let isMuted = false;
     let isBaseSongOn = true;                 // background "level music" theme
+    let isBassOn     = false;                // optional booming bass overlay (Madballz Theme) — off by default; user toggles via BASS button
     let isJumpScareActive = false;           // debounce + visual gate for BOO
     let currentStep = 0;
     let currentBar = 0;
@@ -183,7 +191,7 @@
 
     let horrorTriggers = 0;
     let activeBankIndex = 0;
-    let madballzUnlocked = false;
+    let madballzUnlocked = true;   // v1.1: Madballz mode ships unlocked by default
     let isMadballzMode = false;
 
     // ---------- DUAL BAND MODE (v1.1) ----------
@@ -270,8 +278,13 @@
     function dualRowStep(r, step, bar, when) {
         if (!rowGain[r]) return;
         if (isBaseSongOn) {
-            BASE_SONG.play(audioCtx, rowGain[r], when, step, bar);
-            playRowTone(r, step, bar, when);
+            // Mirror the single-band swap: Madballz mode → MADBALLZ_SONG,
+            // standard → BASE_SONG. (Note: Dual Band itself is currently
+            // flag-gated off via DUAL_BAND_ENABLED, but keep this path in
+            // step with scheduleStep for when it's re-enabled in v1.2.)
+            const song = isMadballzMode ? MADBALLZ_SONG : BASE_SONG;
+            song.play(audioCtx, rowGain[r], when, step, bar);
+            if (!isMadballzMode) playRowTone(r, step, bar, when);
         }
         const lo = r * 3;
         for (let i = lo; i < lo + 3; i++) {
@@ -514,6 +527,10 @@
     // unease faint, dread the old 0.32, terror loudest). Edge-detected
     // on `droneLevel` so it only re-ramps when the stage actually moves.
     function setReactDrone(level) {
+        // Madballz mode mutes the horror sub-bass drone — creeps + per-
+        // Munki reacts still escalate the dread state, but the screen-wide
+        // horror audio (and the matching overlays, gated in CSS) goes away.
+        if (isMadballzMode) level = 0;
         if (level === droneLevel) return;
         droneLevel = level;
         if (!toneReady || !toneDroneGain) return;
@@ -560,8 +577,14 @@
         // still run the quarter-note visual/react tick below.
         if (!isDualBandMode) {
             if (isBaseSongOn) {
-                BASE_SONG.play(audioCtx, masterGain, when, step, bar);
-                TONE_LAYER.play(step, bar, when); // ambient pad + bell + hat
+                // Auto-swap by mode: Madballz Mode plays its brooding minor
+                // theme; everything else plays Bala's Theme. SONG button
+                // still toggles whichever theme is currently active.
+                const song = isMadballzMode ? MADBALLZ_SONG : BASE_SONG;
+                song.play(audioCtx, masterGain, when, step, bar);
+                // TONE_LAYER ambient is Cmaj-only — skip in Madballz mode
+                // so the Tone pad doesn't clash with the minor progression.
+                if (!isMadballzMode) TONE_LAYER.play(step, bar, when);
             }
             // User-placed mods
             for (let i = 0; i < NUM_SLOTS; i++) {
@@ -674,6 +697,85 @@
                 g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
                 o.connect(f).connect(g).connect(out);
                 o.start(when); o.stop(when + 0.36);
+            }
+        }
+    };
+
+    // ---------- MADBALLZ THEME (v1.1) ----------
+    // Madballz mode auto-swaps to this brooding minor-key variant instead of
+    // Bala's Theme. Same shape as BASE_SONG (chordsByBar + same play(step,bar)
+    // signature) so the scheduler picks one or the other by mode without any
+    // other logic changes. Progression is i-iv-VI-V in A minor (Am → Dm → F
+    // → E) with the raised 7th (G#) in the E chord for that classic dark-
+    // cathedral tension that resolves back to Am at the loop point.
+    // Instrument palette skews darker than Bala's: sawtooth bass (edgier),
+    // triangle pad (same), triangle melody filtered low (mellow + haunting
+    // vs Bala's bright square hook). TONE_LAYER ambient is *skipped* in
+    // Madballz mode — its Cmaj voicings would clash with the minor keys.
+    const MADBALLZ_SONG = {
+        chordsByBar: [
+            { bass: 110.00, triad: [220.00, 261.63, 329.63], melody: { 0: 440.00, 4: 523.25, 8: 659.25, 12: 523.25 } }, // Am  (A C E)
+            { bass:  73.42, triad: [146.83, 174.61, 220.00], melody: { 0: 587.33, 4: 698.46, 8: 587.33, 12: 440.00 } }, // Dm  (D F A)
+            { bass:  87.31, triad: [174.61, 220.00, 261.63], melody: { 0: 523.25, 4: 698.46, 8: 523.25, 12: 440.00 } }, // F   (F A C)
+            { bass:  82.41, triad: [164.81, 207.65, 246.94], melody: { 0: 493.88, 4: 415.30, 8: 659.25, 12: 415.30 } }  // E   (E G# B) — leading tone, resolves to Am
+        ],
+        play(ctx, out, when, step, bar) {
+            const cb = this.chordsByBar[bar];
+            if (!cb) return;
+            const BAR_LEN = SECONDS_PER_STEP * STEPS_PER_BAR;
+
+            // Triangle triad pad sustain at the top of each bar. The
+            // booming sawtooth bass below is gated behind the BASS button
+            // (isBassOn) — the user pulled the bass out of the song by
+            // default; clicking BASS layers it back on.
+            if (step === 0) {
+                if (isBassOn) {
+                    const b = ctx.createOscillator();
+                    const bg = ctx.createGain();
+                    b.type = 'sawtooth';
+                    b.frequency.value = cb.bass;
+                    // Slightly quieter than BASE_SONG bass — sawtooth is brighter.
+                    bg.gain.setValueAtTime(0, when);
+                    bg.gain.linearRampToValueAtTime(0.10, when + 0.08);
+                    bg.gain.linearRampToValueAtTime(0.08, when + BAR_LEN * 0.7);
+                    bg.gain.exponentialRampToValueAtTime(0.001, when + BAR_LEN);
+                    b.connect(bg).connect(out);
+                    b.start(when); b.stop(when + BAR_LEN + 0.05);
+                }
+
+                cb.triad.forEach((freq, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'triangle';
+                    o.frequency.value = freq;
+                    const peak = 0.040 - i * 0.004;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(peak, when + 0.22);
+                    g.gain.linearRampToValueAtTime(peak * 0.85, when + BAR_LEN * 0.7);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + BAR_LEN);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + BAR_LEN + 0.05);
+                });
+            }
+
+            // Melody hook on quarter notes — triangle through a lowpass for
+            // a mellower, more haunting voice than Bala's bright square hook.
+            const freq = cb.melody[step];
+            if (freq !== undefined) {
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const f = ctx.createBiquadFilter();
+                f.type = 'lowpass';
+                f.frequency.value = 2400;
+                f.Q.value = 1;
+                o.type = 'triangle';
+                o.frequency.value = freq;
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.065, when + 0.03);
+                g.gain.linearRampToValueAtTime(0.05, when + 0.2);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.36);
+                o.connect(f).connect(g).connect(out);
+                o.start(when); o.stop(when + 0.4);
             }
         }
     };
@@ -930,17 +1032,21 @@
             }
         },
 
-        // ===== MADBALLZ MODZ (sheet: 'mb' → assets/sprites/mb-heads.png) =====
-        // 8 sprites, body color matches each head's background color so the
-        // bank reads as a tidy color rainbow on the Madballz page.
-        // PURPLE: mb-skull, mb-zombie, mb-grump
-        // ORANGE: mb-sad, mb-snooze, mb-scared
-        // GREEN:  mb-cool
-        // TEAL:   mb-eye
-        'mb-skull': {
-            label: 'Skull', sheet: 'mb', headFrame: 'mb-skull',
-            bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
-            // Bone-rumble: sub thud filtered low — fits the skull vibe.
+        // ===== MADBALLZ MODZ (sheet: 'mb' → assets/sprites/madballz.png) =====
+        // 8 sprites, body color matches each new head sprite's circle so the
+        // Madballz tray reads as a clean color group:
+        //   PURPLE: mb-brainy, mb-zombi, mb-unc, mb-snooz
+        //   ORANGE: mb-pressio, mb-eyeball, mb-sweats
+        //   GREEN:  mb-chad
+        // Audio profiles are intentionally distinct from the rainbow crew
+        // (no kick/snare/sub-bass overlap) so Madballz Mode reads as its
+        // own sonic palette — each carries forward the v1.0 sound that
+        // was tuned for the previous madballz line, retargeted to the new
+        // sprite that best matches the feel.
+        'mb-brainy': {
+            label: 'Brainy', sheet: 'mb', headFrame: 'brainy',
+            bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764', // PURPLE — matches new head circle
+            // Bone-rumble: sub thud filtered low — fits the brain-skull vibe.
             play(ctx, out, when, step) {
                 if (![2, 9, 14].includes(step)) return;
                 const n = noiseSource(ctx, 0.18);
@@ -957,11 +1063,11 @@
             }
         },
 
-        'mb-zombie': {
-            label: 'Zombi', sheet: 'mb', headFrame: 'mb-zombie',
+        'mb-zombi': {
+            label: 'Zombi', sheet: 'mb', headFrame: 'zombi',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
             // Distorted alien-pluck — sawtooth through a wave shaper, sweeps
-            // pitch + filter for that "zorbie zombie" stagger.
+            // pitch + filter for that staggering undead drag.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -982,10 +1088,10 @@
             }
         },
 
-        'mb-grump': {
-            label: 'Grump', sheet: 'mb', headFrame: 'mb-grump',
+        'mb-unc': {
+            label: 'Unc', sheet: 'mb', headFrame: 'unc',
             bodyColor: '#7e22ce', bodyHi: '#a855f7', bodyShade: '#3b0764',
-            // Chopper-LFO bass — angry pulsing low end.
+            // Chopper-LFO bass — angry pulsing low end, the grumpy uncle.
             play(ctx, out, when, step) {
                 if (step !== 0 && step !== 8) return;
                 const o = ctx.createOscillator();
@@ -1007,30 +1113,9 @@
             }
         },
 
-        'mb-sad': {
-            label: 'Sad', sheet: 'mb', headFrame: 'mb-sad',
-            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
-            // Triangle wave drip — descending pitch fits a teardrop falling.
-            play(ctx, out, when, step) {
-                const seq = { 4: 415.30, 12: 392.00 };
-                const start = seq[step];
-                if (!start) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'triangle';
-                o.frequency.setValueAtTime(start, when);
-                o.frequency.exponentialRampToValueAtTime(start * 0.92, when + 0.45);
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.13, when + 0.05);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.55);
-            }
-        },
-
-        'mb-snooze': {
-            label: 'Snooze', sheet: 'mb', headFrame: 'mb-snooze',
-            bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+        'mb-snooz': {
+            label: 'Snooz', sheet: 'mb', headFrame: 'snooz',
+            bodyColor: '#1e88e5', bodyHi: '#42a5f5', bodyShade: '#0d47a1', // BLUE — matches new head circle (snooz is the blue madball)
             // Long yawn pad — sine with light vibrato, fades up then sleeps
             // back down across most of the bar.
             play(ctx, out, when, step) {
@@ -1054,9 +1139,51 @@
             }
         },
 
-        'mb-scared': {
-            label: 'Shiver', sheet: 'mb', headFrame: 'mb-scared',
+        'mb-pressio': {
+            label: 'Press', sheet: 'mb', headFrame: 'pressio',
             bodyColor: '#a16207', bodyHi: '#d97706', bodyShade: '#451a03',
+            // Triangle wave drip — descending pitch fits a teardrop falling.
+            play(ctx, out, when, step) {
+                const seq = { 4: 415.30, 12: 392.00 };
+                const start = seq[step];
+                if (!start) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                o.type = 'triangle';
+                o.frequency.setValueAtTime(start, when);
+                o.frequency.exponentialRampToValueAtTime(start * 0.92, when + 0.45);
+                g.gain.setValueAtTime(0, when);
+                g.gain.linearRampToValueAtTime(0.13, when + 0.05);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.5);
+                o.connect(g).connect(out);
+                o.start(when); o.stop(when + 0.55);
+            }
+        },
+
+        'mb-eyeball': {
+            label: 'Eyeball', sheet: 'mb', headFrame: 'eyeball',
+            bodyColor: '#1e88e5', bodyHi: '#42a5f5', bodyShade: '#0d47a1', // BLUE — matches new head circle
+            // Square wave electric blip — rising pitch, hi-pass filtered for
+            // a sharp electric snap.
+            play(ctx, out, when, step) {
+                if (step % 4 !== 2) return;
+                const o = ctx.createOscillator();
+                const g = ctx.createGain();
+                const f = ctx.createBiquadFilter();
+                f.type = 'highpass';
+                f.frequency.value = 1500;
+                o.type = 'square';
+                o.frequency.value = 880 + (step * 11);
+                g.gain.setValueAtTime(0.07, when);
+                g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+                o.connect(f).connect(g).connect(out);
+                o.start(when); o.stop(when + 0.07);
+            }
+        },
+
+        'mb-sweats': {
+            label: 'Sweats', sheet: 'mb', headFrame: 'sweats',
+            bodyColor: '#1e88e5', bodyHi: '#42a5f5', bodyShade: '#0d47a1', // BLUE — matches new head circle
             // Shaky percussion — high-pass noise burst + a quick triangle
             // pitch-drop tap, fires on the off-beat.
             play(ctx, out, when, step) {
@@ -1082,8 +1209,8 @@
             }
         },
 
-        'mb-cool': {
-            label: 'Cool', sheet: 'mb', headFrame: 'mb-cool',
+        'mb-chad': {
+            label: 'Chad', sheet: 'mb', headFrame: 'chad',
             bodyColor: '#15803d', bodyHi: '#22c55e', bodyShade: '#052e16',
             // Random sine notes — picks an octave for that "shades say
             // whatever" cool randomness.
@@ -1101,27 +1228,6 @@
                 o.connect(g).connect(out);
                 o.start(when); o.stop(when + 0.14);
             }
-        },
-
-        'mb-eye': {
-            label: 'Eye', sheet: 'mb', headFrame: 'mb-eye',
-            bodyColor: '#0e7490', bodyHi: '#22d3ee', bodyShade: '#083344',
-            // Square wave electric blip — rising pitch, hi-pass filtered for
-            // a sharp electric snap.
-            play(ctx, out, when, step) {
-                if (step % 4 !== 2) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                const f = ctx.createBiquadFilter();
-                f.type = 'highpass';
-                f.frequency.value = 1500;
-                o.type = 'square';
-                o.frequency.value = 880 + (step * 11);
-                g.gain.setValueAtTime(0.07, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
-                o.connect(f).connect(g).connect(out);
-                o.start(when); o.stop(when + 0.07);
-            }
         }
     };
 
@@ -1133,15 +1239,19 @@
         { id: 'bank-1', label: 'BANK 1', munkis: ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'ice'], unlocked: true }
     ];
 
-    // Madballz mode tray order — kept for the dormant Madballz screen (the
-    // reveal button is gated off, but the data + audio profiles stay in
-    // place so the work isn't lost).
+    // Madballz mode tray order. Color-grouped (purple → blue → orange →
+    // green) for v1.1, matching each head sprite's circle backdrop:
+    //   PURPLE: brainy, unc, zombi
+    //   BLUE:   snooz, sweats, eyeball
+    //   ORANGE: pressio
+    //   GREEN:  chad
+    // Ice + Moon are NOT included on the Madballz tray — the user pulled
+    // them so Madballz mode stays its own self-contained set.
     const MADBALLZ_ORDER = [
-        'mb-skull', 'mb-zombie', 'mb-grump',
-        'mb-sad',   'mb-snooze', 'mb-scared',
-        'mb-cool',
-        'mb-eye',
-        'ice', 'moon'
+        'mb-brainy', 'mb-unc',    'mb-zombi',
+        'mb-snooz',  'mb-sweats', 'mb-eyeball',
+        'mb-pressio',
+        'mb-chad'
     ];
 
     function currentOrder() {
@@ -1182,57 +1292,93 @@
     }
 
     const SHEETS = {
-        munki: {
-            src: 'assets/sprites/default-heads.png',
-            sheetW: 1602,
-            sheetH: 1002,
-            // 40 frames = 5 expression rows × 8 color columns.
-            // Frame names are `{expression}-{color}` where expression ∈ 1..5
-            // (1 silly/default → 2 shocked → 3 sad → 4 smug → 5 angry) and
-            // color ∈ {B,G,O,P,R,Y} for regular Munkis, plus X (black) and
-            // Z (white) which both glitch to grey — reserved for the two
-            // antagonists (Moon Munki = X, Ice Munki = Z).
-            // Expression is chosen dynamically per slot by expressionForSlot;
-            // see headArt for how the frame name is composed at render time.
+        rainbow: {
+            src: 'assets/sprites/rainbow-munkis.png',
+            sheetW: 1001,
+            sheetH: 1196,
+            // 30 frames = 6 crew colours × 5 expressions. Frame names are
+            // `{colorWord}{expr}` (e.g. blue1, purple3, yellow5). The colour
+            // is resolved from the Munki's bodyColor via COLOR_BY_BODY →
+            // LETTER_TO_HEAD; the expression is chosen at render time by
+            // expressionForSlot. Each frame has 2 px in-frame padding +
+            // a generous inter-frame gutter so SVG viewBox edge sampling
+            // can no longer pull neighbour pixels through (was the root
+            // cause of the long-standing sprite-bleed issue).
             frames: {
-                '1-B': { x:    2, y:   2, w: 198, h: 198 }, '1-G': { x:  202, y:   2, w: 198, h: 198 },
-                '1-O': { x:  402, y:   2, w: 198, h: 198 }, '1-P': { x:  602, y:   2, w: 198, h: 198 },
-                '1-R': { x:  802, y:   2, w: 198, h: 198 }, '1-X': { x: 1002, y:   2, w: 198, h: 198 },
-                '1-Y': { x: 1202, y:   2, w: 198, h: 198 }, '1-Z': { x: 1402, y:   2, w: 198, h: 198 },
-                '2-B': { x:    2, y: 202, w: 198, h: 198 }, '2-G': { x:  202, y: 202, w: 198, h: 198 },
-                '2-O': { x:  402, y: 202, w: 198, h: 198 }, '2-P': { x:  602, y: 202, w: 198, h: 198 },
-                '2-R': { x:  802, y: 202, w: 198, h: 198 }, '2-X': { x: 1002, y: 202, w: 198, h: 198 },
-                '2-Y': { x: 1202, y: 202, w: 198, h: 198 }, '2-Z': { x: 1402, y: 202, w: 198, h: 198 },
-                '3-B': { x:    2, y: 402, w: 198, h: 198 }, '3-G': { x:  202, y: 402, w: 198, h: 198 },
-                '3-O': { x:  402, y: 402, w: 198, h: 198 }, '3-P': { x:  602, y: 402, w: 198, h: 198 },
-                '3-R': { x:  802, y: 402, w: 198, h: 198 }, '3-X': { x: 1002, y: 402, w: 198, h: 198 },
-                '3-Y': { x: 1202, y: 402, w: 198, h: 198 }, '3-Z': { x: 1402, y: 402, w: 198, h: 198 },
-                '4-B': { x:    2, y: 602, w: 198, h: 198 }, '4-G': { x:  202, y: 602, w: 198, h: 198 },
-                '4-O': { x:  402, y: 602, w: 198, h: 198 }, '4-P': { x:  602, y: 602, w: 198, h: 198 },
-                '4-R': { x:  802, y: 602, w: 198, h: 198 }, '4-X': { x: 1002, y: 602, w: 198, h: 198 },
-                '4-Y': { x: 1202, y: 602, w: 198, h: 198 }, '4-Z': { x: 1402, y: 602, w: 198, h: 198 },
-                '5-B': { x:    2, y: 802, w: 198, h: 198 }, '5-G': { x:  202, y: 802, w: 198, h: 198 },
-                '5-O': { x:  402, y: 802, w: 198, h: 198 }, '5-P': { x:  602, y: 802, w: 198, h: 198 },
-                '5-R': { x:  802, y: 802, w: 198, h: 198 }, '5-X': { x: 1002, y: 802, w: 198, h: 198 },
-                '5-Y': { x: 1202, y: 802, w: 198, h: 198 }, '5-Z': { x: 1402, y: 802, w: 198, h: 198 }
+                blue1:   { x:   2, y:   2, w: 198, h: 198 },
+                blue2:   { x: 202, y:   2, w: 197, h: 197 },
+                blue3:   { x: 401, y:   2, w: 196, h: 196 },
+                blue4:   { x: 601, y:   2, w: 192, h: 192 },
+                blue5:   { x: 801, y:   2, w: 193, h: 193 },
+                green1:  { x:   2, y: 202, w: 195, h: 195 },
+                green2:  { x: 202, y: 202, w: 192, h: 192 },
+                green3:  { x: 401, y: 202, w: 195, h: 195 },
+                green4:  { x: 601, y: 202, w: 195, h: 195 },
+                green5:  { x: 801, y: 202, w: 196, h: 196 },
+                orange1: { x:   2, y: 400, w: 196, h: 196 },
+                orange2: { x: 202, y: 400, w: 194, h: 194 },
+                orange3: { x: 401, y: 400, w: 194, h: 194 },
+                orange4: { x: 601, y: 400, w: 193, h: 193 },
+                orange5: { x: 801, y: 400, w: 198, h: 198 },
+                purple1: { x:   2, y: 600, w: 195, h: 195 },
+                purple2: { x: 202, y: 600, w: 194, h: 194 },
+                purple3: { x: 401, y: 600, w: 195, h: 195 },
+                purple4: { x: 601, y: 600, w: 196, h: 196 },
+                purple5: { x: 801, y: 600, w: 195, h: 195 },
+                red1:    { x:   2, y: 798, w: 195, h: 195 },
+                red2:    { x: 202, y: 798, w: 194, h: 194 },
+                red3:    { x: 401, y: 798, w: 198, h: 198 },
+                red4:    { x: 601, y: 798, w: 198, h: 198 },
+                red5:    { x: 801, y: 798, w: 198, h: 198 },
+                yellow1: { x:   2, y: 998, w: 194, h: 194 },
+                yellow2: { x: 202, y: 998, w: 194, h: 194 },
+                yellow3: { x: 401, y: 998, w: 196, h: 196 },
+                yellow4: { x: 601, y: 998, w: 195, h: 195 },
+                yellow5: { x: 801, y: 998, w: 196, h: 196 }
+            }
+        },
+        icemoon: {
+            src: 'assets/sprites/ice-moon.png',
+            sheetW: 993,
+            sheetH: 400,
+            // 10 frames = 2 evil Munkis × 5 expressions. Frame names are
+            // `ice1..5` and `moon1..5`. Split off from the rainbow crew
+            // sheet so the antagonists can ship their own evolving art
+            // and the crew sheet stays packed tight.
+            frames: {
+                ice1:  { x:   2, y:   2, w: 196, h: 196 },
+                ice2:  { x: 200, y:   2, w: 195, h: 195 },
+                ice3:  { x: 397, y:   2, w: 194, h: 194 },
+                ice4:  { x: 596, y:   2, w: 197, h: 197 },
+                ice5:  { x: 795, y:   2, w: 192, h: 192 },
+                moon1: { x:   2, y: 201, w: 196, h: 196 },
+                moon2: { x: 200, y: 201, w: 195, h: 195 },
+                moon3: { x: 397, y: 201, w: 197, h: 197 },
+                moon4: { x: 596, y: 201, w: 197, h: 197 },
+                moon5: { x: 795, y: 201, w: 196, h: 196 }
             }
         },
         mb: {
-            src: 'assets/sprites/mb-heads.png',
-            sheetW: 4330,
-            sheetH: 2191,
-            // Frame names match each Madballz Mod's id 1:1. Body color
-            // tracks the head-circle background color the same way the
-            // Munki sheet does. PURPLE / ORANGE / GREEN / TEAL.
+            src: 'assets/sprites/madballz.png',
+            sheetW: 874,
+            sheetH: 442,
+            // 8 Madballz heads on a 4×2 grid: ~216 px square, 2–4 px gutters.
+            // Frame names are short single-word ids that match the new
+            // sheet's JSON (brainy, chad, eyeball, pressio, snooz, sweats,
+            // unc, zombi). Each character def below pairs its head sprite
+            // with a bodyColor that matches that head's circle backdrop:
+            //   PURPLE backdrop: brainy, snooz, unc, zombi
+            //   ORANGE backdrop: eyeball, pressio, sweats
+            //   GREEN  backdrop: chad
             frames: {
-                'mb-skull':  { x: 2,    y: 2,    w: 1080, h: 1085 }, // PURPLE
-                'mb-sad':    { x: 1084, y: 2,    w: 1080, h: 1050 }, // ORANGE
-                'mb-zombie': { x: 2166, y: 2,    w: 1080, h: 1088 }, // PURPLE
-                'mb-snooze': { x: 3248, y: 2,    w: 1080, h: 1094 }, // ORANGE
-                'mb-scared': { x: 2,    y: 1098, w: 1080, h: 1088 }, // ORANGE
-                'mb-cool':   { x: 1084, y: 1098, w: 1080, h: 1077 }, // GREEN
-                'mb-grump':  { x: 2166, y: 1098, w: 1080, h: 1090 }, // PURPLE
-                'mb-eye':    { x: 3248, y: 1098, w: 1080, h: 1091 }  // TEAL
+                brainy:  { x:   2, y:   2, w: 216, h: 216 },
+                chad:    { x: 220, y:   2, w: 216, h: 215 },
+                eyeball: { x: 438, y:   2, w: 216, h: 218 },
+                pressio: { x: 656, y:   2, w: 216, h: 218 },
+                snooz:   { x:   2, y: 222, w: 216, h: 216 },
+                sweats:  { x: 220, y: 222, w: 216, h: 217 },
+                unc:     { x: 438, y: 222, w: 216, h: 218 },
+                zombi:   { x: 656, y: 222, w: 216, h: 217 }
             }
         }
     };
@@ -1261,6 +1407,21 @@
         '#9c27b0': 'P',  '#dc2626': 'R',  '#f8fafc': 'Z',  '#fbbf24': 'Y'
     };
 
+    // Bridges COLOR_BY_BODY's single-letter codes to the (sheet, framePrefix)
+    // they live on under the new split sheets. Frame names compose as
+    // `${prefix}${expr}` — e.g. blue3, ice2, moon5 — replacing the old
+    // `${expr}-${letter}` scheme that lived on the unified default-heads.
+    const LETTER_TO_HEAD = {
+        'B': { sheet: 'rainbow', prefix: 'blue'   },
+        'G': { sheet: 'rainbow', prefix: 'green'  },
+        'O': { sheet: 'rainbow', prefix: 'orange' },
+        'P': { sheet: 'rainbow', prefix: 'purple' },
+        'R': { sheet: 'rainbow', prefix: 'red'    },
+        'Y': { sheet: 'rainbow', prefix: 'yellow' },
+        'X': { sheet: 'icemoon', prefix: 'moon'   },  // Moon Munki — X = black-glitch
+        'Z': { sheet: 'icemoon', prefix: 'ice'    }   //  Ice Munki — Z = white-glitch
+    };
+
     // Flat colored circle that sits behind the head sprite. The sprite is a
     // complete head (circle + face), so this backdrop only shows through any
     // transparent edges of the PNG — a safety net, not the primary visual.
@@ -1284,7 +1445,16 @@
     // display downscale a 1px inset still left a sliver of the neighbour
     // bleeding in. 3px clears the sampling window with margin and is
     // invisible — the head art has transparent padding inside the frame.
-    const FRAME_BLEED_INSET = 3;
+    // Was 3 on the old packed default-heads sheet (only 2 px gutter between
+    // 198 px frames — bilinear sampling at the viewBox edge pulled pixels
+    // from the neighbouring head). Even after the split rainbow-munkis +
+    // ice-moon sheets shipped with 2 px in-frame padding + a generous
+    // inter-frame gutter, an inset of 2 still showed faint bleed on heads
+    // because SVG's own rasterisation step is doing its own resampling
+    // independent of `image-rendering: pixelated`. Bumping to 4 burns a
+    // few more source pixels but the sprite art has enough transparent
+    // padding inside each frame to absorb it — and it kills the bleed.
+    const FRAME_BLEED_INSET = 4;
     // Flying Creeps need a MUCH larger inset than the head sheets. The
     // STANDARD creep sheet is a uniform 6×5 grid of the 1310×1412 image
     // (~218×282 px cells) with the cells tiling EDGE-TO-EDGE (no gutter —
@@ -1299,7 +1469,7 @@
     // FRAME_BLEED_INSET to "fix" creeps.
     const CREEP_BLEED_INSET = 8;
     function headModArt(frameName, sheetName) {
-        const sheet = SHEETS[sheetName || 'munki'];
+        const sheet = SHEETS[sheetName || 'rainbow'];
         const f = sheet && sheet.frames[frameName];
         if (!f) return '';
         const b = FRAME_BLEED_INSET;
@@ -1685,7 +1855,8 @@
             inner = headModArt(c.headFrame, c.sheet);
         } else {
             const letter = COLOR_BY_BODY[c.bodyColor];
-            if (letter) inner = headModArt(`${expr}-${letter}`, 'munki');
+            const info = letter && LETTER_TO_HEAD[letter];
+            if (info) inner = headModArt(`${info.prefix}${expr}`, info.sheet);
         }
         return headShapeArt(c) + inner + hairArt(c) + headPhonesArt();
     }
@@ -2461,20 +2632,30 @@
                   `rgba(186,230,253,0) 0%,rgba(191,219,254,0.55) 45%,#ffffff 100%);` +
                   `box-shadow:0 0 14px rgba(186,230,253,0.85);`;
         }
-        const dir = Math.random() < 0.5 ? -1 : 1;
+        // Comets only ever enter diagonally from a TOP CORNER — never
+        // mid-screen. 50/50 between top-LEFT (travel down-right) and
+        // top-RIGHT (travel down-left). The sprite is horizontally
+        // mirrored (scaleX -1 via --flip-x in the comet-streak keyframe)
+        // when entering from the LEFT so the tail trails behind its
+        // travel direction in either case.
+        const enterFromLeft = Math.random() < 0.5;
+        const dir = enterFromLeft ? 1 : -1;        // dir > 0 = going right; dir < 0 = going left
         const dx  = dir * (MOON_FALL.COMET_DX_MIN_VW +
             Math.random() * (MOON_FALL.COMET_DX_MAX_VW - MOON_FALL.COMET_DX_MIN_VW));
         const rot = dir > 0 ? 28 : -28;
         const dur = MOON_FALL.COMET_FALL_MIN_S +
             Math.random() * (MOON_FALL.COMET_FALL_MAX_S - MOON_FALL.COMET_FALL_MIN_S);
-        // Start so the diagonal travels INTO view rather than off-edge.
-        const startLeft = dir > 0 ? (Math.random() * 70 - 10)
-                                  : (Math.random() * 70 + 40);
+        // Hug the entry edge — tight cluster, no mid-screen launches.
+        const startLeft = enterFromLeft
+            ? (-8 + Math.random() * 10)            // top-left:  -8 to +2 vw
+            : (98 + Math.random() * 10);           // top-right: +98 to +108 vw
+        const flipX = enterFromLeft ? -1 : 1;
         m.style.cssText = css +
             `left:${startLeft.toFixed(2)}vw;` +
             `--dx:${dx.toFixed(1)}vw;` +
             `--rot:${rot}deg;` +
-            `--dur:${dur.toFixed(2)}s;`;
+            `--dur:${dur.toFixed(2)}s;` +
+            `--flip-x:${flipX};`;
         m.addEventListener('animationend', () => m.remove());
         moonFallLayer.appendChild(m);
         while (moonFallLayer.childElementCount > MOON_FALL.MAX_CONCURRENT) {
@@ -2548,8 +2729,8 @@
     const SNOW_FALL = {
         SPAWN_MIN_MS:   220,
         SPAWN_MAX_MS:   450,
-        MIN_PX:         10,
-        MAX_PX:         22,
+        MIN_PX:         18,
+        MAX_PX:         42,
         FALL_MIN_S:     6,    // gentler than moons
         FALL_MAX_S:     11,
         RAMP_MS:        12000,
@@ -2570,11 +2751,17 @@
         const s = document.createElement('span');
         const size = SNOW_FALL.MIN_PX +
             Math.random() * (SNOW_FALL.MAX_PX - SNOW_FALL.MIN_PX);
+        // ice-chunks.png is a 3×3 sheet of crystal shards — pick a
+        // random cell each spawn so the rain isn't visibly repeating.
+        const cx = Math.floor(Math.random() * 3) * 50;
+        const cy = Math.floor(Math.random() * 3) * 50;
         const baseCss =
-            `width:${size}px;height:${size}px;border-radius:50%;` +
-            `background:radial-gradient(circle at 38% 32%,` +
-                `#ffffff 0%,#cffafe 55%,rgba(165,243,252,0) 100%);` +
-            `box-shadow:0 0 ${(size*0.6).toFixed(1)}px rgba(165,243,252,0.78);`;
+            `width:${size}px;height:${size}px;` +
+            `background-image:url('assets/sprites/ice-chunks.png');` +
+            `background-size:300% 300%;` +
+            `background-position:${cx}% ${cy}%;` +
+            `background-repeat:no-repeat;` +
+            `filter:drop-shadow(0 0 ${(size*0.4).toFixed(1)}px rgba(165,243,252,0.75));`;
         const frac = (size - SNOW_FALL.MIN_PX) / (SNOW_FALL.MAX_PX - SNOW_FALL.MIN_PX);
         const dur = SNOW_FALL.FALL_MAX_S
                   - frac * (SNOW_FALL.FALL_MAX_S - SNOW_FALL.FALL_MIN_S);
@@ -2643,10 +2830,14 @@
     function setIceMuffle(stage) {
         if (!masterLP || !audioCtx) return;
         const ice = isIceOnStage();
-        const target = (!ice || stage === 'calm') ? 14000
-                     : stage === 'unease' ? 7000
-                     : stage === 'dread'  ? 2500
-                     :                       700;  // terror
+        // Madballz mode keeps clean audio — no cold lowpass muffle even if
+        // dread is climbing (creeps/per-Munki reacts still fire; only the
+        // ice/moon horror audio layer is gated off).
+        const target = isMadballzMode             ? 14000
+                     : (!ice || stage === 'calm') ? 14000
+                     : stage === 'unease'         ? 7000
+                     : stage === 'dread'          ? 2500
+                     :                               700;  // terror
         if (target === iceMuffleLevel) return;
         iceMuffleLevel = target;
         const now = audioCtx.currentTime;
@@ -2875,7 +3066,7 @@
         document.body.classList.remove('madballz-mode');
         const meet = document.getElementById('madballzBtn');
         const back = document.getElementById('backBtn');
-        if (meet) meet.hidden = !MADBALLZ_ENABLED || !madballzUnlocked;
+        if (meet) meet.hidden = !MADBALLZ_ENABLED;   // v1.1: always visible when enabled (unlock gate removed)
         if (back) back.hidden = true;
         for (let i = 0; i < NUM_SLOTS; i++) slots[i] = null;
         renderAllSlots();
@@ -3552,9 +3743,28 @@
             });
         }
 
+        // BASS — swappable booming sawtooth bass overlay for the Madballz
+        // Theme. Off by default (user pulled the booming bass out of the
+        // song; this button adds it back when wanted). No audible effect
+        // in standard mode since BASE_SONG already carries its own bass.
+        const bassBtn = document.getElementById('bassBtn');
+        if (bassBtn) {
+            bassBtn.addEventListener('click', () => {
+                ensureAudio();
+                isBassOn = !isBassOn;
+                bassBtn.classList.toggle('off', !isBassOn);
+                bassBtn.setAttribute('aria-pressed', String(isBassOn));
+            });
+        }
+
         // ---- Dual Band Mode (v1.1, chunk A: mode + footswitch UI) ----
         const dualBandBtn = document.getElementById('dualBandBtn');
-        if (dualBandBtn) {
+        if (dualBandBtn && !DUAL_BAND_ENABLED) {
+            // v1.1 ship gate: hide the button entirely; never wire up the
+            // click handler so setDualBandMode can't be invoked and the
+            // bandFootswitches stay hidden (per their HTML `hidden` attr).
+            dualBandBtn.hidden = true;
+        } else if (dualBandBtn) {
             dualBandBtn.addEventListener('click', () => {
                 ensureAudio();
                 setDualBandMode(!isDualBandMode);
@@ -4397,9 +4607,11 @@
             eyes.appendChild(pair);
         });
         const vig = document.createElement('div'); vig.className = 'red-vignette';
+        const iw  = document.createElement('div'); iw.className  = 'ice-wall';
         root.appendChild(dim);
         root.appendChild(eyes);
         root.appendChild(vig);
+        root.appendChild(iw);
         document.body.appendChild(root);
         // Moon "perception lies" backdrop hue-warp layer (Chunk 4).
         // Inert until body.moon-present + a dread stage drives its

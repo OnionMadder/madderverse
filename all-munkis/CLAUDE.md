@@ -6,6 +6,89 @@ Sprunki-style drag-and-drop music game inside the Madderverse hub.
 ad-free / kid-friendly branding). This file captures only what's specific to
 `all-munkis/`.
 
+> **⚠ DOC FRESHNESS — read this first.** This file is a mix of v1.0 design
+> context and v1.1 updates. The **v1.1 RELEASE STATUS** section immediately
+> below captures everything that changed for the production launch
+> (2026-05-29) and is the authoritative reference for current behaviour.
+> Older sections describe the *design* of features that may since have
+> been refactored, gated off, or replaced — **verify against `game.js` /
+> `style.css` before trusting specifics** (file paths, frame names,
+> ID schemes, button wiring, audio progression).
+
+## v1.1 RELEASE STATUS (2026-05-29 — production)
+
+### Shipped & live
+- **Split sprite sheets**: `rainbow-munkis.png` (30 frames, 6 crew × 5 expr) +
+  `ice-moon.png` (10 frames, 2 antagonists × 5 expr) replace the unified
+  `default-heads.png`. **Frame name scheme changed** from `{expr}-{letter}`
+  (e.g. `3-B`) to `{colorWord}{expr}` (e.g. `blue3`, `ice2`, `moon5`). The
+  split + larger inter-frame gutters killed the chronic edge-sample bleed.
+- **`mb-heads.png` → `madballz.png`** with 8 new sprites (renamed IDs:
+  brainy, zombi, unc, snooz, pressio, eyeball, sweats, chad). Body colors
+  match each new head circle (PURPLE: brainy/zombi/unc · BLUE: snooz/sweats/eyeball
+  · ORANGE: pressio · GREEN: chad). Old IDs (mb-skull/mb-sad/etc.) are gone.
+- **Stage plate swap**: new spotlight-concert-stage `stage.jpg` (and matching
+  `.jpg` portrait crop) replaces the haunted-theater plate. See canonical
+  warning below for current MD5.
+- **Real Ice horror art**: `ice-frost-overlay.png` on `#ice-freeze-warp::before`
+  (opacity ramps with dread), `ice-wall.png` as two side-wall pseudo-elements
+  (~18vw thick, rotated 90° per side, peaks point inward), `ice-encase.png`
+  for the per-Munki freeze (`.frozen-by-ice::after`), `ice-chunks.png` as a
+  3×3 sprite sheet for falling-shard particles (replaces v1.0 drawn cyan-speck).
+- **Horror mode SPLIT by trigger** — Ice gets **cyan** jumpscare flash + cyan
+  glow on `.horror-munki--ice`; Moon keeps red. Mixed Moon+Ice → ice wins
+  (matches ice-wall overriding red-vignette).
+- **Madballz Mode is LIVE** — `MADBALLZ_ENABLED = true`, `madballzUnlocked = true`,
+  unlock gate removed. Tray shows the 8 Madballz, color-grouped, NO ice/moon
+  in the Madballz tray (the user pulled them so it's a self-contained set).
+- **Madballz Theme auto-swap** — entering Madballz mode swaps `BASE_SONG`
+  (Cmaj→Am→F→G) to `MADBALLZ_SONG` (Am→Dm→F→E minor, sawtooth bass +
+  triangle pad + triangle melody). `TONE_LAYER` ambient is skipped in
+  Madballz mode (Cmaj voicings would clash with the minor keys).
+- **BASS button** — orange neon next to SONG, **visible ONLY in Madballz mode**.
+  Toggles `isBassOn`; defaults OFF. The booming sawtooth bass on `MADBALLZ_SONG`
+  is gated by this flag (user pulled it out of the song, made it opt-in).
+- **Madballz horror gate** — in `body.madballz-mode`, CSS hides every
+  screen-wide horror overlay (`bg-dim`, `red-vignette`, `eyes-container`,
+  `ice-wall`, `#ice-freeze-warp` + `::before`, `#moon-warp`, `.horror-munki`,
+  `.snow-fall`, `.moon-fall`) and JS gates (`setIceMuffle`, `setReactDrone`)
+  bypass to clean audio. **Flying creeps + per-Munki react ladder still
+  fire** to build dread (user explicitly asked to keep both).
+- **Tray panel killed** — `.tray-wrap` no longer has the translucent blur
+  slab; chips sit directly on the stage with a thin teal hairline + faint
+  top highlight.
+- **Comet entry constrained** — comets only enter from top-LEFT or top-RIGHT
+  corners (no mid-screen); sprite is `scaleX(-1)` flipped via `--flip-x` CSS
+  var when entering from the LEFT so the tail trails behind travel direction.
+- **Moon phantom tamed** — `.moon-phantom` filter brightness dropped from
+  `1.45 → 1.15` (was amplifying sub-pixel edge bleed) + `will-change:
+  transform, opacity` for stable GPU compositing through the pop animation.
+- **Image-rendering pinned** — `image-rendering: pixelated` now applied to
+  BOTH the SVG container AND the inner `<image>` for `.char-head .head-mod`,
+  with keyword cascade ordered specifically so Chrome picks `pixelated` last.
+  Combined with the split sheets + `FRAME_BLEED_INSET = 4`, head sprites
+  finally render clean across all browsers.
+- **Lore refresh** — new copy in `#storyModal` (kid-toned, longer).
+
+### Flag-gated OFF for v1.1
+- **Dual Band Mode** — `const DUAL_BAND_ENABLED = false;` near the top of
+  game.js hides the DUAL BAND button + skips the click-handler wiring.
+  ALL the underlying code is preserved intact (footswitches, dual-row
+  scheduler, per-row gain bus, `setDualBandMode`, `ensureDualBandAudio`,
+  MADBALLZ_SONG-aware dual-row playback). Flip the flag to true to
+  re-enable for v1.2. The Dual Band design section below is still accurate
+  for what's wired; it's just not exposed to the player.
+
+### Known gaps deferred to v1.2
+- **EYE_PAIRS / EYE_PAIRS_PORTRAIT** — the watching-eye coordinates were
+  tuned for the old haunted-theater plate. May land oddly on the new
+  spotlights stage. Cosmetic; not a launch blocker.
+- **Capacitor app wrap** — the `all-munkis-app/` Capacitor project lives
+  in a sibling worktree and is incomplete on local disk (OneDrive only
+  partially synced source files down). The keystore + Play App Signing
+  enrolment survived, so signing is safe; rehydrate + rebuild for the
+  v1.1 AAB upload as a separate work stream.
+
 ## Dual Band Mode (v1.1 harmonization feature — LOCKED design)
 
 Origin: discovered by accident — two independent browser tabs of the
@@ -269,28 +352,51 @@ all-munkis/
                            # hat, reverb + delay bus) is built from this.
                            # Game stays playable if the file fails to load
                            # — buildToneLayer just bails.
+    bg-img/
+      ice-frost-overlay.png  # v1.1 — full-screen transparent frost wash
+                             # painted onto #ice-freeze-warp::before;
+                             # opacity ramps 0 → 0.55 across dread stages.
+      ice-wall.png           # v1.1 — horizontal ice-crystal bar art that
+                             # the .ice-wall ::before/::after rotate 90°
+                             # per side into two vertical side walls.
+                             # Replaces .red-vignette during Ice phase.
+      stage-portrait.jpg     # v1.1 — 9:16 phone-portrait crop (was .png
+                             # in v1.0; CSS updated). Phones-only swap.
     sprites/
-      default-heads.png    # 1602×1002, 40 Munki heads = 5 expression rows
-                           # × 8 color columns. Frame names are
-                           # `{expr}-{color}`, e.g. `3-G`. Composed on
-                           # render — Munkis pick their COLOR from their
-                           # bodyColor (see COLOR_BY_BODY) and their
-                           # EXPRESSION from game state (see expressionForSlot).
-                           # Expressions: 1 silly (default) → 2 shocked
-                           # → 3 sad → 4 smug → 5 angry.
-                           # Colors: B G O P R Y are crew colors. X (black,
-                           # glitch-grey) is pinned to Moon Munki; Z (white,
-                           # glitch-grey) is pinned to Ice Munki — both are
-                           # evil in lore.
-      default-heads.json   # frame coords (mirrored into SHEETS.munki)
-      mb-heads.png         # 4330×2191, 8 Madballz heads named by id
-                           # (mb-skull, mb-sad, mb-zombie, mb-snooze,
-                           # mb-scared, mb-cool, mb-grump, mb-eye).
-                           # Heads come in 4 colors: PURPLE / ORANGE /
-                           # GREEN / TEAL. Static — Madballz keep their
-                           # single `headFrame` and ignore expression state.
-      mb-heads.json        # frame coords (mirrored into SHEETS.mb)
-  .claude/launch.json     # `python -m http.server 8770` — used by preview tools
+      rainbow-munkis.png   # v1.1 — 1001×1196, 30 frames = 6 crew colors
+                           # × 5 expressions. Frame names: `{colorWord}{expr}`
+                           # (blue1..yellow5). Replaces v1.0 default-heads.png.
+      rainbow-munkis.json  # frame coords (mirrored into SHEETS.rainbow).
+      ice-moon.png         # v1.1 — 993×400, 10 frames = ice1..5 + moon1..5.
+                           # Split off from rainbow so the antagonists ship
+                           # their own evolving art on a smaller sheet.
+      ice-moon.json        # frame coords (mirrored into SHEETS.icemoon).
+      madballz.png         # v1.1 — 874×442, 8 Madballz heads named by sprite
+                           # (brainy, chad, eyeball, pressio, snooz, sweats,
+                           # unc, zombi). Renamed from mb-heads.png; entirely
+                           # new art. Body colors: PURPLE (brainy/zombi/unc) /
+                           # BLUE (snooz/sweats/eyeball) / ORANGE (pressio) /
+                           # GREEN (chad). Static — Madballz keep their single
+                           # `headFrame` and ignore expression state.
+      madballz.json        # frame coords (mirrored into SHEETS.mb).
+      ice-encase.png       # v1.1 — translucent ice block for
+                           # .frozen-by-ice::after; the ice-climb keyframes
+                           # scale its height 0 → 105% over the freeze.
+      ice-chunks.png       # v1.1 — 3×3 sprite sheet of crystal shards.
+                           # spawnFallingSnowflake picks a random cell via
+                           # background-position; replaces v1.0 drawn speck.
+      creep-{color}.png    # v1.1 — per-color Flying Creep sheets (6 files:
+                           # blue/green/orange/purple/red/yellow). Replaces
+                           # the v1.0 single flying-creeps.png. loadCreepSheet
+                           # now fetches per-color with a legacy fallback.
+      creep-{color}.json   # frame coords (one per color).
+      sky-items.png/.json  # Moon + comet sprites for MOON_FALL.
+      SKY_ITEMS_README.md  # MOON_FALL sprite-replacement spec.
+  legal/                   # privacy.html + terms.html (Play Data Safety
+                           # links here).
+  .claude/launch.json      # `python -m http.server 8770` — but 8770 serves
+                           # a STALE snapshot in practice; use the 8771
+                           # absolute-path server for live disk.
 ```
 
 ## Architecture (game.js, top → bottom)
@@ -309,8 +415,8 @@ all-munkis/
 | **CHARACTERS** | The 22-mod dict. **See "Adding a mod" below.** Body color must match the head sprite color — see comment above `SHEETS`. |
 | **STANDARD_ORDER / MADBALLZ_ORDER** | Tray order arrays. Munkis are grouped by HEAD COLOR (green → orange → purple → blue) and Ice Munki + Moon Munki are pinned to the very end on **every page**, including the Madballz tray. |
 | **HORROR_TRIGGER_MODS** | `Set(['moon', 'ice'])`. Auto-trigger jumpscare when one of these is placed (and wasn't already there). |
-| **SHEETS** | `{ munki: {src, sheetW, sheetH, frames}, mb: {…} }`. Frame coords mirror the matching JSON. Munki frames are `{expr}-{color}` (5×8 = 40 frames); Madballz frames are `mb-{id}` (8 static frames). |
-| **COLOR_BY_BODY** | Maps each Munki's `bodyColor` hex to its single-letter color code (B/G/O/P/R/X/Y/Z). Used by `headArt` to pick which column of `default-heads.png` to render. |
+| **SHEETS** (v1.1) | `{ rainbow, icemoon, mb }` — three split sheets. `rainbow` is 30 frames named `{colorWord}{expr}` (e.g. `blue3`); `icemoon` is 10 frames named `ice1..5` + `moon1..5`; `mb` is 8 frames named by sprite id (brainy, chad, eyeball, pressio, snooz, sweats, unc, zombi). Coords mirror each `.json`. The v1.0 unified `default-heads.png` is gone — splitting + larger gutters killed the chronic bleed. |
+| **COLOR_BY_BODY + LETTER_TO_HEAD** (v1.1) | `COLOR_BY_BODY` still maps hex → single-letter code (B/G/O/P/R/X/Y/Z). `LETTER_TO_HEAD` then bridges letter → `{sheet, framePrefix}` — e.g. `B → {sheet: 'rainbow', prefix: 'blue'}`, `X → {sheet: 'icemoon', prefix: 'moon'}`. `headArt` composes `${prefix}${expr}` (e.g. `blue3`) and pulls from the right split sheet. |
 | **expressionForSlot(slotIndex)** | Returns 1..5 per slot. Priority: jumpscare → 2; react mode → cycle 1..5 on beat (`reactStartBeat` Map + `beatCounter`); just placed → 2 (`placedAt` Map, ~600 ms); manual tap → that row (`manualExpression` Map); default → 1. |
 | **cycleManualExpression(idx)** | Tap-on-stage handler — bumps `manualExpression[idx]` to the next row, wrapping 5→1. |
 | **tickReactState()** | Called from `scheduleStep` on every quarter note. Increments `dwellBeats[idx]` for any regular Munki adjacent to Ice/Moon; trips it into react mode at `REACT_DWELL_BEATS`. Re-renders just the affected slots and toggles `body.react-mode-active`. |
@@ -522,13 +628,21 @@ always land against whichever plate is showing; if you re-crop the
 portrait art, retune `EYE_PAIRS_PORTRAIT` to the new composition.
 
 > **🛑 CANONICAL `stage.jpg` — do not let this revert (it has, repeatedly).**
-> The correct background is the **clean empty haunted-theater plate**:
-> the rainbow on a cracked stage, empty red velvet seats, no baked-in
-> HUD/characters/UI. As of this note its identity is **MD5
-> `832AB7D508E8…`, 90,478 bytes**. A *wrong* busy variant with baked-in
-> "LIVES 5/6", a shadow audience and a grid UI (MD5 `0324F8F9EBF5…`,
-> 92,897 bytes) has overwritten it more than once — **never ship that
-> one.**
+> The v1.1 plate is an **empty concert-stage shot with overhead spotlights
+> casting volumetric blue beams down onto a polished concrete floor** — dark
+> and moody so the colorful Munkis pop against it. No baked-in HUD,
+> characters, or UI. **Current MD5 `8c324a0fdc3aa2e53dec389e9a5a7363`** (file
+> ~4 MB). Portrait companion `stage-portrait.jpg` MD5
+> `59c8b8221482294308cc4298c528344a` — note `.jpg` extension, the v1.0 `.png`
+> was deleted.
+>
+> Historical bad variants that have overwritten this file before — **never
+> ship these:**
+> - v1.0 haunted-theater plate (rainbow on cracked stage, red velvet seats):
+>   MD5 `832AB7D508E8…`, 90,478 bytes. Replaced 2026-05-29 with the spotlight
+>   plate; do not let it return.
+> - "LIVES 5/6" mockup with baked-in UI + shadow audience + grid:
+>   MD5 `0324F8F9EBF5…`, 92,897 bytes. Has snuck in twice. Never ship.
 >
 > Rules to keep us on the same page:
 > 1. **Two tracked copies must stay byte-identical:**
@@ -568,9 +682,14 @@ will sound coherent together:
 - **Pad** cloud (Cmaj triad held)
 - **Leads / arps** munki (saw hook), flute (offbeat melody), cocoa (bird arp),
   star (bell triad), ice (high twinkle)
-- **Madballz textures** mb-zombie (distorted alien-pluck), mb-sad (triangle drip),
-  mb-cool (random sine arp), mb-grump (chopper-LFO bass), mb-eye (electric square),
-  mb-skull (low noise thud), mb-snooze (long yawn pad), mb-scared (high-pass shiver)
+- **Madballz textures** (v1.1 renamed IDs, v1.0 audio profiles carried forward):
+  mb-brainy (low noise thud), mb-zombi (distorted alien-pluck), mb-unc (chopper-
+  LFO bass), mb-snooz (long yawn pad), mb-pressio (triangle drip), mb-eyeball
+  (electric square), mb-sweats (high-pass shiver), mb-chad (random sine arp).
+- **Madballz Theme** (v1.1, MADBALLZ_SONG) — Am→Dm→F→E minor progression,
+  triangle triad pad + triangle melody. Booming sawtooth bass is gated by
+  `isBassOn` (BASS button) — defaults off, user toggles it back on.
+  TONE_LAYER ambient is SKIPPED in Madballz mode (Cmaj voicings would clash).
 
 When adding a new mod, pick a register/role that isn't crowded.
 

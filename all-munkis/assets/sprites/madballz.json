@@ -1,163 +1,163 @@
 {
   "frames": {
-    "mb-skull": {
+    "brainy": {
       "frame": {
         "x": 2,
         "y": 2,
-        "w": 1080,
-        "h": 1085
+        "w": 216,
+        "h": 216
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1085
+        "w": 216,
+        "h": 216
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1085
+        "w": 216,
+        "h": 216
       }
     },
-    "mb-sad": {
+    "chad": {
       "frame": {
-        "x": 1084,
+        "x": 220,
         "y": 2,
-        "w": 1080,
-        "h": 1050
+        "w": 216,
+        "h": 215
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1050
+        "w": 216,
+        "h": 215
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1050
+        "w": 216,
+        "h": 215
       }
     },
-    "mb-zombie": {
+    "eyeball": {
       "frame": {
-        "x": 2166,
+        "x": 438,
         "y": 2,
-        "w": 1080,
-        "h": 1088
+        "w": 216,
+        "h": 218
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1088
+        "w": 216,
+        "h": 218
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1088
+        "w": 216,
+        "h": 218
       }
     },
-    "mb-snooze": {
+    "pressio": {
       "frame": {
-        "x": 3248,
+        "x": 656,
         "y": 2,
-        "w": 1080,
-        "h": 1094
+        "w": 216,
+        "h": 218
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1094
+        "w": 216,
+        "h": 218
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1094
+        "w": 216,
+        "h": 218
       }
     },
-    "mb-scared": {
+    "snooz": {
       "frame": {
         "x": 2,
-        "y": 1098,
-        "w": 1080,
-        "h": 1088
+        "y": 222,
+        "w": 216,
+        "h": 216
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1088
+        "w": 216,
+        "h": 216
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1088
+        "w": 216,
+        "h": 216
       }
     },
-    "mb-cool": {
+    "sweats": {
       "frame": {
-        "x": 1084,
-        "y": 1098,
-        "w": 1080,
-        "h": 1077
+        "x": 220,
+        "y": 222,
+        "w": 216,
+        "h": 217
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1077
+        "w": 216,
+        "h": 217
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1077
+        "w": 216,
+        "h": 217
       }
     },
-    "mb-grump": {
+    "unc": {
       "frame": {
-        "x": 2166,
-        "y": 1098,
-        "w": 1080,
-        "h": 1090
+        "x": 438,
+        "y": 222,
+        "w": 216,
+        "h": 218
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1090
+        "w": 216,
+        "h": 218
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1090
+        "w": 216,
+        "h": 218
       }
     },
-    "mb-eye": {
+    "zombi": {
       "frame": {
-        "x": 3248,
-        "y": 1098,
-        "w": 1080,
-        "h": 1091
+        "x": 656,
+        "y": 222,
+        "w": 216,
+        "h": 217
       },
       "rotated": false,
       "trimmed": false,
       "spriteSourceSize": {
         "x": 0,
         "y": 0,
-        "w": 1080,
-        "h": 1091
+        "w": 216,
+        "h": 217
       },
       "sourceSize": {
-        "w": 1080,
-        "h": 1091
+        "w": 216,
+        "h": 217
       }
     }
   },
@@ -167,8 +167,8 @@
     "image": "spritesheet.png",
     "format": "RGBA8888",
     "size": {
-      "w": 4330,
-      "h": 2191
+      "w": 874,
+      "h": 442
     },
     "scale": "1"
   }

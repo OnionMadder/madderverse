@@ -53,17 +53,16 @@ body {
    `background-size: cover` zooms it so hard that the rainbow floor (the
    surface the Munkis stand on) and the side boxes get cropped away — the
    scene reads as a flat smear. So on phone-portrait only, swap to an
-   art-directed 9:16 portrait crop (assets/bg-img/stage-portrait.png,
-   432×768).
+   art-directed 9:16 portrait crop (assets/bg-img/stage-portrait.jpg).
    Gate is deliberately `max-width: 600px` AND `orientation: portrait`:
    - phones in portrait are ~360–430 CSS px wide  → MATCH (get portrait art)
    - tablets in portrait are ≥768 CSS px wide     → NO match (keep stage.jpg)
    - any landscape (phone or tablet or desktop)    → NO match (keep stage.jpg)
    Tablets and desktop are intentionally untouched per the art-direction
-   decision. If stage-portrait.png is ever missing the rule simply has no
+   decision. If stage-portrait.jpg is ever missing the rule simply has no
    image to load and the existing #000 background-color shows — no break. */
 @media (orientation: portrait) and (max-width: 600px) {
-    body { background-image: url('assets/bg-img/stage-portrait.png'); }
+    body { background-image: url('assets/bg-img/stage-portrait.jpg'); }
 }
 
 /* React mode intentionally leaves the page layout + colors alone — the
@@ -135,13 +134,21 @@ body > * { position: relative; z-index: 1; }
 
 body.react-mode-active .horror-munki {
     opacity: 0.96;
-    /* Final pose: sharp focus + a dim blood-red glow that says "they're
-       definitely here now." */
+    /* Final pose: sharp focus + a dim blood-red glow — Moon's signature
+       "they're definitely here now". Ice's glow is overridden below to
+       cyan since Ice's horror palette is cold blue, not blood. */
     filter: blur(0) drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
                     drop-shadow(0 0 40px rgba(255, 40, 40, 0.28));
 }
 body.react-mode-active .horror-munki--moon { transform: scale(1); }
-body.react-mode-active .horror-munki--ice  { transform: scale(1); }
+body.react-mode-active .horror-munki--ice {
+    transform: scale(1);
+    /* Cyan glow for Ice — matches the ice-wall, frost overlay, snow,
+       and the cyan jumpscare flash. Same shape as the red shadow above
+       (long soft drop + wider spread), just shifted to a cold palette. */
+    filter: blur(0) drop-shadow(0 12px 32px rgba(8, 145, 178, 0.55))
+                    drop-shadow(0 0 40px rgba(103, 232, 249, 0.45));
+}
 
 /* Slow ominous breathing — barely-perceptible scale pulse while visible.
    Kicks in AFTER the entry transform finishes (~12 s) so it doesn't fight
@@ -267,6 +274,29 @@ h1 {
 .btn-song.off {
     border-color: rgba(251, 191, 36, 0.35);
     color: rgba(251, 191, 36, 0.5);
+    text-shadow: none;
+}
+
+/* BASS toggle — orange neon, sibling to SONG. Same on/off pattern;
+   off state is intentionally less dim than SONG's so the user can still
+   read "BASS" clearly at a glance (the bass overlay defaults to off).
+   Madballz-mode-only: the bass overlay is a feature of MADBALLZ_SONG,
+   so the button is hidden during og rainbow mode and revealed when the
+   user enters Madballz mode (same pattern as MEET THE MADBALLZ ↔ BACK). */
+.btn-bass { display: none; }
+body.madballz-mode .btn-bass { display: inline-block; }
+.btn-bass {
+    border: 2px solid #fb923c;
+    color: #fb923c;
+    text-shadow: 0 0 6px rgba(251, 146, 60, 0.55);
+}
+.btn-bass:hover, .btn-bass:active {
+    background: rgba(251, 146, 60, 0.15);
+    color: #fff;
+}
+.btn-bass.off {
+    border-color: rgba(251, 146, 60, 0.55);
+    color: rgba(251, 146, 60, 0.75);
     text-shadow: none;
 }
 
@@ -614,10 +644,39 @@ body.dual-band-mode .band-foot:not(.lit) {
 }
 
 /* Pixel-art rendering hint so the spritesheet keeps its crisp edges when
-   scaled down to chip / slot size. */
+   scaled down to chip / slot size. Cascade order matters: each browser
+   uses the LAST keyword it recognises, so list specific/legacy values
+   first and `pixelated` LAST (Chrome/Edge — kills the bilinear bleed
+   that was pulling neighbour-frame pixels through the viewBox edge).
+   Apply to BOTH the SVG and the inner <image> — the SVG's own raster
+   step can smooth too, even when the inner image is pixelated. */
+.char-head .head-mod,
 .char-head .head-mod image {
-    image-rendering: pixelated;
+    image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
+    image-rendering: pixelated;
+}
+
+/* ===== MADBALLZ-MODE HORROR GATE (v1.1) ===========================
+   User asked to strip the ice/moon visual horror entirely from Madballz
+   mode while LEAVING the flying creeps + per-Munki react ladder intact
+   (those still build dread; only the screen-wide horror overlays + the
+   cold-muffle audio are gated). Pure CSS so the underlying horror state
+   keeps running for the creeps/reacts to feed off, but the chrome the
+   ice/moon trigger normally paints simply isn't rendered. The audio
+   gates (setIceMuffle + setReactDrone bypass in Madballz mode) live in
+   game.js. */
+body.madballz-mode #horror-overlay .bg-dim,
+body.madballz-mode #horror-overlay .red-vignette,
+body.madballz-mode #horror-overlay .eyes-container,
+body.madballz-mode #horror-overlay .ice-wall,
+body.madballz-mode #ice-freeze-warp,
+body.madballz-mode #ice-freeze-warp::before,
+body.madballz-mode #moon-warp,
+body.madballz-mode .horror-munki,
+body.madballz-mode .snow-fall,
+body.madballz-mode .moon-fall {
+    display: none !important;
 }
 
 .char-head .head-phones {
@@ -655,16 +714,12 @@ body.dual-band-mode .band-foot:not(.lit) {
     right: 0;
     bottom: 0;
     padding: 8px 0 calc(12px + env(safe-area-inset-bottom, 0) + var(--mv-slim-h, 22px));
-    /* Frosted glass: the haunted-theatre stage shows softly through —
-       modern, and it deepens the horror mood instead of slapping a flat
-       near-opaque black slab over it. The blur+saturate carries the look
-       now that the panel itself is mostly transparent. */
-    background: linear-gradient(to top, rgba(6, 8, 16, 0.46), rgba(6, 8, 16, 0.28));
+    /* Tray sits directly on the stage — no translucent panel, no blur.
+       A thin teal hairline + a faint top highlight keep enough edge
+       definition to read as a separate strip without the frosted slab. */
+    background: transparent;
     border-top: 1px solid rgba(45, 212, 191, 0.26);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06),
-                0 -12px 34px rgba(0, 0, 0, 0.42);
-    backdrop-filter: blur(22px) saturate(1.3);
-    -webkit-backdrop-filter: blur(22px) saturate(1.3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
     z-index: 10;
 }
 
@@ -938,6 +993,23 @@ body.jumpscare::after {
     pointer-events: none;
     z-index: 9998;
     animation: jumpscare-flash 1.5s ease-out forwards;
+}
+
+/* Ice-trigger jumpscare uses a CYAN radial flash + cyan BOO! glow
+   instead of the default red. Body has both `.jumpscare` and
+   `.ice-on-stage` set during ice-triggered jumpscares, so this 2-class
+   selector wins on specificity over the default red ::after above.
+   Mixed Moon+Ice scenario: ice wins (consistent with how the ice-wall
+   overrides the red-vignette in mixed-trigger horror). */
+body.jumpscare.ice-on-stage::after {
+    background: radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.55), rgba(8, 47, 73, 0.85));
+}
+body.jumpscare.ice-on-stage .boo-overlay {
+    text-shadow:
+        0 0 30px #06b6d4,
+        0 0 60px #155e75,
+        4px 4px 0 #000,
+        -4px -4px 0 #000;
 }
 
 body.jumpscare main {
@@ -1339,18 +1411,14 @@ body.madballz-mode .chip-label { color: #f0abfc; }
     position: absolute;
     left: 0; right: 0; bottom: 0;
     height: 0;
-    background:
-        /* the ice column — dense at the floor, fading at the rising
-           waterline; light cracks layered for texture. */
-        linear-gradient(to top,
-            rgba(165, 243, 252, 0.94) 0%,
-            rgba(165, 243, 252, 0.86) 35%,
-            rgba(199, 246, 253, 0.72) 70%,
-            rgba(224, 252, 255, 0.55) 88%,
-            rgba(224, 252, 255, 0.00) 100%),
-        linear-gradient(118deg, transparent 45%, rgba(224, 252, 255, 0.6) 47%, transparent 49%),
-        linear-gradient(204deg, transparent 58%, rgba(165, 243, 252, 0.5) 60%, transparent 62%),
-        linear-gradient(70deg,  transparent 70%, rgba(224, 252, 255, 0.42) 72%, transparent 74%);
+    /* Real ice-chunk encasement (rawpixel). The image stretches with
+       the animated height so the Munki appears to be entombed as the
+       ice rises feet → head; texture/cracks come from the photo. */
+    background-image: url('assets/sprites/ice-encase.png');
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-position: bottom center;
+    opacity: 0.92;
     animation: ice-climb 3.5s ease-in-out forwards;
     z-index: 7;
     pointer-events: none;
@@ -1748,12 +1816,20 @@ body.moon-tilt main {
                comet-flicker 0.16s steps(1) infinite;
 }
 @keyframes comet-streak {
-    0%   { transform: translate(0, -16vh) rotate(var(--rot, 28deg));
+    /* --flip-x is +1 by default; spawnFallingComet sets it to -1 when the
+       comet enters from the top-LEFT so the sprite is mirrored and its
+       tail trails BEHIND the diagonal travel instead of leading it.
+       scaleX comes AFTER rotate so the flip is applied in the rotated
+       reference frame — the tail still trails along the comet's path. */
+    0%   { transform: translate(0, -16vh)
+                       rotate(var(--rot, 28deg))
+                       scaleX(var(--flip-x, 1));
            opacity: 0; }
     9%   { opacity: 0.92; }
     88%  { opacity: 0.9; }
     100% { transform: translate(var(--dx, 40vw), 118vh)
-                       rotate(var(--rot, 28deg));
+                       rotate(var(--rot, 28deg))
+                       scaleX(var(--flip-x, 1));
            opacity: 0; }
 }
 @keyframes comet-jitter {
@@ -1821,7 +1897,10 @@ body.react-mode-active #horror-overlay .bg-dim {
     opacity: 0;
     transition: opacity 3.5s ease;
 }
-body.react-mode-active #horror-overlay .eye-pair { opacity: 1; }
+/* Watching eyes are Moon's territory ("perception lies — you're being
+   watched"). Ice horror is about isolation/stillness, not surveillance,
+   so no eyes during ice-only phase. Mixed Moon+Ice: Moon's eyes show. */
+body.react-mode-active.moon-present #horror-overlay .eye-pair { opacity: 1; }
 #horror-overlay .eye {
     width: 8px;
     height: 8px;
@@ -1891,6 +1970,65 @@ body.dread-terror #horror-overlay .red-vignette {
 }
 @media (prefers-reduced-motion: reduce) {
     body.dread-terror #horror-overlay .red-vignette { animation: none; }
+}
+
+/* (3b) Ice WALL — z 8 sibling of .red-vignette. Replaces the red
+   vignette during the ICE phase (body.ice-on-stage); the Moon phase
+   retains the red. ice-wall.png is a horizontal bar of jagged crystals
+   anchored to the bottom edge so the ice closes in upward from the
+   floor. Ramps with dread like the red vignette does. */
+#horror-overlay .ice-wall {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 8;
+    opacity: 0;
+    transition: opacity 2s ease;
+    overflow: hidden;
+    /* Wall thickness (post-rotation). Tuned so the wall stops at roughly
+       the outer edge of the corner Ice/Moon Munki at its largest
+       "breathing" scale — never crowds the play area. Single source of
+       truth: retune both sides by editing this one value. */
+    --ice-wall-thickness: 18vw;
+}
+/* Two vertical ice columns — one on each side of the viewport, peaks
+   pointing inward. ice-wall.png is a wide horizontal bar with peaks
+   along its top; we rotate the art 90° per side (CW for left, CCW for
+   right) so the jagged edge always faces the play area. Mirrors how
+   Moon's red vignette darkens the edges, but with literal ice. */
+#horror-overlay .ice-wall::before,
+#horror-overlay .ice-wall::after {
+    content: '';
+    position: absolute;
+    width: 100vh;                       /* becomes the wall's HEIGHT after rotation */
+    height: var(--ice-wall-thickness);  /* becomes the wall's THICKNESS after rotation */
+    background-image: url('assets/bg-img/ice-wall.png');
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+}
+#horror-overlay .ice-wall::before {
+    top: 0; left: 0;
+    transform-origin: top left;
+    transform: translateX(var(--ice-wall-thickness)) rotate(90deg);            /* peaks → right (inward) */
+}
+#horror-overlay .ice-wall::after {
+    top: 0; right: 0;
+    transform-origin: top right;
+    transform: translateX(calc(-1 * var(--ice-wall-thickness))) rotate(-90deg); /* peaks → left (inward) */
+}
+body.ice-on-stage.react-mode-active #horror-overlay .ice-wall {
+    opacity: 0.92;
+    transition: opacity 12s ease;
+}
+body.ice-on-stage.dread-unease #horror-overlay .ice-wall {
+    opacity: 0.22;
+    transition: opacity 6s ease;
+}
+body.ice-on-stage.dread-terror #horror-overlay .ice-wall { opacity: 1; }
+/* During ICE phase, suppress the red vignette — Ice takes its slot.
+   Moon phase (no Ice) keeps the red exactly as before. */
+body.ice-on-stage #horror-overlay .red-vignette {
+    opacity: 0 !important;
+    animation: none !important;
 }
 
 /* ===== Moon personality — "perception lies" (Chunk 4) =====
@@ -1963,6 +2101,23 @@ body.moon-present.dread-terror #moon-warp {
     backdrop-filter: saturate(1) brightness(1);
     -webkit-backdrop-filter: saturate(1) brightness(1);
 }
+/* Real frost overlay (rawpixel art) — sits as a ::before so the parent's
+   stutter animation + backdrop-filter keep working on top of it. Opacity
+   ramps with dread stage: the frost slowly creeps in across the glass. */
+#ice-freeze-warp::before {
+    content: '';
+    position: absolute; inset: 0;
+    background-image: url('assets/bg-img/ice-frost-overlay.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity 1.5s ease;
+    pointer-events: none;
+}
+body.ice-on-stage.dread-unease #ice-freeze-warp::before { opacity: 0.15; }
+body.ice-on-stage.dread-dread  #ice-freeze-warp::before { opacity: 0.35; }
+body.ice-on-stage.dread-terror #ice-freeze-warp::before { opacity: 0.55; }
 body.ice-on-stage.dread-unease #ice-freeze-warp {
     animation: ice-stutter-soft 5.4s steps(6, jump-none) infinite;
 }
@@ -2054,17 +2209,24 @@ body.ice-on-stage.dread-terror #ice-freeze-warp {
     100% { transform: translateX(0);    opacity: 0.9; }
 }
 
-/* Phantom Munki briefly haunting an empty slot. */
+/* Phantom Munki briefly haunting an empty slot. brightness was 1.45
+   but that aggressive boost was amplifying sub-pixel edge sampling on
+   the head-mod sprite (the "ghost bleed" the user kept seeing); 1.15
+   keeps the moon-blue glow without exaggerating the alpha fringe.
+   will-change hints the compositor to keep a stable GPU layer through
+   the scale/rotate keyframes so the sprite isn't re-rasterised every
+   frame at slightly different resolutions. */
 .moon-phantom {
     position: absolute;
     inset: 6px;
     z-index: 4;
     pointer-events: none;
-    filter: hue-rotate(220deg) brightness(1.45) drop-shadow(0 0 14px #93c5fd);
+    filter: hue-rotate(220deg) brightness(1.15) drop-shadow(0 0 14px #93c5fd);
     animation: moon-phantom-pop 0.95s ease-out forwards;
     display: flex;
     align-items: center;
     justify-content: center;
+    will-change: transform, opacity;
 }
 .moon-phantom .char-art {
     width: 100%;

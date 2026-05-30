@@ -1,0 +1,215 @@
+{
+  "frames": {
+    "ice1": {
+      "frame": {
+        "x": 2,
+        "y": 2,
+        "w": 196,
+        "h": 196
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 196,
+        "h": 196
+      },
+      "sourceSize": {
+        "w": 196,
+        "h": 196
+      }
+    },
+    "ice2": {
+      "frame": {
+        "x": 200,
+        "y": 2,
+        "w": 195,
+        "h": 195
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 195,
+        "h": 195
+      },
+      "sourceSize": {
+        "w": 195,
+        "h": 195
+      }
+    },
+    "ice3": {
+      "frame": {
+        "x": 397,
+        "y": 2,
+        "w": 194,
+        "h": 194
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 194,
+        "h": 194
+      },
+      "sourceSize": {
+        "w": 194,
+        "h": 194
+      }
+    },
+    "ice4": {
+      "frame": {
+        "x": 596,
+        "y": 2,
+        "w": 197,
+        "h": 197
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 197,
+        "h": 197
+      },
+      "sourceSize": {
+        "w": 197,
+        "h": 197
+      }
+    },
+    "ice5": {
+      "frame": {
+        "x": 795,
+        "y": 2,
+        "w": 192,
+        "h": 192
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 192,
+        "h": 192
+      },
+      "sourceSize": {
+        "w": 192,
+        "h": 192
+      }
+    },
+    "moon1": {
+      "frame": {
+        "x": 2,
+        "y": 201,
+        "w": 196,
+        "h": 196
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 196,
+        "h": 196
+      },
+      "sourceSize": {
+        "w": 196,
+        "h": 196
+      }
+    },
+    "moon2": {
+      "frame": {
+        "x": 200,
+        "y": 201,
+        "w": 195,
+        "h": 195
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 195,
+        "h": 195
+      },
+      "sourceSize": {
+        "w": 195,
+        "h": 195
+      }
+    },
+    "moon3": {
+      "frame": {
+        "x": 397,
+        "y": 201,
+        "w": 197,
+        "h": 197
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 197,
+        "h": 197
+      },
+      "sourceSize": {
+        "w": 197,
+        "h": 197
+      }
+    },
+    "moon4": {
+      "frame": {
+        "x": 596,
+        "y": 201,
+        "w": 197,
+        "h": 197
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 197,
+        "h": 197
+      },
+      "sourceSize": {
+        "w": 197,
+        "h": 197
+      }
+    },
+    "moon5": {
+      "frame": {
+        "x": 795,
+        "y": 201,
+        "w": 196,
+        "h": 196
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 196,
+        "h": 196
+      },
+      "sourceSize": {
+        "w": 196,
+        "h": 196
+      }
+    }
+  },
+  "meta": {
+    "app": "Sprite Sheet Maker",
+    "version": "1.0",
+    "image": "spritesheet.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 993,
+      "h": 400
+    },
+    "scale": "1"
+  }
+}
