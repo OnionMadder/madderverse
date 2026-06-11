@@ -304,6 +304,7 @@ const state = {
     })(),
     photoStyle: "studio",                // studio | sunlit | museum
     photoAspect: "square",               // square | portrait
+    bgCategory: null,                    // resolved by buildBgPicker
     zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
     userRotating: false,        // manually spinning the pot
     background: DEFAULT_BG,
@@ -2184,35 +2185,70 @@ function setBackground(id) {
     try { localStorage.setItem("slip-bg", id); } catch (_) {}
     updateBgPicker();
 }
+// Background picker: a row of category tabs above a single row of
+// swatches. Only the active category's swatches show — keeps the
+// title screen compact, scales to many backdrops without a scrollbar.
 function buildBgPicker() {
     const wrap = document.getElementById("bgPicker");
     if (!wrap) return;
     wrap.innerHTML = "";
+
+    // Pick the initial category: whichever one the saved background lives in.
+    const current = BACKGROUNDS.find((b) => b.id === state.background);
+    state.bgCategory = current ? current.category : BG_CATEGORIES[0];
+
+    const tabs = document.createElement("div");
+    tabs.className = "bg-tabs";
     BG_CATEGORIES.forEach((cat) => {
-        const items = BACKGROUNDS.filter((b) => b.category === cat);
-        if (!items.length) return;
-        const section = document.createElement("div");
-        section.className = "bg-section";
-        const label = document.createElement("div");
-        label.className = "bg-section-label";
-        label.textContent = cat;
-        section.appendChild(label);
-        const row = document.createElement("div");
-        row.className = "bg-section-row";
-        items.forEach((b) => {
-            const el = document.createElement("button");
-            el.type = "button";
-            el.className = "bg-swatch";
-            el.dataset.id = b.id;
-            el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
-            el.setAttribute("aria-label", b.label + " background");
-            el.addEventListener("click", () => setBackground(b.id));
-            row.appendChild(el);
-        });
-        section.appendChild(row);
-        wrap.appendChild(section);
+        if (!BACKGROUNDS.some((b) => b.category === cat)) return;
+        const tab = document.createElement("button");
+        tab.type = "button";
+        tab.className = "bg-tab";
+        tab.dataset.category = cat;
+        tab.textContent = cat;
+        tab.addEventListener("click", () => setBgCategory(cat));
+        tabs.appendChild(tab);
+    });
+    wrap.appendChild(tabs);
+
+    const row = document.createElement("div");
+    row.className = "bg-row";
+    row.id = "bgRow";
+    wrap.appendChild(row);
+
+    renderBgRow();
+}
+
+function setBgCategory(cat) {
+    if (!BG_CATEGORIES.includes(cat)) return;
+    state.bgCategory = cat;
+    renderBgRow();
+}
+
+function renderBgRow() {
+    const row = document.getElementById("bgRow");
+    if (!row) return;
+    row.innerHTML = "";
+    BACKGROUNDS.filter((b) => b.category === state.bgCategory).forEach((b) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "bg-swatch";
+        el.dataset.id = b.id;
+        el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
+        el.setAttribute("aria-label", b.label + " background");
+        el.addEventListener("click", () => setBackground(b.id));
+        row.appendChild(el);
+    });
+    syncBgTabs();
+    updateBgPicker();
+}
+
+function syncBgTabs() {
+    document.querySelectorAll(".bg-tab").forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.category === state.bgCategory);
     });
 }
+
 function updateBgPicker() {
     const wrap = document.getElementById("bgPicker");
     if (!wrap) return;

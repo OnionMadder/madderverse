@@ -240,39 +240,58 @@ html, body {
     transform: scale(1.04);
 }
 
-/* Backdrop picker on the title screen — sections per category. Each
-   category gets its own horizontally-scrolling row so the picker can
-   keep growing as more images are added without ballooning vertically. */
+/* Backdrop picker on the title screen — category tabs on top, one
+   row of swatches below. Only the active category's swatches show,
+   so the picker stays compact even as more backdrops are added. */
 .bg-picker {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    gap: 6px;
     width: 100%;
     max-width: 340px;
-    max-height: 240px;
-    overflow-y: auto;
     margin-bottom: 6px;
-    padding-right: 4px;
-    scrollbar-width: thin;
 }
-.bg-section { display: flex; flex-direction: column; gap: 4px; }
-.bg-section-label {
+.bg-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 2px;
+}
+.bg-tab {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 4px 10px;
+    font: inherit;
     font-size: 0.6rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--ink-dim);
-    padding: 0 4px;
+    color: var(--ink-faint);
+    cursor: pointer;
+    border-radius: 999px;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
-.bg-section-row {
+.bg-tab:hover:not(.is-active) { color: var(--ink-dim); }
+.bg-tab.is-active {
+    color: var(--ink);
+    background: var(--chip);
+    border-color: var(--ink-faint);
+}
+.bg-row {
     display: flex;
     flex-wrap: nowrap;
     gap: 8px;
     overflow-x: auto;
     scrollbar-width: none;
-    padding: 2px 4px 4px;
+    padding: 4px 8px;
+    max-width: 100%;
+    justify-content: safe center;
 }
-.bg-section-row::-webkit-scrollbar { display: none; }
-.bg-section-row .bg-swatch { flex: 0 0 auto; }
+.bg-row::-webkit-scrollbar { display: none; }
+.bg-row .bg-swatch { flex: 0 0 auto; }
 .bg-swatch {
     -webkit-tap-highlight-color: transparent;
     width: 52px;
