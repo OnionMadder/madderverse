@@ -396,6 +396,44 @@ html, body {
     outline: none;
 }
 
+/* ---------- Lid style picker (only while shaping a lid) ---------- */
+.lid-style-picker {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(132px, calc(env(safe-area-inset-bottom, 0px) + 132px));
+    z-index: 35;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    pointer-events: none;
+}
+.lid-style-picker[hidden] { display: none; }
+.lid-style-btn {
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    font: inherit;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    background: var(--chip);
+    border: 1px solid var(--ink-faint);
+    border-radius: 999px;
+    padding: 6px 16px;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.lid-style-btn.is-active {
+    color: var(--ink);
+    border-color: var(--accent);
+    background: rgba(201, 138, 100, 0.18);
+}
+
 /* ---------- Brush size bar (only while wet) ---------- */
 .brush-bar {
     position: fixed;

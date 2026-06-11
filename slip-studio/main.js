@@ -262,6 +262,59 @@ const SHAPES = {
         ],
     },
 };
+
+// Lid silhouettes — keyed by style. Each entry generates control
+// points scaled to a given rim radius. Lives up here (above init())
+// so the picker can wire up at startup without TDZ errors.
+const LID_STYLES = {
+    flat: (k) => [
+        [0.00,     0.00],
+        [k,        0.00],
+        [k,        0.12],
+        [k * 0.96, 0.20],
+        [k * 0.84, 0.32],
+        [k * 0.60, 0.46],
+        [k * 0.34, 0.60],
+        [k * 0.20, 0.74],
+        [k * 0.18, 0.88],
+        [k * 0.24, 1.00],   // shallow knob base
+        [k * 0.26, 1.12],
+        [k * 0.14, 1.26],
+        [0.00,     1.40],
+    ],
+    domed: (k) => [
+        [0.00,     0.00],
+        [k,        0.00],
+        [k,        0.10],
+        [k * 0.94, 0.18],
+        [k * 0.78, 0.34],
+        [k * 0.50, 0.58],
+        [k * 0.30, 0.82],
+        [k * 0.18, 1.00],
+        [k * 0.16, 1.12],
+        [k * 0.26, 1.22],
+        [k * 0.30, 1.30],
+        [k * 0.18, 1.38],
+        [0.00,     1.40],
+    ],
+    tall: (k) => [
+        [0.00,     0.00],
+        [k,        0.00],
+        [k,        0.08],
+        [k * 0.90, 0.14],
+        [k * 0.62, 0.28],
+        [k * 0.30, 0.44],
+        [k * 0.16, 0.62],
+        [k * 0.12, 0.80],
+        [k * 0.12, 1.00],
+        [k * 0.30, 1.12],   // prominent knob base
+        [k * 0.36, 1.24],
+        [k * 0.20, 1.34],
+        [0.00,     1.40],
+    ],
+};
+const LID_STYLE_IDS = ["flat", "domed", "tall"];
+
 // Lids are now generated parametrically from the source pot's rim
 // (see seedLidForRim) — no preset silhouette needed.
 const SHAPE_IDS = ["vase", "bowl", "cup", "bottle"]; // picker order; lid is set-only
@@ -294,6 +347,7 @@ const state = {
     isLid: false,                         // current piece is a lid (relaxes the foot envelope)
     savedPot: null,                       // paused pot state while user shapes a lid
     savedLid: null,                       // paused lid state while user edits the pot
+    lidStyle: "domed",                    // flat | domed | tall — picked while shaping a lid
     partnerMesh: null,                    // second mesh, used for the fired-set assembly view
     partnerMaterial: null,
     partnerDecoCanvas: null, partnerDecoCtx: null, partnerDecoTex: null,
@@ -443,6 +497,7 @@ function init() {
     initMusic();
     buildShapePicker();
     buildBgPicker();
+    buildLidStylePicker();
     let savedBg = DEFAULT_BG, savedMusic = true;
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
     try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
@@ -999,29 +1054,14 @@ function applyControlsToProfile(controls) {
 }
 
 // Generate a lid silhouette whose base radius matches the source
-// pot's rim exactly, so the two pieces visibly fit together. The
-// proportions of the dome + knob scale with the rim — a wide bowl
-// gets a wide squat lid, a narrow bottle gets a tall slim one.
-function seedLidForRim(rimR) {
+// pot's rim exactly, so the two pieces visibly fit together. Style
+// picks the dome + knob proportions — Flat is a shallow disc-like
+// lid, Domed is a graceful default, Tall is steep with a prominent
+// finial. Picked from state.lidStyle when not passed explicitly.
+function seedLidForRim(rimR, style) {
     rimR = Math.max(MIN_R, Math.min(MAX_R, rimR));
-    // Control points are normalised: x = fraction of rimR, y = height.
-    const k = rimR;
-    const controls = [
-        [0.00,      0.00],
-        [k,         0.00],
-        [k,         0.10],   // a short straight lip that sits on the pot rim
-        [k * 0.94,  0.18],
-        [k * 0.78,  0.34],
-        [k * 0.50,  0.58],
-        [k * 0.30,  0.82],
-        [k * 0.18,  1.00],
-        [k * 0.16,  1.12],
-        [k * 0.26,  1.22],   // knob base
-        [k * 0.30,  1.30],   // knob bulb
-        [k * 0.18,  1.38],
-        [0.00,      1.40],
-    ];
-    applyControlsToProfile(controls);
+    const id = (LID_STYLES[style] ? style : state.lidStyle) || "domed";
+    applyControlsToProfile(LID_STYLES[id](rimR));
 }
 
 // Rewrite vertex positions + normals from the current profile.
@@ -1389,9 +1429,11 @@ function updateToolbar() {
     const makeLidBtn = document.getElementById("makeLidBtn");
     const swapBtn    = document.getElementById("swapBtn");
     const hasPartner = !!(state.savedPot || state.savedLid);
+    const lidStylePicker = document.getElementById("lidStylePicker");
     // The brush bar drives wet sculpting and leather trimming (foot zone).
     if (brushBar) brushBar.hidden = !(cs === "wet" || cs === "leather");
     if (decoStack) decoStack.hidden = cs !== "leather";
+    if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
     if (saveBtn) {
         saveBtn.hidden = cs !== "fired";
         saveBtn.textContent = hasPartner ? "Save set" : "Save";
@@ -2283,13 +2325,53 @@ function makeLidPartner() {
     const rimR = profile[ROWS];
     state.savedPot = capturePieceState();
     state.isLid = true;
-    seedLidForRim(rimR);
+    seedLidForRim(rimR, state.lidStyle);
     profileDirty = true;
     state.glaze = null;
     clearDeco();
     resetBumpLayer();
     setPhase(INITIAL_STATE);
     updateGlazeBar();
+    updateLidStylePicker();
+}
+
+// Mid-shaping style swap. Reseeds the lid using the source pot's rim
+// (or the lid's own current rim if no source — fallback for testing).
+function setLidStyle(style) {
+    if (!LID_STYLES[style]) return;
+    state.lidStyle = style;
+    if (state.isLid && state.clayState === "wet") {
+        const rimR = (state.savedPot && state.savedPot.profile) ? state.savedPot.profile[ROWS] : profile[ROWS];
+        seedLidForRim(rimR, style);
+        profileDirty = true;
+        clearDeco();
+        resetBumpLayer();
+    }
+    updateLidStylePicker();
+}
+
+function buildLidStylePicker() {
+    const wrap = document.getElementById("lidStylePicker");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    LID_STYLE_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "lid-style-btn";
+        b.dataset.style = id;
+        b.textContent = id[0].toUpperCase() + id.slice(1);
+        b.addEventListener("click", () => setLidStyle(id));
+        wrap.appendChild(b);
+    });
+    updateLidStylePicker();
+}
+
+function updateLidStylePicker() {
+    const wrap = document.getElementById("lidStylePicker");
+    if (!wrap) return;
+    wrap.querySelectorAll(".lid-style-btn").forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.style === state.lidStyle);
+    });
 }
 
 // Toggle which piece is live for editing/viewing. The currently-live
