@@ -350,6 +350,7 @@ const state = {
     savedPot: null,                       // paused pot state while user shapes a lid
     savedLid: null,                       // paused lid state while user edits the pot
     lidStyle: "domed",                    // flat | domed | tall — picked while shaping a lid
+    lidMaxY: null,                        // y where the lid silhouette caps (set in seedLidForRim)
     partnerMesh: null,                    // second mesh, used for the fired-set assembly view
     partnerMaterial: null,
     partnerDecoCanvas: null, partnerDecoCtx: null, partnerDecoTex: null,
@@ -1063,7 +1064,22 @@ function applyControlsToProfile(controls) {
 function seedLidForRim(rimR, style) {
     rimR = Math.max(MIN_R, Math.min(MAX_R, rimR));
     const id = (LID_STYLES[style] ? style : state.lidStyle) || "domed";
-    applyControlsToProfile(LID_STYLES[id](rimR));
+    const controls = LID_STYLES[id](rimR);
+    state.lidMaxY = lidCapY(controls);
+    applyControlsToProfile(controls);
+}
+
+// Find the y at which the lid's silhouette first closes to the axis
+// (the first control point with x≈0 after a non-zero one). Above this
+// y, the lid is just collapsed rings -- sculpting there would regrow
+// the silhouette, which is what we want to prevent.
+function lidCapY(controls) {
+    let lastX = 0;
+    for (const [x, y] of controls) {
+        if (lastX > 0.001 && x < 0.001) return y;
+        lastX = x;
+    }
+    return TOP; // never closes — use full height
 }
 
 // Rewrite vertex positions + normals from the current profile.
@@ -1139,6 +1155,10 @@ function radiusAt(y) {
 // the foot, opening up to MAX_R above it. This is the physical wheel
 // constraint — the contact base can't overhang the wheel head.
 function maxRadiusAt(y) {
+    // Above a lid's cap, the silhouette is supposed to be the axis —
+    // any radius leaking up there (from a Gaussian sculpt) gets
+    // clamped back to 0 via clampProfile.
+    if (state.isLid && state.lidMaxY != null && y > state.lidMaxY) return 0;
     // A lid sits on the pot, not on the wheel — the foot can be as
     // wide as MAX_R. A regular pot's foot is capped to the wheel head
     // so the contact base can't overhang.
@@ -1190,6 +1210,9 @@ function trimToward(y, targetR) {
 // Pull the silhouette toward `targetR` around height `y`, with a
 // Gaussian vertical falloff so the clay bulges instead of stepping.
 function sculptToward(y, targetR) {
+    // For lids, refuse sculpting above the cap — neither the touch
+    // point nor the falloff loop should touch collapsed rings.
+    if (state.isLid && state.lidMaxY != null && y > state.lidMaxY) return;
     targetR = THREE.MathUtils.clamp(targetR, MIN_R, MAX_R);
     const centerRow = (y / TOP) * ROWS;
     const sigmaRows = (BRUSHES[state.brushIndex].sigma / TOP) * ROWS;
@@ -1197,6 +1220,7 @@ function sculptToward(y, targetR) {
     const lo = Math.max(1, Math.floor(centerRow - reach));
     const hi = Math.min(ROWS, Math.ceil(centerRow + reach));
     for (let r = lo; r <= hi; r++) {
+        if (state.isLid && state.lidMaxY != null && (r / ROWS) * TOP > state.lidMaxY) continue;
         const d = (r - centerRow) / sigmaRows;
         const w = Math.exp(-0.5 * d * d) * STRENGTH;
         profile[r] = THREE.MathUtils.lerp(profile[r], targetR, w);
@@ -1323,6 +1347,7 @@ function stepBack() {
 // Start a fresh wet pot.
 function resetPot() {
     state.isLid = false; // back to regular pot rules — wheel constrains the foot
+    state.lidMaxY = null;
     state.savedPot = null;
     state.savedLid = null;
     seedProfile();
