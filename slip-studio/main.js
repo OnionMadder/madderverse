@@ -36,6 +36,9 @@ const SPIN_SPEED  = 0.3;      // radians / second — contemplative, not nervous
 // --- View (dolly-zoom toward the pot + manual spin) -------------
 const CAM_BASE    = new THREE.Vector3(0, 1.15, 4.1); // camera at zoom = 1
 const CAM_TARGET  = new THREE.Vector3(0, 0.66, 0);
+// Pulled-back framing for the assembled set view (lid on pot).
+const CAM_ASSEMBLED_BASE   = new THREE.Vector3(0, 1.85, 5.6);
+const CAM_ASSEMBLED_TARGET = new THREE.Vector3(0, 1.35, 0);
 const ZOOM_MIN    = 1, ZOOM_MAX = 3.2;
 const ROTATE_SENS = 0.009;    // radians of pot spin per px of drag
 
@@ -291,6 +294,11 @@ const state = {
     isLid: false,                         // current piece is a lid (relaxes the foot envelope)
     savedPot: null,                       // paused pot state while user shapes a lid
     savedLid: null,                       // paused lid state while user edits the pot
+    partnerMesh: null,                    // second mesh, used for the fired-set assembly view
+    partnerMaterial: null,
+    partnerDecoCanvas: null, partnerDecoCtx: null, partnerDecoTex: null,
+    partnerBumpCanvas: null, partnerBumpCtx: null, partnerBumpTex: null,
+    assemblyShown: false,                 // true while the fired set view is on
     firing: false,                        // true during the 1.2s firing sequence
     firingStart: 0,                       // performance.now() when firing began
     galleryView: (() => {
@@ -1023,20 +1031,23 @@ function seedLidForRim(rimR) {
 // at angle 0 and 2π (no lighting seam where the lathe wraps). Cheap
 // enough to call on every sculpting frame.
 function writeProfileToGeometry(geo) {
+    writeProfileArrayToGeometry(geo, profile);
+}
+function writeProfileArrayToGeometry(geo, prof) {
     const pos = geo.attributes.position.array;
     const nor = geo.attributes.normal.array;
     const dyStep = TOP / ROWS;
     for (let r = 0; r <= ROWS; r++) {
         const y = r * dyStep;
-        const rad = profile[r];
+        const rad = prof[r];
 
         // 2D outward normal in the (radius, height) plane, from the
         // local profile slope. Central difference inside, one-sided
         // at the ends.
         let dr, dy;
-        if (r === 0)         { dr = profile[1] - profile[0];           dy = dyStep; }
-        else if (r === ROWS) { dr = profile[ROWS] - profile[ROWS - 1]; dy = dyStep; }
-        else                 { dr = profile[r + 1] - profile[r - 1];   dy = 2 * dyStep; }
+        if (r === 0)         { dr = prof[1] - prof[0];           dy = dyStep; }
+        else if (r === ROWS) { dr = prof[ROWS] - prof[ROWS - 1]; dy = dyStep; }
+        else                 { dr = prof[r + 1] - prof[r - 1];   dy = 2 * dyStep; }
         let n2x = dy;
         let n2y = -dr;
         const len = Math.hypot(n2x, n2y) || 1;
@@ -1158,6 +1169,14 @@ function currentLook() {
 function setPhase(name) {
     state.clayState = name;
     state.clayTarget = currentLook();
+    // Show or hide the assembled lid-on-pot view: only at Fired, only
+    // when a partner is paused in memory.
+    const hasPartner = !!(state.savedPot || state.savedLid);
+    if (name === "fired" && hasPartner) {
+        showAssemblyView();
+    } else if (state.assemblyShown) {
+        hideAssemblyView();
+    }
     updateToolbar();
 }
 
@@ -1380,10 +1399,10 @@ function updateToolbar() {
     if (photoBtn) photoBtn.hidden = cs !== "fired";
     // Make lid: only at decorate, only if you don't already have a partner.
     if (makeLidBtn) makeLidBtn.hidden = !(cs === "leather" && !hasPartner && !state.isLid);
-    // Swap: visible at any phase while a partner is paused, so the
-    // user can hop back to the other piece at any time.
+    // Swap: visible while a partner is paused — but NOT at fired,
+    // where the assembled view already shows both pieces together.
     if (swapBtn) {
-        swapBtn.hidden = !hasPartner;
+        swapBtn.hidden = !hasPartner || cs === "fired";
         swapBtn.textContent = state.isLid ? "↻ Pot" : "↻ Lid";
     }
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
@@ -1545,13 +1564,15 @@ function bindSculpt(canvas) {
 
 // --- View control -----------------------------------------------
 function applyCamera() {
+    const base   = state.assemblyShown ? CAM_ASSEMBLED_BASE   : CAM_BASE;
+    const target = state.assemblyShown ? CAM_ASSEMBLED_TARGET : CAM_TARGET;
     const f = 1 / state.zoom; // higher zoom → camera closer to the target
     state.camera.position.set(
-        CAM_TARGET.x + (CAM_BASE.x - CAM_TARGET.x) * f,
-        CAM_TARGET.y + (CAM_BASE.y - CAM_TARGET.y) * f,
-        CAM_TARGET.z + (CAM_BASE.z - CAM_TARGET.z) * f,
+        target.x + (base.x - target.x) * f,
+        target.y + (base.y - target.y) * f,
+        target.z + (base.z - target.z) * f,
     );
-    state.camera.lookAt(CAM_TARGET);
+    state.camera.lookAt(target);
 }
 function setZoom(z) {
     state.zoom = THREE.MathUtils.clamp(z, ZOOM_MIN, ZOOM_MAX);
@@ -1746,6 +1767,12 @@ function captureThumb(size = 320) {
     const cam = state.camera;
     const prevAspect = cam.aspect;
     const prevPos = cam.position.clone();
+    // Each saved entry is one piece — frame the active mesh alone
+    // even if the live view is the assembled set.
+    const prevPartnerVisible = state.partnerMesh && state.partnerMesh.visible;
+    if (prevPartnerVisible) state.partnerMesh.visible = false;
+    const prevPotY = state.pot.position.y;
+    state.pot.position.y = 0;
     cam.aspect = 1;
     cam.position.copy(CAM_BASE);
     cam.lookAt(CAM_TARGET);
@@ -1762,11 +1789,13 @@ function captureThumb(size = 320) {
     state.renderer.setClearAlpha(0); // back to transparent for the live canvas
     rt.dispose();
 
-    // restore the live camera
+    // restore everything
     cam.aspect = prevAspect;
     cam.position.copy(prevPos);
     cam.lookAt(CAM_TARGET);
     cam.updateProjectionMatrix();
+    state.pot.position.y = prevPotY;
+    if (prevPartnerVisible) state.partnerMesh.visible = true;
 
     // GL pixels are bottom-up; flip into a 2D canvas, then encode.
     const c = document.createElement("canvas");
@@ -1796,9 +1825,12 @@ function captureScenePot(size) {
     const cam = state.camera;
     const prevAspect = cam.aspect;
     const prevPos = cam.position.clone();
+    // In set mode, frame the assembly (lid on pot); otherwise just the piece.
+    const base   = state.assemblyShown ? CAM_ASSEMBLED_BASE   : CAM_BASE;
+    const target = state.assemblyShown ? CAM_ASSEMBLED_TARGET : CAM_TARGET;
     cam.aspect = 1;
-    cam.position.copy(CAM_BASE);
-    cam.lookAt(CAM_TARGET);
+    cam.position.copy(base);
+    cam.lookAt(target);
     cam.updateProjectionMatrix();
 
     const rt = new THREE.WebGLRenderTarget(size, size);
@@ -1813,7 +1845,7 @@ function captureScenePot(size) {
 
     cam.aspect = prevAspect;
     cam.position.copy(prevPos);
-    cam.lookAt(CAM_TARGET);
+    cam.lookAt(target);
     cam.updateProjectionMatrix();
 
     // GL pixels are bottom-up — flip into a 2D canvas.
@@ -2093,6 +2125,152 @@ function restorePieceState(saved) {
     state.bumpTex.needsUpdate = true;
     setPhase(saved.clayState);
     updateGlazeBar();
+}
+
+// --- Partner mesh (used for the fired-set assembly view) -------
+// A second pot mesh that shares the geometry topology of state.pot
+// but has its own deco / bump canvases + material. Built lazily on
+// first set-fire; reused thereafter.
+function buildPartnerMesh() {
+    if (state.partnerMesh) return state.partnerMesh;
+
+    const vCount = (ROWS + 1) * (COLS + 1);
+    const positions = new Float32Array(vCount * 3);
+    const normals = new Float32Array(vCount * 3);
+    const uvs = new Float32Array(vCount * 2);
+    const indices = [];
+    for (let r = 0; r <= ROWS; r++) {
+        for (let c = 0; c <= COLS; c++) {
+            const v = r * (COLS + 1) + c;
+            uvs[v * 2]     = c / COLS;
+            uvs[v * 2 + 1] = r / ROWS;
+        }
+    }
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            const a = r * (COLS + 1) + c;
+            const b = a + (COLS + 1);
+            indices.push(a, b, a + 1, a + 1, b, b + 1);
+        }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute("normal",   new THREE.BufferAttribute(normals,   3));
+    geo.setAttribute("uv",       new THREE.BufferAttribute(uvs,       2));
+    geo.setIndex(indices);
+
+    // Partner's own deco canvas + texture (syncPartnerMesh copies the
+    // saved piece's deco/bump into these on each show).
+    const pdc = document.createElement("canvas");
+    pdc.width  = DECO_W;
+    pdc.height = DECO_H;
+    state.partnerDecoCanvas = pdc;
+    state.partnerDecoCtx    = pdc.getContext("2d");
+    const pdt = new THREE.CanvasTexture(pdc);
+    pdt.colorSpace = THREE.SRGBColorSpace;
+    pdt.wrapS = THREE.RepeatWrapping;
+    pdt.wrapT = THREE.ClampToEdgeWrapping;
+    pdt.anisotropy = 4;
+    state.partnerDecoTex = pdt;
+
+    // Partner's own bump canvas + texture.
+    const pbc = document.createElement("canvas");
+    pbc.width  = BUMP_W;
+    pbc.height = BUMP_H;
+    state.partnerBumpCanvas = pbc;
+    state.partnerBumpCtx    = pbc.getContext("2d");
+    const pbt = new THREE.CanvasTexture(pbc);
+    pbt.colorSpace = THREE.NoColorSpace;
+    pbt.wrapS = THREE.RepeatWrapping;
+    pbt.wrapT = THREE.ClampToEdgeWrapping;
+    pbt.anisotropy = 4;
+    state.partnerBumpTex = pbt;
+
+    const mat = new THREE.MeshPhysicalMaterial({
+        color: CLAY_STATES.fired.color,
+        roughness: CLAY_STATES.fired.roughness,
+        metalness: 0.0,
+        clearcoat: CLAY_STATES.fired.clearcoat,
+        clearcoatRoughness: CLAY_STATES.fired.clearcoatRoughness,
+        envMapIntensity: CLAY_STATES.fired.envMapIntensity,
+        bumpMap: pbt,
+        bumpScale: CLAY_STATES.fired.bump,
+        side: THREE.DoubleSide,
+    });
+    mat.onBeforeCompile = (shader) => {
+        shader.uniforms.decoMap = { value: pdt };
+        shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
+            .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
+        shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", "uniform sampler2D decoMap;\nvarying vec2 vDecoUv;\n#include <common>")
+            .replace(
+                "#include <map_fragment>",
+                "#include <map_fragment>\n  vec4 _deco = texture2D( decoMap, vDecoUv );\n  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a );",
+            );
+    };
+    mat.customProgramCacheKey = () => "clay-deco-v1-partner";
+    state.partnerMaterial = mat;
+
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.visible = false;
+    state.turntable.add(mesh);
+    state.partnerMesh = mesh;
+    return mesh;
+}
+
+// Populate the partner mesh from a saved piece (profile + deco +
+// bump + glaze) and set its material to the fired look. Position
+// stays at y=0 here — showAssemblyView decides where to place it.
+function syncPartnerMesh(saved) {
+    if (!state.partnerMesh) buildPartnerMesh();
+    writeProfileArrayToGeometry(state.partnerMesh.geometry, saved.profile);
+    state.partnerDecoCtx.clearRect(0, 0, DECO_W, DECO_H);
+    state.partnerDecoCtx.drawImage(saved.decoCanvas, 0, 0);
+    state.partnerDecoTex.needsUpdate = true;
+    state.partnerBumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
+    state.partnerBumpCtx.drawImage(saved.bumpCanvas, 0, 0);
+    state.partnerBumpTex.needsUpdate = true;
+    const look = saved.glaze ? GLAZES[saved.glaze].fired : CLAY_STATES.fired;
+    const mat = state.partnerMaterial;
+    mat.color.setHex(look.color);
+    mat.roughness          = look.roughness;
+    mat.clearcoat          = look.clearcoat;
+    mat.clearcoatRoughness = look.clearcoatRoughness;
+    mat.envMapIntensity    = look.envMapIntensity;
+    mat.bumpScale          = look.bump;
+    mat.metalness          = look.metalness != null ? look.metalness : 0;
+}
+
+// Show both pieces in their natural assembled positions. The pot
+// always sits on the wheel (y=0); the lid always sits on top of the
+// pot (y=TOP). Whichever piece is the live editable one gets moved
+// to the right y; the other is rendered from the saved snapshot.
+function showAssemblyView() {
+    const partnerSaved = state.isLid ? state.savedPot : state.savedLid;
+    if (!partnerSaved) return;
+    syncPartnerMesh(partnerSaved);
+    if (state.isLid) {
+        // Active is the LID → goes on top. Partner is the pot at y=0.
+        state.pot.position.y = TOP;
+        state.partnerMesh.position.y = 0;
+    } else {
+        // Active is the POT → stays on the wheel. Partner is the lid on top.
+        state.pot.position.y = 0;
+        state.partnerMesh.position.y = TOP;
+    }
+    state.partnerMesh.visible = true;
+    state.assemblyShown = true;
+    applyCamera();
+}
+
+function hideAssemblyView() {
+    if (state.partnerMesh) state.partnerMesh.visible = false;
+    state.pot.position.y = 0;
+    state.assemblyShown = false;
+    applyCamera();
 }
 
 // "+ Make lid" at the decorate stage. Pauses the pot in memory (NOT
