@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=25" />
+    <link rel="stylesheet" href="style.css?v=30" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -44,6 +44,7 @@
 
 <body>
     <div id="backdrop" class="backdrop"></div>
+    <div id="kilnGlow" class="kiln-glow" aria-hidden="true"></div>
 
     <a class="home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
     <button class="title-btn" id="titleBtn" type="button" aria-label="Back to title" title="Title screen">&#x21A9;</button>
@@ -61,7 +62,7 @@
         <p class="landing-tag">a calm place to shape clay</p>
         <div class="shape-picker" id="shapePicker" role="group" aria-label="Starter shape"></div>
         <div class="bg-picker" id="bgPicker" role="group" aria-label="Backdrop"></div>
-        <button class="music-toggle" id="musicToggle" type="button" aria-pressed="true">&#9834; Music on</button>
+        <button class="music-toggle" id="musicToggle" type="button" aria-pressed="true">&#9834; Sound on</button>
         <button id="beginBtn" class="landing-btn" type="button">Begin</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
     </div>
@@ -111,10 +112,33 @@
         <button id="advanceBtn" class="tool-btn tool-btn-primary" type="button">Dry</button>
     </div>
 
+    <div id="photoModal" class="photo-modal" role="dialog" aria-label="Photo" hidden>
+        <div class="photo-modal-bar">
+            <span class="gallery-title">Photo</span>
+            <button class="tool-btn" id="photoClose" type="button">Close</button>
+        </div>
+        <div class="photo-preview-wrap">
+            <canvas id="photoPreview" class="photo-preview" aria-label="Photo preview"></canvas>
+        </div>
+        <div class="photo-row" id="photoStyles" role="group" aria-label="Style">
+            <button class="photo-chip" data-style="studio" type="button">Studio</button>
+            <button class="photo-chip" data-style="sunlit" type="button">Sunlit</button>
+            <button class="photo-chip" data-style="museum" type="button">Museum</button>
+        </div>
+        <div class="photo-row" id="photoAspects" role="group" aria-label="Aspect">
+            <button class="photo-chip" data-aspect="square" type="button">Square</button>
+            <button class="photo-chip" data-aspect="portrait" type="button">9 : 16</button>
+        </div>
+        <button id="photoSave" class="landing-btn" type="button">Save photo</button>
+    </div>
+
     <div class="gallery" id="gallery" role="dialog" aria-label="Your pots" hidden>
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
-            <button class="tool-btn" id="galleryClose" type="button">Close</button>
+            <span class="gallery-bar-right">
+                <button class="tool-btn" id="galleryViewToggle" type="button">Grid</button>
+                <button class="tool-btn" id="galleryClose" type="button">Close</button>
+            </span>
         </div>
         <div class="gallery-grid" id="galleryGrid"></div>
         <p class="gallery-empty" id="galleryEmpty">No pots yet — shape one, fire it, and tap Save.</p>
@@ -126,7 +150,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=25"></script>
+    <script type="module" src="main.js?v=30"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

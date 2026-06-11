@@ -96,26 +96,42 @@ const ADVANCE_LABEL = { wet: "Trim", leather: "Dry", bonedry: "Fire", fired: "Ne
 const BACK_LABEL    = { leather: "&larr; Re-wet", bonedry: "&larr; Re-soften" };
 
 // Glazes. `raw` is the chalky matte coat before firing; `fired` is the
-// glossy vitrified result. Shared surface params, per-glaze colours
-// (tunable placeholders). The reveal is raw → fired on the glaze fire.
-const GLAZE_RAW   = { roughness: 0.92, clearcoat: 0.03, clearcoatRoughness: 0.95, envMapIntensity: 0.32, bump: 0.012 };
-const GLAZE_FIRED = { roughness: 0.30, clearcoat: 0.72, clearcoatRoughness: 0.14, envMapIntensity: 0.85, bump: 0.004 };
-function glaze(name, rawHex, firedHex) {
-    return { name, raw: { ...GLAZE_RAW, color: rawHex }, fired: { ...GLAZE_FIRED, color: firedHex } };
+// glossy vitrified result. Shared surface params, per-glaze colours.
+// Optional 4th arg to glaze() overrides fired params (used for the
+// metallics: gold / copper / platinum get high metalness; pearl gets
+// extra clearcoat). The reveal is raw → fired on the glaze fire.
+const GLAZE_RAW   = { roughness: 0.92, clearcoat: 0.03, clearcoatRoughness: 0.95, envMapIntensity: 0.32, bump: 0.012, metalness: 0.00 };
+const GLAZE_FIRED = { roughness: 0.30, clearcoat: 0.72, clearcoatRoughness: 0.14, envMapIntensity: 0.85, bump: 0.004, metalness: 0.00 };
+function glaze(name, rawHex, firedHex, firedOver) {
+    return {
+        name,
+        raw:   { ...GLAZE_RAW,   color: rawHex },
+        fired: { ...GLAZE_FIRED, color: firedHex, ...(firedOver || {}) },
+    };
 }
 const GLAZES = {
-    celadon: glaze("Celadon", 0xb9c3b3, 0x7d9b7e),
-    cobalt:  glaze("Cobalt",  0x9aa3b6, 0x37507e),
-    oatmeal: glaze("Oatmeal", 0xd8d2c4, 0xe7ddca),
-    honey:   glaze("Honey",   0xc2a274, 0xb27a33),
-    tenmoku: glaze("Tenmoku", 0x6e6258, 0x2c2320),
-    blush:   glaze("Blush",   0xd9c2c0, 0xc98a86),
-    forest:  glaze("Forest",  0x9fb0a0, 0x3f5e4a),
-    slate:   glaze("Slate",   0xb0b6bd, 0x4a5a68),
-    plum:    glaze("Plum",    0xbcaebe, 0x6e4a6b),
-    sand:    glaze("Sand",    0xd8cbb0, 0xc2a35e),
+    celadon:  glaze("Celadon",  0xb9c3b3, 0x7d9b7e),
+    cobalt:   glaze("Cobalt",   0x9aa3b6, 0x37507e),
+    oatmeal:  glaze("Oatmeal",  0xd8d2c4, 0xe7ddca),
+    honey:    glaze("Honey",    0xc2a274, 0xb27a33),
+    tenmoku:  glaze("Tenmoku",  0x6e6258, 0x2c2320),
+    blush:    glaze("Blush",    0xd9c2c0, 0xc98a86),
+    forest:   glaze("Forest",   0x9fb0a0, 0x3f5e4a),
+    slate:    glaze("Slate",    0xb0b6bd, 0x4a5a68),
+    plum:     glaze("Plum",     0xbcaebe, 0x6e4a6b),
+    sand:     glaze("Sand",     0xd8cbb0, 0xc2a35e),
+    gold:     glaze("Gold",     0xc9a575, 0xd9aa3f, { metalness: 0.72, roughness: 0.22, envMapIntensity: 1.20 }),
+    copper:   glaze("Copper",   0xb2895c, 0xb35030, { metalness: 0.58, roughness: 0.30, envMapIntensity: 1.10 }),
+    platinum: glaze("Platinum", 0xbcbcbc, 0xd5d5dc, { metalness: 0.75, roughness: 0.20, envMapIntensity: 1.25 }),
+    ironred:  glaze("Iron red", 0xb87055, 0xa53a1f, { roughness: 0.42, envMapIntensity: 0.92 }),
+    mint:     glaze("Mint",     0xc5ddcd, 0x84b899),
+    pearl:    glaze("Pearl",    0xe8dfd2, 0xf2ead8, { clearcoat: 0.88, clearcoatRoughness: 0.08, envMapIntensity: 1.00 }),
 };
-const GLAZE_IDS = ["celadon", "cobalt", "oatmeal", "honey", "tenmoku", "blush", "forest", "slate", "plum", "sand"];
+const GLAZE_IDS = [
+    "celadon", "cobalt", "oatmeal", "honey", "tenmoku",
+    "blush", "forest", "slate", "plum", "sand",
+    "gold", "copper", "platinum", "ironred", "mint", "pearl",
+];
 
 // --- Decoration -------------------------------------------------
 // Painted onto the surface (over the glaze) by dragging on the pot.
@@ -165,18 +181,44 @@ const OVERLAY_PATTERNS = [
 // --- Ambiance: backdrops + music --------------------------------
 // Backdrops are CSS images behind the (transparent) canvas; chosen on
 // the title screen and remembered. Music is one looping ambient track.
+// Backdrops are tagged with a category so the title-screen picker can
+// group them. Adding a new image = one entry here (drop the file at
+// assets/backgrounds/<id>.jpg). The picker renders categories in the
+// order they appear in BG_CATEGORIES.
+const BG_CATEGORIES = ["Painted", "Botanical", "Earthy", "Abstract", "Architectural"];
 const BACKGROUNDS = [
-    { id: "watercolor",     label: "Watercolor" },
-    { id: "dried-flowers",  label: "Dried flowers" },
-    { id: "shadow-flowers", label: "Shadow" },
-    { id: "clay-tunnel",    label: "Clay" },
-    { id: "waves",          label: "Waves" },
-    { id: "abstract",       label: "Abstract" },
-    { id: "cardboard",      label: "Cardboard" },
-    { id: "wireframe",      label: "Wireframe" },
+    { id: "watercolor",     label: "Watercolor",    category: "Painted" },
+    { id: "dried-flowers",  label: "Dried flowers", category: "Botanical" },
+    { id: "shadow-flowers", label: "Shadow",        category: "Botanical" },
+    { id: "clay-tunnel",    label: "Clay tunnel",   category: "Earthy" },
+    { id: "cardboard",      label: "Cardboard",     category: "Earthy" },
+    { id: "waves",          label: "Waves",         category: "Abstract" },
+    { id: "abstract",       label: "Abstract",      category: "Abstract" },
+    { id: "wireframe",      label: "Wireframe",     category: "Architectural" },
 ];
 const DEFAULT_BG = "watercolor";
-const MUSIC_SRC = "assets/audio/New Plan - Out To The World.mp3";
+// Multiple ambient tracks — initMusic picks one per session so it
+// doesn't get repetitive across launches. Missing files fail silently
+// (the Audio element errors and the rest of the app keeps working).
+const MUSIC_TRACKS = [
+    { src: "assets/audio/New Plan - Out To The World.mp3", label: "Out to the World" },
+    { src: "assets/audio/ambient-2.mp3",                   label: "Track 2" },
+    { src: "assets/audio/ambient-3.mp3",                   label: "Track 3" },
+];
+
+// --- Sound effects ----------------------------------------------
+// Lazy-loaded ambient + one-shot clips. The wheel hum is looping and
+// fades with the auto-spin; the rest are one-shots cloned per play so
+// overlapping triggers don't restart the source. All paths are local
+// — the user supplies the audio files (drop into assets/sfx/). A
+// missing file fails silently; the rest of the app still works.
+const SFX_SOURCES = {
+    wheel:   { src: "assets/sfx/wheel-hum.mp3",    loop: true,  vol: 0.22 },
+    squelch: { src: "assets/sfx/clay-squelch.mp3", loop: false, vol: 0.40, pitchVar: 0.18 },
+    drip:    { src: "assets/sfx/water-drip.mp3",   loop: false, vol: 0.45, pitchVar: 0.10 },
+    pour:    { src: "assets/sfx/glaze-pour.mp3",   loop: false, vol: 0.42 },
+    kiln:    { src: "assets/sfx/kiln-fire.mp3",    loop: false, vol: 0.55 },
+};
 
 // --- Starter silhouettes ----------------------------------------
 // Spline control points for the seed profile: (radius, height) in
@@ -254,6 +296,14 @@ const state = {
     // Mixed additively with the procedural clay grain in the shader.
     bumpCanvas: null, bumpCtx: null, bumpTex: null,
     pendingSetId: null,                   // carried across save → reset for lid pairs
+    firing: false,                        // true during the 1.2s firing sequence
+    firingStart: 0,                       // performance.now() when firing began
+    galleryView: (() => {
+        try { return localStorage.getItem("slip-gallery-view") || "shelf"; }
+        catch (_) { return "shelf"; }
+    })(),
+    photoStyle: "studio",                // studio | sunlit | museum
+    photoAspect: "square",               // square | portrait
     zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
     userRotating: false,        // manually spinning the pot
     background: DEFAULT_BG,
@@ -354,10 +404,19 @@ function init() {
     document.getElementById("tabGlaze")?.addEventListener("click", () => setDecoTab("glaze"));
     document.getElementById("tabDecorate")?.addEventListener("click", () => setDecoTab("decorate"));
     document.getElementById("saveBtn")?.addEventListener("click", () => savePot());
-    document.getElementById("photoBtn")?.addEventListener("click", () => exportPhoto());
+    document.getElementById("photoBtn")?.addEventListener("click", () => openPhotoModal());
+    document.getElementById("photoClose")?.addEventListener("click", closePhotoModal);
+    document.getElementById("photoSave")?.addEventListener("click", finalizePhoto);
+    document.querySelectorAll("#photoStyles .photo-chip").forEach((el) =>
+        el.addEventListener("click", () => setPhotoStyle(el.dataset.style)));
+    document.querySelectorAll("#photoAspects .photo-chip").forEach((el) =>
+        el.addEventListener("click", () => setPhotoAspect(el.dataset.aspect)));
     document.getElementById("lidBtn")?.addEventListener("click", () => makeLidPartner());
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
+    document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
+        setGalleryView(state.galleryView === "shelf" ? "compact" : "shelf");
+    });
     document.querySelectorAll(".deco-size").forEach((b, idx) =>
         b.addEventListener("click", () => setDecoSize(idx)));
     setDecoTool("brush");
@@ -398,10 +457,14 @@ function init() {
             state, profile, radiusAt, sculptToward, trimToward, maxRadiusAt,
             setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape,
             bumpDab, resetBumpLayer,
+            playSfx, stopSfx,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             setZoom, zoomBy, rotateBy,
-            savePot, exportPhoto, makeLidPartner, loadPot, openGallery, closeGallery, dbAll, dbDelete, dismissLanding,
+            savePot, openPhotoModal, closePhotoModal, finalizePhoto,
+            setPhotoStyle, setPhotoAspect,
+            makeLidPartner, loadPot, openGallery, closeGallery,
+            dbAll, dbDelete, dismissLanding,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -1063,8 +1126,28 @@ function advanceStage() {
     switch (state.clayState) {
         case "wet":     setPhase("leather"); break; // firms to leather-hard
         case "leather": setPhase("bonedry"); break;
-        case "bonedry": setPhase("fired");   break; // fire — the glaze reveal
+        case "bonedry":
+            setPhase("fired");
+            playSfx("kiln");
+            startFiringMoment();
+            break;
         case "fired":   resetPot();          break;
+    }
+}
+
+// Run the kiln-flash sequence: a quick warm glow scrim + camera lean.
+// Audio is the kiln sfx (triggered alongside this). Tick handles the
+// per-frame camera + spin update; CSS handles the glow animation.
+function startFiringMoment() {
+    state.firing = true;
+    state.firingStart = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const glow = document.getElementById("kilnGlow");
+    if (glow) {
+        glow.classList.remove("is-firing");
+        // Force a reflow so the next add restarts the animation cleanly,
+        // even when refiring back-to-back (Re-soften → Fire again).
+        void glow.offsetWidth;
+        glow.classList.add("is-firing");
     }
 }
 
@@ -1072,7 +1155,9 @@ function advanceStage() {
 // to clear it and fire bare).
 function setGlaze(id) {
     if (!GLAZES[id]) return;
-    state.glaze = state.glaze === id ? null : id;
+    const wasActive = state.glaze === id;
+    state.glaze = wasActive ? null : id;
+    if (!wasActive) playSfx("pour"); // soft pour when a glaze is selected
     if (state.clayState === "bonedry") setPhase("bonedry"); // refresh the raw look
     updateGlazeBar();
 }
@@ -1082,7 +1167,9 @@ function setGlaze(id) {
 function stepBack() {
     const cs = state.clayState;
     if (cs === "wet" || cs === "fired") return;
-    setPhase(PHASES[PHASES.indexOf(cs) - 1]);
+    const next = PHASES[PHASES.indexOf(cs) - 1];
+    setPhase(next);
+    if (next === "wet") playSfx("drip");
     updateGlazeBar();
 }
 
@@ -1169,6 +1256,7 @@ function tickMaterial(dt) {
     m.clearcoatRoughness += (t.clearcoatRoughness - m.clearcoatRoughness) * k;
     m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
     m.bumpScale          += (t.bump               - m.bumpScale)          * k;
+    m.metalness          += ((t.metalness != null ? t.metalness : 0) - m.metalness) * k;
 }
 
 // The stage label, including the glaze name once chosen.
@@ -1421,6 +1509,7 @@ function onPointerDown(ev) {
         if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
         sculpting = true;
         trimToward(p.y, p.r);
+        maybeSquelch();
         ev.preventDefault();
     } else if (state.clayState === "wet") {
         const p = pointerToProfile(ev);
@@ -1429,6 +1518,7 @@ function onPointerDown(ev) {
         if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
         sculpting = true;
         sculptToward(p.y, p.r);
+        maybeSquelch();
         ev.preventDefault();
     } else if (state.clayState === "bonedry" && state.decoColor != null && state.decoTool !== "overlay") {
         state.painting = true;
@@ -1465,6 +1555,7 @@ function onPointerMove(ev) {
         if (p) {
             if (state.clayState === "leather") trimToward(p.y, p.r);
             else sculptToward(p.y, p.r);
+            maybeSquelch();
         }
         ev.preventDefault();
     } else if (state.painting) {
@@ -1588,13 +1679,17 @@ function captureThumb(size = 320) {
     return c.toDataURL("image/jpeg", 0.85);
 }
 
-// Compose a 1024px photo of the fired pot on the chosen backdrop and
-// hand it off to share/download. Falls back to a regular anchor
-// download on browsers without the Web Share API. Inside the Capacitor
-// wrap on Android, navigator.share + files is the canonical "save to
-// gallery / share to Photos" path.
-async function exportPhoto() {
-    const size = 1024;
+// --- Photo modal ------------------------------------------------
+// The Photo button opens a modal with a live preview, 3 framing
+// styles (Studio shelf / Sunlit window / Museum plinth), and a 1:1 /
+// 9:16 aspect toggle. The pot is rendered once via the GL pipeline on
+// modal open; toggling style/aspect just re-composites the 2D layer
+// over that cached pot, so the preview updates instantly.
+
+// Render the fired pot to a 1024×1024 transparent canvas (no backdrop).
+// Reused for both preview and final save.
+function captureScenePot(size) {
+    size = size || 1024;
     tickMaterial(10); // snap the glaze to its fired look
     const cam = state.camera;
     const prevAspect = cam.aspect;
@@ -1604,8 +1699,6 @@ async function exportPhoto() {
     cam.lookAt(CAM_TARGET);
     cam.updateProjectionMatrix();
 
-    // Render the pot with a transparent background so we can composite
-    // it over the user's backdrop afterwards.
     const rt = new THREE.WebGLRenderTarget(size, size);
     state.renderer.setRenderTarget(rt);
     state.renderer.setClearAlpha(0);
@@ -1616,45 +1709,160 @@ async function exportPhoto() {
     state.renderer.setRenderTarget(null);
     rt.dispose();
 
-    // restore the live camera
     cam.aspect = prevAspect;
     cam.position.copy(prevPos);
     cam.lookAt(CAM_TARGET);
     cam.updateProjectionMatrix();
 
-    const out = document.createElement("canvas");
-    out.width = out.height = size;
-    const ctx = out.getContext("2d");
-
-    // 1) Backdrop, cover-fit to square.
-    try {
-        const bg = await new Promise((res, rej) => {
-            const img = new Image();
-            img.onload = () => res(img);
-            img.onerror = rej;
-            img.src = `assets/backgrounds/${state.background}.jpg`;
-        });
-        const s = Math.min(bg.width, bg.height);
-        const sx = (bg.width  - s) / 2;
-        const sy = (bg.height - s) / 2;
-        ctx.drawImage(bg, sx, sy, s, s, 0, 0, size, size);
-    } catch (_) {
-        ctx.fillStyle = "#1b1815";
-        ctx.fillRect(0, 0, size, size);
-    }
-
-    // 2) Pot (flip the GL bottom-up buffer into a temp canvas first).
-    const tmp = document.createElement("canvas");
-    tmp.width = tmp.height = size;
-    const tmpImg = tmp.getContext("2d").createImageData(size, size);
+    // GL pixels are bottom-up — flip into a 2D canvas.
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const ctx = c.getContext("2d");
+    const img = ctx.createImageData(size, size);
     for (let y = 0; y < size; y++) {
         const src = (size - 1 - y) * size * 4;
-        tmpImg.data.set(buf.subarray(src, src + size * 4), y * size * 4);
+        img.data.set(buf.subarray(src, src + size * 4), y * size * 4);
     }
-    tmp.getContext("2d").putImageData(tmpImg, 0, 0);
-    ctx.drawImage(tmp, 0, 0);
+    ctx.putImageData(img, 0, 0);
+    return c;
+}
 
-    // 3) Hand off.
+async function loadBackdropImage() {
+    return new Promise((res) => {
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => res(null);
+        img.src = `assets/backgrounds/${state.background}.jpg`;
+    });
+}
+
+// Compose the chosen style + aspect into target canvas.
+function composeStyledPhoto(potCanvas, bgImage, style, aspect, target) {
+    const isPortrait = aspect === "portrait";
+    const W = 1024;
+    const H = isPortrait ? 1820 : 1024;
+    target.width = W;
+    target.height = H;
+    const ctx = target.getContext("2d");
+
+    // 1) Backdrop, cover-fit
+    if (bgImage) {
+        const r = Math.max(W / bgImage.width, H / bgImage.height);
+        const w = bgImage.width * r, h = bgImage.height * r;
+        const x = (W - w) / 2, y = (H - h) / 2;
+        ctx.drawImage(bgImage, x, y, w, h);
+    } else {
+        ctx.fillStyle = "#1b1815";
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    // 2) Style decorations (under the pot)
+    const baseY = isPortrait ? H * 0.62 : H * 0.66;
+    if (style === "studio") {
+        // Subtle shelf line + soft cast shadow
+        ctx.fillStyle = "rgba(60, 40, 30, 0.20)";
+        ctx.fillRect(0, baseY + 8, W, 4);
+        const sh = ctx.createRadialGradient(W / 2, baseY + 30, 40, W / 2, baseY + 30, W * 0.42);
+        sh.addColorStop(0, "rgba(0,0,0,0.42)");
+        sh.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = sh;
+        ctx.fillRect(0, baseY - 30, W, 130);
+    } else if (style === "sunlit") {
+        // Warm sun gradient from upper-right
+        const sun = ctx.createRadialGradient(W * 0.82, H * 0.18, 0, W * 0.82, H * 0.18, W * 0.95);
+        sun.addColorStop(0,    "rgba(255, 196, 110, 0.45)");
+        sun.addColorStop(0.45, "rgba(255, 156,  80, 0.18)");
+        sun.addColorStop(1,    "rgba(255, 156,  80, 0.00)");
+        ctx.fillStyle = sun;
+        ctx.fillRect(0, 0, W, H);
+        // Long lower-left shadow
+        const sh = ctx.createRadialGradient(W * 0.42, baseY + 30, 30, W * 0.42, baseY + 30, W * 0.5);
+        sh.addColorStop(0, "rgba(0,0,0,0.50)");
+        sh.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = sh;
+        ctx.fillRect(0, baseY - 20, W, 130);
+    } else if (style === "museum") {
+        // Muted backdrop tint
+        ctx.fillStyle = "rgba(20, 18, 16, 0.34)";
+        ctx.fillRect(0, 0, W, H);
+        // Plinth beneath the pot
+        const plinthY = baseY + 60;
+        const plinthH = isPortrait ? 220 : 180;
+        const grad = ctx.createLinearGradient(0, plinthY, 0, plinthY + plinthH);
+        grad.addColorStop(0, "rgba(34, 28, 22, 0.92)");
+        grad.addColorStop(1, "rgba(14, 11,  9, 0.94)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(W * 0.22, plinthY, W * 0.56, plinthH);
+        // Caption strip
+        const stripH = isPortrait ? 120 : 90;
+        const stripY = H - stripH;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
+        ctx.fillRect(0, stripY, W, stripH);
+        ctx.fillStyle = "rgba(243, 237, 230, 0.85)";
+        ctx.font = `${isPortrait ? 26 : 20}px Quicksand, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const glaze = (state.glaze && GLAZES[state.glaze])
+            ? GLAZES[state.glaze].name : "Bare clay";
+        ctx.fillText(`SLIP STUDIO · ${glaze.toUpperCase()}`, W / 2, stripY + stripH / 2);
+    }
+
+    // 3) Pot render — square pot fills full width, vertically anchored.
+    const potY = isPortrait ? Math.floor((H - W) * 0.42) : 0;
+    ctx.drawImage(potCanvas, 0, potY, W, W);
+
+    return target;
+}
+
+let photoPotCache = null;
+let photoBgCache = null;
+
+async function openPhotoModal() {
+    photoPotCache = captureScenePot(1024);
+    photoBgCache = await loadBackdropImage();
+    syncPhotoChips();
+    renderPhotoPreview();
+    document.getElementById("photoModal").hidden = false;
+}
+
+function closePhotoModal() {
+    document.getElementById("photoModal").hidden = true;
+    photoPotCache = null;
+    photoBgCache = null;
+}
+
+function renderPhotoPreview() {
+    const preview = document.getElementById("photoPreview");
+    if (!preview || !photoPotCache) return;
+    composeStyledPhoto(photoPotCache, photoBgCache, state.photoStyle, state.photoAspect, preview);
+}
+
+function setPhotoStyle(name) {
+    if (!["studio", "sunlit", "museum"].includes(name)) return;
+    state.photoStyle = name;
+    syncPhotoChips();
+    renderPhotoPreview();
+}
+
+function setPhotoAspect(name) {
+    state.photoAspect = name === "portrait" ? "portrait" : "square";
+    syncPhotoChips();
+    renderPhotoPreview();
+}
+
+function syncPhotoChips() {
+    document.querySelectorAll("#photoStyles .photo-chip").forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.style === state.photoStyle);
+    });
+    document.querySelectorAll("#photoAspects .photo-chip").forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.aspect === state.photoAspect);
+    });
+}
+
+async function finalizePhoto() {
+    if (!photoPotCache) return;
+    const out = document.createElement("canvas");
+    composeStyledPhoto(photoPotCache, photoBgCache, state.photoStyle, state.photoAspect, out);
     const filename = `slip-studio-${Date.now().toString(36)}.png`;
     const blob = await new Promise((res) => out.toBlob(res, "image/png"));
     try {
@@ -1662,11 +1870,11 @@ async function exportPhoto() {
             const file = new File([blob], filename, { type: "image/png" });
             if (navigator.canShare({ files: [file] })) {
                 await navigator.share({ files: [file], title: "Slip Studio pot" });
-                flashPhoto();
+                flashPhotoSave();
                 return;
             }
         }
-    } catch (_) { /* user cancelled or share blocked — fall back to download */ }
+    } catch (_) { /* user cancelled or share blocked — fall through to download */ }
     const url = blob ? URL.createObjectURL(blob) : out.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
@@ -1675,14 +1883,14 @@ async function exportPhoto() {
     a.click();
     try { a.remove(); } catch (_) {}
     if (blob) setTimeout(() => URL.revokeObjectURL(url), 5000);
-    flashPhoto();
+    flashPhotoSave();
 }
 
-function flashPhoto() {
-    const b = document.getElementById("photoBtn");
+function flashPhotoSave() {
+    const b = document.getElementById("photoSave");
     if (!b) return;
     const prev = b.textContent;
-    b.textContent = "Photo ✓";
+    b.textContent = "Saved ✓";
     setTimeout(() => { b.textContent = prev; }, 1300);
 }
 
@@ -1696,6 +1904,7 @@ async function savePot() {
         bump: state.bumpCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
         setId: state.pendingSetId || null,
+        title: null, // user can name from the gallery
     };
     try {
         await dbPut(entry);
@@ -1775,6 +1984,8 @@ async function openGallery() {
     const empty = document.getElementById("galleryEmpty");
     if (!grid) return;
     grid.innerHTML = "";
+    grid.classList.toggle("shelf",   state.galleryView === "shelf");
+    grid.classList.toggle("compact", state.galleryView !== "shelf");
     let pots = [];
     try { pots = await dbAll(); } catch (_) {}
     pots.sort((a, b) => b.ts - a.ts);
@@ -1792,39 +2003,60 @@ async function openGallery() {
             renderGalleryTile(grid, [p]);
         }
     });
+    syncGalleryViewToggle();
     document.getElementById("gallery").hidden = false;
 }
 
 function renderGalleryTile(grid, members) {
+    const isShelf = state.galleryView === "shelf";
+    const isSet = members.length > 1;
     const item = document.createElement("div");
-    item.className = "gallery-item" + (members.length > 1 ? " gallery-set" : "");
-    if (members.length === 1) {
-        const p = members[0];
+    item.className = "gallery-item" + (isSet ? " gallery-set" : "") + (isShelf ? " is-shelf" : "");
+
+    // Thumbnail(s). A single pot shows one image; a set shows both
+    // halves (side-by-side in compact mode, stacked in shelf mode).
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "pot-thumb-wrap";
+    members.forEach((p) => {
+        const half = document.createElement("div");
+        half.className = isSet ? "gallery-half" : "pot-thumb";
         const img = document.createElement("img");
         img.src = p.thumb;
-        img.alt = "Saved pot";
+        img.alt = p.title || "Saved pot";
         img.loading = "lazy";
         img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
-        item.appendChild(img);
-    } else {
-        // Paired set: side-by-side thumbnails, each tappable.
-        members.forEach((p) => {
-            const half = document.createElement("div");
-            half.className = "gallery-half";
-            const img = document.createElement("img");
-            img.src = p.thumb;
-            img.alt = "Saved pot";
-            img.loading = "lazy";
-            img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
-            half.appendChild(img);
-            item.appendChild(half);
-        });
+        half.appendChild(img);
+        thumbWrap.appendChild(half);
+    });
+    item.appendChild(thumbWrap);
+
+    // Metadata column (shelf view only): title (tap to rename) + glaze
+    // name + saved-on date. Title acts as the portfolio caption.
+    if (isShelf) {
+        const meta = document.createElement("div");
+        meta.className = "pot-meta";
+        const titleBtn = document.createElement("button");
+        titleBtn.type = "button";
+        const hasTitle = !!(members[0].title && members[0].title.length);
+        titleBtn.className = "pot-title" + (hasTitle ? "" : " is-empty");
+        titleBtn.textContent = hasTitle ? members[0].title : "Tap to name";
+        titleBtn.title = "Rename this pot";
+        titleBtn.addEventListener("click", (e) => { e.stopPropagation(); renameTile(members[0]); });
+        meta.appendChild(titleBtn);
+        const sub = document.createElement("div");
+        sub.className = "pot-sub";
+        const dateStr = formatPotDate(members[0].ts);
+        const glaze = glazeNameFor(members[0]);
+        sub.textContent = isSet ? `Lid set · ${glaze} · ${dateStr}` : `${glaze} · ${dateStr}`;
+        meta.appendChild(sub);
+        item.appendChild(meta);
     }
+
     const del = document.createElement("button");
     del.className = "gallery-del";
     del.type = "button";
     del.textContent = "×";
-    del.setAttribute("aria-label", members.length > 1 ? "Delete set" : "Delete pot");
+    del.setAttribute("aria-label", isSet ? "Delete set" : "Delete pot");
     del.addEventListener("click", async (e) => {
         e.stopPropagation();
         await Promise.all(members.map((m) => dbDelete(m.id)));
@@ -1832,6 +2064,41 @@ function renderGalleryTile(grid, members) {
     });
     item.appendChild(del);
     grid.appendChild(item);
+}
+
+function renameTile(p) {
+    const cur = p.title || "";
+    // prompt() is enough for a casual name-edit; the title is stored
+    // verbatim (no markup) and rendered with textContent.
+    const next = window.prompt("Name this pot", cur);
+    if (next == null) return;
+    p.title = next.trim() ? next.trim().slice(0, 60) : null;
+    dbPut(p).then(() => openGallery()).catch(() => {});
+}
+
+function glazeNameFor(p) {
+    if (!p.glaze || !GLAZES[p.glaze]) return "Bare clay";
+    return GLAZES[p.glaze].name;
+}
+
+function formatPotDate(ts) {
+    const d = new Date(ts);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+function setGalleryView(name) {
+    state.galleryView = name === "compact" ? "compact" : "shelf";
+    try { localStorage.setItem("slip-gallery-view", state.galleryView); } catch (_) {}
+    syncGalleryViewToggle();
+    openGallery();
+}
+
+function syncGalleryViewToggle() {
+    const btn = document.getElementById("galleryViewToggle");
+    if (!btn) return;
+    btn.textContent = state.galleryView === "shelf" ? "Grid" : "Shelf";
 }
 function closeGallery() {
     const g = document.getElementById("gallery");
@@ -1853,10 +2120,36 @@ function tick() {
     // painting), while you manually spin, and whenever zoomed in —
     // then drifts back up once you're idle at the default framing.
     const zoomed = state.zoom > 1.02;
-    const busy = sculpting || state.painting || state.userRotating || zoomed;
+    const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing;
     const targetSpin = busy ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
+    // Wheel hum tracks the spin: as the auto-spin eases out while the
+    // user works, the hum quiets to near-silent; restored when idle.
+    if (state.musicOn) {
+        const ratio = Math.max(0, state.spin / SPIN_SPEED);
+        playSfx("wheel", { volume: ratio * SFX_SOURCES.wheel.vol });
+    } else {
+        stopSfx("wheel");
+    }
+    // The firing moment: a bell-shaped camera lean alongside the CSS
+    // glow flash + kiln SFX. Spin is held near zero via state.firing in
+    // the busy flag above, so the pot stills for the reveal.
+    if (state.firing) {
+        const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+        const elapsed = (now - state.firingStart) / 1000;
+        if (elapsed >= 1.2) {
+            state.firing = false;
+            setZoom(1);
+        } else {
+            const peakAt = 0.34;
+            const t = elapsed < peakAt
+                ? elapsed / peakAt
+                : Math.max(0, (1.2 - elapsed) / (1.2 - peakAt));
+            const eased = t * t * (3 - 2 * t);          // smoothstep
+            setZoom(1 + 0.13 * eased);
+        }
+    }
     if (profileDirty) {
         writeProfileToGeometry(state.pot.geometry);
         profileDirty = false;
@@ -1894,28 +2187,110 @@ function setBackground(id) {
 function buildBgPicker() {
     const wrap = document.getElementById("bgPicker");
     if (!wrap) return;
-    BACKGROUNDS.forEach((b) => {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = "bg-swatch";
-        el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
-        el.setAttribute("aria-label", b.label + " background");
-        el.addEventListener("click", () => setBackground(b.id));
-        wrap.appendChild(el);
+    wrap.innerHTML = "";
+    BG_CATEGORIES.forEach((cat) => {
+        const items = BACKGROUNDS.filter((b) => b.category === cat);
+        if (!items.length) return;
+        const section = document.createElement("div");
+        section.className = "bg-section";
+        const label = document.createElement("div");
+        label.className = "bg-section-label";
+        label.textContent = cat;
+        section.appendChild(label);
+        const row = document.createElement("div");
+        row.className = "bg-section-row";
+        items.forEach((b) => {
+            const el = document.createElement("button");
+            el.type = "button";
+            el.className = "bg-swatch";
+            el.dataset.id = b.id;
+            el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
+            el.setAttribute("aria-label", b.label + " background");
+            el.addEventListener("click", () => setBackground(b.id));
+            row.appendChild(el);
+        });
+        section.appendChild(row);
+        wrap.appendChild(section);
     });
 }
 function updateBgPicker() {
     const wrap = document.getElementById("bgPicker");
     if (!wrap) return;
-    Array.from(wrap.children).forEach((el, i) => {
-        el.classList.toggle("is-active", BACKGROUNDS[i].id === state.background);
+    wrap.querySelectorAll(".bg-swatch").forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.id === state.background);
     });
 }
 
 function initMusic() {
-    music = new Audio(MUSIC_SRC);
+    // Pick a random track per session for variety. If the file is
+    // missing the Audio element will error; we fall back to track 0
+    // so a typo in the listing doesn't silence the whole studio.
+    let idx = 0;
+    if (MUSIC_TRACKS.length > 1) idx = Math.floor(Math.random() * MUSIC_TRACKS.length);
+    music = new Audio(MUSIC_TRACKS[idx].src);
     music.loop = true;
     music.volume = 0.45;
+    music.addEventListener("error", () => {
+        if (idx === 0) return;
+        music = new Audio(MUSIC_TRACKS[0].src);
+        music.loop = true;
+        music.volume = 0.45;
+        if (state.musicOn) music.play().catch(() => {});
+    }, { once: true });
+}
+
+// --- SFX manager -----------------------------------------------
+const sfxCache = {};       // id -> { audio, def } (lazy-instantiated)
+const sfxFailed = new Set(); // ids whose file errored — don't retry
+
+function loadSfx(id) {
+    if (sfxCache[id]) return sfxCache[id];
+    if (sfxFailed.has(id)) return null;
+    const def = SFX_SOURCES[id];
+    if (!def) return null;
+    const a = new Audio(def.src);
+    a.preload = "auto";
+    a.loop = !!def.loop;
+    a.addEventListener("error", () => { sfxFailed.add(id); }, { once: true });
+    sfxCache[id] = { audio: a, def };
+    return sfxCache[id];
+}
+
+// Play a sound. For looping ambient (wheel) the same audio element is
+// reused and the volume is set in-place; for one-shots we clone the
+// node so a fast burst of triggers can overlap without restarting.
+function playSfx(id, opts) {
+    if (!state.musicOn) return;
+    const s = loadSfx(id);
+    if (!s) return;
+    const vol = (opts && opts.volume != null) ? opts.volume : s.def.vol;
+    if (s.def.loop) {
+        s.audio.volume = Math.max(0, Math.min(1, vol));
+        if (s.audio.paused && vol > 0.005) s.audio.play().catch(() => {});
+        return;
+    }
+    const clone = s.audio.cloneNode(true);
+    clone.loop = false;
+    clone.volume = Math.max(0, Math.min(1, vol));
+    if (s.def.pitchVar) clone.playbackRate = 1 + (Math.random() - 0.5) * s.def.pitchVar;
+    clone.play().catch(() => {});
+}
+
+function stopSfx(id) {
+    const s = sfxCache[id];
+    if (!s) return;
+    s.audio.pause();
+    if (!s.def.loop) s.audio.currentTime = 0;
+}
+
+// Squelch trigger gets called from every sculpt move — throttle so
+// it sounds like soft pressure, not a buzzing machine gun.
+let lastSquelch = 0;
+function maybeSquelch() {
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    if (now - lastSquelch < 220) return;
+    lastSquelch = now;
+    playSfx("squelch");
 }
 function setMusic(on) {
     state.musicOn = on;
@@ -1924,6 +2299,7 @@ function setMusic(on) {
         if (on) music.play().catch(() => {});
         else music.pause();
     }
+    if (!on) stopSfx("wheel"); // hum restarts from the tick loop next frame when on
     updateMusicToggle();
 }
 function updateMusicToggle() {
@@ -1931,5 +2307,5 @@ function updateMusicToggle() {
     if (!btn) return;
     btn.classList.toggle("is-on", state.musicOn);
     btn.setAttribute("aria-pressed", state.musicOn ? "true" : "false");
-    btn.textContent = state.musicOn ? "♪ Music on" : "♪ Music off";
+    btn.textContent = state.musicOn ? "♪ Sound on" : "♪ Sound off";
 }
