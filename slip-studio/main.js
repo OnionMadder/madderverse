@@ -258,16 +258,9 @@ const SHAPES = {
             [0.22, 1.00], [0.20, 1.18], [0.22, 1.32], [0.20, 1.40],
         ],
     },
-    lid: {
-        label: "Lid",
-        controls: [
-            [0.00, 0.00], [0.42, 0.00], [0.44, 0.05], [0.40, 0.10],
-            [0.30, 0.16], [0.20, 0.22], [0.16, 0.30], [0.14, 0.55],
-            [0.12, 0.80], [0.10, 1.00], [0.16, 1.15], [0.20, 1.28],
-            [0.12, 1.36], [0.04, 1.40],
-        ],
-    },
 };
+// Lids are now generated parametrically from the source pot's rim
+// (see seedLidForRim) — no preset silhouette needed.
 const SHAPE_IDS = ["vase", "bowl", "cup", "bottle"]; // picker order; lid is set-only
 const DEFAULT_SHAPE = "vase";
 
@@ -295,6 +288,7 @@ const state = {
     // Mixed additively with the procedural clay grain in the shader.
     bumpCanvas: null, bumpCtx: null, bumpTex: null,
     pendingSetId: null,                   // carried across save → reset for lid pairs
+    isLid: false,                         // current piece is a lid (relaxes the foot envelope)
     firing: false,                        // true during the 1.2s firing sequence
     firingStart: 0,                       // performance.now() when firing began
     galleryView: (() => {
@@ -964,9 +958,15 @@ function buildPot() {
 // evenly-spaced height row.
 function seedProfile(shapeId) {
     const id = SHAPES[shapeId] ? shapeId : (SHAPES[state.shape] ? state.shape : DEFAULT_SHAPE);
-    const controls = SHAPES[id].controls.map(([x, y]) => new THREE.Vector2(x, y));
+    applyControlsToProfile(SHAPES[id].controls);
+}
 
-    const curve = new THREE.SplineCurve(controls).getPoints(600);
+// Resample a [x, y] control-points array through a spline into the
+// per-row profile array. Shared by seedProfile (preset silhouettes)
+// and seedLidForRim (parametric lid generation).
+function applyControlsToProfile(controls) {
+    const ctrl = controls.map(([x, y]) => new THREE.Vector2(x, y));
+    const curve = new THREE.SplineCurve(ctrl).getPoints(600);
     let j = 0;
     for (let r = 0; r <= ROWS; r++) {
         const y = (r / ROWS) * TOP;
@@ -977,7 +977,33 @@ function seedProfile(shapeId) {
         const t = span > 1e-6 ? THREE.MathUtils.clamp((y - a.y) / span, 0, 1) : 0;
         profile[r] = a.x + (b.x - a.x) * t;
     }
-    clampProfile(); // seed must obey the wheel envelope too
+    clampProfile(); // seed must obey the (possibly relaxed) envelope
+}
+
+// Generate a lid silhouette whose base radius matches the source
+// pot's rim exactly, so the two pieces visibly fit together. The
+// proportions of the dome + knob scale with the rim — a wide bowl
+// gets a wide squat lid, a narrow bottle gets a tall slim one.
+function seedLidForRim(rimR) {
+    rimR = Math.max(MIN_R, Math.min(MAX_R, rimR));
+    // Control points are normalised: x = fraction of rimR, y = height.
+    const k = rimR;
+    const controls = [
+        [0.00,      0.00],
+        [k,         0.00],
+        [k,         0.10],   // a short straight lip that sits on the pot rim
+        [k * 0.94,  0.18],
+        [k * 0.78,  0.34],
+        [k * 0.50,  0.58],
+        [k * 0.30,  0.82],
+        [k * 0.18,  1.00],
+        [k * 0.16,  1.12],
+        [k * 0.26,  1.22],   // knob base
+        [k * 0.30,  1.30],   // knob bulb
+        [k * 0.18,  1.38],
+        [0.00,      1.40],
+    ];
+    applyControlsToProfile(controls);
 }
 
 // Rewrite vertex positions + normals from the current profile.
@@ -1039,9 +1065,13 @@ function radiusAt(y) {
 // the foot, opening up to MAX_R above it. This is the physical wheel
 // constraint — the contact base can't overhang the wheel head.
 function maxRadiusAt(y) {
-    if (y <= FOOT_TOP) return BASE_MAX;
+    // A lid sits on the pot, not on the wheel — the foot can be as
+    // wide as MAX_R. A regular pot's foot is capped to the wheel head
+    // so the contact base can't overhang.
+    const baseMax = state.isLid ? MAX_R : BASE_MAX;
+    if (y <= FOOT_TOP) return baseMax;
     const t = THREE.MathUtils.clamp((y - FOOT_TOP) / FOOT_BLEND, 0, 1);
-    return THREE.MathUtils.lerp(BASE_MAX, MAX_R, t);
+    return THREE.MathUtils.lerp(baseMax, MAX_R, t);
 }
 
 // Enforce the envelope across the whole profile.
@@ -1206,6 +1236,7 @@ function stepBack() {
 
 // Start a fresh wet pot.
 function resetPot() {
+    state.isLid = false; // back to regular pot rules — wheel constrains the foot
     seedProfile();
     profileDirty = true;
     state.glaze = null;
@@ -1964,12 +1995,16 @@ async function savePot() {
 // in the gallery.
 async function makeLidPartner() {
     if (state.clayState !== "fired") return;
+    // Read the source pot's rim BEFORE saving + resetting — the lid's
+    // base will match it exactly so the two pieces visibly fit.
+    const rimR = profile[ROWS];
     const setId = "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
     state.pendingSetId = setId;
     await savePot();
-    // Now seed the partner: a lid silhouette, same set id carried over.
+    // Now seed the partner as a lid that fits this pot's rim.
     state.pendingSetId = setId;
-    seedProfile("lid");
+    state.isLid = true;
+    seedLidForRim(rimR);
     profileDirty = true;
     state.glaze = null;
     clearDeco();
