@@ -266,35 +266,37 @@ const SHAPES = {
 // Lid silhouettes — keyed by style. Each entry generates control
 // points scaled to a given rim radius. Lives up here (above init())
 // so the picker can wire up at startup without TDZ errors.
+// Each style now ENDS at a different y so the lid genuinely varies
+// in height. Above the silhouette's end, the profile collapses to
+// radius 0 — the rings stack at the axis and produce no visible
+// geometry, so the lid actually looks short, medium, or tall.
 const LID_STYLES = {
     flat: (k) => [
         [0.00,     0.00],
         [k,        0.00],
-        [k,        0.12],
-        [k * 0.96, 0.20],
-        [k * 0.84, 0.32],
-        [k * 0.60, 0.46],
-        [k * 0.34, 0.60],
-        [k * 0.20, 0.74],
-        [k * 0.18, 0.88],
-        [k * 0.24, 1.00],   // shallow knob base
-        [k * 0.26, 1.12],
-        [k * 0.14, 1.26],
-        [0.00,     1.40],
+        [k,        0.08],   // base lip
+        [k * 0.94, 0.14],
+        [k * 0.86, 0.22],
+        [k * 0.70, 0.30],
+        [k * 0.46, 0.40],
+        [k * 0.24, 0.50],   // small knob bulb
+        [k * 0.14, 0.58],
+        [0.00,     0.62],   // ends here — flat lid is short
+        [0.00,     1.40],   // unused — collapsed to axis
     ],
     domed: (k) => [
         [0.00,     0.00],
         [k,        0.00],
-        [k,        0.10],
-        [k * 0.94, 0.18],
-        [k * 0.78, 0.34],
-        [k * 0.50, 0.58],
-        [k * 0.30, 0.82],
-        [k * 0.18, 1.00],
-        [k * 0.16, 1.12],
-        [k * 0.26, 1.22],
-        [k * 0.30, 1.30],
-        [k * 0.18, 1.38],
+        [k,        0.08],
+        [k * 0.96, 0.14],
+        [k * 0.88, 0.22],
+        [k * 0.72, 0.34],
+        [k * 0.50, 0.48],
+        [k * 0.28, 0.60],
+        [k * 0.16, 0.72],
+        [k * 0.28, 0.84],   // knob bulb
+        [k * 0.14, 0.94],
+        [0.00,     1.00],   // medium-tall lid
         [0.00,     1.40],
     ],
     tall: (k) => [
@@ -310,7 +312,7 @@ const LID_STYLES = {
         [k * 0.30, 1.12],   // prominent knob base
         [k * 0.36, 1.24],
         [k * 0.20, 1.34],
-        [0.00,     1.40],
+        [0.00,     1.40],   // tall — uses the full height
     ],
 };
 const LID_STYLE_IDS = ["flat", "domed", "tall"];
@@ -521,7 +523,7 @@ function init() {
     if (location.search.includes("dev")) {
         window.__slip = {
             state, profile, radiusAt, sculptToward, trimToward, maxRadiusAt,
-            setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape,
+            setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape, setLidStyle,
             startFiringMoment, endFiringMoment,
             bumpDab, resetBumpLayer,
             playSfx, stopSfx,
@@ -1838,6 +1840,7 @@ function captureThumb(size = 320) {
     cam.updateProjectionMatrix();
     state.pot.position.y = prevPotY;
     if (prevPartnerVisible) state.partnerMesh.visible = true;
+    // (rest of the function returns the thumb data URL below)
 
     // GL pixels are bottom-up; flip into a 2D canvas, then encode.
     const c = document.createElement("canvas");
@@ -1850,6 +1853,49 @@ function captureThumb(size = 320) {
     }
     ctx.putImageData(img, 0, 0);
     return c.toDataURL("image/jpeg", 0.85);
+}
+
+// Capture the assembled lid-on-pot view as a square thumbnail. Used
+// once at save time so the gallery's set tile can show a single
+// "set complete" image rather than two stacked halves. Only valid
+// when state.assemblyShown is true (both meshes are positioned).
+function captureAssemblyThumb(size = 360) {
+    if (!state.assemblyShown) return null;
+    tickMaterial(10);
+    const cam = state.camera;
+    const prevAspect = cam.aspect;
+    const prevPos = cam.position.clone();
+    cam.aspect = 1;
+    cam.position.copy(CAM_ASSEMBLED_BASE);
+    cam.lookAt(CAM_ASSEMBLED_TARGET);
+    cam.updateProjectionMatrix();
+
+    const rt = new THREE.WebGLRenderTarget(size, size);
+    state.renderer.setRenderTarget(rt);
+    state.renderer.setClearColor(BG_COLOR, 1);
+    state.renderer.clear();
+    state.renderer.render(state.scene, cam);
+    const buf = new Uint8Array(size * size * 4);
+    state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
+    state.renderer.setRenderTarget(null);
+    state.renderer.setClearAlpha(0);
+    rt.dispose();
+
+    cam.aspect = prevAspect;
+    cam.position.copy(prevPos);
+    cam.lookAt(CAM_TARGET);
+    cam.updateProjectionMatrix();
+
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const ctx = c.getContext("2d");
+    const img = ctx.createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+        const src = (size - 1 - y) * size * 4;
+        img.data.set(buf.subarray(src, src + size * 4), y * size * 4);
+    }
+    ctx.putImageData(img, 0, 0);
+    return c.toDataURL("image/jpeg", 0.86);
 }
 
 // --- Photo modal ------------------------------------------------
@@ -2080,6 +2126,10 @@ async function savePot() {
     if (partner && !setId) {
         setId = "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
     }
+    // For sets, capture the assembled lid-on-pot thumb FIRST while
+    // both meshes are still in their assembly positions. Both saved
+    // entries share this thumb so the gallery shows the set together.
+    const assemblyThumb = partner ? captureAssemblyThumb() : null;
     const entry = {
         id: Date.now().toString(36),
         ts: Date.now(),
@@ -2091,6 +2141,7 @@ async function savePot() {
         setId,
         title: null, // user can name from the gallery
         isLid: state.isLid,
+        assemblyThumb,
     };
     try {
         await dbPut(entry);
@@ -2115,6 +2166,7 @@ async function savePot() {
                 setId,
                 title: null,
                 isLid: state.isLid,
+                assemblyThumb, // same shared shot
             };
             await dbPut(partnerEntry);
             restorePieceState(active);
@@ -2516,24 +2568,41 @@ async function openGallery() {
 function renderGalleryTile(grid, members) {
     const isShelf = state.galleryView === "shelf";
     const isSet = members.length > 1;
+    // For sets where we captured an assembly shot at save time, show
+    // that single composite thumb instead of two stacked halves.
+    const assemblyThumb = isSet && members[0].assemblyThumb;
     const item = document.createElement("div");
-    item.className = "gallery-item" + (isSet ? " gallery-set" : "") + (isShelf ? " is-shelf" : "");
+    item.className = "gallery-item" + (isSet ? " gallery-set" : "") + (isShelf ? " is-shelf" : "")
+                   + (assemblyThumb ? " has-assembly" : "");
 
-    // Thumbnail(s). A single pot shows one image; a set shows both
-    // halves (side-by-side in compact mode, stacked in shelf mode).
     const thumbWrap = document.createElement("div");
     thumbWrap.className = "pot-thumb-wrap";
-    members.forEach((p) => {
+    if (assemblyThumb) {
+        // Single combined image — clicking it loads either piece (the
+        // assembly view restores both anyway).
         const half = document.createElement("div");
-        half.className = isSet ? "gallery-half" : "pot-thumb";
+        half.className = "pot-thumb";
         const img = document.createElement("img");
-        img.src = p.thumb;
-        img.alt = p.title || "Saved pot";
+        img.src = assemblyThumb;
+        img.alt = (members[0].title || "Saved set");
         img.loading = "lazy";
-        img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
+        img.addEventListener("click", async () => { await loadPot(members[0]); closeGallery(); });
         half.appendChild(img);
         thumbWrap.appendChild(half);
-    });
+    } else {
+        // Solo pot, or a legacy set without an assembly thumb.
+        members.forEach((p) => {
+            const half = document.createElement("div");
+            half.className = isSet ? "gallery-half" : "pot-thumb";
+            const img = document.createElement("img");
+            img.src = p.thumb;
+            img.alt = p.title || "Saved pot";
+            img.loading = "lazy";
+            img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
+            half.appendChild(img);
+            thumbWrap.appendChild(half);
+        });
+    }
     item.appendChild(thumbWrap);
 
     // Metadata column (shelf view only): title (tap to rename) + glaze
