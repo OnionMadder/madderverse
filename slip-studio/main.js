@@ -1079,9 +1079,20 @@ function writeProfileArrayToGeometry(geo, prof) {
     const pos = geo.attributes.position.array;
     const nor = geo.attributes.normal.array;
     const dyStep = TOP / ROWS;
+    // Find the highest contiguous tail of zero-radius rings at the top
+    // of the profile (lid silhouettes collapse to the axis above the
+    // dome). All those rings will share the cap row's y so the
+    // triangles between them have zero area in every dimension —
+    // otherwise they'd render as a thin needle along the y axis.
+    const EPS = 0.001;
+    let firstCollapse = ROWS + 1;
+    for (let r = ROWS; r >= 0; r--) {
+        if (prof[r] < EPS) firstCollapse = r; else break;
+    }
+    const capY = firstCollapse <= ROWS ? firstCollapse * dyStep : ROWS * dyStep;
     for (let r = 0; r <= ROWS; r++) {
-        const y = r * dyStep;
-        const rad = prof[r];
+        const y = (r < firstCollapse) ? r * dyStep : capY;
+        const rad = prof[r] < EPS ? 0 : prof[r];
 
         // 2D outward normal in the (radius, height) plane, from the
         // local profile slope. Central difference inside, one-sided
