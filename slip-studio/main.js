@@ -289,6 +289,8 @@ const state = {
     bumpCanvas: null, bumpCtx: null, bumpTex: null,
     pendingSetId: null,                   // carried across save → reset for lid pairs
     isLid: false,                         // current piece is a lid (relaxes the foot envelope)
+    savedPot: null,                       // paused pot state while user shapes a lid
+    savedLid: null,                       // paused lid state while user edits the pot
     firing: false,                        // true during the 1.2s firing sequence
     firingStart: 0,                       // performance.now() when firing began
     galleryView: (() => {
@@ -405,7 +407,14 @@ function init() {
         el.addEventListener("click", () => setPhotoStyle(el.dataset.style)));
     document.querySelectorAll("#photoAspects .photo-chip").forEach((el) =>
         el.addEventListener("click", () => setPhotoAspect(el.dataset.aspect)));
-    document.getElementById("lidBtn")?.addEventListener("click", () => makeLidPartner());
+    document.getElementById("makeLidBtn")?.addEventListener("click", () => {
+        makeLidPartner();
+        updateToolbar();
+    });
+    document.getElementById("swapBtn")?.addEventListener("click", () => {
+        swapActivePiece();
+        updateToolbar();
+    });
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
@@ -458,7 +467,8 @@ function init() {
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
-            makeLidPartner, loadPot, openGallery, closeGallery,
+            makeLidPartner, swapActivePiece, capturePieceState, restorePieceState,
+            loadPot, openGallery, closeGallery,
             dbAll, dbDelete, dismissLanding,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
@@ -1159,6 +1169,10 @@ function advanceStage() {
             setPhase("fired");
             playSfx("kiln");
             startFiringMoment();
+            // If a partner is paused, mark it fired too so a Swap
+            // after the kiln view shows it already at the fired look.
+            if (state.savedPot) state.savedPot.clayState = "fired";
+            if (state.savedLid) state.savedLid.clayState = "fired";
             break;
         case "fired":   resetPot();          break;
     }
@@ -1237,6 +1251,8 @@ function stepBack() {
 // Start a fresh wet pot.
 function resetPot() {
     state.isLid = false; // back to regular pot rules — wheel constrains the foot
+    state.savedPot = null;
+    state.savedLid = null;
     seedProfile();
     profileDirty = true;
     state.glaze = null;
@@ -1349,15 +1365,27 @@ function updateToolbar() {
         back.hidden = cs === "wet" || cs === "fired";
         if (!back.hidden) back.innerHTML = BACK_LABEL[cs] || "&larr; Back";
     }
-    const saveBtn = document.getElementById("saveBtn");
-    const photoBtn = document.getElementById("photoBtn");
-    const lidBtn = document.getElementById("lidBtn");
+    const saveBtn    = document.getElementById("saveBtn");
+    const photoBtn   = document.getElementById("photoBtn");
+    const makeLidBtn = document.getElementById("makeLidBtn");
+    const swapBtn    = document.getElementById("swapBtn");
+    const hasPartner = !!(state.savedPot || state.savedLid);
     // The brush bar drives wet sculpting and leather trimming (foot zone).
     if (brushBar) brushBar.hidden = !(cs === "wet" || cs === "leather");
     if (decoStack) decoStack.hidden = cs !== "leather";
-    if (saveBtn)  saveBtn.hidden  = cs !== "fired"; // save finished pieces
+    if (saveBtn) {
+        saveBtn.hidden = cs !== "fired";
+        saveBtn.textContent = hasPartner ? "Save set" : "Save";
+    }
     if (photoBtn) photoBtn.hidden = cs !== "fired";
-    if (lidBtn)   lidBtn.hidden   = cs !== "fired";
+    // Make lid: only at decorate, only if you don't already have a partner.
+    if (makeLidBtn) makeLidBtn.hidden = !(cs === "leather" && !hasPartner && !state.isLid);
+    // Swap: visible at any phase while a partner is paused, so the
+    // user can hop back to the other piece at any time.
+    if (swapBtn) {
+        swapBtn.hidden = !hasPartner;
+        swapBtn.textContent = state.isLid ? "↻ Pot" : "↻ Lid";
+    }
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
 
@@ -1969,6 +1997,15 @@ function flashPhotoSave() {
 }
 
 async function savePot() {
+    // If a partner is paused in memory, generate a shared set id so
+    // both pieces save together. The active piece is written first
+    // using the live canvases; the partner is restored briefly so its
+    // thumb captures the right look, then the active piece is put back.
+    const partner = state.savedPot || state.savedLid;
+    let setId = state.pendingSetId || null;
+    if (partner && !setId) {
+        setId = "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+    }
     const entry = {
         id: Date.now().toString(36),
         ts: Date.now(),
@@ -1977,13 +2014,38 @@ async function savePot() {
         deco: state.decoCanvas.toDataURL("image/png"),
         bump: state.bumpCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
-        setId: state.pendingSetId || null,
+        setId,
         title: null, // user can name from the gallery
     };
     try {
         await dbPut(entry);
         flashSaved();
-        state.pendingSetId = null; // one save consumes the pending set link
+        state.pendingSetId = null;
+
+        if (partner) {
+            // Swap in the partner, save it under the same set id, then
+            // swap back to the original so the view doesn't lurch.
+            const active = capturePieceState();
+            restorePieceState(partner);
+            // Force material to settle into the fired look before thumb.
+            tickMaterial(10);
+            const partnerEntry = {
+                id: (Date.now() + 1).toString(36),
+                ts: Date.now() + 1,
+                profile: Array.from(profile, (x) => +x.toFixed(4)),
+                glaze: state.glaze,
+                deco: state.decoCanvas.toDataURL("image/png"),
+                bump: state.bumpCanvas.toDataURL("image/png"),
+                thumb: captureThumb(),
+                setId,
+                title: null,
+            };
+            await dbPut(partnerEntry);
+            restorePieceState(active);
+            tickMaterial(10);
+            state.savedPot = null;
+            state.savedLid = null;
+        }
     } catch (e) {
         console.warn("save failed", e);
     }
@@ -1993,16 +2055,55 @@ async function savePot() {
 // reset to a new lid-shaped wet pot that will carry the same set id on
 // its eventual save. Saved pots that share a set id render as a pair
 // in the gallery.
-async function makeLidPartner() {
-    if (state.clayState !== "fired") return;
-    // Read the source pot's rim BEFORE saving + resetting — the lid's
-    // base will match it exactly so the two pieces visibly fit.
+// Snapshot the live piece's full editable state (profile, glaze, deco
+// canvas, bump canvas, lid flag, current phase) into a plain object
+// so we can swap it in/out of memory while the user shapes a partner.
+function capturePieceState() {
+    const decoCopy = document.createElement("canvas");
+    decoCopy.width = DECO_W;
+    decoCopy.height = DECO_H;
+    decoCopy.getContext("2d").drawImage(state.decoCanvas, 0, 0);
+    const bumpCopy = document.createElement("canvas");
+    bumpCopy.width = BUMP_W;
+    bumpCopy.height = BUMP_H;
+    bumpCopy.getContext("2d").drawImage(state.bumpCanvas, 0, 0);
+    return {
+        profile: Float32Array.from(profile),
+        glaze: state.glaze,
+        decoCanvas: decoCopy,
+        bumpCanvas: bumpCopy,
+        isLid: state.isLid,
+        clayState: state.clayState,
+    };
+}
+
+// Inverse of capturePieceState — write a paused piece back into the
+// live editable state. Phase is set last so the toolbar refreshes
+// against the fully-restored state.
+function restorePieceState(saved) {
+    for (let i = 0; i < saved.profile.length; i++) profile[i] = saved.profile[i];
+    profileDirty = true;
+    state.glaze = saved.glaze;
+    state.isLid = saved.isLid;
+    state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
+    state.decoCtx.drawImage(saved.decoCanvas, 0, 0);
+    state.decoTex.needsUpdate = true;
+    state.bumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
+    state.bumpCtx.drawImage(saved.bumpCanvas, 0, 0);
+    state.bumpTex.needsUpdate = true;
+    setPhase(saved.clayState);
+    updateGlazeBar();
+}
+
+// "+ Make lid" at the decorate stage. Pauses the pot in memory (NOT
+// to the gallery) and seeds a fresh wet lid whose base matches this
+// pot's rim. The two pieces share a set id at save time.
+function makeLidPartner() {
+    if (state.clayState !== "leather") return;
+    if (state.isLid) return;          // already a lid
+    if (state.savedPot) return;       // a partner already exists
     const rimR = profile[ROWS];
-    const setId = "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
-    state.pendingSetId = setId;
-    await savePot();
-    // Now seed the partner as a lid that fits this pot's rim.
-    state.pendingSetId = setId;
+    state.savedPot = capturePieceState();
     state.isLid = true;
     seedLidForRim(rimR);
     profileDirty = true;
@@ -2011,6 +2112,24 @@ async function makeLidPartner() {
     resetBumpLayer();
     setPhase(INITIAL_STATE);
     updateGlazeBar();
+}
+
+// Toggle which piece is live for editing/viewing. The currently-live
+// piece is captured into the OTHER slot; the paused piece is restored
+// into the live state. Available whenever exactly one piece is paused.
+function swapActivePiece() {
+    const wasLid = state.isLid;
+    const other = wasLid ? state.savedPot : state.savedLid;
+    if (!other) return;
+    const current = capturePieceState();
+    restorePieceState(other);
+    if (wasLid) {
+        state.savedLid = current;
+        state.savedPot = null;
+    } else {
+        state.savedPot = current;
+        state.savedLid = null;
+    }
 }
 
 function flashSaved() {
