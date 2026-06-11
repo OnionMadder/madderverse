@@ -39,30 +39,44 @@ html, body {
     overscroll-behavior: none;   /* no rubber-band on mobile */
 }
 
-/* The kiln glow: a brief warm flash over the scene when a pot fires.
-   Pointer-events:none lets all the underlying controls keep working.
-   The animation is restarted by toggling .is-firing off → on in JS. */
-.kiln-glow {
+/* The kiln view: a dark vignette frames the scene during firing, with
+   a warm inner glow that builds + fades. JS controls each layer's
+   opacity per frame via the firing sequence in tick(); CSS only
+   provides the gradients + a tiny transition so frame-to-frame
+   opacity changes stay smooth. Pointer-events:none lets the (now
+   muted) underlying controls stay unclickable but visible. */
+.kiln-vignette {
     position: fixed;
     inset: 0;
-    z-index: 38; /* above the toolbar (35), below modals (50+) */
-    background: radial-gradient(ellipse at 50% 58%,
-        rgba(255, 156, 60, 0.78) 0%,
-        rgba(220, 80, 18, 0.45) 32%,
-        rgba(140, 50, 0, 0) 70%);
+    z-index: 38;
     pointer-events: none;
     opacity: 0;
+    transition: opacity 0.18s linear;
 }
-.kiln-glow.is-firing {
-    animation: kiln-flash 1.2s ease-out forwards;
+.kiln-vignette > * {
+    position: absolute;
+    inset: 0;
+    transition: opacity 0.18s linear;
 }
-@keyframes kiln-flash {
-    0%   { opacity: 0; }
-    18%  { opacity: 0.92; }
-    100% { opacity: 0; }
+.kiln-edge {
+    /* dark chamber walls — transparent in the middle, opaque at the rim */
+    background: radial-gradient(ellipse 60% 70% at 50% 56%,
+        transparent 0%,
+        transparent 28%,
+        rgba(8, 5, 3, 0.55) 50%,
+        rgba(6, 4, 2, 0.96) 82%);
+}
+.kiln-inner-glow {
+    /* warm orange flame light pulsing inside the chamber */
+    background: radial-gradient(ellipse 52% 60% at 50% 58%,
+        rgba(255, 130, 40, 0.55) 0%,
+        rgba(255,  90, 30, 0.30) 22%,
+        transparent 56%);
+    mix-blend-mode: screen;
+    opacity: 0;
 }
 @media (prefers-reduced-motion: reduce) {
-    .kiln-glow.is-firing { animation: none; opacity: 0; }
+    .kiln-vignette { transition: none; opacity: 0; }
 }
 
 /* Backdrop image sits behind the transparent canvas. */

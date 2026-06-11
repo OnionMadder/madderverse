@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=31" />
+    <link rel="stylesheet" href="style.css?v=32" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -44,7 +44,10 @@
 
 <body>
     <div id="backdrop" class="backdrop"></div>
-    <div id="kilnGlow" class="kiln-glow" aria-hidden="true"></div>
+    <div id="kilnVignette" class="kiln-vignette" aria-hidden="true">
+        <div class="kiln-edge"></div>
+        <div class="kiln-inner-glow"></div>
+    </div>
 
     <a class="home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
     <button class="title-btn" id="titleBtn" type="button" aria-label="Back to title" title="Title screen">&#x21A9;</button>
@@ -150,7 +153,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=31"></script>
+    <script type="module" src="main.js?v=32"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

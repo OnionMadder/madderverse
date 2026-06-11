@@ -457,6 +457,7 @@ function init() {
         window.__slip = {
             state, profile, radiusAt, sculptToward, trimToward, maxRadiusAt,
             setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape,
+            startFiringMoment, endFiringMoment,
             bumpDab, resetBumpLayer,
             playSfx, stopSfx,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
@@ -1136,20 +1137,52 @@ function advanceStage() {
     }
 }
 
-// Run the kiln-flash sequence: a quick warm glow scrim + camera lean.
-// Audio is the kiln sfx (triggered alongside this). Tick handles the
-// per-frame camera + spin update; CSS handles the glow animation.
+// The cinematic kiln sequence: ~4.5 s of close → fire → cool → open.
+// The kiln-vignette overlay (dark edge + warm inner glow) takes over
+// the frame; the backdrop fades to near-black; the auto-spin stops
+// (state.firing in the busy flag); the material tween slows so the
+// glaze visibly melts raw → fired; the music ducks; the kiln SFX
+// plays alongside. Tick() drives the per-frame interpolation.
+const FIRING_DURATION = 4.5;
+const FIRING_MUSIC_DUCK = 0.38; // multiplier on saved music volume during firing
+
 function startFiringMoment() {
     state.firing = true;
     state.firingStart = (typeof performance !== "undefined" ? performance.now() : Date.now());
-    const glow = document.getElementById("kilnGlow");
-    if (glow) {
-        glow.classList.remove("is-firing");
-        // Force a reflow so the next add restarts the animation cleanly,
-        // even when refiring back-to-back (Re-soften → Fire again).
-        void glow.offsetWidth;
-        glow.classList.add("is-firing");
+    const v = document.getElementById("kilnVignette");
+    if (v) {
+        v.style.opacity = "0";   // tick() will ramp it up
+        const edge = v.querySelector(".kiln-edge");
+        const glow = v.querySelector(".kiln-inner-glow");
+        if (edge) edge.style.opacity = "0";
+        if (glow) glow.style.opacity = "0";
     }
+    // Save current music volume so we can restore on exit.
+    if (music && !music.paused) {
+        state._musicSavedVol = music.volume;
+    } else {
+        state._musicSavedVol = null;
+    }
+}
+
+function endFiringMoment() {
+    state.firing = false;
+    const v = document.getElementById("kilnVignette");
+    if (v) {
+        v.style.opacity = "0";
+        const glow = v.querySelector(".kiln-inner-glow");
+        if (glow) glow.style.opacity = "0";
+    }
+    const bd = document.getElementById("backdrop");
+    if (bd) bd.style.opacity = "1";
+    if (music && state._musicSavedVol != null) music.volume = state._musicSavedVol;
+    state._musicSavedVol = null;
+}
+
+// 0..1 ease for smooth-in/out transitions inside the firing phases.
+function smoothstep(x) {
+    x = Math.max(0, Math.min(1, x));
+    return x * x * (3 - 2 * x);
 }
 
 // Decorate: pick a glaze on the bone-dry pot (tap the active one again
@@ -1245,11 +1278,14 @@ function setBrush(i) {
 
 // Ease the material toward the current state's look each frame, so
 // stage changes read as a calm transition rather than a hard cut.
+// During the firing sequence the time constant slows ~7x so the user
+// actually watches the glaze melt raw → fired instead of snapping.
 function tickMaterial(dt) {
     const m = state.clayMaterial;
     const t = state.clayTarget;
     if (!m || !t) return;
-    const k = 1 - Math.exp(-dt * 5); // frame-rate-independent smoothing
+    const rate = state.firing ? 0.8 : 5; // tau = 1/rate seconds
+    const k = 1 - Math.exp(-dt * rate);
     targetColor.setHex(t.color);
     m.color.lerp(targetColor, k);
     m.roughness          += (t.roughness          - m.roughness)          * k;
@@ -2133,22 +2169,58 @@ function tick() {
     } else {
         stopSfx("wheel");
     }
-    // The firing moment: a bell-shaped camera lean alongside the CSS
-    // glow flash + kiln SFX. Spin is held near zero via state.firing in
-    // the busy flag above, so the pot stills for the reveal.
+    // The kiln sequence drives the dark-edge vignette opacity, the
+    // warm inner glow, the backdrop fade and the music ducking each
+    // frame. The slowed material tween (see tickMaterial) lets the
+    // glaze melt visibly through the firing phase.
     if (state.firing) {
         const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
         const elapsed = (now - state.firingStart) / 1000;
-        if (elapsed >= 1.2) {
-            state.firing = false;
-            setZoom(1);
+        if (elapsed >= FIRING_DURATION) {
+            endFiringMoment();
         } else {
-            const peakAt = 0.34;
-            const t = elapsed < peakAt
-                ? elapsed / peakAt
-                : Math.max(0, (1.2 - elapsed) / (1.2 - peakAt));
-            const eased = t * t * (3 - 2 * t);          // smoothstep
-            setZoom(1 + 0.13 * eased);
+            const phaseT = elapsed / FIRING_DURATION;
+            // Phase fractions of the total: close 11%, fire 44%, cool 11%, open 33%.
+            const closeEnd = 0.11, fireEnd = 0.55, coolEnd = 0.66;
+            let edge = 0, glow = 0, bd = 1, ducked = 1;
+            if (phaseT < closeEnd) {
+                const t = smoothstep(phaseT / closeEnd);
+                edge = t;            // dark walls fade in
+                glow = t * 0.4;      // warm light starts
+                bd = 1 - 0.88 * t;   // studio darkens
+                ducked = 1 - (1 - FIRING_MUSIC_DUCK) * t;
+            } else if (phaseT < fireEnd) {
+                const t = (phaseT - closeEnd) / (fireEnd - closeEnd);
+                edge = 1;
+                glow = 0.4 + 0.6 * smoothstep(t); // glow builds toward peak
+                bd = 0.12;
+                ducked = FIRING_MUSIC_DUCK;
+            } else if (phaseT < coolEnd) {
+                const t = (phaseT - fireEnd) / (coolEnd - fireEnd);
+                edge = 1;
+                glow = 1 - 0.4 * smoothstep(t);   // glow softens
+                bd = 0.12;
+                ducked = FIRING_MUSIC_DUCK;
+            } else {
+                const t = smoothstep((phaseT - coolEnd) / (1 - coolEnd));
+                edge = 1 - t;            // walls fade out
+                glow = 0.6 * (1 - t);    // last embers
+                bd = 0.12 + 0.88 * t;    // studio brightens back
+                ducked = FIRING_MUSIC_DUCK + (1 - FIRING_MUSIC_DUCK) * t;
+            }
+            const vignette = document.getElementById("kilnVignette");
+            if (vignette) {
+                vignette.style.opacity = "1";
+                const edgeEl = vignette.querySelector(".kiln-edge");
+                const glowEl = vignette.querySelector(".kiln-inner-glow");
+                if (edgeEl) edgeEl.style.opacity = edge.toFixed(3);
+                if (glowEl) glowEl.style.opacity = glow.toFixed(3);
+            }
+            const backdrop = document.getElementById("backdrop");
+            if (backdrop) backdrop.style.opacity = bd.toFixed(3);
+            if (music && state._musicSavedVol != null) {
+                music.volume = state._musicSavedVol * ducked;
+            }
         }
     }
     if (profileDirty) {
