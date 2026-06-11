@@ -80,20 +80,19 @@ const FOOT_BLEND  = 0.14; // allowed width opens to MAX_R over this rise
 // wet reads smoother (water fills the tooth), bone-dry shows the most
 // grain. `fired` is the bare (unglazed) fired earthenware look.
 const CLAY_STATES = {
-    wet:     { label: "Wet clay",     color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.03 },
-    leather: { label: "Leather-hard", color: 0xb38566, roughness: 0.78, clearcoat: 0.18, clearcoatRoughness: 0.70, envMapIntensity: 0.55, bump: 0.05 },
-    bonedry: { label: "Bone-dry",     color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, bump: 0.07 },
-    fired:   { label: "Fired",        color: 0xbf6a45, roughness: 0.60, clearcoat: 0.15, clearcoatRoughness: 0.70, envMapIntensity: 0.62, bump: 0.04 },
+    wet:     { label: "Wet clay", color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.03 },
+    leather: { label: "Decorate", color: 0xb38566, roughness: 0.78, clearcoat: 0.18, clearcoatRoughness: 0.70, envMapIntensity: 0.55, bump: 0.05 },
+    fired:   { label: "Fired",    color: 0xbf6a45, roughness: 0.60, clearcoat: 0.15, clearcoatRoughness: 0.70, envMapIntensity: 0.62, bump: 0.04 },
 };
 const INITIAL_STATE = "wet";
 
-// Four-step arc following real pottery: shape it wet → trim the
-// foot ring while it's leather-hard → decorate it bone-dry (pick a
-// glaze) → fire it. Glazing is optional — a bare bone-dry pot fires
-// to plain earthenware.
-const PHASES = ["wet", "leather", "bonedry", "fired"];
-const ADVANCE_LABEL = { wet: "Trim", leather: "Dry", bonedry: "Fire", fired: "New pot" };
-const BACK_LABEL    = { leather: "&larr; Re-wet", bonedry: "&larr; Re-soften" };
+// Three-step arc: shape it wet → decorate the leather-hard clay
+// (pick a glaze, paint, trim the foot in passing) → fire it. The
+// previous bone-dry phase was just a transition with no unique role;
+// it's been folded into leather so decorating + trim share a stage.
+const PHASES = ["wet", "leather", "fired"];
+const ADVANCE_LABEL = { wet: "Dry", leather: "Fire", fired: "New pot" };
+const BACK_LABEL    = { leather: "&larr; Re-wet" };
 
 // Glazes. `raw` is the chalky matte coat before firing; `fired` is the
 // glossy vitrified result. Shared surface params, per-glaze colours.
@@ -1105,14 +1104,13 @@ function sculptToward(y, targetR) {
 // --- Material states (wet → bone-dry/decorate → fired) ----------
 
 // The material look for the current phase. A chosen glaze shows as a
-// matte raw coat while bone-dry, then glossy once fired; with no glaze
-// it's bare clay (and plain fired earthenware). Leather-hard is its
-// own bare-clay look — drier than wet, less sheen, more visible grain.
+// matte raw coat at the leather-hard / decorate stage, then glossy
+// once fired; with no glaze it's bare clay (and plain fired
+// earthenware).
 function currentLook() {
     const cs = state.clayState;
     if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].fired : CLAY_STATES.fired;
-    if (cs === "bonedry") return state.glaze ? GLAZES[state.glaze].raw   : CLAY_STATES.bonedry;
-    if (cs === "leather") return CLAY_STATES.leather;
+    if (cs === "leather") return state.glaze ? GLAZES[state.glaze].raw   : CLAY_STATES.leather;
     return CLAY_STATES.wet;
 }
 
@@ -1123,12 +1121,11 @@ function setPhase(name) {
     updateToolbar();
 }
 
-// The forward control: firm up → dry → fire → new pot.
+// The forward control: dry → fire → new pot.
 function advanceStage() {
     switch (state.clayState) {
-        case "wet":     setPhase("leather"); break; // firms to leather-hard
-        case "leather": setPhase("bonedry"); break;
-        case "bonedry":
+        case "wet":     setPhase("leather"); break; // firms to leather-hard, ready to decorate
+        case "leather":
             setPhase("fired");
             playSfx("kiln");
             startFiringMoment();
@@ -1192,7 +1189,7 @@ function setGlaze(id) {
     const wasActive = state.glaze === id;
     state.glaze = wasActive ? null : id;
     if (!wasActive) playSfx("pour"); // soft pour when a glaze is selected
-    if (state.clayState === "bonedry") setPhase("bonedry"); // refresh the raw look
+    if (state.clayState === "leather") setPhase("leather"); // refresh the raw look
     updateGlazeBar();
 }
 
@@ -1299,9 +1296,8 @@ function tickMaterial(dt) {
 // The stage label, including the glaze name once chosen.
 function stageLabelText() {
     const cs = state.clayState;
-    if (cs === "bonedry") return state.glaze ? GLAZES[state.glaze].name + " · raw" : "Decorate";
-    if (cs === "fired") return state.glaze ? GLAZES[state.glaze].name + " glaze" : "Fired";
-    if (cs === "leather") return CLAY_STATES.leather.label;
+    if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].name + " glaze" : "Fired";
+    if (cs === "leather") return state.glaze ? GLAZES[state.glaze].name + " · raw" : CLAY_STATES.leather.label;
     return CLAY_STATES.wet.label;
 }
 
@@ -1327,11 +1323,11 @@ function updateToolbar() {
     const lidBtn = document.getElementById("lidBtn");
     // The brush bar drives wet sculpting and leather trimming (foot zone).
     if (brushBar) brushBar.hidden = !(cs === "wet" || cs === "leather");
-    if (decoStack) decoStack.hidden = cs !== "bonedry";
+    if (decoStack) decoStack.hidden = cs !== "leather";
     if (saveBtn)  saveBtn.hidden  = cs !== "fired"; // save finished pieces
     if (photoBtn) photoBtn.hidden = cs !== "fired";
     if (lidBtn)   lidBtn.hidden   = cs !== "fired";
-    if (cs === "bonedry") updateDecoSub();   // contextual sub-palette
+    if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
 
 // Build the glaze palette once (swatches coloured by each glaze's
@@ -1538,17 +1534,7 @@ function onPointerDown(ev) {
         return;
     }
 
-    if (state.clayState === "leather") {
-        // Trim the foot ring. Only engages in the foot zone, only cuts inward.
-        const p = pointerToProfile(ev);
-        if (!p) return;
-        if (p.y < -0.05 || p.y > TRIM_MAX_Y) return;
-        if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
-        sculpting = true;
-        trimToward(p.y, p.r);
-        maybeSquelch();
-        ev.preventDefault();
-    } else if (state.clayState === "wet") {
+    if (state.clayState === "wet") {
         const p = pointerToProfile(ev);
         if (!p) return;
         if (p.y < -0.05 || p.y > TOP + 0.15) return;
@@ -1557,11 +1543,31 @@ function onPointerDown(ev) {
         sculptToward(p.y, p.r);
         maybeSquelch();
         ev.preventDefault();
-    } else if (state.clayState === "bonedry" && state.decoColor != null && state.decoTool !== "overlay") {
-        state.painting = true;
-        const uv = pointerToUV(ev);
-        if (uv) { decoApplyAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
-        else lastPaintUV = null;
+    } else if (state.clayState === "leather") {
+        // Two actions live here. A silhouette grab in the foot zone
+        // is a trim (constrained inward sculpt). Anything else, when
+        // a paint colour is selected, is a brush/splatter/stamp tap.
+        const p = pointerToProfile(ev);
+        const inFoot = p && p.y >= -0.05 && p.y <= TRIM_MAX_Y
+                    && Math.abs(p.r - radiusAt(p.y)) <= GRAB_TOL;
+        if (inFoot) {
+            sculpting = true;
+            trimToward(p.y, p.r);
+            maybeSquelch();
+            ev.preventDefault();
+            return;
+        }
+        if (state.decoColor != null && state.decoTool !== "overlay") {
+            state.painting = true;
+            const uv = pointerToUV(ev);
+            if (uv) { decoApplyAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
+            else lastPaintUV = null;
+            ev.preventDefault();
+            return;
+        }
+        // No tool engaged — fall through to spin.
+        state.userRotating = true;
+        viewPrevX = ev.clientX;
         ev.preventDefault();
     } else {
         // No tool here (e.g. fired) → drag to spin and inspect.
