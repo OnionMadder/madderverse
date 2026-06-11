@@ -80,17 +80,20 @@ const FOOT_BLEND  = 0.14; // allowed width opens to MAX_R over this rise
 // wet reads smoother (water fills the tooth), bone-dry shows the most
 // grain. `fired` is the bare (unglazed) fired earthenware look.
 const CLAY_STATES = {
-    wet:     { label: "Wet clay", color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.008 },
-    bonedry: { label: "Bone-dry", color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, bump: 0.024 },
-    fired:   { label: "Fired",    color: 0xbf6a45, roughness: 0.60, clearcoat: 0.15, clearcoatRoughness: 0.70, envMapIntensity: 0.62, bump: 0.014 },
+    wet:     { label: "Wet clay",     color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.03 },
+    leather: { label: "Leather-hard", color: 0xb38566, roughness: 0.78, clearcoat: 0.18, clearcoatRoughness: 0.70, envMapIntensity: 0.55, bump: 0.05 },
+    bonedry: { label: "Bone-dry",     color: 0xc9a98c, roughness: 0.95, clearcoat: 0.02, clearcoatRoughness: 1.00, envMapIntensity: 0.38, bump: 0.07 },
+    fired:   { label: "Fired",        color: 0xbf6a45, roughness: 0.60, clearcoat: 0.15, clearcoatRoughness: 0.70, envMapIntensity: 0.62, bump: 0.04 },
 };
 const INITIAL_STATE = "wet";
 
-// Three-step arc: shape it wet, decorate it bone-dry (pick a glaze),
-// fire it. Glazing is optional — a bare bone-dry pot fires to plain
-// earthenware.
-const PHASES = ["wet", "bonedry", "fired"];
-const ADVANCE_LABEL = { wet: "Dry", bonedry: "Fire", fired: "New pot" };
+// Four-step arc following real pottery: shape it wet → trim the
+// foot ring while it's leather-hard → decorate it bone-dry (pick a
+// glaze) → fire it. Glazing is optional — a bare bone-dry pot fires
+// to plain earthenware.
+const PHASES = ["wet", "leather", "bonedry", "fired"];
+const ADVANCE_LABEL = { wet: "Trim", leather: "Dry", bonedry: "Fire", fired: "New pot" };
+const BACK_LABEL    = { leather: "&larr; Re-wet", bonedry: "&larr; Re-soften" };
 
 // Glazes. `raw` is the chalky matte coat before firing; `fired` is the
 // glossy vitrified result. Shared surface params, per-glaze colours
@@ -120,6 +123,12 @@ const GLAZE_IDS = ["celadon", "cobalt", "oatmeal", "honey", "tenmoku", "blush", 
 // it on the clay. Brush = soft dab; splatter = scattered droplets.
 const DECO_COLORS = [0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86, 0x6e4a6b, 0x4a5a68];
 const DECO_W = 2048, DECO_H = 1024; // unwrapped surface (≈ circumference:height)
+// Bump canvas. The procedural clay grain is rendered into it once at
+// pot reset; the texture stays static for v2 (earlier prototypes of
+// texture-stamp + carve tools were pulled — see the section comment
+// where carving used to live). Same wrap as the deco layer; smaller
+// because relief reads softer than colour.
+const BUMP_W = 1024, BUMP_H = 512;
 // Brush radii in canvas px (at zoom 1). The effective radius is divided
 // by the zoom, so the brush keeps a constant on-screen size — zoom in
 // for finer detail.
@@ -152,6 +161,7 @@ const OVERLAY_PATTERNS = [
     { id: "diagonal", label: "Diagonal" },
 ];
 
+
 // --- Ambiance: backdrops + music --------------------------------
 // Backdrops are CSS images behind the (transparent) canvas; chosen on
 // the title screen and remembered. Music is one looping ambient track.
@@ -167,6 +177,58 @@ const BACKGROUNDS = [
 ];
 const DEFAULT_BG = "watercolor";
 const MUSIC_SRC = "assets/audio/New Plan - Out To The World.mp3";
+
+// --- Starter silhouettes ----------------------------------------
+// Spline control points for the seed profile: (radius, height) in
+// world units. All shapes terminate at y=TOP (1.40) so they fill the
+// vertex grid without leaving degenerate rings above. The picker on
+// the title screen exposes vase / bowl / cup / bottle; `lid` is used
+// internally by the matched-set flow when you make a partner piece.
+const SHAPES = {
+    vase: {
+        label: "Vase",
+        controls: [
+            [0.00, 0.00], [0.30, 0.00], [0.33, 0.06], [0.27, 0.16],
+            [0.41, 0.34], [0.54, 0.58], [0.53, 0.74], [0.42, 0.92],
+            [0.31, 1.08], [0.30, 1.20], [0.35, 1.32], [0.33, 1.40],
+        ],
+    },
+    bowl: {
+        label: "Bowl",
+        controls: [
+            [0.00, 0.00], [0.40, 0.00], [0.46, 0.06], [0.52, 0.18],
+            [0.66, 0.40], [0.78, 0.70], [0.86, 1.00], [0.90, 1.25],
+            [0.88, 1.40],
+        ],
+    },
+    cup: {
+        label: "Cup",
+        controls: [
+            [0.00, 0.00], [0.32, 0.00], [0.35, 0.08], [0.38, 0.30],
+            [0.42, 0.60], [0.45, 0.90], [0.47, 1.15], [0.50, 1.32],
+            [0.52, 1.40],
+        ],
+    },
+    bottle: {
+        label: "Bottle",
+        controls: [
+            [0.00, 0.00], [0.28, 0.00], [0.32, 0.08], [0.40, 0.20],
+            [0.52, 0.40], [0.55, 0.55], [0.45, 0.72], [0.28, 0.85],
+            [0.22, 1.00], [0.20, 1.18], [0.22, 1.32], [0.20, 1.40],
+        ],
+    },
+    lid: {
+        label: "Lid",
+        controls: [
+            [0.00, 0.00], [0.42, 0.00], [0.44, 0.05], [0.40, 0.10],
+            [0.30, 0.16], [0.20, 0.22], [0.16, 0.30], [0.14, 0.55],
+            [0.12, 0.80], [0.10, 1.00], [0.16, 1.15], [0.20, 1.28],
+            [0.12, 1.36], [0.04, 1.40],
+        ],
+    },
+};
+const SHAPE_IDS = ["vase", "bowl", "cup", "bottle"]; // picker order; lid is set-only
+const DEFAULT_SHAPE = "vase";
 
 const state = {
     renderer: null,
@@ -187,10 +249,19 @@ const state = {
     stampShape: "dot",
     painting: false,
     decoCanvas: null, decoCtx: null, decoTex: null,
+    // Editable bump layer: painted into by wet-clay texture stamps
+    // (positive relief) and leather-hard carving (negative grooves).
+    // Mixed additively with the procedural clay grain in the shader.
+    bumpCanvas: null, bumpCtx: null, bumpTex: null,
+    pendingSetId: null,                   // carried across save → reset for lid pairs
     zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
     userRotating: false,        // manually spinning the pot
     background: DEFAULT_BG,
     musicOn: true,
+    shape: (() => {
+        try { const s = localStorage.getItem("slip-shape"); return s && SHAPES[s] ? s : DEFAULT_SHAPE; }
+        catch (_) { return DEFAULT_SHAPE; }
+    })(),
     clock: new THREE.Clock(),
 };
 let lastPaintUV = null;         // for continuous paint strokes
@@ -283,6 +354,8 @@ function init() {
     document.getElementById("tabGlaze")?.addEventListener("click", () => setDecoTab("glaze"));
     document.getElementById("tabDecorate")?.addEventListener("click", () => setDecoTab("decorate"));
     document.getElementById("saveBtn")?.addEventListener("click", () => savePot());
+    document.getElementById("photoBtn")?.addEventListener("click", () => exportPhoto());
+    document.getElementById("lidBtn")?.addEventListener("click", () => makeLidPartner());
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
     document.querySelectorAll(".deco-size").forEach((b, idx) =>
@@ -298,6 +371,7 @@ function init() {
 
     // Ambiance: backdrop + music. Restore saved choices.
     initMusic();
+    buildShapePicker();
     buildBgPicker();
     let savedBg = DEFAULT_BG, savedMusic = true;
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
@@ -321,12 +395,13 @@ function init() {
     // and inspect the sculpt during testing across the build.
     if (location.search.includes("dev")) {
         window.__slip = {
-            state, profile, radiusAt, sculptToward, maxRadiusAt,
-            setPhase, advanceStage, stepBack, setBrush, setGlaze,
+            state, profile, radiusAt, sculptToward, trimToward, maxRadiusAt,
+            setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape,
+            bumpDab, resetBumpLayer,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             setZoom, zoomBy, rotateBy,
-            savePot, loadPot, openGallery, closeGallery, dbAll, dbDelete, dismissLanding,
+            savePot, exportPhoto, makeLidPartner, loadPot, openGallery, closeGallery, dbAll, dbDelete, dismissLanding,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -385,7 +460,9 @@ function buildWheel() {
 // A bump texture generated in code (no image asset): fine clay grain
 // (wrapping value noise) plus gentle spiral throwing lines. Because it
 // has angular variation, it also makes the wheel's rotation visible —
-// the grain and lines sweep past the light as the pot turns.
+// the grain and lines sweep past the light as the pot turns. The
+// canvas is editable (see paintProceduralClayGrain), so texture-stamps
+// and carved grooves are drawn straight into this same surface.
 function randGrid(n) {
     const a = new Float32Array(n * n);
     for (let i = 0; i < a.length; i++) a[i] = Math.random();
@@ -401,34 +478,25 @@ function valueNoise(g, n, u, v) {
     const c = g[y1 * n + x0], d = g[y1 * n + x1];
     return (a * (1 - sx) + b * sx) * (1 - sy) + (c * (1 - sx) + d * sx) * sy;
 }
-function makeClayTexture() {
-    const SIZE = 768;
-    const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = SIZE;
-    const ctx = canvas.getContext("2d");
-    const img = ctx.createImageData(SIZE, SIZE);
+function paintProceduralClayGrain(ctx) {
+    const img = ctx.createImageData(BUMP_W, BUMP_H);
     const data = img.data;
     const g1 = randGrid(128), g2 = randGrid(48);
-    for (let y = 0; y < SIZE; y++) {
-        const v = y / SIZE;
-        for (let x = 0; x < SIZE; x++) {
-            const u = x / SIZE;
+    for (let y = 0; y < BUMP_H; y++) {
+        const v = y / BUMP_H;
+        for (let x = 0; x < BUMP_W; x++) {
+            const u = x / BUMP_W;
             const grain = valueNoise(g1, 128, u, v) * 0.6 +
                           valueNoise(g2, 48, u, v) * 0.4 - 0.5;
             const lines = Math.sin((v * 22 + u * 2) * Math.PI * 2); // u*2 = integer turns → seamless wrap
             const h = 0.5 + grain * 0.5 + lines * 0.16;
             const c = Math.max(0, Math.min(255, h * 255)) | 0;
-            const i = (y * SIZE + x) * 4;
+            const i = (y * BUMP_W + x) * 4;
             data[i] = data[i + 1] = data[i + 2] = c;
             data[i + 3] = 255;
         }
     }
     ctx.putImageData(img, 0, 0);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.colorSpace = THREE.NoColorSpace; // data, not colour
-    tex.anisotropy = 4;
-    return tex;
 }
 
 // --- Decoration layer -------------------------------------------
@@ -448,6 +516,69 @@ function makeDecoLayer() {
     state.decoTex = tex;
     return tex;
 }
+
+// --- Editable bump layer ----------------------------------------
+// A paintable grayscale canvas that ADDS to the procedural clay
+// grain in the bump shader. Neutral grey (0.5) = no change; brighter
+// = raised relief (the wet-clay texture stamps press patterns INTO
+// the soft clay); darker = carved groove (the leather-hard carve
+// tool incises lines). Persists through firing.
+// (Dimensions live up top with DECO_W so they're declared before init().)
+
+// The bump canvas is BOTH the procedural clay grain (a fresh paint at
+// the start of every pot) AND the surface that wet-clay stamps + carve
+// grooves draw onto. There is only one bump texture; stamps/carves
+// composite directly on top of the grain. That avoids juggling a
+// separate paint layer with custom shader uniforms.
+function makeBumpLayer() {
+    const canvas = document.createElement("canvas");
+    canvas.width = BUMP_W;
+    canvas.height = BUMP_H;
+    state.bumpCanvas = canvas;
+    state.bumpCtx = canvas.getContext("2d");
+    resetBumpLayer(); // fill with the procedural clay grain
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.NoColorSpace;     // height data, not colour
+    tex.wrapS = THREE.RepeatWrapping;        // wraps around the pot
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 4;
+    state.bumpTex = tex;
+    return tex;
+}
+
+function resetBumpLayer() {
+    if (!state.bumpCtx) return;
+    paintProceduralClayGrain(state.bumpCtx);
+    if (state.bumpTex) state.bumpTex.needsUpdate = true;
+}
+
+// One circular dab into the bump layer. positive=true raises the
+// surface (a pressed stamp); positive=false carves a groove. The dab
+// is mostly flat-toned with a thin feathered edge — the sharp edge
+// produces the strong screen-space derivative the bump shader needs
+// to read as relief.
+function bumpDab(cx, cy, positive, radius, alpha) {
+    const ctx = state.bumpCtx;
+    const tone = positive ? 255 : 0;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    g.addColorStop(0,    `rgba(${tone},${tone},${tone},${alpha})`);
+    g.addColorStop(0.78, `rgba(${tone},${tone},${tone},${alpha * 0.92})`);
+    g.addColorStop(1,    `rgba(${tone},${tone},${tone},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+// Bump dab, mirrored across the u=0/1 seam so strokes wrap cleanly.
+function bumpDabWrap(cx, cy, positive, radius, alpha) {
+    bumpDab(cx, cy, positive, radius, alpha);
+    if (cx < radius) bumpDab(cx + BUMP_W, cy, positive, radius, alpha);
+    else if (cx > BUMP_W - radius) bumpDab(cx - BUMP_W, cy, positive, radius, alpha);
+}
+
+// (Carve tool removed 2026-06-10 — marks read as drawn stamps, not
+// carved grooves. Leather-hard is Trim-only now.)
 
 function rgba(hex, a) {
     return `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${a})`;
@@ -721,7 +852,11 @@ function buildPot() {
     // Clay surface. MeshPhysicalMaterial so the wet sheen (a subtle
     // clearcoat) and a future glaze pass both work. Initialised from
     // the starting state; material-state changes tween its props.
+    // The bump canvas is shared: procedural clay grain + texture
+    // stamps + carve grooves are all painted into the SAME canvas, so
+    // we don't have to wrangle a custom sampler uniform.
     const s0 = CLAY_STATES[INITIAL_STATE];
+    const bumpTex = makeBumpLayer();
     const mat = new THREE.MeshPhysicalMaterial({
         color: s0.color,
         roughness: s0.roughness,
@@ -729,7 +864,7 @@ function buildPot() {
         clearcoat: s0.clearcoat,
         clearcoatRoughness: s0.clearcoatRoughness,
         envMapIntensity: s0.envMapIntensity,
-        bumpMap: makeClayTexture(),     // clay grain + throwing lines
+        bumpMap: bumpTex,               // clay grain + throwing lines + edits
         bumpScale: s0.bump,
         side: THREE.DoubleSide,         // open vase — render the inner wall too
     });
@@ -759,16 +894,13 @@ function buildPot() {
     return pot;
 }
 
-// Seed `profile` from a vase silhouette: narrow foot, full belly,
-// tapered neck, small rim. Control points are run through a spline
-// (C1-continuous) so the surface reads smooth, not faceted, then
-// resampled to one radius per evenly-spaced height row.
-function seedProfile() {
-    const controls = [
-        [0.00, 0.00], [0.30, 0.00], [0.33, 0.06], [0.27, 0.16],
-        [0.41, 0.34], [0.54, 0.58], [0.53, 0.74], [0.42, 0.92],
-        [0.31, 1.08], [0.30, 1.20], [0.35, 1.32], [0.33, 1.40],
-    ].map(([x, y]) => new THREE.Vector2(x, y));
+// Seed `profile` from one of the starter silhouettes (see SHAPES).
+// Control points are run through a spline (C1-continuous) so the
+// surface reads smooth, not faceted, then resampled to one radius per
+// evenly-spaced height row.
+function seedProfile(shapeId) {
+    const id = SHAPES[shapeId] ? shapeId : (SHAPES[state.shape] ? state.shape : DEFAULT_SHAPE);
+    const controls = SHAPES[id].controls.map(([x, y]) => new THREE.Vector2(x, y));
 
     const curve = new THREE.SplineCurve(controls).getPoints(600);
     let j = 0;
@@ -858,6 +990,35 @@ function clampProfile() {
     profile[0] = 0; // keep the bottom capped at the axis
 }
 
+// Leather-hard trimming: a finer sculpt that ONLY affects the foot
+// zone, and ONLY cuts inward (you can't bulge a leather-hard foot).
+// Real potters trim with a loop tool to clean up the foot ring — this
+// is the digital equivalent.
+const TRIM_MAX_Y    = FOOT_TOP * 1.9;  // trim only acts below this height
+const TRIM_STRENGTH = 0.28;            // a touch firmer than wet sculpting
+function trimToward(y, targetR) {
+    if (y > TRIM_MAX_Y) return;
+    const currentR = radiusAt(y);
+    if (targetR >= currentR) return;   // trim only carves inward
+    targetR = THREE.MathUtils.clamp(targetR, MIN_R, MAX_R);
+    const centerRow = (y / TOP) * ROWS;
+    const sigma = BRUSHES[state.brushIndex].sigma * 0.55; // narrower than throw
+    const sigmaRows = (sigma / TOP) * ROWS;
+    const reach = Math.ceil(sigmaRows * 3);
+    const lo = Math.max(1, Math.floor(centerRow - reach));
+    const hi = Math.min(ROWS, Math.ceil(centerRow + reach));
+    for (let r = lo; r <= hi; r++) {
+        // Stay inside the foot envelope — never pull rows above TRIM_MAX_Y.
+        const rowY = (r / ROWS) * TOP;
+        if (rowY > TRIM_MAX_Y) continue;
+        const d = (r - centerRow) / sigmaRows;
+        const w = Math.exp(-0.5 * d * d) * TRIM_STRENGTH;
+        profile[r] = THREE.MathUtils.lerp(profile[r], targetR, w);
+    }
+    clampProfile();
+    profileDirty = true;
+}
+
 // Pull the silhouette toward `targetR` around height `y`, with a
 // Gaussian vertical falloff so the clay bulges instead of stepping.
 function sculptToward(y, targetR) {
@@ -880,11 +1041,13 @@ function sculptToward(y, targetR) {
 
 // The material look for the current phase. A chosen glaze shows as a
 // matte raw coat while bone-dry, then glossy once fired; with no glaze
-// it's bare clay (and plain fired earthenware).
+// it's bare clay (and plain fired earthenware). Leather-hard is its
+// own bare-clay look — drier than wet, less sheen, more visible grain.
 function currentLook() {
     const cs = state.clayState;
     if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].fired : CLAY_STATES.fired;
     if (cs === "bonedry") return state.glaze ? GLAZES[state.glaze].raw   : CLAY_STATES.bonedry;
+    if (cs === "leather") return CLAY_STATES.leather;
     return CLAY_STATES.wet;
 }
 
@@ -895,10 +1058,11 @@ function setPhase(name) {
     updateToolbar();
 }
 
-// The forward control: dry → fire → new pot.
+// The forward control: firm up → dry → fire → new pot.
 function advanceStage() {
     switch (state.clayState) {
-        case "wet":     setPhase("bonedry"); break;
+        case "wet":     setPhase("leather"); break; // firms to leather-hard
+        case "leather": setPhase("bonedry"); break;
         case "bonedry": setPhase("fired");   break; // fire — the glaze reveal
         case "fired":   resetPot();          break;
     }
@@ -928,8 +1092,57 @@ function resetPot() {
     profileDirty = true;
     state.glaze = null;
     clearDeco();
+    resetBumpLayer();
     setPhase(INITIAL_STATE);
     updateGlazeBar();
+}
+
+// Choose which silhouette new pots seed from. Persists to localStorage.
+// Resets the live pot too, so the choice is immediately visible.
+function setShape(id) {
+    if (!SHAPES[id]) return;
+    state.shape = id;
+    try { localStorage.setItem("slip-shape", id); } catch (_) {}
+    updateShapePicker();
+    resetPot();
+}
+
+function updateShapePicker() {
+    const wrap = document.getElementById("shapePicker");
+    if (!wrap) return;
+    Array.from(wrap.children).forEach((el, i) => {
+        el.classList.toggle("is-active", SHAPE_IDS[i] === state.shape);
+    });
+}
+
+// Build a tiny SVG silhouette of a shape from its spline control points,
+// so the picker icon matches exactly what the seeded pot will look like.
+function shapeIconSVG(shapeId) {
+    const sh = SHAPES[shapeId];
+    if (!sh) return "";
+    const pts = sh.controls;
+    const VW = 60, VH = 70, CX = 30, SY = 48, SX = 28, MY = 4;
+    const left  = pts.map(([r, y]) => `${(CX - r * SX).toFixed(1)},${(VH - MY - y * SY).toFixed(1)}`);
+    const right = [...pts].reverse().map(([r, y]) => `${(CX + r * SX).toFixed(1)},${(VH - MY - y * SY).toFixed(1)}`);
+    const d = `M${left.join(" L")} L${right.join(" L")} Z`;
+    return `<svg viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg"><path d="${d}" fill="currentColor"/></svg>`;
+}
+
+function buildShapePicker() {
+    const wrap = document.getElementById("shapePicker");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    SHAPE_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "shape-swatch";
+        b.innerHTML = shapeIconSVG(id) + `<span>${SHAPES[id].label}</span>`;
+        b.setAttribute("aria-label", SHAPES[id].label + " starter shape");
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", () => setShape(id));
+        wrap.appendChild(b);
+    });
+    updateShapePicker();
 }
 
 // Choose a brush size; reflect the active one in the brush bar.
@@ -963,12 +1176,14 @@ function stageLabelText() {
     const cs = state.clayState;
     if (cs === "bonedry") return state.glaze ? GLAZES[state.glaze].name + " · raw" : "Decorate";
     if (cs === "fired") return state.glaze ? GLAZES[state.glaze].name + " glaze" : "Fired";
+    if (cs === "leather") return CLAY_STATES.leather.label;
     return CLAY_STATES.wet.label;
 }
 
 // Reflect the current phase in the UI: stage label, advance button,
-// back button (hidden at the ends), the brush bar (only while wet),
-// and the glaze palette (only while bone-dry / decorating).
+// back button (hidden at the ends), the brush bar (wet sculpting +
+// leather-hard trimming), and the glaze palette (only while bone-dry
+// / decorating).
 function updateToolbar() {
     const cs = state.clayState;
     const label = document.getElementById("stageLabel");
@@ -978,12 +1193,20 @@ function updateToolbar() {
     const decoStack = document.getElementById("decoStack");
     if (label) label.textContent = stageLabelText();
     if (advance) advance.textContent = ADVANCE_LABEL[cs];
+    if (back) {
+        back.hidden = cs === "wet" || cs === "fired";
+        if (!back.hidden) back.innerHTML = BACK_LABEL[cs] || "&larr; Back";
+    }
     const saveBtn = document.getElementById("saveBtn");
-    if (back) back.hidden = cs === "wet" || cs === "fired";
-    if (brushBar) brushBar.hidden = cs !== "wet";
+    const photoBtn = document.getElementById("photoBtn");
+    const lidBtn = document.getElementById("lidBtn");
+    // The brush bar drives wet sculpting and leather trimming (foot zone).
+    if (brushBar) brushBar.hidden = !(cs === "wet" || cs === "leather");
     if (decoStack) decoStack.hidden = cs !== "bonedry";
-    if (saveBtn) saveBtn.hidden = cs !== "fired"; // save finished pieces
-    if (cs === "bonedry") updateDecoSub(); // contextual sub-palette
+    if (saveBtn)  saveBtn.hidden  = cs !== "fired"; // save finished pieces
+    if (photoBtn) photoBtn.hidden = cs !== "fired";
+    if (lidBtn)   lidBtn.hidden   = cs !== "fired";
+    if (cs === "bonedry") updateDecoSub();   // contextual sub-palette
 }
 
 // Build the glaze palette once (swatches coloured by each glaze's
@@ -1190,7 +1413,16 @@ function onPointerDown(ev) {
         return;
     }
 
-    if (state.clayState === "wet") {
+    if (state.clayState === "leather") {
+        // Trim the foot ring. Only engages in the foot zone, only cuts inward.
+        const p = pointerToProfile(ev);
+        if (!p) return;
+        if (p.y < -0.05 || p.y > TRIM_MAX_Y) return;
+        if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
+        sculpting = true;
+        trimToward(p.y, p.r);
+        ev.preventDefault();
+    } else if (state.clayState === "wet") {
         const p = pointerToProfile(ev);
         if (!p) return;
         if (p.y < -0.05 || p.y > TOP + 0.15) return;
@@ -1230,7 +1462,10 @@ function onPointerMove(ev) {
 
     if (sculpting) {
         const p = pointerToProfile(ev);
-        if (p) sculptToward(p.y, p.r);
+        if (p) {
+            if (state.clayState === "leather") trimToward(p.y, p.r);
+            else sculptToward(p.y, p.r);
+        }
         ev.preventDefault();
     } else if (state.painting) {
         const uv = pointerToUV(ev);
@@ -1353,6 +1588,104 @@ function captureThumb(size = 320) {
     return c.toDataURL("image/jpeg", 0.85);
 }
 
+// Compose a 1024px photo of the fired pot on the chosen backdrop and
+// hand it off to share/download. Falls back to a regular anchor
+// download on browsers without the Web Share API. Inside the Capacitor
+// wrap on Android, navigator.share + files is the canonical "save to
+// gallery / share to Photos" path.
+async function exportPhoto() {
+    const size = 1024;
+    tickMaterial(10); // snap the glaze to its fired look
+    const cam = state.camera;
+    const prevAspect = cam.aspect;
+    const prevPos = cam.position.clone();
+    cam.aspect = 1;
+    cam.position.copy(CAM_BASE);
+    cam.lookAt(CAM_TARGET);
+    cam.updateProjectionMatrix();
+
+    // Render the pot with a transparent background so we can composite
+    // it over the user's backdrop afterwards.
+    const rt = new THREE.WebGLRenderTarget(size, size);
+    state.renderer.setRenderTarget(rt);
+    state.renderer.setClearAlpha(0);
+    state.renderer.clear();
+    state.renderer.render(state.scene, cam);
+    const buf = new Uint8Array(size * size * 4);
+    state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
+    state.renderer.setRenderTarget(null);
+    rt.dispose();
+
+    // restore the live camera
+    cam.aspect = prevAspect;
+    cam.position.copy(prevPos);
+    cam.lookAt(CAM_TARGET);
+    cam.updateProjectionMatrix();
+
+    const out = document.createElement("canvas");
+    out.width = out.height = size;
+    const ctx = out.getContext("2d");
+
+    // 1) Backdrop, cover-fit to square.
+    try {
+        const bg = await new Promise((res, rej) => {
+            const img = new Image();
+            img.onload = () => res(img);
+            img.onerror = rej;
+            img.src = `assets/backgrounds/${state.background}.jpg`;
+        });
+        const s = Math.min(bg.width, bg.height);
+        const sx = (bg.width  - s) / 2;
+        const sy = (bg.height - s) / 2;
+        ctx.drawImage(bg, sx, sy, s, s, 0, 0, size, size);
+    } catch (_) {
+        ctx.fillStyle = "#1b1815";
+        ctx.fillRect(0, 0, size, size);
+    }
+
+    // 2) Pot (flip the GL bottom-up buffer into a temp canvas first).
+    const tmp = document.createElement("canvas");
+    tmp.width = tmp.height = size;
+    const tmpImg = tmp.getContext("2d").createImageData(size, size);
+    for (let y = 0; y < size; y++) {
+        const src = (size - 1 - y) * size * 4;
+        tmpImg.data.set(buf.subarray(src, src + size * 4), y * size * 4);
+    }
+    tmp.getContext("2d").putImageData(tmpImg, 0, 0);
+    ctx.drawImage(tmp, 0, 0);
+
+    // 3) Hand off.
+    const filename = `slip-studio-${Date.now().toString(36)}.png`;
+    const blob = await new Promise((res) => out.toBlob(res, "image/png"));
+    try {
+        if (blob && navigator.canShare) {
+            const file = new File([blob], filename, { type: "image/png" });
+            if (navigator.canShare({ files: [file] })) {
+                await navigator.share({ files: [file], title: "Slip Studio pot" });
+                flashPhoto();
+                return;
+            }
+        }
+    } catch (_) { /* user cancelled or share blocked — fall back to download */ }
+    const url = blob ? URL.createObjectURL(blob) : out.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    try { a.remove(); } catch (_) {}
+    if (blob) setTimeout(() => URL.revokeObjectURL(url), 5000);
+    flashPhoto();
+}
+
+function flashPhoto() {
+    const b = document.getElementById("photoBtn");
+    if (!b) return;
+    const prev = b.textContent;
+    b.textContent = "Photo ✓";
+    setTimeout(() => { b.textContent = prev; }, 1300);
+}
+
 async function savePot() {
     const entry = {
         id: Date.now().toString(36),
@@ -1360,14 +1693,37 @@ async function savePot() {
         profile: Array.from(profile, (x) => +x.toFixed(4)),
         glaze: state.glaze,
         deco: state.decoCanvas.toDataURL("image/png"),
+        bump: state.bumpCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
+        setId: state.pendingSetId || null,
     };
     try {
         await dbPut(entry);
         flashSaved();
+        state.pendingSetId = null; // one save consumes the pending set link
     } catch (e) {
         console.warn("save failed", e);
     }
+}
+
+// "Make a lid" — save the current fired pot under a fresh set id, then
+// reset to a new lid-shaped wet pot that will carry the same set id on
+// its eventual save. Saved pots that share a set id render as a pair
+// in the gallery.
+async function makeLidPartner() {
+    if (state.clayState !== "fired") return;
+    const setId = "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
+    state.pendingSetId = setId;
+    await savePot();
+    // Now seed the partner: a lid silhouette, same set id carried over.
+    state.pendingSetId = setId;
+    seedProfile("lid");
+    profileDirty = true;
+    state.glaze = null;
+    clearDeco();
+    resetBumpLayer();
+    setPhase(INITIAL_STATE);
+    updateGlazeBar();
 }
 
 function flashSaved() {
@@ -1393,6 +1749,18 @@ async function loadPot(entry) {
         img.onerror = () => { clearDeco(); res(); };
         img.src = entry.deco;
     });
+    await new Promise((res) => {
+        if (!entry.bump) { resetBumpLayer(); res(); return; }
+        const img = new Image();
+        img.onload = () => {
+            state.bumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
+            state.bumpCtx.drawImage(img, 0, 0, BUMP_W, BUMP_H);
+            state.bumpTex.needsUpdate = true;
+            res();
+        };
+        img.onerror = () => { resetBumpLayer(); res(); };
+        img.src = entry.bump;
+    });
     setPhase("fired");
     updateGlazeBar();
     // Force an immediate frame so the piece shows right away.
@@ -1411,24 +1779,59 @@ async function openGallery() {
     try { pots = await dbAll(); } catch (_) {}
     pots.sort((a, b) => b.ts - a.ts);
     if (empty) empty.hidden = pots.length > 0;
+
+    // Group set-mates together; each setId yields a single paired tile.
+    const seen = new Set();
     pots.forEach((p) => {
-        const item = document.createElement("div");
-        item.className = "gallery-item";
+        if (p.setId) {
+            if (seen.has(p.setId)) return;
+            seen.add(p.setId);
+            const members = pots.filter((q) => q.setId === p.setId);
+            renderGalleryTile(grid, members);
+        } else {
+            renderGalleryTile(grid, [p]);
+        }
+    });
+    document.getElementById("gallery").hidden = false;
+}
+
+function renderGalleryTile(grid, members) {
+    const item = document.createElement("div");
+    item.className = "gallery-item" + (members.length > 1 ? " gallery-set" : "");
+    if (members.length === 1) {
+        const p = members[0];
         const img = document.createElement("img");
         img.src = p.thumb;
         img.alt = "Saved pot";
         img.loading = "lazy";
         img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
-        const del = document.createElement("button");
-        del.className = "gallery-del";
-        del.type = "button";
-        del.textContent = "×";
-        del.setAttribute("aria-label", "Delete pot");
-        del.addEventListener("click", async (e) => { e.stopPropagation(); await dbDelete(p.id); openGallery(); });
-        item.append(img, del);
-        grid.appendChild(item);
+        item.appendChild(img);
+    } else {
+        // Paired set: side-by-side thumbnails, each tappable.
+        members.forEach((p) => {
+            const half = document.createElement("div");
+            half.className = "gallery-half";
+            const img = document.createElement("img");
+            img.src = p.thumb;
+            img.alt = "Saved pot";
+            img.loading = "lazy";
+            img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
+            half.appendChild(img);
+            item.appendChild(half);
+        });
+    }
+    const del = document.createElement("button");
+    del.className = "gallery-del";
+    del.type = "button";
+    del.textContent = "×";
+    del.setAttribute("aria-label", members.length > 1 ? "Delete set" : "Delete pot");
+    del.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await Promise.all(members.map((m) => dbDelete(m.id)));
+        openGallery();
     });
-    document.getElementById("gallery").hidden = false;
+    item.appendChild(del);
+    grid.appendChild(item);
 }
 function closeGallery() {
     const g = document.getElementById("gallery");
@@ -1446,9 +1849,9 @@ function resize() {
 
 function tick() {
     const dt = state.clock.getDelta();
-    // The auto-spin eases to a stop while you work (throwing/painting),
-    // while you manually spin, and whenever zoomed in — then drifts
-    // back up once you're idle at the default framing.
+    // The auto-spin eases to a stop while you work (throwing/trimming/
+    // painting), while you manually spin, and whenever zoomed in —
+    // then drifts back up once you're idle at the default framing.
     const zoomed = state.zoom > 1.02;
     const busy = sculpting || state.painting || state.userRotating || zoomed;
     const targetSpin = busy ? 0 : SPIN_SPEED;

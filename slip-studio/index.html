@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=6" />
+    <link rel="stylesheet" href="style.css?v=25" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -59,6 +59,7 @@
     <div id="landing" class="landing" hidden>
         <h1 class="landing-title">Slip Studio</h1>
         <p class="landing-tag">a calm place to shape clay</p>
+        <div class="shape-picker" id="shapePicker" role="group" aria-label="Starter shape"></div>
         <div class="bg-picker" id="bgPicker" role="group" aria-label="Backdrop"></div>
         <button class="music-toggle" id="musicToggle" type="button" aria-pressed="true">&#9834; Music on</button>
         <button id="beginBtn" class="landing-btn" type="button">Begin</button>
@@ -104,6 +105,8 @@
     <div class="toolbar" role="toolbar" aria-label="Pottery stage">
         <button id="backBtn" class="tool-btn" type="button" hidden>&larr; Re-wet</button>
         <span id="stageLabel" class="stage-chip" aria-live="polite">Wet clay</span>
+        <button id="photoBtn" class="tool-btn" type="button" hidden>Photo</button>
+        <button id="lidBtn" class="tool-btn" type="button" hidden>+ Lid</button>
         <button id="saveBtn" class="tool-btn" type="button" hidden>Save</button>
         <button id="advanceBtn" class="tool-btn tool-btn-primary" type="button">Dry</button>
     </div>
@@ -123,7 +126,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=6"></script>
+    <script type="module" src="main.js?v=25"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

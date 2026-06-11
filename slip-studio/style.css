@@ -168,6 +168,52 @@ html, body {
 }
 .landing-link:hover { color: var(--ink); }
 
+/* Starter-shape picker on the title screen */
+.shape-picker {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    max-width: 320px;
+    margin-bottom: 10px;
+}
+.shape-swatch {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 56px;
+    height: 64px;
+    padding: 6px 4px 2px;
+    border-radius: 12px;
+    border: 2px solid var(--ink-faint);
+    background: var(--chip);
+    color: var(--ink-dim);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+    transition: border-color 0.15s ease, color 0.15s ease,
+                background 0.15s ease, transform 0.1s ease;
+}
+.shape-swatch svg {
+    width: 40px;
+    height: 40px;
+    display: block;
+}
+.shape-swatch span {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.shape-swatch.is-active {
+    border-color: var(--accent);
+    color: var(--ink);
+    background: rgba(201, 138, 100, 0.18);
+    transform: scale(1.04);
+}
+
 /* Backdrop picker on the title screen */
 .bg-picker {
     display: flex;
@@ -388,6 +434,8 @@ html, body {
 }
 .deco-strip::-webkit-scrollbar { display: none; }
 .deco-strip > * { pointer-events: auto; flex: 0 0 auto; }
+/* `display: flex` above would otherwise defeat the `hidden` attribute. */
+.deco-strip[hidden] { display: none; }
 
 /* The tools row (centred, may wrap on very narrow screens). */
 .deco-row {
@@ -678,6 +726,20 @@ html, body {
     object-fit: cover;
     display: block;
     cursor: pointer;
+}
+
+/* Paired set: two thumbnails split horizontally inside one tile. */
+.gallery-item.gallery-set {
+    display: flex;
+    flex-direction: row;
+}
+.gallery-item.gallery-set .gallery-half {
+    flex: 1 1 0;
+    height: 100%;
+    overflow: hidden;
+}
+.gallery-item.gallery-set .gallery-half + .gallery-half {
+    border-left: 1px solid var(--ink-faint);
 }
 .gallery-del {
     position: absolute;
