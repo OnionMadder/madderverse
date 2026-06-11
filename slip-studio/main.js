@@ -2090,6 +2090,7 @@ async function savePot() {
         thumb: captureThumb(),
         setId,
         title: null, // user can name from the gallery
+        isLid: state.isLid,
     };
     try {
         await dbPut(entry);
@@ -2113,6 +2114,7 @@ async function savePot() {
                 thumb: captureThumb(),
                 setId,
                 title: null,
+                isLid: state.isLid,
             };
             await dbPut(partnerEntry);
             restorePieceState(active);
@@ -2401,32 +2403,33 @@ function flashSaved() {
 
 // Restore a saved pot into the scene as a finished (fired) piece.
 async function loadPot(entry) {
+    // Reset set state first; populated below if the loaded entry pairs.
+    state.savedPot = null;
+    state.savedLid = null;
+
     for (let i = 0; i < profile.length; i++) profile[i] = entry.profile?.[i] ?? 0;
     profileDirty = true;
     state.glaze = entry.glaze || null;
-    await new Promise((res) => {
-        const img = new Image();
-        img.onload = () => {
-            state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
-            state.decoCtx.drawImage(img, 0, 0, DECO_W, DECO_H);
-            state.decoTex.needsUpdate = true;
-            res();
-        };
-        img.onerror = () => { clearDeco(); res(); };
-        img.src = entry.deco;
-    });
-    await new Promise((res) => {
-        if (!entry.bump) { resetBumpLayer(); res(); return; }
-        const img = new Image();
-        img.onload = () => {
-            state.bumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
-            state.bumpCtx.drawImage(img, 0, 0, BUMP_W, BUMP_H);
-            state.bumpTex.needsUpdate = true;
-            res();
-        };
-        img.onerror = () => { resetBumpLayer(); res(); };
-        img.src = entry.bump;
-    });
+    state.isLid = lookupIsLid(entry);
+    await loadImageOntoCanvas(entry.deco, state.decoCtx, DECO_W, DECO_H, clearDeco);
+    state.decoTex.needsUpdate = true;
+    await loadImageOntoCanvas(entry.bump, state.bumpCtx, BUMP_W, BUMP_H, resetBumpLayer);
+    state.bumpTex.needsUpdate = true;
+
+    // If this entry is part of a set, also load the partner so the
+    // assembly view auto-triggers at setPhase("fired") below.
+    if (entry.setId) {
+        try {
+            const all = await dbAll();
+            const partnerEntry = all.find((p) => p.setId === entry.setId && p.id !== entry.id);
+            if (partnerEntry) {
+                const partnerSaved = await loadAsCapturedState(partnerEntry);
+                if (state.isLid) state.savedPot = partnerSaved;
+                else            state.savedLid = partnerSaved;
+            }
+        } catch (_) { /* gallery read failed — fall back to solo view */ }
+    }
+
     setPhase("fired");
     updateGlazeBar();
     // Force an immediate frame so the piece shows right away.
@@ -2434,6 +2437,52 @@ async function loadPot(entry) {
     profileDirty = false;
     tickMaterial(10); // snap material to the fired look
     state.renderer.render(state.scene, state.camera);
+}
+
+// Read isLid off a saved entry; fall back to a profile-shape heuristic
+// for legacy entries that didn't persist the flag (lids have a narrow
+// top "knob" radius while pots have a wider rim).
+function lookupIsLid(entry) {
+    if (entry && typeof entry.isLid === "boolean") return entry.isLid;
+    const top = entry?.profile?.[ROWS];
+    return typeof top === "number" && top < 0.12;
+}
+
+// Tiny helper to draw a data-URL onto an existing 2D context.
+async function loadImageOntoCanvas(src, ctx, w, h, onFail) {
+    return new Promise((res) => {
+        if (!src) { if (onFail) onFail(); res(); return; }
+        const img = new Image();
+        img.onload = () => { ctx.clearRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h); res(); };
+        img.onerror = () => { if (onFail) onFail(); res(); };
+        img.src = src;
+    });
+}
+
+// Convert a saved gallery entry into a capturePieceState-shape object
+// so it can be slotted into state.savedPot / state.savedLid and feed
+// the assembly view + swap logic.
+async function loadAsCapturedState(entry) {
+    const decoCanvas = document.createElement("canvas");
+    decoCanvas.width  = DECO_W;
+    decoCanvas.height = DECO_H;
+    await loadImageOntoCanvas(entry.deco, decoCanvas.getContext("2d"), DECO_W, DECO_H);
+    const bumpCanvas = document.createElement("canvas");
+    bumpCanvas.width  = BUMP_W;
+    bumpCanvas.height = BUMP_H;
+    const bctx = bumpCanvas.getContext("2d");
+    // Default to the neutral grey baseline if the entry has no bump.
+    bctx.fillStyle = "rgb(128,128,128)";
+    bctx.fillRect(0, 0, BUMP_W, BUMP_H);
+    await loadImageOntoCanvas(entry.bump, bctx, BUMP_W, BUMP_H);
+    return {
+        profile: Float32Array.from(entry.profile || []),
+        glaze: entry.glaze || null,
+        decoCanvas,
+        bumpCanvas,
+        isLid: lookupIsLid(entry),
+        clayState: "fired",
+    };
 }
 
 async function openGallery() {
