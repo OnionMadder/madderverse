@@ -1468,8 +1468,10 @@ function updateToolbar() {
     const swapBtn    = document.getElementById("swapBtn");
     const hasPartner = !!(state.savedPot || state.savedLid);
     const lidStylePicker = document.getElementById("lidStylePicker");
-    // The brush bar drives wet sculpting and leather trimming (foot zone).
-    if (brushBar) brushBar.hidden = !(cs === "wet" || cs === "leather");
+    // The brush bar is for wet sculpting only. Trim at leather reuses
+    // whatever brush size you set in wet — no UI here so the
+    // decorate panel doesn't get crowded with controls.
+    if (brushBar) brushBar.hidden = cs !== "wet";
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
     if (saveBtn) {
