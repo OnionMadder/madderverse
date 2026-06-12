@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=45" />
+    <link rel="stylesheet" href="style.css?v=46" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -44,6 +44,7 @@
 
 <body>
     <div id="backdrop" class="backdrop"></div>
+    <video id="backdropVideo" class="backdrop-video" autoplay loop muted playsinline preload="none" aria-hidden="true"></video>
     <div id="kilnVignette" class="kiln-vignette" aria-hidden="true">
         <div class="kiln-edge"></div>
         <div class="kiln-inner-glow"></div>
@@ -159,7 +160,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=45"></script>
+    <script type="module" src="main.js?v=46"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

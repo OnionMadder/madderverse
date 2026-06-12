@@ -187,7 +187,7 @@ const OVERLAY_PATTERNS = [
 // group them. Adding a new image = one entry here (drop the file at
 // assets/backgrounds/<id>.jpg). The picker renders categories in the
 // order they appear in BG_CATEGORIES.
-const BG_CATEGORIES = ["Painted", "Botanical", "Earthy", "Abstract", "Architectural"];
+const BG_CATEGORIES = ["Painted", "Botanical", "Earthy", "Abstract", "Architectural", "Motion"];
 const BACKGROUNDS = [
     { id: "watercolor",     label: "Watercolor",    category: "Painted" },
     { id: "dried-flowers",  label: "Dried flowers", category: "Botanical" },
@@ -197,6 +197,9 @@ const BACKGROUNDS = [
     { id: "waves",          label: "Waves",         category: "Abstract" },
     { id: "abstract",       label: "Abstract",      category: "Abstract" },
     { id: "wireframe",      label: "Wireframe",     category: "Architectural" },
+    { id: "balloons", label: "Balloons", category: "Motion", type: "video", src: "assets/backgrounds/motion/balloons.mp4" },
+    { id: "birds",    label: "Birds",    category: "Motion", type: "video", src: "assets/backgrounds/motion/birds.mp4" },
+    { id: "hearts",   label: "Hearts",   category: "Motion", type: "video", src: "assets/backgrounds/motion/hearts.mp4" },
 ];
 const DEFAULT_BG = "watercolor";
 // Multiple ambient tracks — initMusic picks one per session so it
@@ -2872,9 +2875,31 @@ function showLanding() {
 
 // --- Ambiance: backdrops + music --------------------------------
 function setBackground(id) {
+    const bg = BACKGROUNDS.find((b) => b.id === id);
+    if (!bg) return;
     state.background = id;
     const bd = document.getElementById("backdrop");
-    if (bd) bd.style.backgroundImage = `url("assets/backgrounds/${id}.jpg")`;
+    const vid = document.getElementById("backdropVideo");
+    if (bg.type === "video") {
+        if (bd) bd.classList.add("is-hidden");
+        if (vid) {
+            // Only swap the src if it changed — avoids reloading the
+            // file when the same motion bg is reselected.
+            const want = new URL(bg.src, location.href).href;
+            if (vid.src !== want) vid.src = bg.src;
+            vid.classList.add("is-active");
+            vid.play().catch(() => {}); // user gesture or muted autoplay
+        }
+    } else {
+        if (vid) {
+            vid.classList.remove("is-active");
+            vid.pause();
+        }
+        if (bd) {
+            bd.classList.remove("is-hidden");
+            bd.style.backgroundImage = `url("assets/backgrounds/${id}.jpg")`;
+        }
+    }
     try { localStorage.setItem("slip-bg", id); } catch (_) {}
     updateBgPicker();
 }
@@ -2925,9 +2950,13 @@ function renderBgRow() {
     BACKGROUNDS.filter((b) => b.category === state.bgCategory).forEach((b) => {
         const el = document.createElement("button");
         el.type = "button";
-        el.className = "bg-swatch";
+        el.className = "bg-swatch" + (b.type === "video" ? " is-video" : "");
         el.dataset.id = b.id;
-        el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
+        // Video swatches use a chip-coloured tile + play glyph (CSS).
+        // Static swatches show their JPG as the swatch background.
+        if (b.type !== "video") {
+            el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
+        }
         el.setAttribute("aria-label", b.label + " background");
         el.addEventListener("click", () => setBackground(b.id));
         row.appendChild(el);
