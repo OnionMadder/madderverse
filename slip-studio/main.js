@@ -1105,6 +1105,16 @@ function lidCapY(controls) {
     return TOP; // never closes — use full height
 }
 
+// Same cap, recovered from a sampled profile array — used when a lid
+// is restored from a swap snapshot or a saved gallery entry, where the
+// original control points are long gone but the collapse rings at the
+// top of the silhouette still encode the cap height.
+function lidCapFromProfile(prof) {
+    const EPS = 0.001;
+    for (let r = ROWS; r >= 0; r--) if (prof[r] >= EPS) return (r + 1) * (TOP / ROWS);
+    return TOP;
+}
+
 // Rewrite vertex positions + normals from the current profile.
 // Normals are ANALYTIC (derived from the profile slope) rather than
 // face-averaged: a surface of revolution has an exact normal, which
@@ -1342,6 +1352,8 @@ function endFiringMoment() {
     // its saved clayState consistent so later swap/save logic works.
     if (state.savedPot) state.savedPot.clayState = "fired";
     if (state.savedLid) state.savedLid.clayState = "fired";
+    // Save + Photo were gated on !state.firing — bring them back now.
+    updateToolbar();
 }
 
 // 0..1 ease for smooth-in/out transitions inside the firing phases.
@@ -1502,11 +1514,16 @@ function updateToolbar() {
     if (brushBar) brushBar.hidden = cs !== "wet";
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
+    // Hide Save + Photo while the kiln animation is still running —
+    // cs flips to "fired" the instant advanceStage commits, so without
+    // this guard both buttons appear during the 4.5 s firing sequence
+    // and a mid-tween tap snaps the material + captures a half-melt.
+    const firedAndCool = cs === "fired" && !state.firing;
     if (saveBtn) {
-        saveBtn.hidden = cs !== "fired";
+        saveBtn.hidden = !firedAndCool;
         saveBtn.textContent = hasPartner ? "Save set" : "Save";
     }
-    if (photoBtn) photoBtn.hidden = cs !== "fired";
+    if (photoBtn) photoBtn.hidden = !firedAndCool;
     // Make lid: only at decorate, only if you don't already have a partner.
     if (makeLidBtn) makeLidBtn.hidden = !(cs === "leather" && !hasPartner && !state.isLid);
     // Swap: visible while a partner is paused — but NOT at fired,
@@ -2222,6 +2239,11 @@ async function savePot() {
             // swap back to the original so the view doesn't lurch.
             const active = capturePieceState();
             restorePieceState(partner);
+            // Flush the partner's profile to the pot's GPU buffers
+            // before captureThumb renders — otherwise the thumb keeps
+            // the active piece's silhouette under the partner's glaze.
+            writeProfileToGeometry(state.pot.geometry);
+            profileDirty = false;
             // Force material to settle into the fired look before thumb.
             tickMaterial(10);
             const partnerEntry = {
@@ -2282,6 +2304,11 @@ function restorePieceState(saved) {
     profileDirty = true;
     state.glaze = saved.glaze;
     state.isLid = saved.isLid;
+    // Rebuild the lid's sculpt cap from the restored silhouette —
+    // capturePieceState doesn't carry lidMaxY, and without this the
+    // cap check at sculptToward is a no-op and the lid can regrow
+    // above its collapsed rings.
+    state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
     state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
     state.decoCtx.drawImage(saved.decoCanvas, 0, 0);
     state.decoTex.needsUpdate = true;
@@ -2565,6 +2592,7 @@ async function loadPot(entry) {
     profileDirty = true;
     state.glaze = entry.glaze || null;
     state.isLid = lookupIsLid(entry);
+    state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
     await loadImageOntoCanvas(entry.deco, state.decoCtx, DECO_W, DECO_H, clearDeco);
     state.decoTex.needsUpdate = true;
     await loadImageOntoCanvas(entry.bump, state.bumpCtx, BUMP_W, BUMP_H, resetBumpLayer);
@@ -2882,6 +2910,13 @@ function dismissLanding() {
     if (l) l.classList.add("is-gone");
     // The Begin tap is a user gesture — safe to start audio here.
     if (state.musicOn && music) music.play().catch(() => {});
+    // Same window for the video backdrop: iOS Safari + Low-Power Mode
+    // can block muted autoplay on load; retry now that we have a gesture.
+    const bg = BACKGROUNDS.find((b) => b.id === state.background);
+    if (bg && bg.type === "video") {
+        const vid = document.getElementById("backdropVideo");
+        if (vid && vid.paused) vid.play().catch(() => {});
+    }
 }
 
 // Return to the title screen (re-show the landing over the studio).
@@ -2902,9 +2937,11 @@ function setBackground(id) {
         if (bd) bd.classList.add("is-hidden");
         if (vid) {
             // Only swap the src if it changed — avoids reloading the
-            // file when the same motion bg is reselected.
+            // file when the same motion bg is reselected. iOS Safari
+            // needs an explicit load() after src change or play() can
+            // no-op silently against a stale-or-empty buffer.
             const want = new URL(src, location.href).href;
-            if (vid.src !== want) vid.src = src;
+            if (vid.src !== want) { vid.src = src; vid.load(); }
             vid.classList.add("is-active");
             vid.play().catch(() => {}); // user gesture or muted autoplay
         }
