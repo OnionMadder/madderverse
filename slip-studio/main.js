@@ -369,6 +369,7 @@ const state = {
     userRotating: false,        // manually spinning the pot
     background: DEFAULT_BG,
     musicOn: true,
+    sfxOn: true,
     shape: (() => {
         try { const s = localStorage.getItem("slip-shape"); return s && SHAPES[s] ? s : DEFAULT_SHAPE; }
         catch (_) { return DEFAULT_SHAPE; }
@@ -501,13 +502,17 @@ function init() {
     buildShapePicker();
     buildBgPicker();
     buildLidStylePicker();
-    let savedBg = DEFAULT_BG, savedMusic = true;
+    let savedBg = DEFAULT_BG, savedMusic = true, savedSfx = true;
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
     try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
+    try { savedSfx = localStorage.getItem("slip-sfx") !== "0"; } catch (_) {}
     setBackground(BACKGROUNDS.some((b) => b.id === savedBg) ? savedBg : DEFAULT_BG);
     state.musicOn = savedMusic;
+    state.sfxOn = savedSfx;
     updateMusicToggle();
+    updateSfxToggle();
     document.getElementById("musicToggle")?.addEventListener("click", () => setMusic(!state.musicOn));
+    document.getElementById("sfxToggle")?.addEventListener("click", () => setSfx(!state.sfxOn));
     document.getElementById("titleBtn")?.addEventListener("click", showLanding);
 
     // Title screen sits over the (already-spinning) studio until "Begin".
@@ -2739,7 +2744,7 @@ function tick() {
     state.turntable.rotation.y += state.spin * dt;
     // Wheel hum tracks the spin: as the auto-spin eases out while the
     // user works, the hum quiets to near-silent; restored when idle.
-    if (state.musicOn) {
+    if (state.sfxOn) {
         const ratio = Math.max(0, state.spin / SPIN_SPEED);
         playSfx("wheel", { volume: ratio * SFX_SOURCES.wheel.vol });
     } else {
@@ -2944,7 +2949,7 @@ function loadSfx(id) {
 // reused and the volume is set in-place; for one-shots we clone the
 // node so a fast burst of triggers can overlap without restarting.
 function playSfx(id, opts) {
-    if (!state.musicOn) return;
+    if (!state.sfxOn) return;
     const s = loadSfx(id);
     if (!s) return;
     const vol = (opts && opts.volume != null) ? opts.volume : s.def.vol;
@@ -2983,7 +2988,6 @@ function setMusic(on) {
         if (on) music.play().catch(() => {});
         else music.pause();
     }
-    if (!on) stopSfx("wheel"); // hum restarts from the tick loop next frame when on
     updateMusicToggle();
 }
 function updateMusicToggle() {
@@ -2991,5 +2995,19 @@ function updateMusicToggle() {
     if (!btn) return;
     btn.classList.toggle("is-on", state.musicOn);
     btn.setAttribute("aria-pressed", state.musicOn ? "true" : "false");
-    btn.textContent = state.musicOn ? "♪ Sound on" : "♪ Sound off";
+    btn.textContent = state.musicOn ? "♪ Music on" : "♪ Music off";
+}
+
+function setSfx(on) {
+    state.sfxOn = on;
+    try { localStorage.setItem("slip-sfx", on ? "1" : "0"); } catch (_) {}
+    if (!on) stopSfx("wheel"); // hum restarts from the tick loop next frame when re-enabled
+    updateSfxToggle();
+}
+function updateSfxToggle() {
+    const btn = document.getElementById("sfxToggle");
+    if (!btn) return;
+    btn.classList.toggle("is-on", state.sfxOn);
+    btn.setAttribute("aria-pressed", state.sfxOn ? "true" : "false");
+    btn.textContent = state.sfxOn ? "♫ SFX on" : "♫ SFX off";
 }

@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=43" />
+    <link rel="stylesheet" href="style.css?v=44" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -65,7 +65,10 @@
         <p class="landing-tag">a calm place to shape clay</p>
         <div class="shape-picker" id="shapePicker" role="group" aria-label="Starter shape"></div>
         <div class="bg-picker" id="bgPicker" role="group" aria-label="Backdrop"></div>
-        <button class="music-toggle" id="musicToggle" type="button" aria-pressed="true">&#9834; Sound on</button>
+        <div class="sound-toggles">
+            <button class="music-toggle" id="musicToggle" type="button" aria-pressed="true">&#9834; Music on</button>
+            <button class="music-toggle" id="sfxToggle"   type="button" aria-pressed="true">&#9835; SFX on</button>
+        </div>
         <button id="beginBtn" class="landing-btn" type="button">Begin</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
     </div>
@@ -156,7 +159,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=43"></script>
+    <script type="module" src="main.js?v=44"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
