@@ -187,21 +187,35 @@ const OVERLAY_PATTERNS = [
 // group them. Adding a new image = one entry here (drop the file at
 // assets/backgrounds/<id>.jpg). The picker renders categories in the
 // order they appear in BG_CATEGORIES.
-const BG_CATEGORIES = ["Painted", "Botanical", "Earthy", "Abstract", "Architectural", "Motion"];
+// Each entry's `folder` is a subdir of assets/backgrounds/. The
+// Studio category points at assets/backgrounds/preload/ (the only
+// folder the app build needs to bundle); the rest are fetched on
+// demand by the browser the first time the user picks one.
+const BG_CATEGORIES = ["Studio", "Art", "Botanical", "Digital", "Paper", "Motion"];
 const BACKGROUNDS = [
-    { id: "watercolor",     label: "Watercolor",    category: "Painted" },
-    { id: "dried-flowers",  label: "Dried flowers", category: "Botanical" },
-    { id: "shadow-flowers", label: "Shadow",        category: "Botanical" },
-    { id: "clay-tunnel",    label: "Clay tunnel",   category: "Earthy" },
-    { id: "cardboard",      label: "Cardboard",     category: "Earthy" },
-    { id: "waves",          label: "Waves",         category: "Abstract" },
-    { id: "abstract",       label: "Abstract",      category: "Abstract" },
-    { id: "wireframe",      label: "Wireframe",     category: "Architectural" },
-    { id: "balloons", label: "Balloons", category: "Motion", type: "video", src: "assets/backgrounds/motion/balloons.mp4" },
-    { id: "birds",    label: "Birds",    category: "Motion", type: "video", src: "assets/backgrounds/motion/birds.mp4" },
-    { id: "hearts",   label: "Hearts",   category: "Motion", type: "video", src: "assets/backgrounds/motion/hearts.mp4" },
+    { id: "cherrytree",     label: "Cherry tree",   category: "Studio",    folder: "preload" },
+    { id: "paintswatch",    label: "Paint swatch",  category: "Studio",    folder: "preload" },
+    { id: "papercut",       label: "Papercut",      category: "Studio",    folder: "preload" },
+    { id: "abstract",       label: "Abstract",      category: "Art",       folder: "art" },
+    { id: "oil",            label: "Oil",           category: "Art",       folder: "art" },
+    { id: "watercolor",     label: "Watercolor",    category: "Art",       folder: "art" },
+    { id: "dried-flowers",  label: "Dried flowers", category: "Botanical", folder: "botanical" },
+    { id: "floral",         label: "Floral",        category: "Botanical", folder: "botanical" },
+    { id: "shadow-flowers", label: "Shadow",        category: "Botanical", folder: "botanical" },
+    { id: "clay-tunnel",    label: "Clay tunnel",   category: "Digital",   folder: "digital" },
+    { id: "vapor",          label: "Vapor",         category: "Digital",   folder: "digital" },
+    { id: "wireframe",      label: "Wireframe",     category: "Digital",   folder: "digital" },
+    { id: "books",          label: "Books",         category: "Paper",     folder: "paper" },
+    { id: "cardboard",      label: "Cardboard",     category: "Paper",     folder: "paper" },
+    { id: "waves",          label: "Waves",         category: "Paper",     folder: "paper" },
+    { id: "balloons",       label: "Balloons",      category: "Motion",    folder: "motion", type: "video", ext: "mp4" },
+    { id: "birds",          label: "Birds",         category: "Motion",    folder: "motion", type: "video", ext: "mp4" },
+    { id: "hearts",         label: "Hearts",        category: "Motion",    folder: "motion", type: "video", ext: "mp4" },
 ];
-const DEFAULT_BG = "watercolor";
+function bgAssetUrl(bg) {
+    return `assets/backgrounds/${bg.folder}/${bg.id}.${bg.ext || "jpg"}`;
+}
+const DEFAULT_BG = "paintswatch"; // one of the preload-bundled starters
 // Multiple ambient tracks — initMusic picks one per session so it
 // doesn't get repetitive across launches. Missing files fail silently
 // (the Audio element errors and the rest of the app keeps working).
@@ -2006,7 +2020,10 @@ async function loadBackdropImage() {
         const img = new Image();
         img.onload = () => res(img);
         img.onerror = () => res(null);
-        img.src = `assets/backgrounds/${state.background}.jpg`;
+        const bg = BACKGROUNDS.find((b) => b.id === state.background);
+        // Photo composite only handles still backdrops — video bgs
+        // fall through to a transparent backdrop in the composer.
+        img.src = bg && bg.type !== "video" ? bgAssetUrl(bg) : "";
     });
 }
 
@@ -2880,13 +2897,14 @@ function setBackground(id) {
     state.background = id;
     const bd = document.getElementById("backdrop");
     const vid = document.getElementById("backdropVideo");
+    const src = bgAssetUrl(bg);
     if (bg.type === "video") {
         if (bd) bd.classList.add("is-hidden");
         if (vid) {
             // Only swap the src if it changed — avoids reloading the
             // file when the same motion bg is reselected.
-            const want = new URL(bg.src, location.href).href;
-            if (vid.src !== want) vid.src = bg.src;
+            const want = new URL(src, location.href).href;
+            if (vid.src !== want) vid.src = src;
             vid.classList.add("is-active");
             vid.play().catch(() => {}); // user gesture or muted autoplay
         }
@@ -2897,7 +2915,7 @@ function setBackground(id) {
         }
         if (bd) {
             bd.classList.remove("is-hidden");
-            bd.style.backgroundImage = `url("assets/backgrounds/${id}.jpg")`;
+            bd.style.backgroundImage = `url("${src}")`;
         }
     }
     try { localStorage.setItem("slip-bg", id); } catch (_) {}
@@ -2953,9 +2971,11 @@ function renderBgRow() {
         el.className = "bg-swatch" + (b.type === "video" ? " is-video" : "");
         el.dataset.id = b.id;
         // Video swatches use a chip-coloured tile + play glyph (CSS).
-        // Static swatches show their JPG as the swatch background.
+        // Static swatches show their JPG as the swatch background;
+        // since it's the same URL the backdrop will use, the browser
+        // caches the bytes once for both purposes.
         if (b.type !== "video") {
-            el.style.backgroundImage = `url("assets/backgrounds/${b.id}.jpg")`;
+            el.style.backgroundImage = `url("${bgAssetUrl(b)}")`;
         }
         el.setAttribute("aria-label", b.label + " background");
         el.addEventListener("click", () => setBackground(b.id));
