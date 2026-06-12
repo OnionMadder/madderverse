@@ -226,6 +226,18 @@ html, body {
 }
 .landing-link:hover { color: var(--ink); }
 
+/* Get-the-app link on the title screen. Same minimal weight as the
+   gallery link, with a touch of breathing room above so it reads as
+   an aside rather than a third action competing with Begin. Hidden
+   inside the Capacitor wrap (where you're already in the app). */
+.landing-app-link {
+    margin-top: 14px;
+    text-decoration: none;
+    font-size: 0.78rem;
+    opacity: 0.85;
+}
+.landing-app-link:hover { opacity: 1; }
+
 /* Starter-shape picker on the title screen */
 .shape-picker {
     display: flex;

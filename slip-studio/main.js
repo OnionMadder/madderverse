@@ -541,6 +541,12 @@ function init() {
         dismissLanding();
         openGallery();
     });
+    // The Get-the-app link is for the web build only — hide it inside
+    // the Capacitor Android wrap (Capacitor injects window.Capacitor).
+    if (window.Capacitor) {
+        const appLink = document.getElementById("landingAppLink");
+        if (appLink) appLink.hidden = true;
+    }
 
     // Dev handle (inert unless the URL carries ?dev) — used to drive
     // and inspect the sculpt during testing across the build.
