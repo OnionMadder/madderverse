@@ -672,7 +672,18 @@ html, body {
     transform: scale(1.14);
 }
 
-/* ---------- Glaze palette (in the decorate stack) ---------- */
+/* ---------- Glaze palette (in the decorate stack) ----------
+   The bar lives inside a .deco-strip whose default is a single
+   scrolling row. With 16+ glazes we explicitly wrap into a centred
+   grid so users see all swatches without horizontal scroll. */
+#glazeBar {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    justify-content: center;
+    max-width: 360px;
+    margin: 0 auto;
+    row-gap: 8px;
+}
 .glaze-bar {
     display: flex;
     flex-wrap: wrap;
@@ -703,7 +714,11 @@ html, body {
     transform: scale(1.12);
 }
 
-/* ---------- Tool bar ---------- */
+/* ---------- Tool bar ----------
+   Buttons + the stage chip share one centred row. On narrow screens
+   they wrap so nothing overlaps; padding tightens on mobile so a
+   busy set+fired toolbar (Swap / Photo / Save / + Lid / advance)
+   still fits. */
 .toolbar {
     position: fixed;
     left: 0;
@@ -711,8 +726,10 @@ html, body {
     bottom: max(34px, calc(env(safe-area-inset-bottom, 0px) + 34px));
     z-index: 35;
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 10px;
+    gap: 8px;
+    padding: 0 10px;
     pointer-events: none;        /* gaps stay pass-through */
 }
 .tool-btn {
@@ -721,13 +738,13 @@ html, body {
     -webkit-appearance: none;
     appearance: none;
     font: inherit;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     letter-spacing: 0.04em;
     color: var(--ink-dim);
     background: var(--chip);
     border: 1px solid var(--ink-faint);
     border-radius: 999px;
-    padding: 9px 18px;
+    padding: 8px 14px;
     cursor: pointer;
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
