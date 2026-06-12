@@ -353,6 +353,7 @@ const state = {
     lidMaxY: null,                        // y where the lid silhouette caps (set in seedLidForRim)
     partnerMesh: null,                    // second mesh, used for the fired-set assembly view
     partnerMaterial: null,
+    partnerTarget: null,                  // material look the partner is tweening toward
     partnerDecoCanvas: null, partnerDecoCtx: null, partnerDecoTex: null,
     partnerBumpCanvas: null, partnerBumpCtx: null, partnerBumpTex: null,
     assemblyShown: false,                 // true while the fired set view is on
@@ -1270,10 +1271,11 @@ function advanceStage() {
             setPhase("fired");
             playSfx("kiln");
             startFiringMoment();
-            // If a partner is paused, mark it fired too so a Swap
-            // after the kiln view shows it already at the fired look.
-            if (state.savedPot) state.savedPot.clayState = "fired";
-            if (state.savedLid) state.savedLid.clayState = "fired";
+            // The partner's clayState stays "leather" through the kiln
+            // animation so it enters the view at its raw-glaze look
+            // and tweens to fired alongside the active piece;
+            // endFiringMoment flips it to "fired" when the sequence
+            // wraps up.
             break;
         case "fired":   resetPot();          break;
     }
@@ -1319,6 +1321,10 @@ function endFiringMoment() {
     if (bd) bd.style.opacity = "1";
     if (music && state._musicSavedVol != null) music.volume = state._musicSavedVol;
     state._musicSavedVol = null;
+    // The partner finished firing alongside the active piece — keep
+    // its saved clayState consistent so later swap/save logic works.
+    if (state.savedPot) state.savedPot.clayState = "fired";
+    if (state.savedLid) state.savedLid.clayState = "fired";
 }
 
 // 0..1 ease for smooth-in/out transitions inside the firing phases.
@@ -2361,8 +2367,10 @@ function buildPartnerMesh() {
 }
 
 // Populate the partner mesh from a saved piece (profile + deco +
-// bump + glaze) and set its material to the fired look. Position
-// stays at y=0 here — showAssemblyView decides where to place it.
+// bump + glaze). The material is set to the saved piece's CURRENT
+// look (so a leather-stage piece enters the kiln as raw glaze), and
+// state.partnerTarget is set to the fired look so tickPartnerMaterial
+// can tween the partner alongside the active piece during firing.
 function syncPartnerMesh(saved) {
     if (!state.partnerMesh) buildPartnerMesh();
     writeProfileArrayToGeometry(state.partnerMesh.geometry, saved.profile);
@@ -2372,15 +2380,46 @@ function syncPartnerMesh(saved) {
     state.partnerBumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
     state.partnerBumpCtx.drawImage(saved.bumpCanvas, 0, 0);
     state.partnerBumpTex.needsUpdate = true;
-    const look = saved.glaze ? GLAZES[saved.glaze].fired : CLAY_STATES.fired;
+    const initial = lookForPiece(saved);
+    const target  = saved.glaze ? GLAZES[saved.glaze].fired : CLAY_STATES.fired;
     const mat = state.partnerMaterial;
-    mat.color.setHex(look.color);
-    mat.roughness          = look.roughness;
-    mat.clearcoat          = look.clearcoat;
-    mat.clearcoatRoughness = look.clearcoatRoughness;
-    mat.envMapIntensity    = look.envMapIntensity;
-    mat.bumpScale          = look.bump;
-    mat.metalness          = look.metalness != null ? look.metalness : 0;
+    mat.color.setHex(initial.color);
+    mat.roughness          = initial.roughness;
+    mat.clearcoat          = initial.clearcoat;
+    mat.clearcoatRoughness = initial.clearcoatRoughness;
+    mat.envMapIntensity    = initial.envMapIntensity;
+    mat.bumpScale          = initial.bump;
+    mat.metalness          = initial.metalness != null ? initial.metalness : 0;
+    state.partnerTarget = target;
+}
+
+// Same shape as currentLook() but reads from a snapshot rather than
+// the live state. Used for the partner mesh which lives in memory.
+function lookForPiece(piece) {
+    const cs = piece.clayState;
+    if (cs === "fired")   return piece.glaze ? GLAZES[piece.glaze].fired : CLAY_STATES.fired;
+    if (cs === "leather") return piece.glaze ? GLAZES[piece.glaze].raw   : CLAY_STATES.leather;
+    return CLAY_STATES.wet;
+}
+
+// Tween the partner material toward state.partnerTarget. Runs from
+// tick() once per frame using the same rate constants as
+// tickMaterial — slower during firing so the glaze melts visibly.
+const partnerTweenColor = new THREE.Color();
+function tickPartnerMaterial(dt) {
+    const m = state.partnerMaterial;
+    const t = state.partnerTarget;
+    if (!m || !t || !state.partnerMesh || !state.partnerMesh.visible) return;
+    const rate = state.firing ? 0.8 : 5;
+    const k = 1 - Math.exp(-dt * rate);
+    partnerTweenColor.setHex(t.color);
+    m.color.lerp(partnerTweenColor, k);
+    m.roughness          += (t.roughness          - m.roughness)          * k;
+    m.clearcoat          += (t.clearcoat          - m.clearcoat)          * k;
+    m.clearcoatRoughness += (t.clearcoatRoughness - m.clearcoatRoughness) * k;
+    m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
+    m.bumpScale          += (t.bump               - m.bumpScale)          * k;
+    m.metalness          += ((t.metalness != null ? t.metalness : 0) - m.metalness) * k;
 }
 
 // Show both pieces in their natural assembled positions. The pot
@@ -2809,6 +2848,7 @@ function tick() {
         profileDirty = false;
     }
     tickMaterial(dt);
+    tickPartnerMaterial(dt);
     state.renderer.render(state.scene, state.camera);
 }
 
