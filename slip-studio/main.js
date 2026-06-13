@@ -215,6 +215,14 @@ const BACKGROUNDS = [
 function bgAssetUrl(bg) {
     return `assets/backgrounds/${bg.folder}/${bg.id}.${bg.ext || "jpg"}`;
 }
+// The Capacitor wrap bundles only the preload backgrounds to keep the
+// AAB small (the other folders are 28MB combined, mostly motion videos).
+// The web build sees every entry. A future in-app "Download backdrops"
+// feature will re-surface the rest as installable packs.
+function visibleBackgrounds() {
+    if (window.Capacitor) return BACKGROUNDS.filter((b) => b.folder === "preload");
+    return BACKGROUNDS;
+}
 const DEFAULT_BG = "paintswatch"; // one of the preload-bundled starters
 // Multiple ambient tracks — initMusic picks one per session so it
 // doesn't get repetitive across launches. Missing files fail silently
@@ -524,7 +532,7 @@ function init() {
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
     try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
     try { savedSfx = localStorage.getItem("slip-sfx") !== "0"; } catch (_) {}
-    setBackground(BACKGROUNDS.some((b) => b.id === savedBg) ? savedBg : DEFAULT_BG);
+    setBackground(visibleBackgrounds().some((b) => b.id === savedBg) ? savedBg : DEFAULT_BG);
     state.musicOn = savedMusic;
     state.sfxOn = savedSfx;
     updateMusicToggle();
@@ -2973,13 +2981,14 @@ function buildBgPicker() {
     wrap.innerHTML = "";
 
     // Pick the initial category: whichever one the saved background lives in.
-    const current = BACKGROUNDS.find((b) => b.id === state.background);
+    const visible = visibleBackgrounds();
+    const current = visible.find((b) => b.id === state.background);
     state.bgCategory = current ? current.category : BG_CATEGORIES[0];
 
     const tabs = document.createElement("div");
     tabs.className = "bg-tabs";
     BG_CATEGORIES.forEach((cat) => {
-        if (!BACKGROUNDS.some((b) => b.category === cat)) return;
+        if (!visible.some((b) => b.category === cat)) return;
         const tab = document.createElement("button");
         tab.type = "button";
         tab.className = "bg-tab";
@@ -3008,7 +3017,7 @@ function renderBgRow() {
     const row = document.getElementById("bgRow");
     if (!row) return;
     row.innerHTML = "";
-    BACKGROUNDS.filter((b) => b.category === state.bgCategory).forEach((b) => {
+    visibleBackgrounds().filter((b) => b.category === state.bgCategory).forEach((b) => {
         const el = document.createElement("button");
         el.type = "button";
         el.className = "bg-swatch" + (b.type === "video" ? " is-video" : "");
