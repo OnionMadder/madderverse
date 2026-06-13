@@ -65,11 +65,11 @@ PAID ONCE. NOTHING ELSE.
 • No ads. Not banner, not interstitial, not "rewarded."
 • No subscriptions, no in-app purchases, no glaze packs to unlock.
 • No account. No sign-in.
-• Works fully offline — every asset is bundled, every save is local.
+• Works offline — the studio, glazes, kiln, gallery, and three starter backdrops are all bundled at install. Every save is local.
 • No analytics, no third-party trackers, no advertising profiles.
 
 ATMOSPHERE
-• 18 backdrops across six categories — studio still-lifes, art, botanicals, paper textures, digital tunnels, and three looping motion backgrounds (balloons, birds, hearts)
+• Three hand-picked starter backdrops included; additional backdrop packs (art, botanicals, paper textures, digital, motion videos) are coming as free updates so you choose what to keep on your phone
 • Independent toggles for music and ambient sound — the wheel hum, the clay squelch, the kiln crackle
 • Multiple ambient music tracks, chosen at random each session
 
@@ -134,9 +134,9 @@ Already set in the Capacitor wrap:
 
 | Asset | Spec | Status |
 |-------|------|--------|
-| App icon | 512×512 PNG, 32-bit, ≤1 MB | **needed** — the Capacitor wrap is still on the default icon (`slip-studio-app/assets/icon.png` not yet created). Generate via `npx @capacitor/assets generate --android` once a 1024×1024 source exists. |
-| Feature graphic | 1024×500 PNG/JPG (no alpha) | **needed** |
-| Phone screenshots | 2–8 images, 16:9 or 9:16, min 320 px side | **needed** — capture: title screen, wheel + clay sculpting, leather-hard with the glaze tray, the kiln moment mid-fire, a fired piece, the assembled set view, the portfolio shelf, the photo composer |
+| App icon | 512×512 PNG, 32-bit, ≤1 MB | **needs downscale for the listing only**. Source at `slip-studio-app/assets/icon.png` is 1080×1080 (rose-striped vase scene) and is already wired into the Android launcher mipmaps via `npx @capacitor/assets generate --android`. For Play's storefront field, downscale the source to 512×512. |
+| Feature graphic | 1024×500 PNG/JPG (no alpha) | **needs resize**. Source at `slip-studio-app/assets/slip-feature.png` is 1488×720 — Play will reject this size. Crop/resize to exactly 1024×500 before upload. |
+| Phone screenshots | 2–8 images, 16:9 or 9:16, min 320 px side | **5 staged at `slip-studio-app/assets/`**: `title.jpg`, `shape.jpg`, `decorate.jpg`, `fired.jpg`, `gallery.jpg`. Three more optional (the kiln moment mid-fire, the assembled set view, the photo composer). |
 | 7" tablet screenshots | optional, up to 8 | optional |
 | 10" tablet screenshots | optional, up to 8 | optional |
 | Promo video (YouTube URL) | optional but high-leverage for a creative app | optional — a 30-second silent capture of throwing → glazing → firing → photo would convert |
@@ -212,9 +212,9 @@ or to expand the store description if Play's character limit changes.
 - Web Share (where supported) with anchor-download fallback
 
 ### Atmosphere
-- 18 backdrops in six categories: **Studio**, **Art**, **Botanical**, **Digital**, **Paper**, **Motion**
-- Three motion (looping video) backdrops: Balloons, Birds, Hearts
-- "Studio" backdrops bundle with the app; the rest stream on demand the first time they're picked
+- 18 backdrops in six categories: **Studio**, **Art**, **Botanical**, **Digital**, **Paper**, **Motion** (web build); **3 Studio backdrops bundled at install in the Android app**, with the other five categories planned as opt-in download packs in a future update
+- Three motion (looping video) backdrops: Balloons, Birds, Hearts (web only at v2.0; coming to the app via the future download-packs feature)
+- Bundle convention: only `assets/backgrounds/preload/` is copied into `slip-studio-app/www/`; the other folders are filtered out of the picker via `visibleBackgrounds()` in `main.js`
 - Multiple ambient music tracks, randomised per session
 - Five sound effects, all subtle: wheel hum (volume tracks the spin), clay squelch (throttled), water drip on re-wet, glaze pour on selection, kiln crackle on fire
 - Independent toggles for music and SFX
