@@ -64,6 +64,23 @@ const SCULPT_RATE_MAX = 0.30;
 const TRIM_RATE_MAX   = 0.42;
 let lastSculptT = 0, lastTrimT = 0;
 
+// Clay-feel modifiers layered on the rate cap.
+//   PULL_PENALTY: stretching the wall outward is harder than compressing
+//     it inward — the wheel does work for you on a push and against
+//     you on a pull. 0.55 = pulls run a touch over half push speed.
+//   THIN_BAND / THIN_FLOOR: as the local wall approaches MIN_R, the
+//     allowed rate fades toward THIN_FLOOR so a thin wall resists
+//     further movement (you can still squeeze it, but it tears
+//     slowly instead of snapping). THIN_BAND is the width of clay
+//     over which the penalty fades in.
+//   SMOOTH_ALPHA: how aggressively the rotation "polishes" each
+//     sculpted band per sample. Subtle by design — intentional rim /
+//     foot features survive, but jagged finger micro-jitter settles.
+const PULL_PENALTY = 0.55;
+const THIN_BAND    = 0.10;
+const THIN_FLOOR   = 0.05;
+const SMOOTH_ALPHA = 0.04;
+
 // Selectable brush sizes (vertical softness of the pull, world units).
 // A fine brush lets you shape small features like a foot or a crisp
 // rim; a broad one sweeps the whole belly.
@@ -1459,15 +1476,20 @@ function trimToward(y, targetR) {
     const reach = Math.ceil(sigmaRows * 3);
     const lo = Math.max(1, Math.floor(centerRow - reach));
     const hi = Math.min(ROWS, Math.ceil(centerRow + reach));
-    // First pass: how much would the strongest-affected row move?
+    // Single pass: max desired delta (drives the cap) + thinnest core
+    // row (drives the thinness penalty — already-trimmed foot resists
+    // further removal, so the loop tool can't run away into MIN_R).
     let maxAbs = 0;
+    let minRInCore = currentR;
     for (let r = lo; r <= hi; r++) {
         const rowY = (r / ROWS) * TOP;
         if (rowY > TRIM_MAX_Y) continue;
         const d = (r - centerRow) / sigmaRows;
-        const w = Math.exp(-0.5 * d * d) * TRIM_STRENGTH;
+        const wbase = Math.exp(-0.5 * d * d);
+        const w = wbase * TRIM_STRENGTH;
         const abs = Math.abs((targetR - profile[r]) * w);
         if (abs > maxAbs) maxAbs = abs;
+        if (wbase > 0.4 && profile[r] < minRInCore) minRInCore = profile[r];
     }
     // Convert per-second cap to per-call cap using actual elapsed time.
     // Clamp dt so a paused finger doesn't bank up a single huge step on
@@ -1475,7 +1497,8 @@ function trimToward(y, targetR) {
     const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
     const dt = lastTrimT ? Math.min(0.05, Math.max(0.005, (now - lastTrimT) / 1000)) : 1 / 60;
     lastTrimT = now;
-    const cap = TRIM_RATE_MAX * dt;
+    const thinness = THREE.MathUtils.clamp((minRInCore - MIN_R) / THIN_BAND, THIN_FLOOR, 1);
+    const cap = TRIM_RATE_MAX * dt * thinness;
     // Scale the whole Gaussian uniformly so the loop tool's shape
     // doesn't flatten under the cap — it just slows down as a whole.
     const scale = (maxAbs > cap && maxAbs > 0) ? cap / maxAbs : 1;
@@ -1498,32 +1521,56 @@ function sculptToward(y, targetR) {
     if (state.isLid && state.lidMaxY != null && y > state.lidMaxY) return;
     targetR = THREE.MathUtils.clamp(targetR, MIN_R, MAX_R);
     const centerRow = (y / TOP) * ROWS;
+    const cRowIdx   = Math.max(0, Math.min(ROWS, Math.round(centerRow)));
     const sigmaRows = (BRUSHES[state.brushIndex].sigma / TOP) * ROWS;
     const reach = Math.ceil(sigmaRows * 3);
     const lo = Math.max(1, Math.floor(centerRow - reach));
     const hi = Math.min(ROWS, Math.ceil(centerRow + reach));
-    // First pass: peek at the strongest-affected row's desired delta.
-    // The cap below scales the whole Gaussian uniformly so a big finger
-    // jump drags the silhouette toward the target over many frames
-    // instead of teleporting in one step.
+    // Single pass: collect the strongest desired delta (drives the cap
+    // scale) and the thinnest wall inside the brush's core (drives the
+    // thinness penalty). The "core" is rows where the bare Gaussian
+    // weight > 0.4 — the inner ~40% of the brush; fringe rows don't
+    // count because they barely register the move.
     let maxAbs = 0;
+    let minRInCore = profile[cRowIdx];
     for (let r = lo; r <= hi; r++) {
         if (state.isLid && state.lidMaxY != null && (r / ROWS) * TOP > state.lidMaxY) continue;
         const d = (r - centerRow) / sigmaRows;
-        const w = Math.exp(-0.5 * d * d) * STRENGTH;
+        const wbase = Math.exp(-0.5 * d * d);
+        const w = wbase * STRENGTH;
         const abs = Math.abs((targetR - profile[r]) * w);
         if (abs > maxAbs) maxAbs = abs;
+        if (wbase > 0.4 && profile[r] < minRInCore) minRInCore = profile[r];
     }
     const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
     const dt = lastSculptT ? Math.min(0.05, Math.max(0.005, (now - lastSculptT) / 1000)) : 1 / 60;
     lastSculptT = now;
-    const cap = SCULPT_RATE_MAX * dt;
+    // Asymmetric clay feel. Thinness ALWAYS applies (stretching thin
+    // clay tears just like pinching it does); pull penalty stacks on
+    // top for outward moves.
+    const isPull = targetR > profile[cRowIdx];
+    const thinness = THREE.MathUtils.clamp((minRInCore - MIN_R) / THIN_BAND, THIN_FLOOR, 1);
+    const capMod = thinness * (isPull ? PULL_PENALTY : 1);
+    const cap = SCULPT_RATE_MAX * dt * capMod;
     const scale = (maxAbs > cap && maxAbs > 0) ? cap / maxAbs : 1;
     for (let r = lo; r <= hi; r++) {
         if (state.isLid && state.lidMaxY != null && (r / ROWS) * TOP > state.lidMaxY) continue;
         const d = (r - centerRow) / sigmaRows;
         const w = Math.exp(-0.5 * d * d) * STRENGTH;
         profile[r] = profile[r] + (targetR - profile[r]) * w * scale;
+    }
+    // Local smoothing pass — what the wheel's rotation does for a real
+    // thrower: it slides clay across the hand many times per second,
+    // averaging out micro-bumps under the contact. Scoped to the brush
+    // core so a fine brush keeps crisper edges than a broad one, and
+    // never touches the lid cap zone (where rings are pinched to zero
+    // and must stay that way).
+    const sLo = Math.max(2, Math.floor(centerRow - sigmaRows * 0.6));
+    const sHi = Math.min(ROWS - 1, Math.ceil(centerRow + sigmaRows * 0.6));
+    for (let r = sLo; r <= sHi; r++) {
+        if (state.isLid && state.lidMaxY != null && (r / ROWS) * TOP > state.lidMaxY) continue;
+        const avg = (profile[r - 1] + 2 * profile[r] + profile[r + 1]) / 4;
+        profile[r] = profile[r] + (avg - profile[r]) * SMOOTH_ALPHA;
     }
     clampProfile(); // the foot can't pull wider than the wheel
     profileDirty = true;
