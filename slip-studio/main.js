@@ -51,7 +51,18 @@ const TOP  = 1.40;  // pot height in world units; foot sits at y=0
 const MIN_R    = 0.06; // clay can't pinch to nothing
 const MAX_R    = 0.95; // belly may bulge this wide (wider than the wheel)
 const GRAB_TOL = 0.26; // must start the drag this close to the surface
-const STRENGTH = 0.20; // gentle: the clay lags the finger, for fine control
+const STRENGTH = 0.08; // soft lerp toward the finger; clay LAGS, not snaps
+
+// World-units-per-second caps on how fast the silhouette may move
+// under a sustained drag. The lerp above is the "how much the clay
+// wants to follow"; this cap is the "how fast clay actually can move"
+// — so a big finger jump still pulls clay toward it but smears over
+// many frames instead of teleporting. Real wet stoneware has the same
+// finger-leads-the-clay feel on a wheel. Trim is firmer because its
+// loop tool bites into leather-hard with more conviction.
+const SCULPT_RATE_MAX = 0.30;
+const TRIM_RATE_MAX   = 0.42;
+let lastSculptT = 0, lastTrimT = 0;
 
 // Selectable brush sizes (vertical softness of the pull, world units).
 // A fine brush lets you shape small features like a foot or a crisp
@@ -1448,13 +1459,32 @@ function trimToward(y, targetR) {
     const reach = Math.ceil(sigmaRows * 3);
     const lo = Math.max(1, Math.floor(centerRow - reach));
     const hi = Math.min(ROWS, Math.ceil(centerRow + reach));
+    // First pass: how much would the strongest-affected row move?
+    let maxAbs = 0;
     for (let r = lo; r <= hi; r++) {
-        // Stay inside the foot envelope — never pull rows above TRIM_MAX_Y.
         const rowY = (r / ROWS) * TOP;
         if (rowY > TRIM_MAX_Y) continue;
         const d = (r - centerRow) / sigmaRows;
         const w = Math.exp(-0.5 * d * d) * TRIM_STRENGTH;
-        profile[r] = THREE.MathUtils.lerp(profile[r], targetR, w);
+        const abs = Math.abs((targetR - profile[r]) * w);
+        if (abs > maxAbs) maxAbs = abs;
+    }
+    // Convert per-second cap to per-call cap using actual elapsed time.
+    // Clamp dt so a paused finger doesn't bank up a single huge step on
+    // the next sample, and bound the cap floor for cold-start / 60 Hz.
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const dt = lastTrimT ? Math.min(0.05, Math.max(0.005, (now - lastTrimT) / 1000)) : 1 / 60;
+    lastTrimT = now;
+    const cap = TRIM_RATE_MAX * dt;
+    // Scale the whole Gaussian uniformly so the loop tool's shape
+    // doesn't flatten under the cap — it just slows down as a whole.
+    const scale = (maxAbs > cap && maxAbs > 0) ? cap / maxAbs : 1;
+    for (let r = lo; r <= hi; r++) {
+        const rowY = (r / ROWS) * TOP;
+        if (rowY > TRIM_MAX_Y) continue;
+        const d = (r - centerRow) / sigmaRows;
+        const w = Math.exp(-0.5 * d * d) * TRIM_STRENGTH;
+        profile[r] = profile[r] + (targetR - profile[r]) * w * scale;
     }
     clampProfile();
     profileDirty = true;
@@ -1472,11 +1502,28 @@ function sculptToward(y, targetR) {
     const reach = Math.ceil(sigmaRows * 3);
     const lo = Math.max(1, Math.floor(centerRow - reach));
     const hi = Math.min(ROWS, Math.ceil(centerRow + reach));
+    // First pass: peek at the strongest-affected row's desired delta.
+    // The cap below scales the whole Gaussian uniformly so a big finger
+    // jump drags the silhouette toward the target over many frames
+    // instead of teleporting in one step.
+    let maxAbs = 0;
     for (let r = lo; r <= hi; r++) {
         if (state.isLid && state.lidMaxY != null && (r / ROWS) * TOP > state.lidMaxY) continue;
         const d = (r - centerRow) / sigmaRows;
         const w = Math.exp(-0.5 * d * d) * STRENGTH;
-        profile[r] = THREE.MathUtils.lerp(profile[r], targetR, w);
+        const abs = Math.abs((targetR - profile[r]) * w);
+        if (abs > maxAbs) maxAbs = abs;
+    }
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const dt = lastSculptT ? Math.min(0.05, Math.max(0.005, (now - lastSculptT) / 1000)) : 1 / 60;
+    lastSculptT = now;
+    const cap = SCULPT_RATE_MAX * dt;
+    const scale = (maxAbs > cap && maxAbs > 0) ? cap / maxAbs : 1;
+    for (let r = lo; r <= hi; r++) {
+        if (state.isLid && state.lidMaxY != null && (r / ROWS) * TOP > state.lidMaxY) continue;
+        const d = (r - centerRow) / sigmaRows;
+        const w = Math.exp(-0.5 * d * d) * STRENGTH;
+        profile[r] = profile[r] + (targetR - profile[r]) * w * scale;
     }
     clampProfile(); // the foot can't pull wider than the wheel
     profileDirty = true;
@@ -2057,6 +2104,11 @@ function onPointerUp(ev) {
     if (pointers.size < 2) pinchPrevDist = 0;
     if (pointers.size === 0) {
         sculpting = false;
+        // Reset rate-cap timers so the next stroke's first sample uses
+        // the 1/60 fallback instead of a multi-second gap that would
+        // otherwise let a single first sample exhaust the per-call cap.
+        lastSculptT = 0;
+        lastTrimT = 0;
         state.painting = false;
         state.userRotating = false;
         lastPaintUV = null;
