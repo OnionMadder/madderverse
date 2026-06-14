@@ -212,18 +212,197 @@ const BACKGROUNDS = [
     { id: "birds",          label: "Birds",         category: "Motion",    folder: "motion", type: "video", ext: "mp4" },
     { id: "hearts",         label: "Hearts",        category: "Motion",    folder: "motion", type: "video", ext: "mp4" },
 ];
+// The Capacitor wrap bundles only the preload backgrounds to keep the
+// AAB small (the other folders are ~28MB combined, mostly motion videos).
+// The other categories are installable on demand — see "Pack downloads"
+// below — and once installed live in the app's Data dir, resolved at
+// load time via Capacitor.convertFileSrc(). Cache populated by
+// primeBgUrls() at startup; the bare key is bg.id.
+const STUDIO_FOLDER = "preload";
+const bgUrlCache = new Map();
 function bgAssetUrl(bg) {
+    const cached = bgUrlCache.get(bg.id);
+    if (cached) return cached;
     return `assets/backgrounds/${bg.folder}/${bg.id}.${bg.ext || "jpg"}`;
 }
-// The Capacitor wrap bundles only the preload backgrounds to keep the
-// AAB small (the other folders are 28MB combined, mostly motion videos).
-// The web build sees every entry. A future in-app "Download backdrops"
-// feature will re-surface the rest as installable packs.
+// Backgrounds the picker should show. Web build → everything. Capacitor
+// → the preload pack (always bundled) plus whatever installable packs
+// the user has fetched. The category tabs themselves still render for
+// every category in Capacitor — see buildBgPicker — so the user has a
+// surface to install from; this filter governs which swatches appear.
 function visibleBackgrounds() {
-    if (window.Capacitor) return BACKGROUNDS.filter((b) => b.folder === "preload");
-    return BACKGROUNDS;
+    if (!window.Capacitor) return BACKGROUNDS;
+    const installed = installedPacks();
+    return BACKGROUNDS.filter((b) =>
+        b.folder === STUDIO_FOLDER || installed.has(b.category)
+    );
 }
 const DEFAULT_BG = "paintswatch"; // one of the preload-bundled starters
+
+// --- Pack downloads (Capacitor only) ----------------------------
+// A "pack" = one bg-category folder. The web app sees every backdrop
+// directly from the site; the Android wrap ships only the Studio pack
+// (preload) and downloads other categories on demand. PACKS lists the
+// installable ones — Studio isn't here because it's always present.
+// `bytes` is the approximate uncompressed pack size, used for the
+// "About 1 MB" prompt; it doesn't need to be exact.
+const PACKS = {
+    Art:       { folder: "art",       bytes:   960 * 1024 },
+    Botanical: { folder: "botanical", bytes:   860 * 1024 },
+    Digital:   { folder: "digital",   bytes:  1040 * 1024 },
+    Paper:     { folder: "paper",     bytes:   900 * 1024 },
+    Motion:    { folder: "motion",    bytes:    23 * 1024 * 1024 },
+};
+const REMOTE_BG_BASE = "https://madderverse.org/slip-studio/assets/backgrounds";
+const FS_BG_BASE     = "slip-studio/backgrounds"; // under Directory.Data
+const PACK_INSTALLED_KEY = "slip-packs-installed";
+const PACK_DIRECTORY = "DATA"; // matches Filesystem plugin's Directory.Data
+const PRELOAD_PACK_BYTES = 1.7 * 1024 * 1024; // for the manage sheet
+
+function packBgs(category) {
+    return BACKGROUNDS.filter((b) => b.category === category);
+}
+function installedPacks() {
+    try {
+        const raw = localStorage.getItem(PACK_INSTALLED_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return new Set(Array.isArray(arr) ? arr : []);
+    } catch (_) { return new Set(); }
+}
+function setInstalledPacks(set) {
+    try { localStorage.setItem(PACK_INSTALLED_KEY, JSON.stringify([...set])); }
+    catch (_) {}
+}
+function isPackInstalled(category) {
+    if (!window.Capacitor) return true; // web has every pack inline
+    if (category === "Studio") return true; // bundled with the AAB
+    return installedPacks().has(category);
+}
+function fmtBytes(b) {
+    if (b < 1024 * 1024) return `${Math.max(1, Math.round(b / 1024))} KB`;
+    const mb = b / (1024 * 1024);
+    return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
+}
+function fsPlugin() {
+    return window.Capacitor && window.Capacitor.Plugins
+        ? window.Capacitor.Plugins.Filesystem
+        : null;
+}
+function bgFileName(bg) {
+    return `${bg.id}.${bg.ext || "jpg"}`;
+}
+function bgFsPath(bg) {
+    return `${FS_BG_BASE}/${bg.folder}/${bgFileName(bg)}`;
+}
+
+// On startup, resolve a webview-loadable URL for every installed-pack
+// background. The picker + setBackground both read from bgUrlCache, so
+// once this resolves the rest of the app uses local URIs transparently.
+// Missing files silently demote the bg to "not installed" so a torn
+// download doesn't wedge the picker.
+async function primeBgUrls() {
+    bgUrlCache.clear();
+    if (!window.Capacitor) return;
+    const fs = fsPlugin();
+    if (!fs) return;
+    const installed = installedPacks();
+    const recovered = new Set();
+    for (const bg of BACKGROUNDS) {
+        if (bg.folder === STUDIO_FOLDER) continue;
+        if (!installed.has(bg.category)) continue;
+        try {
+            const { uri } = await fs.getUri({
+                path: bgFsPath(bg),
+                directory: PACK_DIRECTORY,
+            });
+            bgUrlCache.set(bg.id, window.Capacitor.convertFileSrc(uri));
+            recovered.add(bg.category);
+        } catch (_) { /* file missing — treat as gone */ }
+    }
+    // If a previously-installed pack lost all its files (e.g. user
+    // cleared app storage from Android Settings), forget the entry so
+    // the picker offers a fresh install instead of broken swatches.
+    let changed = false;
+    for (const cat of [...installed]) {
+        if (!recovered.has(cat)) {
+            installed.delete(cat);
+            changed = true;
+        }
+    }
+    if (changed) setInstalledPacks(installed);
+}
+
+// Fetch a remote URL into a base64 string suitable for Filesystem.writeFile.
+async function fetchAsBase64(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const blob = await r.blob();
+    return await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onloadend = () => {
+            const s = fr.result;
+            const i = (typeof s === "string") ? s.indexOf(",") : -1;
+            resolve(i >= 0 ? s.slice(i + 1) : "");
+        };
+        fr.onerror = () => reject(fr.error || new Error("Read failed"));
+        fr.readAsDataURL(blob);
+    });
+}
+
+// Download every file in a pack into Filesystem. onProgress(done, total)
+// fires after each file. On any error we clean up partial writes so a
+// retried install starts clean (no half-decoded JPG sitting on disk).
+async function downloadPack(category, onProgress) {
+    const fs = fsPlugin();
+    if (!fs) throw new Error("Filesystem unavailable");
+    const pack = PACKS[category];
+    if (!pack) throw new Error(`Unknown pack: ${category}`);
+    const bgs = packBgs(category);
+    if (!bgs.length) throw new Error("Empty pack");
+
+    const written = [];
+    try {
+        for (let i = 0; i < bgs.length; i++) {
+            const bg = bgs[i];
+            const remote = `${REMOTE_BG_BASE}/${pack.folder}/${bgFileName(bg)}`;
+            const data = await fetchAsBase64(remote);
+            await fs.writeFile({
+                path: bgFsPath(bg),
+                data,
+                directory: PACK_DIRECTORY,
+                recursive: true,
+            });
+            written.push(bgFsPath(bg));
+            onProgress?.(i + 1, bgs.length);
+        }
+    } catch (e) {
+        for (const p of written) {
+            try { await fs.deleteFile({ path: p, directory: PACK_DIRECTORY }); }
+            catch (_) {}
+        }
+        throw e;
+    }
+    const installed = installedPacks();
+    installed.add(category);
+    setInstalledPacks(installed);
+}
+
+async function uninstallPack(category) {
+    const fs = fsPlugin();
+    const pack = PACKS[category];
+    if (!fs || !pack) return;
+    try {
+        await fs.rmdir({
+            path: `${FS_BG_BASE}/${pack.folder}`,
+            directory: PACK_DIRECTORY,
+            recursive: true,
+        });
+    } catch (_) { /* nothing on disk, fine */ }
+    const installed = installedPacks();
+    installed.delete(category);
+    setInstalledPacks(installed);
+    for (const bg of packBgs(category)) bgUrlCache.delete(bg.id);
+}
 // Multiple ambient tracks — initMusic picks one per session so it
 // doesn't get repetitive across launches. Missing files fail silently
 // (the Audio element errors and the rest of the app keeps working).
@@ -532,7 +711,26 @@ function init() {
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
     try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
     try { savedSfx = localStorage.getItem("slip-sfx") !== "0"; } catch (_) {}
-    setBackground(visibleBackgrounds().some((b) => b.id === savedBg) ? savedBg : DEFAULT_BG);
+    // Restore a backdrop immediately. In Capacitor a non-preload saved
+    // bg can't load until primeBgUrls() resolves the Data-dir URI, so
+    // we show DEFAULT_BG (always bundled) as a placeholder, then swap
+    // to the saved choice once the cache is primed. The web build has
+    // every bg inline and can restore synchronously.
+    const savedIsPreload = (() => {
+        const b = BACKGROUNDS.find((x) => x.id === savedBg);
+        return b && b.folder === STUDIO_FOLDER;
+    })();
+    if (window.Capacitor && !savedIsPreload) {
+        setBackground(DEFAULT_BG);
+        primeBgUrls().then(() => {
+            buildBgPicker();
+            if (visibleBackgrounds().some((b) => b.id === savedBg)) {
+                setBackground(savedBg);
+            }
+        });
+    } else {
+        setBackground(visibleBackgrounds().some((b) => b.id === savedBg) ? savedBg : DEFAULT_BG);
+    }
     state.musicOn = savedMusic;
     state.sfxOn = savedSfx;
     updateMusicToggle();
@@ -573,6 +771,14 @@ function init() {
             makeLidPartner, swapActivePiece, capturePieceState, restorePieceState,
             loadPot, openGallery, closeGallery,
             dbAll, dbDelete, dismissLanding,
+            // Pack-download surface: drive install/uninstall from the
+            // console (or a future debug sheet) without going through
+            // the picker. installedPacks() returns a Set of category names.
+            PACKS, installedPacks, isPackInstalled,
+            runInstall, downloadPack, uninstallPack,
+            primeBgUrls, openPackManager, closePackManager,
+            buildBgPicker, setBgCategory, setBackground,
+            bgUrlCache,
             pause: () => state.renderer.setAnimationLoop(null),
             resume: () => state.renderer.setAnimationLoop(tick),
             redraw: () => {
@@ -2975,28 +3181,51 @@ function setBackground(id) {
 // Background picker: a row of category tabs above a single row of
 // swatches. Only the active category's swatches show — keeps the
 // title screen compact, scales to many backdrops without a scrollbar.
+// In the Capacitor wrap every category tab renders (not just installed
+// ones) so the user has an inline surface for installing more packs;
+// uninstalled categories show an "Install" prompt in the swatch row
+// in place of swatches.
 function buildBgPicker() {
     const wrap = document.getElementById("bgPicker");
     if (!wrap) return;
     wrap.innerHTML = "";
 
-    // Pick the initial category: whichever one the saved background lives in.
+    // Pick the initial category: whichever one the saved background
+    // lives in (if it's still installed); else Studio so we don't open
+    // on an install prompt.
     const visible = visibleBackgrounds();
     const current = visible.find((b) => b.id === state.background);
-    state.bgCategory = current ? current.category : BG_CATEGORIES[0];
+    if (current) {
+        state.bgCategory = current.category;
+    } else if (!state.bgCategory || !categoryAvailable(state.bgCategory)) {
+        state.bgCategory = "Studio";
+    }
 
     const tabs = document.createElement("div");
     tabs.className = "bg-tabs";
     BG_CATEGORIES.forEach((cat) => {
-        if (!visible.some((b) => b.category === cat)) return;
+        if (!categoryAvailable(cat)) return;
         const tab = document.createElement("button");
         tab.type = "button";
         tab.className = "bg-tab";
         tab.dataset.category = cat;
         tab.textContent = cat;
+        if (window.Capacitor && !isPackInstalled(cat)) {
+            tab.classList.add("is-pack-locked");
+            // Dot lives in CSS so the label isn't pushed around.
+        }
         tab.addEventListener("click", () => setBgCategory(cat));
         tabs.appendChild(tab);
     });
+    if (window.Capacitor) {
+        const manage = document.createElement("button");
+        manage.type = "button";
+        manage.className = "bg-tab bg-manage";
+        manage.textContent = "Packs";
+        manage.setAttribute("aria-label", "Manage backdrop packs");
+        manage.addEventListener("click", openPackManager);
+        tabs.appendChild(manage);
+    }
     wrap.appendChild(tabs);
 
     const row = document.createElement("div");
@@ -3005,6 +3234,13 @@ function buildBgPicker() {
     wrap.appendChild(row);
 
     renderBgRow();
+}
+
+// Should we render a tab for this category? Yes if any bg lives in it
+// (true for every category here, but kept so adding an empty category
+// definition doesn't break the picker).
+function categoryAvailable(cat) {
+    return BACKGROUNDS.some((b) => b.category === cat);
 }
 
 function setBgCategory(cat) {
@@ -3017,6 +3253,12 @@ function renderBgRow() {
     const row = document.getElementById("bgRow");
     if (!row) return;
     row.innerHTML = "";
+    row.classList.remove("bg-row-install");
+    if (window.Capacitor && !isPackInstalled(state.bgCategory)) {
+        renderInstallPrompt(row, state.bgCategory);
+        syncBgTabs();
+        return;
+    }
     visibleBackgrounds().filter((b) => b.category === state.bgCategory).forEach((b) => {
         const el = document.createElement("button");
         el.type = "button";
@@ -3039,8 +3281,221 @@ function renderBgRow() {
 
 function syncBgTabs() {
     document.querySelectorAll(".bg-tab").forEach((el) => {
-        el.classList.toggle("is-active", el.dataset.category === state.bgCategory);
+        const cat = el.dataset.category;
+        if (!cat) return; // skip the Packs button
+        el.classList.toggle("is-active", cat === state.bgCategory);
+        el.classList.toggle("is-pack-locked",
+            !!window.Capacitor && !isPackInstalled(cat));
     });
+}
+
+// --- Pack install UI -------------------------------------------
+// Inline prompt that takes the swatch row's place for an uninstalled
+// category. The button kicks off downloadPack; progress and error
+// states re-render inside the same row.
+let installInFlight = null; // category currently downloading, or null
+
+function renderInstallPrompt(row, category) {
+    row.classList.add("bg-row-install");
+    const pack = PACKS[category];
+    if (!pack) return;
+    const wrap = document.createElement("div");
+    wrap.className = "bg-install";
+    const label = document.createElement("span");
+    label.className = "bg-install-label";
+    label.textContent = `${category} backdrops · ${fmtBytes(pack.bytes)}`;
+    wrap.appendChild(label);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "bg-install-btn";
+    btn.textContent = installInFlight === category ? "Downloading…" : "Install";
+    btn.disabled = installInFlight === category;
+    btn.addEventListener("click", () => runInstall(category));
+    wrap.appendChild(btn);
+    row.appendChild(wrap);
+}
+
+function renderInstallProgress(row, category, pct) {
+    row.classList.add("bg-row-install");
+    row.innerHTML = "";
+    const wrap = document.createElement("div");
+    wrap.className = "bg-install bg-install-progress";
+    const label = document.createElement("span");
+    label.className = "bg-install-label";
+    label.textContent = `Downloading ${category}…`;
+    wrap.appendChild(label);
+    const meter = document.createElement("span");
+    meter.className = "bg-install-pct";
+    meter.textContent = `${pct}%`;
+    meter.id = "bgInstallPct";
+    wrap.appendChild(meter);
+    row.appendChild(wrap);
+}
+
+function renderInstallError(row, category, message) {
+    row.classList.add("bg-row-install");
+    row.innerHTML = "";
+    const wrap = document.createElement("div");
+    wrap.className = "bg-install bg-install-error";
+    const label = document.createElement("span");
+    label.className = "bg-install-label";
+    label.textContent = message;
+    wrap.appendChild(label);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "bg-install-btn";
+    btn.textContent = "Try again";
+    btn.addEventListener("click", () => runInstall(category));
+    wrap.appendChild(btn);
+    row.appendChild(wrap);
+}
+
+async function runInstall(category) {
+    if (installInFlight) return;
+    if (isPackInstalled(category)) { buildBgPicker(); return; }
+    const fs = fsPlugin();
+    if (!fs) {
+        const row = document.getElementById("bgRow");
+        if (row) renderInstallError(row, category, "Downloader unavailable.");
+        return;
+    }
+    installInFlight = category;
+    const row = document.getElementById("bgRow");
+    if (row) renderInstallProgress(row, category, 0);
+    try {
+        await downloadPack(category, (done, total) => {
+            const meter = document.getElementById("bgInstallPct");
+            if (meter) meter.textContent = `${Math.round((done / total) * 100)}%`;
+        });
+        await primeBgUrls();
+        installInFlight = null;
+        // Stay on the just-installed category — the user came here to
+        // pick one of these. Re-rendering the row in place (rather than
+        // rebuilding the whole picker) keeps state.bgCategory fixed at
+        // `category`; the tab lock indicator falls off via syncBgTabs.
+        state.bgCategory = category;
+        renderBgRow();
+        renderPackList(); // if the manage sheet is open
+    } catch (e) {
+        installInFlight = null;
+        const r = document.getElementById("bgRow");
+        const msg = /HTTP|network|Failed|fetch/i.test(String(e && e.message))
+            ? "Download failed. Check your connection."
+            : "Download failed.";
+        if (r) renderInstallError(r, category, msg);
+    }
+}
+
+// --- Pack manager sheet ----------------------------------------
+function openPackManager() {
+    let sheet = document.getElementById("packSheet");
+    if (!sheet) {
+        sheet = document.createElement("div");
+        sheet.id = "packSheet";
+        sheet.className = "pack-sheet";
+        sheet.setAttribute("role", "dialog");
+        sheet.setAttribute("aria-label", "Backdrop packs");
+        sheet.innerHTML = `
+            <div class="pack-sheet-bar">
+                <span class="gallery-title">Backdrop packs</span>
+                <button class="tool-btn" id="packSheetClose" type="button">Close</button>
+            </div>
+            <div class="pack-list" id="packList"></div>
+            <p class="pack-note">Backdrops live on your device — uninstall any pack any time to free space.</p>
+        `;
+        document.body.appendChild(sheet);
+        sheet.querySelector("#packSheetClose")
+            .addEventListener("click", closePackManager);
+    }
+    renderPackList();
+    sheet.hidden = false;
+    requestAnimationFrame(() => sheet.classList.add("is-open"));
+}
+
+function closePackManager() {
+    const sheet = document.getElementById("packSheet");
+    if (!sheet) return;
+    sheet.classList.remove("is-open");
+    setTimeout(() => { sheet.hidden = true; }, 220);
+}
+
+function renderPackList() {
+    const list = document.getElementById("packList");
+    if (!list) return;
+    list.innerHTML = "";
+    const installed = installedPacks();
+    const rows = [
+        { cat: "Studio", bytes: PRELOAD_PACK_BYTES, isBundled: true, isInstalled: true },
+        ...Object.entries(PACKS).map(([cat, p]) => ({
+            cat, bytes: p.bytes, isBundled: false, isInstalled: installed.has(cat),
+        })),
+    ];
+    rows.forEach(({ cat, bytes, isBundled, isInstalled }) => {
+        const item = document.createElement("div");
+        item.className = "pack-item";
+        const info = document.createElement("div");
+        info.className = "pack-item-info";
+        const name = document.createElement("span");
+        name.className = "pack-item-name";
+        name.textContent = cat;
+        const size = document.createElement("span");
+        size.className = "pack-item-size";
+        size.textContent = fmtBytes(bytes);
+        info.appendChild(name);
+        info.appendChild(size);
+        item.appendChild(info);
+
+        const action = document.createElement("div");
+        action.className = "pack-item-action";
+        if (isBundled) {
+            const tag = document.createElement("span");
+            tag.className = "pack-item-tag";
+            tag.textContent = "Built in";
+            action.appendChild(tag);
+        } else if (installInFlight === cat) {
+            const tag = document.createElement("span");
+            tag.className = "pack-item-tag is-busy";
+            tag.textContent = "Installing…";
+            action.appendChild(tag);
+        } else if (isInstalled) {
+            const u = document.createElement("button");
+            u.type = "button";
+            u.className = "tool-btn";
+            u.textContent = "Uninstall";
+            u.addEventListener("click", () => doUninstall(cat));
+            action.appendChild(u);
+        } else {
+            const i = document.createElement("button");
+            i.type = "button";
+            i.className = "tool-btn tool-btn-primary";
+            i.textContent = "Install";
+            i.addEventListener("click", () => {
+                closePackManager();
+                state.bgCategory = cat;
+                buildBgPicker();
+                runInstall(cat);
+            });
+            action.appendChild(i);
+        }
+        item.appendChild(action);
+        list.appendChild(item);
+    });
+}
+
+async function doUninstall(category) {
+    await uninstallPack(category);
+    // If the current backdrop disappeared with the pack, snap back to
+    // the bundled default so the studio doesn't end up on a 404.
+    const bg = BACKGROUNDS.find((b) => b.id === state.background);
+    if (bg && bg.category === category) {
+        setBackground(DEFAULT_BG);
+        state.bgCategory = "Studio";
+    }
+    renderPackList();
+    // Re-render the row + tab lock state without rebuilding the picker,
+    // so an unrelated uninstall doesn't bounce the user off whichever
+    // category tab they were viewing.
+    renderBgRow();
 }
 
 function updateBgPicker() {

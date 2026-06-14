@@ -69,7 +69,7 @@ PAID ONCE. NOTHING ELSE.
 • No analytics, no third-party trackers, no advertising profiles.
 
 ATMOSPHERE
-• Three hand-picked starter backdrops included; additional backdrop packs (art, botanicals, paper textures, digital, motion videos) are coming as free updates so you choose what to keep on your phone
+• Three hand-picked starter backdrops included at install; five more themed packs (Art, Botanical, Digital, Paper, Motion videos) are free downloads you opt into one at a time, so motion videos only land on your phone if you want them
 • Independent toggles for music and ambient sound — the wheel hum, the clay squelch, the kiln crackle
 • Multiple ambient music tracks, chosen at random each session
 
@@ -94,6 +94,16 @@ Slip Studio v2.0 — the first Play Store release.
 Throw, trim, glaze, paint, fire. Make matching lids and pots. Frame a photo on a studio shelf. Save everything to a portfolio that's yours forever.
 
 No ads. No subscriptions. No account. No internet needed.
+```
+
+## What's new  (release notes for v2.1)
+
+```
+Slip Studio v2.1 — backdrop packs you choose.
+
+The five extra backdrop sets — Art, Botanical, Digital, Paper, and Motion videos — are now optional downloads inside the app, so the install stays small and you only keep what you'll use. Tap a category in the title-screen picker to install it; manage installed packs from "Packs" any time.
+
+Still no ads. Still no subscriptions. Still nothing to sign in to.
 ```
 
 (Future "What's new" blocks should stay short — one screen of text, not a changelog.)
@@ -212,9 +222,11 @@ or to expand the store description if Play's character limit changes.
 - Web Share (where supported) with anchor-download fallback
 
 ### Atmosphere
-- 18 backdrops in six categories: **Studio**, **Art**, **Botanical**, **Digital**, **Paper**, **Motion** (web build); **3 Studio backdrops bundled at install in the Android app**, with the other five categories planned as opt-in download packs in a future update
-- Three motion (looping video) backdrops: Balloons, Birds, Hearts (web only at v2.0; coming to the app via the future download-packs feature)
-- Bundle convention: only `assets/backgrounds/preload/` is copied into `slip-studio-app/www/`; the other folders are filtered out of the picker via `visibleBackgrounds()` in `main.js`
+- 18 backdrops in six categories: **Studio**, **Art**, **Botanical**, **Digital**, **Paper**, **Motion**
+- Studio (3 backdrops) is bundled at install in the Android app; the other five categories are opt-in download packs the player installs from the title-screen picker (v2.1) — Art / Botanical / Digital / Paper are ~1 MB each, Motion (3 looping videos) is ~23 MB
+- Three motion (looping video) backdrops: Balloons, Birds, Hearts
+- Pack files persist in the app's private Data dir via `@capacitor/filesystem`; tracked in `slip-packs-installed` (localStorage) and resolved at load time via `Capacitor.convertFileSrc`
+- Bundle convention: only `assets/backgrounds/preload/` is copied into `slip-studio-app/www/`; the other folders are filtered out of the picker via `visibleBackgrounds()` in `main.js` and fetched on demand from `https://madderverse.org/slip-studio/assets/backgrounds/<folder>/`
 - Multiple ambient music tracks, randomised per session
 - Five sound effects, all subtle: wheel hum (volume tracks the spin), clay squelch (throttled), water drip on re-wet, glaze pour on selection, kiln crackle on fire
 - Independent toggles for music and SFX
