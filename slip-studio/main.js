@@ -1795,7 +1795,7 @@ function tickMaterial(dt) {
 function stageLabelText() {
     const cs = state.clayState;
     if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].name + " glaze" : "Fired";
-    if (cs === "leather") return state.glaze ? GLAZES[state.glaze].name + " · raw" : CLAY_STATES.leather.label;
+    if (cs === "leather") return state.glaze ? GLAZES[state.glaze].name : CLAY_STATES.leather.label;
     return CLAY_STATES.wet.label;
 }
 
