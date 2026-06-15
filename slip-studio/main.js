@@ -599,6 +599,11 @@ const state = {
     // Mixed additively with the procedural clay grain in the shader.
     bumpCanvas: null, bumpCtx: null, bumpTex: null,
     pendingSetId: null,                   // carried across save → reset for lid pairs
+    // Has the user done anything that isn't reflected in the gallery?
+    // Set true on any sculpt / decorate / glaze / advance / lid-create;
+    // cleared on resetPot, loadPot, and a successful savePot. The title
+    // button reads this to decide whether to prompt before discarding.
+    dirty: false,
     isLid: false,                         // current piece is a lid (relaxes the foot envelope)
     savedPot: null,                       // paused pot state while user shapes a lid
     savedLid: null,                       // paused lid state while user edits the pot
@@ -792,7 +797,7 @@ function init() {
     updateSfxToggle();
     document.getElementById("musicToggle")?.addEventListener("click", () => setMusic(!state.musicOn));
     document.getElementById("sfxToggle")?.addEventListener("click", () => setSfx(!state.sfxOn));
-    document.getElementById("titleBtn")?.addEventListener("click", showLanding);
+    document.getElementById("titleBtn")?.addEventListener("click", returnToTitle);
 
     // Title screen sits over the (already-spinning) studio until "Begin".
     const landing = document.getElementById("landing");
@@ -1301,6 +1306,7 @@ function stampAt(u, v) {
 // --- Overlays (one tap fills the whole surface) -----------------
 function applyOverlay(id) {
     if (state.decoColor == null) return;
+    state.dirty = true;
     const ctx = state.decoCtx, hex = state.decoColor;
     const cell = DECO_SIZES[state.decoSizeIndex].px * 2.4;
     ctx.save();
@@ -1381,6 +1387,7 @@ function decoApplyAt(u, v) {
     if (state.decoTool === "stamp")     stampAt(u, v);
     else if (state.decoTool === "carve") scratchAt(u, v);
     else                                 paintAt(u, v); // brush / splatter
+    state.dirty = true;
 }
 
 // Raycast a pointer onto the pot and return the surface UV (or null).
@@ -1747,6 +1754,7 @@ function trimToward(y, targetR) {
     }
     clampProfile();
     profileDirty = true;
+    state.dirty = true;
 }
 
 // Pull the silhouette toward `targetR` around height `y`, with a
@@ -1824,6 +1832,7 @@ function sculptToward(y, targetR) {
     }
     clampProfile(); // the foot can't pull wider than the wheel
     profileDirty = true;
+    state.dirty = true;
 }
 
 // --- Material states (wet → bone-dry/decorate → fired) ----------
@@ -1868,6 +1877,7 @@ function advanceStage() {
             // stays where it is.
             if (state.savedPot && state.savedPot.clayState === "wet") state.savedPot.clayState = "leather";
             if (state.savedLid && state.savedLid.clayState === "wet") state.savedLid.clayState = "leather";
+            state.dirty = true;
             break;
         case "leather":
             setPhase("fired");
@@ -1878,6 +1888,7 @@ function advanceStage() {
             // and tweens to fired alongside the active piece;
             // endFiringMoment flips it to "fired" when the sequence
             // wraps up.
+            state.dirty = true;
             break;
         case "fired":   resetPot();          break;
     }
@@ -1943,6 +1954,7 @@ function setGlaze(id) {
     if (!GLAZES[id]) return;
     const wasActive = state.glaze === id;
     state.glaze = wasActive ? null : id;
+    state.dirty = true;
     if (!wasActive) playSfx("pour"); // soft pour when a glaze is selected
     if (state.clayState === "leather") setPhase("leather"); // refresh the raw look
     updateGlazeBar();
@@ -1971,6 +1983,7 @@ function resetPot() {
     clearDeco();
     resetBumpLayer();
     setPhase(INITIAL_STATE);
+    state.dirty = false;
     updateGlazeBar();
 }
 
@@ -2847,6 +2860,7 @@ async function savePot() {
         await dbPut(entry);
         flashSaved();
         state.pendingSetId = null;
+        state.dirty = false; // the gallery now reflects everything in view
 
         if (partner) {
             // Swap in the partner, save it under the same set id, then
@@ -3186,6 +3200,7 @@ function makeLidPartner() {
     clearDeco();
     resetBumpLayer();
     setPhase(INITIAL_STATE);
+    state.dirty = true;
     updateGlazeBar();
     updateLidStylePicker();
 }
@@ -3285,6 +3300,7 @@ async function loadPot(entry) {
     // Reset set state first; populated below if the loaded entry pairs.
     state.savedPot = null;
     state.savedLid = null;
+    state.dirty = false; // loaded piece reflects the gallery snapshot
 
     for (let i = 0; i < profile.length; i++) profile[i] = entry.profile?.[i] ?? 0;
     profileDirty = true;
@@ -3660,6 +3676,19 @@ function dismissLanding() {
 function showLanding() {
     const l = document.getElementById("landing");
     if (l) { l.hidden = false; l.classList.remove("is-gone"); }
+}
+
+// Title-button tap: always end up at the landing screen with a fresh
+// wet pot in the studio behind it. If the user has unsaved work, ask
+// before discarding it; if they've saved (or done nothing yet), just
+// reset and return without interrupting.
+function returnToTitle() {
+    if (state.dirty) {
+        const proceed = window.confirm("Discard this pot and start over? Your work isn't saved.");
+        if (!proceed) return;
+    }
+    resetPot();
+    showLanding();
 }
 
 // --- Ambiance: backdrops + music --------------------------------
