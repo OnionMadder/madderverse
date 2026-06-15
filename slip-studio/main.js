@@ -1100,46 +1100,116 @@ function clearDeco() {
     clearSgraffito();
 }
 
-// Carve a soft-edged stroke into the sgraffito mask, wrapping across
-// the seam like the deco brush. The mask is white-alpha (composited
-// onto a transparent base) so we read alpha in the shader; sizes are
-// narrower than the deco brush (carving is a needle, not a sponge).
+// Sgraffito carving: a needle scribed across wet slip. NOT a paint
+// brush. The stroke is a crisp thin line drawn with canvas's stroke()
+// API (no radial fade) so the cut has sharp edges; widths are way
+// narrower than the deco-paint brushes — a real scribe leaves a 1–3
+// mm groove, not a 30 mm sponge mark. The same path is also painted
+// into the bump canvas as a DARK line, which the bump shader reads as
+// recessed depth (a small surface shadow), so each scratch shows real
+// groove relief instead of a flat colour swap. Bump grooves are
+// permanent — same as the existing decoration stamps, and same as a
+// real needle scratch on wet clay (Clear wipes the colour mask, the
+// gouge stays).
+const SGRAFFITO_WIDTHS = [3, 6, 12]; // S = needle, M = wood tool, L = gouge
+
+function sgraffitoLineWidthDeco() {
+    return Math.max(1.5, SGRAFFITO_WIDTHS[state.decoSizeIndex] / Math.max(0.5, state.zoom));
+}
+
+// First tap on pointerdown: a degenerate stroke renders as a tiny
+// round dot — same width as a continuous-drag segment so the stroke
+// reads as starting cleanly instead of with a blob.
 function scratchAt(u, v) {
-    const ctx = state.sgraffitoCtx;
-    if (!ctx) return;
-    const cx = u * DECO_W;
-    const cy = (1 - v) * DECO_H;
-    const size = Math.max(2, decoRadius() * 0.55);
-    scratchDab(cx, cy, size, 0.92);
-    // Wrap across the seam so a stroke at u≈0 or u≈1 doesn't break.
-    if (cx < size) scratchDab(cx + DECO_W, cy, size, 0.92);
-    else if (cx > DECO_W - size) scratchDab(cx - DECO_W, cy, size, 0.92);
-    state.sgraffitoTex.needsUpdate = true;
+    scratchStroke(u, v, u, v);
 }
-function scratchDab(cx, cy, radius, alpha) {
-    const ctx = state.sgraffitoCtx;
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-    g.addColorStop(0,    `rgba(255,255,255,${alpha})`);
-    g.addColorStop(0.6,  `rgba(255,255,255,${alpha * 0.85})`);
-    g.addColorStop(1,    `rgba(255,255,255,0)`);
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fill();
-}
+
 function scratchStroke(au, av, bu, bv) {
-    if (Math.abs(bu - au) > 0.5) { scratchAt(bu, bv); return; }
-    const dist = Math.hypot((bu - au) * DECO_W, (bv - av) * DECO_H);
-    const steps = Math.max(1, Math.floor(dist / (decoRadius() * 0.3)));
-    for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        scratchAt(au + (bu - au) * t, av + (bv - av) * t);
+    const sgCtx = state.sgraffitoCtx;
+    const bpCtx = state.bumpCtx;
+    if (!sgCtx || !bpCtx) return;
+    // Skip seam-crossing line segments — drop a dot at the destination
+    // and resume from there next sample.
+    if (Math.abs(bu - au) > 0.5) { scratchStroke(bu, bv, bu, bv); return; }
+    const wDeco = sgraffitoLineWidthDeco();
+    const wBump = wDeco * (BUMP_W / DECO_W); // bump canvas is half-res, keep on-pot width consistent
+    const decoAx = au * DECO_W, decoAy = (1 - av) * DECO_H;
+    const decoBx = bu * DECO_W, decoBy = (1 - bv) * DECO_H;
+    const bumpAx = au * BUMP_W, bumpAy = (1 - av) * BUMP_H;
+    const bumpBx = bu * BUMP_W, bumpBy = (1 - bv) * BUMP_H;
+
+    drawSgraffitoMaskSegment(sgCtx, decoAx, decoAy, decoBx, decoBy, wDeco);
+    drawSgraffitoBumpSegment(bpCtx, bumpAx, bumpAy, bumpBx, bumpBy, wBump);
+    // Seam wrap: a stroke near u≈0 or u≈1 also paints a copy at the
+    // wrapped position so the line doesn't visually clip on the back
+    // of the pot.
+    if (decoAx < wDeco || decoBx < wDeco) {
+        drawSgraffitoMaskSegment(sgCtx, decoAx + DECO_W, decoAy, decoBx + DECO_W, decoBy, wDeco);
+        drawSgraffitoBumpSegment(bpCtx, bumpAx + BUMP_W, bumpAy, bumpBx + BUMP_W, bumpBy, wBump);
+    } else if (decoAx > DECO_W - wDeco || decoBx > DECO_W - wDeco) {
+        drawSgraffitoMaskSegment(sgCtx, decoAx - DECO_W, decoAy, decoBx - DECO_W, decoBy, wDeco);
+        drawSgraffitoBumpSegment(bpCtx, bumpAx - BUMP_W, bumpAy, bumpBx - BUMP_W, bumpBy, wBump);
     }
+
+    state.sgraffitoTex.needsUpdate = true;
+    state.bumpTex.needsUpdate = true;
 }
+
+function drawSgraffitoMaskSegment(ctx, ax, ay, bx, by, w) {
+    ctx.save();
+    ctx.lineWidth   = w;
+    ctx.lineCap     = "round";
+    ctx.lineJoin    = "round";
+    ctx.strokeStyle = "rgba(255,255,255,0.92)";
+    if (ax === bx && ay === by) {
+        // Degenerate (single tap): tiny filled disc, same width as a
+        // segment so the first tap doesn't read as a different tool.
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.beginPath();
+        ctx.arc(ax, ay, w / 2, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
+function drawSgraffitoBumpSegment(ctx, ax, ay, bx, by, w) {
+    ctx.save();
+    // Dark line = recessed (the bump shader reads brightness as
+    // height; baseline is the procedural mid-grey ~128, dark here
+    // reads as a clear groove). Drawn slightly narrower than the
+    // mask so the depth sits inside the visible colour cut.
+    const wB = w * 0.85;
+    ctx.lineWidth   = wB;
+    ctx.lineCap     = "round";
+    ctx.lineJoin    = "round";
+    ctx.strokeStyle = "rgba(28,28,28,0.92)";
+    if (ax === bx && ay === by) {
+        ctx.fillStyle = "rgba(28,28,28,0.92)";
+        ctx.beginPath();
+        ctx.arc(ax, ay, wB / 2, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        ctx.beginPath();
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.stroke();
+    }
+    ctx.restore();
+}
+
 function clearSgraffito() {
     if (!state.sgraffitoCtx) return;
     state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (state.sgraffitoTex) state.sgraffitoTex.needsUpdate = true;
+    // Bump grooves from previous sgraffito strokes are NOT wiped —
+    // they're permanent surface impressions, same model as the bump
+    // stamps. Re-throwing or starting a new pot is the way to get a
+    // clean bump.
 }
 
 // --- Stamps -----------------------------------------------------
@@ -1391,10 +1461,15 @@ function buildPot() {
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _scratch );`,
+                 // Inside a sgraffito cut, the wall is recessed — small
+                 // shadow from the surrounding surface. Mixing toward a
+                 // darkened clay tone gives the cut visible depth on
+                 // top of the bump-shader's normal perturbation.
+                 vec3 _carveColor = uClayColor * 0.78;
+                 diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v1";
+    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v2";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -2875,10 +2950,15 @@ function buildPartnerMesh() {
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _scratch );`,
+                 // Inside a sgraffito cut, the wall is recessed — small
+                 // shadow from the surrounding surface. Mixing toward a
+                 // darkened clay tone gives the cut visible depth on
+                 // top of the bump-shader's normal perturbation.
+                 vec3 _carveColor = uClayColor * 0.78;
+                 diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v1-partner";
+    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v2-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
