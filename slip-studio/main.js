@@ -573,6 +573,19 @@ const state = {
     stampShape: "dot",
     painting: false,
     decoCanvas: null, decoCtx: null, decoTex: null,
+    // Sgraffito mask layer: a paintable greyscale (alpha-only canvas)
+    // that the shader uses to subtract glaze + decoration and reveal
+    // the bare-clay state colour underneath. Real sgraffito is a
+    // scratch through a slip layer.
+    sgraffitoCanvas: null, sgraffitoCtx: null, sgraffitoTex: null,
+    partnerSgraffitoCanvas: null, partnerSgraffitoCtx: null, partnerSgraffitoTex: null,
+    // The current bare-clay base colour as a THREE.Color — tweened in
+    // tickMaterial alongside the glaze so carved areas pass through the
+    // kiln smoothly (leather brown -> fired terracotta). The shader
+    // reads this as a uniform; the same Color instance is reused so
+    // we never reassign the uniform's value reference.
+    clayBaseColor: new THREE.Color(CLAY_STATES.wet.color),
+    partnerClayBaseColor: new THREE.Color(CLAY_STATES.wet.color),
     // Editable bump layer: painted into by wet-clay texture stamps
     // (positive relief) and leather-hard carving (negative grooves).
     // Mixed additively with the procedural clay grain in the shader.
@@ -696,6 +709,7 @@ function init() {
     document.getElementById("toolSplatter")?.addEventListener("click", () => setDecoTool("splatter"));
     document.getElementById("toolStamp")?.addEventListener("click", () => setDecoTool("stamp"));
     document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
+    document.getElementById("toolCarve")?.addEventListener("click", () => setDecoTool("carve"));
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
     document.getElementById("tabGlaze")?.addEventListener("click", () => setDecoTab("glaze"));
     document.getElementById("tabDecorate")?.addEventListener("click", () => setDecoTab("decorate"));
@@ -794,6 +808,7 @@ function init() {
             playSfx, stopSfx,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
+            scratchAt, scratchStroke, clearSgraffito,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
@@ -931,6 +946,26 @@ function makeDecoLayer() {
     return tex;
 }
 
+// --- Sgraffito layer --------------------------------------------
+// Carved-through scribble pattern. White-painted alpha = "scratched".
+// The shader uses this to subtract any glaze + deco contribution and
+// blend the bare-clay state colour through, simulating a slip-trail
+// carved with a needle. Same UV grid as the deco layer.
+function makeSgraffitoLayer() {
+    const canvas = document.createElement("canvas");
+    canvas.width = DECO_W;
+    canvas.height = DECO_H;
+    state.sgraffitoCanvas = canvas;
+    state.sgraffitoCtx = canvas.getContext("2d");
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.NoColorSpace; // mask data, not colour
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 4;
+    state.sgraffitoTex = tex;
+    return tex;
+}
+
 // --- Editable bump layer ----------------------------------------
 // A paintable grayscale canvas that ADDS to the procedural clay
 // grain in the bump shader. Neutral grey (0.5) = no change; brighter
@@ -1059,6 +1094,52 @@ function clearDeco() {
     if (!state.decoCtx) return;
     state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
     state.decoTex.needsUpdate = true;
+    // Clear wipes both paint AND sgraffito carving — one button, full
+    // reset of the decorate surface. (The glaze itself is separate and
+    // is cleared by tapping the active glaze swatch again.)
+    clearSgraffito();
+}
+
+// Carve a soft-edged stroke into the sgraffito mask, wrapping across
+// the seam like the deco brush. The mask is white-alpha (composited
+// onto a transparent base) so we read alpha in the shader; sizes are
+// narrower than the deco brush (carving is a needle, not a sponge).
+function scratchAt(u, v) {
+    const ctx = state.sgraffitoCtx;
+    if (!ctx) return;
+    const cx = u * DECO_W;
+    const cy = (1 - v) * DECO_H;
+    const size = Math.max(2, decoRadius() * 0.55);
+    scratchDab(cx, cy, size, 0.92);
+    // Wrap across the seam so a stroke at u≈0 or u≈1 doesn't break.
+    if (cx < size) scratchDab(cx + DECO_W, cy, size, 0.92);
+    else if (cx > DECO_W - size) scratchDab(cx - DECO_W, cy, size, 0.92);
+    state.sgraffitoTex.needsUpdate = true;
+}
+function scratchDab(cx, cy, radius, alpha) {
+    const ctx = state.sgraffitoCtx;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    g.addColorStop(0,    `rgba(255,255,255,${alpha})`);
+    g.addColorStop(0.6,  `rgba(255,255,255,${alpha * 0.85})`);
+    g.addColorStop(1,    `rgba(255,255,255,0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+}
+function scratchStroke(au, av, bu, bv) {
+    if (Math.abs(bu - au) > 0.5) { scratchAt(bu, bv); return; }
+    const dist = Math.hypot((bu - au) * DECO_W, (bv - av) * DECO_H);
+    const steps = Math.max(1, Math.floor(dist / (decoRadius() * 0.3)));
+    for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        scratchAt(au + (bu - au) * t, av + (bv - av) * t);
+    }
+}
+function clearSgraffito() {
+    if (!state.sgraffitoCtx) return;
+    state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (state.sgraffitoTex) state.sgraffitoTex.needsUpdate = true;
 }
 
 // --- Stamps -----------------------------------------------------
@@ -1215,8 +1296,9 @@ function applyOverlay(id) {
 
 // Dispatch a pot-touch to the active decorate tool.
 function decoApplyAt(u, v) {
-    if (state.decoTool === "stamp") stampAt(u, v);
-    else paintAt(u, v); // brush / splatter
+    if (state.decoTool === "stamp")     stampAt(u, v);
+    else if (state.decoTool === "carve") scratchAt(u, v);
+    else                                 paintAt(u, v); // brush / splatter
 }
 
 // Raycast a pointer onto the pot and return the surface UV (or null).
@@ -1284,22 +1366,35 @@ function buildPot() {
     });
     state.clayMaterial = mat;
 
-    // Overlay the painted decoration layer on the clay diffuse colour.
-    // (sRGB → linear via pow(2.2) before mixing into linear space.)
+    // Overlay the painted decoration layer + sgraffito carving on the
+    // clay diffuse colour. (sRGB → linear via pow(2.2) before mixing
+    // into linear space.) Sgraffito is sampled FIRST so the scratched
+    // regions also strip any decoration on top — a carved line cuts
+    // through both glaze and paint, not just through the base coat.
     const decoTex = makeDecoLayer();
+    const sgraffitoTex = makeSgraffitoLayer();
     mat.onBeforeCompile = (shader) => {
-        shader.uniforms.decoMap = { value: decoTex };
+        shader.uniforms.decoMap      = { value: decoTex };
+        shader.uniforms.sgraffitoMap = { value: sgraffitoTex };
+        shader.uniforms.uClayColor   = { value: state.clayBaseColor };
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
             .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
         shader.fragmentShader = shader.fragmentShader
-            .replace("#include <common>", "uniform sampler2D decoMap;\nvarying vec2 vDecoUv;\n#include <common>")
+            .replace(
+                "#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
+            )
             .replace(
                 "#include <map_fragment>",
-                "#include <map_fragment>\n  vec4 _deco = texture2D( decoMap, vDecoUv );\n  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a );",
+                `#include <map_fragment>
+                 float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
+                 vec4 _deco = texture2D( decoMap, vDecoUv );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-v1";
+    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v1";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -1784,6 +1879,7 @@ function setBrush(i) {
 // stage changes read as a calm transition rather than a hard cut.
 // During the firing sequence the time constant slows ~7x so the user
 // actually watches the glaze melt raw → fired instead of snapping.
+const _scratchTargetColor = new THREE.Color();
 function tickMaterial(dt) {
     const m = state.clayMaterial;
     const t = state.clayTarget;
@@ -1798,6 +1894,13 @@ function tickMaterial(dt) {
     m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
     m.bumpScale          += (t.bump               - m.bumpScale)          * k;
     m.metalness          += ((t.metalness != null ? t.metalness : 0) - m.metalness) * k;
+    // Bare-clay base colour for the sgraffito carve uniform. Always
+    // tracks the CURRENT CLAY STATE'S colour (NOT the glaze), so
+    // carved-through regions show the right tone — leather brown at
+    // decorate, fired terracotta after the kiln. Same Color instance
+    // is mutated so the shader uniform's value reference stays stable.
+    _scratchTargetColor.setHex(CLAY_STATES[state.clayState].color);
+    state.clayBaseColor.lerp(_scratchTargetColor, k);
 }
 
 // The stage label, including the glaze name once chosen.
@@ -1890,7 +1993,8 @@ function updateGlazeBar() {
 function setDecoTool(name) {
     state.decoTool = name;
     [["toolBrush", "brush"], ["toolSplatter", "splatter"],
-     ["toolStamp", "stamp"], ["toolOverlay", "overlay"]].forEach(([id, t]) => {
+     ["toolStamp", "stamp"], ["toolOverlay", "overlay"],
+     ["toolCarve", "carve"]].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
         const on = name === t;
@@ -2087,7 +2191,13 @@ function onPointerDown(ev) {
             ev.preventDefault();
             return;
         }
-        if (state.decoColor != null && state.decoTool !== "overlay") {
+        // The Carve (sgraffito) tool doesn't need a paint colour — it
+        // scratches into a separate mask layer. Brush / Splatter / Stamp
+        // still gate on decoColor (no colour, no paint). Overlay is its
+        // own one-tap action.
+        const carveActive = state.decoTool === "carve";
+        const paintActive = state.decoColor != null && state.decoTool !== "overlay" && state.decoTool !== "carve";
+        if (carveActive || paintActive) {
             state.painting = true;
             const uv = pointerToUV(ev);
             if (uv) { decoApplyAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
@@ -2139,6 +2249,10 @@ function onPointerMove(ev) {
                 const moved = !lastPaintUV ? Infinity : Math.hypot(
                     (uv.x - lastPaintUV.x) * DECO_W, (uv.y - lastPaintUV.y) * DECO_H);
                 if (moved > decoRadius() * 1.8) { stampAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
+            } else if (state.decoTool === "carve") {
+                if (lastPaintUV) scratchStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
+                else scratchAt(uv.x, uv.y);
+                lastPaintUV = { x: uv.x, y: uv.y };
             } else {
                 if (lastPaintUV) paintStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
                 else paintAt(uv.x, uv.y);
@@ -2551,6 +2665,7 @@ async function savePot() {
         glaze: state.glaze,
         deco: state.decoCanvas.toDataURL("image/png"),
         bump: state.bumpCanvas.toDataURL("image/png"),
+        sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
         setId,
         title: null, // user can name from the gallery
@@ -2581,6 +2696,7 @@ async function savePot() {
                 glaze: state.glaze,
                 deco: state.decoCanvas.toDataURL("image/png"),
                 bump: state.bumpCanvas.toDataURL("image/png"),
+                sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
                 thumb: captureThumb(),
                 setId,
                 title: null,
@@ -2614,11 +2730,16 @@ function capturePieceState() {
     bumpCopy.width = BUMP_W;
     bumpCopy.height = BUMP_H;
     bumpCopy.getContext("2d").drawImage(state.bumpCanvas, 0, 0);
+    const sgraffitoCopy = document.createElement("canvas");
+    sgraffitoCopy.width = DECO_W;
+    sgraffitoCopy.height = DECO_H;
+    sgraffitoCopy.getContext("2d").drawImage(state.sgraffitoCanvas, 0, 0);
     return {
         profile: Float32Array.from(profile),
         glaze: state.glaze,
         decoCanvas: decoCopy,
         bumpCanvas: bumpCopy,
+        sgraffitoCanvas: sgraffitoCopy,
         isLid: state.isLid,
         clayState: state.clayState,
     };
@@ -2643,6 +2764,11 @@ function restorePieceState(saved) {
     state.bumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
     state.bumpCtx.drawImage(saved.bumpCanvas, 0, 0);
     state.bumpTex.needsUpdate = true;
+    // Sgraffito: older captured states may pre-date this field — guard
+    // so a captured-pre-v2.2 partner doesn't blow up the swap path.
+    state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (saved.sgraffitoCanvas) state.sgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
+    state.sgraffitoTex.needsUpdate = true;
     setPhase(saved.clayState);
     updateGlazeBar();
 }
@@ -2706,6 +2832,20 @@ function buildPartnerMesh() {
     pbt.anisotropy = 4;
     state.partnerBumpTex = pbt;
 
+    // Partner's own sgraffito mask canvas + texture (mirrors the
+    // active mesh's setup so lid + pot sets keep their carving).
+    const psc = document.createElement("canvas");
+    psc.width  = DECO_W;
+    psc.height = DECO_H;
+    state.partnerSgraffitoCanvas = psc;
+    state.partnerSgraffitoCtx    = psc.getContext("2d");
+    const pst = new THREE.CanvasTexture(psc);
+    pst.colorSpace = THREE.NoColorSpace;
+    pst.wrapS = THREE.RepeatWrapping;
+    pst.wrapT = THREE.ClampToEdgeWrapping;
+    pst.anisotropy = 4;
+    state.partnerSgraffitoTex = pst;
+
     const mat = new THREE.MeshPhysicalMaterial({
         color: CLAY_STATES.fired.color,
         roughness: CLAY_STATES.fired.roughness,
@@ -2718,18 +2858,27 @@ function buildPartnerMesh() {
         side: THREE.DoubleSide,
     });
     mat.onBeforeCompile = (shader) => {
-        shader.uniforms.decoMap = { value: pdt };
+        shader.uniforms.decoMap      = { value: pdt };
+        shader.uniforms.sgraffitoMap = { value: pst };
+        shader.uniforms.uClayColor   = { value: state.partnerClayBaseColor };
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
             .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
         shader.fragmentShader = shader.fragmentShader
-            .replace("#include <common>", "uniform sampler2D decoMap;\nvarying vec2 vDecoUv;\n#include <common>")
+            .replace(
+                "#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
+            )
             .replace(
                 "#include <map_fragment>",
-                "#include <map_fragment>\n  vec4 _deco = texture2D( decoMap, vDecoUv );\n  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a );",
+                `#include <map_fragment>
+                 float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
+                 vec4 _deco = texture2D( decoMap, vDecoUv );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-v1-partner";
+    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v1-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -2755,6 +2904,11 @@ function syncPartnerMesh(saved) {
     state.partnerBumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
     state.partnerBumpCtx.drawImage(saved.bumpCanvas, 0, 0);
     state.partnerBumpTex.needsUpdate = true;
+    // Partner sgraffito mask. Older captures might not carry it.
+    state.partnerSgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (saved.sgraffitoCanvas) state.partnerSgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
+    state.partnerSgraffitoTex.needsUpdate = true;
+    state.partnerClayBaseColor.setHex(CLAY_STATES[saved.clayState || "fired"].color);
     const initial = lookForPiece(saved);
     const target  = saved.glaze ? GLAZES[saved.glaze].fired : CLAY_STATES.fired;
     const mat = state.partnerMaterial;
@@ -2781,6 +2935,7 @@ function lookForPiece(piece) {
 // tick() once per frame using the same rate constants as
 // tickMaterial — slower during firing so the glaze melts visibly.
 const partnerTweenColor = new THREE.Color();
+const _partnerScratchTarget = new THREE.Color();
 function tickPartnerMaterial(dt) {
     const m = state.partnerMaterial;
     const t = state.partnerTarget;
@@ -2795,6 +2950,14 @@ function tickPartnerMaterial(dt) {
     m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
     m.bumpScale          += (t.bump               - m.bumpScale)          * k;
     m.metalness          += ((t.metalness != null ? t.metalness : 0) - m.metalness) * k;
+    // Partner sgraffito base colour tracks the saved partner's CURRENT
+    // clay state (set in syncPartnerMesh) and the live clay state at
+    // firing time. We read the active state during firing so both
+    // pieces transition together; otherwise the partner snapshot's
+    // value is steady.
+    const psCs = state.firing ? state.clayState : (state.savedPot?.clayState || state.savedLid?.clayState || "fired");
+    _partnerScratchTarget.setHex(CLAY_STATES[psCs].color);
+    state.partnerClayBaseColor.lerp(_partnerScratchTarget, k);
 }
 
 // Show both pieces in their natural assembled positions. The pot
@@ -2925,6 +3088,9 @@ async function loadPot(entry) {
     state.decoTex.needsUpdate = true;
     await loadImageOntoCanvas(entry.bump, state.bumpCtx, BUMP_W, BUMP_H, resetBumpLayer);
     state.bumpTex.needsUpdate = true;
+    // Sgraffito mask. Older entries don't carry it; treat as empty.
+    await loadImageOntoCanvas(entry.sgraffito, state.sgraffitoCtx, DECO_W, DECO_H, clearSgraffito);
+    state.sgraffitoTex.needsUpdate = true;
 
     // If this entry is part of a set, also load the partner so the
     // assembly view auto-triggers at setPhase("fired") below.
@@ -2985,11 +3151,18 @@ async function loadAsCapturedState(entry) {
     bctx.fillStyle = "rgb(128,128,128)";
     bctx.fillRect(0, 0, BUMP_W, BUMP_H);
     await loadImageOntoCanvas(entry.bump, bctx, BUMP_W, BUMP_H);
+    const sgraffitoCanvas = document.createElement("canvas");
+    sgraffitoCanvas.width  = DECO_W;
+    sgraffitoCanvas.height = DECO_H;
+    if (entry.sgraffito) {
+        await loadImageOntoCanvas(entry.sgraffito, sgraffitoCanvas.getContext("2d"), DECO_W, DECO_H);
+    }
     return {
         profile: Float32Array.from(entry.profile || []),
         glaze: entry.glaze || null,
         decoCanvas,
         bumpCanvas,
+        sgraffitoCanvas,
         isLid: lookupIsLid(entry),
         clayState: "fired",
     };
