@@ -1845,7 +1845,18 @@ function setPhase(name) {
 // The forward control: dry → fire → new pot.
 function advanceStage() {
     switch (state.clayState) {
-        case "wet":     setPhase("leather"); break; // firms to leather-hard, ready to decorate
+        case "wet":
+            setPhase("leather"); // firms to leather-hard, ready to decorate
+            // Tandem shaping: if the user made a partner at wet, advance
+            // it alongside so both pieces ride the clay arc together
+            // instead of having to be dried independently. We only
+            // promote a partner that's still at wet — a partner that's
+            // already been dried (the original leather-flow scenario,
+            // where the pot is frozen at leather while the lid is fresh)
+            // stays where it is.
+            if (state.savedPot && state.savedPot.clayState === "wet") state.savedPot.clayState = "leather";
+            if (state.savedLid && state.savedLid.clayState === "wet") state.savedLid.clayState = "leather";
+            break;
         case "leather":
             setPhase("fired");
             playSfx("kiln");
@@ -2084,8 +2095,11 @@ function updateToolbar() {
         saveBtn.textContent = hasPartner ? "Save set" : "Save";
     }
     if (photoBtn) photoBtn.hidden = !firedAndCool;
-    // Make lid: only at decorate, only if you don't already have a partner.
-    if (makeLidBtn) makeLidBtn.hidden = !(cs === "leather" && !hasPartner && !state.isLid);
+    // Make lid: at wet OR at decorate, only if you don't already
+    // have a partner. Wet creation is the tandem-shape entry point
+    // (sculpt pot + lid together from the start); leather creation
+    // is the original "decorate-stage lid" flow.
+    if (makeLidBtn) makeLidBtn.hidden = !((cs === "wet" || cs === "leather") && !hasPartner && !state.isLid);
     // Swap: visible while a partner is paused — but NOT at fired,
     // where the assembled view already shows both pieces together.
     if (swapBtn) {
@@ -3132,7 +3146,12 @@ function hideAssemblyView() {
 // to the gallery) and seeds a fresh wet lid whose base matches this
 // pot's rim. The two pieces share a set id at save time.
 function makeLidPartner() {
-    if (state.clayState !== "leather") return;
+    // Tandem shaping: allow lid creation from either wet or leather.
+    // Wet → both pieces are being shaped at the same time, advance
+    // and fire move them together. Leather → the original "decorate-
+    // stage lid" flow, where the pot stays frozen at leather while
+    // the lid is freshly thrown.
+    if (state.clayState !== "leather" && state.clayState !== "wet") return;
     if (state.isLid) return;          // already a lid
     if (state.savedPot) return;       // a partner already exists
     const rimR = profile[ROWS];
