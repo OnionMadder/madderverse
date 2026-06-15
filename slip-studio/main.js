@@ -1772,10 +1772,24 @@ function sculptToward(y, targetR) {
     // Asymmetric clay feel. Thinness ALWAYS applies (stretching thin
     // clay tears just like pinching it does); pull penalty stacks on
     // top for outward moves.
+    //
+    // Lids are tiny structures by design — the silhouette is narrow
+    // everywhere, so the same THIN_BAND that protects a pot wall from
+    // pinch-to-zero makes the lid's apex effectively unworkable. Lift
+    // the floor and narrow the band on lids so only walls genuinely
+    // at MIN_R slow down; everything wider sculpts at near-full speed.
     const isPull = targetR > profile[cRowIdx];
-    const thinness = THREE.MathUtils.clamp((minRInCore - MIN_R) / THIN_BAND, THIN_FLOOR, 1);
+    const thinFloor = state.isLid ? 0.35 : THIN_FLOOR;
+    const thinBand  = state.isLid ? 0.04 : THIN_BAND;
+    const thinness = THREE.MathUtils.clamp((minRInCore - MIN_R) / thinBand, thinFloor, 1);
     const capMod = thinness * (isPull ? PULL_PENALTY : 1);
-    const cap = SCULPT_RATE_MAX * dt * capMod;
+    // Brush-inverse rate scaling: a fine brush moves fewer rows per
+    // sample (narrower Gaussian) so the cap-divided absolute movement
+    // per second is naturally small. Boost the cap inversely to the
+    // brush sigma so fine-detail work stays responsive while broad
+    // sweeps still lag like real wet clay. Reference brush is medium.
+    const brushBoost = BRUSHES[1].sigma / BRUSHES[state.brushIndex].sigma;
+    const cap = SCULPT_RATE_MAX * dt * capMod * brushBoost;
     const scale = (maxAbs > cap && maxAbs > 0) ? cap / maxAbs : 1;
     for (let r = lo; r <= hi; r++) {
         if (state.isLid && state.lidMaxY != null && (r / ROWS) * TOP > state.lidMaxY) continue;
