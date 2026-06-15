@@ -729,6 +729,10 @@ function init() {
         swapActivePiece();
         updateToolbar();
     });
+    document.getElementById("matchRimBtn")?.addEventListener("click", () => {
+        matchLidRim();
+        updateToolbar();
+    });
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
@@ -812,7 +816,7 @@ function init() {
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
-            makeLidPartner, swapActivePiece, capturePieceState, restorePieceState,
+            makeLidPartner, swapActivePiece, matchLidRim, capturePieceState, restorePieceState,
             loadPot, openGallery, closeGallery,
             dbAll, dbDelete, dismissLanding,
             // Pack-download surface: drive install/uninstall from the
@@ -2106,6 +2110,17 @@ function updateToolbar() {
         swapBtn.hidden = !hasPartner || cs === "fired";
         swapBtn.textContent = state.isLid ? "↻ Pot" : "↻ Lid";
     }
+    // Match rim: only useful when the user is on the LID at WET and a
+    // pot partner exists — that's when the lid's base can be re-fit to
+    // the pot's current rim. (Always-visible would clutter the bar; an
+    // unneeded tap from elsewhere wouldn't break anything anyway —
+    // matchLidRim self-guards — but the chip-rich toolbar reads
+    // cleaner when buttons appear only when they apply.)
+    const matchRimBtn = document.getElementById("matchRimBtn");
+    if (matchRimBtn) {
+        const canMatch = state.isLid && cs === "wet" && !!state.savedPot;
+        matchRimBtn.hidden = !canMatch;
+    }
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
 
@@ -3209,6 +3224,32 @@ function updateLidStylePicker() {
 // Toggle which piece is live for editing/viewing. The currently-live
 // piece is captured into the OTHER slot; the paused piece is restored
 // into the live state. Available whenever exactly one piece is paused.
+// Refit the active lid's silhouette to the partner pot's CURRENT rim
+// without throwing away the user's sculpt work. Every row's radius
+// scales by (new pot rim / current lid base), so the proportions of
+// the lid (knob shape, neck width, dome curvature) are preserved
+// while the base lands exactly on the pot's rim. Only meaningful
+// when the user has been sculpting the pot AFTER seeding the lid —
+// otherwise the rims already match and this is a no-op.
+function matchLidRim() {
+    if (!state.isLid || !state.savedPot) return;
+    if (state.clayState !== "wet") return;
+    // The pot's rim lives at profile[ROWS] (rim row, top of the pot).
+    // The lid's base lives at profile[1] (row 0 is the axis sentinel
+    // always pinned to 0; row 1 is the first real radius of the lid
+    // and corresponds to the "sits on pot" contact ring). profile[ROWS]
+    // for the lid is the APEX (= 0), not the base.
+    const newRim = state.savedPot.profile ? state.savedPot.profile[ROWS] : 0;
+    const oldBase = profile[1];
+    if (newRim <= MIN_R || oldBase <= MIN_R) return;
+    if (Math.abs(newRim - oldBase) < 1e-4) return;
+    const ratio = newRim / oldBase;
+    for (let r = 0; r <= ROWS; r++) profile[r] *= ratio;
+    clampProfile();
+    state.lidMaxY = lidCapFromProfile(profile);
+    profileDirty = true;
+}
+
 function swapActivePiece() {
     const wasLid = state.isLid;
     const other = wasLid ? state.savedPot : state.savedLid;
