@@ -591,6 +591,7 @@ const state = {
     assemblyShown: false,                 // true while the fired set view is on
     firing: false,                        // true during the 1.2s firing sequence
     firingStart: 0,                       // performance.now() when firing began
+    wetSheenBoost: 0,                     // 0..1 — reactive sheen on wet clay; fast attack, slow decay
     galleryView: (() => {
         try { return localStorage.getItem("slip-gallery-view") || "shelf"; }
         catch (_) { return "shelf"; }
@@ -886,15 +887,23 @@ function valueNoise(g, n, u, v) {
 function paintProceduralClayGrain(ctx) {
     const img = ctx.createImageData(BUMP_W, BUMP_H);
     const data = img.data;
-    const g1 = randGrid(128), g2 = randGrid(48);
+    const g1 = randGrid(128), g2 = randGrid(48), g3 = randGrid(32);
     for (let y = 0; y < BUMP_H; y++) {
         const v = y / BUMP_H;
         for (let x = 0; x < BUMP_W; x++) {
             const u = x / BUMP_W;
             const grain = valueNoise(g1, 128, u, v) * 0.6 +
                           valueNoise(g2, 48, u, v) * 0.4 - 0.5;
-            const lines = Math.sin((v * 22 + u * 2) * Math.PI * 2); // u*2 = integer turns → seamless wrap
-            const h = 0.5 + grain * 0.5 + lines * 0.16;
+            // Throwing lines: 22 rings up the pot, a 2-turn helical tilt
+            // so they spiral subtly (as a real wheel would leave). A
+            // smooth low-freq noise wobble shifts each ring's height
+            // slightly with circumferential position — hands aren't
+            // metronomes, so the rings sway instead of stamping out as
+            // a perfect grid. Amplitude is high enough to actually read
+            // as "this pot was thrown on a wheel".
+            const wobble = (valueNoise(g3, 32, u * 0.4, v * 3) - 0.5);
+            const lines  = Math.sin((v * 22 + u * 2 + wobble * 0.45) * Math.PI * 2);
+            const h = 0.5 + grain * 0.5 + lines * 0.24;
             const c = Math.max(0, Math.min(255, h * 255)) | 0;
             const i = (y * BUMP_W + x) * 4;
             data[i] = data[i + 1] = data[i + 2] = c;
@@ -3152,7 +3161,13 @@ function tick() {
     // user works, the hum quiets to near-silent; restored when idle.
     if (state.sfxOn) {
         const ratio = Math.max(0, state.spin / SPIN_SPEED);
-        playSfx("wheel", { volume: ratio * SFX_SOURCES.wheel.vol });
+        // Pitch dips to ~0.65x at full-stop and recovers to 1.0x at
+        // full spin — the hum sounds heavier as the wheel slows down,
+        // which is what real motors do.
+        playSfx("wheel", {
+            volume: ratio * SFX_SOURCES.wheel.vol,
+            rate: 0.65 + 0.35 * ratio,
+        });
     } else {
         stopSfx("wheel");
     }
@@ -3216,7 +3231,26 @@ function tick() {
     }
     tickMaterial(dt);
     tickPartnerMaterial(dt);
+    // Wet-clay reactive sheen: water on the surface catches the room
+    // light when the finger is sliding across it. Fast attack so the
+    // glint pops, slow decay so it settles. Applied as a temporary
+    // multiplier on envMapIntensity around the render so the material
+    // tween's tracked value stays untouched next frame.
+    const m = state.clayMaterial;
+    let sheenLift = 0;
+    if (m) {
+        const wantSheen = (state.clayState === "wet" && sculpting) ? 1 : 0;
+        const att = wantSheen > state.wetSheenBoost ? 0.22 : 0.025;
+        state.wetSheenBoost += (wantSheen - state.wetSheenBoost) * att;
+        if (state.clayState === "wet" && state.wetSheenBoost > 0.002) {
+            sheenLift = m.envMapIntensity * (0.50 * state.wetSheenBoost);
+            m.envMapIntensity += sheenLift;
+        } else if (state.clayState !== "wet" && state.wetSheenBoost > 0) {
+            state.wetSheenBoost = 0;
+        }
+    }
     state.renderer.render(state.scene, state.camera);
+    if (sheenLift > 0) m.envMapIntensity -= sheenLift;
 }
 
 function hideLoader() {
@@ -3650,6 +3684,12 @@ function playSfx(id, opts) {
     const vol = (opts && opts.volume != null) ? opts.volume : s.def.vol;
     if (s.def.loop) {
         s.audio.volume = Math.max(0, Math.min(1, vol));
+        // Looping sources (wheel hum) can pitch-shift in-place via
+        // playbackRate — slower spin = deeper hum. Clamp so the file
+        // can't blow up audibly even if a caller passes nonsense.
+        if (opts && opts.rate != null) {
+            s.audio.playbackRate = Math.max(0.25, Math.min(2, opts.rate));
+        }
         if (s.audio.paused && vol > 0.005) s.audio.play().catch(() => {});
         return;
     }
