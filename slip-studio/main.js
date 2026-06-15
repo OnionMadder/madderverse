@@ -503,48 +503,56 @@ const SHAPES = {
 // radius 0 — the rings stack at the axis and produce no visible
 // geometry, so the lid actually looks short, medium, or tall.
 const LID_STYLES = {
+    // Flat: a wide low lid with a small knob — most of the visible
+    // height holds at the rim radius, then a quick dome with a tiny
+    // finial. ~16% of pot height total.
     flat: (k) => [
         [0.00,     0.00],
         [k,        0.00],
-        [k,        0.08],   // base lip
-        [k * 0.94, 0.14],
-        [k * 0.86, 0.22],
-        [k * 0.70, 0.30],
-        [k * 0.46, 0.40],
-        [k * 0.24, 0.50],   // small knob bulb
-        [k * 0.14, 0.58],
-        [0.00,     0.62],   // ends here — flat lid is short
+        [k,        0.05],   // wide flat lip
+        [k,        0.07],   // hold the rim shape
+        [k * 0.80, 0.10],   // start of small dome
+        [k * 0.40, 0.13],   // dome top
+        [k * 0.20, 0.15],   // base of knob
+        [k * 0.22, 0.17],   // knob bulb
+        [k * 0.10, 0.20],   // knob taper
+        [0.00,     0.22],
         [0.00,     1.40],   // unused — collapsed to axis
     ],
+    // Domed: a graceful onion-dome with a knob bulb at the top.
+    // ~36% of pot height — half the old "domed".
     domed: (k) => [
         [0.00,     0.00],
         [k,        0.00],
-        [k,        0.08],
-        [k * 0.96, 0.14],
-        [k * 0.88, 0.22],
-        [k * 0.72, 0.34],
-        [k * 0.50, 0.48],
-        [k * 0.28, 0.60],
-        [k * 0.16, 0.72],
-        [k * 0.28, 0.84],   // knob bulb
-        [k * 0.14, 0.94],
-        [0.00,     1.00],   // medium-tall lid
+        [k,        0.04],
+        [k * 0.96, 0.07],
+        [k * 0.88, 0.11],
+        [k * 0.72, 0.17],
+        [k * 0.50, 0.24],
+        [k * 0.28, 0.30],
+        [k * 0.16, 0.36],
+        [k * 0.28, 0.42],   // knob bulb
+        [k * 0.14, 0.47],
+        [0.00,     0.50],
         [0.00,     1.40],
     ],
+    // Tall: a slimmer profile with a prominent finial bulb near the
+    // top. ~50% of pot height — half the old "tall".
     tall: (k) => [
         [0.00,     0.00],
         [k,        0.00],
-        [k,        0.08],
-        [k * 0.90, 0.14],
-        [k * 0.62, 0.28],
-        [k * 0.30, 0.44],
-        [k * 0.16, 0.62],
-        [k * 0.12, 0.80],
-        [k * 0.12, 1.00],
-        [k * 0.30, 1.12],   // prominent knob base
-        [k * 0.36, 1.24],
-        [k * 0.20, 1.34],
-        [0.00,     1.40],   // tall — uses the full height
+        [k,        0.04],
+        [k * 0.90, 0.07],
+        [k * 0.62, 0.14],
+        [k * 0.30, 0.22],
+        [k * 0.16, 0.31],
+        [k * 0.12, 0.40],
+        [k * 0.12, 0.50],
+        [k * 0.30, 0.56],   // knob base
+        [k * 0.36, 0.62],   // knob bulb
+        [k * 0.20, 0.67],
+        [0.00,     0.70],
+        [0.00,     1.40],
     ],
 };
 const LID_STYLE_IDS = ["flat", "domed", "tall"];
