@@ -579,6 +579,13 @@ const state = {
     // scratch through a slip layer.
     sgraffitoCanvas: null, sgraffitoCtx: null, sgraffitoTex: null,
     partnerSgraffitoCanvas: null, partnerSgraffitoCtx: null, partnerSgraffitoTex: null,
+    // Glaze coverage mask: a procedural drip pattern painted once per
+    // pot when the user first picks a glaze. White = glazed, black =
+    // bare clay. The shader uses it to reveal patches of clay through
+    // thinly-glazed areas and pool the colour at the foot.
+    glazeCoverageCanvas: null, glazeCoverageCtx: null, glazeCoverageTex: null,
+    glazePatternSeeded: false,
+    partnerGlazeCoverageCanvas: null, partnerGlazeCoverageCtx: null, partnerGlazeCoverageTex: null,
     // The current bare-clay base colour as a THREE.Color — tweened in
     // tickMaterial alongside the glaze so carved areas pass through the
     // kiln smoothly (leather brown -> fired terracotta). The shader
@@ -809,6 +816,7 @@ function init() {
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             scratchAt, scratchStroke, clearSgraffito,
+            paintGlazeCoverage, clearGlazeCoverage,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
@@ -944,6 +952,92 @@ function makeDecoLayer() {
     tex.anisotropy = 4;
     state.decoTex = tex;
     return tex;
+}
+
+// --- Glaze coverage layer ---------------------------------------
+// A procedural mask: white = full glaze coverage, black = bare clay.
+// Painted once per pot at the first glaze-pick (the drip pattern is
+// the physical record of that one dip; switching glaze swatches keeps
+// the same coverage shape so the user can compare colours without the
+// pattern re-rolling). Same UV grid as the deco / sgraffito layers.
+function makeGlazeCoverageLayer() {
+    const canvas = document.createElement("canvas");
+    canvas.width = DECO_W;
+    canvas.height = DECO_H;
+    state.glazeCoverageCanvas = canvas;
+    state.glazeCoverageCtx = canvas.getContext("2d");
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.NoColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 4;
+    state.glazeCoverageTex = tex;
+    return tex;
+}
+
+// Paint the drip pattern. Canvas y=0 is the rim (v=1) and y=DECO_H is
+// the foot (v=0), matching the deco-canvas convention. The shape: a
+// vertical brightness gradient that builds toward the foot, with a
+// few darker drip streaks running down from the rim where extra glaze
+// pooled and ran. Drips wrap across the canvas seam so a streak at
+// u≈0 doesn't visually clip on the back of the pot.
+function paintGlazeCoverage() {
+    const ctx = state.glazeCoverageCtx;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, DECO_W, DECO_H);
+    // Base gradient: rim is thin (~45% covered), foot pools to 100%.
+    const base = ctx.createLinearGradient(0, 0, 0, DECO_H);
+    base.addColorStop(0.00, "rgba(255,255,255,0.45)");
+    base.addColorStop(0.45, "rgba(255,255,255,0.82)");
+    base.addColorStop(0.75, "rgba(255,255,255,0.96)");
+    base.addColorStop(1.00, "rgba(255,255,255,1.00)");
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, DECO_W, DECO_H);
+
+    // 4–6 drip streaks running down from the rim. Each is a tapered
+    // polygon (wider at top, narrowing as the glaze ran out), filled
+    // with a clipped vertical gradient that fades the bottom of the
+    // streak so drips don't all end with a hard edge.
+    const dripCount = 4 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < dripCount; i++) {
+        const cx       = Math.random() * DECO_W;
+        const width    = 70 + Math.random() * 110;        // 70..180 px wide at the top
+        const taper    = 0.18 + Math.random() * 0.25;     // 0.18..0.43 ratio at the bottom
+        const lenFrac  = 0.45 + Math.random() * 0.4;      // 45..85% of canvas height
+        const endY     = DECO_H * lenFrac;
+        drawDrip(ctx, cx,            width, taper, endY);
+        // Seam wrap: if the drip sits near either edge, draw a copy
+        // at the wrapped position so the seam doesn't clip it.
+        if (cx < width)                drawDrip(ctx, cx + DECO_W, width, taper, endY);
+        else if (cx > DECO_W - width)  drawDrip(ctx, cx - DECO_W, width, taper, endY);
+    }
+    state.glazeCoverageTex.needsUpdate = true;
+    state.glazePatternSeeded = true;
+}
+
+function drawDrip(ctx, cx, w, taper, endY) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx - w / 2,         0);
+    ctx.lineTo(cx + w / 2,         0);
+    ctx.lineTo(cx + w * taper / 2, endY);
+    ctx.lineTo(cx - w * taper / 2, endY);
+    ctx.closePath();
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, 0, 0, endY);
+    g.addColorStop(0.00, "rgba(255,255,255,1.00)");
+    g.addColorStop(0.70, "rgba(255,255,255,0.92)");
+    g.addColorStop(1.00, "rgba(255,255,255,0.00)");
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - w, 0, w * 2, endY);
+    ctx.restore();
+}
+
+function clearGlazeCoverage() {
+    if (!state.glazeCoverageCtx) return;
+    state.glazeCoverageCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (state.glazeCoverageTex) state.glazeCoverageTex.needsUpdate = true;
+    state.glazePatternSeeded = false;
 }
 
 // --- Sgraffito layer --------------------------------------------
@@ -1094,9 +1188,9 @@ function clearDeco() {
     if (!state.decoCtx) return;
     state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
     state.decoTex.needsUpdate = true;
-    // Clear wipes both paint AND sgraffito carving — one button, full
-    // reset of the decorate surface. (The glaze itself is separate and
-    // is cleared by tapping the active glaze swatch again.)
+    // Clear wipes paint AND sgraffito carving, but NOT the glaze
+    // coverage mask — the glaze itself is separate (cleared by tapping
+    // the active glaze swatch again to remove it).
     clearSgraffito();
 }
 
@@ -1366,35 +1460,42 @@ function buildPot() {
     });
     state.clayMaterial = mat;
 
-    // Overlay the painted decoration layer + sgraffito carving on the
-    // clay diffuse colour. (sRGB → linear via pow(2.2) before mixing
-    // into linear space.) Sgraffito is sampled FIRST so the scratched
-    // regions also strip any decoration on top — a carved line cuts
-    // through both glaze and paint, not just through the base coat.
+    // Layered shader patch:
+    //   1. Glaze coverage mask: blends the (uniform) glaze diffuse
+    //      toward bare clay where coverage < 1 (thin spots near rim,
+    //      gaps between drip streaks).
+    //   2. Decoration layer overlays on top of whatever glaze remains.
+    //   3. Sgraffito scratches override both, restoring bare clay.
+    // sRGB→linear conversion via pow(2.2) before mixing into linear
+    // diffuseColor space.
     const decoTex = makeDecoLayer();
     const sgraffitoTex = makeSgraffitoLayer();
+    const glazeCoverageTex = makeGlazeCoverageLayer();
     mat.onBeforeCompile = (shader) => {
-        shader.uniforms.decoMap      = { value: decoTex };
-        shader.uniforms.sgraffitoMap = { value: sgraffitoTex };
-        shader.uniforms.uClayColor   = { value: state.clayBaseColor };
+        shader.uniforms.decoMap          = { value: decoTex };
+        shader.uniforms.sgraffitoMap     = { value: sgraffitoTex };
+        shader.uniforms.glazeCoverageMap = { value: glazeCoverageTex };
+        shader.uniforms.uClayColor       = { value: state.clayBaseColor };
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
             .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D glazeCoverageMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
+                 float _glazeCov = texture2D( glazeCoverageMap, vDecoUv ).a;
+                 diffuseColor.rgb = mix( uClayColor, diffuseColor.rgb, _glazeCov );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
                  diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v1";
+    mat.customProgramCacheKey = () => "clay-deco-sgraffito-glaze-v1";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -1787,6 +1888,18 @@ function setGlaze(id) {
     const wasActive = state.glaze === id;
     state.glaze = wasActive ? null : id;
     if (!wasActive) playSfx("pour"); // soft pour when a glaze is selected
+    // Glaze coverage: real glazes are dipped, then gravity pulls them
+    // toward the foot — thicker at the bottom, runny drip streaks
+    // running down from the rim. We paint a procedural mask once per
+    // pot (first time the user picks any glaze) and keep it across
+    // swatch swaps so the user can A/B colours without the pattern
+    // re-rolling under them. Clearing the glaze wipes the mask so the
+    // next dip generates fresh.
+    if (state.glaze == null) {
+        clearGlazeCoverage();
+    } else if (!state.glazePatternSeeded) {
+        paintGlazeCoverage();
+    }
     if (state.clayState === "leather") setPhase("leather"); // refresh the raw look
     updateGlazeBar();
 }
@@ -1812,6 +1925,7 @@ function resetPot() {
     profileDirty = true;
     state.glaze = null;
     clearDeco();
+    clearGlazeCoverage();
     resetBumpLayer();
     setPhase(INITIAL_STATE);
     updateGlazeBar();
@@ -2666,6 +2780,7 @@ async function savePot() {
         deco: state.decoCanvas.toDataURL("image/png"),
         bump: state.bumpCanvas.toDataURL("image/png"),
         sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
+        glazeCoverage: state.glazeCoverageCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
         setId,
         title: null, // user can name from the gallery
@@ -2697,6 +2812,7 @@ async function savePot() {
                 deco: state.decoCanvas.toDataURL("image/png"),
                 bump: state.bumpCanvas.toDataURL("image/png"),
                 sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
+                glazeCoverage: state.glazeCoverageCanvas.toDataURL("image/png"),
                 thumb: captureThumb(),
                 setId,
                 title: null,
@@ -2734,12 +2850,18 @@ function capturePieceState() {
     sgraffitoCopy.width = DECO_W;
     sgraffitoCopy.height = DECO_H;
     sgraffitoCopy.getContext("2d").drawImage(state.sgraffitoCanvas, 0, 0);
+    const glazeCovCopy = document.createElement("canvas");
+    glazeCovCopy.width = DECO_W;
+    glazeCovCopy.height = DECO_H;
+    glazeCovCopy.getContext("2d").drawImage(state.glazeCoverageCanvas, 0, 0);
     return {
         profile: Float32Array.from(profile),
         glaze: state.glaze,
         decoCanvas: decoCopy,
         bumpCanvas: bumpCopy,
         sgraffitoCanvas: sgraffitoCopy,
+        glazeCoverageCanvas: glazeCovCopy,
+        glazePatternSeeded: state.glazePatternSeeded,
         isLid: state.isLid,
         clayState: state.clayState,
     };
@@ -2769,6 +2891,21 @@ function restorePieceState(saved) {
     state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (saved.sgraffitoCanvas) state.sgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
     state.sgraffitoTex.needsUpdate = true;
+    // Glaze coverage: same guard for partners captured before this field
+    // existed — fall back to "fully glazed" so the legacy partner still
+    // shows its glaze uniformly.
+    state.glazeCoverageCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (saved.glazeCoverageCanvas) {
+        state.glazeCoverageCtx.drawImage(saved.glazeCoverageCanvas, 0, 0);
+        state.glazePatternSeeded = saved.glazePatternSeeded !== false;
+    } else if (saved.glaze) {
+        // Legacy: paint a fresh pattern on the fly so old saves look
+        // current instead of bizarrely uniform.
+        paintGlazeCoverage();
+    } else {
+        state.glazePatternSeeded = false;
+    }
+    state.glazeCoverageTex.needsUpdate = true;
     setPhase(saved.clayState);
     updateGlazeBar();
 }
@@ -2846,6 +2983,20 @@ function buildPartnerMesh() {
     pst.anisotropy = 4;
     state.partnerSgraffitoTex = pst;
 
+    // Partner's own glaze-coverage mask (drip pattern from when this
+    // partner was originally dipped).
+    const pgc = document.createElement("canvas");
+    pgc.width  = DECO_W;
+    pgc.height = DECO_H;
+    state.partnerGlazeCoverageCanvas = pgc;
+    state.partnerGlazeCoverageCtx    = pgc.getContext("2d");
+    const pgt = new THREE.CanvasTexture(pgc);
+    pgt.colorSpace = THREE.NoColorSpace;
+    pgt.wrapS = THREE.RepeatWrapping;
+    pgt.wrapT = THREE.ClampToEdgeWrapping;
+    pgt.anisotropy = 4;
+    state.partnerGlazeCoverageTex = pgt;
+
     const mat = new THREE.MeshPhysicalMaterial({
         color: CLAY_STATES.fired.color,
         roughness: CLAY_STATES.fired.roughness,
@@ -2858,27 +3009,30 @@ function buildPartnerMesh() {
         side: THREE.DoubleSide,
     });
     mat.onBeforeCompile = (shader) => {
-        shader.uniforms.decoMap      = { value: pdt };
-        shader.uniforms.sgraffitoMap = { value: pst };
-        shader.uniforms.uClayColor   = { value: state.partnerClayBaseColor };
+        shader.uniforms.decoMap          = { value: pdt };
+        shader.uniforms.sgraffitoMap     = { value: pst };
+        shader.uniforms.glazeCoverageMap = { value: pgt };
+        shader.uniforms.uClayColor       = { value: state.partnerClayBaseColor };
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
             .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D glazeCoverageMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
+                 float _glazeCov = texture2D( glazeCoverageMap, vDecoUv ).a;
+                 diffuseColor.rgb = mix( uClayColor, diffuseColor.rgb, _glazeCov );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
                  diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v1-partner";
+    mat.customProgramCacheKey = () => "clay-deco-sgraffito-glaze-v1-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -2908,6 +3062,17 @@ function syncPartnerMesh(saved) {
     state.partnerSgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (saved.sgraffitoCanvas) state.partnerSgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
     state.partnerSgraffitoTex.needsUpdate = true;
+    // Partner glaze-coverage mask. Older captures fall back to full
+    // coverage (one solid white fill = uniform glaze) so they still
+    // render at their fired look.
+    state.partnerGlazeCoverageCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (saved.glazeCoverageCanvas) {
+        state.partnerGlazeCoverageCtx.drawImage(saved.glazeCoverageCanvas, 0, 0);
+    } else if (saved.glaze) {
+        state.partnerGlazeCoverageCtx.fillStyle = "rgba(255,255,255,1)";
+        state.partnerGlazeCoverageCtx.fillRect(0, 0, DECO_W, DECO_H);
+    }
+    state.partnerGlazeCoverageTex.needsUpdate = true;
     state.partnerClayBaseColor.setHex(CLAY_STATES[saved.clayState || "fired"].color);
     const initial = lookForPiece(saved);
     const target  = saved.glaze ? GLAZES[saved.glaze].fired : CLAY_STATES.fired;
@@ -3091,6 +3256,18 @@ async function loadPot(entry) {
     // Sgraffito mask. Older entries don't carry it; treat as empty.
     await loadImageOntoCanvas(entry.sgraffito, state.sgraffitoCtx, DECO_W, DECO_H, clearSgraffito);
     state.sgraffitoTex.needsUpdate = true;
+    // Glaze coverage mask. Older entries that pre-date this field but
+    // do carry a glaze get a freshly-painted pattern so they look
+    // current; entries with no glaze get a clean mask.
+    if (entry.glazeCoverage) {
+        await loadImageOntoCanvas(entry.glazeCoverage, state.glazeCoverageCtx, DECO_W, DECO_H, clearGlazeCoverage);
+        state.glazePatternSeeded = true;
+    } else if (entry.glaze) {
+        paintGlazeCoverage();
+    } else {
+        clearGlazeCoverage();
+    }
+    state.glazeCoverageTex.needsUpdate = true;
 
     // If this entry is part of a set, also load the partner so the
     // assembly view auto-triggers at setPhase("fired") below.
@@ -3157,12 +3334,26 @@ async function loadAsCapturedState(entry) {
     if (entry.sgraffito) {
         await loadImageOntoCanvas(entry.sgraffito, sgraffitoCanvas.getContext("2d"), DECO_W, DECO_H);
     }
+    const glazeCoverageCanvas = document.createElement("canvas");
+    glazeCoverageCanvas.width  = DECO_W;
+    glazeCoverageCanvas.height = DECO_H;
+    if (entry.glazeCoverage) {
+        await loadImageOntoCanvas(entry.glazeCoverage, glazeCoverageCanvas.getContext("2d"), DECO_W, DECO_H);
+    } else if (entry.glaze) {
+        // Legacy: backfill a solid white mask so the partner still
+        // reads as fully glazed (pre-drip-pattern behaviour).
+        const gctx = glazeCoverageCanvas.getContext("2d");
+        gctx.fillStyle = "rgba(255,255,255,1)";
+        gctx.fillRect(0, 0, DECO_W, DECO_H);
+    }
     return {
         profile: Float32Array.from(entry.profile || []),
         glaze: entry.glaze || null,
         decoCanvas,
         bumpCanvas,
         sgraffitoCanvas,
+        glazeCoverageCanvas,
+        glazePatternSeeded: !!entry.glazeCoverage || !!entry.glaze,
         isLid: lookupIsLid(entry),
         clayState: "fired",
     };
