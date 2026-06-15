@@ -1517,6 +1517,44 @@ function seedLidForRim(rimR, style) {
     const controls = LID_STYLES[id](rimR);
     state.lidMaxY = lidCapY(controls);
     applyControlsToProfile(controls);
+    smoothLidApex();
+}
+
+// Round off the lid's apex so it doesn't render as a pinprick. The
+// raw spline closes to zero over one or two rows — fine on paper,
+// but the last sliver of geometry between a tiny non-zero radius and
+// the pole vertex shows up as a sharp point at the top of the lid.
+// Replace the last few rows before the cap with a quarter-circle
+// (hemisphere) profile so the silhouette curves to zero like a dome.
+function smoothLidApex() {
+    if (!state.isLid) return;
+    const EPS = 0.001;
+    // Find the apex row = the first row at radius 0, walking down
+    // from the top until we hit a non-zero radius.
+    let apexRow = -1;
+    for (let r = ROWS; r >= 0; r--) {
+        if (profile[r] >= EPS) { apexRow = r + 1; break; }
+    }
+    if (apexRow <= 0 || apexRow > ROWS) return;
+    const BLEND = 6;
+    const startRow = apexRow - BLEND;
+    if (startRow < 1) return;
+    const startR = profile[startRow];
+    if (startR < EPS * 2) return;
+    const startY = (startRow / ROWS) * TOP;
+    const apexY  = (apexRow  / ROWS) * TOP;
+    const dy = apexY - startY;
+    if (dy <= 0) return;
+    for (let r = startRow; r <= apexRow; r++) {
+        const y = (r / ROWS) * TOP;
+        const tNorm = THREE.MathUtils.clamp((y - startY) / dy, 0, 1);
+        // r(θ) = startR·cos(θ),  y(θ) = startY + dy·sin(θ).
+        // Given a row's y, recover θ via asin so the profile sits on
+        // a true quarter-circle (a flat half-dome cap), not a
+        // misaligned ellipse.
+        profile[r] = startR * Math.sqrt(1 - tNorm * tNorm);
+    }
+    profile[apexRow] = 0; // ensure the apex sits exactly at the axis
 }
 
 // Find the y at which the lid's silhouette first closes to the axis
@@ -1582,7 +1620,8 @@ function writeProfileArrayToGeometry(geo, prof) {
         const len = Math.hypot(n2x, n2y) || 1;
         n2x /= len;
         n2y /= len;
-        const cap = r === 0; // degenerate ring at the axis → faces down
+        const bottomCap = r === 0;              // degenerate ring at the foot pole → faces down
+        const topCap    = r >= firstCollapse;   // degenerate rings at the lid apex → face up
 
         for (let c = 0; c <= COLS; c++) {
             const theta = (c / COLS) * Math.PI * 2;
@@ -1592,8 +1631,14 @@ function writeProfileArrayToGeometry(geo, prof) {
             pos[i]     = rad * cos;
             pos[i + 1] = y;
             pos[i + 2] = rad * sin;
-            if (cap) {
+            if (bottomCap) {
                 nor[i] = 0; nor[i + 1] = -1; nor[i + 2] = 0;
+            } else if (topCap) {
+                // Apex pole gets a fully-upward normal so the lighting
+                // reads it as a dome top instead of a horizontal ring —
+                // pairs with the quarter-circle apex smoothing so the
+                // slope-derived normals on rows below blend cleanly up.
+                nor[i] = 0; nor[i + 1] = 1; nor[i + 2] = 0;
             } else {
                 nor[i] = n2x * cos; nor[i + 1] = n2y; nor[i + 2] = n2x * sin;
             }
@@ -3164,6 +3209,10 @@ async function loadPot(entry) {
     state.glaze = entry.glaze || null;
     state.isLid = lookupIsLid(entry);
     state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
+    // Old gallery saves predate the apex-smoothing pass — re-apply so
+    // loaded lids don't render with the sharp pinprick they were
+    // saved with.
+    smoothLidApex();
     await loadImageOntoCanvas(entry.deco, state.decoCtx, DECO_W, DECO_H, clearDeco);
     state.decoTex.needsUpdate = true;
     await loadImageOntoCanvas(entry.bump, state.bumpCtx, BUMP_W, BUMP_H, resetBumpLayer);
