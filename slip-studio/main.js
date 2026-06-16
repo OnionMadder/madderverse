@@ -598,6 +598,13 @@ const state = {
     // (positive relief) and leather-hard carving (negative grooves).
     // Mixed additively with the procedural clay grain in the shader.
     bumpCanvas: null, bumpCtx: null, bumpTex: null,
+    // Handle (mug/pitcher-style ear on the pot's right side). Lives on
+    // the pot only — when state.isLid is true the mesh hides itself.
+    // Geometry is rebuilt from the current profile whenever profile
+    // changes (so the handle reattaches as the user sculpts). Material
+    // is separate from the clay shader patch (handle uses plain glaze
+    // colour, no deco / sgraffito overlay).
+    handle: { mesh: null, material: null, on: false },
     pendingSetId: null,                   // carried across save → reset for lid pairs
     // Has the user done anything that isn't reflected in the gallery?
     // Set true on any sculpt / decorate / glaze / advance / lid-create;
@@ -745,6 +752,9 @@ function init() {
     document.getElementById("matchRimBtn")?.addEventListener("click", () => {
         matchLidRim();
         updateToolbar();
+    });
+    document.getElementById("handleBtn")?.addEventListener("click", () => {
+        setHandleOn(!state.handle.on);
     });
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
@@ -1599,6 +1609,83 @@ function lidCapFromProfile(prof) {
     return TOP;
 }
 
+// --- Handle (pot-side ear) --------------------------------------
+// A separate mesh built as a tube along a C-curve attached at two
+// y-points on the pot's current profile. NOT a surface of revolution,
+// so it sits outside the lathe pipeline — its own geometry, its own
+// material (no deco / sgraffito uniforms), but tweens the same
+// colour / roughness / clearcoat as the clay so it reads as one piece
+// through wet / leather / fired. Only meaningful on the pot — when
+// state.isLid is true the handle hides.
+const HANDLE_TOP_FRAC    = 0.78; // upper attach point as fraction of TOP
+const HANDLE_BOT_FRAC    = 0.30; // lower attach point as fraction of TOP
+const HANDLE_BULGE       = 0.45; // peak outward bulge from the pot wall
+const HANDLE_THICKNESS   = 0.045; // tube radius
+
+function buildHandleCurve() {
+    const yTop = HANDLE_TOP_FRAC * TOP;
+    const yBot = HANDLE_BOT_FRAC * TOP;
+    const rTop = radiusAt(yTop);
+    const rBot = radiusAt(yBot);
+    const yMid = (yTop + yBot) / 2;
+    return new THREE.CatmullRomCurve3([
+        new THREE.Vector3(rTop,                       yTop,        0),
+        new THREE.Vector3(rTop + HANDLE_BULGE * 0.55, yTop - 0.05, 0),
+        new THREE.Vector3(Math.max(rTop, rBot) + HANDLE_BULGE, yMid, 0),
+        new THREE.Vector3(rBot + HANDLE_BULGE * 0.55, yBot + 0.05, 0),
+        new THREE.Vector3(rBot,                       yBot,        0),
+    ]);
+}
+
+function buildHandleGeometry() {
+    const curve = buildHandleCurve();
+    return new THREE.TubeGeometry(curve, 40, HANDLE_THICKNESS, 10, false);
+}
+
+function ensureHandleMesh() {
+    if (state.handle.mesh) return state.handle.mesh;
+    const initial = currentLook();
+    const mat = new THREE.MeshPhysicalMaterial({
+        color: initial.color,
+        roughness: initial.roughness,
+        clearcoat: initial.clearcoat,
+        clearcoatRoughness: initial.clearcoatRoughness,
+        envMapIntensity: initial.envMapIntensity,
+        metalness: initial.metalness != null ? initial.metalness : 0,
+    });
+    state.handle.material = mat;
+    const mesh = new THREE.Mesh(buildHandleGeometry(), mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    state.turntable.add(mesh);
+    state.handle.mesh = mesh;
+    return mesh;
+}
+
+function rebuildHandleGeometry() {
+    if (!state.handle.mesh) return;
+    const old = state.handle.mesh.geometry;
+    state.handle.mesh.geometry = buildHandleGeometry();
+    if (old) old.dispose();
+}
+
+function setHandleOn(on) {
+    state.handle.on = !!on;
+    if (state.handle.on) {
+        ensureHandleMesh();
+        rebuildHandleGeometry();
+    }
+    updateHandleVisibility();
+    state.dirty = true;
+    updateToolbar();
+}
+
+function updateHandleVisibility() {
+    const mesh = state.handle.mesh;
+    if (!mesh) return;
+    mesh.visible = state.handle.on && !state.isLid;
+}
+
 // Rewrite vertex positions + normals from the current profile.
 // Normals are ANALYTIC (derived from the profile slope) rather than
 // face-averaged: a surface of revolution has an exact normal, which
@@ -1666,6 +1753,14 @@ function writeProfileArrayToGeometry(geo, prof) {
     geo.attributes.position.needsUpdate = true;
     geo.attributes.normal.needsUpdate = true;
     geo.computeBoundingSphere();
+    // If a handle is attached AND this is the live pot mesh (not a
+    // partner mesh write), rebuild its geometry so the attach points
+    // follow the sculpted rim/belly. writeProfileArrayToGeometry runs
+    // for both the live pot and the partner mesh; we only want the
+    // handle update on the live one.
+    if (geo === state.pot?.geometry && state.handle.on && !state.isLid) {
+        rebuildHandleGeometry();
+    }
 }
 
 function radiusAt(y) {
@@ -1982,6 +2077,9 @@ function resetPot() {
     state.glaze = null;
     clearDeco();
     resetBumpLayer();
+    // Clear the handle on reset — a fresh pot starts handle-less.
+    state.handle.on = false;
+    updateHandleVisibility();
     setPhase(INITIAL_STATE);
     state.dirty = false;
     updateGlazeBar();
@@ -2071,6 +2169,18 @@ function tickMaterial(dt) {
     // is mutated so the shader uniform's value reference stays stable.
     _scratchTargetColor.setHex(CLAY_STATES[state.clayState].color);
     state.clayBaseColor.lerp(_scratchTargetColor, k);
+    // Handle (if attached) tweens the same look as the clay so it
+    // melts raw → fired alongside the pot through the kiln. No deco
+    // / sgraffito on the handle in v1 — just glaze colour.
+    if (state.handle.material && state.handle.on) {
+        const hm = state.handle.material;
+        hm.color.lerp(targetColor, k);
+        hm.roughness          += (t.roughness          - hm.roughness)          * k;
+        hm.clearcoat          += (t.clearcoat          - hm.clearcoat)          * k;
+        hm.clearcoatRoughness += (t.clearcoatRoughness - hm.clearcoatRoughness) * k;
+        hm.envMapIntensity    += (t.envMapIntensity    - hm.envMapIntensity)    * k;
+        hm.metalness          += ((t.metalness != null ? t.metalness : 0) - hm.metalness) * k;
+    }
 }
 
 // The stage label, including the glaze name once chosen.
@@ -2141,6 +2251,15 @@ function updateToolbar() {
     if (matchRimBtn) {
         const canMatch = state.isLid && cs === "wet" && !!state.savedPot;
         matchRimBtn.hidden = !canMatch;
+    }
+    // Handle toggle: only on the pot, only at wet (handles aren't
+    // edited after the clay firms). Label flips between add and
+    // remove so a single button covers both directions.
+    const handleBtn = document.getElementById("handleBtn");
+    if (handleBtn) {
+        const canHandle = !state.isLid && cs === "wet";
+        handleBtn.hidden = !canHandle;
+        handleBtn.textContent = state.handle.on ? "Remove handle" : "+ Handle";
     }
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
@@ -2854,6 +2973,7 @@ async function savePot() {
         setId,
         title: null, // user can name from the gallery
         isLid: state.isLid,
+        handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
         assemblyThumb,
     };
     try {
@@ -2886,6 +3006,7 @@ async function savePot() {
                 setId,
                 title: null,
                 isLid: state.isLid,
+                handle: !state.isLid && state.handle.on,
                 assemblyThumb, // same shared shot
             };
             await dbPut(partnerEntry);
@@ -2956,6 +3077,12 @@ function restorePieceState(saved) {
     state.sgraffitoTex.needsUpdate = true;
     setPhase(saved.clayState);
     updateGlazeBar();
+    // Handle visibility tracks isLid which may have flipped during
+    // restore (e.g., swapping pot ↔ lid). The mesh geometry doesn't
+    // need rebuilding here — it already reflects the live profile if
+    // visible, and we don't render it on lids.
+    updateHandleVisibility();
+    if (state.handle.on && !state.isLid) rebuildHandleGeometry();
 }
 
 // --- Partner mesh (used for the fired-set assembly view) -------
@@ -3201,6 +3328,7 @@ function makeLidPartner() {
     resetBumpLayer();
     setPhase(INITIAL_STATE);
     state.dirty = true;
+    updateHandleVisibility(); // hide handle while shaping the lid
     updateGlazeBar();
     updateLidStylePicker();
 }
@@ -3318,6 +3446,16 @@ async function loadPot(entry) {
     // Sgraffito mask. Older entries don't carry it; treat as empty.
     await loadImageOntoCanvas(entry.sgraffito, state.sgraffitoCtx, DECO_W, DECO_H, clearSgraffito);
     state.sgraffitoTex.needsUpdate = true;
+    // Handle: only meaningful for pot entries. If loading the lid side
+    // of a set, the pot's handle stays in the partner's saved data but
+    // isn't rendered in the v1 assembled view (state.handle attaches
+    // to state.pot only).
+    state.handle.on = !state.isLid && !!entry.handle;
+    if (state.handle.on) {
+        ensureHandleMesh();
+        rebuildHandleGeometry();
+    }
+    updateHandleVisibility();
 
     // If this entry is part of a set, also load the partner so the
     // assembly view auto-triggers at setPhase("fired") below.
