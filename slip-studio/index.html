@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=66" />
+    <link rel="stylesheet" href="style.css?v=67" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -145,6 +145,16 @@
         <button id="photoSave" class="landing-btn" type="button">Save photo</button>
     </div>
 
+    <div id="confirmModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirmModalMessage" hidden>
+        <div class="confirm-modal-card">
+            <p class="confirm-modal-message" id="confirmModalMessage"></p>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn" id="confirmModalCancel" type="button">Keep editing</button>
+                <button class="confirm-modal-btn confirm-modal-btn-primary" id="confirmModalConfirm" type="button">Discard</button>
+            </div>
+        </div>
+    </div>
+
     <div class="gallery" id="gallery" role="dialog" aria-label="Your pots" hidden>
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
@@ -163,7 +173,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=66"></script>
+    <script type="module" src="main.js?v=67"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

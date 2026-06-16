@@ -3678,13 +3678,55 @@ function showLanding() {
     if (l) { l.hidden = false; l.classList.remove("is-gone"); }
 }
 
+// Generic confirm dialog — a centered card over a dimmed backdrop,
+// styled to match the calm palette (instead of native confirm()'s
+// system harshness). Returns a promise; Esc / backdrop tap = cancel,
+// Enter = confirm. Falls back to window.confirm if the modal markup
+// isn't on the page (degrades safely).
+function showConfirm(message, opts) {
+    const o = opts || {};
+    return new Promise((resolve) => {
+        const modal = document.getElementById("confirmModal");
+        const msg   = document.getElementById("confirmModalMessage");
+        const ok    = document.getElementById("confirmModalConfirm");
+        const cancel= document.getElementById("confirmModalCancel");
+        if (!modal || !msg || !ok || !cancel) { resolve(window.confirm(message)); return; }
+        msg.textContent = message;
+        ok.textContent = o.confirmLabel || "Discard";
+        cancel.textContent = o.cancelLabel || "Keep editing";
+        const close = (result) => {
+            modal.classList.remove("is-open");
+            setTimeout(() => { modal.hidden = true; }, 200);
+            ok.removeEventListener("click", onOk);
+            cancel.removeEventListener("click", onCancel);
+            modal.removeEventListener("click", onBackdrop);
+            document.removeEventListener("keydown", onKey);
+            resolve(result);
+        };
+        const onOk       = () => close(true);
+        const onCancel   = () => close(false);
+        const onBackdrop = (e) => { if (e.target === modal) close(false); };
+        const onKey      = (e) => {
+            if (e.key === "Escape") close(false);
+            else if (e.key === "Enter") close(true);
+        };
+        ok.addEventListener("click", onOk);
+        cancel.addEventListener("click", onCancel);
+        modal.addEventListener("click", onBackdrop);
+        document.addEventListener("keydown", onKey);
+        modal.hidden = false;
+        requestAnimationFrame(() => modal.classList.add("is-open"));
+        cancel.focus(); // safer default for keyboard
+    });
+}
+
 // Title-button tap: always end up at the landing screen with a fresh
 // wet pot in the studio behind it. If the user has unsaved work, ask
 // before discarding it; if they've saved (or done nothing yet), just
 // reset and return without interrupting.
-function returnToTitle() {
+async function returnToTitle() {
     if (state.dirty) {
-        const proceed = window.confirm("Discard this pot and start over? Your work isn't saved.");
+        const proceed = await showConfirm("Discard this pot and start over? Your work isn't saved.");
         if (!proceed) return;
     }
     resetPot();

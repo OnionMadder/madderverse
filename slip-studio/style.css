@@ -447,6 +447,87 @@ html, body {
 /* Pack manager — a slide-up sheet over the studio. Mirrors the
    gallery's full-screen treatment but takes only the bottom band so
    the studio (and the title screen behind it) stays visible behind. */
+/* Custom confirm dialog — centered card over a dimmed backdrop. Used
+   by returnToTitle when the user has unsaved work; generic helper
+   `showConfirm()` returns a promise so future callers can reuse it
+   for any yes/no decision. Matches the rest of the app's calm
+   palette (no native browser-modal harshness). */
+.confirm-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(10, 8, 6, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    opacity: 0;
+    transition: opacity 0.18s ease;
+}
+.confirm-modal[hidden] { display: none; }
+.confirm-modal.is-open { opacity: 1; }
+.confirm-modal-card {
+    background: var(--bg);
+    border: 1px solid var(--ink-faint);
+    border-radius: 16px;
+    padding: 22px 22px 18px;
+    max-width: 360px;
+    width: 100%;
+    color: var(--ink);
+    transform: translateY(8px);
+    transition: transform 0.18s ease;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+.confirm-modal.is-open .confirm-modal-card { transform: translateY(0); }
+.confirm-modal-message {
+    margin: 0 0 18px;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    text-align: center;
+    color: var(--ink);
+}
+.confirm-modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+.confirm-modal-btn {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--ink-faint);
+    color: var(--ink-dim);
+    font: inherit;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    padding: 8px 16px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.confirm-modal-btn:hover,
+.confirm-modal-btn:focus-visible {
+    color: var(--ink);
+    border-color: var(--ink);
+    outline: none;
+}
+.confirm-modal-btn:active { transform: scale(0.97); }
+.confirm-modal-btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1b1815;
+    font-weight: 600;
+}
+.confirm-modal-btn-primary:hover,
+.confirm-modal-btn-primary:focus-visible {
+    background: #d89a74;
+    border-color: #d89a74;
+    color: #1b1815;
+}
+
 .pack-sheet {
     position: fixed;
     left: 0;
