@@ -1617,23 +1617,44 @@ function lidCapFromProfile(prof) {
 // colour / roughness / clearcoat as the clay so it reads as one piece
 // through wet / leather / fired. Only meaningful on the pot — when
 // state.isLid is true the handle hides.
-const HANDLE_TOP_FRAC    = 0.78; // upper attach point as fraction of TOP
-const HANDLE_BOT_FRAC    = 0.30; // lower attach point as fraction of TOP
+const HANDLE_SPAN        = 0.55; // distance from belly attach up to shoulder attach
 const HANDLE_BULGE       = 0.45; // peak outward bulge from the pot wall
 const HANDLE_THICKNESS   = 0.045; // tube radius
 
+// Find the widest row in the pot body (skip the foot zone where the
+// wheel constraint can artificially be the max). That's where a real
+// mug handle attaches at the bottom — sitting on the belly, not down
+// at the foot. The top attach sits HANDLE_SPAN world-units above so
+// the handle bridges the upper body / shoulder.
+function findBellyY() {
+    const startRow = Math.floor((FOOT_TOP + FOOT_BLEND) / TOP * ROWS);
+    const endRow   = Math.floor(0.80 * ROWS);
+    let maxR = 0, maxRow = -1;
+    for (let r = startRow; r <= endRow; r++) {
+        if (profile[r] > maxR) { maxR = profile[r]; maxRow = r; }
+    }
+    if (maxRow < 0) return 0.50 * TOP; // fallback if profile is empty
+    return (maxRow / ROWS) * TOP;
+}
+
 function buildHandleCurve() {
-    const yTop = HANDLE_TOP_FRAC * TOP;
-    const yBot = HANDLE_BOT_FRAC * TOP;
+    const yBot = findBellyY();
+    const yTop = Math.min(yBot + HANDLE_SPAN, TOP - 0.10);
     const rTop = radiusAt(yTop);
     const rBot = radiusAt(yBot);
     const yMid = (yTop + yBot) / 2;
+    // Bulge scales with the actual vertical span: a tall mug handle
+    // bulges the full HANDLE_BULGE out from the wall, but a short
+    // ear-tab on a bowl (where belly == rim, so span is tiny) gets a
+    // proportionally smaller arc so it doesn't fly out like a wing.
+    const span = yTop - yBot;
+    const bulge = HANDLE_BULGE * Math.max(0.25, Math.min(1, span / HANDLE_SPAN));
     return new THREE.CatmullRomCurve3([
-        new THREE.Vector3(rTop,                       yTop,        0),
-        new THREE.Vector3(rTop + HANDLE_BULGE * 0.55, yTop - 0.05, 0),
-        new THREE.Vector3(Math.max(rTop, rBot) + HANDLE_BULGE, yMid, 0),
-        new THREE.Vector3(rBot + HANDLE_BULGE * 0.55, yBot + 0.05, 0),
-        new THREE.Vector3(rBot,                       yBot,        0),
+        new THREE.Vector3(rTop,                yTop,        0),
+        new THREE.Vector3(rTop + bulge * 0.55, yTop - 0.05, 0),
+        new THREE.Vector3(Math.max(rTop, rBot) + bulge, yMid, 0),
+        new THREE.Vector3(rBot + bulge * 0.55, yBot + 0.05, 0),
+        new THREE.Vector3(rBot,                yBot,        0),
     ]);
 }
 
