@@ -1690,15 +1690,22 @@ function buildHandleCurve() {
     // (a tight ear is rounder than a stretched one). Cap at 0.30 so
     // even tall spans don't fly outward like a mug handle.
     const bulge = Math.min(0.30, Math.max(HANDLE_BULGE * 0.5, span * 0.75));
+    // INSET the endpoints into the pot wall so the tube's open cap
+    // is occluded by the opaque pot surface — without this you see
+    // straight into the hollow tube end where it meets the wall and
+    // the joint looks broken. ~2× the tube radius is enough depth
+    // for the cross-section to clear the wall at typical viewing
+    // angles without sinking so far the curve loses its shape.
+    const inset = HANDLE_THICKNESS * 2.2;
     // Tight amphora arc: short rise outward, peak at midspan, back in.
     // The peak X uses max(rTop, rBot) so the ear clears whichever wall
     // is wider rather than scooping into the pot.
     return new THREE.CatmullRomCurve3([
-        new THREE.Vector3(rBot,                yBot,             0),
+        new THREE.Vector3(rBot - inset,        yBot,             0),
         new THREE.Vector3(rBot + bulge * 0.50, yBot + span * 0.18, 0),
         new THREE.Vector3(Math.max(rTop, rBot) + bulge, yMid, 0),
         new THREE.Vector3(rTop + bulge * 0.50, yTop - span * 0.18, 0),
-        new THREE.Vector3(rTop,                yTop,             0),
+        new THREE.Vector3(rTop - inset,        yTop,             0),
     ]);
 }
 
