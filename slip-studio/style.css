@@ -5,11 +5,19 @@
    language is deliberately quiet.
    ============================================================ */
 
-/* Quicksand — soft rounded sans, vendored locally (offline, no CDN). */
-@font-face { font-family: "Quicksand"; font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/quicksand-400.woff2") format("woff2"); }
-@font-face { font-family: "Quicksand"; font-style: normal; font-weight: 500; font-display: swap; src: url("vendor/fonts/quicksand-500.woff2") format("woff2"); }
-@font-face { font-family: "Quicksand"; font-style: normal; font-weight: 600; font-display: swap; src: url("vendor/fonts/quicksand-600.woff2") format("woff2"); }
-@font-face { font-family: "Quicksand"; font-style: normal; font-weight: 700; font-display: swap; src: url("vendor/fonts/quicksand-700.woff2") format("woff2"); }
+/* Type system, vendored locally (offline, no CDN):
+   - Inter for UI + body — neutral modern sans, crisp at small sizes
+   - Fraunces for titles — variable-style serif for the landing title
+     and gallery headings, lends a "curated gallery" feel
+   font-display: swap so the page renders system-font while files
+   load, then upgrades when the woff2 arrives. If the files aren't
+   present yet, the stack falls back to system UI sans / serif so
+   nothing breaks. */
+@font-face { font-family: "Inter";    font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/inter-400.woff2") format("woff2"); }
+@font-face { font-family: "Inter";    font-style: normal; font-weight: 500; font-display: swap; src: url("vendor/fonts/inter-500.woff2") format("woff2"); }
+@font-face { font-family: "Inter";    font-style: normal; font-weight: 600; font-display: swap; src: url("vendor/fonts/inter-600.woff2") format("woff2"); }
+@font-face { font-family: "Fraunces"; font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/fraunces-400.woff2") format("woff2"); }
+@font-face { font-family: "Fraunces"; font-style: normal; font-weight: 600; font-display: swap; src: url("vendor/fonts/fraunces-600.woff2") format("woff2"); }
 
 :root {
     --bg:        #1b1815;   /* warm near-black charcoal (matches scene bg) */
@@ -20,7 +28,8 @@
     /* Dark translucent chip behind controls — readable over any backdrop. */
     --chip:      rgba(24, 21, 18, 0.62);
     --chip-hi:   rgba(44, 38, 32, 0.74);
-    --font: "Quicksand", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-display: "Fraunces", Georgia, "Times New Roman", serif;
 }
 
 * { box-sizing: border-box; }
@@ -182,9 +191,10 @@ html, body {
 .landing.is-gone { opacity: 0; pointer-events: none; }
 .landing-title {
     margin: 0;
-    font-size: 2.4rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
+    font-family: var(--font-display);
+    font-size: 2.6rem;
+    font-weight: 400;
+    letter-spacing: 0.005em;
     color: var(--ink);
 }
 .landing-tag {
@@ -1164,7 +1174,9 @@ html, body {
     margin-bottom: 16px;
 }
 .gallery-title {
-    font-size: 0.82rem;
+    font-family: var(--font-display);
+    font-size: 0.88rem;
+    font-weight: 400;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--ink-dim);
