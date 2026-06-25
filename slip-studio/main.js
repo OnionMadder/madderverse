@@ -616,7 +616,17 @@ const state = {
     // is separate from the clay shader patch (handles use plain glaze
     // colour, no deco / sgraffito overlay). Right mesh holds the
     // canonical geometry; left mirrors it with scale.x = -1.
-    handle: { mesh: null, mirrorMesh: null, material: null, on: false },
+    handle: {
+        mesh: null, mirrorMesh: null, material: null, on: false,
+        // User-applied modifiers from drag-to-reshape. bulgeOffset
+        // widens / tightens the ear's outward arc; heightOffset shifts
+        // both attach points up / down along the body together. Both
+        // start at zero (= the auto-derived attach + bulge); persist
+        // across sculpts so the reshape sticks until the user changes
+        // it or resets.
+        bulgeOffset: 0,
+        heightOffset: 0,
+    },
     pendingSetId: null,                   // carried across save → reset for lid pairs
     // Has the user done anything that isn't reflected in the gallery?
     // Set true on any sculpt / decorate / glaze / advance / lid-create;
@@ -671,6 +681,10 @@ const raycaster = new THREE.Raycaster();
 const axisPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 const hitPoint  = new THREE.Vector3();
 let sculpting = false;
+// Handle drag-to-reshape: when the user grabs a handle ear at wet
+// and drags, this carries the grab-time snapshot so each pointermove
+// can compute the offset from there. null when not dragging.
+let handleDrag = null;
 
 init();
 
@@ -1680,16 +1694,25 @@ function findShoulderY(bellyRow, bellyR) {
 
 function buildHandleCurve() {
     const belly = findBellyY();
-    const yBot  = belly.y;
-    const yTop  = findShoulderY(belly.row != null ? belly.row : Math.floor(yBot / TOP * ROWS), belly.r);
+    const baseYBot = belly.y;
+    const baseYTop = findShoulderY(belly.row != null ? belly.row : Math.floor(baseYBot / TOP * ROWS), belly.r);
+    // User-applied vertical shift (drag-to-reshape). Clamp so the
+    // handle stays above the foot zone and below the rim.
+    const limitMin = FOOT_TOP + FOOT_BLEND + 0.05;
+    const limitMax = TOP - 0.08;
+    const shift = state.handle.heightOffset || 0;
+    const yBot = Math.max(limitMin, Math.min(limitMax - 0.10, baseYBot + shift));
+    const yTop = Math.max(yBot + 0.10, Math.min(limitMax, baseYTop + shift));
     const rBot  = radiusAt(yBot);
     const rTop  = radiusAt(yTop);
     const span  = Math.max(0.05, yTop - yBot);
     const yMid  = (yTop + yBot) / 2;
     // Bulge clamps to the actual span so a short ear-tab stays small
     // (a tight ear is rounder than a stretched one). Cap at 0.30 so
-    // even tall spans don't fly outward like a mug handle.
-    const bulge = Math.min(0.30, Math.max(HANDLE_BULGE * 0.5, span * 0.75));
+    // even tall spans don't fly outward like a mug handle. The user's
+    // drag bulgeOffset adds on top, allowed to range much wider.
+    const baseBulge = Math.min(0.30, Math.max(HANDLE_BULGE * 0.5, span * 0.75));
+    const bulge = Math.max(0.05, Math.min(0.80, baseBulge + (state.handle.bulgeOffset || 0)));
     // INSET the endpoints into the pot wall so the tube's open cap
     // is occluded by the opaque pot surface — without this you see
     // straight into the hollow tube end where it meets the wall and
@@ -1759,6 +1782,13 @@ function rebuildHandleGeometry() {
 
 function setHandleOn(on) {
     state.handle.on = !!on;
+    // Toggling off clears the reshape — turning the handle back on
+    // gives the user a fresh default-shaped ear rather than restoring
+    // a stale drag from a previous session.
+    if (!state.handle.on) {
+        state.handle.bulgeOffset = 0;
+        state.handle.heightOffset = 0;
+    }
     if (state.handle.on) {
         ensureHandleMesh();
         rebuildHandleGeometry();
@@ -2198,6 +2228,8 @@ function resetPot() {
     resetBumpLayer();
     // Clear the handle on reset — a fresh pot starts handle-less.
     state.handle.on = false;
+    state.handle.bulgeOffset = 0;
+    state.handle.heightOffset = 0;
     updateHandleVisibility();
     setPhase(INITIAL_STATE);
     state.dirty = false;
@@ -2624,6 +2656,52 @@ function pointerToProfile(ev) {
     return { y: hitPoint.y, r: Math.abs(hitPoint.x) };
 }
 
+// Raycast against the handle meshes. Returns the side ("right" /
+// "left") of the ear that was hit, or null if the pointer missed.
+// Cheap: only the two thin tubes are checked, not the full pot.
+function raycastHandleMeshes(ev) {
+    const rect = state.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(ndc, state.camera);
+    const meshes = [];
+    if (state.handle.mesh && state.handle.mesh.visible)       meshes.push(state.handle.mesh);
+    if (state.handle.mirrorMesh && state.handle.mirrorMesh.visible) meshes.push(state.handle.mirrorMesh);
+    if (!meshes.length) return null;
+    const hits = raycaster.intersectObjects(meshes);
+    if (!hits.length) return null;
+    return { side: hits[0].object === state.handle.mesh ? "right" : "left" };
+}
+
+// Project pointer onto the handle's local X-Y plane (the plane the
+// CatmullRom curve lives in, before the turntable's spin rotates it).
+// Used by the drag-reshape gesture so per-frame motion converts to
+// stable bulge / height offsets in the same coordinate system the
+// curve is defined in. Lives in `_handlePlanePoint` to avoid per-call
+// allocations.
+const _handlePlane      = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const _handlePlanePoint = new THREE.Vector3();
+const _handleNormal     = new THREE.Vector3();
+function pointerToHandleLocal(ev) {
+    const rect = state.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    raycaster.setFromCamera(ndc, state.camera);
+    // Reorient the handle's z=0 normal into world space using the
+    // turntable's current rotation, so we intersect against the same
+    // plane regardless of how the pot has been spun.
+    _handleNormal.set(0, 0, 1).applyQuaternion(state.turntable.quaternion).normalize();
+    _handlePlane.normal.copy(_handleNormal);
+    _handlePlane.constant = 0;
+    if (!raycaster.ray.intersectPlane(_handlePlane, _handlePlanePoint)) return null;
+    state.turntable.worldToLocal(_handlePlanePoint);
+    return { x: _handlePlanePoint.x, y: _handlePlanePoint.y };
+}
+
 function onPointerDown(ev) {
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
@@ -2641,6 +2719,27 @@ function onPointerDown(ev) {
     }
 
     if (state.clayState === "wet") {
+        // Handle reshape: grabbing an ear at wet starts a drag that
+        // updates the handle's bulge / height offsets. Check this
+        // BEFORE the sculpt grab so a pointer on the handle goes to
+        // reshape, not to the pot wall hidden behind it.
+        if (state.handle.on && !state.isLid) {
+            const hit = raycastHandleMeshes(ev);
+            if (hit) {
+                const local = pointerToHandleLocal(ev);
+                if (local) {
+                    handleDrag = {
+                        side: hit.side,
+                        grabX: local.x,
+                        grabY: local.y,
+                        bulgeStart: state.handle.bulgeOffset || 0,
+                        heightStart: state.handle.heightOffset || 0,
+                    };
+                    ev.preventDefault();
+                    return;
+                }
+            }
+        }
         const p = pointerToProfile(ev);
         if (!p) return;
         if (p.y < -0.05 || p.y > TOP + 0.15) return;
@@ -2705,6 +2804,21 @@ function onPointerMove(ev) {
         return;
     }
 
+    if (handleDrag) {
+        const local = pointerToHandleLocal(ev);
+        if (local) {
+            // Mirror on the left ear flips outward to -X; abs() unifies
+            // the math so dragging either ear outward widens the bulge.
+            const dx = Math.abs(local.x) - Math.abs(handleDrag.grabX);
+            const dy = local.y - handleDrag.grabY;
+            state.handle.bulgeOffset  = handleDrag.bulgeStart  + dx;
+            state.handle.heightOffset = handleDrag.heightStart + dy;
+            rebuildHandleGeometry();
+            state.dirty = true;
+        }
+        ev.preventDefault();
+        return;
+    }
     if (sculpting) {
         const p = pointerToProfile(ev);
         if (p) {
@@ -2746,6 +2860,7 @@ function onPointerUp(ev) {
     if (pointers.size < 2) pinchPrevDist = 0;
     if (pointers.size === 0) {
         sculpting = false;
+        handleDrag = null;
         // Reset rate-cap timers so the next stroke's first sample uses
         // the 1/60 fallback instead of a multi-second gap that would
         // otherwise let a single first sample exhaust the per-call cap.
@@ -3144,6 +3259,8 @@ async function savePot() {
         title: null, // user can name from the gallery
         isLid: state.isLid,
         handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
+        handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
+        handleHeight: !state.isLid && state.handle.on ? state.handle.heightOffset : 0,
         assemblyThumb,
     };
     try {
@@ -3639,6 +3756,8 @@ async function loadPot(entry) {
     // isn't rendered in the v1 assembled view (state.handle attaches
     // to state.pot only).
     state.handle.on = !state.isLid && !!entry.handle;
+    state.handle.bulgeOffset  = state.handle.on ? (entry.handleBulge  || 0) : 0;
+    state.handle.heightOffset = state.handle.on ? (entry.handleHeight || 0) : 0;
     if (state.handle.on) {
         ensureHandleMesh();
         rebuildHandleGeometry();
@@ -3880,7 +3999,7 @@ function tick() {
     // painting), while you manually spin, and whenever zoomed in —
     // then drifts back up once you're idle at the default framing.
     const zoomed = state.zoom > 1.02;
-    const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing;
+    const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing || !!handleDrag;
     const targetSpin = busy ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
