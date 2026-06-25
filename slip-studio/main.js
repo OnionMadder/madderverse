@@ -598,13 +598,14 @@ const state = {
     // (positive relief) and leather-hard carving (negative grooves).
     // Mixed additively with the procedural clay grain in the shader.
     bumpCanvas: null, bumpCtx: null, bumpTex: null,
-    // Handle (mug/pitcher-style ear on the pot's right side). Lives on
-    // the pot only — when state.isLid is true the mesh hides itself.
-    // Geometry is rebuilt from the current profile whenever profile
-    // changes (so the handle reattaches as the user sculpts). Material
-    // is separate from the clay shader patch (handle uses plain glaze
-    // colour, no deco / sgraffito overlay).
-    handle: { mesh: null, material: null, on: false },
+    // Handle: twin amphora-style ears on opposite sides of the pot.
+    // Lives on the pot only — when state.isLid is true both meshes
+    // hide. Geometry is rebuilt from the current profile whenever it
+    // changes (so the handles reattach as the user sculpts). Material
+    // is separate from the clay shader patch (handles use plain glaze
+    // colour, no deco / sgraffito overlay). Right mesh holds the
+    // canonical geometry; left mirrors it with scale.x = -1.
+    handle: { mesh: null, mirrorMesh: null, material: null, on: false },
     pendingSetId: null,                   // carried across save → reset for lid pairs
     // Has the user done anything that isn't reflected in the gallery?
     // Set true on any sculpt / decorate / glaze / advance / lid-create;
@@ -1617,15 +1618,14 @@ function lidCapFromProfile(prof) {
 // colour / roughness / clearcoat as the clay so it reads as one piece
 // through wet / leather / fired. Only meaningful on the pot — when
 // state.isLid is true the handle hides.
-const HANDLE_SPAN        = 0.55; // distance from belly attach up to shoulder attach
-const HANDLE_BULGE       = 0.45; // peak outward bulge from the pot wall
-const HANDLE_THICKNESS   = 0.045; // tube radius
+const HANDLE_BULGE     = 0.22;   // outward arc — modest amphora ear, not a giant wing
+const HANDLE_THICKNESS = 0.032;  // tube radius — slim/elegant
+const HANDLE_SHOULDER_RATIO = 0.70; // upper attach: row where r ≤ this × belly_r counts as shoulder
 
 // Find the widest row in the pot body (skip the foot zone where the
-// wheel constraint can artificially be the max). That's where a real
-// mug handle attaches at the bottom — sitting on the belly, not down
-// at the foot. The top attach sits HANDLE_SPAN world-units above so
-// the handle bridges the upper body / shoulder.
+// wheel constraint can artificially be the max). That's where the
+// lower handle attach lands — on the belly, where you'd grip a real
+// vessel.
 function findBellyY() {
     const startRow = Math.floor((FOOT_TOP + FOOT_BLEND) / TOP * ROWS);
     const endRow   = Math.floor(0.80 * ROWS);
@@ -1633,28 +1633,46 @@ function findBellyY() {
     for (let r = startRow; r <= endRow; r++) {
         if (profile[r] > maxR) { maxR = profile[r]; maxRow = r; }
     }
-    if (maxRow < 0) return 0.50 * TOP; // fallback if profile is empty
-    return (maxRow / ROWS) * TOP;
+    if (maxRow < 0) return { y: 0.50 * TOP, r: 0.30 };
+    return { y: (maxRow / ROWS) * TOP, r: maxR, row: maxRow };
+}
+
+// Find the shoulder y — walking up from the belly, the row where the
+// profile drops below SHOULDER_RATIO × belly radius. That's where a
+// real amphora handle's upper attach lands (right at the narrowing
+// where body meets neck). If the pot has no narrowing (cylinder,
+// open bowl), cap at the rim minus a small margin.
+function findShoulderY(bellyRow, bellyR) {
+    const limitY = TOP - 0.08;
+    for (let r = bellyRow + 1; r <= ROWS; r++) {
+        const y = (r / ROWS) * TOP;
+        if (y >= limitY) return limitY;
+        if (profile[r] < bellyR * HANDLE_SHOULDER_RATIO) return y;
+    }
+    return limitY;
 }
 
 function buildHandleCurve() {
-    const yBot = findBellyY();
-    const yTop = Math.min(yBot + HANDLE_SPAN, TOP - 0.10);
-    const rTop = radiusAt(yTop);
-    const rBot = radiusAt(yBot);
-    const yMid = (yTop + yBot) / 2;
-    // Bulge scales with the actual vertical span: a tall mug handle
-    // bulges the full HANDLE_BULGE out from the wall, but a short
-    // ear-tab on a bowl (where belly == rim, so span is tiny) gets a
-    // proportionally smaller arc so it doesn't fly out like a wing.
-    const span = yTop - yBot;
-    const bulge = HANDLE_BULGE * Math.max(0.25, Math.min(1, span / HANDLE_SPAN));
+    const belly = findBellyY();
+    const yBot  = belly.y;
+    const yTop  = findShoulderY(belly.row != null ? belly.row : Math.floor(yBot / TOP * ROWS), belly.r);
+    const rBot  = radiusAt(yBot);
+    const rTop  = radiusAt(yTop);
+    const span  = Math.max(0.05, yTop - yBot);
+    const yMid  = (yTop + yBot) / 2;
+    // Bulge clamps to the actual span so a short ear-tab stays small
+    // (a tight ear is rounder than a stretched one). Cap at 0.30 so
+    // even tall spans don't fly outward like a mug handle.
+    const bulge = Math.min(0.30, Math.max(HANDLE_BULGE * 0.5, span * 0.75));
+    // Tight amphora arc: short rise outward, peak at midspan, back in.
+    // The peak X uses max(rTop, rBot) so the ear clears whichever wall
+    // is wider rather than scooping into the pot.
     return new THREE.CatmullRomCurve3([
-        new THREE.Vector3(rTop,                yTop,        0),
-        new THREE.Vector3(rTop + bulge * 0.55, yTop - 0.05, 0),
+        new THREE.Vector3(rBot,                yBot,             0),
+        new THREE.Vector3(rBot + bulge * 0.50, yBot + span * 0.18, 0),
         new THREE.Vector3(Math.max(rTop, rBot) + bulge, yMid, 0),
-        new THREE.Vector3(rBot + bulge * 0.55, yBot + 0.05, 0),
-        new THREE.Vector3(rBot,                yBot,        0),
+        new THREE.Vector3(rTop + bulge * 0.50, yTop - span * 0.18, 0),
+        new THREE.Vector3(rTop,                yTop,             0),
     ]);
 }
 
@@ -1675,18 +1693,34 @@ function ensureHandleMesh() {
         metalness: initial.metalness != null ? initial.metalness : 0,
     });
     state.handle.material = mat;
-    const mesh = new THREE.Mesh(buildHandleGeometry(), mat);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    state.turntable.add(mesh);
-    state.handle.mesh = mesh;
-    return mesh;
+    const geo = buildHandleGeometry();
+    // Right ear (canonical geometry).
+    const right = new THREE.Mesh(geo, mat);
+    right.castShadow = true;
+    right.receiveShadow = true;
+    state.turntable.add(right);
+    state.handle.mesh = right;
+    // Left ear: same geometry + material, mirrored across the y axis
+    // so it sits on the opposite side. scale.x = -1 flips winding —
+    // material.side is THREE.DoubleSide-equivalent on FrontSide tubes
+    // via the negative scale, so we'd see backface culling artifacts;
+    // setting side to DoubleSide on the shared material is safest.
+    mat.side = THREE.DoubleSide;
+    const left = new THREE.Mesh(geo, mat);
+    left.castShadow = true;
+    left.receiveShadow = true;
+    left.scale.x = -1;
+    state.turntable.add(left);
+    state.handle.mirrorMesh = left;
+    return right;
 }
 
 function rebuildHandleGeometry() {
     if (!state.handle.mesh) return;
     const old = state.handle.mesh.geometry;
-    state.handle.mesh.geometry = buildHandleGeometry();
+    const fresh = buildHandleGeometry();
+    state.handle.mesh.geometry = fresh;
+    if (state.handle.mirrorMesh) state.handle.mirrorMesh.geometry = fresh;
     if (old) old.dispose();
 }
 
@@ -1702,9 +1736,9 @@ function setHandleOn(on) {
 }
 
 function updateHandleVisibility() {
-    const mesh = state.handle.mesh;
-    if (!mesh) return;
-    mesh.visible = state.handle.on && !state.isLid;
+    const visible = state.handle.on && !state.isLid;
+    if (state.handle.mesh)       state.handle.mesh.visible       = visible;
+    if (state.handle.mirrorMesh) state.handle.mirrorMesh.visible = visible;
 }
 
 // Rewrite vertex positions + normals from the current profile.
