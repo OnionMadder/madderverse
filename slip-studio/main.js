@@ -594,6 +594,17 @@ const state = {
     // we never reassign the uniform's value reference.
     clayBaseColor: new THREE.Color(CLAY_STATES.wet.color),
     partnerClayBaseColor: new THREE.Color(CLAY_STATES.wet.color),
+    // Optional secondary glaze for a vertical gradient (bottom-up).
+    // glazeGradient = id of the secondary glaze (or null = no gradient).
+    // gradientColor + gradientMix are the shader-side tween values:
+    // colour tracks GLAZES[glazeGradient].raw|fired with clayState;
+    // mix fades 0 → 1 when gradient is on, 1 → 0 when off, so the
+    // transition into / out of the gradient look is smooth.
+    glazeGradient: null,
+    gradientColor: new THREE.Color(0xffffff),
+    gradientMix: 0,
+    partnerGradientColor: new THREE.Color(0xffffff),
+    partnerGradientMix: 0,
     // Editable bump layer: painted into by wet-clay texture stamps
     // (positive relief) and leather-hard carving (negative grooves).
     // Mixed additively with the procedural clay grain in the shader.
@@ -837,6 +848,7 @@ function init() {
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             scratchAt, scratchStroke, clearSgraffito,
+            setGradientGlaze, setHandleOn,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
@@ -1474,20 +1486,34 @@ function buildPot() {
     const decoTex = makeDecoLayer();
     const sgraffitoTex = makeSgraffitoLayer();
     mat.onBeforeCompile = (shader) => {
-        shader.uniforms.decoMap      = { value: decoTex };
-        shader.uniforms.sgraffitoMap = { value: sgraffitoTex };
-        shader.uniforms.uClayColor   = { value: state.clayBaseColor };
+        shader.uniforms.decoMap        = { value: decoTex };
+        shader.uniforms.sgraffitoMap   = { value: sgraffitoTex };
+        shader.uniforms.uClayColor     = { value: state.clayBaseColor };
+        shader.uniforms.uGradientColor = { value: state.gradientColor };
+        shader.uniforms.uGradientMix   = { value: state.gradientMix };
+        // Stash the uniform map on the material so tickMaterial can
+        // poke the scalar uGradientMix each frame without re-running
+        // onBeforeCompile. The Color uniforms hold a reference to the
+        // same THREE.Color instance, so mutating state.gradientColor
+        // in-place propagates automatically.
+        mat.userData.shaderUniforms = shader.uniforms;
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
             .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
+                 // Gradient glaze: mix the diffuse toward a secondary
+                 // glaze colour at the bottom of the pot. Smoothstep
+                 // along vDecoUv.y (0 = foot, 1 = rim) so the
+                 // transition is soft. uGradientMix is the on/off fade.
+                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
+                 diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
@@ -1499,7 +1525,7 @@ function buildPot() {
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v2";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-v3";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -1998,6 +2024,19 @@ function currentLook() {
     return CLAY_STATES.wet;
 }
 
+// Look for the secondary (gradient) glaze at the current clay state.
+// Returns null when there's no gradient — caller fades the mix to 0
+// so the shader smoothly drops back to the primary-only look.
+function currentGradientLook() {
+    if (!state.glazeGradient) return null;
+    const g = GLAZES[state.glazeGradient];
+    if (!g) return null;
+    const cs = state.clayState;
+    if (cs === "fired")   return g.fired;
+    if (cs === "leather") return g.raw;
+    return null; // wet — gradient invisible (no glaze layer rendered yet)
+}
+
 // Enter a phase: point the material tween at its look, refresh the UI.
 function setPhase(name) {
     state.clayState = name;
@@ -2104,9 +2143,26 @@ function setGlaze(id) {
     if (!GLAZES[id]) return;
     const wasActive = state.glaze === id;
     state.glaze = wasActive ? null : id;
+    // Clearing the primary clears the gradient too — gradient can't
+    // exist without a primary glaze underneath.
+    if (!state.glaze) state.glazeGradient = null;
+    // Don't allow primary == gradient (would render a flat colour).
+    if (state.glaze && state.glaze === state.glazeGradient) state.glazeGradient = null;
     state.dirty = true;
     if (!wasActive) playSfx("pour"); // soft pour when a glaze is selected
     if (state.clayState === "leather") setPhase("leather"); // refresh the raw look
+    updateGlazeBar();
+}
+
+function setGradientGlaze(id) {
+    if (!GLAZES[id]) return;
+    if (!state.glaze) return; // gradient requires a primary
+    if (id === state.glaze) return; // gradient must differ from primary
+    const wasActive = state.glazeGradient === id;
+    state.glazeGradient = wasActive ? null : id;
+    state.dirty = true;
+    if (!wasActive) playSfx("pour");
+    if (state.clayState === "leather") setPhase("leather");
     updateGlazeBar();
 }
 
@@ -2130,6 +2186,7 @@ function resetPot() {
     seedProfile();
     profileDirty = true;
     state.glaze = null;
+    state.glazeGradient = null;
     clearDeco();
     resetBumpLayer();
     // Clear the handle on reset — a fresh pot starts handle-less.
@@ -2203,6 +2260,7 @@ function setBrush(i) {
 // During the firing sequence the time constant slows ~7x so the user
 // actually watches the glaze melt raw → fired instead of snapping.
 const _scratchTargetColor = new THREE.Color();
+const _gradientTargetColor = new THREE.Color();
 function tickMaterial(dt) {
     const m = state.clayMaterial;
     const t = state.clayTarget;
@@ -2224,6 +2282,19 @@ function tickMaterial(dt) {
     // is mutated so the shader uniform's value reference stays stable.
     _scratchTargetColor.setHex(CLAY_STATES[state.clayState].color);
     state.clayBaseColor.lerp(_scratchTargetColor, k);
+    // Gradient (secondary) glaze: tween the secondary colour toward
+    // the right raw/fired look, and tween the mix scalar 0 ↔ 1.
+    // When there's no secondary glaze, just fade mix back to 0 — the
+    // shader becomes a no-op without us having to swap programs.
+    const gLook = currentGradientLook();
+    if (gLook) {
+        _gradientTargetColor.setHex(gLook.color);
+        state.gradientColor.lerp(_gradientTargetColor, k);
+    }
+    const wantMix = gLook ? 1 : 0;
+    state.gradientMix += (wantMix - state.gradientMix) * k;
+    const u = state.clayMaterial.userData.shaderUniforms;
+    if (u && u.uGradientMix) u.uGradientMix.value = state.gradientMix;
     // Handle (if attached) tweens the same look as the clay so it
     // melts raw → fired alongside the pot through the kiln. No deco
     // / sgraffito on the handle in v1 — just glaze colour.
@@ -2334,17 +2405,53 @@ function buildGlazeBar() {
         b.addEventListener("click", () => setGlaze(id));
         bar.appendChild(b);
     });
+    buildGradientBar();
 }
 
-// Mark the active glaze swatch.
+// Optional second row for a gradient (bottom-half tint). Hidden until
+// a primary glaze is picked; each swatch toggles the gradient pick.
+function buildGradientBar() {
+    const bar = document.getElementById("gradientBar");
+    if (!bar) return;
+    GLAZE_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "glaze-btn glaze-btn-gradient";
+        b.style.background = "#" + new THREE.Color(GLAZES[id].fired.color).getHexString();
+        b.setAttribute("aria-label", GLAZES[id].name + " bottom gradient");
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", () => setGradientGlaze(id));
+        bar.appendChild(b);
+    });
+}
+
+// Mark the active glaze swatch + sync the gradient row visibility +
+// disabled state of the matching primary swatch in the gradient row.
 function updateGlazeBar() {
     const bar = document.getElementById("glazeBar");
-    if (!bar) return;
-    Array.from(bar.children).forEach((b, i) => {
-        const on = GLAZE_IDS[i] === state.glaze;
-        b.classList.toggle("is-active", on);
-        b.setAttribute("aria-pressed", on ? "true" : "false");
-    });
+    if (bar) {
+        Array.from(bar.children).forEach((b, i) => {
+            const on = GLAZE_IDS[i] === state.glaze;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+    }
+    const gradWrap = document.getElementById("gradientWrap");
+    const gradBar  = document.getElementById("gradientBar");
+    const hasPrimary = !!state.glaze;
+    if (gradWrap) gradWrap.hidden = !hasPrimary;
+    if (gradBar) {
+        Array.from(gradBar.children).forEach((b, i) => {
+            const id = GLAZE_IDS[i];
+            const isPrimary = id === state.glaze;
+            // The primary swatch can't also be the gradient — dim it.
+            b.classList.toggle("is-disabled", isPrimary);
+            b.disabled = isPrimary;
+            const on = id === state.glazeGradient;
+            b.classList.toggle("is-active", on);
+            b.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+    }
 }
 
 // --- Decoration UI ----------------------------------------------
@@ -3021,6 +3128,7 @@ async function savePot() {
         ts: Date.now(),
         profile: Array.from(profile, (x) => +x.toFixed(4)),
         glaze: state.glaze,
+        glazeGradient: state.glazeGradient,
         deco: state.decoCanvas.toDataURL("image/png"),
         bump: state.bumpCanvas.toDataURL("image/png"),
         sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
@@ -3098,6 +3206,7 @@ function capturePieceState() {
     return {
         profile: Float32Array.from(profile),
         glaze: state.glaze,
+        glazeGradient: state.glazeGradient,
         decoCanvas: decoCopy,
         bumpCanvas: bumpCopy,
         sgraffitoCanvas: sgraffitoCopy,
@@ -3113,6 +3222,7 @@ function restorePieceState(saved) {
     for (let i = 0; i < saved.profile.length; i++) profile[i] = saved.profile[i];
     profileDirty = true;
     state.glaze = saved.glaze;
+    state.glazeGradient = saved.glazeGradient || null;
     state.isLid = saved.isLid;
     // Rebuild the lid's sculpt cap from the restored silhouette —
     // capturePieceState doesn't carry lidMaxY, and without this the
@@ -3225,32 +3335,33 @@ function buildPartnerMesh() {
         side: THREE.DoubleSide,
     });
     mat.onBeforeCompile = (shader) => {
-        shader.uniforms.decoMap      = { value: pdt };
-        shader.uniforms.sgraffitoMap = { value: pst };
-        shader.uniforms.uClayColor   = { value: state.partnerClayBaseColor };
+        shader.uniforms.decoMap        = { value: pdt };
+        shader.uniforms.sgraffitoMap   = { value: pst };
+        shader.uniforms.uClayColor     = { value: state.partnerClayBaseColor };
+        shader.uniforms.uGradientColor = { value: state.partnerGradientColor };
+        shader.uniforms.uGradientMix   = { value: state.partnerGradientMix };
+        mat.userData.shaderUniforms = shader.uniforms;
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
             .replace("#include <uv_vertex>", "#include <uv_vertex>\n  vDecoUv = uv;");
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
+                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
+                 diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
-                 // Inside a sgraffito cut, the wall is recessed — small
-                 // shadow from the surrounding surface. Mixing toward a
-                 // darkened clay tone gives the cut visible depth on
-                 // top of the bump-shader's normal perturbation.
                  vec3 _carveColor = uClayColor * 0.78;
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-deco-sgraffito-v2-partner";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-v3-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -3292,6 +3403,20 @@ function syncPartnerMesh(saved) {
     mat.bumpScale          = initial.bump;
     mat.metalness          = initial.metalness != null ? initial.metalness : 0;
     state.partnerTarget = target;
+    // Partner gradient: snap colour + mix to the saved piece's
+    // secondary glaze (or to the fired colour with mix=0 if there
+    // isn't one). Wet captures default to mix=0; leather/fired with
+    // a gradient render with mix=1.
+    const pgId = saved.glazeGradient || null;
+    if (pgId && GLAZES[pgId]) {
+        const pg = (saved.clayState === "fired") ? GLAZES[pgId].fired : GLAZES[pgId].raw;
+        state.partnerGradientColor.setHex(pg.color);
+        state.partnerGradientMix = 1;
+    } else {
+        state.partnerGradientMix = 0;
+    }
+    const u = mat.userData.shaderUniforms;
+    if (u && u.uGradientMix) u.uGradientMix.value = state.partnerGradientMix;
 }
 
 // Same shape as currentLook() but reads from a snapshot rather than
@@ -3488,6 +3613,7 @@ async function loadPot(entry) {
     for (let i = 0; i < profile.length; i++) profile[i] = entry.profile?.[i] ?? 0;
     profileDirty = true;
     state.glaze = entry.glaze || null;
+    state.glazeGradient = entry.glazeGradient || null;
     state.isLid = lookupIsLid(entry);
     state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
     // Old gallery saves predate the apex-smoothing pass — re-apply so
@@ -3580,6 +3706,7 @@ async function loadAsCapturedState(entry) {
     return {
         profile: Float32Array.from(entry.profile || []),
         glaze: entry.glaze || null,
+        glazeGradient: entry.glazeGradient || null,
         decoCanvas,
         bumpCanvas,
         sgraffitoCanvas,

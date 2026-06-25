@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=70" />
+    <link rel="stylesheet" href="style.css?v=71" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -91,6 +91,10 @@
 
         <div class="deco-panel" id="panelGlaze">
             <div class="deco-strip" id="glazeBar" role="group" aria-label="Glaze"></div>
+            <div class="deco-strip gradient-wrap" id="gradientWrap" hidden>
+                <span class="gradient-label">Bottom</span>
+                <span class="gradient-row" id="gradientBar" role="group" aria-label="Bottom gradient glaze"></span>
+            </div>
         </div>
 
         <div class="deco-panel" id="panelDecorate" hidden>
@@ -175,7 +179,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=70"></script>
+    <script type="module" src="main.js?v=71"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

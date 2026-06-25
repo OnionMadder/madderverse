@@ -1000,6 +1000,46 @@ html, body {
     box-shadow: 0 0 0 2px rgba(243, 237, 230, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
     transform: scale(1.12);
 }
+.glaze-btn.is-disabled {
+    opacity: 0.30;
+    cursor: default;
+    transform: none;
+}
+.glaze-btn.is-disabled:hover,
+.glaze-btn.is-disabled:focus-visible { transform: none; }
+
+/* Gradient (secondary glaze) row — same swatches a half-step smaller,
+   prefixed by a quiet "Bottom" label so users understand what the row
+   does. Sits directly under the primary glaze strip and only renders
+   while a primary glaze is active. */
+.gradient-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+.gradient-wrap[hidden] { display: none; }
+.gradient-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    flex: 0 0 auto;
+}
+.gradient-row {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.gradient-row::-webkit-scrollbar { display: none; }
+.glaze-btn-gradient {
+    width: 26px;
+    height: 26px;
+    flex: 0 0 auto;
+}
 
 /* ---------- Tool bar ----------
    Buttons + the stage chip share one centred row. On narrow screens
