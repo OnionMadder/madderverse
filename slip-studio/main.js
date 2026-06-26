@@ -1116,6 +1116,7 @@ function decoRadius() {
 // Paint the current tool at a UV coordinate.
 function paintAt(u, v) {
     if (state.decoColor == null) return;
+    state.dirty = true;
     const cx = u * DECO_W;
     const cy = (1 - v) * DECO_H; // v=0 (foot) → canvas bottom
     const size = decoRadius();
@@ -1182,6 +1183,7 @@ function scratchStroke(au, av, bu, bv) {
     const sgCtx = state.sgraffitoCtx;
     const bpCtx = state.bumpCtx;
     if (!sgCtx || !bpCtx) return;
+    state.dirty = true;
     // Skip seam-crossing line segments — drop a dot at the destination
     // and resume from there next sample.
     if (Math.abs(bu - au) > 0.5) { scratchStroke(bu, bv, bu, bv); return; }
@@ -1332,6 +1334,7 @@ function drawStamp(cx, cy, r, shape, hex) {
 }
 function stampAt(u, v) {
     if (state.decoColor == null) return;
+    state.dirty = true;
     const r = decoRadius() * 1.25;
     const cx = u * DECO_W, cy = (1 - v) * DECO_H;
     drawStamp(cx, cy, r, state.stampShape, state.decoColor);
@@ -2706,8 +2709,11 @@ function onPointerDown(ev) {
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
     if (pointers.size >= 2) {
-        // Two fingers → view gesture; abandon any in-progress stroke.
+        // Two fingers → view gesture; abandon any in-progress stroke
+        // (sculpt, paint, OR handle-reshape) so the pinch/spin pair
+        // takes over cleanly.
         sculpting = false;
+        handleDrag = null;
         state.painting = false;
         lastPaintUV = null;
         state.userRotating = true;
@@ -3136,7 +3142,11 @@ function composeStyledPhoto(potCanvas, bgImage, style, aspect, target) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.78)";
         ctx.fillRect(0, stripY, W, stripH);
         ctx.fillStyle = "rgba(243, 237, 230, 0.85)";
-        ctx.font = `${isPortrait ? 26 : 20}px Quicksand, sans-serif`;
+        // Museum-plinth caption uses the display face (Fraunces) for
+        // gallery-catalog feel, with serif fallback if the woff2 isn't
+        // yet on disk. The face was Quicksand pre-font-swap; updated
+        // when the type system switched to Inter + Fraunces.
+        ctx.font = `${isPortrait ? 26 : 20}px Fraunces, Georgia, "Times New Roman", serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         const glaze = (state.glaze && GLAZES[state.glaze])
@@ -3294,6 +3304,8 @@ async function savePot() {
                 title: null,
                 isLid: state.isLid,
                 handle: !state.isLid && state.handle.on,
+                handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
+                handleHeight: !state.isLid && state.handle.on ? state.handle.heightOffset : 0,
                 assemblyThumb, // same shared shot
             };
             await dbPut(partnerEntry);
@@ -3556,7 +3568,8 @@ function lookForPiece(piece) {
 // tick() once per frame using the same rate constants as
 // tickMaterial — slower during firing so the glaze melts visibly.
 const partnerTweenColor = new THREE.Color();
-const _partnerScratchTarget = new THREE.Color();
+const _partnerScratchTarget  = new THREE.Color();
+const _partnerGradientTarget = new THREE.Color();
 function tickPartnerMaterial(dt) {
     const m = state.partnerMaterial;
     const t = state.partnerTarget;
@@ -3579,6 +3592,27 @@ function tickPartnerMaterial(dt) {
     const psCs = state.firing ? state.clayState : (state.savedPot?.clayState || state.savedLid?.clayState || "fired");
     _partnerScratchTarget.setHex(CLAY_STATES[psCs].color);
     state.partnerClayBaseColor.lerp(_partnerScratchTarget, k);
+    // Partner gradient (secondary glaze) tween — mirror tickMaterial.
+    // syncPartnerMesh snaps the colour at first show; this melts it
+    // raw → fired alongside the primary during the kiln animation, so
+    // a set with a gradient on the partner doesn't freeze chalky.
+    const partnerSaved = state.isLid ? state.savedPot : state.savedLid;
+    const pgId = partnerSaved && partnerSaved.glazeGradient;
+    let pgLook = null;
+    if (pgId && GLAZES[pgId]) {
+        const targetCs = state.firing ? "fired" : (partnerSaved.clayState || "fired");
+        pgLook = (targetCs === "fired") ? GLAZES[pgId].fired
+               : (targetCs === "leather") ? GLAZES[pgId].raw
+               : null;
+    }
+    if (pgLook) {
+        _partnerGradientTarget.setHex(pgLook.color);
+        state.partnerGradientColor.lerp(_partnerGradientTarget, k);
+    }
+    const wantPMix = pgLook ? 1 : 0;
+    state.partnerGradientMix += (wantPMix - state.partnerGradientMix) * k;
+    const pu = state.partnerMaterial.userData.shaderUniforms;
+    if (pu && pu.uGradientMix) pu.uGradientMix.value = state.partnerGradientMix;
 }
 
 // Show both pieces in their natural assembled positions. The pot
@@ -3648,6 +3682,7 @@ function setLidStyle(style) {
         profileDirty = true;
         clearDeco();
         resetBumpLayer();
+        state.dirty = true;
     }
     updateLidStylePicker();
 }
@@ -3703,6 +3738,7 @@ function matchLidRim() {
     clampProfile();
     state.lidMaxY = lidCapFromProfile(profile);
     profileDirty = true;
+    state.dirty = true;
 }
 
 function swapActivePiece() {
