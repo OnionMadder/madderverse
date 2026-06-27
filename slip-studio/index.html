@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=77" />
+    <link rel="stylesheet" href="style.css?v=78" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -49,6 +49,9 @@
          lets the icon inherit the button's text colour for hover /
          active states. -->
     <svg style="display:none" aria-hidden="true">
+        <symbol id="icon-pot" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 4 L12 4 L12 6 C 15.5 7.5, 15.5 14, 12 16 L8 16 C 4.5 14, 4.5 7.5, 8 6 L8 4 Z"/>
+        </symbol>
         <symbol id="icon-lid" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 13 C 3 6, 17 6, 17 13"/>
             <line x1="3" y1="13" x2="17" y2="13"/>
@@ -161,17 +164,17 @@
             <span id="stageLabel" class="stage-chip" aria-live="polite">Wet clay</span>
         </div>
         <div class="toolbar-zone toolbar-center">
-            <button id="makeLidBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Add lid" title="Add lid">
-                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-lid"/></svg>
+            <button id="swapBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Switch to pot" title="Switch to pot">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-pot"/></svg>
             </button>
             <button id="handleBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Add handle" title="Add handle">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-handle"/></svg>
             </button>
-            <button id="matchRimBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Match rim" title="Refit the lid's base to the pot's current rim, keeping your sculpt proportions">
-                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-match-rim"/></svg>
+            <button id="makeLidBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Add lid" title="Add lid">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-lid"/></svg>
             </button>
-            <button id="swapBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Swap pieces" title="Swap pieces">
-                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-swap"/></svg>
+            <button id="matchRimBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Refit lid to pot rim" title="Refit the lid's base to the pot's current rim, keeping your sculpt proportions">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-match-rim"/></svg>
             </button>
             <button id="photoBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Photo" title="Photo">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-photo"/></svg>
@@ -233,7 +236,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=77"></script>
+    <script type="module" src="main.js?v=78"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

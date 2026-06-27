@@ -767,8 +767,14 @@ function init() {
         el.addEventListener("click", () => setPhotoStyle(el.dataset.style)));
     document.querySelectorAll("#photoAspects .photo-chip").forEach((el) =>
         el.addEventListener("click", () => setPhotoAspect(el.dataset.aspect)));
+    // Lid button is dual-purpose now: creates a lid partner if you
+    // don't have one, swaps to the existing lid if you do. The pot
+    // icon (swapBtn) only ever swaps in one direction — back to the
+    // pot from the lid — so the Lid button owns the "go to lid" path
+    // whether the lid needs to be born first.
     document.getElementById("makeLidBtn")?.addEventListener("click", () => {
-        makeLidPartner();
+        if (state.savedLid) swapActivePiece();
+        else                makeLidPartner();
         updateToolbar();
     });
     document.getElementById("swapBtn")?.addEventListener("click", () => {
@@ -2401,18 +2407,24 @@ function updateToolbar() {
         saveBtn.setAttribute("title",       hasPartner ? "Save set" : "Save");
     }
     if (photoBtn) photoBtn.hidden = !firedAndCool;
-    // Make lid: at wet OR at decorate, only if you don't already
-    // have a partner. Wet creation is the tandem-shape entry point
-    // (sculpt pot + lid together from the start); leather creation
-    // is the original "decorate-stage lid" flow.
-    if (makeLidBtn) makeLidBtn.hidden = !((cs === "wet" || cs === "leather") && !hasPartner && !state.isLid);
-    // Swap: visible while a partner is paused — but NOT at fired,
-    // where the assembled view already shows both pieces together.
+    // Lid button (dual-purpose): visible while you're on the pot at
+    // any pre-fired stage. Creates a lid partner the first time you
+    // tap it; on subsequent taps (a lid already exists) it swaps you
+    // to the lid. Hidden when you're already shaping the lid — the
+    // pot button (swapBtn) carries the reverse trip.
+    if (makeLidBtn) {
+        makeLidBtn.hidden = !(!state.isLid && cs !== "fired");
+        const lidLabel = state.savedLid ? "Switch to lid" : "Add lid";
+        makeLidBtn.setAttribute("aria-label", lidLabel);
+        makeLidBtn.setAttribute("title",       lidLabel);
+    }
+    // Pot button (the renamed swapBtn): only visible while you're
+    // shaping the lid AND a pot partner is paused in memory. Single
+    // purpose now — swap back to pot.
     if (swapBtn) {
-        swapBtn.hidden = !hasPartner || cs === "fired";
-        const label = state.isLid ? "Swap to pot" : "Swap to lid";
-        swapBtn.setAttribute("aria-label", label);
-        swapBtn.setAttribute("title",       label);
+        swapBtn.hidden = !(state.isLid && !!state.savedPot && cs !== "fired");
+        swapBtn.setAttribute("aria-label", "Switch to pot");
+        swapBtn.setAttribute("title",       "Switch to pot");
     }
     // Match rim: only useful when the user is on the LID at WET and a
     // pot partner exists — that's when the lid's base can be re-fit to
