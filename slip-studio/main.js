@@ -48,6 +48,16 @@ const COLS = 128;   // radial segments (around)
 const TOP  = 1.40;  // pot height in world units; foot sits at y=0
 
 // --- Sculpt feel ------------------------------------------------
+// Pot height range — how far the user can pull the rim up or push
+// it down via the Taller / Shorter buttons. Applied as a Group
+// scale on potGroup, so it's purely visual — sculpt math stays in
+// the unchanged profile coordinate system. Declared up here (with
+// the other shape-knob constants) so the toolbar's first init-time
+// updateToolbar call doesn't hit a temporal-dead-zone reference.
+const MIN_HEIGHT_SCALE = 0.70;
+const MAX_HEIGHT_SCALE = 1.70;
+const HEIGHT_STEP      = 0.08;
+
 const MIN_R    = 0.06; // clay can't pinch to nothing
 const MAX_R    = 0.95; // belly may bulge this wide (wider than the wheel)
 const GRAB_TOL = 0.26; // must start the drag this close to the surface
@@ -678,6 +688,14 @@ const state = {
         try { return localStorage.getItem("slip-gallery-view") || "shelf"; }
         catch (_) { return "shelf"; }
     })(),
+    // Per-piece vertical stretch. 1.0 = the default TOP-tall silhouette;
+    // > 1 pulls the rim higher (pot grows taller), < 1 squashes it down.
+    // Implemented as a Group transform on potGroup so the geometry data
+    // (the profile array of per-row radii) stays the same — sculpt
+    // math still works in profile-space, the pointer-to-profile raycast
+    // divides world-Y by this scale to read the right row. Handle
+    // meshes live inside potGroup too so they stretch with the pot.
+    heightScale: 1.0,
     glazePack: (() => {
         try {
             const saved = localStorage.getItem("slip-glaze-pack");
@@ -766,8 +784,15 @@ function init() {
     // --- Turntable (pot + wheel spin together) --------------------
     const turntable = new THREE.Group();
     turntable.add(buildWheel());
+    // potGroup wraps the pot mesh + (eventually) the handle meshes
+    // so a single scale.y on the group stretches the whole piece
+    // vertically without touching the wheel. Per-piece heightScale
+    // is the user's "pull the clay up" knob; default 1.0 = original.
+    state.potGroup = new THREE.Group();
     state.pot = buildPot();
-    turntable.add(state.pot);
+    state.potGroup.add(state.pot);
+    state.potGroup.scale.y = state.heightScale;
+    turntable.add(state.potGroup);
     scene.add(turntable);
     state.turntable = turntable;
 
@@ -822,6 +847,8 @@ function init() {
     document.getElementById("handleBtn")?.addEventListener("click", () => {
         setHandleOn(!state.handle.on);
     });
+    document.getElementById("tallerBtn")?.addEventListener("click", () => nudgeHeight(+HEIGHT_STEP));
+    document.getElementById("shorterBtn")?.addEventListener("click", () => nudgeHeight(-HEIGHT_STEP));
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
@@ -1701,6 +1728,22 @@ function lidCapFromProfile(prof) {
 // colour / roughness / clearcoat as the clay so it reads as one piece
 // through wet / leather / fired. Only meaningful on the pot — when
 // state.isLid is true the handle hides.
+function setHeightScale(scale) {
+    scale = Math.max(MIN_HEIGHT_SCALE, Math.min(MAX_HEIGHT_SCALE, scale));
+    if (Math.abs(state.heightScale - scale) < 1e-4) return;
+    state.heightScale = scale;
+    if (state.potGroup) state.potGroup.scale.y = scale;
+    state.dirty = true;
+    // Re-place the partner lid on top of the now-taller / shorter pot
+    // if the assembled view is showing.
+    if (state.assemblyShown) showAssemblyView();
+    updateToolbar(); // refresh button disabled state at extremes
+}
+function nudgeHeight(delta) {
+    if (state.clayState !== "wet") return; // height locks at leather+
+    setHeightScale(state.heightScale + delta);
+}
+
 const HANDLE_BULGE     = 0.22;   // outward arc — modest amphora ear, not a giant wing
 const HANDLE_THICKNESS = 0.032;  // tube radius — slim/elegant
 const HANDLE_SHOULDER_RATIO = 0.70; // upper attach: row where r ≤ this × belly_r counts as shoulder
@@ -1797,7 +1840,10 @@ function ensureHandleMesh() {
     const right = new THREE.Mesh(geo, mat);
     right.castShadow = true;
     right.receiveShadow = true;
-    state.turntable.add(right);
+    // Add to potGroup (not turntable) so the handle stretches with
+    // the pot when the user grows heightScale — keeps the ear glued
+    // to the belly + shoulder it was attached to in profile-space.
+    state.potGroup.add(right);
     state.handle.mesh = right;
     // Left ear: same geometry + material, mirrored across the y axis
     // so it sits on the opposite side. scale.x = -1 flips winding —
@@ -1809,7 +1855,7 @@ function ensureHandleMesh() {
     left.castShadow = true;
     left.receiveShadow = true;
     left.scale.x = -1;
-    state.turntable.add(left);
+    state.potGroup.add(left);
     state.handle.mirrorMesh = left;
     return right;
 }
@@ -2274,6 +2320,8 @@ function resetPot() {
     state.handle.bulgeOffset = 0;
     state.handle.heightOffset = 0;
     updateHandleVisibility();
+    // Reset the per-piece vertical stretch — fresh pot, default height.
+    setHeightScale(1.0);
     setPhase(INITIAL_STATE);
     state.dirty = false;
     updateGlazeBar();
@@ -2485,6 +2533,20 @@ function updateToolbar() {
         const label = state.handle.on ? "Remove handle" : "Add handle";
         handleBtn.setAttribute("aria-label", label);
         handleBtn.setAttribute("title",       label);
+    }
+    // Height nudgers: only at wet (clay can be stretched while wet
+    // but locks once it firms). Disable at extremes so taps stop
+    // mattering when you've already pushed the cap.
+    const tallerBtn  = document.getElementById("tallerBtn");
+    const shorterBtn = document.getElementById("shorterBtn");
+    const canHeight = cs === "wet";
+    if (tallerBtn) {
+        tallerBtn.hidden = !canHeight;
+        tallerBtn.disabled = state.heightScale >= MAX_HEIGHT_SCALE - 1e-3;
+    }
+    if (shorterBtn) {
+        shorterBtn.hidden = !canHeight;
+        shorterBtn.disabled = state.heightScale <= MIN_HEIGHT_SCALE + 1e-3;
     }
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
@@ -2751,7 +2813,12 @@ function pointerToProfile(ev) {
     );
     raycaster.setFromCamera(ndc, state.camera);
     if (!raycaster.ray.intersectPlane(axisPlane, hitPoint)) return null;
-    return { y: hitPoint.y, r: Math.abs(hitPoint.x) };
+    // The pot's geometry is in profile-space (y in [0, TOP]) but the
+    // potGroup stretches it vertically by state.heightScale to render
+    // in world. Divide the raycast hit Y by the scale so sculpt /
+    // trim / handle-drag all see the row the user actually touched,
+    // not a row offset by the visual stretch.
+    return { y: hitPoint.y / state.heightScale, r: Math.abs(hitPoint.x) };
 }
 
 // Raycast against the handle meshes. Returns the side ("right" /
@@ -3366,6 +3433,7 @@ async function savePot() {
         handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
         handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
         handleHeight: !state.isLid && state.handle.on ? state.handle.heightOffset : 0,
+        heightScale:  state.heightScale,
         assemblyThumb,
     };
     try {
@@ -3443,6 +3511,7 @@ function capturePieceState() {
         sgraffitoCanvas: sgraffitoCopy,
         isLid: state.isLid,
         clayState: state.clayState,
+        heightScale: state.heightScale,
     };
 }
 
@@ -3471,6 +3540,9 @@ function restorePieceState(saved) {
     state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (saved.sgraffitoCanvas) state.sgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
     state.sgraffitoTex.needsUpdate = true;
+    // Restore the snapshot's vertical stretch — older snapshots that
+    // pre-date heightScale default to 1.0 (the pre-stretch original).
+    setHeightScale(saved.heightScale != null ? saved.heightScale : 1.0);
     setPhase(saved.clayState);
     updateGlazeBar();
     // Handle visibility tracks isLid which may have flipped during
@@ -3718,14 +3790,21 @@ function showAssemblyView() {
     const partnerSaved = state.isLid ? state.savedPot : state.savedLid;
     if (!partnerSaved) return;
     syncPartnerMesh(partnerSaved);
+    const partnerHeight = partnerSaved.heightScale != null ? partnerSaved.heightScale : 1.0;
+    state.partnerMesh.scale.y = partnerHeight;
     if (state.isLid) {
         // Active is the LID → goes on top. Partner is the pot at y=0.
-        state.pot.position.y = TOP;
+        // The lid lives inside potGroup, so shift the whole group up
+        // to where the partner pot's (height-scaled) top sits.
+        state.potGroup.position.y = TOP * partnerHeight;
+        state.pot.position.y = 0;
         state.partnerMesh.position.y = 0;
     } else {
-        // Active is the POT → stays on the wheel. Partner is the lid on top.
+        // Active is the POT → stays on the wheel. Partner is the lid
+        // on top, positioned at the live pot's height-scaled top.
+        state.potGroup.position.y = 0;
         state.pot.position.y = 0;
-        state.partnerMesh.position.y = TOP;
+        state.partnerMesh.position.y = TOP * state.heightScale;
     }
     state.partnerMesh.visible = true;
     state.assemblyShown = true;
@@ -3733,7 +3812,11 @@ function showAssemblyView() {
 }
 
 function hideAssemblyView() {
-    if (state.partnerMesh) state.partnerMesh.visible = false;
+    if (state.partnerMesh) {
+        state.partnerMesh.visible = false;
+        state.partnerMesh.scale.y = 1;
+    }
+    state.potGroup.position.y = 0;
     state.pot.position.y = 0;
     state.assemblyShown = false;
     applyCamera();
@@ -3869,6 +3952,8 @@ async function loadPot(entry) {
     profileDirty = true;
     state.glaze = entry.glaze || null;
     state.glazeGradient = entry.glazeGradient || null;
+    // Per-piece vertical stretch (older entries default to 1.0).
+    setHeightScale(entry.heightScale != null ? entry.heightScale : 1.0);
     // Auto-switch glaze pack if the loaded pot uses a glaze that's
     // not in the currently-displayed pack — otherwise the picker
     // wouldn't show the active swatch and the user would have to
