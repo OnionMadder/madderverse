@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=81" />
+    <link rel="stylesheet" href="style.css?v=82" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -126,6 +126,7 @@
     </div>
 
     <div class="lid-style-picker" id="lidStylePicker" role="group" aria-label="Lid style" hidden></div>
+    <div class="lid-style-picker" id="handleStylePicker" role="group" aria-label="Handle thickness" hidden></div>
 
     <div class="brush-bar" id="brushBar" role="group" aria-label="Brush size">
         <button class="brush-btn" type="button" aria-label="Fine brush" aria-pressed="false"><span class="brush-dot brush-dot-s"></span></button>
@@ -186,6 +187,9 @@
             </button>
             <button id="handleBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Add handle" title="Add handle">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-handle"/></svg>
+            </button>
+            <button id="refitHandleBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Refit handle to pot" title="Refit the handle to the current pot belly + shoulder">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-match-rim"/></svg>
             </button>
             <button id="makeLidBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Add lid" title="Add lid">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-lid"/></svg>
@@ -253,7 +257,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=81"></script>
+    <script type="module" src="main.js?v=82"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

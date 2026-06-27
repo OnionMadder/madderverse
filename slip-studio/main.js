@@ -663,6 +663,9 @@ const state = {
         // it or resets.
         bulgeOffset: 0,
         heightOffset: 0,
+        // Tube-radius preset id (key into HANDLE_THICKNESSES). Mirrors
+        // the lid-style picker — small chip row at handle-on + wet.
+        thickness: "medium",
     },
     pendingSetId: null,                   // carried across save → reset for lid pairs
     // Has the user done anything that isn't reflected in the gallery?
@@ -736,6 +739,16 @@ let sculpting = false;
 // and drags, this carries the grab-time snapshot so each pointermove
 // can compute the offset from there. null when not dragging.
 let handleDrag = null;
+
+// Hoisted from the handle constants section further down — UI build
+// in init() reads HANDLE_THICKNESS_IDS for the picker chips, and
+// top-down evaluation hadn't reached the original spot yet (TDZ).
+const HANDLE_THICKNESSES = { thin: 0.022, medium: 0.032, thick: 0.048 };
+const HANDLE_THICKNESS_IDS = ["thin", "medium", "thick"];
+const DEFAULT_HANDLE_THICKNESS = "medium";
+function handleTubeRadius() {
+    return HANDLE_THICKNESSES[state.handle.thickness] || HANDLE_THICKNESSES[DEFAULT_HANDLE_THICKNESS];
+}
 
 init();
 
@@ -847,6 +860,9 @@ function init() {
     document.getElementById("handleBtn")?.addEventListener("click", () => {
         setHandleOn(!state.handle.on);
     });
+    document.getElementById("refitHandleBtn")?.addEventListener("click", () => {
+        refitHandle();
+    });
     document.getElementById("tallerBtn")?.addEventListener("click", () => nudgeHeight(+HEIGHT_STEP));
     document.getElementById("shorterBtn")?.addEventListener("click", () => nudgeHeight(-HEIGHT_STEP));
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
@@ -870,6 +886,7 @@ function init() {
     buildShapePicker();
     buildBgPicker();
     buildLidStylePicker();
+    buildHandleStylePicker();
     let savedBg = DEFAULT_BG, savedMusic = true, savedSfx = true;
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
     try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
@@ -1745,7 +1762,11 @@ function nudgeHeight(delta) {
 }
 
 const HANDLE_BULGE     = 0.22;   // outward arc — modest amphora ear, not a giant wing
-const HANDLE_THICKNESS = 0.032;  // tube radius — slim/elegant
+// HANDLE_THICKNESSES / HANDLE_THICKNESS_IDS / DEFAULT_HANDLE_THICKNESS
+// + handleTubeRadius() are hoisted earlier in the file (before init())
+// because buildHandleStylePicker reads HANDLE_THICKNESS_IDS during
+// initial UI build, and the rest of the file's top-down evaluation
+// hadn't reached this point yet — TDZ error otherwise.
 const HANDLE_SHOULDER_RATIO = 0.70; // upper attach: row where r ≤ this × belly_r counts as shoulder
 
 // Find the widest row in the pot body (skip the foot zone where the
@@ -1805,7 +1826,7 @@ function buildHandleCurve() {
     // the joint looks broken. ~2× the tube radius is enough depth
     // for the cross-section to clear the wall at typical viewing
     // angles without sinking so far the curve loses its shape.
-    const inset = HANDLE_THICKNESS * 2.2;
+    const inset = handleTubeRadius() * 2.2;
     // Tight amphora arc: short rise outward, peak at midspan, back in.
     // The peak X uses max(rTop, rBot) so the ear clears whichever wall
     // is wider rather than scooping into the pot.
@@ -1820,7 +1841,7 @@ function buildHandleCurve() {
 
 function buildHandleGeometry() {
     const curve = buildHandleCurve();
-    return new THREE.TubeGeometry(curve, 40, HANDLE_THICKNESS, 10, false);
+    return new THREE.TubeGeometry(curve, 40, handleTubeRadius(), 10, false);
 }
 
 function ensureHandleMesh() {
@@ -1883,6 +1904,7 @@ function setHandleOn(on) {
         rebuildHandleGeometry();
     }
     updateHandleVisibility();
+    updateHandleStylePicker();
     state.dirty = true;
     updateToolbar();
 }
@@ -1891,6 +1913,51 @@ function updateHandleVisibility() {
     const visible = state.handle.on && !state.isLid;
     if (state.handle.mesh)       state.handle.mesh.visible       = visible;
     if (state.handle.mirrorMesh) state.handle.mirrorMesh.visible = visible;
+}
+
+// Tube-radius preset swap. New geometry uses the new thickness; the
+// inset compensation in buildHandleCurve also reads handleTubeRadius
+// so the endpoint burial stays correct as the tube grows / shrinks.
+function setHandleThickness(id) {
+    if (!HANDLE_THICKNESSES[id]) return;
+    state.handle.thickness = id;
+    if (state.handle.on) rebuildHandleGeometry();
+    updateHandleStylePicker();
+    state.dirty = true;
+}
+
+// Reset the drag-reshape offsets so the handle re-snaps to the
+// auto-derived belly + shoulder attach points. Mirrors the
+// matchLidRim pattern — "refit to the current pot shape".
+function refitHandle() {
+    if (!state.handle.on || state.isLid) return;
+    state.handle.bulgeOffset = 0;
+    state.handle.heightOffset = 0;
+    rebuildHandleGeometry();
+    state.dirty = true;
+    updateToolbar();
+}
+
+// Thickness picker chips (mirrors the lid-style picker structure).
+function buildHandleStylePicker() {
+    const wrap = document.getElementById("handleStylePicker");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    HANDLE_THICKNESS_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "lid-style-btn"; // reuses the lid-style chip look
+        b.dataset.thickness = id;
+        b.textContent = id[0].toUpperCase() + id.slice(1);
+        b.addEventListener("click", () => setHandleThickness(id));
+        wrap.appendChild(b);
+    });
+    updateHandleStylePicker();
+}
+function updateHandleStylePicker() {
+    document.querySelectorAll("#handleStylePicker .lid-style-btn").forEach((b) => {
+        b.classList.toggle("is-active", b.dataset.thickness === state.handle.thickness);
+    });
 }
 
 // Rewrite vertex positions + normals from the current profile.
@@ -2319,7 +2386,9 @@ function resetPot() {
     state.handle.on = false;
     state.handle.bulgeOffset = 0;
     state.handle.heightOffset = 0;
+    state.handle.thickness = DEFAULT_HANDLE_THICKNESS;
     updateHandleVisibility();
+    updateHandleStylePicker();
     // Reset the per-piece vertical stretch — fresh pot, default height.
     setHeightScale(1.0);
     setPhase(INITIAL_STATE);
@@ -2476,6 +2545,8 @@ function updateToolbar() {
     if (brushBar) brushBar.hidden = cs !== "wet";
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
+    const handleStylePicker = document.getElementById("handleStylePicker");
+    if (handleStylePicker) handleStylePicker.hidden = !(state.handle.on && !state.isLid && cs === "wet");
     // Hide Save + Photo while the kiln animation is still running —
     // cs flips to "fired" the instant advanceStage commits, so without
     // this guard both buttons appear during the 4.5 s firing sequence
@@ -2533,6 +2604,14 @@ function updateToolbar() {
         const label = state.handle.on ? "Remove handle" : "Add handle";
         handleBtn.setAttribute("aria-label", label);
         handleBtn.setAttribute("title",       label);
+    }
+    // Refit handle: mirrors matchRimBtn for the lid — visible while
+    // a handle is attached at wet. Resets the user's drag offsets so
+    // the ear re-snaps to the auto-derived belly + shoulder of the
+    // current pot shape.
+    const refitHandleBtn = document.getElementById("refitHandleBtn");
+    if (refitHandleBtn) {
+        refitHandleBtn.hidden = !(state.handle.on && !state.isLid && cs === "wet");
     }
     // Height nudgers: only at wet (clay can be stretched while wet
     // but locks once it firms). Disable at extremes so taps stop
@@ -3446,6 +3525,7 @@ async function savePot() {
         handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
         handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
         handleHeight: !state.isLid && state.handle.on ? state.handle.heightOffset : 0,
+        handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
         heightScale:  state.heightScale,
         assemblyThumb,
     };
@@ -3994,6 +4074,8 @@ async function loadPot(entry) {
     state.handle.on = !state.isLid && !!entry.handle;
     state.handle.bulgeOffset  = state.handle.on ? (entry.handleBulge  || 0) : 0;
     state.handle.heightOffset = state.handle.on ? (entry.handleHeight || 0) : 0;
+    state.handle.thickness    = (state.handle.on && HANDLE_THICKNESSES[entry.handleThickness])
+        ? entry.handleThickness : DEFAULT_HANDLE_THICKNESS;
     if (state.handle.on) {
         ensureHandleMesh();
         rebuildHandleGeometry();
