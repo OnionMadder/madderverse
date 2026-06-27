@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=75" />
+    <link rel="stylesheet" href="style.css?v=76" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -119,16 +119,21 @@
     </div>
 
     <div class="toolbar" role="toolbar" aria-label="Pottery stage">
-        <button id="backBtn" class="tool-btn" type="button" hidden>&larr; Re-wet</button>
-        <span id="stageLabel" class="stage-chip" aria-live="polite">Wet clay</span>
-        <button id="makeLidBtn" class="tool-btn" type="button" hidden>+ Lid</button>
-        <button id="handleBtn" class="tool-btn" type="button" hidden>+ Handle</button>
-        <button id="matchRimBtn" class="tool-btn" type="button" hidden>Match rim</button>
-        <button id="swapBtn" class="tool-btn" type="button" hidden>Swap</button>
-        <button id="matchRimBtn" class="tool-btn" type="button" hidden title="Refit the lid's base to the pot's current rim, keeping your sculpt proportions">Match rim</button>
-        <button id="photoBtn" class="tool-btn" type="button" hidden>Photo</button>
-        <button id="saveBtn" class="tool-btn" type="button" hidden>Save</button>
-        <button id="advanceBtn" class="tool-btn tool-btn-primary" type="button">Dry</button>
+        <div class="toolbar-zone toolbar-left">
+            <button id="backBtn" class="tool-btn tool-btn-ghost" type="button" hidden aria-label="Re-wet">&larr;</button>
+            <span id="stageLabel" class="stage-chip" aria-live="polite">Wet clay</span>
+        </div>
+        <div class="toolbar-zone toolbar-center">
+            <button id="makeLidBtn" class="tool-btn" type="button" hidden>+ Lid</button>
+            <button id="handleBtn" class="tool-btn" type="button" hidden>+ Handle</button>
+            <button id="matchRimBtn" class="tool-btn" type="button" hidden title="Refit the lid's base to the pot's current rim, keeping your sculpt proportions">Match rim</button>
+            <button id="swapBtn" class="tool-btn" type="button" hidden>Swap</button>
+            <button id="photoBtn" class="tool-btn" type="button" hidden>Photo</button>
+            <button id="saveBtn" class="tool-btn" type="button" hidden>Save</button>
+        </div>
+        <div class="toolbar-zone toolbar-right">
+            <button id="advanceBtn" class="tool-btn tool-btn-primary" type="button">Dry</button>
+        </div>
     </div>
 
     <div id="photoModal" class="photo-modal" role="dialog" aria-label="Photo" hidden>
@@ -179,7 +184,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=75"></script>
+    <script type="module" src="main.js?v=76"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

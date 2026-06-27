@@ -2427,7 +2427,12 @@ function updateToolbar() {
     if (handleBtn) {
         const canHandle = !state.isLid && cs === "wet";
         handleBtn.hidden = !canHandle;
-        handleBtn.textContent = state.handle.on ? "Remove handle" : "+ Handle";
+        // "+ Handle" when off, "Handle" with an active ring when on.
+        // The visual ring carries the "currently engaged" meaning so
+        // the label can stay short, and tapping a ringed button reads
+        // as toggle-off without needing destructive language.
+        handleBtn.textContent = state.handle.on ? "Handle" : "+ Handle";
+        handleBtn.classList.toggle("is-active", state.handle.on);
     }
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
