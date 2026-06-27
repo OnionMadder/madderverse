@@ -2395,7 +2395,10 @@ function updateToolbar() {
     const firedAndCool = cs === "fired" && !state.firing;
     if (saveBtn) {
         saveBtn.hidden = !firedAndCool;
-        saveBtn.textContent = hasPartner ? "Save set" : "Save";
+        // Icon-only: aria-label flips so screen readers + the title
+        // attribute say "Save set" vs "Save" at the right moment.
+        saveBtn.setAttribute("aria-label", hasPartner ? "Save set" : "Save");
+        saveBtn.setAttribute("title",       hasPartner ? "Save set" : "Save");
     }
     if (photoBtn) photoBtn.hidden = !firedAndCool;
     // Make lid: at wet OR at decorate, only if you don't already
@@ -2407,7 +2410,9 @@ function updateToolbar() {
     // where the assembled view already shows both pieces together.
     if (swapBtn) {
         swapBtn.hidden = !hasPartner || cs === "fired";
-        swapBtn.textContent = state.isLid ? "↻ Pot" : "↻ Lid";
+        const label = state.isLid ? "Swap to pot" : "Swap to lid";
+        swapBtn.setAttribute("aria-label", label);
+        swapBtn.setAttribute("title",       label);
     }
     // Match rim: only useful when the user is on the LID at WET and a
     // pot partner exists — that's when the lid's base can be re-fit to
@@ -2427,12 +2432,13 @@ function updateToolbar() {
     if (handleBtn) {
         const canHandle = !state.isLid && cs === "wet";
         handleBtn.hidden = !canHandle;
-        // "+ Handle" when off, "Handle" with an active ring when on.
-        // The visual ring carries the "currently engaged" meaning so
-        // the label can stay short, and tapping a ringed button reads
-        // as toggle-off without needing destructive language.
-        handleBtn.textContent = state.handle.on ? "Handle" : "+ Handle";
+        // Icon-only: the .is-active ring shows the on-state; aria-label
+        // + title flip between Add/Remove so screen readers + hover
+        // tooltips read the right intent.
         handleBtn.classList.toggle("is-active", state.handle.on);
+        const label = state.handle.on ? "Remove handle" : "Add handle";
+        handleBtn.setAttribute("aria-label", label);
+        handleBtn.setAttribute("title",       label);
     }
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }

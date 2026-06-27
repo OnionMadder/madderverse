@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=76" />
+    <link rel="stylesheet" href="style.css?v=77" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -43,6 +43,43 @@
 </head>
 
 <body>
+    <!-- Toolbar icon sprites. One <symbol> per icon, referenced via
+         <use href="#icon-x"/> in each button so the SVG path data
+         lives in one place. Stroke-only line art at 20×20; currentColor
+         lets the icon inherit the button's text colour for hover /
+         active states. -->
+    <svg style="display:none" aria-hidden="true">
+        <symbol id="icon-lid" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 13 C 3 6, 17 6, 17 13"/>
+            <line x1="3" y1="13" x2="17" y2="13"/>
+            <line x1="9" y1="4" x2="11" y2="4"/>
+        </symbol>
+        <symbol id="icon-handle" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="6" y1="3" x2="6" y2="17"/>
+            <path d="M6 6 C 14 6, 14 14, 6 14"/>
+        </symbol>
+        <symbol id="icon-match-rim" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 3 L10 9 M7 6.5 L10 9.5 L13 6.5"/>
+            <ellipse cx="10" cy="14" rx="7" ry="2"/>
+        </symbol>
+        <symbol id="icon-swap" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 8 C 4 4, 16 4, 16 8"/>
+            <path d="M14 6 L16 8 L18 6"/>
+            <path d="M16 12 C 16 16, 4 16, 4 12"/>
+            <path d="M2 14 L4 12 L6 14"/>
+        </symbol>
+        <symbol id="icon-photo" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2.5" y="6" width="15" height="10" rx="1.5"/>
+            <path d="M7 6 L8 4 L12 4 L13 6"/>
+            <circle cx="10" cy="11" r="2.6"/>
+        </symbol>
+        <symbol id="icon-save" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 3 L10 12"/>
+            <path d="M6 9 L10 13 L14 9"/>
+            <path d="M4 16 L16 16"/>
+        </symbol>
+    </svg>
+
     <div id="backdrop" class="backdrop"></div>
     <video id="backdropVideo" class="backdrop-video" autoplay loop muted playsinline preload="metadata" aria-hidden="true"></video>
     <div id="kilnVignette" class="kiln-vignette" aria-hidden="true">
@@ -124,12 +161,24 @@
             <span id="stageLabel" class="stage-chip" aria-live="polite">Wet clay</span>
         </div>
         <div class="toolbar-zone toolbar-center">
-            <button id="makeLidBtn" class="tool-btn" type="button" hidden>+ Lid</button>
-            <button id="handleBtn" class="tool-btn" type="button" hidden>+ Handle</button>
-            <button id="matchRimBtn" class="tool-btn" type="button" hidden title="Refit the lid's base to the pot's current rim, keeping your sculpt proportions">Match rim</button>
-            <button id="swapBtn" class="tool-btn" type="button" hidden>Swap</button>
-            <button id="photoBtn" class="tool-btn" type="button" hidden>Photo</button>
-            <button id="saveBtn" class="tool-btn" type="button" hidden>Save</button>
+            <button id="makeLidBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Add lid" title="Add lid">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-lid"/></svg>
+            </button>
+            <button id="handleBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Add handle" title="Add handle">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-handle"/></svg>
+            </button>
+            <button id="matchRimBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Match rim" title="Refit the lid's base to the pot's current rim, keeping your sculpt proportions">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-match-rim"/></svg>
+            </button>
+            <button id="swapBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Swap pieces" title="Swap pieces">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-swap"/></svg>
+            </button>
+            <button id="photoBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Photo" title="Photo">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-photo"/></svg>
+            </button>
+            <button id="saveBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Save" title="Save">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-save"/></svg>
+            </button>
         </div>
         <div class="toolbar-zone toolbar-right">
             <button id="advanceBtn" class="tool-btn tool-btn-primary" type="button">Dry</button>
@@ -184,7 +233,7 @@
         <a href="../">The Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=76"></script>
+    <script type="module" src="main.js?v=77"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
