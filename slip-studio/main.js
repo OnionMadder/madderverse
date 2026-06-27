@@ -2891,6 +2891,14 @@ function onPointerDown(ev) {
         // updates the handle's bulge / height offsets. Check this
         // BEFORE the sculpt grab so a pointer on the handle goes to
         // reshape, not to the pot wall hidden behind it.
+        //
+        // While a handle IS attached, pot sculpting is suppressed
+        // entirely — a touch outside the handle just spins the pot.
+        // Without this, a near-miss on the thin handle tube falls
+        // through to the sculpt grab and quietly reshapes the wall
+        // when the user was trying to drag the ear. To sculpt the
+        // pot, remove the handle (one tap) and re-add it after
+        // (auto-attaches to the new belly + shoulder).
         if (state.handle.on && !state.isLid) {
             const hit = raycastHandleMeshes(ev);
             if (hit) {
@@ -2907,6 +2915,11 @@ function onPointerDown(ev) {
                     return;
                 }
             }
+            // Missed the handle → spin the pot, don't sculpt.
+            state.userRotating = true;
+            viewPrevX = ev.clientX;
+            ev.preventDefault();
+            return;
         }
         const p = pointerToProfile(ev);
         if (!p) return;
