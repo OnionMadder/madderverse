@@ -1,5 +1,5 @@
 # robots.txt for madderverse.org
-# The Madderverse is free, ad-free, and made to be found.
+# Madderverse is free, ad-free, and made to be found.
 # We WANT search engines AND AI assistants to index and cite it.
 
 User-agent: *

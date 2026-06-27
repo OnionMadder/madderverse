@@ -1,7 +1,7 @@
 {
     "name": "Tiny Canvas",
     "short_name": "Tiny Canvas",
-    "description": "A polished kids coloring app from The Madderverse. Pick a page, color it in, save it.",
+    "description": "A polished kids coloring app from Madderverse. Pick a page, color it in, save it.",
     "start_url": "./",
     "scope": "./",
     "display": "standalone",
