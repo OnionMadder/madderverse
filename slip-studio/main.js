@@ -163,6 +163,33 @@ const GLAZE_IDS = [
     "gold", "copper", "platinum", "ironred", "mint", "pearl",
 ];
 
+// Swappable glaze packs — each pack curates 8 glazes that read well
+// together. The picker shows the active pack's eight; switching packs
+// rebuilds the swatch row. All glazes still exist in GLAZES (above),
+// so loaded gallery pots can render any glaze even if it's not in the
+// current pack — loadPot auto-switches the pack to match.
+const GLAZE_PACKS = {
+    studio: {
+        label: "Studio",
+        ids: ["celadon", "cobalt", "oatmeal", "honey", "tenmoku", "blush", "forest", "slate"],
+    },
+    modern: {
+        label: "Modern",
+        ids: ["plum", "sand", "gold", "copper", "platinum", "ironred", "mint", "pearl"],
+    },
+};
+const DEFAULT_GLAZE_PACK = "studio";
+function currentPackIds() {
+    return (GLAZE_PACKS[state.glazePack] || GLAZE_PACKS[DEFAULT_GLAZE_PACK]).ids;
+}
+function packContaining(glazeId) {
+    if (!glazeId) return null;
+    for (const [pid, p] of Object.entries(GLAZE_PACKS)) {
+        if (p.ids.includes(glazeId)) return pid;
+    }
+    return null;
+}
+
 // --- Decoration -------------------------------------------------
 // Painted onto the surface (over the glaze) by dragging on the pot.
 // One unwrapped RGBA canvas wraps the pot via UVs; a shader overlays
@@ -651,6 +678,12 @@ const state = {
         try { return localStorage.getItem("slip-gallery-view") || "shelf"; }
         catch (_) { return "shelf"; }
     })(),
+    glazePack: (() => {
+        try {
+            const saved = localStorage.getItem("slip-glaze-pack");
+            return (saved && GLAZE_PACKS[saved]) ? saved : DEFAULT_GLAZE_PACK;
+        } catch (_) { return DEFAULT_GLAZE_PACK; }
+    })(),
     photoStyle: "studio",                // studio | sunlit | museum
     photoAspect: "square",               // square | portrait
     bgCategory: null,                    // resolved by buildBgPicker
@@ -749,6 +782,7 @@ function init() {
     document.querySelectorAll(".brush-btn").forEach((b, idx) =>
         b.addEventListener("click", () => setBrush(idx)));
     setBrush(DEFAULT_BRUSH);
+    buildGlazePackTabs();
     buildGlazeBar();
     buildDecoBar();
     document.getElementById("toolBrush")?.addEventListener("click", () => setDecoTool("brush"));
@@ -2460,10 +2494,12 @@ function updateToolbar() {
 function buildGlazeBar() {
     const bar = document.getElementById("glazeBar");
     if (!bar) return;
-    GLAZE_IDS.forEach((id) => {
+    bar.innerHTML = "";
+    currentPackIds().forEach((id) => {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "glaze-btn";
+        b.dataset.glaze = id;
         b.style.background = "#" + new THREE.Color(GLAZES[id].fired.color).getHexString();
         b.setAttribute("aria-label", GLAZES[id].name + " glaze");
         b.setAttribute("aria-pressed", "false");
@@ -2471,6 +2507,7 @@ function buildGlazeBar() {
         bar.appendChild(b);
     });
     buildGradientBar();
+    updateGlazeBar();
 }
 
 // Optional second row for a gradient (bottom-half tint). Hidden until
@@ -2478,10 +2515,12 @@ function buildGlazeBar() {
 function buildGradientBar() {
     const bar = document.getElementById("gradientBar");
     if (!bar) return;
-    GLAZE_IDS.forEach((id) => {
+    bar.innerHTML = "";
+    currentPackIds().forEach((id) => {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "glaze-btn glaze-btn-gradient";
+        b.dataset.glaze = id;
         b.style.background = "#" + new THREE.Color(GLAZES[id].fired.color).getHexString();
         b.setAttribute("aria-label", GLAZES[id].name + " bottom gradient");
         b.setAttribute("aria-pressed", "false");
@@ -2490,13 +2529,46 @@ function buildGradientBar() {
     });
 }
 
+// Pack tabs — small chip row above the glaze swatches. Same visual
+// pattern as the backdrop category tabs so the picker pattern reads
+// as one design. Click to switch the active pack; persists to
+// localStorage so the user's preference sticks across sessions.
+function buildGlazePackTabs() {
+    const wrap = document.getElementById("glazePackTabs");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    for (const [id, pack] of Object.entries(GLAZE_PACKS)) {
+        const tab = document.createElement("button");
+        tab.type = "button";
+        tab.className = "glaze-pack-tab";
+        tab.dataset.pack = id;
+        tab.textContent = pack.label;
+        tab.addEventListener("click", () => setGlazePack(id));
+        wrap.appendChild(tab);
+    }
+    syncGlazePackTabs();
+}
+function syncGlazePackTabs() {
+    document.querySelectorAll(".glaze-pack-tab").forEach((t) => {
+        t.classList.toggle("is-active", t.dataset.pack === state.glazePack);
+    });
+}
+function setGlazePack(id) {
+    if (!GLAZE_PACKS[id]) return;
+    if (state.glazePack === id) return;
+    state.glazePack = id;
+    try { localStorage.setItem("slip-glaze-pack", id); } catch (_) {}
+    syncGlazePackTabs();
+    buildGlazeBar(); // rebuilds gradient bar + updates active marks too
+}
+
 // Mark the active glaze swatch + sync the gradient row visibility +
 // disabled state of the matching primary swatch in the gradient row.
 function updateGlazeBar() {
     const bar = document.getElementById("glazeBar");
     if (bar) {
-        Array.from(bar.children).forEach((b, i) => {
-            const on = GLAZE_IDS[i] === state.glaze;
+        Array.from(bar.children).forEach((b) => {
+            const on = b.dataset.glaze === state.glaze;
             b.classList.toggle("is-active", on);
             b.setAttribute("aria-pressed", on ? "true" : "false");
         });
@@ -2506,8 +2578,8 @@ function updateGlazeBar() {
     const hasPrimary = !!state.glaze;
     if (gradWrap) gradWrap.hidden = !hasPrimary;
     if (gradBar) {
-        Array.from(gradBar.children).forEach((b, i) => {
-            const id = GLAZE_IDS[i];
+        Array.from(gradBar.children).forEach((b) => {
+            const id = b.dataset.glaze;
             const isPrimary = id === state.glaze;
             // The primary swatch can't also be the gradient — dim it.
             b.classList.toggle("is-disabled", isPrimary);
@@ -3797,6 +3869,13 @@ async function loadPot(entry) {
     profileDirty = true;
     state.glaze = entry.glaze || null;
     state.glazeGradient = entry.glazeGradient || null;
+    // Auto-switch glaze pack if the loaded pot uses a glaze that's
+    // not in the currently-displayed pack — otherwise the picker
+    // wouldn't show the active swatch and the user would have to
+    // hunt for which pack it lives in. Primary takes precedence
+    // over gradient if they're in different packs.
+    const targetPack = packContaining(state.glaze) || packContaining(state.glazeGradient);
+    if (targetPack && targetPack !== state.glazePack) setGlazePack(targetPack);
     state.isLid = lookupIsLid(entry);
     state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
     // Old gallery saves predate the apex-smoothing pass — re-apply so

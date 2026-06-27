@@ -1016,6 +1016,39 @@ html, body {
     pointer-events: none;
 }
 .glaze-bar[hidden] { display: none; }
+/* Pack-picker tabs above the glaze swatches. Visually mirror the
+   backdrop category tabs so the whole picker grammar reads as one
+   design language. Compact, low-contrast inactive, chip-style active. */
+.glaze-pack-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 2px;
+    pointer-events: auto;
+}
+.glaze-pack-tab {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 3px 10px;
+    font: inherit;
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    cursor: pointer;
+    border-radius: 999px;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.glaze-pack-tab:hover:not(.is-active) { color: var(--ink-dim); }
+.glaze-pack-tab.is-active {
+    color: var(--ink);
+    background: var(--chip);
+    border-color: var(--ink-faint);
+}
+
 .glaze-btn {
     pointer-events: auto;
     -webkit-tap-highlight-color: transparent;
