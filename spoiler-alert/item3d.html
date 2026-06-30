@@ -41,8 +41,8 @@
 <body>
   <div id="app">
     <div id="top">
-      <h1>🧪 3D Item Scrub — harness</h1>
-      <p>Procedural placeholder. Your Synty GLB swaps in where marked in the code.</p>
+      <h1>🧪 3D Item Scrub — Synty</h1>
+      <p>Real PolygonShops models. Scrub the slime off · ↻ Turn to spin · ⏭ Next item.</p>
       <div id="status">loading three.js…</div>
     </div>
     <div id="stage">
@@ -56,12 +56,14 @@
     <div id="controls">
       <button class="alt" id="turn">↻ Turn</button>
       <button class="alt" id="regoop">Re-slime</button>
+      <button class="alt" id="nextItem">⏭ Next item</button>
       <button id="jet">💦 Power tool</button>
     </div>
   </div>
 
 <script type="module">
 import * as THREE from './vendor/three.module.js';
+import { GLTFLoader } from './vendor/addons/loaders/GLTFLoader.js';
 
 var statusEl=document.getElementById('status');
 var RES_W=300, RES_H=420;                       // canvas bitmap resolution
@@ -81,8 +83,43 @@ try{
   var fill=new THREE.DirectionalLight(0xcfe6ff,0.5); fill.position.set(3,-1,2); scene.add(fill);
   model=buildPlaceholderBottle();
   scene.add(model);
-  statusEl.textContent='three r'+THREE.REVISION+' ready · placeholder bottle';
+  statusEl.textContent='three r'+THREE.REVISION+' ready · loading model…';
 }catch(e){ statusEl.textContent='WebGL init failed: '+e.message; }
+
+/* ----- real Synty PolygonShops models (converted to GLB) ----- */
+var MODELS=[
+  {file:'SM_Prop_Product_Milk_01.glb',            name:"Spoilk Milk"},
+  {file:'SM_Prop_SauceBottle_01.glb',             name:"Onion's Ranch"},
+  {file:'SM_Prop_Food_Takeaway_Container_01.glb', name:"Munki Mystery Tub"},
+  {file:'SM_Prop_Food_Cheese_Stack_01.glb',       name:"Cheddar Days"},
+  {file:'SM_Prop_Food_Tomato_Whole_01.glb',       name:"Rotto Tomato"},
+  {file:'SM_Prop_Food_Lettuce_Whole_01.glb',      name:"Lettuce Be"},
+  {file:'SM_Prop_Bar_Bottle_01.glb',              name:"Bottle o' Mystery"},
+  {file:'SM_Prop_Food_Egg_Whole_01.glb',          name:"Eggs-pired"}
+];
+var curIdx=0, loader=new GLTFLoader();
+function normalizeFootprint(obj){
+  // scale any Synty model to a consistent on-screen size + center it
+  var box=new THREE.Box3().setFromObject(obj), size=box.getSize(new THREE.Vector3()), c=box.getCenter(new THREE.Vector3());
+  var maxd=Math.max(size.x,size.y,size.z)||1;
+  obj.position.sub(c);
+  var g=new THREE.Group(); g.add(obj); g.scale.setScalar(2.3/maxd);
+  return g;
+}
+function loadModel(idx){
+  if(!renderer) return;
+  curIdx=((idx%MODELS.length)+MODELS.length)%MODELS.length;
+  var m=MODELS[curIdx];
+  statusEl.textContent='loading '+m.name+'…';
+  loader.load('assets/models/'+m.file, function(gltf){
+    if(model) scene.remove(model);
+    model=normalizeFootprint(gltf.scene);
+    model.rotation.y=-0.6;
+    scene.add(model);
+    render(); paintSlime();
+    statusEl.textContent=m.name+'  ·  '+m.file;
+  }, undefined, function(){ statusEl.textContent='load failed: '+m.file+' (placeholder shown)'; });
+}
 
 /* ===== PLACEHOLDER MODEL =====
    Swap this whole function for a GLB load once the Synty FBX is converted:
@@ -168,11 +205,12 @@ goopCanvas.addEventListener('pointerdown',down);
 /* controls */
 document.getElementById('turn').addEventListener('click',function(){ if(model){model.rotation.y+=Math.PI/4; render(); paintSlime();} });
 document.getElementById('regoop').addEventListener('click',function(){ paintSlime(); });
+document.getElementById('nextItem').addEventListener('click',function(){ loadModel(curIdx+1); });
 document.getElementById('jet').addEventListener('click',function(){ T.brush=52;T.bite=1.0; });
 
-if(renderer){ render(); paintSlime(); }
-window.__item3d={render:render, paintSlime:paintSlime, measure:measure, T:T,
-  scene:function(){return scene;}, model:function(){return model;}, glCanvas:glCanvas, goopCanvas:goopCanvas};
+if(renderer){ render(); paintSlime(); loadModel(0); }
+window.__item3d={render:render, paintSlime:paintSlime, measure:measure, T:T, loadModel:loadModel, MODELS:MODELS,
+  curIdx:function(){return curIdx;}, scene:function(){return scene;}, model:function(){return model;}, glCanvas:glCanvas, goopCanvas:goopCanvas};
 </script>
 </body>
 </html>

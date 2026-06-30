@@ -41,6 +41,14 @@ def build_atlas_material(atlas_path):
     bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
     tex = nt.nodes.new("ShaderNodeTexImage")
     img = bpy.data.images.load(atlas_path, check_existing=True)
+    # Synty atlases are flat colour swatches -> a small copy is visually identical
+    # and keeps the embedded texture (so each GLB) tiny. Embedding the full 2-4K
+    # atlas in every model balloons each GLB to multiple MB for no visual gain.
+    TEX_MAX = 512
+    w, h = img.size
+    if max(w, h) > TEX_MAX:
+        f = TEX_MAX / float(max(w, h))
+        img.scale(max(1, int(w * f)), max(1, int(h * f)))
     tex.image = img
     tex.interpolation = "Closest"     # crisp flat swatches; glTF carries NEAREST sampler
     nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
