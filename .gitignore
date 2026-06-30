@@ -4,3 +4,14 @@ New folder/
 
 # Hole-Up: local-only full Kenney model library (pick food from here, but don't ship it)
 hole-up/assets/Models/GLB format/
+
+# Capacitor app wraps — built/signed outside git, live as sibling projects
+all-munkis-app/
+pootery-app/
+slip-studio-app/
+
+# Backend — deployed to NearlyFreeSpeech (PHP+MySQL), not GitHub Pages
+nfsn-api/
+
+# Scratch / archived working copies — never commit
+versions - do not commit/
