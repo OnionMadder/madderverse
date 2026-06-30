@@ -32,12 +32,12 @@
   }
   .item{
     position:relative; flex:0 0 auto; width:var(--iw); height:var(--ih);
-    filter:drop-shadow(0 12px 18px rgba(30,55,75,.28));
     transition:transform .15s ease;
   }
-  .item.done{transform:translateY(-4px) scale(1.02);}
-  .item canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:14px;}
-  .item .clean{z-index:1;}
+  .item.done{transform:translateY(-6px) scale(1.03);}
+  .item canvas{position:absolute;inset:0;width:100%;height:100%;}
+  /* shadow follows the ITEM silhouette, not a square card */
+  .item .clean{z-index:1; filter:drop-shadow(0 12px 16px rgba(30,55,75,.34));}
   .item .goop{z-index:2;cursor:grab;}
   .item.done .goop{pointer-events:none;}
   .label{
@@ -105,16 +105,25 @@
     font-weight:900;color:#e0a72a;font-size:20px;pointer-events:none;animation:earn .9s ease-out forwards;
     text-shadow:0 2px 4px rgba(0,0,0,.18);}
   @keyframes earn{to{transform:translate(-50%,-32px);opacity:0;}}
+  /* next-item button */
+  #next{flex:0 0 auto; align-self:center; margin:0 auto 6px; border:0; cursor:pointer;
+    padding:12px 24px; border-radius:14px; font-size:16px; font-weight:800; color:#fff;
+    background:linear-gradient(180deg,#2f9e6f,#1f7a54); box-shadow:0 6px 16px rgba(31,122,84,.4);
+    animation:pop .25s ease;}
+  #next[hidden]{display:none;}
+  #next:active{transform:scale(.97);}
+  @keyframes pop{0%{transform:scale(.8);opacity:0}100%{transform:scale(1);opacity:1}}
 </style>
 </head>
 <body>
   <div id="fridge">
     <div id="title">
       <h1>🪣 Scrape Prototype</h1>
-      <p>Scrape the slime off — better tools clear it faster. Earn points, buy upgrades.</p>
-      <div id="hud"><span class="coin">💰</span><span id="pts">0</span>&nbsp;pts</div>
+      <p>Pull an item from the fridge and scrape it clean.</p>
+      <div id="hud"><span class="coin">💰</span><span id="pts">0</span>&nbsp;pts&nbsp;·&nbsp;<span id="left">0</span>&nbsp;in&nbsp;fridge</div>
     </div>
     <div id="scene"></div>
+    <button id="next" hidden>Next item ▸</button>
     <div id="tray"></div>
   </div>
 
@@ -200,33 +209,40 @@ var ITEMS = [
   { name:"Munki Mystery Tub", sub:"no label…",  verdict:"Fuzzy! Compost", bad:true,  draw:drawTub,    hue:'#dfe7d8', cap:'#b9c4ad' }
 ];
 
-var IW=200, IH=280, items=[];
-document.documentElement.style.setProperty('--iw', IW+'px');
-document.documentElement.style.setProperty('--ih', IH+'px');
+var IW=200, IH=280, items=[];     // canvas bitmap res (matches the draw coords)
+var nextBtn=document.getElementById('next');
+document.documentElement.style.setProperty('--iw', '264px');   // displayed bigger — one item, centered
+document.documentElement.style.setProperty('--ih', '370px');
 
-function build(){
-  scene.innerHTML='';
-  items=[];
-  ITEMS.forEach(function(cfg){
-    var wrap=document.createElement('div'); wrap.className='item';
-    var clean=document.createElement('canvas'); clean.className='clean'; clean.width=IW; clean.height=IH;
-    var goop=document.createElement('canvas');  goop.className='goop';  goop.width=IW; goop.height=IH;
-    var pct=document.createElement('div'); pct.className='pct'; pct.textContent='0%';
-    var label=document.createElement('div'); label.className='label';
-    label.innerHTML='<span>'+cfg.name+'</span><small>'+cfg.sub+'</small>'+
-      '<small class="verdict'+(cfg.bad?' bad':'')+'">'+cfg.verdict+'</small>';
-    wrap.appendChild(clean); wrap.appendChild(goop); wrap.appendChild(pct); wrap.appendChild(label);
-    scene.appendChild(wrap);
-    // draw the clean item (with spoiled tint if bad)
-    var cctx=clean.getContext('2d');
-    cfg.draw(cctx, cfg);
-    if(cfg.bad) tintSpoiled(cctx, cfg);
-    var rec={cfg:cfg, wrap:wrap, goop:goop, gctx:goop.getContext('2d'), pct:pct,
-             cleaned:0, done:false, last:null, total:0};
-    paintGoop(rec);
-    attach(rec);
-    items.push(rec);
-  });
+/* one item at a time, pulled from a (shuffled) fridge queue */
+var QUEUE=[], queueIdx=0;
+function shuffle(a){ for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+function newFridge(){ QUEUE=shuffle(ITEMS.slice()); queueIdx=0; showCurrent(); }
+function showCurrent(){ buildOne(QUEUE[queueIdx]); updateLeft(); }
+function updateLeft(){ var el=document.getElementById('left'); if(el) el.textContent=(QUEUE.length-queueIdx); }
+function nextItem(){ queueIdx++; if(queueIdx>=QUEUE.length){ newFridge(); } else { showCurrent(); } }
+
+function buildOne(cfg){
+  scene.innerHTML=''; items=[];
+  nextBtn.hidden=true;
+  var wrap=document.createElement('div'); wrap.className='item';
+  var clean=document.createElement('canvas'); clean.className='clean'; clean.width=IW; clean.height=IH;
+  var goop=document.createElement('canvas');  goop.className='goop';  goop.width=IW; goop.height=IH;
+  var pct=document.createElement('div'); pct.className='pct'; pct.textContent='0%';
+  var label=document.createElement('div'); label.className='label';
+  label.innerHTML='<span>'+cfg.name+'</span><small>'+cfg.sub+'</small>'+
+    '<small class="verdict'+(cfg.bad?' bad':'')+'">'+cfg.verdict+'</small>';
+  wrap.appendChild(clean); wrap.appendChild(goop); wrap.appendChild(pct); wrap.appendChild(label);
+  scene.appendChild(wrap);
+  // draw the clean item (with spoiled tint if bad) on a transparent canvas
+  var cctx=clean.getContext('2d');
+  cfg.draw(cctx, cfg);
+  if(cfg.bad) tintSpoiled(cctx, cfg);
+  var rec={cfg:cfg, wrap:wrap, goop:goop, gctx:goop.getContext('2d'), cleanCanvas:clean, pct:pct,
+           cleaned:0, done:false, last:null, goopTotal:1};
+  paintGoop(rec);
+  attach(rec);
+  items=[rec];
 }
 
 /* ---- clean item art (placeholder shapes) ---- */
@@ -316,10 +332,17 @@ function paintGoop(rec){
     ctx.fillStyle='rgba(255,255,255,'+(0.25+Math.random()*0.4)+')';
     ctx.beginPath(); ctx.arc(Math.random()*IW, Math.random()*IH, 1+Math.random()*1.7, 0,7); ctx.fill();
   }
+  // clip the slime to the item's silhouette — slime clings to the ITEM, no square slab
+  ctx.globalCompositeOperation='destination-in';
+  if(rec.cleanCanvas) ctx.drawImage(rec.cleanCanvas, 0, 0);
+  ctx.globalCompositeOperation='source-over';
+  // count remaining goop pixels inside the silhouette (basis for the % meter)
+  var gd=ctx.getImageData(0,0,IW,IH).data, gt=0;
+  for(var q=3;q<gd.length;q+=4){ if(gd[q]>=40) gt++; }
+  rec.goopTotal=gt||1;
   rec.cleaned=0; rec.done=false; rec.last=null;
   rec.wrap.classList.remove('done','revealed');
   rec.pct.textContent='0%'; rec.pct.style.opacity='1';
-  measure(rec);
 }
 
 /* ---- scrub interaction ---- */
@@ -357,9 +380,10 @@ function stroke(rec,x,y,lx,ly){
 /* ---- coverage measure + completion ---- */
 function measure(rec){
   if(rec.done) return;
-  var data=rec.gctx.getImageData(0,0,IW,IH).data, cleared=0, total=IW*IH;
-  for(var i=3;i<data.length;i+=4){ if(data[i]<40) cleared++; }
-  rec.cleaned=cleared/total;
+  var data=rec.gctx.getImageData(0,0,IW,IH).data, remaining=0;
+  for(var i=3;i<data.length;i+=4){ if(data[i]>=40) remaining++; }
+  rec.cleaned = 1 - remaining/rec.goopTotal;
+  if(rec.cleaned<0) rec.cleaned=0;
   rec.pct.textContent=Math.round(rec.cleaned*100)+'%';
   if(rec.cleaned>=T.snap) finish(rec);
 }
@@ -377,6 +401,9 @@ function finish(rec){
     s.style.animationDelay=(i*0.05)+'s'; rec.wrap.appendChild(s);
     setTimeout(function(){ s.remove(); }, 800);
   })(i); }
+  // offer the next item from the fridge
+  nextBtn.hidden=false;
+  nextBtn.textContent = (queueIdx>=QUEUE.length-1) ? 'New fridge ▸' : 'Next item ▸';
 }
 
 /* ---------------- tools / points ---------------- */
@@ -429,13 +456,14 @@ function checkSmall(){ if(window.innerWidth<560){ dev.style.display='none'; tog.
 tog.addEventListener('click',function(){ var open=dev.style.display==='block'; dev.style.display=open?'none':'block'; });
 window.addEventListener('resize',checkSmall);
 
-build();
 selectTool(TOOLS[0]);   // start with hands
+newFridge();            // stock the fridge, show the first item
 renderTray();
 updateHud();
 checkSmall();
-window.__scrub={items:items,T:T,TOOLS:TOOLS,
-  get points(){return points;}, regoop:function(){items.forEach(paintGoop);},
+nextBtn.addEventListener('click', nextItem);
+window.__scrub={get items(){return items;}, T:T, TOOLS:TOOLS,
+  get points(){return points;}, regoop:function(){items.forEach(paintGoop);}, next:nextItem, newFridge:newFridge,
   pick:function(id){var t=TOOLS.filter(function(x){return x.id===id;})[0]; if(t){t.owned=true; selectTool(t); renderTray();}}};
 })();
 </script>
