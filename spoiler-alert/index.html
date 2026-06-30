@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>Spoiler Alert</title>
+
+    <link rel="canonical" href="https://madderverse.org/spoiler-alert/" />
+    <meta property="og:url" content="https://madderverse.org/spoiler-alert/" />
+    <meta name="twitter:url" content="https://madderverse.org/spoiler-alert/" />
+    <meta name="title" content="Spoiler Alert — Clean Out the Fridge. From Madderverse." />
+    <meta name="description" content="Sort the fridge: toss the spoiled stuff, compost the scraps, keep the good food. Read smudged dates, pop mystery tubs, beat the clock. Free, ad-free." />
+    <meta name="keywords" content="spoiler alert, fridge cleaning game, sorting game, expired food, satisfying game, kids game, Madderverse, Onion Madder, Mad Sundar LLC, free ad-free games" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Spoiler Alert — Clean Out the Fridge" />
+    <meta property="og:description" content="Sort the fridge: toss the spoiled stuff, compost the scraps, keep the good food. Read smudged dates, pop mystery tubs, beat the clock." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Spoiler Alert — Clean Out the Fridge" />
+    <meta name="twitter:description" content="Sort the fridge: toss the spoiled, compost the scraps, keep the good food." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#cfe8f0" />
+    <meta name="apple-mobile-web-app-title" content="Spoiler Alert" />
+    <meta name="application-name" content="Spoiler Alert" />
+
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+    <a class="madder-home" href="../" aria-label="Back to Madderverse" title="Back to Madderverse">&#x2302;</a>
+    <div class="madder-controls">
+        <button id="muteBtn" type="button" class="ctl-btn" aria-label="Mute / unmute">&#x1F50A;</button>
+    </div>
+
+    <div id="app">
+        <header id="hud" aria-hidden="false">
+            <div class="hud-cell"><b id="hLvl">1</b><small>Level</small></div>
+            <div class="hud-cell"><b id="hToday">—</b><small>Today</small></div>
+            <div class="hud-cell timer" id="hTimeWrap"><b id="hTime">60</b><small>Time</small></div>
+            <div class="hud-cell"><b id="hScore">0</b><small>Score</small></div>
+            <div class="hud-cell combo" id="hComboWrap"><b id="hCombo">x1</b><small>Combo</small></div>
+        </header>
+
+        <div id="fridge">
+            <div id="grime" aria-hidden="true"></div>
+            <div id="shelves"></div>
+            <div id="bubbles" aria-hidden="true"></div>
+        </div>
+
+        <div id="bins">
+            <button class="bin" data-bin="compost" type="button">
+                <span class="bin-ico">&#x1F331;</span><span class="bin-name">Compost</span>
+            </button>
+            <button class="bin" data-bin="keep" type="button">
+                <span class="bin-ico">&#x2705;</span><span class="bin-name">Keep</span>
+            </button>
+            <button class="bin" data-bin="trash" type="button">
+                <span class="bin-ico">&#x1F5D1;&#xFE0F;</span><span class="bin-name">Trash</span>
+            </button>
+        </div>
+
+        <div id="hint">Drag each item to a bin &middot; tap to take a closer look</div>
+
+        <div id="overlay">
+            <div class="overlay-card" id="overlayCard"></div>
+        </div>
+    </div>
+
+    <footer class="site-footer-slim" aria-label="Site info">
+        <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../">Madderverse</a>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../about.html">About</a>
+    </footer>
+
+    <script src="game.js"></script>
+    <script>document.querySelectorAll('[data-year]').forEach(function (el) { el.textContent = new Date().getFullYear(); });</script>
+</body>
+</html>

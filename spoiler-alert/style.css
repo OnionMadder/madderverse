@@ -1,0 +1,452 @@
+/* ============================================================
+   Spoiler Alert — clean-out-the-fridge sorting game
+   Own clean "kitchen" aesthetic (NOT the neon hub theme):
+   soft whites, fridge-blue interior, chrome shelves.
+   ============================================================ */
+
+:root {
+    --ink: #25303a;
+    --muted: #6a7a86;
+    --fridge-top: #eaf4f8;
+    --fridge-bot: #d3e7ef;
+    --chrome: #b9cdd6;
+    --keep: #2f9e6f;
+    --keep-d: #1f7a54;
+    --compost: #8a6d3b;
+    --compost-d: #6e5328;
+    --trash: #455561;
+    --trash-d: #2f3b44;
+    --good: #2f9e6f;
+    --bad: #d6492f;
+    --pop: #ffce3a;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    background:
+        radial-gradient(120% 100% at 50% 0%, #f5fbfd 0%, #dbeaf1 55%, #c6dbe5 100%);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none;
+}
+
+#app {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    padding: max(8px, env(safe-area-inset-top)) 8px 26px;
+    gap: 8px;
+    max-width: 760px;
+    margin: 0 auto;
+}
+
+/* ---------------- HUD ---------------- */
+#hud {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+    justify-content: space-between;
+    align-items: stretch;
+    padding: 4px 4px 0;
+    margin-top: 4px;
+}
+.hud-cell {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 6px 2px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(120, 150, 165, 0.28);
+    border-radius: 12px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+.hud-cell b {
+    font-size: clamp(15px, 4.4vw, 21px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.3px;
+}
+.hud-cell small {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+    font-weight: 700;
+}
+.hud-cell.combo b { color: var(--keep-d); }
+.hud-cell.combo.hot b { color: var(--bad); }
+.hud-cell.combo.bump { animation: pop 0.32s ease; }
+.hud-cell.timer.low b { color: var(--bad); animation: blink 1s steps(2) infinite; }
+
+@keyframes pop { 0%{transform:scale(1)} 40%{transform:scale(1.28)} 100%{transform:scale(1)} }
+@keyframes blink { 50% { opacity: 0.35; } }
+
+/* ---------------- Fridge ---------------- */
+#fridge {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    border-radius: 18px;
+    padding: 12px 12px 14px;
+    background:
+        linear-gradient(180deg, var(--fridge-top), var(--fridge-bot));
+    border: 3px solid #fff;
+    box-shadow:
+        0 10px 30px rgba(60, 90, 110, 0.22),
+        0 0 0 2px rgba(150, 180, 195, 0.5),
+        inset 0 2px 14px rgba(255, 255, 255, 0.7);
+    overflow: hidden;
+}
+/* subtle interior light from the top */
+#fridge::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0;
+    height: 40%;
+    background: linear-gradient(180deg, rgba(255,255,255,0.55), transparent);
+    pointer-events: none;
+}
+
+#grime {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    background:
+        radial-gradient(60px 40px at 18% 78%, rgba(90, 120, 60, 0.30), transparent 70%),
+        radial-gradient(70px 50px at 82% 30%, rgba(110, 95, 40, 0.26), transparent 70%),
+        radial-gradient(50px 40px at 60% 90%, rgba(80, 110, 70, 0.26), transparent 70%),
+        radial-gradient(40px 30px at 38% 12%, rgba(100, 110, 50, 0.22), transparent 70%);
+    z-index: 1;
+}
+
+#shelves {
+    position: relative;
+    z-index: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+}
+.shelf {
+    position: relative;
+    flex: 1 1 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 4px 6px 10px;
+    border-bottom: 6px solid transparent;
+    border-image: linear-gradient(90deg, transparent, var(--chrome) 12%, #fff 50%, var(--chrome) 88%, transparent) 1;
+}
+.shelf:last-child { border-image: none; }
+
+/* ---------------- Items ---------------- */
+.tile {
+    position: relative;
+    width: clamp(46px, 13vw, 64px);
+    height: clamp(46px, 13vw, 64px);
+    border: 0;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.55);
+    border-radius: 14px;
+    box-shadow: 0 3px 6px rgba(40, 70, 90, 0.18), inset 0 0 0 1px rgba(255,255,255,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.18s ease;
+    animation: drop-in 0.3s cubic-bezier(.2,.9,.3,1.3) both;
+}
+@keyframes drop-in { from { transform: translateY(-14px) scale(.7); opacity: 0; } }
+.tile:active { cursor: grabbing; }
+.tile .glyph {
+    font-size: clamp(28px, 8vw, 40px);
+    line-height: 1;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.18));
+    pointer-events: none;
+}
+
+/* spoiled visual tells */
+.tile.spoiled .glyph { filter: sepia(0.55) hue-rotate(40deg) saturate(1.3) brightness(0.82) drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
+.tile.spoiled::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 12px;
+    pointer-events: none;
+    background:
+        radial-gradient(4px 4px at 24% 30%, rgba(70,120,40,0.95), transparent 70%),
+        radial-gradient(5px 5px at 70% 60%, rgba(90,140,55,0.95), transparent 70%),
+        radial-gradient(3px 3px at 50% 80%, rgba(60,100,35,0.95), transparent 70%),
+        radial-gradient(4px 4px at 80% 25%, rgba(110,150,70,0.9), transparent 70%),
+        radial-gradient(3px 3px at 35% 65%, rgba(80,130,50,0.9), transparent 70%);
+}
+.tile.bulge .glyph { animation: bulge 1.4s ease-in-out infinite; }
+@keyframes bulge { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+
+/* date label */
+.datelabel {
+    position: absolute;
+    left: 50%;
+    bottom: -7px;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    padding: 1px 5px;
+    border-radius: 6px;
+    background: #fffce8;
+    color: #7a5a2a;
+    border: 1px solid rgba(150, 120, 60, 0.4);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+    pointer-events: none;
+}
+.datelabel.smudge { filter: blur(1.4px); opacity: 0.62; letter-spacing: -0.3px; }
+
+/* mystery container badge */
+.mystery-badge {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--pop);
+    color: #5a4500;
+    font-size: 12px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    pointer-events: none;
+}
+.tile.opened .mystery-badge { display: none; }
+
+/* drag clone */
+.drag-clone {
+    position: fixed;
+    z-index: 200;
+    margin: 0;
+    pointer-events: none;
+    transform: scale(1.18) rotate(-3deg);
+    box-shadow: 0 14px 26px rgba(30, 55, 75, 0.35);
+    transition: none;
+    animation: none;
+}
+.tile.lifting { opacity: 0.22; }
+body.dragging { cursor: grabbing; }
+
+/* inspect bubble (magnified date / hint) */
+.bubble {
+    position: fixed;
+    z-index: 150;
+    transform: translate(-50%, -100%);
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: #fffefa;
+    border: 2px solid rgba(120, 100, 50, 0.35);
+    box-shadow: 0 8px 22px rgba(40, 60, 80, 0.28);
+    font-weight: 800;
+    color: #4a3b1c;
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+    animation: pop 0.22s ease;
+}
+.bubble .big { font-size: 22px; letter-spacing: 0.5px; display: block; }
+.bubble .lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+.bubble::after {
+    content: "";
+    position: absolute;
+    left: 50%; bottom: -8px;
+    transform: translateX(-50%);
+    border: 8px solid transparent;
+    border-top-color: #fffefa;
+}
+
+/* ---------------- Bins ---------------- */
+#bins {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    padding: 0 2px;
+}
+.bin {
+    flex: 1 1 0;
+    border: 2px dashed rgba(255, 255, 255, 0.65);
+    border-radius: 16px;
+    padding: 10px 4px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: #fff;
+    cursor: pointer;
+    transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    box-shadow: 0 4px 12px rgba(40, 60, 80, 0.2);
+}
+.bin .bin-ico { font-size: clamp(24px, 7vw, 34px); line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.25)); }
+.bin .bin-name { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; }
+.bin[data-bin="compost"] { background: linear-gradient(180deg, var(--compost), var(--compost-d)); }
+.bin[data-bin="keep"]    { background: linear-gradient(180deg, var(--keep), var(--keep-d)); }
+.bin[data-bin="trash"]   { background: linear-gradient(180deg, var(--trash), var(--trash-d)); }
+.bin.hot {
+    transform: translateY(-4px) scale(1.05);
+    border-color: #fff;
+    box-shadow: 0 8px 20px rgba(40, 60, 80, 0.4), 0 0 0 3px rgba(255,255,255,0.5);
+    filter: brightness(1.12);
+}
+.bin.good-flash { animation: goodflash 0.4s ease; }
+.bin.bad-flash  { animation: badflash 0.4s ease; }
+@keyframes goodflash { 0%,100%{box-shadow:0 4px 12px rgba(40,60,80,0.2)} 40%{box-shadow:0 0 0 5px var(--good)} }
+@keyframes badflash  { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)} }
+
+#hint {
+    flex: 0 0 auto;
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    min-height: 14px;
+    padding-bottom: 2px;
+}
+
+/* score popups + puffs in #bubbles layer */
+#bubbles { position: absolute; inset: 0; pointer-events: none; z-index: 30; }
+.fx {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font-weight: 900;
+    pointer-events: none;
+    animation: rise 0.9s ease-out forwards;
+}
+.fx.plus { color: var(--good); font-size: 20px; text-shadow: 0 2px 4px rgba(0,0,0,0.15); }
+.fx.minus { color: var(--bad); font-size: 18px; }
+.fx.puff { font-size: 30px; animation: puff 0.8s ease-out forwards; }
+@keyframes rise { to { transform: translate(-50%, -150%); opacity: 0; } }
+@keyframes puff { 0%{opacity:0; transform:translate(-50%,-50%) scale(.4)} 30%{opacity:1} 100%{opacity:0; transform:translate(-50%,-120%) scale(1.5)} }
+.sparkle {
+    position: absolute;
+    font-size: 22px;
+    transform: translate(-50%, -50%);
+    animation: sparkle 0.7s ease-out forwards;
+}
+@keyframes sparkle { 0%{opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(0)} 40%{opacity:1} 100%{opacity:0; transform:translate(-50%,-50%) scale(1.4) rotate(120deg)} }
+
+/* ---------------- Overlay (title / summary) ---------------- */
+#overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(210, 230, 238, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+#overlay.hidden { display: none; }
+.overlay-card {
+    width: 100%;
+    max-width: 380px;
+    background: #fff;
+    border-radius: 22px;
+    padding: 26px 24px 24px;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(40, 70, 90, 0.35);
+    border: 3px solid #eaf4f8;
+    animation: drop-in 0.35s cubic-bezier(.2,.9,.3,1.3) both;
+}
+.overlay-card h1 { margin: 0 0 4px; font-size: 32px; letter-spacing: -0.5px; }
+.overlay-card h2 { margin: 0 0 6px; font-size: 24px; }
+.overlay-card .tag { color: var(--muted); font-size: 14px; margin: 0 0 16px; font-weight: 600; }
+.overlay-card p { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 14px; }
+.legend {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin: 0 0 18px;
+    font-size: 12px;
+    font-weight: 700;
+    flex-wrap: wrap;
+}
+.legend span { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; color: var(--ink); }
+.legend .e { font-size: 22px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 4px 0 18px; }
+.stats div {
+    background: #f3f8fa;
+    border-radius: 12px;
+    padding: 8px 6px;
+}
+.stats b { display: block; font-size: 22px; }
+.stats small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 700; }
+.grade { font-size: 46px; line-height: 1; margin: 0 0 6px; }
+.btn {
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+    width: 100%;
+    padding: 14px;
+    border-radius: 14px;
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+    background: linear-gradient(180deg, var(--keep), var(--keep-d));
+    box-shadow: 0 6px 16px rgba(31, 122, 84, 0.4);
+    transition: transform 0.08s ease, filter 0.15s ease;
+}
+.btn:hover { filter: brightness(1.06); }
+.btn:active { transform: scale(0.97); }
+.btn.ghost {
+    background: #f0f5f7;
+    color: var(--ink);
+    box-shadow: none;
+    margin-top: 8px;
+    font-size: 14px;
+    padding: 10px;
+}
+
+/* control button (mute) */
+.ctl-btn {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(120, 150, 165, 0.4);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    font-size: 18px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.08s ease;
+}
+.ctl-btn:active { transform: scale(0.92); }
+.ctl-btn.muted { opacity: 0.5; }
+
+@media (max-width: 380px) {
+    .hud-cell small { font-size: 8px; }
+    .bin .bin-name { font-size: 10px; }
+}
+@media (min-height: 720px) {
+    .tile { width: clamp(54px, 13vw, 70px); height: clamp(54px, 13vw, 70px); }
+}
