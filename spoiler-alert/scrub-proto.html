@@ -79,26 +79,55 @@
   #devToggle{position:fixed;right:8px;bottom:8px;z-index:21;display:none;
     border:0;border-radius:50%;width:40px;height:40px;background:rgba(255,255,255,.9);
     box-shadow:0 6px 14px rgba(40,60,80,.25);font-size:18px;cursor:pointer;}
+
+  /* points HUD */
+  #hud{display:flex;justify-content:center;align-items:center;gap:5px;margin-top:5px;
+    font-weight:800;font-size:15px;color:#3a2f12;}
+  #hud .coin{font-size:16px;}
+  /* tool tray */
+  #tray{flex:0 0 auto;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:6px 10px 14px;}
+  .tool{position:relative;min-width:76px;border:2px solid transparent;cursor:pointer;border-radius:14px;
+    padding:8px 8px 6px;background:rgba(255,255,255,.88);box-shadow:0 4px 10px rgba(40,60,80,.18);
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    transition:transform .1s ease,box-shadow .12s ease,border-color .12s ease,filter .12s ease;}
+  .tool:active{transform:scale(.94);}
+  .tool .ti{font-size:24px;line-height:1;}
+  .tool .tn{font-size:10px;font-weight:800;color:var(--ink);text-transform:uppercase;letter-spacing:.3px;}
+  .tool .tc{font-size:10px;font-weight:800;color:#b07d1a;}
+  .tool.sel{border-color:#2f9e6f;box-shadow:0 6px 16px rgba(47,158,111,.4);}
+  .tool.sel .tc{color:#2f9e6f;}
+  .tool.locked{filter:grayscale(.6);opacity:.7;}
+  .tool.buyable{filter:none;opacity:1;border-color:#ffce3a;animation:buyp 1.4s ease-in-out infinite;}
+  @keyframes buyp{50%{box-shadow:0 6px 16px rgba(255,206,58,.65);}}
+  .tool.cant{animation:cant .3s;}
+  @keyframes cant{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  .earn{position:absolute;left:50%;top:34%;transform:translateX(-50%);z-index:5;
+    font-weight:900;color:#e0a72a;font-size:20px;pointer-events:none;animation:earn .9s ease-out forwards;
+    text-shadow:0 2px 4px rgba(0,0,0,.18);}
+  @keyframes earn{to{transform:translate(-50%,-32px);opacity:0;}}
 </style>
 </head>
 <body>
   <div id="fridge">
     <div id="title">
       <h1>🪣 Scrape Prototype</h1>
-      <p>Drag across each item to scrape the goop off — work it off in a couple of passes. Procedural placeholders.</p>
+      <p>Scrape the slime off — better tools clear it faster. Earn points, buy upgrades.</p>
+      <div id="hud"><span class="coin">💰</span><span id="pts">0</span>&nbsp;pts</div>
     </div>
     <div id="scene"></div>
+    <div id="tray"></div>
   </div>
 
   <button id="devToggle" title="tuning">🎛️</button>
   <div id="dev">
     <h2>Feel tuning</h2>
-    <label>Scraper size <input id="sBrush" type="range" min="14" max="60" value="32"><span class="val" id="vBrush">32</span></label>
-    <label>Scrape bite <input id="sBite" type="range" min="20" max="100" value="50"><span class="val" id="vBite">50</span></label>
-    <label>Goop thickness <input id="sThick" type="range" min="70" max="100" value="97"><span class="val" id="vThick">97</span></label>
+    <label>Tool size <input id="sBrush" type="range" min="14" max="60" value="20"><span class="val" id="vBrush">20</span></label>
+    <label>Tool bite <input id="sBite" type="range" min="20" max="100" value="34"><span class="val" id="vBite">34</span></label>
+    <label>Slime thickness <input id="sThick" type="range" min="45" max="100" value="68"><span class="val" id="vThick">68</span></label>
     <label>Scrape volume <input id="sVol" type="range" min="0" max="100" value="60"><span class="val" id="vVol">60</span></label>
-    <button id="reset">Re-goop everything</button>
-    <div class="hint">Find the satisfying spot, then tell me the numbers and we bake them in + swap real images.</div>
+    <button id="demo">+1000 pts (demo)</button>
+    <button id="reset">New fridge</button>
+    <div class="hint">Tools set size + bite; the top two sliders tweak the selected tool. Tell me the values that feel right.</div>
   </div>
 
 <script>
@@ -109,7 +138,20 @@ var scene = document.getElementById('scene');
 /* ---------------- tuning ----------------
    bite   = how much goop one pass removes (lower = more scraping needed)
    feather= soft fraction of the brush rim (small = hard scrape edge)        */
-var T = { brush:32, bite:0.5, thick:0.97, vol:0.6, snap:0.90, feather:0.14 };
+var T = { brush:20, bite:0.34, thick:0.68, vol:0.6, snap:0.90, feather:0.14 };
+
+/* ---------------- tools / upgrades ----------------
+   start with hands; win points per cleaned item; spend them on better
+   tools. brush = how wide it clears, bite = how much goop per pass.       */
+var points=0, curTool=null, POINTS_PER_ITEM=50;
+var TOOLS=[
+  { id:'hands',   icon:'🖐️', name:'Hands',    brush:20, bite:0.34, cost:0,   owned:true  },
+  { id:'rag',     icon:'🧻', name:'Rag',      brush:30, bite:0.50, cost:60,  owned:false },
+  { id:'sponge',  icon:'🧽', name:'Sponge',   brush:40, bite:0.62, cost:150, owned:false },
+  { id:'scraper', icon:'🥄', name:'Scraper',  brush:26, bite:0.92, cost:300, owned:false },
+  { id:'squeegee',icon:'🪟', name:'Squeegee', brush:48, bite:0.78, cost:500, owned:false },
+  { id:'jet',     icon:'💦', name:'Power Jet',brush:54, bite:1.00, cost:900, owned:false }
+];
 
 /* ---------------- audio: goop scrape ---------------- */
 var AC=null, sprayGain=null, sprayFilter=null, audioReady=false, isDown=false, scrubVel=0;
@@ -238,33 +280,41 @@ function tintSpoiled(ctx,cfg){
 /* ---- goop layer ---- */
 function paintGoop(rec){
   var ctx=rec.gctx; ctx.globalCompositeOperation='source-over'; ctx.clearRect(0,0,IW,IH);
-  var th=T.thick;
-  // thick base muck
-  var base=ctx.createLinearGradient(0,0,IW,IH);
-  base.addColorStop(0,'rgba(84,82,52,'+th+')');
-  base.addColorStop(.5,'rgba(66,74,48,'+th+')');
-  base.addColorStop(1,'rgba(52,58,38,'+th+')');
+  var a=T.thick;   // slime opacity — translucent, so the item ghosts through
+  // translucent green slime base (item shows through, tinted)
+  var base=ctx.createLinearGradient(0,0,0,IH);
+  base.addColorStop(0,'rgba(122,186,76,'+(a*0.78)+')');
+  base.addColorStop(1,'rgba(80,140,58,'+(a*0.92)+')');
   ctx.fillStyle=base; ctx.fillRect(0,0,IW,IH);
-  // chunky 3D globs — lit top-left, shadowed bottom-right so the scraped edge pops
-  for(var i=0;i<22;i++){
-    var x=Math.random()*IW, y=Math.random()*IH, r=14+Math.random()*30;
-    var g=ctx.createRadialGradient(x-r*0.35,y-r*0.35,r*0.1,x,y,r);
-    g.addColorStop(0,'rgba(108,116,74,'+th+')');   // highlight
-    g.addColorStop(0.55,'rgba(68,74,46,'+th+')');
-    g.addColorStop(1,'rgba(40,46,28,'+th+')');     // shadow rim
+  // soft gel blobs — smooth, overlapping, varying green
+  for(var i=0;i<16;i++){
+    var x=Math.random()*IW, y=Math.random()*IH, r=24+Math.random()*42;
+    var g=ctx.createRadialGradient(x,y,r*0.1,x,y,r);
+    g.addColorStop(0,'rgba(146,205,92,'+a+')');
+    g.addColorStop(0.7,'rgba(94,162,68,'+(a*0.8)+')');
+    g.addColorStop(1,'rgba(72,124,52,0)');
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
   }
-  // dark crevices between globs
-  for(var k=0;k<26;k++){
-    var cx=Math.random()*IW, cy=Math.random()*IH, cr=4+Math.random()*12;
-    var cg=ctx.createRadialGradient(cx,cy,0,cx,cy,cr);
-    cg.addColorStop(0,'rgba(28,32,18,'+(0.4+Math.random()*0.4)+')'); cg.addColorStop(1,'rgba(28,32,18,0)');
-    ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(cx,cy,cr,0,7); ctx.fill();
+  // drippy runs hanging downward (slime stretch)
+  for(var d=0;d<7;d++){
+    var dx=16+Math.random()*(IW-32), dy=Math.random()*IH*0.55, dl=22+Math.random()*64, dw=6+Math.random()*8;
+    var dg=ctx.createLinearGradient(dx,dy,dx,dy+dl);
+    dg.addColorStop(0,'rgba(96,166,68,'+a+')'); dg.addColorStop(1,'rgba(96,166,68,0)');
+    ctx.fillStyle=dg; rr(ctx,dx-dw/2,dy,dw,dl,dw/2); ctx.fill();
+    ctx.beginPath(); ctx.arc(dx,dy+dl,dw/2+1,0,7); ctx.fill();   // a drop at the tip
   }
-  // wet specular flecks (grit catching the light)
-  for(var j=0;j<120;j++){
-    ctx.fillStyle='rgba(190,200,160,'+(0.12+Math.random()*0.22)+')';
-    ctx.fillRect(Math.random()*IW, Math.random()*IH, 2, 2);
+  // GLOSS — wet shine highlights = the slimy look
+  for(var h=0;h<11;h++){
+    var hx=Math.random()*IW, hy=Math.random()*IH, hr=7+Math.random()*18;
+    var hg=ctx.createRadialGradient(hx-hr*0.3,hy-hr*0.3,0,hx,hy,hr);
+    hg.addColorStop(0,'rgba(238,255,212,'+(0.30+Math.random()*0.26)+')');
+    hg.addColorStop(1,'rgba(238,255,212,0)');
+    ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(hx,hy,hr,0,7); ctx.fill();
+  }
+  // tiny bright specular pops (wet sparkle)
+  for(var j=0;j<46;j++){
+    ctx.fillStyle='rgba(255,255,255,'+(0.25+Math.random()*0.4)+')';
+    ctx.beginPath(); ctx.arc(Math.random()*IW, Math.random()*IH, 1+Math.random()*1.7, 0,7); ctx.fill();
   }
   rec.cleaned=0; rec.done=false; rec.last=null;
   rec.wrap.classList.remove('done','revealed');
@@ -319,6 +369,7 @@ function finish(rec){
   rec.wrap.classList.add('done','revealed');
   rec.pct.textContent='100%';
   ding();
+  awardPoints(POINTS_PER_ITEM, rec);
   // sparkle sweep
   for(var i=0;i<6;i++){ (function(i){
     var s=document.createElement('div'); s.className='sparkle'; s.textContent='✨';
@@ -326,6 +377,39 @@ function finish(rec){
     s.style.animationDelay=(i*0.05)+'s'; rec.wrap.appendChild(s);
     setTimeout(function(){ s.remove(); }, 800);
   })(i); }
+}
+
+/* ---------------- tools / points ---------------- */
+var tray=document.getElementById('tray'), ptsEl=document.getElementById('pts');
+function updateHud(){ ptsEl.textContent=points; }
+function renderTray(){
+  tray.innerHTML='';
+  TOOLS.forEach(function(t){
+    var b=document.createElement('button'); b.className='tool';
+    if(t===curTool) b.classList.add('sel');
+    if(!t.owned){ b.classList.add('locked'); if(points>=t.cost) b.classList.add('buyable'); }
+    b.innerHTML='<span class="ti">'+t.icon+'</span><span class="tn">'+t.name+'</span>'+
+      '<span class="tc">'+(t.owned?(t===curTool?'using':'equip'):('💰'+t.cost))+'</span>';
+    b.addEventListener('click',function(){ onTool(t,b); });
+    tray.appendChild(b);
+  });
+}
+function onTool(t,b){
+  if(t.owned){ selectTool(t); }
+  else if(points>=t.cost){ points-=t.cost; t.owned=true; selectTool(t); ding(); updateHud(); }
+  else { b.classList.remove('cant'); void b.offsetWidth; b.classList.add('cant'); return; }
+  renderTray();
+}
+function selectTool(t){ curTool=t; T.brush=t.brush; T.bite=t.bite; syncSliders(); }
+function syncSliders(){
+  var sb=document.getElementById('sBrush'), sbi=document.getElementById('sBite');
+  sb.value=Math.round(T.brush); document.getElementById('vBrush').textContent=Math.round(T.brush);
+  sbi.value=Math.round(T.bite*100); document.getElementById('vBite').textContent=Math.round(T.bite*100);
+}
+function awardPoints(n,rec){
+  points+=n; updateHud(); renderTray();
+  if(rec){ var f=document.createElement('div'); f.className='earn'; f.textContent='+'+n;
+    rec.wrap.appendChild(f); setTimeout(function(){ f.remove(); },900); }
 }
 
 /* ---------------- dev panel ---------------- */
@@ -338,6 +422,7 @@ bind('sBite','vBite',100,function(x){ T.bite=x; });
 bind('sThick','vThick',100,function(x){ T.thick=x; items.forEach(paintGoop); });
 bind('sVol','vVol',100,function(x){ T.vol=x; });
 document.getElementById('reset').addEventListener('click',function(){ items.forEach(paintGoop); });
+document.getElementById('demo').addEventListener('click',function(){ points+=1000; updateHud(); renderTray(); });
 // collapse dev panel on small screens
 var dev=document.getElementById('dev'), tog=document.getElementById('devToggle');
 function checkSmall(){ if(window.innerWidth<560){ dev.style.display='none'; tog.style.display='block'; } else { dev.style.display='block'; tog.style.display='none'; } }
@@ -345,8 +430,13 @@ tog.addEventListener('click',function(){ var open=dev.style.display==='block'; d
 window.addEventListener('resize',checkSmall);
 
 build();
+selectTool(TOOLS[0]);   // start with hands
+renderTray();
+updateHud();
 checkSmall();
-window.__scrub={items:items,T:T,regoop:function(){items.forEach(paintGoop);}};
+window.__scrub={items:items,T:T,TOOLS:TOOLS,
+  get points(){return points;}, regoop:function(){items.forEach(paintGoop);},
+  pick:function(id){var t=TOOLS.filter(function(x){return x.id===id;})[0]; if(t){t.owned=true; selectTool(t); renderTray();}}};
 })();
 </script>
 </body>
