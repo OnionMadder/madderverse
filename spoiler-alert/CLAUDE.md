@@ -86,3 +86,39 @@ Standard **flat shape** — do not reorganize:
   it with synthetic pointer events and assert against `window.__spoiler`
   (`score`, `combo`, `items`, `correct/wrong`). `preview_screenshot` has timed
   out here mid-animation — don't depend on it.
+
+## Prototype lineage (scrub direction)
+
+The hub-style tile-sort game is `index.html`/`game.js`. The newer
+*satisfying-cleaning* direction lives in separate prototype pages so the
+shippable game stays intact:
+
+- `scrub-proto.html` — feel sandbox for the PowerWash-style goop scrape
+  (canvas `destination-out` over a clean layer, tool upgrades, translucent slime).
+- `fridge.html` — the "big" scene: CSS French-door fridge that swings open to a
+  grungy stocked interior; grab an item → CSS kitchen-**sink** station (faucet,
+  basin, rising foam suds) → scrub → put away; clear all items → wipe the fridge
+  interior itself. One generic scrub engine (`attachScrub`/`paintSlime`/`strokeT`/
+  `measureT`) powers both items and the interior; `onProgress`/`onDone` hooks drive
+  suds + the washing/faucet state. Debug handle `window.__fridge`.
+
+## 3D items (experimental — Three.js, like Slip Studio)
+
+`item3d.html` is the harness for making items **3D** (the original
+"rotate & examine" idea). Browser/WebGL via **vendored Three.js r165** at
+`vendor/three.module.js` (copied from slip-studio; NOT a CDN — keep it local/
+offline per house style). Approach **A** (chosen): a rotatable 3D model with the
+existing 2D goop layer composited on top — slime is clipped to the *rendered
+model's silhouette* by `destination-in`-drawing the GL canvas into the goop
+canvas (renderer needs `alpha:true` + `preserveDrawingBuffer:true`). Renders
+**on demand** (init / Turn / re-slime), not a continuous rAF loop, so it's
+verifiable even when the preview's animation clock is frozen. Later upgrade =
+per-texel dirt shader so goop persists through free rotation (needs a unique-UV
+unwrap per model in Blender). `window.__item3d` is the debug handle.
+
+**Synty assets:** the user drops POLYGON-pack **FBX**; convert with
+`tools/synty_fbx_to_glb.py` (headless Blender — builds a Principled material
+from the pack's shared atlas at NEAREST filter, embeds it in a self-contained
+GLB). See [[synty-fbx-to-glb]] for gotchas. Swap `buildPlaceholderBottle()` in
+`item3d.html` for a `GLTFLoader` call (marked in code); `GLTFLoader.js` still
+needs vendoring into `vendor/addons/loaders/` when the first GLB lands.

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Spoiler Alert — 3D Item Scrub</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;touch-action:none;color:#25303a;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    background:radial-gradient(130% 100% at 50% 0%,#eef5f9,#cfe0e9 60%,#b8cdd8);}
+  #app{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;}
+  #top{text-align:center;padding:10px 12px 2px;}
+  #top h1{margin:0;font-size:18px;}
+  #top p{margin:3px 0 0;font-size:12px;color:#6a7a86;font-weight:600;}
+  #status{font-size:11px;color:#6a7a86;font-weight:700;min-height:14px;margin-top:2px;}
+
+  #stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;}
+  /* basin-ish frame just to ground the item; real sink CSS lives in fridge.html */
+  .work{position:relative;width:min(300px,82vw);aspect-ratio:5/7;
+    filter:drop-shadow(0 16px 22px rgba(30,55,75,.32));}
+  .work canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:10px;}
+  #gl{z-index:1;}
+  #goop{z-index:2;cursor:grab;}
+  .pct{position:absolute;top:-6px;left:50%;transform:translateX(-50%);z-index:3;font-size:12px;font-weight:800;
+    color:#fff;background:rgba(0,0,0,.45);padding:1px 8px;border-radius:8px;transition:opacity .3s;}
+  .work.done .pct{opacity:0;}
+  .done-badge{position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);z-index:3;opacity:0;transition:opacity .3s;
+    font-size:12px;font-weight:800;color:#2f9e6f;}
+  .work.done .done-badge{opacity:1;}
+
+  #controls{flex:0 0 auto;display:flex;gap:10px;padding:12px;flex-wrap:wrap;justify-content:center;}
+  button{border:0;cursor:pointer;padding:11px 18px;border-radius:13px;font-size:15px;font-weight:800;color:#fff;
+    background:linear-gradient(180deg,#2f9e6f,#1f7a54);box-shadow:0 5px 14px rgba(31,122,84,.4);}
+  button.alt{background:linear-gradient(180deg,#5a8aa8,#3f6b86);box-shadow:0 5px 14px rgba(63,107,134,.4);}
+  button:active{transform:scale(.96);}
+  .sparkle{position:absolute;z-index:4;font-size:22px;pointer-events:none;transform:translate(-50%,-50%);animation:sp .8s ease-out forwards;}
+  @keyframes sp{0%{opacity:0;transform:translate(-50%,-50%) scale(.2)}40%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(130deg)}}
+</style>
+</head>
+<body>
+  <div id="app">
+    <div id="top">
+      <h1>🧪 3D Item Scrub — harness</h1>
+      <p>Procedural placeholder. Your Synty GLB swaps in where marked in the code.</p>
+      <div id="status">loading three.js…</div>
+    </div>
+    <div id="stage">
+      <div class="work" id="work">
+        <canvas id="gl"></canvas>
+        <canvas id="goop"></canvas>
+        <div class="pct" id="pct">0%</div>
+        <div class="done-badge">✨ clean — turn it to check the back</div>
+      </div>
+    </div>
+    <div id="controls">
+      <button class="alt" id="turn">↻ Turn</button>
+      <button class="alt" id="regoop">Re-slime</button>
+      <button id="jet">💦 Power tool</button>
+    </div>
+  </div>
+
+<script type="module">
+import * as THREE from './vendor/three.module.js';
+
+var statusEl=document.getElementById('status');
+var RES_W=300, RES_H=420;                       // canvas bitmap resolution
+var glCanvas=document.getElementById('gl'), goopCanvas=document.getElementById('goop');
+glCanvas.width=RES_W; glCanvas.height=RES_H; goopCanvas.width=RES_W; goopCanvas.height=RES_H;
+var workEl=document.getElementById('work'), pctEl=document.getElementById('pct');
+
+/* ---------------- three.js scene ---------------- */
+var renderer, scene, camera, model;
+try{
+  renderer=new THREE.WebGLRenderer({canvas:glCanvas,alpha:true,antialias:true,preserveDrawingBuffer:true});
+  renderer.setPixelRatio(1); renderer.setSize(RES_W,RES_H,false);
+  scene=new THREE.Scene();
+  camera=new THREE.PerspectiveCamera(42,RES_W/RES_H,0.1,100); camera.position.set(0,0,3.7);
+  scene.add(new THREE.AmbientLight(0xffffff,0.75));
+  var key=new THREE.DirectionalLight(0xffffff,1.1); key.position.set(-2,3,4); scene.add(key);
+  var fill=new THREE.DirectionalLight(0xcfe6ff,0.5); fill.position.set(3,-1,2); scene.add(fill);
+  model=buildPlaceholderBottle();
+  scene.add(model);
+  statusEl.textContent='three r'+THREE.REVISION+' ready · placeholder bottle';
+}catch(e){ statusEl.textContent='WebGL init failed: '+e.message; }
+
+/* ===== PLACEHOLDER MODEL =====
+   Swap this whole function for a GLB load once the Synty FBX is converted:
+
+     import { GLTFLoader } from './vendor/addons/loaders/GLTFLoader.js';
+     new GLTFLoader().load('assets/models/spoilk-milk.glb', g => {
+        model = normalizeFootprint(g.scene); scene.add(model); render(); regoop();
+     });
+   (normalizeFootprint = scale by bounding box so any Synty scale fits the frame,
+    same trick Hole-Up uses.)                                                     */
+function buildPlaceholderBottle(){
+  var g=new THREE.Group();
+  function mat(c){ return new THREE.MeshStandardMaterial({color:c,flatShading:true,roughness:.85,metalness:.05}); }
+  var cream=mat(0xf3ecdc), cap=mat(0xc44f3a), band=mat(0x3f7a3a);
+  var body=new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.62,1.5,18),cream); body.position.y=-0.15; g.add(body);
+  var shoulder=new THREE.Mesh(new THREE.CylinderGeometry(0.62,0.34,0.4,18),cream); shoulder.position.y=0.8; g.add(shoulder);
+  var neck=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.26,0.34,16),cream); neck.position.y=1.15; g.add(neck);
+  var lid=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.2,16),cap); lid.position.y=1.36; g.add(lid);
+  var label=new THREE.Mesh(new THREE.CylinderGeometry(0.635,0.635,0.62,18,1,true),band); label.position.y=-0.2; g.add(label);
+  g.rotation.y=-0.5;
+  return g;
+}
+function render(){ if(renderer) renderer.render(scene,camera); }
+
+/* ---------------- screen-space goop (reveals the 3D render beneath) ---------------- */
+var gctx=goopCanvas.getContext('2d');
+var T={brush:22,bite:0.4,thick:0.66,feather:0.14,snap:0.9};
+var goopTotal=1, done=false, last=null;
+
+function paintSlime(){
+  render();                                   // make sure the GL canvas shows the model (for the silhouette mask)
+  var ctx=gctx,W=RES_W,H=RES_H,a=T.thick;
+  ctx.globalCompositeOperation='source-over'; ctx.clearRect(0,0,W,H);
+  var base=ctx.createLinearGradient(0,0,0,H);
+  base.addColorStop(0,'rgba(122,186,76,'+(a*0.78)+')'); base.addColorStop(1,'rgba(80,140,58,'+(a*0.92)+')');
+  ctx.fillStyle=base; ctx.fillRect(0,0,W,H);
+  var blobs=Math.round(W*H/2500);
+  for(var i=0;i<blobs;i++){var x=Math.random()*W,y=Math.random()*H,r=18+Math.random()*42;
+    var g=ctx.createRadialGradient(x,y,r*0.1,x,y,r);
+    g.addColorStop(0,'rgba(146,205,92,'+a+')'); g.addColorStop(0.7,'rgba(94,162,68,'+(a*0.8)+')'); g.addColorStop(1,'rgba(72,124,52,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();}
+  for(var h=0;h<blobs*0.7;h++){var hx=Math.random()*W,hy=Math.random()*H,hr=6+Math.random()*16;
+    var hg=ctx.createRadialGradient(hx-hr*.3,hy-hr*.3,0,hx,hy,hr);
+    hg.addColorStop(0,'rgba(238,255,212,'+(0.28+Math.random()*0.26)+')'); hg.addColorStop(1,'rgba(238,255,212,0)');
+    ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(hx,hy,hr,0,7); ctx.fill();}
+  for(var s=0;s<W*H/900;s++){ctx.fillStyle='rgba(255,255,255,'+(0.25+Math.random()*0.4)+')';
+    ctx.beginPath(); ctx.arc(Math.random()*W,Math.random()*H,1+Math.random()*1.6,0,7); ctx.fill();}
+  // clip slime to the rendered model's silhouette (the GL canvas alpha)
+  ctx.globalCompositeOperation='destination-in'; ctx.drawImage(glCanvas,0,0,W,H); ctx.globalCompositeOperation='source-over';
+  var gd=ctx.getImageData(0,0,W,H).data,gt=0; for(var q=3;q<gd.length;q+=4){if(gd[q]>=40)gt++;} goopTotal=gt||1;
+  done=false; last=null; workEl.classList.remove('done'); pctEl.textContent='0%';
+}
+function stroke(x,y,lx,ly){
+  var ctx=gctx; ctx.globalCompositeOperation='destination-out';
+  var r=T.brush,dist=Math.hypot(x-lx,y-ly),steps=Math.max(1,dist/(r*0.5)),solid=1-T.feather;
+  for(var i=0;i<=steps;i++){var px=lx+(x-lx)*(i/steps),py=ly+(y-ly)*(i/steps);
+    var g=ctx.createRadialGradient(px,py,0,px,py,r);
+    g.addColorStop(0,'rgba(0,0,0,'+T.bite+')'); g.addColorStop(solid,'rgba(0,0,0,'+T.bite+')'); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.fill();}
+}
+function measure(){ if(done)return;
+  var data=gctx.getImageData(0,0,RES_W,RES_H).data,rem=0;
+  for(var i=3;i<data.length;i+=4){if(data[i]>=40)rem++;}
+  var cleaned=Math.max(0,1-rem/goopTotal); pctEl.textContent=Math.round(cleaned*100)+'%';
+  if(cleaned>=T.snap) finish();
+  return cleaned;
+}
+function finish(){ done=true; gctx.clearRect(0,0,RES_W,RES_H); workEl.classList.add('done');
+  for(var i=0;i<7;i++){(function(i){var s=document.createElement('div');s.className='sparkle';s.textContent='✨';
+    s.style.left=(20+Math.random()*(workEl.clientWidth-40))+'px';s.style.top=(20+Math.random()*(workEl.clientHeight-40))+'px';
+    s.style.animationDelay=(i*.05)+'s';workEl.appendChild(s);setTimeout(function(){s.remove();},800);})(i);} }
+
+/* pointer scrubbing on the goop layer */
+function xy(ev){var r=goopCanvas.getBoundingClientRect();return{x:(ev.clientX-r.left)*(RES_W/r.width),y:(ev.clientY-r.top)*(RES_H/r.height)};}
+function down(ev){ if(done)return;
+  goopCanvas.addEventListener('pointermove',move); goopCanvas.addEventListener('pointerup',up); goopCanvas.addEventListener('pointercancel',up);
+  last=xy(ev); stroke(last.x,last.y,last.x,last.y); measure();
+  try{goopCanvas.setPointerCapture(ev.pointerId);}catch(e){} }
+function move(ev){var p=xy(ev); stroke(p.x,p.y,last.x,last.y); last=p; measure();}
+function up(){goopCanvas.removeEventListener('pointermove',move);goopCanvas.removeEventListener('pointerup',up);goopCanvas.removeEventListener('pointercancel',up);last=null;measure();}
+goopCanvas.addEventListener('pointerdown',down);
+
+/* controls */
+document.getElementById('turn').addEventListener('click',function(){ if(model){model.rotation.y+=Math.PI/4; render(); paintSlime();} });
+document.getElementById('regoop').addEventListener('click',function(){ paintSlime(); });
+document.getElementById('jet').addEventListener('click',function(){ T.brush=52;T.bite=1.0; });
+
+if(renderer){ render(); paintSlime(); }
+window.__item3d={render:render, paintSlime:paintSlime, measure:measure, T:T,
+  scene:function(){return scene;}, model:function(){return model;}, glCanvas:glCanvas, goopCanvas:goopCanvas};
+</script>
+</body>
+</html>
