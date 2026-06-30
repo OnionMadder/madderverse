@@ -36,7 +36,6 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 - Tub's Cookie Cache — arcade muncher: https://madderverse.org/cookie-cache/
 - George's Jump — arcade jumper: https://madderverse.org/georges-jump/
 - GazOnionaire — space-trading economy sim: https://madderverse.org/gazonionaire/
-- Krazy Kritters — match puzzle: https://madderverse.org/krazy-kritters/
 - Friend Picker — silly party toy: https://madderverse.org/friend-picker/
 
 ## Key pages

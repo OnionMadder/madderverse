@@ -38,7 +38,7 @@ The site deploys to GitHub Pages via a **GitHub Actions workflow**, not the lega
 
 Each game directory follows one of two shapes. **Match the existing shape of the game you are editing — do not reorganize.**
 
-- **Flat shape** (most games — `cookie-cache/`, `krazy-kritters/`, `georges-jump/`, `friend-picker/`, `bala-draws/`, `all-monkeys/`): `index.html` + `game.js` + `style.css` at the game root, with `assets/` (typically `audio/`, `img/`, `sprites/`) alongside.
+- **Flat shape** (most games — `cookie-cache/`, `georges-jump/`, `friend-picker/`, `bala-draws/`, `all-monkeys/`): `index.html` + `game.js` + `style.css` at the game root, with `assets/` (typically `audio/`, `img/`, `sprites/`) alongside.
 - **Split shape** (`gazonionaire/` only): `index.html` at root, with `css/style.css`, and `js/` split into `data.js` (constants/economy tables), `game.js` (pure state + rules, no DOM), and `ui.js` (DOM/event layer). Load order in HTML is `data.js` → `game.js` → `ui.js`; preserve that ordering when editing.
 
 Other top-level entries:
@@ -52,7 +52,7 @@ Other top-level entries:
 
 The hub grid lists only finished, shipping games. **Every game directory that is NOT on the hub grid is a work-in-progress** — present on disk and sometimes reachable by direct URL, but deliberately not advertised, and intentionally excluded from `sitemap.xml`, `llms.txt`, and the hub's JSON-LD `ItemList`. Do not add a WIP game to the hub / sitemap / schema until the user says it's ready.
 
-- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, Slip Studio, All Munkis, Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Krazy Kritters, Friend Picker.
+- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, Slip Studio, All Munkis, Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Friend Picker. *(Krazy Kritters was removed 2026-06-30 — migrated to nodehole.com.)*
 - **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `tiny-canvas/` (and any future dir not yet on the grid). `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
 
 ## Conventions worth knowing
