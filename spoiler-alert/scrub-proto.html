@@ -84,8 +84,8 @@
 <body>
   <div id="fridge">
     <div id="title">
-      <h1>🧽 Scrub Prototype</h1>
-      <p>Drag across each item to blast the goop off. Procedural placeholders — real art drops in later.</p>
+      <h1>🪣 Scrape Prototype</h1>
+      <p>Drag across each item to scrape the goop off — work it off in a couple of passes. Procedural placeholders.</p>
     </div>
     <div id="scene"></div>
   </div>
@@ -93,10 +93,10 @@
   <button id="devToggle" title="tuning">🎛️</button>
   <div id="dev">
     <h2>Feel tuning</h2>
-    <label>Brush size <input id="sBrush" type="range" min="10" max="60" value="28"><span class="val" id="vBrush">28</span></label>
-    <label>Edge softness <input id="sSoft" type="range" min="0" max="100" value="55"><span class="val" id="vSoft">55</span></label>
-    <label>Goop thickness <input id="sThick" type="range" min="60" max="100" value="94"><span class="val" id="vThick">94</span></label>
-    <label>Spray volume <input id="sVol" type="range" min="0" max="100" value="55"><span class="val" id="vVol">55</span></label>
+    <label>Scraper size <input id="sBrush" type="range" min="14" max="60" value="32"><span class="val" id="vBrush">32</span></label>
+    <label>Scrape bite <input id="sBite" type="range" min="20" max="100" value="50"><span class="val" id="vBite">50</span></label>
+    <label>Goop thickness <input id="sThick" type="range" min="70" max="100" value="97"><span class="val" id="vThick">97</span></label>
+    <label>Scrape volume <input id="sVol" type="range" min="0" max="100" value="60"><span class="val" id="vVol">60</span></label>
     <button id="reset">Re-goop everything</button>
     <div class="hint">Find the satisfying spot, then tell me the numbers and we bake them in + swap real images.</div>
   </div>
@@ -106,19 +106,21 @@
 "use strict";
 var scene = document.getElementById('scene');
 
-/* ---------------- tuning ---------------- */
-var T = { brush:28, soft:0.55, thick:0.94, vol:0.55, snap:0.90 };
+/* ---------------- tuning ----------------
+   bite   = how much goop one pass removes (lower = more scraping needed)
+   feather= soft fraction of the brush rim (small = hard scrape edge)        */
+var T = { brush:32, bite:0.5, thick:0.97, vol:0.6, snap:0.90, feather:0.14 };
 
-/* ---------------- audio: powerwash spray ---------------- */
-var AC=null, sprayGain=null, sprayFilter=null, targetSpray=0, audioReady=false;
+/* ---------------- audio: goop scrape ---------------- */
+var AC=null, sprayGain=null, sprayFilter=null, audioReady=false, isDown=false, scrubVel=0;
 function unlock(){
   if(audioReady) return;
   try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
-  // looping noise = the spray hiss
+  // looping noise = the gritty scrape; low bandpass + speed-driven gain
   var n = Math.floor(AC.sampleRate*1.2), buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
   for(var i=0;i<n;i++) d[i]=Math.random()*2-1;
   var src=AC.createBufferSource(); src.buffer=buf; src.loop=true;
-  sprayFilter=AC.createBiquadFilter(); sprayFilter.type='bandpass'; sprayFilter.frequency.value=1400; sprayFilter.Q.value=0.7;
+  sprayFilter=AC.createBiquadFilter(); sprayFilter.type='bandpass'; sprayFilter.frequency.value=320; sprayFilter.Q.value=1.3;
   sprayGain=AC.createGain(); sprayGain.gain.value=0;
   src.connect(sprayFilter); sprayFilter.connect(sprayGain); sprayGain.connect(AC.destination);
   src.start();
@@ -127,11 +129,12 @@ function unlock(){
 }
 function rampSpray(){
   if(!audioReady){ return; }
+  scrubVel *= 0.82;                                  // decay between frames
+  var target = isDown ? T.vol*(0.16 + 0.84*scrubVel) : 0;   // silent unless actually moving
   var g=sprayGain.gain.value;
-  g += (targetSpray - g) * 0.25;
+  g += (target - g) * 0.3;
   sprayGain.gain.value = g;
-  // a little brighter/faster-feeling when scrubbing hard
-  sprayFilter.frequency.value = 1100 + targetSpray*2600;
+  sprayFilter.frequency.value = 240 + scrubVel*620;  // low + gritty, rises with scrape speed
   requestAnimationFrame(rampSpray);
 }
 function ding(){
@@ -235,23 +238,32 @@ function tintSpoiled(ctx,cfg){
 /* ---- goop layer ---- */
 function paintGoop(rec){
   var ctx=rec.gctx; ctx.globalCompositeOperation='source-over'; ctx.clearRect(0,0,IW,IH);
-  // base muck
+  var th=T.thick;
+  // thick base muck
   var base=ctx.createLinearGradient(0,0,IW,IH);
-  base.addColorStop(0,'rgba(86,80,54,'+T.thick+')');
-  base.addColorStop(.5,'rgba(70,78,52,'+T.thick+')');
-  base.addColorStop(1,'rgba(58,64,44,'+T.thick+')');
+  base.addColorStop(0,'rgba(84,82,52,'+th+')');
+  base.addColorStop(.5,'rgba(66,74,48,'+th+')');
+  base.addColorStop(1,'rgba(52,58,38,'+th+')');
   ctx.fillStyle=base; ctx.fillRect(0,0,IW,IH);
-  // darker grime splotches
-  for(var i=0;i<40;i++){
-    var x=Math.random()*IW, y=Math.random()*IH, r=10+Math.random()*34;
-    var g=ctx.createRadialGradient(x,y,0,x,y,r);
-    g.addColorStop(0,'rgba(40,46,28,'+(0.25+Math.random()*0.35)+')');
-    g.addColorStop(1,'rgba(40,46,28,0)');
+  // chunky 3D globs — lit top-left, shadowed bottom-right so the scraped edge pops
+  for(var i=0;i<22;i++){
+    var x=Math.random()*IW, y=Math.random()*IH, r=14+Math.random()*30;
+    var g=ctx.createRadialGradient(x-r*0.35,y-r*0.35,r*0.1,x,y,r);
+    g.addColorStop(0,'rgba(108,116,74,'+th+')');   // highlight
+    g.addColorStop(0.55,'rgba(68,74,46,'+th+')');
+    g.addColorStop(1,'rgba(40,46,28,'+th+')');     // shadow rim
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
   }
-  // fine speckle
-  for(var j=0;j<450;j++){
-    ctx.fillStyle='rgba('+(30+Math.random()*60|0)+','+(40+Math.random()*60|0)+',30,'+(Math.random()*0.4)+')';
+  // dark crevices between globs
+  for(var k=0;k<26;k++){
+    var cx=Math.random()*IW, cy=Math.random()*IH, cr=4+Math.random()*12;
+    var cg=ctx.createRadialGradient(cx,cy,0,cx,cy,cr);
+    cg.addColorStop(0,'rgba(28,32,18,'+(0.4+Math.random()*0.4)+')'); cg.addColorStop(1,'rgba(28,32,18,0)');
+    ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(cx,cy,cr,0,7); ctx.fill();
+  }
+  // wet specular flecks (grit catching the light)
+  for(var j=0;j<120;j++){
+    ctx.fillStyle='rgba(190,200,160,'+(0.12+Math.random()*0.22)+')';
     ctx.fillRect(Math.random()*IW, Math.random()*IH, 2, 2);
   }
   rec.cleaned=0; rec.done=false; rec.last=null;
@@ -267,24 +279,24 @@ function attach(rec){
     return { x:(ev.clientX-r.left)*(IW/r.width), y:(ev.clientY-r.top)*(IH/r.height) }; }
   function down(ev){ if(rec.done) return; unlock();
     el.addEventListener('pointermove',move); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
-    rec.last=xy(ev); stroke(rec,rec.last.x,rec.last.y,rec.last.x,rec.last.y);
-    targetSpray=T.vol;
+    isDown=true; rec.last=xy(ev); stroke(rec,rec.last.x,rec.last.y,rec.last.x,rec.last.y);
     try{ el.setPointerCapture(ev.pointerId); }catch(e){ /* non-fatal */ }
   }
-  function move(ev){ var p=xy(ev); stroke(rec,p.x,p.y,rec.last.x,rec.last.y); rec.last=p; targetSpray=T.vol; }
+  function move(ev){ var p=xy(ev); stroke(rec,p.x,p.y,rec.last.x,rec.last.y); rec.last=p; }
   function up(ev){ el.removeEventListener('pointermove',move); el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',up);
-    rec.last=null; targetSpray=0; measure(rec); }
+    rec.last=null; isDown=false; measure(rec); }
   el.addEventListener('pointerdown',down);
 }
 function stroke(rec,x,y,lx,ly){
   var ctx=rec.gctx; ctx.globalCompositeOperation='destination-out';
-  var r=T.brush, dist=Math.hypot(x-lx,y-ly), steps=Math.max(1,dist/(r*0.35));
+  var r=T.brush, dist=Math.hypot(x-lx,y-ly), steps=Math.max(1,dist/(r*0.5));
+  scrubVel = Math.min(1, dist/22);           // drives the scrape sound
+  var solid = 1 - T.feather;                 // hard until the very rim
   for(var i=0;i<=steps;i++){
     var px=lx+(x-lx)*(i/steps), py=ly+(y-ly)*(i/steps);
     var g=ctx.createRadialGradient(px,py,0,px,py,r);
-    var hard=1-T.soft;                       // soft=0 -> hard edge, soft=1 -> very feathered
-    g.addColorStop(0,'rgba(0,0,0,1)');
-    g.addColorStop(Math.max(0.01,hard),'rgba(0,0,0,1)');
+    g.addColorStop(0,'rgba(0,0,0,'+T.bite+')');     // each pass only takes a BITE...
+    g.addColorStop(solid,'rgba(0,0,0,'+T.bite+')'); // ...so goop works off in ~2 passes
     g.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.fill();
   }
@@ -322,8 +334,8 @@ function bind(id,vid,scale,fn){
   s.addEventListener('input',function(){ v.textContent=s.value; fn(parseFloat(s.value)/scale); });
 }
 bind('sBrush','vBrush',1,function(x){ T.brush=x; });
-bind('sSoft','vSoft',100,function(x){ T.soft=x; });
-bind('sThick','vThick',100,function(x){ T.thick=x; });
+bind('sBite','vBite',100,function(x){ T.bite=x; });
+bind('sThick','vThick',100,function(x){ T.thick=x; items.forEach(paintGoop); });
 bind('sVol','vVol',100,function(x){ T.vol=x; });
 document.getElementById('reset').addEventListener('click',function(){ items.forEach(paintGoop); });
 // collapse dev panel on small screens
