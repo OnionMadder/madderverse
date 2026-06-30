@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>Spoiler Alert — Scrub Prototype</title>
+<style>
+  :root{
+    --ink:#25303a; --muted:#6a7a86;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;overflow:hidden;touch-action:none;
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:var(--ink);}
+  /* placeholder "fridge interior" backdrop — real photo drops in here later */
+  #fridge{
+    position:fixed; inset:0;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.10), rgba(0,0,0,.18)),
+      repeating-linear-gradient(180deg,#cfe0e8 0 116px,#c0d4dd 116px 122px),
+      linear-gradient(180deg,#dfeef4,#bcd2dc);
+    display:flex; flex-direction:column;
+  }
+  #title{
+    padding:10px 14px 4px; text-align:center;
+  }
+  #title h1{margin:0;font-size:20px;letter-spacing:-.3px;}
+  #title p{margin:2px 0 0;font-size:12px;color:var(--muted);font-weight:600;}
+
+  #scene{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    gap:clamp(10px,4vw,40px); flex-wrap:wrap; padding:10px;
+  }
+  .item{
+    position:relative; flex:0 0 auto; width:var(--iw); height:var(--ih);
+    filter:drop-shadow(0 12px 18px rgba(30,55,75,.28));
+    transition:transform .15s ease;
+  }
+  .item.done{transform:translateY(-4px) scale(1.02);}
+  .item canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:14px;}
+  .item .clean{z-index:1;}
+  .item .goop{z-index:2;cursor:grab;}
+  .item.done .goop{pointer-events:none;}
+  .label{
+    position:absolute; left:50%; bottom:-30px; transform:translateX(-50%) translateY(6px);
+    z-index:3; white-space:nowrap; opacity:0; transition:opacity .35s ease, transform .35s ease;
+    background:#fffdf4; border:2px solid rgba(150,120,60,.4); border-radius:11px;
+    padding:5px 12px; font-weight:800; font-size:14px; color:#4a3b1c;
+    box-shadow:0 6px 14px rgba(40,60,80,.25); text-align:center;
+  }
+  .label small{display:block;font-size:10px;font-weight:700;letter-spacing:.4px;}
+  .label .verdict{color:#2f9e6f;} .label .verdict.bad{color:#d6492f;}
+  .item.revealed .label{opacity:1; transform:translateX(-50%) translateY(0);}
+  .pct{
+    position:absolute; top:6px; left:50%; transform:translateX(-50%); z-index:3;
+    font-size:11px; font-weight:800; color:#fff; background:rgba(0,0,0,.4);
+    padding:1px 7px; border-radius:8px; pointer-events:none; transition:opacity .3s;
+  }
+  .item.done .pct{opacity:0;}
+
+  .sparkle{position:absolute;z-index:4;font-size:22px;pointer-events:none;
+    transform:translate(-50%,-50%);animation:sp .7s ease-out forwards;}
+  @keyframes sp{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(0)}
+    40%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1.5) rotate(140deg)}}
+
+  /* dev panel */
+  #dev{
+    position:fixed; right:8px; bottom:8px; z-index:20;
+    background:rgba(255,255,255,.92); border:1px solid rgba(120,150,165,.4);
+    border-radius:12px; padding:10px 12px; font-size:12px; width:208px;
+    box-shadow:0 8px 22px rgba(40,60,80,.25); backdrop-filter:blur(6px);
+  }
+  #dev h2{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);}
+  #dev label{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:5px 0;font-weight:600;}
+  #dev input[type=range]{flex:1;}
+  #dev .val{width:34px;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums;}
+  #dev button{width:100%;margin-top:8px;padding:8px;border:0;border-radius:9px;cursor:pointer;
+    font-weight:800;color:#fff;background:linear-gradient(180deg,#2f9e6f,#1f7a54);}
+  #dev .hint{margin-top:6px;font-size:10px;color:var(--muted);line-height:1.3;}
+  #devToggle{position:fixed;right:8px;bottom:8px;z-index:21;display:none;
+    border:0;border-radius:50%;width:40px;height:40px;background:rgba(255,255,255,.9);
+    box-shadow:0 6px 14px rgba(40,60,80,.25);font-size:18px;cursor:pointer;}
+</style>
+</head>
+<body>
+  <div id="fridge">
+    <div id="title">
+      <h1>🧽 Scrub Prototype</h1>
+      <p>Drag across each item to blast the goop off. Procedural placeholders — real art drops in later.</p>
+    </div>
+    <div id="scene"></div>
+  </div>
+
+  <button id="devToggle" title="tuning">🎛️</button>
+  <div id="dev">
+    <h2>Feel tuning</h2>
+    <label>Brush size <input id="sBrush" type="range" min="10" max="60" value="28"><span class="val" id="vBrush">28</span></label>
+    <label>Edge softness <input id="sSoft" type="range" min="0" max="100" value="55"><span class="val" id="vSoft">55</span></label>
+    <label>Goop thickness <input id="sThick" type="range" min="60" max="100" value="94"><span class="val" id="vThick">94</span></label>
+    <label>Spray volume <input id="sVol" type="range" min="0" max="100" value="55"><span class="val" id="vVol">55</span></label>
+    <button id="reset">Re-goop everything</button>
+    <div class="hint">Find the satisfying spot, then tell me the numbers and we bake them in + swap real images.</div>
+  </div>
+
+<script>
+(function(){
+"use strict";
+var scene = document.getElementById('scene');
+
+/* ---------------- tuning ---------------- */
+var T = { brush:28, soft:0.55, thick:0.94, vol:0.55, snap:0.90 };
+
+/* ---------------- audio: powerwash spray ---------------- */
+var AC=null, sprayGain=null, sprayFilter=null, targetSpray=0, audioReady=false;
+function unlock(){
+  if(audioReady) return;
+  try{ AC = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  // looping noise = the spray hiss
+  var n = Math.floor(AC.sampleRate*1.2), buf=AC.createBuffer(1,n,AC.sampleRate), d=buf.getChannelData(0);
+  for(var i=0;i<n;i++) d[i]=Math.random()*2-1;
+  var src=AC.createBufferSource(); src.buffer=buf; src.loop=true;
+  sprayFilter=AC.createBiquadFilter(); sprayFilter.type='bandpass'; sprayFilter.frequency.value=1400; sprayFilter.Q.value=0.7;
+  sprayGain=AC.createGain(); sprayGain.gain.value=0;
+  src.connect(sprayFilter); sprayFilter.connect(sprayGain); sprayGain.connect(AC.destination);
+  src.start();
+  audioReady=true;
+  rampSpray();
+}
+function rampSpray(){
+  if(!audioReady){ return; }
+  var g=sprayGain.gain.value;
+  g += (targetSpray - g) * 0.25;
+  sprayGain.gain.value = g;
+  // a little brighter/faster-feeling when scrubbing hard
+  sprayFilter.frequency.value = 1100 + targetSpray*2600;
+  requestAnimationFrame(rampSpray);
+}
+function ding(){
+  if(!audioReady) return;
+  [880,1320,1760].forEach(function(f,i){
+    setTimeout(function(){
+      var o=AC.createOscillator(), g=AC.createGain(), t=AC.currentTime;
+      o.type='triangle'; o.frequency.value=f;
+      g.gain.setValueAtTime(.0001,t); g.gain.exponentialRampToValueAtTime(.18,t+.01);
+      g.gain.exponentialRampToValueAtTime(.0001,t+.3);
+      o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+.32);
+    }, i*70);
+  });
+}
+
+/* ---------------- procedural items ---------------- */
+// each: name = wacky madderverse label; real = under-the-goop verdict
+var ITEMS = [
+  { name:"Onion's Ranch", sub:"USE BY Jul 14", verdict:"Looks fine", bad:false, draw:drawBottle, hue:'#fbf7ee', cap:'#7fb24a' },
+  { name:"Spoilk Milk",    sub:"USE BY Jun 02", verdict:"Curdled — toss it", bad:true,  draw:drawCarton, hue:'#eef4f7', cap:'#cdd6da' },
+  { name:"Munki Mystery Tub", sub:"no label…",  verdict:"Fuzzy! Compost", bad:true,  draw:drawTub,    hue:'#dfe7d8', cap:'#b9c4ad' }
+];
+
+var IW=200, IH=280, items=[];
+document.documentElement.style.setProperty('--iw', IW+'px');
+document.documentElement.style.setProperty('--ih', IH+'px');
+
+function build(){
+  scene.innerHTML='';
+  items=[];
+  ITEMS.forEach(function(cfg){
+    var wrap=document.createElement('div'); wrap.className='item';
+    var clean=document.createElement('canvas'); clean.className='clean'; clean.width=IW; clean.height=IH;
+    var goop=document.createElement('canvas');  goop.className='goop';  goop.width=IW; goop.height=IH;
+    var pct=document.createElement('div'); pct.className='pct'; pct.textContent='0%';
+    var label=document.createElement('div'); label.className='label';
+    label.innerHTML='<span>'+cfg.name+'</span><small>'+cfg.sub+'</small>'+
+      '<small class="verdict'+(cfg.bad?' bad':'')+'">'+cfg.verdict+'</small>';
+    wrap.appendChild(clean); wrap.appendChild(goop); wrap.appendChild(pct); wrap.appendChild(label);
+    scene.appendChild(wrap);
+    // draw the clean item (with spoiled tint if bad)
+    var cctx=clean.getContext('2d');
+    cfg.draw(cctx, cfg);
+    if(cfg.bad) tintSpoiled(cctx, cfg);
+    var rec={cfg:cfg, wrap:wrap, goop:goop, gctx:goop.getContext('2d'), pct:pct,
+             cleaned:0, done:false, last:null, total:0};
+    paintGoop(rec);
+    attach(rec);
+    items.push(rec);
+  });
+}
+
+/* ---- clean item art (placeholder shapes) ---- */
+function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function drawBottle(ctx,cfg){
+  ctx.clearRect(0,0,IW,IH);
+  ctx.fillStyle=cfg.cap; rr(ctx,82,18,36,26,6); ctx.fill();      // cap
+  ctx.fillStyle=cfg.hue; rr(ctx,86,40,28,34,8); ctx.fill();      // neck
+  var g=ctx.createLinearGradient(50,0,150,0);
+  g.addColorStop(0,'#e9e2d2'); g.addColorStop(.5,cfg.hue); g.addColorStop(1,'#d7cdb8');
+  ctx.fillStyle=g; rr(ctx,52,70,96,190,18); ctx.fill();          // body
+  ctx.fillStyle='#c94f3d'; rr(ctx,60,120,80,80,8); ctx.fill();   // label band
+  ctx.fillStyle='#fff'; ctx.font='bold 13px Inter,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('RANCH',100,150); ctx.font='9px Inter,sans-serif'; ctx.fillText('dressing',100,168);
+}
+function drawCarton(ctx,cfg){
+  ctx.clearRect(0,0,IW,IH);
+  ctx.fillStyle=cfg.hue; ctx.beginPath();
+  ctx.moveTo(60,70); ctx.lineTo(100,40); ctx.lineTo(140,70); ctx.lineTo(140,256);
+  ctx.lineTo(60,256); ctx.closePath(); ctx.fill();
+  ctx.fillStyle=cfg.cap; rr(ctx,92,30,16,18,3); ctx.fill();
+  ctx.fillStyle='#5aa0d6'; rr(ctx,70,120,60,70,6); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.font='bold 12px Inter,sans-serif'; ctx.textAlign='center';
+  ctx.fillText('MILK',100,150); ctx.font='9px Inter,sans-serif'; ctx.fillText('whole',100,167);
+}
+function drawTub(ctx,cfg){
+  ctx.clearRect(0,0,IW,IH);
+  ctx.fillStyle=cfg.cap; rr(ctx,44,78,112,22,8); ctx.fill();       // lid
+  var g=ctx.createLinearGradient(0,90,0,250);
+  g.addColorStop(0,cfg.hue); g.addColorStop(1,'#cdd6c2');
+  ctx.fillStyle=g; ctx.beginPath();
+  ctx.moveTo(52,96); ctx.lineTo(148,96); ctx.lineTo(138,250); ctx.lineTo(62,250); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.12)'; ctx.lineWidth=2; ctx.stroke();
+}
+function tintSpoiled(ctx,cfg){
+  // greenish bloom + a few mold dots showing the contents went bad
+  ctx.save(); ctx.globalCompositeOperation='source-atop';
+  var g=ctx.createRadialGradient(100,170,10,100,170,120);
+  g.addColorStop(0,'rgba(96,140,60,.55)'); g.addColorStop(1,'rgba(96,140,60,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,IW,IH);
+  for(var i=0;i<14;i++){
+    var x=40+Math.random()*120, y=110+Math.random()*120, r=2+Math.random()*5;
+    ctx.fillStyle='rgba('+(40+Math.random()*40|0)+',' + (90+Math.random()*50|0) + ',40,.85)';
+    ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* ---- goop layer ---- */
+function paintGoop(rec){
+  var ctx=rec.gctx; ctx.globalCompositeOperation='source-over'; ctx.clearRect(0,0,IW,IH);
+  // base muck
+  var base=ctx.createLinearGradient(0,0,IW,IH);
+  base.addColorStop(0,'rgba(86,80,54,'+T.thick+')');
+  base.addColorStop(.5,'rgba(70,78,52,'+T.thick+')');
+  base.addColorStop(1,'rgba(58,64,44,'+T.thick+')');
+  ctx.fillStyle=base; ctx.fillRect(0,0,IW,IH);
+  // darker grime splotches
+  for(var i=0;i<40;i++){
+    var x=Math.random()*IW, y=Math.random()*IH, r=10+Math.random()*34;
+    var g=ctx.createRadialGradient(x,y,0,x,y,r);
+    g.addColorStop(0,'rgba(40,46,28,'+(0.25+Math.random()*0.35)+')');
+    g.addColorStop(1,'rgba(40,46,28,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.fill();
+  }
+  // fine speckle
+  for(var j=0;j<450;j++){
+    ctx.fillStyle='rgba('+(30+Math.random()*60|0)+','+(40+Math.random()*60|0)+',30,'+(Math.random()*0.4)+')';
+    ctx.fillRect(Math.random()*IW, Math.random()*IH, 2, 2);
+  }
+  rec.cleaned=0; rec.done=false; rec.last=null;
+  rec.wrap.classList.remove('done','revealed');
+  rec.pct.textContent='0%'; rec.pct.style.opacity='1';
+  measure(rec);
+}
+
+/* ---- scrub interaction ---- */
+function attach(rec){
+  var el=rec.goop;
+  function xy(ev){ var r=el.getBoundingClientRect();
+    return { x:(ev.clientX-r.left)*(IW/r.width), y:(ev.clientY-r.top)*(IH/r.height) }; }
+  function down(ev){ if(rec.done) return; unlock();
+    el.addEventListener('pointermove',move); el.addEventListener('pointerup',up); el.addEventListener('pointercancel',up);
+    rec.last=xy(ev); stroke(rec,rec.last.x,rec.last.y,rec.last.x,rec.last.y);
+    targetSpray=T.vol;
+    try{ el.setPointerCapture(ev.pointerId); }catch(e){ /* non-fatal */ }
+  }
+  function move(ev){ var p=xy(ev); stroke(rec,p.x,p.y,rec.last.x,rec.last.y); rec.last=p; targetSpray=T.vol; }
+  function up(ev){ el.removeEventListener('pointermove',move); el.removeEventListener('pointerup',up); el.removeEventListener('pointercancel',up);
+    rec.last=null; targetSpray=0; measure(rec); }
+  el.addEventListener('pointerdown',down);
+}
+function stroke(rec,x,y,lx,ly){
+  var ctx=rec.gctx; ctx.globalCompositeOperation='destination-out';
+  var r=T.brush, dist=Math.hypot(x-lx,y-ly), steps=Math.max(1,dist/(r*0.35));
+  for(var i=0;i<=steps;i++){
+    var px=lx+(x-lx)*(i/steps), py=ly+(y-ly)*(i/steps);
+    var g=ctx.createRadialGradient(px,py,0,px,py,r);
+    var hard=1-T.soft;                       // soft=0 -> hard edge, soft=1 -> very feathered
+    g.addColorStop(0,'rgba(0,0,0,1)');
+    g.addColorStop(Math.max(0.01,hard),'rgba(0,0,0,1)');
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.fill();
+  }
+  rec._dirty=true;
+  if(!rec._raf){ rec._raf=requestAnimationFrame(function(){ rec._raf=0; if(rec._dirty){rec._dirty=false; measure(rec);} }); }
+}
+
+/* ---- coverage measure + completion ---- */
+function measure(rec){
+  if(rec.done) return;
+  var data=rec.gctx.getImageData(0,0,IW,IH).data, cleared=0, total=IW*IH;
+  for(var i=3;i<data.length;i+=4){ if(data[i]<40) cleared++; }
+  rec.cleaned=cleared/total;
+  rec.pct.textContent=Math.round(rec.cleaned*100)+'%';
+  if(rec.cleaned>=T.snap) finish(rec);
+}
+function finish(rec){
+  rec.done=true;
+  rec.gctx.clearRect(0,0,IW,IH);        // snap the last flecks away
+  rec.wrap.classList.add('done','revealed');
+  rec.pct.textContent='100%';
+  ding();
+  // sparkle sweep
+  for(var i=0;i<6;i++){ (function(i){
+    var s=document.createElement('div'); s.className='sparkle'; s.textContent='✨';
+    s.style.left=(20+Math.random()*(IW-40))+'px'; s.style.top=(20+Math.random()*(IH-40))+'px';
+    s.style.animationDelay=(i*0.05)+'s'; rec.wrap.appendChild(s);
+    setTimeout(function(){ s.remove(); }, 800);
+  })(i); }
+}
+
+/* ---------------- dev panel ---------------- */
+function bind(id,vid,scale,fn){
+  var s=document.getElementById(id), v=document.getElementById(vid);
+  s.addEventListener('input',function(){ v.textContent=s.value; fn(parseFloat(s.value)/scale); });
+}
+bind('sBrush','vBrush',1,function(x){ T.brush=x; });
+bind('sSoft','vSoft',100,function(x){ T.soft=x; });
+bind('sThick','vThick',100,function(x){ T.thick=x; });
+bind('sVol','vVol',100,function(x){ T.vol=x; });
+document.getElementById('reset').addEventListener('click',function(){ items.forEach(paintGoop); });
+// collapse dev panel on small screens
+var dev=document.getElementById('dev'), tog=document.getElementById('devToggle');
+function checkSmall(){ if(window.innerWidth<560){ dev.style.display='none'; tog.style.display='block'; } else { dev.style.display='block'; tog.style.display='none'; } }
+tog.addEventListener('click',function(){ var open=dev.style.display==='block'; dev.style.display=open?'none':'block'; });
+window.addEventListener('resize',checkSmall);
+
+build();
+checkSmall();
+window.__scrub={items:items,T:T,regoop:function(){items.forEach(paintGoop);}};
+})();
+</script>
+</body>
+</html>
