@@ -74,27 +74,78 @@
   #fridge.open .tap-hint{display:none;}
   @keyframes pulse{50%{opacity:.45;}}
 
-  /* ---------- cleaning station ---------- */
+  /* ---------- cleaning station: the sink ---------- */
   #station{position:fixed;inset:0;z-index:30;display:none;flex-direction:column;align-items:center;justify-content:center;
-    background:rgba(40,60,75,.55);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);}
+    background:rgba(30,45,58,.6);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);padding-bottom:74px;}
   #station.open{display:flex;}
-  #station .counter{font-size:12px;color:#e7f0f4;font-weight:700;margin-bottom:6px;}
-  .work{position:relative;width:264px;height:370px;animation:rise .35s cubic-bezier(.2,.9,.3,1.3) both;}
-  @keyframes rise{from{transform:translateY(40px) scale(.9);opacity:0;}}
+  .counter-label{font-size:12px;color:#e7f0f4;font-weight:700;margin-bottom:10px;letter-spacing:.3px;}
+
+  .sink{position:relative;width:min(330px,90vw);height:min(470px,62vh);}
+  /* tiled backsplash */
+  .backsplash{position:absolute;top:0;left:0;right:0;height:46%;border-radius:12px 12px 0 0;
+    background:
+      repeating-linear-gradient(90deg,rgba(0,0,0,.06) 0 1px,transparent 1px 48px),
+      repeating-linear-gradient(0deg,rgba(0,0,0,.06) 0 1px,transparent 1px 38px),
+      linear-gradient(180deg,#e7eff3,#d3dee4);
+    box-shadow:inset 0 0 20px rgba(0,0,0,.1);}
+  /* wooden counter ledge */
+  .counter-top{position:absolute;bottom:0;left:-18px;right:-18px;height:60px;border-radius:10px;
+    background:linear-gradient(180deg,#c89b6a,#a97c4c 60%,#8a6238);
+    box-shadow:0 12px 26px rgba(40,30,15,.4),inset 0 2px 4px rgba(255,255,255,.3);}
+  /* faucet */
+  .faucet{position:absolute;top:7%;left:50%;transform:translateX(-44px);width:108px;height:64px;z-index:4;}
+  .faucet .knob{position:absolute;top:-2px;left:-4px;width:20px;height:20px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#f3f7f9,#9aa6ad);box-shadow:0 2px 4px rgba(0,0,0,.3);}
+  .faucet .arm{position:absolute;top:3px;left:6px;width:92px;height:13px;border-radius:7px;
+    background:linear-gradient(180deg,#f2f6f8,#a6b1b7);box-shadow:0 2px 4px rgba(0,0,0,.3);}
+  .faucet .spout{position:absolute;top:11px;right:2px;width:13px;height:28px;border-radius:0 0 6px 6px;
+    background:linear-gradient(90deg,#d4dbdf,#9aa6ad);box-shadow:0 2px 4px rgba(0,0,0,.3);}
+  .stream{position:absolute;top:7%;left:50%;transform:translateX(40px);margin-top:40px;width:6px;height:0;border-radius:4px;
+    background:linear-gradient(180deg,rgba(205,238,255,.95),rgba(150,205,245,.5));opacity:0;z-index:3;transition:opacity .1s,height .1s;}
+  #station.washing .stream{opacity:.92;height:26%;animation:streamW .2s linear infinite;}
+  @keyframes streamW{50%{transform:translateX(41px) scaleX(1.3);}}
+
+  /* the metal basin */
+  .basin{position:absolute;top:30%;left:8px;right:8px;bottom:40px;border-radius:14px 14px 22px 22px;overflow:hidden;
+    background:linear-gradient(180deg,#c2ccd2,#9fabb2 55%,#8a979e);
+    box-shadow:inset 0 9px 18px rgba(0,0,0,.42),inset 0 -4px 10px rgba(255,255,255,.22),0 12px 24px rgba(40,60,80,.35);}
+  .basin .rim{position:absolute;top:0;left:0;right:0;height:9px;background:linear-gradient(180deg,#e8eef1,#b6c0c6);}
+  .drain{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:30px;height:10px;border-radius:50%;
+    background:radial-gradient(ellipse at center,#5a666c,#2f3a40);box-shadow:inset 0 1px 2px rgba(0,0,0,.6);z-index:1;}
+  .splash{position:absolute;left:50%;top:34%;transform:translate(-50%,-50%);width:58px;height:16px;border-radius:50%;
+    background:radial-gradient(ellipse,rgba(210,240,255,.7),transparent 70%);opacity:0;z-index:3;pointer-events:none;}
+  #station.washing .splash{opacity:1;animation:splashP .3s ease-in-out infinite;}
+  @keyframes splashP{50%{transform:translate(-50%,-50%) scale(1.18);}}
+
+  .work{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);width:58%;aspect-ratio:5/7;z-index:2;
+    animation:rise .35s cubic-bezier(.2,.9,.3,1.3) both;}
+  @keyframes rise{from{transform:translate(-50%,-25%) scale(.9);opacity:0;}}
   .work canvas{position:absolute;inset:0;width:100%;height:100%;}
-  .work .clean{z-index:1;filter:drop-shadow(0 14px 18px rgba(0,0,0,.4));}
+  .work .clean{z-index:1;filter:drop-shadow(0 12px 14px rgba(0,0,0,.4));}
   .work .goop{z-index:2;cursor:grab;}
-  .work .pct{position:absolute;top:4px;left:50%;transform:translateX(-50%);z-index:3;font-size:12px;font-weight:800;
+  .work .pct{position:absolute;top:-4px;left:50%;transform:translateX(-50%);z-index:3;font-size:12px;font-weight:800;
     color:#fff;background:rgba(0,0,0,.45);padding:1px 8px;border-radius:8px;transition:opacity .3s;}
   .work.done .pct{opacity:0;}
-  .work .label{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%) translateY(8px);z-index:3;
+  .work .label{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%) translateY(8px);z-index:4;
     opacity:0;transition:opacity .35s,transform .35s;background:#fffdf4;border:2px solid rgba(150,120,60,.4);
-    border-radius:11px;padding:5px 12px;font-weight:800;font-size:14px;color:#4a3b1c;box-shadow:0 6px 14px rgba(0,0,0,.3);
+    border-radius:11px;padding:5px 12px;font-weight:800;font-size:13px;color:#4a3b1c;box-shadow:0 6px 14px rgba(0,0,0,.3);
     text-align:center;white-space:nowrap;}
-  .work .label small{display:block;font-size:10px;font-weight:700;}
+  .work .label small{display:block;font-size:9px;font-weight:700;}
   .work .label .verdict{color:#2f9e6f;} .work .label .verdict.bad{color:#d6492f;}
   .work.revealed .label{opacity:1;transform:translateX(-50%) translateY(0);}
-  #putAway{margin-top:26px;border:0;cursor:pointer;padding:12px 26px;border-radius:14px;font-size:16px;font-weight:800;
+
+  /* foam suds rising in the basin as it gets clean */
+  .suds{position:absolute;left:0;right:0;bottom:0;height:0;z-index:3;pointer-events:none;transition:height .25s ease;
+    background:
+      radial-gradient(circle at 12% 55%,#fff 9px,transparent 10px),
+      radial-gradient(circle at 32% 38%,#fff 12px,transparent 13px),
+      radial-gradient(circle at 52% 60%,#fff 10px,transparent 11px),
+      radial-gradient(circle at 72% 42%,#fff 13px,transparent 14px),
+      radial-gradient(circle at 90% 58%,#fff 9px,transparent 10px),
+      linear-gradient(180deg,rgba(255,255,255,.9),#fff);
+    filter:drop-shadow(0 -2px 3px rgba(0,0,0,.08));}
+
+  #putAway{margin-top:18px;border:0;cursor:pointer;padding:12px 26px;border-radius:14px;font-size:16px;font-weight:800;
     color:#fff;background:linear-gradient(180deg,#2f9e6f,#1f7a54);box-shadow:0 6px 16px rgba(31,122,84,.45);
     opacity:0;pointer-events:none;transition:opacity .25s;}
   #putAway.show{opacity:1;pointer-events:auto;animation:pop .25s ease;}
@@ -153,9 +204,21 @@
   </div>
 
   <div id="station">
-    <div class="counter">Scrape it clean</div>
-    <div class="work" id="work"></div>
-    <button id="putAway">Put it away ▸</button>
+    <div class="counter-label">Scrub it clean in the sink 🧼</div>
+    <div class="sink">
+      <div class="backsplash"></div>
+      <div class="faucet"><span class="knob"></span><span class="arm"></span><span class="spout"></span></div>
+      <span class="stream"></span>
+      <div class="counter-top"></div>
+      <div class="basin">
+        <span class="rim"></span>
+        <span class="drain"></span>
+        <div class="splash"></div>
+        <div class="work" id="work"></div>
+        <div class="suds"></div>
+      </div>
+    </div>
+    <button id="putAway">Set on the rack ▸</button>
   </div>
 
   <button id="demo">+1000 pts</button>
@@ -192,7 +255,10 @@ function unlock(){ if(audioReady)return;
 function rampSpray(){ if(!audioReady)return;
   scrubVel*=0.82; var target=isDown?T.vol*(0.16+0.84*scrubVel):0;
   var g=sprayGain.gain.value; g+=(target-g)*0.3; sprayGain.gain.value=g;
-  sprayFilter.frequency.value=240+scrubVel*620; requestAnimationFrame(rampSpray);
+  sprayFilter.frequency.value=240+scrubVel*620;
+  var st=D.getElementById('station');                 // run the faucet while scrubbing at the sink
+  if(st) st.classList.toggle('washing', isDown && st.classList.contains('open'));
+  requestAnimationFrame(rampSpray);
 }
 function tone(f,dur,type,vol,slide){ if(!audioReady)return; var t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();
   o.type=type||'sine';o.frequency.setValueAtTime(f,t); if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+dur);
@@ -269,7 +335,7 @@ function paintSlime(tg){
 }
 function attachScrub(canvas,opts){
   var tg={ctx:canvas.getContext('2d'),W:canvas.width,H:canvas.height,canvas:canvas,
-          mask:opts.mask||null,onDone:opts.onDone,pctEl:opts.pctEl||null,done:false,goopTotal:1,last:null,_raf:0};
+          mask:opts.mask||null,onDone:opts.onDone,onProgress:opts.onProgress||null,pctEl:opts.pctEl||null,done:false,goopTotal:1,last:null,_raf:0};
   paintSlime(tg);
   function xy(ev){var r=canvas.getBoundingClientRect();return{x:(ev.clientX-r.left)*(tg.W/r.width),y:(ev.clientY-r.top)*(tg.H/r.height)};}
   function down(ev){ if(tg.done)return; unlock();
@@ -299,6 +365,7 @@ function measureT(tg){ if(tg.done)return;
   for(var i=3;i<data.length;i+=4){if(data[i]>=40)rem++;}
   tg.cleaned=Math.max(0,1-rem/tg.goopTotal);
   if(tg.pctEl)tg.pctEl.textContent=Math.round(tg.cleaned*100)+'%';
+  if(tg.onProgress)tg.onProgress(tg);
   if(tg.cleaned>=T.snap)finishT(tg);
 }
 function finishT(tg){ tg.done=true;tg.ctx.clearRect(0,0,tg.W,tg.H);ding();
@@ -368,13 +435,17 @@ function openStation(cfg,slot){
   workEl.classList.remove('done','revealed');
   var cx=clean.getContext('2d');cfg.draw(cx,cfg);if(cfg.bad)tintSpoiled(cx);
   putAway.classList.remove('show');
+  var suds=D.querySelector('.suds'); if(suds) suds.style.height='0';
   stationEl.classList.add('open');
-  curStation=attachScrub(goop,{mask:clean,pctEl:pct,onDone:function(){
-    workEl.classList.add('done','revealed');
-    awardPoints(POINTS_PER_ITEM,workEl);
-    sparkleBurst(workEl,7);
-    putAway.classList.add('show');
-  }});
+  curStation=attachScrub(goop,{mask:clean,pctEl:pct,
+    onProgress:function(t){ if(suds) suds.style.height=(t.cleaned*50)+'%'; },
+    onDone:function(){
+      workEl.classList.add('done','revealed');
+      if(suds) suds.style.height='54%';
+      awardPoints(POINTS_PER_ITEM,workEl);
+      sparkleBurst(workEl,7);
+      putAway.classList.add('show');
+    }});
   curStation._slot=slot; curStation._rec=placed.filter(function(p){return p.slot===slot;})[0];
 }
 putAway.addEventListener('click',function(){
