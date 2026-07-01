@@ -52,7 +52,7 @@ Other top-level entries:
 
 The hub grid lists only finished, shipping games. **Every game directory that is NOT on the hub grid is a work-in-progress** — present on disk and sometimes reachable by direct URL, but deliberately not advertised, and intentionally excluded from `sitemap.xml`, `llms.txt`, and the hub's JSON-LD `ItemList`. Do not add a WIP game to the hub / sitemap / schema until the user says it's ready.
 
-- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, Slip Studio, All Munkis, Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Friend Picker. *(Krazy Kritters was removed 2026-06-30 — migrated to nodehole.com.)*
+- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, All Munkis, Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Friend Picker. *(Krazy Kritters was removed 2026-06-30 — migrated to nodehole.com. Slip Studio was unlisted 2026-07-01 — migrated to nodehole.com/games/crittercore/slip-studio/; the `slip-studio/` dir is kept on disk and reachable by direct URL because the live paid Android app's privacy link points at `madderverse.org/slip-studio/privacy/`.)*
 - **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `tiny-canvas/` (and any future dir not yet on the grid). `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
 
 ## Conventions worth knowing

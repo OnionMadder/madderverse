@@ -28,7 +28,6 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 
 - Hole-Up — swallow-the-world hole game: https://madderverse.org/hole-up/
 - Glass Gallery — carnival glass-smashing game: https://madderverse.org/glass-gallery/
-- Slip Studio — calm 3D pottery wheel (also a paid Android app): https://madderverse.org/slip-studio/
 - All Munkis — drag-and-drop beat maker: https://madderverse.org/all-munkis/
 - Pootery: Throw, Glaze, Fire — pottery studio: https://madderverse.org/pootery/
 - Tonehouse — hands-on synth toy: https://madderverse.org/tonehouse/
