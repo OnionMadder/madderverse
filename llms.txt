@@ -26,7 +26,6 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 
 ## Games
 
-- Hole-Up — swallow-the-world hole game: https://madderverse.org/hole-up/
 - Glass Gallery — carnival glass-smashing game: https://madderverse.org/glass-gallery/
 - All Munkis — drag-and-drop beat maker: https://madderverse.org/all-munkis/
 - Pootery: Throw, Glaze, Fire — pottery studio: https://madderverse.org/pootery/
@@ -34,7 +33,6 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 - Groodle — draw-and-dance maker: https://madderverse.org/groodle/
 - Tub's Cookie Cache — arcade muncher: https://madderverse.org/cookie-cache/
 - George's Jump — arcade jumper: https://madderverse.org/georges-jump/
-- GazOnionaire — space-trading economy sim: https://madderverse.org/gazonionaire/
 - Friend Picker — silly party toy: https://madderverse.org/friend-picker/
 
 ## Key pages

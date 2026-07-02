@@ -52,8 +52,33 @@ Other top-level entries:
 
 The hub grid lists only finished, shipping games. **Every game directory that is NOT on the hub grid is a work-in-progress** — present on disk and sometimes reachable by direct URL, but deliberately not advertised, and intentionally excluded from `sitemap.xml`, `llms.txt`, and the hub's JSON-LD `ItemList`. Do not add a WIP game to the hub / sitemap / schema until the user says it's ready.
 
-- **Advertised (on the hub, in the order they appear):** Hole-Up, Glass Gallery, All Munkis, Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, GazOnionaire, Friend Picker. *(Krazy Kritters was removed 2026-06-30 — migrated to nodehole.com. Slip Studio was unlisted 2026-07-01 — migrated to nodehole.com/games/crittercore/slip-studio/; the `slip-studio/` dir is kept on disk and reachable by direct URL because the live paid Android app's privacy link points at `madderverse.org/slip-studio/privacy/`.)*
+- **Advertised (on the hub, in the order they appear):** Glass Gallery, All Munkis, Pootery, Tonehouse, Groodle, Tub's Cookie Cache, George's Jump, Friend Picker. *(George's Jump is also published on nodehole — deliberately dual-listed, it's an all-audiences game. See "The nodehole sister site" below for games migrated off the hub.)*
 - **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `tiny-canvas/` (and any future dir not yet on the grid). `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
+- **Migrated to nodehole (unlisted from the hub, but `dir kept on disk`):** `krazy-kritters/` (removed 2026-06-30, dir deleted), `slip-studio/` (2026-07-01, dir kept — live paid Android app's privacy link points at `madderverse.org/slip-studio/privacy/`), `hole-up/` + `gazonionaire/` (2026-07-01, dirs kept, web-only). These are pulled from the grid / JSON-LD / `sitemap.xml` / `llms.txt` but stay reachable by direct URL. See below.
+
+## The nodehole sister site
+
+**nodehole.com is a separate site — an itch.io-style game PORTAL hosted on NearlyFreeSpeech (NFSN), NOT part of this repo and NOT locally checked out.** It's the **older/adult-skewing** brand; madderverse is the **kids** brand. The two-brand split is the point: kid-targeted games live on madderverse, older/edgier games on nodehole, and genuinely all-audiences games can be **dual-listed** on both.
+
+**Portal structure (important).** Each nodehole game has a **platform-generated landing page** at `nodehole.com/games/<shelf>/<game>/` (nodehole banner, category shelves, login, favorites, `cover.jpg`, and nodehole's own favicons at `nodehole.com/assets/favi/`). The **actual game runs at the `…/<game>/play/` subpath**, which the landing links to. Shelves seen so far: `crittercore`, `erotic`, `glitch`, `interactivefiction`, `narrative`, `simulation`.
+
+**Publishing / updating a game on nodehole:**
+1. The game payload (`index.html` + js/css/assets) goes to **`games/<shelf>/<game>/play/`** — **never** overwrite the platform-generated landing at the game root.
+2. Make the `/play/` copy **self-contained + nodehole-branded**: canonical/`og:url`/`twitter:url` → `…/<game>/play/`; `og:image` → the game's own `cover.jpg`; favicons/manifest → relative local `assets/favi/` (copy a set in if the game lacks one); **GoatCounter beacon → `https://nodehole.goatcounter.com/count`**; strip madderverse chrome (the ⌂ "Back to Madderverse" home button, the slim site footer, any `../assets/css/site-footer.css` link); neutralize kids/Madderverse SEO copy to game-specific/audience-neutral text.
+3. There is **no local nodehole checkout** — stage the copy to a Desktop folder mirroring the target (`Desktop/<game>-nodehole/play/…`) and the user uploads it via NFSN. (I have no NFSN access.)
+4. Old live `/play/` pages may be stale **`fymz.lol`-branded** dumps; overwriting fixes that.
+
+**Migration ledger (as of 2026-07-01):**
+| Game | nodehole path | madderverse | Staged copy |
+|---|---|---|---|
+| Krazy Kritters | (crittercore) | dir **deleted** | `Desktop/krazy-kritters/` |
+| Slip Studio | `crittercore/slip-studio/play/` | unlisted, **dir kept** (app privacy URL); app stays `org.madderverse.slipstudio` (Level-1) | `Desktop/slip-studio-nodehole/play/` |
+| George's Jump | `crittercore/georges-jump/play/` | **dual-listed (stays on hub)** | `Desktop/georges-jump-nodehole/play/` |
+| Hole-Up | `simulation/hole-up/play/` | unlisted, dir kept | `Desktop/hole-up-nodehole/play/` |
+| GazOnionaire | `simulation/gazonionaire/play/` | unlisted, dir kept | `Desktop/gazonionaire-nodehole/play/` |
+| Poly Hi | `glitch/poly-hi/play/` | n/a (never on madderverse; source at `Desktop/PolyHi/`) | `Desktop/poly-hi-nodehole/play/` |
+
+All staged copies are **pending user upload to NFSN**. GazOnionaire's in-game story text still references "Madderverse" as its fictional universe name (flavor, left as-is).
 
 ## Conventions worth knowing
 
