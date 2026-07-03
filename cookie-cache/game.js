@@ -1,7 +1,6 @@
 // ── Sprite-sheet data (precise coords from JSON, used by applySprite) ──
 const SHEETS = {
     before: { url: 'assets/img/cookies-before.png', w: 4325, h: 2434 },
-    after:  { url: 'assets/img/cookies-after.png',  w: 4325, h: 2908 },
     veg:    { url: 'assets/img/veg.png',            w: 1318, h: 879  },
 };
 
@@ -19,20 +18,6 @@ const FRAMES = {
         'cookie-ten':    { x: 1082, y: 1623, w: 1080, h: 810 },
         'cookie-eleven': { x: 2163, y: 1623, w: 1080, h: 810 },
         'cookie-twelve': { x: 3244, y: 1623, w: 1080, h: 810 },
-    },
-    after: {
-        'eaten-one':     { x: 1,    y: 1,    w: 1080, h: 968 },
-        'eaten-two':     { x: 1082, y: 1,    w: 1080, h: 968 },
-        'eaten-three':   { x: 2163, y: 1,    w: 1080, h: 968 },
-        'eaten-four':    { x: 3244, y: 1,    w: 1080, h: 968 },
-        'eaten-five':    { x: 1,    y: 970,  w: 1080, h: 968 },
-        'eaten-six':     { x: 1082, y: 970,  w: 1080, h: 968 },
-        'eaten-seven':   { x: 2163, y: 970,  w: 1080, h: 968 },
-        'eaten-eight':   { x: 3244, y: 970,  w: 1080, h: 968 },
-        'eaten-nine':    { x: 1,    y: 1939, w: 1080, h: 968 },
-        'eaten-ten':     { x: 1082, y: 1939, w: 1080, h: 968 },
-        'eaten-eleven':  { x: 2163, y: 1939, w: 1080, h: 968 },
-        'eaten-twelve':  { x: 3244, y: 1939, w: 1080, h: 968 },
     },
     veg: {
         'veg-two':   { x: 1,   y: 1,   w: 438, h: 438 },
@@ -59,8 +44,7 @@ function applySprite(el, sheetKey, frameKey, w, h) {
     // Element aspect matches cell aspect (see spawnCookie / .flying-*
     // CSS) so this min collapses to a single scale and offsetX/Y are
     // both zero in the common case. The centering branch is kept as a
-    // safety net for the brief .after sprite swap on catch (eaten cells
-    // are ~1.115:1, not exactly 4:3).
+    // safety net in case a caller ever passes an off-aspect box.
     const s = Math.min(w / fw, h / fh);
     const offsetX = (w - fw * s) / 2;
     const offsetY = (h - fh * s) / 2;
@@ -73,9 +57,11 @@ const COOKIE_NAMES = [
     'one', 'two', 'three', 'four', 'five', 'six',
     'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve',
 ];
+// Each cookie is a single whole-cookie sprite. The "eaten" look is now a
+// CSS bite (see .bitten in style.css + applyBite below) punched out of this
+// same image — no separate eaten sheet, which drops ~11.7 MB from the app.
 const COOKIES = COOKIE_NAMES.map(n => ({
     before: { sheet: 'before', frame: 'cookie-' + n },
-    after:  { sheet: 'after',  frame: 'eaten-'  + n },
 }));
 
 const VEGGIES = [
@@ -577,7 +563,6 @@ function bumpHud(el) {
 function preload() {
     const sheets = [
         'assets/img/cookies-before.png',
-        'assets/img/cookies-after.png',
         'assets/img/eater.png',
         'assets/img/veg.png',
     ];
@@ -682,10 +667,10 @@ function spawnCookie() {
     const dy = Math.max(20, startY - peakY);
     const vy = -Math.sqrt(2 * CFG.gravity * dy);
 
-    const entry    = choice(isVeggie ? VEGGIES : COOKIES);
-    // Veggies have a single sprite; cookies have a before/after pair.
-    const sprite      = isVeggie ? entry : entry.before;
-    const eatenSprite = isVeggie ? null  : entry.after;
+    const entry  = choice(isVeggie ? VEGGIES : COOKIES);
+    // Veggies are a single sprite; cookies use their whole-cookie sprite and
+    // get a CSS bite (applyBite) on catch instead of a separate eaten image.
+    const sprite = isVeggie ? entry : entry.before;
 
     const el = document.createElement('div');
     el.className = isVeggie ? 'flying-veggie' : 'flying-cookie';
@@ -716,7 +701,6 @@ function spawnCookie() {
         popped: false,
         isVeggie,
         sprite,
-        eatenSprite,
         timeMult,
     };
 
@@ -748,6 +732,22 @@ const SCORE_LABELS  = ['YUM!', 'POP!', 'NOM!', 'CRUNCH!', 'TASTY!', 'CHOMP!', 'G
 
 state.streakHits = 0;
 state.lastHitAt  = 0;
+
+// ── CSS bite ──────────────────────────────────────────────────────
+// Adds the .bitten class (a radial-gradient mask in style.css) to make a
+// whole-cookie sprite look eaten. Bites are pinned near a corner and the
+// spot is randomized per cookie so a shelf of them doesn't look stamped;
+// keeping every spot ~a corner means the farthest-corner gradient radius —
+// and therefore the bite size — stays consistent regardless of which spot.
+const BITE_SPOTS = [
+    ['82%', '20%'], ['20%', '20%'], ['82%', '80%'], ['20%', '80%'],
+];
+function applyBite(el) {
+    const [x, y] = choice(BITE_SPOTS);
+    el.style.setProperty('--bite-x', x);
+    el.style.setProperty('--bite-y', y);
+    el.classList.add('bitten');
+}
 
 function updateStreakHud() {
     if (!els.hudStreak) return;
@@ -783,20 +783,10 @@ function catchCookie(c) {
     c.alive  = false; // freeze in place — punch then fly-to-tub takes over
     c.el.classList.add('popped');
 
-    // Swap to the eaten/crumb sprite the moment the player taps. The
-    // .after cells are 1080×968 (~1.115:1), not 4:3 like .before — so
-    // reshape the element to match before rendering. Otherwise the
-    // sheet's next eaten cell bleeds into the ~10px sliver of empty
-    // space on the right of the 4:3 box. Re-anchor on c.y so the
-    // cookie's visual center doesn't jump during the swap.
-    if (c.eatenSprite) {
-        const eatenH = Math.round(c.w * 968 / 1080);
-        c.h = eatenH;
-        c.el.style.width  = c.w + 'px';
-        c.el.style.height = eatenH + 'px';
-        c.el.style.top = (c.y - eatenH / 2) + 'px';
-        applySprite(c.el, c.eatenSprite.sheet, c.eatenSprite.frame, c.w, c.h);
-    }
+    // "Eaten" look: punch a CSS bite out of the whole-cookie sprite the
+    // moment the player taps. No sprite swap, no reshape — the element keeps
+    // its 4:3 cookie box, so nothing jumps.
+    applyBite(c.el);
 
     // Streak persists across spawns — only misses or veggies break it. Empty
     // screens between cookies do NOT reset.
@@ -848,7 +838,7 @@ function catchCookie(c) {
     spawnConfetti(c.x, c.y, big ? 18 : 10);
     cookiePunch(c);
 
-    addPileThumb(c.eatenSprite || c.sprite);
+    addPileThumb(c.sprite);
     flashTubChomp();
     playSfx('catch');
 
@@ -1139,10 +1129,11 @@ function addPileThumb(sprite) {
     el.className = 'pile-cookie';
     const zoneR = els.pileZone.getBoundingClientRect();
     const thumbW = Math.min(Math.max(zoneR.width * 0.45, 28), 44);
-    // Match the .after cell aspect (1080×968 ≈ 1.115:1) so the scaled
-    // sheet has no empty space to bleed adjacent cells into.
-    const thumbH = Math.round(thumbW * 968 / 1080);
+    // 4:3 to match the whole-cookie cells (1080×810); the eaten look is a
+    // CSS bite, not a taller eaten sprite.
+    const thumbH = Math.round(thumbW * 0.75);
     applySprite(el, sprite.sheet, sprite.frame, thumbW, thumbH);
+    applyBite(el);
     el.style.width = thumbW + 'px';
     el.style.height = thumbH + 'px';
     const x = rand(0, Math.max(0, zoneR.width  - thumbW));
@@ -1357,17 +1348,17 @@ function buildFeastPile(stageR) {
     const pileW = pileR.width;
     const pileH = pileR.height;
     const cookieW = Math.min(Math.max(pileW * 0.22, 38), 70);
-    // Match the .after cell aspect (1080×968) so no sheet bleed in
-    // the feast pile (same trick as the in-flight cookies + pile thumbs).
-    const cookieH = Math.round(cookieW * 968 / 1080);
+    // 4:3 like the whole-cookie cells (1080×810); eaten look = CSS bite.
+    const cookieH = Math.round(cookieW * 0.75);
 
     const imgs = [];
     for (let i = 0; i < count; i++) {
-        // End-game pile shows the eaten/crumb state of each cookie.
-        const sprite = COOKIES[i % COOKIES.length].after;
+        // End-game pile shows each cookie with a CSS bite taken out.
+        const sprite = COOKIES[i % COOKIES.length].before;
         const el = document.createElement('div');
         el.className = 'feast-cookie';
         applySprite(el, sprite.sheet, sprite.frame, cookieW, cookieH);
+        applyBite(el);
         el.style.width  = cookieW + 'px';
         el.style.height = cookieH + 'px';
 

@@ -579,6 +579,27 @@ body {
 .flying-cookie.popped,
 .flying-veggie.popped { pointer-events: none; }
 
+/* ── CSS "bite" — replaces the old cookies-after.png eaten sheet ──────
+   A radial-gradient mask punches a transparent circular bite out of the
+   whole-cookie sprite, so a caught cookie looks eaten with no second image.
+   --bite-x / --bite-y (set per cookie in JS, one of four corners) place the
+   bite; keeping the spot near a corner keeps the farthest-corner gradient
+   radius — and therefore the bite size — consistent across positions.
+   mask-origin/clip are content-box so the bite lands on the cookie art even
+   on flying cookies, whose box is padded out for a larger tap target.
+   Tune the bite size via the two stop percentages below. */
+.bitten {
+    --bite-x: 82%;
+    --bite-y: 20%;
+    -webkit-mask-image: radial-gradient(circle at var(--bite-x) var(--bite-y),
+        transparent 0 15.5%, #000 16.5%);
+            mask-image: radial-gradient(circle at var(--bite-x) var(--bite-y),
+        transparent 0 15.5%, #000 16.5%);
+    -webkit-mask-repeat: no-repeat;   mask-repeat: no-repeat;
+    -webkit-mask-origin: content-box; mask-origin: content-box;
+    -webkit-mask-clip: content-box;   mask-clip: content-box;
+}
+
 /* veggie tap = penalty visual */
 .flying-veggie.zapped {
     animation: veg-zap 0.55s ease-out forwards;
