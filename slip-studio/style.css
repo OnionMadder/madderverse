@@ -1171,6 +1171,89 @@ html, body {
 .glaze-btn.is-disabled:hover,
 .glaze-btn.is-disabled:focus-visible { transform: none; }
 
+/* ---------- Glaze dip bar ---------- */
+.dip-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ink-faint);
+}
+.dip-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.dip-row-tools[hidden] { display: none; }
+/* The Dip mode toggle */
+.dip-toggle {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    font: inherit;
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    background: var(--chip);
+    border: 1px solid var(--ink-faint);
+    border-radius: 999px;
+    padding: 5px 14px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.dip-toggle.is-active {
+    color: var(--bg);
+    background: var(--accent);
+    border-color: var(--accent);
+}
+/* Preset dip-set chips — the gradient previews the effect */
+.dip-preset {
+    -webkit-tap-highlight-color: transparent;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 7px;
+    border: 2px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.dip-preset:hover,
+.dip-preset:focus-visible { outline: none; transform: scale(1.1); border-color: var(--ink); }
+/* Drip amount + undo/clear chips */
+.dip-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+}
+.dip-chip {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    font: inherit;
+    font-size: 0.66rem;
+    letter-spacing: 0.03em;
+    color: var(--ink-dim);
+    background: var(--chip);
+    border: 1px solid var(--ink-faint);
+    border-radius: 999px;
+    padding: 4px 11px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.dip-chip.is-active {
+    color: var(--ink);
+    border-color: var(--accent);
+    background: rgba(201, 138, 100, 0.18);
+}
+.dip-chip.dip-action { margin-left: 2px; }
+.dip-chip:disabled { opacity: 0.4; cursor: default; }
+
 /* Gradient (secondary glaze) row — same swatches a half-step smaller,
    prefixed by a quiet "Bottom" label so users understand what the row
    does. Sits directly under the primary glaze strip and only renders

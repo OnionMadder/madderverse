@@ -180,6 +180,24 @@ const RAINBOW_STOPS = [
     [0.00, "#33d6c0"], [0.16, "#4bd35f"], [0.36, "#f2d63a"],
     [0.54, "#ef8a2a"], [0.70, "#e23b2f"], [0.86, "#8a3bd6"], [1.00, "#3a46d6"],
 ];
+
+// --- Glaze dipping ----------------------------------------------
+// Glaze is applied by DIPPING: a 2-D glaze layer (u around, v height)
+// that the shader mixes over the clay, under the decoration, taking the
+// fired gloss. A dip fills from the foot up to a line with a soft top
+// edge (the gradient); dips stack into multi-colour gradients; drips run
+// up from each line. "Dip sets" are one-tap full-height gradient presets.
+const GLAZE_W = 1024, GLAZE_H = 512;   // dip layer resolution
+// Preset dip sets — full-height gradients, stops authored rim (0) → foot (1).
+const DIP_SETS = {
+    rainbow: { label: "Rainbow", stops: RAINBOW_STOPS },
+    sunset:  { label: "Sunset",  stops: [[0, "#ffd76b"], [0.42, "#ff9e4a"], [0.72, "#e6533f"], [1, "#7a2a6b"]] },
+    ocean:   { label: "Ocean",   stops: [[0, "#9ce8dc"], [0.45, "#39a0c4"], [1, "#123a6b"]] },
+    ember:   { label: "Ember",   stops: [[0, "#ffe08a"], [0.5, "#f2762a"], [1, "#5a1414"]] },
+};
+const DIP_SET_IDS = ["rainbow", "sunset", "ocean", "ember"];
+const DIP_FEATHER = 0.14;              // soft top-edge fraction of the dip's own span
+const DRIP_COUNTS = { off: 0, few: 4, lots: 9 };
 const GLAZE_IDS = [
     "celadon", "cobalt", "oatmeal", "honey", "tenmoku",
     "blush", "forest", "slate", "plum", "sand",
@@ -661,11 +679,16 @@ const state = {
     gradientMix: 0,
     partnerGradientColor: new THREE.Color(0xffffff),
     partnerGradientMix: 0,
-    // Rainbow glaze: a fixed vertical colour ramp (rampTex) mixed over the
-    // diffuse in the shader. rampMix fades 0 ↔ 1 as the "rainbow" glaze is
-    // selected / deselected, mirroring the gradient-mix pattern above.
-    rampTex: null,
-    rampMix: 0,
+    // Glaze dipping. A 2-D glaze layer (dipCanvas) the shader mixes over
+    // the clay by its alpha. `dips` is the ordered list of applied dips +
+    // presets, replayed into the canvas (so dips are non-destructive /
+    // undoable). dipMode gates the drag-to-dip gesture; dipColor is the
+    // glaze loaded for a manual dip; dripAmount scales the drips.
+    dipCanvas: null, dipCtx: null, dipTex: null,
+    dips: [],
+    dipMode: false,
+    dipColor: null,
+    dripAmount: "few",
     // Editable bump layer: painted into by wet-clay texture stamps
     // (positive relief) and leather-hard carving (negative grooves).
     // Mixed additively with the procedural clay grain in the shader.
@@ -773,6 +796,8 @@ let sculpting = false;
 // Handle reshape: set while dragging an ear at the handle phase; carries
 // the grab-time snapshot so each move computes an offset from there.
 let handleDrag = null;
+// True while dragging a glaze dip line (leather + dip tool).
+let dipping = false;
 
 // Hoisted from the handle constants section further down — UI build
 // in init() reads HANDLE_THICKNESS_IDS for the picker chips, and
@@ -992,7 +1017,9 @@ function init() {
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             scratchAt, scratchStroke, clearSgraffito,
-            setGradientGlaze, setHandleOn, setHandleThickness,
+            setGradientGlaze,
+            setDipMode, setDipColor, applyDipPreset, undoDip, clearDips, setDripAmount, renderDips,
+            setHandleOn, setHandleThickness,
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
@@ -1131,29 +1158,106 @@ function makeDecoLayer() {
     return tex;
 }
 
-// --- Rainbow ramp -----------------------------------------------
-// A 1-D vertical colour ramp (RAINBOW_STOPS) painted into a tall, thin
-// canvas. The clay shader samples it by height (vDecoUv.y) and mixes it
-// over the diffuse when the "rainbow" glaze is active — a real glaze,
-// not a decal, so it takes the fired gloss + shows the throwing lines.
-function makeRampTexture() {
+// --- Glaze dip layer --------------------------------------------
+// A 2-D RGBA canvas (u around, v height) holding all applied glaze —
+// dips, drips and presets. The clay shader samples it by vDecoUv and
+// mixes it over the diffuse by its alpha, under the decoration, so the
+// glaze takes the fired gloss + shows the throwing lines. Canvas top =
+// rim (v=1), bottom = foot (v=0), because CanvasTexture flips Y.
+function makeGlazeDipLayer() {
     const canvas = document.createElement("canvas");
-    canvas.width = 8;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    const g = ctx.createLinearGradient(0, 0, 0, canvas.height); // 0 = top (rim)
-    RAINBOW_STOPS.forEach(([pos, col]) => g.addColorStop(pos, col));
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    canvas.width = GLAZE_W;
+    canvas.height = GLAZE_H;
+    state.dipCanvas = canvas;
+    state.dipCtx = canvas.getContext("2d");
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapS = THREE.RepeatWrapping;         // wraps around the pot
     tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    state.rampTex = tex;
+    tex.anisotropy = 4;
+    state.dipTex = tex;
     return tex;
 }
+
+// The dip currently being dragged (live preview), or null.
+let dipPreview = null;
+
+// Replay the ordered dip list (plus any in-progress preview) into the
+// glaze canvas. Non-destructive: editing/removing a dip = re-render.
+function renderDips() {
+    const ctx = state.dipCtx;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, GLAZE_W, GLAZE_H);
+    const list = dipPreview ? state.dips.concat(dipPreview) : state.dips;
+    for (const d of list) {
+        if (d.type === "preset") paintPresetDip(ctx, d.id);
+        else paintDip(ctx, d);
+    }
+    if (state.dipTex) state.dipTex.needsUpdate = true;
+}
+
+// One dip: glaze rises from the foot (canvas bottom) up to line v, with a
+// soft feathered top edge (the gradient) and optional drips reaching up
+// past the line.
+function paintDip(ctx, d) {
+    const yLine = GLAZE_H * (1 - d.v);        // v=0 foot(bottom), v=1 rim(top)
+    const feath = Math.max(3, (d.feather || DIP_FEATHER) * d.v * GLAZE_H);
+    // Solid fill below the feather band, down to the foot.
+    ctx.fillStyle = rgba(d.hex, 1);
+    ctx.fillRect(0, yLine + feath, GLAZE_W, GLAZE_H - (yLine + feath));
+    // Feather band: alpha ramps 0 (at the line) → 1 (into the solid).
+    const fg = ctx.createLinearGradient(0, yLine, 0, yLine + feath);
+    fg.addColorStop(0, rgba(d.hex, 0));
+    fg.addColorStop(1, rgba(d.hex, 1));
+    ctx.fillStyle = fg;
+    ctx.fillRect(0, yLine, GLAZE_W, feath);
+    // Drips: tapering tendrils of the same glaze reaching up from the line.
+    if (d.drips) {
+        ctx.save();
+        ctx.lineCap = "round";
+        for (const dr of d.drips) {
+            const x = dr.u * GLAZE_W;
+            const topY = yLine - dr.len * GLAZE_H;
+            const g = ctx.createLinearGradient(0, yLine, 0, topY);
+            g.addColorStop(0, rgba(d.hex, 1));
+            g.addColorStop(1, rgba(d.hex, 0));
+            ctx.strokeStyle = g;
+            ctx.lineWidth = dr.w * GLAZE_W;
+            ctx.beginPath();
+            ctx.moveTo(x, yLine + feath * 0.4);
+            ctx.lineTo(x, topY);
+            ctx.stroke();
+        }
+        ctx.restore();
+    }
+}
+
+// A preset "dip set": a full-height gradient at full coverage.
+function paintPresetDip(ctx, id) {
+    const set = DIP_SETS[id];
+    if (!set) return;
+    const g = ctx.createLinearGradient(0, 0, 0, GLAZE_H); // 0 = rim (top)
+    set.stops.forEach(([p, c]) => g.addColorStop(p, c));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, GLAZE_W, GLAZE_H);
+}
+
+// Random drips for a committed dip, count from the current drip amount.
+function makeDrips(v) {
+    const n = DRIP_COUNTS[state.dripAmount] || 0;
+    const drips = [];
+    for (let i = 0; i < n; i++) {
+        const slot = (i + 0.5) / n;
+        drips.push({
+            u: (slot + (Math.random() - 0.5) * (0.7 / n) + 1) % 1,
+            len: Math.min(v * 0.9, 0.03 + Math.random() * 0.09), // don't overshoot the rim
+            w: 0.006 + Math.random() * 0.012,
+        });
+    }
+    return drips;
+}
+
+// --- Sgraffito layer --------------------------------------------
 
 // --- Sgraffito layer --------------------------------------------
 // Carved-through scribble pattern. White-painted alpha = "scratched".
@@ -1717,15 +1821,14 @@ function buildPot() {
     // through both glaze and paint, not just through the base coat.
     const decoTex = makeDecoLayer();
     const sgraffitoTex = makeSgraffitoLayer();
-    const rampTex = makeRampTexture();
+    const dipTex = makeGlazeDipLayer();
     mat.onBeforeCompile = (shader) => {
         shader.uniforms.decoMap        = { value: decoTex };
         shader.uniforms.sgraffitoMap   = { value: sgraffitoTex };
         shader.uniforms.uClayColor     = { value: state.clayBaseColor };
         shader.uniforms.uGradientColor = { value: state.gradientColor };
         shader.uniforms.uGradientMix   = { value: state.gradientMix };
-        shader.uniforms.uRampMap       = { value: rampTex };
-        shader.uniforms.uRampMix       = { value: state.rampMix };
+        shader.uniforms.uDipMap        = { value: dipTex };
         // Stash the uniform map on the material so tickMaterial can
         // poke the scalar uGradientMix each frame without re-running
         // onBeforeCompile. The Color uniforms hold a reference to the
@@ -1738,7 +1841,7 @@ function buildPot() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uRampMap;\nuniform float uRampMix;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
@@ -1749,12 +1852,12 @@ function buildPot() {
                  // transition is soft. uGradientMix is the on/off fade.
                  float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
-                 // Rainbow glaze: a full vertical colour ramp sampled by
-                 // height, faded in by uRampMix. Applied over the base +
-                 // gradient but UNDER the paint/carve so patterns can sit
-                 // on a rainbow pot.
-                 vec3 _ramp = texture2D( uRampMap, vec2( 0.5, vDecoUv.y ) ).rgb;
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _ramp, vec3( 2.2 ) ), uRampMix );
+                 // Glaze dip layer: 2-D applied glaze (dips / drips /
+                 // presets) mixed over the base by its own alpha. Applied
+                 // over the base + gradient but UNDER paint/carve, so
+                 // decoration can sit on a dipped pot.
+                 vec4 _dip = texture2D( uDipMap, vDecoUv );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
@@ -1766,7 +1869,7 @@ function buildPot() {
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-ramp-v4";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v5";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -2533,14 +2636,18 @@ function smoothstep(x) {
 // to clear it and fire bare).
 function setGlaze(id) {
     if (!GLAZES[id]) return;
+    // In dip mode, a glaze swatch just LOADS that colour for the next dip
+    // (drag on the pot to apply) rather than flooding the whole pot.
+    if (state.dipMode) {
+        setDipColor(GLAZES[id].fired.color);
+        updateGlazeBar();
+        return;
+    }
     const wasActive = state.glaze === id;
     state.glaze = wasActive ? null : id;
     // Clearing the primary clears the gradient too — gradient can't
     // exist without a primary glaze underneath.
     if (!state.glaze) state.glazeGradient = null;
-    // Rainbow is a full-height ramp — a 2-colour bottom gradient under it
-    // would be invisible, so clear it (and the gradient row hides).
-    if (state.glaze === "rainbow") state.glazeGradient = null;
     // Don't allow primary == gradient (would render a flat colour).
     if (state.glaze && state.glaze === state.glazeGradient) state.glazeGradient = null;
     state.dirty = true;
@@ -2559,6 +2666,117 @@ function setGradientGlaze(id) {
     if (!wasActive) playSfx("pour");
     if (state.clayState === "leather") setPhase("leather");
     updateGlazeBar();
+}
+
+// --- Glaze dip UI -----------------------------------------------
+// A small bar under the glaze swatches: a Dip toggle + one-tap preset
+// dip-sets on top, and (in dip mode) drip amount + undo/clear below.
+function buildDipBar() {
+    const wrap = document.getElementById("dipBar");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    const row1 = document.createElement("div");
+    row1.className = "dip-row";
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "dip-toggle";
+    toggle.id = "dipToggle";
+    toggle.textContent = "Dip";
+    toggle.addEventListener("click", () => setDipMode(!state.dipMode));
+    row1.appendChild(toggle);
+    DIP_SET_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dip-preset";
+        b.dataset.preset = id;
+        const stops = DIP_SETS[id].stops.map(([p, c]) => `${c} ${Math.round(p * 100)}%`).join(", ");
+        b.style.background = `linear-gradient(180deg, ${stops})`;
+        b.title = DIP_SETS[id].label + " dip set";
+        b.setAttribute("aria-label", DIP_SETS[id].label + " dip set");
+        b.addEventListener("click", () => applyDipPreset(id));
+        row1.appendChild(b);
+    });
+    wrap.appendChild(row1);
+
+    const row2 = document.createElement("div");
+    row2.className = "dip-row dip-row-tools";
+    row2.id = "dipTools";
+    const dripLabel = document.createElement("span");
+    dripLabel.className = "dip-label";
+    dripLabel.textContent = "Drips";
+    row2.appendChild(dripLabel);
+    [["off", "Off"], ["few", "Few"], ["lots", "Lots"]].forEach(([id, label]) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dip-chip";
+        b.dataset.drip = id;
+        b.textContent = label;
+        b.addEventListener("click", () => setDripAmount(id));
+        row2.appendChild(b);
+    });
+    const undo = document.createElement("button");
+    undo.type = "button"; undo.className = "dip-chip dip-action"; undo.id = "dipUndo"; undo.textContent = "Undo";
+    undo.addEventListener("click", undoDip);
+    row2.appendChild(undo);
+    const clear = document.createElement("button");
+    clear.type = "button"; clear.className = "dip-chip dip-action"; clear.textContent = "Clear";
+    clear.addEventListener("click", clearDips);
+    row2.appendChild(clear);
+    wrap.appendChild(row2);
+    updateDipBar();
+}
+
+function setDipMode(on) {
+    state.dipMode = !!on;
+    if (!state.dipMode) state.dipColor = null;
+    updateDipBar();
+    updateGlazeBar();
+}
+function setDipColor(hex) {
+    state.dipColor = hex;
+    updateDipBar();
+}
+function setDripAmount(name) {
+    if (DRIP_COUNTS[name] == null) return;
+    state.dripAmount = name;
+    updateDipBar();
+}
+function applyDipPreset(id) {
+    if (!DIP_SETS[id]) return;
+    if (!state.dipMode) setDipMode(true);
+    state.dips.push({ type: "preset", id });
+    state.dirty = true;
+    renderDips();
+    playSfx("pour");
+    updateDipBar();
+}
+function undoDip() {
+    if (!state.dips.length) return;
+    state.dips.pop();
+    state.dirty = true;
+    renderDips();
+    updateDipBar();
+}
+function clearDips() {
+    if (!state.dips.length) return;
+    state.dips = [];
+    state.dirty = true;
+    renderDips();
+    updateDipBar();
+}
+function updateDipBar() {
+    const toggle = document.getElementById("dipToggle");
+    if (toggle) {
+        toggle.classList.toggle("is-active", state.dipMode);
+        toggle.setAttribute("aria-pressed", state.dipMode ? "true" : "false");
+    }
+    const tools = document.getElementById("dipTools");
+    if (tools) tools.hidden = !state.dipMode;
+    document.querySelectorAll("#dipBar .dip-chip[data-drip]").forEach((b) => {
+        b.classList.toggle("is-active", b.dataset.drip === state.dripAmount);
+    });
+    const undo = document.getElementById("dipUndo");
+    if (undo) undo.disabled = state.dips.length === 0;
 }
 
 // Step back one phase to keep editing. The ends are commitments: wet
@@ -2582,6 +2800,9 @@ function resetPot() {
     profileDirty = true;
     state.glaze = null;
     state.glazeGradient = null;
+    state.dips = [];
+    dipPreview = null;
+    renderDips();
     clearDeco();
     resetBumpLayer();
     // Clear the handle on reset — a fresh pot starts handle-less.
@@ -2697,12 +2918,6 @@ function tickMaterial(dt) {
     state.gradientMix += (wantMix - state.gradientMix) * k;
     const u = state.clayMaterial.userData.shaderUniforms;
     if (u && u.uGradientMix) u.uGradientMix.value = state.gradientMix;
-    // Rainbow ramp: fade in while the "rainbow" glaze is the active
-    // primary, out otherwise. Only meaningful once a glaze can show
-    // (leather / fired) — at wet no glaze is selectable so it stays 0.
-    const wantRamp = state.glaze === "rainbow" ? 1 : 0;
-    state.rampMix += (wantRamp - state.rampMix) * k;
-    if (u && u.uRampMix) u.uRampMix.value = state.rampMix;
     // Handle (if attached) tweens the same look as the clay so it
     // melts raw → fired alongside the pot through the kiln. No deco
     // / sgraffito on the handle in v1 — just glaze colour.
@@ -2848,19 +3063,11 @@ function buildGlazeBar() {
         b.addEventListener("click", () => setGlaze(id));
         bar.appendChild(b);
     });
-    // Rainbow — a special multi-colour glaze, always shown after the pack
-    // swatches (it lives in no pack). CSS gradient chip so the swatch
-    // previews the effect.
-    const rb = document.createElement("button");
-    rb.type = "button";
-    rb.className = "glaze-btn glaze-btn-rainbow";
-    rb.dataset.glaze = "rainbow";
-    rb.style.background = "linear-gradient(180deg, #33d6c0, #4bd35f, #f2d63a, #ef8a2a, #e23b2f, #8a3bd6, #3a46d6)";
-    rb.setAttribute("aria-label", "Rainbow glaze");
-    rb.setAttribute("aria-pressed", "false");
-    rb.addEventListener("click", () => setGlaze("rainbow"));
-    bar.appendChild(rb);
+    // (Rainbow moved from a glaze swatch into a dip-set preset — see the
+    // dip bar; GLAZES.rainbow is kept only so old saved rainbow pots still
+    // load, converted to a rainbow dip.)
     buildGradientBar();
+    buildDipBar();
     updateGlazeBar();
 }
 
@@ -2922,15 +3129,20 @@ function updateGlazeBar() {
     const bar = document.getElementById("glazeBar");
     if (bar) {
         Array.from(bar.children).forEach((b) => {
-            const on = b.dataset.glaze === state.glaze;
+            // In dip mode a swatch is "active" when its colour is the
+            // loaded dip colour; otherwise when it's the uniform glaze.
+            const on = state.dipMode
+                ? (state.dipColor != null && GLAZES[b.dataset.glaze]
+                   && GLAZES[b.dataset.glaze].fired.color === state.dipColor)
+                : (b.dataset.glaze === state.glaze);
             b.classList.toggle("is-active", on);
             b.setAttribute("aria-pressed", on ? "true" : "false");
         });
     }
     const gradWrap = document.getElementById("gradientWrap");
     const gradBar  = document.getElementById("gradientBar");
-    // Rainbow owns the whole height ramp, so no 2-colour bottom gradient.
-    const hasPrimary = !!state.glaze && state.glaze !== "rainbow";
+    // Dipping supersedes the 2-colour bottom gradient — hide it in dip mode.
+    const hasPrimary = !!state.glaze && !state.dipMode;
     if (gradWrap) gradWrap.hidden = !hasPrimary;
     if (gradBar) {
         Array.from(gradBar.children).forEach((b) => {
@@ -3167,9 +3379,10 @@ function onPointerDown(ev) {
 
     if (pointers.size >= 2) {
         // Two fingers → view gesture; abandon any in-progress stroke
-        // (sculpt, paint, or handle reshape) so pinch/spin takes over.
+        // (sculpt, paint, handle reshape, or dip) so pinch/spin takes over.
         sculpting = false;
         handleDrag = null;
+        if (dipping) { dipping = false; dipPreview = null; renderDips(); }
         state.painting = false;
         lastPaintUV = null;
         state.userRotating = true;
@@ -3230,6 +3443,19 @@ function onPointerDown(ev) {
         maybeSquelch();
         ev.preventDefault();
     } else if (state.clayState === "leather") {
+        // Glaze dipping takes priority when the dip tool is armed with a
+        // colour: dragging on the pot sets the glaze line (uv.y = height),
+        // previewed live and committed on release.
+        if (state.dipMode && state.dipColor != null) {
+            const uvd = pointerToUV(ev);
+            if (uvd) {
+                dipping = true;
+                dipPreview = { type: "dip", v: THREE.MathUtils.clamp(uvd.y, 0.02, 1), hex: state.dipColor, feather: DIP_FEATHER };
+                renderDips();
+                ev.preventDefault();
+                return;
+            }
+        }
         // Two actions live here. A silhouette grab in the foot zone
         // is a trim (constrained inward sculpt). Anything else, when
         // a paint colour is selected, is a brush/splatter/stamp tap.
@@ -3303,6 +3529,15 @@ function onPointerMove(ev) {
         ev.preventDefault();
         return;
     }
+    if (dipping) {
+        const uv = pointerToUV(ev);
+        if (uv && dipPreview) {
+            dipPreview.v = THREE.MathUtils.clamp(uv.y, 0.02, 1);
+            renderDips();
+        }
+        ev.preventDefault();
+        return;
+    }
     if (sculpting) {
         const p = pointerToProfile(ev);
         if (p) {
@@ -3345,6 +3580,18 @@ function onPointerUp(ev) {
     if (pointers.size === 0) {
         sculpting = false;
         handleDrag = null;
+        // Commit an in-progress dip: freeze it with drips into the list.
+        if (dipping) {
+            if (dipPreview) {
+                dipPreview.drips = makeDrips(dipPreview.v);
+                state.dips.push(dipPreview);
+                dipPreview = null;
+                state.dirty = true;
+                playSfx("pour");
+            }
+            dipping = false;
+            renderDips();
+        }
         // Reset rate-cap timers so the next stroke's first sample uses
         // the 1/60 fallback instead of a multi-second gap that would
         // otherwise let a single first sample exhaust the per-call cap.
@@ -3776,6 +4023,7 @@ async function savePot() {
         profile: Array.from(profile, (x) => +x.toFixed(4)),
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
+        dips: state.dips.map((d) => ({ ...d })),
         deco: state.decoCanvas.toDataURL("image/png"),
         bump: state.bumpCanvas.toDataURL("image/png"),
         sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
@@ -3814,6 +4062,7 @@ async function savePot() {
                 ts: Date.now() + 1,
                 profile: Array.from(profile, (x) => +x.toFixed(4)),
                 glaze: state.glaze,
+                dips: state.dips.map((d) => ({ ...d })),
                 deco: state.decoCanvas.toDataURL("image/png"),
                 bump: state.bumpCanvas.toDataURL("image/png"),
                 sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
@@ -3862,6 +4111,7 @@ function capturePieceState() {
         profile: Float32Array.from(profile),
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
+        dips: state.dips.map((d) => ({ ...d })),
         decoCanvas: decoCopy,
         bumpCanvas: bumpCopy,
         sgraffitoCanvas: sgraffitoCopy,
@@ -3879,6 +4129,8 @@ function restorePieceState(saved) {
     profileDirty = true;
     state.glaze = saved.glaze;
     state.glazeGradient = saved.glazeGradient || null;
+    state.dips = saved.dips ? saved.dips.map((d) => ({ ...d })) : [];
+    renderDips();
     state.isLid = saved.isLid;
     // Rebuild the lid's sculpt cap from the restored silhouette —
     // capturePieceState doesn't carry lidMaxY, and without this the
@@ -4328,6 +4580,16 @@ async function loadPot(entry) {
     profileDirty = true;
     state.glaze = entry.glaze || null;
     state.glazeGradient = entry.glazeGradient || null;
+    // Glaze dips. Back-compat: pots saved with the old whole-pot "rainbow"
+    // glaze had no dips — turn that into a rainbow dip preset instead.
+    state.dips = Array.isArray(entry.dips) ? entry.dips.map((d) => ({ ...d })) : [];
+    if (state.glaze === "rainbow") {
+        if (!state.dips.some((d) => d.type === "preset" && d.id === "rainbow")) {
+            state.dips.push({ type: "preset", id: "rainbow" });
+        }
+        state.glaze = null;
+    }
+    renderDips();
     // Per-piece vertical stretch (older entries default to 1.0).
     setHeightScale(entry.heightScale != null ? entry.heightScale : 1.0);
     // Auto-switch glaze pack if the loaded pot uses a glaze that's
@@ -4438,6 +4700,7 @@ async function loadAsCapturedState(entry) {
         profile: Float32Array.from(entry.profile || []),
         glaze: entry.glaze || null,
         glazeGradient: entry.glazeGradient || null,
+        dips: Array.isArray(entry.dips) ? entry.dips.map((d) => ({ ...d })) : [],
         decoCanvas,
         bumpCanvas,
         sgraffitoCanvas,
@@ -4633,7 +4896,7 @@ function tick() {
     // The handle stage is the finishing step — the wheel stops so the
     // piece stands still while you add + inspect the ears.
     const handlePhase = state.handle.on && !state.isLid && state.clayState === "wet";
-    const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing || handlePhase;
+    const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing || handlePhase || dipping;
     const targetSpin = busy ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
