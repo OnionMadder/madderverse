@@ -605,6 +605,7 @@ const state = {
     camera: null,
     canvas: null,
     turntable: null,
+    wheel: null,
     pot: null,
     clayMaterial: null,
     clayState: INITIAL_STATE,   // a key of PHASES
@@ -655,11 +656,10 @@ const state = {
     // canonical geometry; left mirrors it with scale.x = -1.
     handle: {
         mesh: null, mirrorMesh: null, material: null, on: false,
-        // Legacy reshape offsets — handles are auto-fitted now (the
-        // drag-to-reshape gesture was removed), so these stay 0. Kept
-        // only so old saved pots that persisted handleBulge/handleHeight
-        // still load without a shape surprise; buildHandleCurve ignores
-        // them.
+        // Reshape offsets from the handle-edit drag. bulgeOffset widens /
+        // tightens the ear's outward reach (shape); heightOffset slides
+        // both attach points up / down the body (placement). Start at 0
+        // (= the auto-fit ear) and reset when the handle is toggled off.
         bulgeOffset: 0,
         heightOffset: 0,
         // Tube-radius preset id (key into HANDLE_THICKNESSES). Mirrors
@@ -744,6 +744,9 @@ const raycaster = new THREE.Raycaster();
 const axisPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 const hitPoint  = new THREE.Vector3();
 let sculpting = false;
+// Handle reshape: set while dragging an ear at the handle phase; carries
+// the grab-time snapshot so each move computes an offset from there.
+let handleDrag = null;
 
 // Hoisted from the handle constants section further down — UI build
 // in init() reads HANDLE_THICKNESS_IDS for the picker chips, and
@@ -804,7 +807,8 @@ function init() {
 
     // --- Turntable (pot + wheel spin together) --------------------
     const turntable = new THREE.Group();
-    turntable.add(buildWheel());
+    state.wheel = buildWheel();
+    turntable.add(state.wheel);
     // potGroup wraps the pot mesh + (eventually) the handle meshes
     // so a single scale.y on the group stretches the whole piece
     // vertically without touching the wheel. Per-piece heightScale
@@ -1820,20 +1824,23 @@ function buildHandleCurve() {
     const belly = findBellyY();
     const baseYBot = belly.y;
     const baseYTop = findShoulderY(belly.row != null ? belly.row : Math.floor(baseYBot / TOP * ROWS), belly.r);
-    // Handles are auto-fitted (no hand reshaping): the ear attaches at
-    // the belly + shoulder derived above. Clamp both attach heights to
-    // stay above the foot zone and below the rim.
+    // The ear attaches at the belly + shoulder derived above; the user's
+    // reshape drag shifts both attach points together (heightOffset =
+    // placement) and widens / tightens the outward reach (bulgeOffset =
+    // shape). Clamp the attach heights above the foot zone, below the rim.
     const limitMin = FOOT_TOP + FOOT_BLEND + 0.05;
     const limitMax = TOP - 0.08;
-    const yBot = Math.max(limitMin, Math.min(limitMax - 0.10, baseYBot));
-    const yTop = Math.max(yBot + 0.10, Math.min(limitMax, baseYTop));
+    const shift = state.handle.heightOffset || 0;
+    const yBot = Math.max(limitMin, Math.min(limitMax - 0.10, baseYBot + shift));
+    const yTop = Math.max(yBot + 0.10, Math.min(limitMax, baseYTop + shift));
     const rBot  = radiusAt(yBot);
     const rTop  = radiusAt(yTop);
     const span  = Math.max(0.05, yTop - yBot);
     // Outward reach of the ear. Scales with the attach span so a short
-    // attach makes a tight round ear and a taller one a bigger loop;
-    // clamped so it never flies out like a mug handle.
-    const bulge = Math.min(0.38, Math.max(HANDLE_BULGE * 0.85, span * 0.95));
+    // attach makes a tight round ear and a taller one a bigger loop; the
+    // reshape drag adds on top, clamped so it never flies out like a wing.
+    const baseBulge = Math.min(0.38, Math.max(HANDLE_BULGE * 0.85, span * 0.95));
+    const bulge = Math.max(0.06, Math.min(0.85, baseBulge + (state.handle.bulgeOffset || 0)));
     // Bury the open tube cap behind the opaque wall so the joint reads
     // solid. 2× the tube radius clears the wall at typical angles.
     const inset = handleTubeRadius() * 2.0;
@@ -2902,6 +2909,52 @@ function pointerToProfile(ev) {
     return { y: hitPoint.y / state.heightScale, r: Math.abs(hitPoint.x) };
 }
 
+// Screen point → NDC, shared by the object raycasts below.
+function pointerNDC(ev) {
+    const rect = state.canvas.getBoundingClientRect();
+    return new THREE.Vector2(
+        ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+        -((ev.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+}
+
+// Raycast the twin handle ears. Returns which side was hit, or null.
+function raycastHandleMeshes(ev) {
+    raycaster.setFromCamera(pointerNDC(ev), state.camera);
+    const meshes = [];
+    if (state.handle.mesh && state.handle.mesh.visible)             meshes.push(state.handle.mesh);
+    if (state.handle.mirrorMesh && state.handle.mirrorMesh.visible) meshes.push(state.handle.mirrorMesh);
+    if (!meshes.length) return null;
+    const hits = raycaster.intersectObjects(meshes);
+    if (!hits.length) return null;
+    return { side: hits[0].object === state.handle.mesh ? "right" : "left" };
+}
+
+// True if the pointer is over the wheel head — the only surface that
+// rotates the piece during the handle phase (touching the pot itself
+// never moves it; you spin the wheel to turn your work).
+function raycastWheel(ev) {
+    if (!state.wheel) return false;
+    raycaster.setFromCamera(pointerNDC(ev), state.camera);
+    return raycaster.intersectObject(state.wheel, false).length > 0;
+}
+
+// Project the pointer onto the handle's local X-Y plane (the plane the
+// ear curve lives in, before the turntable spins it) so a reshape drag
+// converts to stable bulge (outward) + height (placement) offsets.
+const _handlePlane      = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const _handlePlanePoint = new THREE.Vector3();
+const _handleNormal     = new THREE.Vector3();
+function pointerToHandleLocal(ev) {
+    raycaster.setFromCamera(pointerNDC(ev), state.camera);
+    _handleNormal.set(0, 0, 1).applyQuaternion(state.turntable.quaternion).normalize();
+    _handlePlane.normal.copy(_handleNormal);
+    _handlePlane.constant = 0;
+    if (!raycaster.ray.intersectPlane(_handlePlane, _handlePlanePoint)) return null;
+    state.turntable.worldToLocal(_handlePlanePoint);
+    return { x: _handlePlanePoint.x, y: _handlePlanePoint.y };
+}
+
 function onPointerDown(ev) {
     // Any touch on the studio dismisses the first-run hints for good.
     dismissFirstRunHint();
@@ -2909,8 +2962,9 @@ function onPointerDown(ev) {
 
     if (pointers.size >= 2) {
         // Two fingers → view gesture; abandon any in-progress stroke
-        // (sculpt or paint) so the pinch/spin pair takes over cleanly.
+        // (sculpt, paint, or handle reshape) so pinch/spin takes over.
         sculpting = false;
+        handleDrag = null;
         state.painting = false;
         lastPaintUV = null;
         state.userRotating = true;
@@ -2922,15 +2976,35 @@ function onPointerDown(ev) {
     }
 
     if (state.clayState === "wet") {
-        // Handles are the finishing step: once one is attached the wheel
-        // stops (see tick) and the piece is static so you can look it
-        // over. Handles aren't reshaped by hand — they're auto-fitted to
-        // the belly + shoulder — so a touch here just rotates the piece
-        // to inspect it from any side; body sculpting is suppressed while
-        // a handle is on (remove the handle to keep sculpting).
+        // Handle phase — the finishing step. The wheel is stopped (see
+        // tick) and the piece is static. Three targets, checked in order:
+        //   1. an ear  → grab it to edit its shape + placement
+        //   2. the wheel → drag it to spin the piece and inspect it
+        //   3. the pot body / empty space → nothing; the pot is NEVER
+        //      moved by touching it (only the wheel turns your work)
+        // Body sculpting is suppressed while a handle is on — remove the
+        // handle to keep shaping the pot.
         if (state.handle.on && !state.isLid) {
-            state.userRotating = true;
-            viewPrevX = ev.clientX;
+            const hit = raycastHandleMeshes(ev);
+            if (hit) {
+                const local = pointerToHandleLocal(ev);
+                if (local) {
+                    handleDrag = {
+                        side: hit.side,
+                        grabX: local.x,
+                        grabY: local.y,
+                        bulgeStart: state.handle.bulgeOffset || 0,
+                        heightStart: state.handle.heightOffset || 0,
+                    };
+                    ev.preventDefault();
+                    return;
+                }
+            }
+            if (raycastWheel(ev)) {
+                state.userRotating = true;
+                viewPrevX = ev.clientX;
+            }
+            // Pot body or empty space → do nothing.
             ev.preventDefault();
             return;
         }
@@ -2998,6 +3072,23 @@ function onPointerMove(ev) {
         return;
     }
 
+    if (handleDrag) {
+        // Reshape the grabbed ear: horizontal drag widens / tightens the
+        // outward bulge (shape); vertical drag slides both attach points
+        // along the body together (placement). abs() unifies the two ears
+        // so dragging either one outward widens the bulge.
+        const local = pointerToHandleLocal(ev);
+        if (local) {
+            const dx = Math.abs(local.x) - Math.abs(handleDrag.grabX);
+            const dy = local.y - handleDrag.grabY;
+            state.handle.bulgeOffset  = handleDrag.bulgeStart  + dx;
+            state.handle.heightOffset = handleDrag.heightStart + dy;
+            rebuildHandleGeometry();
+            state.dirty = true;
+        }
+        ev.preventDefault();
+        return;
+    }
     if (sculpting) {
         const p = pointerToProfile(ev);
         if (p) {
@@ -3039,6 +3130,7 @@ function onPointerUp(ev) {
     if (pointers.size < 2) pinchPrevDist = 0;
     if (pointers.size === 0) {
         sculpting = false;
+        handleDrag = null;
         // Reset rate-cap timers so the next stroke's first sample uses
         // the 1/60 fallback instead of a multi-second gap that would
         // otherwise let a single first sample exhaust the per-call cap.
