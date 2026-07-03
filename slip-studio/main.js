@@ -753,7 +753,10 @@ let handleDrag = null;
 // Hoisted from the handle constants section further down — UI build
 // in init() reads HANDLE_THICKNESS_IDS for the picker chips, and
 // top-down evaluation hadn't reached the original spot yet (TDZ).
-const HANDLE_THICKNESSES = { thin: 0.022, medium: 0.032, thick: 0.048 };
+// Tube cross-section radii. Bumped up substantially (v2.3) — the old
+// values (0.022/0.032/0.048) read as thin wire straps; real pulled
+// ceramic handles are chunky. These give a rounded, gripable ear.
+const HANDLE_THICKNESSES = { thin: 0.040, medium: 0.058, thick: 0.080 };
 const HANDLE_THICKNESS_IDS = ["thin", "medium", "thick"];
 const DEFAULT_HANDLE_THICKNESS = "medium";
 function handleTubeRadius() {
@@ -967,7 +970,8 @@ function init() {
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setStampShape, stampAt, applyOverlay,
             scratchAt, scratchStroke, clearSgraffito,
-            setGradientGlaze, setHandleOn,
+            setGradientGlaze, setHandleOn, setHandleThickness,
+            rebuildHandleGeometry, buildHandleCurve, refitHandle,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
@@ -1839,30 +1843,41 @@ function buildHandleCurve() {
     // (a tight ear is rounder than a stretched one). Cap at 0.30 so
     // even tall spans don't fly outward like a mug handle. The user's
     // drag bulgeOffset adds on top, allowed to range much wider.
-    const baseBulge = Math.min(0.30, Math.max(HANDLE_BULGE * 0.5, span * 0.75));
-    const bulge = Math.max(0.05, Math.min(0.80, baseBulge + (state.handle.bulgeOffset || 0)));
+    const baseBulge = Math.min(0.34, Math.max(HANDLE_BULGE * 0.7, span * 0.85));
+    const bulge = Math.max(0.06, Math.min(0.85, baseBulge + (state.handle.bulgeOffset || 0)));
     // INSET the endpoints into the pot wall so the tube's open cap
     // is occluded by the opaque pot surface — without this you see
     // straight into the hollow tube end where it meets the wall and
     // the joint looks broken. ~2× the tube radius is enough depth
     // for the cross-section to clear the wall at typical viewing
     // angles without sinking so far the curve loses its shape.
-    const inset = handleTubeRadius() * 2.2;
-    // Tight amphora arc: short rise outward, peak at midspan, back in.
-    // The peak X uses max(rTop, rBot) so the ear clears whichever wall
-    // is wider rather than scooping into the pot.
+    // Bury the open tube cap behind the opaque wall. 2× the (now larger)
+    // tube radius is enough depth to occlude the cap without scooping so
+    // far the curve loses its shape.
+    const inset = handleTubeRadius() * 2.0;
+    // The ear projects from whichever wall is wider so it never scoops
+    // into the pot.
+    const rBase = Math.max(rTop, rBot);
+    // A full, rounded D-loop (not a flat wing): the three outer control
+    // points sit at nearly the same X (0.82·bulge → bulge → 0.82·bulge),
+    // so the outer edge reads as a rounded vertical arc you could hook a
+    // finger through, and it comes almost straight out of the wall at
+    // top + bottom the way a pulled ceramic handle does.
     return new THREE.CatmullRomCurve3([
-        new THREE.Vector3(rBot - inset,        yBot,             0),
-        new THREE.Vector3(rBot + bulge * 0.50, yBot + span * 0.18, 0),
-        new THREE.Vector3(Math.max(rTop, rBot) + bulge, yMid, 0),
-        new THREE.Vector3(rTop + bulge * 0.50, yTop - span * 0.18, 0),
-        new THREE.Vector3(rTop - inset,        yTop,             0),
-    ]);
+        new THREE.Vector3(rBot - inset,           yBot,               0),
+        new THREE.Vector3(rBase + bulge * 0.82,   yBot + span * 0.10, 0),
+        new THREE.Vector3(rBase + bulge,          yMid,               0),
+        new THREE.Vector3(rBase + bulge * 0.82,   yTop - span * 0.10, 0),
+        new THREE.Vector3(rTop - inset,           yTop,               0),
+    ], false, "catmullrom", 0.5);
 }
 
 function buildHandleGeometry() {
     const curve = buildHandleCurve();
-    return new THREE.TubeGeometry(curve, 40, handleTubeRadius(), 10, false);
+    // 64 tubular segments for a smooth arc; 20 radial for a round
+    // cross-section (was 40 × 10 — the low radial count faceted the tube
+    // and read as flat).
+    return new THREE.TubeGeometry(curve, 64, handleTubeRadius(), 20, false);
 }
 
 function ensureHandleMesh() {
