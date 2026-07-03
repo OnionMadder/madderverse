@@ -166,7 +166,20 @@ const GLAZES = {
     ironred:  glaze("Iron red", 0xb87055, 0xa53a1f, { roughness: 0.42, envMapIntensity: 0.92 }),
     mint:     glaze("Mint",     0xc5ddcd, 0x84b899),
     pearl:    glaze("Pearl",    0xe8dfd2, 0xf2ead8, { clearcoat: 0.88, clearcoatRoughness: 0.08, envMapIntensity: 1.00 }),
+    // Rainbow is a special glaze: its colour comes from a vertical height
+    // ramp painted in the shader (see RAINBOW_STOPS / uRampMix), not from
+    // this base hex — the white base just avoids a flash while the ramp
+    // fades in. Shares the glossy fired surface params so it reads as a
+    // real glaze, not a decal.
+    rainbow:  glaze("Rainbow",  0xf2f2f2, 0xffffff),
 };
+// Vertical rainbow ramp, authored rim (top) → foot (bottom) to match the
+// reference: teal/green up top sweeping down through yellow, orange, red,
+// purple to a deep blue foot. Painted into a 1-D texture (makeRampTexture).
+const RAINBOW_STOPS = [
+    [0.00, "#33d6c0"], [0.16, "#4bd35f"], [0.36, "#f2d63a"],
+    [0.54, "#ef8a2a"], [0.70, "#e23b2f"], [0.86, "#8a3bd6"], [1.00, "#3a46d6"],
+];
 const GLAZE_IDS = [
     "celadon", "cobalt", "oatmeal", "honey", "tenmoku",
     "blush", "forest", "slate", "plum", "sand",
@@ -242,6 +255,11 @@ const OVERLAY_PATTERNS = [
     { id: "checker",  label: "Checker" },
     { id: "waves",    label: "Waves" },
     { id: "diagonal", label: "Diagonal" },
+    // Horizontal banded geometric patterns (wrap the pot in rows).
+    { id: "triangles", label: "Triangles" },
+    { id: "diamonds",  label: "Diamonds" },
+    { id: "chevron",   label: "Chevron" },
+    { id: "crosses",   label: "Crosses" },
 ];
 
 
@@ -643,6 +661,11 @@ const state = {
     gradientMix: 0,
     partnerGradientColor: new THREE.Color(0xffffff),
     partnerGradientMix: 0,
+    // Rainbow glaze: a fixed vertical colour ramp (rampTex) mixed over the
+    // diffuse in the shader. rampMix fades 0 ↔ 1 as the "rainbow" glaze is
+    // selected / deselected, mirroring the gradient-mix pattern above.
+    rampTex: null,
+    rampMix: 0,
     // Editable bump layer: painted into by wet-clay texture stamps
     // (positive relief) and leather-hard carving (negative grooves).
     // Mixed additively with the procedural clay grain in the shader.
@@ -657,11 +680,14 @@ const state = {
     handle: {
         mesh: null, mirrorMesh: null, material: null, on: false,
         // Reshape offsets from the handle-edit drag. bulgeOffset widens /
-        // tightens the ear's outward reach (shape); heightOffset slides
-        // both attach points up / down the body (placement). Start at 0
-        // (= the auto-fit ear) and reset when the handle is toggled off.
+        // tightens the ear's outward reach (width). topOffset + bottomOffset
+        // move the two attach points independently: dragging one end resizes
+        // the loop's height from that end, dragging the middle moves both
+        // together (placement). All start at 0 (= the auto-fit ear) and
+        // reset when the handle is toggled off.
         bulgeOffset: 0,
-        heightOffset: 0,
+        topOffset: 0,
+        bottomOffset: 0,
         // Tube-radius preset id (key into HANDLE_THICKNESSES). Mirrors
         // the lid-style picker — small chip row at handle-on + wet.
         thickness: "medium",
@@ -967,7 +993,7 @@ function init() {
             setStampShape, stampAt, applyOverlay,
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze, setHandleOn, setHandleThickness,
-            rebuildHandleGeometry, buildHandleCurve,
+            rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
@@ -1102,6 +1128,30 @@ function makeDecoLayer() {
     tex.wrapT = THREE.ClampToEdgeWrapping;
     tex.anisotropy = 4;
     state.decoTex = tex;
+    return tex;
+}
+
+// --- Rainbow ramp -----------------------------------------------
+// A 1-D vertical colour ramp (RAINBOW_STOPS) painted into a tall, thin
+// canvas. The clay shader samples it by height (vDecoUv.y) and mixes it
+// over the diffuse when the "rainbow" glaze is active — a real glaze,
+// not a decal, so it takes the fired gloss + shows the throwing lines.
+function makeRampTexture() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 8;
+    canvas.height = 512;
+    const ctx = canvas.getContext("2d");
+    const g = ctx.createLinearGradient(0, 0, 0, canvas.height); // 0 = top (rim)
+    RAINBOW_STOPS.forEach(([pos, col]) => g.addColorStop(pos, col));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    state.rampTex = tex;
     return tex;
 }
 
@@ -1522,6 +1572,66 @@ function applyOverlay(id) {
                 if (x > DECO_W - sw) ctx.fillRect(x - DECO_W, y, sw, slice + 1); // wrap overflow
             }
         }
+    } else if (id === "triangles") {
+        // Aztec-style serrated bands: rows of filled triangles. Even col
+        // count keeps the row seamless across the u-seam.
+        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
+        let cols = Math.max(4, Math.round(DECO_W / (rh * 0.9))); if (cols % 2) cols++;
+        const cw = DECO_W / cols, th = rh * 0.6;
+        for (let r = 0; r < rows; r++) {
+            const yb = r * rh + (rh + th) / 2;
+            for (let c = 0; c < cols; c++) {
+                const x = c * cw;
+                ctx.beginPath();
+                ctx.moveTo(x, yb); ctx.lineTo(x + cw / 2, yb - th); ctx.lineTo(x + cw, yb);
+                ctx.closePath(); ctx.fill();
+            }
+        }
+    } else if (id === "diamonds") {
+        // Rows of diamonds — one motif per cell, centred.
+        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
+        const cols = Math.max(3, Math.round(DECO_W / rh)), cw = DECO_W / cols;
+        const hw = cw * 0.32, hh = rh * 0.32;
+        for (let r = 0; r < rows; r++) {
+            const cy = r * rh + rh / 2;
+            for (let c = 0; c < cols; c++) {
+                const cx = c * cw + cw / 2;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy - hh); ctx.lineTo(cx + hw, cy);
+                ctx.lineTo(cx, cy + hh); ctx.lineTo(cx - hw, cy);
+                ctx.closePath(); ctx.fill();
+            }
+        }
+    } else if (id === "chevron") {
+        // Rows of chevrons — a thick angular zigzag. Even col count so the
+        // first and last vertex land at the same height at the seam.
+        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
+        let cols = Math.max(4, Math.round(DECO_W / rh)); if (cols % 2) cols++;
+        const cw = DECO_W / cols, amp = rh * 0.3, lw = Math.max(4, rh * 0.14);
+        ctx.strokeStyle = rgba(hex, 0.85);
+        ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.lineCap = "round";
+        for (let r = 0; r < rows; r++) {
+            const y = r * rh + rh / 2;
+            ctx.beginPath();
+            for (let c = 0; c <= cols; c++) {
+                const x = c * cw, yy = y + (c % 2 ? amp : -amp);
+                c === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
+            }
+            ctx.stroke();
+        }
+    } else if (id === "crosses") {
+        // Rows of plus signs.
+        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
+        const cols = Math.max(3, Math.round(DECO_W / rh)), cw = DECO_W / cols;
+        const arm = Math.min(cw, rh) * 0.3, t = arm * 0.42;
+        for (let r = 0; r < rows; r++) {
+            const cy = r * rh + rh / 2;
+            for (let c = 0; c < cols; c++) {
+                const cx = c * cw + cw / 2;
+                ctx.fillRect(cx - arm, cy - t, arm * 2, t * 2);
+                ctx.fillRect(cx - t, cy - arm, t * 2, arm * 2);
+            }
+        }
     }
     ctx.restore();
     state.decoTex.needsUpdate = true;
@@ -1607,12 +1717,15 @@ function buildPot() {
     // through both glaze and paint, not just through the base coat.
     const decoTex = makeDecoLayer();
     const sgraffitoTex = makeSgraffitoLayer();
+    const rampTex = makeRampTexture();
     mat.onBeforeCompile = (shader) => {
         shader.uniforms.decoMap        = { value: decoTex };
         shader.uniforms.sgraffitoMap   = { value: sgraffitoTex };
         shader.uniforms.uClayColor     = { value: state.clayBaseColor };
         shader.uniforms.uGradientColor = { value: state.gradientColor };
         shader.uniforms.uGradientMix   = { value: state.gradientMix };
+        shader.uniforms.uRampMap       = { value: rampTex };
+        shader.uniforms.uRampMix       = { value: state.rampMix };
         // Stash the uniform map on the material so tickMaterial can
         // poke the scalar uGradientMix each frame without re-running
         // onBeforeCompile. The Color uniforms hold a reference to the
@@ -1625,7 +1738,7 @@ function buildPot() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uRampMap;\nuniform float uRampMix;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
@@ -1636,6 +1749,12 @@ function buildPot() {
                  // transition is soft. uGradientMix is the on/off fade.
                  float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
+                 // Rainbow glaze: a full vertical colour ramp sampled by
+                 // height, faded in by uRampMix. Applied over the base +
+                 // gradient but UNDER the paint/carve so patterns can sit
+                 // on a rainbow pot.
+                 vec3 _ramp = texture2D( uRampMap, vec2( 0.5, vDecoUv.y ) ).rgb;
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _ramp, vec3( 2.2 ) ), uRampMix );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
@@ -1647,7 +1766,7 @@ function buildPot() {
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-v3";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-ramp-v4";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -1822,19 +1941,28 @@ function findShoulderY(bellyRow, bellyR) {
     return limitY;
 }
 
-function buildHandleCurve() {
+// The ear's two attach heights, after the user's independent top/bottom
+// reshape offsets and clamping. Factored out so the grab-zone classifier
+// (which end did you grab?) and buildHandleCurve agree on where the ear
+// currently sits. bottomOffset moves the belly root; topOffset moves the
+// shoulder end; a min span keeps the loop from collapsing.
+function handleAttachYs() {
     const belly = findBellyY();
     const baseYBot = belly.y;
     const baseYTop = findShoulderY(belly.row != null ? belly.row : Math.floor(baseYBot / TOP * ROWS), belly.r);
-    // The ear attaches at the belly + shoulder derived above; the user's
-    // reshape drag shifts both attach points together (heightOffset =
-    // placement) and widens / tightens the outward reach (bulgeOffset =
-    // shape). Clamp the attach heights above the foot zone, below the rim.
     const limitMin = FOOT_TOP + FOOT_BLEND + 0.05;
     const limitMax = TOP - 0.08;
-    const shift = state.handle.heightOffset || 0;
-    const yBot = Math.max(limitMin, Math.min(limitMax - 0.10, baseYBot + shift));
-    const yTop = Math.max(yBot + 0.10, Math.min(limitMax, baseYTop + shift));
+    const botOff = state.handle.bottomOffset || 0;
+    const topOff = state.handle.topOffset || 0;
+    const yBot = Math.max(limitMin, Math.min(limitMax - 0.12, baseYBot + botOff));
+    const yTop = Math.max(yBot + 0.12, Math.min(limitMax, baseYTop + topOff));
+    return { yBot, yTop };
+}
+
+function buildHandleCurve() {
+    // Attach heights carry the user's placement + height edits (see
+    // handleAttachYs); horizontal drag adds bulge below.
+    const { yBot, yTop } = handleAttachYs();
     const rBot  = radiusAt(yBot);
     const rTop  = radiusAt(yTop);
     const span  = Math.max(0.05, yTop - yBot);
@@ -1977,7 +2105,8 @@ function setHandleOn(on) {
     // a stale drag from a previous session.
     if (!state.handle.on) {
         state.handle.bulgeOffset = 0;
-        state.handle.heightOffset = 0;
+        state.handle.topOffset = 0;
+        state.handle.bottomOffset = 0;
     }
     if (state.handle.on) {
         ensureHandleMesh();
@@ -2409,6 +2538,9 @@ function setGlaze(id) {
     // Clearing the primary clears the gradient too — gradient can't
     // exist without a primary glaze underneath.
     if (!state.glaze) state.glazeGradient = null;
+    // Rainbow is a full-height ramp — a 2-colour bottom gradient under it
+    // would be invisible, so clear it (and the gradient row hides).
+    if (state.glaze === "rainbow") state.glazeGradient = null;
     // Don't allow primary == gradient (would render a flat colour).
     if (state.glaze && state.glaze === state.glazeGradient) state.glazeGradient = null;
     state.dirty = true;
@@ -2455,7 +2587,8 @@ function resetPot() {
     // Clear the handle on reset — a fresh pot starts handle-less.
     state.handle.on = false;
     state.handle.bulgeOffset = 0;
-    state.handle.heightOffset = 0;
+    state.handle.topOffset = 0;
+    state.handle.bottomOffset = 0;
     state.handle.thickness = DEFAULT_HANDLE_THICKNESS;
     updateHandleVisibility();
     updateHandleStylePicker();
@@ -2564,6 +2697,12 @@ function tickMaterial(dt) {
     state.gradientMix += (wantMix - state.gradientMix) * k;
     const u = state.clayMaterial.userData.shaderUniforms;
     if (u && u.uGradientMix) u.uGradientMix.value = state.gradientMix;
+    // Rainbow ramp: fade in while the "rainbow" glaze is the active
+    // primary, out otherwise. Only meaningful once a glaze can show
+    // (leather / fired) — at wet no glaze is selectable so it stays 0.
+    const wantRamp = state.glaze === "rainbow" ? 1 : 0;
+    state.rampMix += (wantRamp - state.rampMix) * k;
+    if (u && u.uRampMix) u.uRampMix.value = state.rampMix;
     // Handle (if attached) tweens the same look as the clay so it
     // melts raw → fired alongside the pot through the kiln. No deco
     // / sgraffito on the handle in v1 — just glaze colour.
@@ -2709,6 +2848,18 @@ function buildGlazeBar() {
         b.addEventListener("click", () => setGlaze(id));
         bar.appendChild(b);
     });
+    // Rainbow — a special multi-colour glaze, always shown after the pack
+    // swatches (it lives in no pack). CSS gradient chip so the swatch
+    // previews the effect.
+    const rb = document.createElement("button");
+    rb.type = "button";
+    rb.className = "glaze-btn glaze-btn-rainbow";
+    rb.dataset.glaze = "rainbow";
+    rb.style.background = "linear-gradient(180deg, #33d6c0, #4bd35f, #f2d63a, #ef8a2a, #e23b2f, #8a3bd6, #3a46d6)";
+    rb.setAttribute("aria-label", "Rainbow glaze");
+    rb.setAttribute("aria-pressed", "false");
+    rb.addEventListener("click", () => setGlaze("rainbow"));
+    bar.appendChild(rb);
     buildGradientBar();
     updateGlazeBar();
 }
@@ -2778,7 +2929,8 @@ function updateGlazeBar() {
     }
     const gradWrap = document.getElementById("gradientWrap");
     const gradBar  = document.getElementById("gradientBar");
-    const hasPrimary = !!state.glaze;
+    // Rainbow owns the whole height ramp, so no 2-colour bottom gradient.
+    const hasPrimary = !!state.glaze && state.glaze !== "rainbow";
     if (gradWrap) gradWrap.hidden = !hasPrimary;
     if (gradBar) {
         Array.from(gradBar.children).forEach((b) => {
@@ -3042,12 +3194,20 @@ function onPointerDown(ev) {
             if (hit) {
                 const local = pointerToHandleLocal(ev);
                 if (local) {
+                    // Which end of the ear did you grab? Top third → move
+                    // the shoulder end; bottom third → move the belly end;
+                    // middle → move both together (placement).
+                    const { yBot, yTop } = handleAttachYs();
+                    const f = yTop > yBot ? (local.y - yBot) / (yTop - yBot) : 0.5;
+                    const zone = f > 0.65 ? "top" : (f < 0.35 ? "bottom" : "mid");
                     handleDrag = {
                         side: hit.side,
+                        zone,
                         grabX: local.x,
                         grabY: local.y,
                         bulgeStart: state.handle.bulgeOffset || 0,
-                        heightStart: state.handle.heightOffset || 0,
+                        topStart: state.handle.topOffset || 0,
+                        botStart: state.handle.bottomOffset || 0,
                     };
                     ev.preventDefault();
                     return;
@@ -3126,16 +3286,17 @@ function onPointerMove(ev) {
     }
 
     if (handleDrag) {
-        // Reshape the grabbed ear: horizontal drag widens / tightens the
-        // outward bulge (shape); vertical drag slides both attach points
-        // along the body together (placement). abs() unifies the two ears
-        // so dragging either one outward widens the bulge.
+        // Reshape the grabbed ear. Horizontal drag widens / tightens the
+        // outward bulge (width); abs() unifies the two ears so dragging
+        // either one outward widens it. Vertical drag moves attach points
+        // per the grabbed zone: top end, bottom end, or both (placement).
         const local = pointerToHandleLocal(ev);
         if (local) {
             const dx = Math.abs(local.x) - Math.abs(handleDrag.grabX);
             const dy = local.y - handleDrag.grabY;
-            state.handle.bulgeOffset  = handleDrag.bulgeStart  + dx;
-            state.handle.heightOffset = handleDrag.heightStart + dy;
+            state.handle.bulgeOffset = handleDrag.bulgeStart + dx;
+            if (handleDrag.zone !== "bottom") state.handle.topOffset    = handleDrag.topStart + dy;
+            if (handleDrag.zone !== "top")    state.handle.bottomOffset = handleDrag.botStart + dy;
             rebuildHandleGeometry();
             state.dirty = true;
         }
@@ -3623,8 +3784,9 @@ async function savePot() {
         title: defaultPotTitle(), // pre-named; user can rename in the gallery
         isLid: state.isLid,
         handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
-        handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
-        handleHeight: !state.isLid && state.handle.on ? state.handle.heightOffset : 0,
+        handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset    : 0,
+        handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset      : 0,
+        handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset   : 0,
         handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
         heightScale:  state.heightScale,
         assemblyThumb,
@@ -3661,7 +3823,8 @@ async function savePot() {
                 isLid: state.isLid,
                 handle: !state.isLid && state.handle.on,
                 handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
-                handleHeight: !state.isLid && state.handle.on ? state.handle.heightOffset : 0,
+                handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset    : 0,
+                handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset : 0,
                 assemblyThumb, // same shared shot
             };
             await dbPut(partnerEntry);
@@ -4193,7 +4356,11 @@ async function loadPot(entry) {
     // to state.pot only).
     state.handle.on = !state.isLid && !!entry.handle;
     state.handle.bulgeOffset  = state.handle.on ? (entry.handleBulge  || 0) : 0;
-    state.handle.heightOffset = state.handle.on ? (entry.handleHeight || 0) : 0;
+    // topOffset/bottomOffset replaced the single handleHeight (a whole-loop
+    // shift). Old saves carried handleHeight; apply it to both ends so a
+    // pre-split pot loads at the same placement it was saved with.
+    state.handle.topOffset    = state.handle.on ? (entry.handleTop    ?? entry.handleHeight ?? 0) : 0;
+    state.handle.bottomOffset = state.handle.on ? (entry.handleBottom ?? entry.handleHeight ?? 0) : 0;
     state.handle.thickness    = (state.handle.on && HANDLE_THICKNESSES[entry.handleThickness])
         ? entry.handleThickness : DEFAULT_HANDLE_THICKNESS;
     if (state.handle.on) {
