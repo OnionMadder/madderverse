@@ -26,6 +26,7 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 
 ## Games
 
+- Slip Studio — calm, meditative 3D pottery wheel (also a Teacher Approved paid Android app): https://madderverse.org/slip-studio/
 - All Munkis — drag-and-drop beat maker: https://madderverse.org/all-munkis/
 - Pootery: Throw, Glaze, Fire — pottery studio: https://madderverse.org/pootery/
 - Groodle — draw-and-dance maker: https://madderverse.org/groodle/
