@@ -206,6 +206,63 @@ body {
     letter-spacing: 0.5px;
     margin-top: 4px;
 }
+.menu-best {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: clamp(0.78rem, 2.1vw, 0.95rem);
+    color: #ffd54a;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(255,213,74,0.5);
+    margin-top: 2px;
+}
+.menu-best[hidden] { display: none; }
+.menu-best span { font-weight: 900; }
+
+/* ── Difficulty toggle (menu) ─────────────────────────────────────── */
+.mode-toggle {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 2px 0;
+}
+.mode-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: clamp(96px, 30vw, 128px);
+    padding: 8px 12px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: clamp(0.85rem, 2.4vw, 1rem);
+    font-weight: 900;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.7);
+    background: rgba(5,5,5,0.55);
+    border: 2px solid rgba(0,255,204,0.3);
+    border-radius: 12px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.08s ease, border-color 0.15s ease,
+                color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.mode-btn .mode-sub {
+    font-size: 0.62em;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    opacity: 0.75;
+}
+.mode-btn:active { transform: scale(0.95); }
+.mode-btn.is-active {
+    color: #050505;
+    background: var(--accent-cyan);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 18px rgba(0,255,204,0.55);
+}
+.mode-btn:focus-visible {
+    outline: 2px solid var(--accent-cyan);
+    outline-offset: 3px;
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    GAME SCREEN
@@ -923,6 +980,38 @@ body {
     font-size: clamp(0.95rem, 2.6vw, 1.15rem);
     margin-top: 4px;
     letter-spacing: 0.3px;
+}
+.end-best {
+    margin-top: 6px;
+    color: #ffd54a;
+    text-shadow: 0 0 8px rgba(255,213,74,0.4);
+}
+.end-best[hidden] { display: none; }
+.end-best span { font-weight: 700; }
+
+/* "NEW HIGH SCORE!" banner — pops in above the feast title on a new best. */
+.new-best-banner {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 900;
+    font-size: clamp(1rem, 4vw, 1.5rem);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, var(--accent-pink), #ffd54a);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    filter: drop-shadow(0 0 12px rgba(255,0,255,0.6));
+    margin-bottom: 4px;
+}
+.new-best-banner[hidden] { display: none; }
+.new-best-banner.show {
+    animation: new-best-pop 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes new-best-pop {
+    0%   { transform: scale(0.4); opacity: 0; }
+    60%  { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1);   opacity: 1; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -90,33 +90,52 @@ const VEGGIES = [
 const EATER_FRAMES = ['frame-one','frame-two','frame-three','frame-four','frame-five','frame-six'];
 const WALK_CYCLE = ['frame-one','frame-two','frame-three','frame-five','frame-six'];
 
-// ── Streak / speed tuning ─────────────────────────────────────────
-// Streak is persistent across cookie spawns. Each catch increments it.
-// It breaks only on miss (cookie flies offscreen) or veggie tap — empty
-// screens between spawns do NOT break it. Per-cookie speed scales as
-// STREAK_SPEED_BASE ** min(streak, STREAK_SPEED_CAP), so the streak
-// counter can keep climbing past 50 but the speed contribution is capped.
-const STREAK_SPEED_BASE = 1.04;   // each streak step multiplies cookie speed by this
-const STREAK_SPEED_CAP  = 50;     // streak count beyond which speed stops growing
+// ── Difficulty modes ──────────────────────────────────────────────
+// Two hand-tuned presets share one shape of tuning:
+//   • streakSpeedBase/Cap — per-cookie speed grows as
+//     streakSpeedBase ** min(streak, streakSpeedCap). Streak persists
+//     across spawns; it breaks only on a miss or a veggie tap.
+//   • spawnStart/End       — ms between spawns, start of round → end.
+//   • baseSpeedStart/End   — baseline cookie-speed multiplier over the round.
+//   • difficultyExp        — ease-in exponent on both curves (higher = gentler
+//     start, so COZY stays easy far longer; CLASSIC gets brutal near the end).
+//   • veggieRatio/vegPenalty — share of spawns that are veggies, and points
+//     lost per veggie tap.
+//
+// CLASSIC is the original arcade curve. COZY is for the youngest players
+// (4–5): slower cookies, a much gentler ramp, fewer veggies, and NO score
+// penalty for a stray veggie tap (a wrong tap still breaks the streak, but
+// never drives the score down — nothing to cry about).
+const MODES = {
+    classic: {
+        streakSpeedBase: 1.04, streakSpeedCap: 50,
+        spawnStart: 800,  spawnEnd: 250,
+        baseSpeedStart: 1.0,  baseSpeedEnd: 1.5,
+        spawnJitter: 0.25, difficultyExp: 1.6,
+        veggieRatio: 0.18, vegPenalty: 20,
+    },
+    cozy: {
+        streakSpeedBase: 1.02, streakSpeedCap: 30,
+        spawnStart: 1000, spawnEnd: 500,
+        baseSpeedStart: 0.85, baseSpeedEnd: 1.05,
+        spawnJitter: 0.25, difficultyExp: 2.2,
+        veggieRatio: 0.10, vegPenalty: 0,
+    },
+};
 
-// ── Round difficulty tuning ───────────────────────────────────────
-// Over the round, two curves stack on top of the streak multiplier:
-//   1. Spawn interval shrinks from SPAWN_INTERVAL_START ms → SPAWN_INTERVAL_END ms
-//   2. Base cookie speed grows from BASE_SPEED_START → BASE_SPEED_END
-// Both follow an ease-in curve (Math.pow(p, ROUND_DIFFICULTY_EXP)) so the
-// first ~third of the round is gentle and the last third gets brutal.
-// Raise the exponent for a flatter ramp; lower it to compress the difficulty.
-const SPAWN_INTERVAL_START = 800;  // ms between spawns at round start
-const SPAWN_INTERVAL_END   = 250;  // ms between spawns at round end
-const BASE_SPEED_START     = 1.0;  // baseline cookie-speed multiplier at start
-const BASE_SPEED_END       = 1.5;  // baseline cookie-speed multiplier at end
-const SPAWN_JITTER         = 0.25; // ± fraction applied to the mean spawn interval
-const ROUND_DIFFICULTY_EXP = 1.6;  // ease-in exponent (gentle start, steeper end)
+// Active tuning — repopulated by applyMode() at the start of each round.
+// Defaults to classic so any code path that runs before a round (e.g. a
+// stray spawn) still has sane numbers.
+const TUNE = Object.assign({}, MODES.classic);
+
+function applyMode(mode) {
+    Object.assign(TUNE, MODES[mode] || MODES.classic);
+}
 
 function roundEase(p) {
     if (p <= 0) return 0;
     if (p >= 1) return 1;
-    return Math.pow(p, ROUND_DIFFICULTY_EXP);
+    return Math.pow(p, TUNE.difficultyExp);
 }
 
 const CFG = {
@@ -129,8 +148,7 @@ const CFG = {
     feastChompMs:    260,
     feastMinDelay:   60,
     points:          10,       // base points per cookie catch (multiplied by streak tier)
-    veggieRatio:     0.18,     // ~18% of spawns are veggies
-    vegPenalty:      20,       // points lost per veggie tap
+    // veggieRatio + vegPenalty are per-mode now — see MODES / TUNE above.
     // Streak multiplier tiers — score earned per catch = points * mult.
     // Capped at x5 so values stay readable; streak count itself keeps climbing.
     comboTiers: [
@@ -148,7 +166,7 @@ function comboTier(streak) {
 }
 
 function streakSpeedMult(streak) {
-    return Math.pow(STREAK_SPEED_BASE, Math.min(streak, STREAK_SPEED_CAP));
+    return Math.pow(TUNE.streakSpeedBase, Math.min(streak, TUNE.streakSpeedCap));
 }
 
 // ── Lore booklet content ──────────────────────────────────────────
@@ -228,7 +246,72 @@ const els = {
     feastTitle:  document.getElementById('feast-title'),
     endScore:    document.getElementById('end-score'),
     endRank:     document.getElementById('end-rank'),
+    endBest:     document.getElementById('end-best'),
+    endBestVal:  document.getElementById('end-best-val'),
+    newBestBanner: document.getElementById('new-best-banner'),
+    menuBest:    document.getElementById('menu-best'),
+    menuBestVal: document.getElementById('menu-best-val'),
+    modeBtns:    Array.from(document.querySelectorAll('.mode-btn')),
 };
+
+// ── Personal best (localStorage) ──────────────────────────────────
+// A single number: the highest score the player has ever reached on
+// this device. No leaderboards, no accounts — just "beat your own best."
+// Keyed like the game dir so it never collides with other games served
+// from the same madderverse.org origin.
+const BEST_KEY = 'cookie-cache-best';
+
+function loadBest() {
+    try {
+        const v = parseInt(localStorage.getItem(BEST_KEY), 10);
+        return Number.isFinite(v) && v > 0 ? v : 0;
+    } catch (_) { return 0; }
+}
+
+function saveBest(v) {
+    try { localStorage.setItem(BEST_KEY, String(v)); } catch (_) {}
+}
+
+function renderMenuBest() {
+    if (!els.menuBest) return;
+    if (state.best > 0) {
+        if (els.menuBestVal) els.menuBestVal.textContent = String(state.best);
+        els.menuBest.hidden = false;
+    } else {
+        els.menuBest.hidden = true;
+    }
+}
+
+// ── Difficulty mode (localStorage) ────────────────────────────────
+// Which preset the START button will launch. Persists so a parent can set
+// Cozy once for a young child and it stays put across sessions.
+const MODE_KEY = 'cookie-cache-mode';
+
+function loadMode() {
+    try {
+        const m = localStorage.getItem(MODE_KEY);
+        return (m === 'cozy' || m === 'classic') ? m : 'classic';
+    } catch (_) { return 'classic'; }
+}
+
+function saveMode(m) {
+    try { localStorage.setItem(MODE_KEY, m); } catch (_) {}
+}
+
+function setMode(m) {
+    state.mode = (m === 'cozy') ? 'cozy' : 'classic';
+    saveMode(state.mode);
+    renderModeToggle();
+}
+
+function renderModeToggle() {
+    if (!els.modeBtns) return;
+    els.modeBtns.forEach(btn => {
+        const on = btn.dataset.mode === state.mode;
+        btn.classList.toggle('is-active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+}
 
 // ── Audio ──────────────────────────────────────────────────────────
 const AUDIO_BASE = 'assets/audio/';
@@ -395,6 +478,8 @@ const state = {
     stageH:       0,
     chompResetTo: 0,
     glitchTimer:  0,
+    best:         0,
+    mode:         'classic',
 };
 
 function showScreen(name) {
@@ -573,7 +658,7 @@ function spawnCookie() {
     if (W < 50 || H < 50) return;
 
     const fromLeft = Math.random() < 0.5;
-    const isVeggie = Math.random() < CFG.veggieRatio;
+    const isVeggie = Math.random() < TUNE.veggieRatio;
     // Element aspect tracks sheet-cell aspect: cookies are 4:3, veggies
     // are 1:1. This is what kills the "neighbour cookie chunks" bleed —
     // when the element matches the cell exactly, the scaled sheet image
@@ -614,7 +699,7 @@ function spawnCookie() {
     // round's base-speed curve both multiply in — so cookies already in
     // flight keep their pace even as the streak or round progress changes.
     const progress    = 1 - (state.timeLeftMs / (CFG.duration * 1000));
-    const baseSpeed   = lerp(BASE_SPEED_START, BASE_SPEED_END, roundEase(progress));
+    const baseSpeed   = lerp(TUNE.baseSpeedStart, TUNE.baseSpeedEnd, roundEase(progress));
     const timeMult    = streakSpeedMult(state.streakHits) * baseSpeed;
 
     const cookie = {
@@ -782,7 +867,7 @@ function hitVeggie(v) {
     v.el.classList.add('zapped', 'popped');
 
     const before = state.score;
-    state.score = Math.max(0, state.score - CFG.vegPenalty);
+    state.score = Math.max(0, state.score - TUNE.vegPenalty);
     const lost  = before - state.score;
     if (lost > 0) {
         els.hudScore.textContent = state.score;
@@ -792,7 +877,8 @@ function hitVeggie(v) {
 
     const pop = document.createElement('div');
     pop.className   = 'score-pop big yuck-wobble';
-    pop.textContent = `${choice(VEG_LABELS)} -${lost}`;
+    // In Cozy mode there's no point penalty, so drop the "-0" and just wail.
+    pop.textContent = lost > 0 ? `${choice(VEG_LABELS)} -${lost}` : choice(VEG_LABELS);
     pop.style.left  = v.x + 'px';
     pop.style.top   = v.y + 'px';
     pop.style.color = '#ff6b6b';
@@ -1116,8 +1202,8 @@ function loop(ts) {
     if (state.spawnInMs <= 0) {
         spawnCookie();
         const progress = 1 - (state.timeLeftMs / (CFG.duration * 1000));
-        const mean = lerp(SPAWN_INTERVAL_START, SPAWN_INTERVAL_END, roundEase(progress));
-        state.spawnInMs = mean * (1 + rand(-SPAWN_JITTER, SPAWN_JITTER));
+        const mean = lerp(TUNE.spawnStart, TUNE.spawnEnd, roundEase(progress));
+        state.spawnInMs = mean * (1 + rand(-TUNE.spawnJitter, TUNE.spawnJitter));
     }
 
     state.timeLeftMs -= dt * 1000;
@@ -1140,7 +1226,7 @@ function resetState() {
     state.score       = 0;
     state.pile        = 0;
     state.timeLeftMs  = CFG.duration * 1000;
-    state.spawnInMs   = SPAWN_INTERVAL_START * (1 + rand(-SPAWN_JITTER, SPAWN_JITTER));
+    state.spawnInMs   = TUNE.spawnStart * (1 + rand(-TUNE.spawnJitter, TUNE.spawnJitter));
     state.lastTs      = 0;
     state.chompResetTo = 0;
     state.streakHits  = 0;
@@ -1159,6 +1245,7 @@ function resetState() {
 }
 
 function startRound() {
+    applyMode(state.mode);
     playStartSfx();
     document.body.classList.add('in-game');
     // Chain orientation lock off the fullscreen promise — browsers only
@@ -1219,6 +1306,27 @@ function endRound() {
 function showFeast() {
     els.endScore.textContent = String(state.score);
     els.endRank.textContent  = rankFor(state.score);
+
+    // Personal best: a new high only counts if the player actually scored.
+    // Beating it updates the saved value, reveals the menu badge next time,
+    // and pops the celebratory banner on this feast screen.
+    const isNewBest = state.score > 0 && state.score > state.best;
+    if (isNewBest) {
+        state.best = state.score;
+        saveBest(state.best);
+    }
+    if (els.endBestVal) els.endBestVal.textContent = String(state.best);
+    if (els.endBest) els.endBest.hidden = state.best <= 0;
+    if (els.newBestBanner) {
+        els.newBestBanner.hidden = !isNewBest;
+        if (isNewBest) {
+            els.newBestBanner.classList.remove('show');
+            void els.newBestBanner.offsetWidth;
+            els.newBestBanner.classList.add('show');
+        }
+    }
+    renderMenuBest();
+
     showScreen('feast');
 
     requestAnimationFrame(() => {
@@ -1404,6 +1512,13 @@ function init() {
     preload();
     loadSfxPools();
     initCodeRain();
+    state.best = loadBest();
+    renderMenuBest();
+    state.mode = loadMode();
+    renderModeToggle();
+    els.modeBtns.forEach(btn => {
+        btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    });
     els.btnStart.addEventListener('click',  startRound);
     els.btnReplay.addEventListener('click', startRound);
     if (els.btnMute) els.btnMute.addEventListener('click', toggleMute);
