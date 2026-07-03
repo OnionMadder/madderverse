@@ -1783,6 +1783,8 @@ function nudgeHeight(delta) {
 }
 
 const HANDLE_BULGE     = 0.22;   // outward arc — modest amphora ear, not a giant wing
+const HANDLE_GAP       = 0.055;  // min clearance of the tube's inner edge from the wall (finger gap)
+const HANDLE_ROOT_FLARE = 0.9;   // how much the tube swells at the roots (0 = uniform pipe)
 // HANDLE_THICKNESSES / HANDLE_THICKNESS_IDS / DEFAULT_HANDLE_THICKNESS
 // + handleTubeRadius() are hoisted earlier in the file (before init())
 // because buildHandleStylePicker reads HANDLE_THICKNESS_IDS during
@@ -1839,8 +1841,12 @@ function buildHandleCurve() {
     // Outward reach of the ear. Scales with the attach span so a short
     // attach makes a tight round ear and a taller one a bigger loop; the
     // reshape drag adds on top, clamped so it never flies out like a wing.
+    // The MINIMUM keeps a standoff: the inner edge of the tube must clear
+    // the wall by HANDLE_GAP so the ear can never be dragged flush (which
+    // made the tube graze the body and read as a lumpy merged blob).
+    const minBulge = handleTubeRadius() + HANDLE_GAP;
     const baseBulge = Math.min(0.38, Math.max(HANDLE_BULGE * 0.85, span * 0.95));
-    const bulge = Math.max(0.06, Math.min(0.85, baseBulge + (state.handle.bulgeOffset || 0)));
+    const bulge = Math.max(minBulge, Math.min(0.85, baseBulge + (state.handle.bulgeOffset || 0)));
     // Bury the open tube cap behind the opaque wall so the joint reads
     // solid. 2× the tube radius clears the wall at typical angles.
     const inset = handleTubeRadius() * 2.0;
@@ -1863,12 +1869,59 @@ function buildHandleCurve() {
     return new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
 }
 
+// How much the tube swells toward the two ends (the roots). ~1 at the
+// very ends, easing to 0 across the first/last ~20% of the length, so the
+// ear thickens where it meets the body — a pulled-clay fillet that blends
+// into the wall instead of a uniform pipe poking through it.
+function handleRootBlend(t) {
+    const edge = 0.20;
+    let e = 0;
+    if (t < edge)          e = 1 - t / edge;
+    else if (t > 1 - edge) e = 1 - (1 - t) / edge;
+    return smoothstep(e);
+}
+
+// Sweep a circular cross-section of VARYING radius along the ear curve.
+// Three's TubeGeometry only does a constant radius, so this is a hand
+// build (same frame-sweep algorithm) with a per-station radius that
+// flares at the roots. Normals are recomputed after so the flare shades
+// correctly.
 function buildHandleGeometry() {
     const curve = buildHandleCurve();
-    // 64 tubular segments for a smooth arc; 20 radial for a round
-    // cross-section (was 40 × 10 — the low radial count faceted the tube
-    // and read as flat).
-    return new THREE.TubeGeometry(curve, 64, handleTubeRadius(), 20, false);
+    const r0 = handleTubeRadius();
+    const TUBULAR = 64, RADIAL = 20;
+    const frames = curve.computeFrenetFrames(TUBULAR, false);
+    const pos = [], idx = [];
+    const P = new THREE.Vector3();
+    for (let i = 0; i <= TUBULAR; i++) {
+        const t = i / TUBULAR;
+        curve.getPointAt(t, P);
+        const N = frames.normals[i], B = frames.binormals[i];
+        const r = r0 * (1 + HANDLE_ROOT_FLARE * handleRootBlend(t));
+        for (let j = 0; j <= RADIAL; j++) {
+            const v = (j / RADIAL) * Math.PI * 2;
+            const sn = Math.sin(v), cs = -Math.cos(v);
+            pos.push(
+                P.x + r * (cs * N.x + sn * B.x),
+                P.y + r * (cs * N.y + sn * B.y),
+                P.z + r * (cs * N.z + sn * B.z),
+            );
+        }
+    }
+    for (let i = 1; i <= TUBULAR; i++) {
+        for (let j = 1; j <= RADIAL; j++) {
+            const a = (RADIAL + 1) * (i - 1) + (j - 1);
+            const b = (RADIAL + 1) * i + (j - 1);
+            const c = (RADIAL + 1) * i + j;
+            const d = (RADIAL + 1) * (i - 1) + j;
+            idx.push(a, b, d, b, c, d);
+        }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setIndex(idx);
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    return geo;
 }
 
 function ensureHandleMesh() {
