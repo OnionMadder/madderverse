@@ -88,6 +88,85 @@ html, body {
     .kiln-vignette { transition: none; opacity: 0; }
 }
 
+/* Save "flashbulb": a brief soft white bloom over the pot when a piece
+   is saved — a stamp on the work, borrowing the kiln's warm-glow
+   vocabulary but cooler and much shorter (<250ms) so it stays texture,
+   not celebration. JS adds .is-pulsing to fire the one-shot animation. */
+.save-flash {
+    position: fixed;
+    inset: 0;
+    z-index: 37;
+    pointer-events: none;
+    opacity: 0;
+    background: radial-gradient(ellipse 46% 52% at 50% 52%,
+        rgba(255, 251, 244, 0.9) 0%,
+        rgba(255, 246, 232, 0.4) 34%,
+        transparent 64%);
+    mix-blend-mode: screen;
+}
+.save-flash.is-pulsing { animation: slip-flash 260ms ease-out; }
+@keyframes slip-flash {
+    0%   { opacity: 0; }
+    22%  { opacity: 0.35; }
+    100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .save-flash.is-pulsing { animation: none; opacity: 0; }
+}
+
+/* First-launch control hints. Calm, low-opacity line art centred low in
+   the frame so it doesn't cover the pot. Fades in only after an idle
+   beat on a fresh install; .is-visible drives the fade both ways. */
+.first-run-hint {
+    position: fixed;
+    inset: 0;
+    z-index: 36;
+    pointer-events: none;   /* the dismissing tap passes through to the pot */
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0 24px 22vh;
+    opacity: 0;
+    transition: opacity 0.55s ease;
+}
+.first-run-hint[hidden] { display: none; }
+.first-run-hint.is-visible { opacity: 1; }
+.first-run-hint-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 18px 22px;
+    border-radius: 16px;
+    background: rgba(20, 18, 16, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+.first-run-hint .hint-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--ink);
+}
+.first-run-hint .hint-row svg {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    fill: none;
+    stroke: var(--ink-dim);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: var(--ink-dim);   /* for the fill:currentColor dots */
+}
+.first-run-hint .hint-row span {
+    font-size: 0.9rem;
+    letter-spacing: 0.02em;
+    color: rgba(243, 237, 230, 0.82);
+}
+@media (prefers-reduced-motion: reduce) {
+    .first-run-hint { transition: none; }
+}
+
 /* Looping video backdrop, same plane as .backdrop. JS toggles
    is-active to fade between static-image + motion backgrounds. */
 .backdrop-video {
@@ -168,6 +247,9 @@ html, body {
 
 @media (prefers-reduced-motion: reduce) {
     .loader-ring { animation: none; }
+    /* Skip the cross-fades too — snap instead of ease for reduced motion. */
+    .loader { transition: none; }
+    .landing { transition: none; }
 }
 
 /* ---------- Title / landing screen ---------- */
@@ -293,6 +375,17 @@ html, body {
     background: rgba(201, 138, 100, 0.18);
     transform: scale(1.04);
 }
+/* First-visit caption under the shape picker — names the swatches as
+   choices for the starter pot. Shown only until the first pot is made
+   (JS gates on the slip-seen-first-run flag). */
+.shape-hint {
+    margin: -2px 0 12px;
+    color: var(--ink-dim);
+    font-size: 0.76rem;
+    font-style: italic;
+    letter-spacing: 0.03em;
+}
+.shape-hint[hidden] { display: none; }
 
 /* Backdrop picker on the title screen — category tabs on top, one
    row of swatches below. Only the active category's swatches show,
@@ -1232,6 +1325,15 @@ html, body {
     box-shadow: inset 0 0 0 1px var(--accent);
 }
 
+/* Save confirmation: the icon swaps to a checkmark and the button glows
+   accent for a beat — a wax seal on the piece rather than a form-style
+   "Saved ✓" text swap. */
+.tool-btn.is-saved {
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
 /* Icon-only piece-comp buttons. Square 38×38 with a centred 20×20
    line-art glyph. Same chip background + border as text tool-btns
    so the whole toolbar row reads as one set; active ring still
@@ -1369,6 +1471,13 @@ html, body {
     height: 100%;
     overflow: hidden;
 }
+/* Glaze-tinted hairline over the shelf thumbnail (see renderGalleryTile). */
+.thumb-glaze-ring {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+}
 .gallery-item.is-shelf .pot-thumb {
     width: 100%;
     height: 100%;
@@ -1470,6 +1579,7 @@ html, body {
     margin-bottom: 4px;
 }
 .photo-preview-wrap {
+    position: relative;
     flex: 0 1 auto;
     display: flex;
     align-items: center;
@@ -1480,6 +1590,22 @@ html, body {
     border-radius: 14px;
     overflow: hidden;
     border: 1px solid var(--ink-faint);
+}
+/* A small pill marking the render as a frozen snapshot, not a live view. */
+.photo-preview-tag {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 1;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(20, 18, 16, 0.62);
+    color: rgba(243, 237, 230, 0.72);
+    font-family: var(--font-display);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    pointer-events: none;
 }
 .photo-preview {
     display: block;

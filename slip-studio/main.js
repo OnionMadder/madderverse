@@ -722,6 +722,16 @@ const state = {
 let lastPaintUV = null;         // for continuous paint strokes
 let music = null;               // looping ambient track
 
+// First-launch control hints: shown once, after a short idle beat in the
+// studio on a fresh install; suppressed forever once the user interacts.
+const FIRST_RUN_KEY = "slip-seen-first-run";
+let firstRunTimer = null;
+
+// Wheel-hum ramp: the hum fades in from silence after Begin rather than
+// popping to full volume the first frame (see tick()).
+let wheelStarted = false;
+let wheelGain = 0;
+
 const targetColor = new THREE.Color(); // scratch for the material tween
 
 // Editable silhouette: profile[r] = clay radius at height row r.
@@ -918,6 +928,17 @@ function init() {
     document.getElementById("musicToggle")?.addEventListener("click", () => setMusic(!state.musicOn));
     document.getElementById("sfxToggle")?.addEventListener("click", () => setSfx(!state.sfxOn));
     document.getElementById("titleBtn")?.addEventListener("click", returnToTitle);
+
+    // Light haptic tick on any control tap (Android only; a silent no-op
+    // elsewhere). Capture phase so it fires even for buttons whose own
+    // handler stops propagation; Save + Fire add their own firmer buzz.
+    document.addEventListener("click", (e) => {
+        if (e.target.closest(".tool-btn, .deco-tool, .deco-tab, .brush-btn," +
+            " .shape-swatch, .glaze-btn, .photo-chip, .landing-btn")) haptic(8);
+    }, true);
+
+    // First-visit landing caption ("Pick a starter shape").
+    updateShapeHint();
 
     // Title screen sits over the (already-spinning) studio until "Begin".
     const landing = document.getElementById("landing");
@@ -2247,6 +2268,7 @@ function setPhase(name) {
 
 // The forward control: dry → fire → new pot.
 function advanceStage() {
+    dismissFirstRunHint(); // progressing the arc counts as engaged
     switch (state.clayState) {
         case "wet":
             setPhase("leather"); // firms to leather-hard, ready to decorate
@@ -2264,6 +2286,7 @@ function advanceStage() {
         case "leather":
             setPhase("fired");
             playSfx("kiln");
+            haptic(30); // a firmer rumble for the commitment to fire
             startFiringMoment();
             // The partner's clayState stays "leather" through the kiln
             // animation so it enters the view at its raw-glaze look
@@ -2947,6 +2970,8 @@ function pointerToHandleLocal(ev) {
 }
 
 function onPointerDown(ev) {
+    // Any touch on the studio dismisses the first-run hints for good.
+    dismissFirstRunHint();
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
     if (pointers.size >= 2) {
@@ -3333,11 +3358,21 @@ async function loadBackdropImage() {
     });
 }
 
+// Export-canvas height per aspect (width is always 1024).
+//   square 1:1, feed 4:5 (Instagram feed), portrait 9:16 (stories).
+function photoHeightFor(aspect) {
+    if (aspect === "portrait") return 1820;
+    if (aspect === "feed")     return 1280;
+    return 1024;
+}
+
 // Compose the chosen style + aspect into target canvas.
 function composeStyledPhoto(potCanvas, bgImage, style, aspect, target) {
-    const isPortrait = aspect === "portrait";
+    // Any non-square aspect uses the taller-frame layout (shelf lower,
+    // pot nudged down, plinth + caption sized up).
+    const isPortrait = aspect !== "square";
     const W = 1024;
-    const H = isPortrait ? 1820 : 1024;
+    const H = photoHeightFor(aspect);
     target.width = W;
     target.height = H;
     const ctx = target.getContext("2d");
@@ -3446,9 +3481,27 @@ function setPhotoStyle(name) {
 }
 
 function setPhotoAspect(name) {
-    state.photoAspect = name === "portrait" ? "portrait" : "square";
+    state.photoAspect = ["portrait", "feed", "square"].includes(name) ? name : "square";
     syncPhotoChips();
     renderPhotoPreview();
+}
+
+// A descriptive, brand-forward filename for the exported photo so every
+// shared image reads like a considered artifact: e.g.
+// slip-studio-vase-cobalt-2026-07-02.png. Kebab-cased ASCII only.
+function kebabCase(s) {
+    return String(s).toLowerCase()
+        .normalize("NFKD")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "x";
+}
+function photoFilename() {
+    const shape = state.isLid ? "lid" : (state.shape || "pot");
+    const glazeName = (state.glaze && GLAZES[state.glaze]) ? GLAZES[state.glaze].name : "bare-clay";
+    const d = new Date();
+    const p2 = (n) => String(n).padStart(2, "0");
+    const date = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+    return `slip-studio-${kebabCase(shape)}-${kebabCase(glazeName)}-${date}.png`;
 }
 
 function syncPhotoChips() {
@@ -3464,7 +3517,7 @@ async function finalizePhoto() {
     if (!photoPotCache) return;
     const out = document.createElement("canvas");
     composeStyledPhoto(photoPotCache, photoBgCache, state.photoStyle, state.photoAspect, out);
-    const filename = `slip-studio-${Date.now().toString(36)}.png`;
+    const filename = photoFilename();
     const blob = await new Promise((res) => out.toBlob(res, "image/png"));
     try {
         if (blob && navigator.canShare) {
@@ -3495,6 +3548,15 @@ function flashPhotoSave() {
     setTimeout(() => { b.textContent = prev; }, 1300);
 }
 
+// A gentle default name so the shelf view has content from the moment a
+// piece is saved (e.g. "Vase in Cobalt", "Bare-clay bowl", "Lid in Sand").
+// The user can still tap the title in the gallery to rename it.
+function defaultPotTitle() {
+    const base = state.isLid ? "Lid" : (SHAPES[state.shape]?.label || "Pot");
+    const glazeName = (state.glaze && GLAZES[state.glaze]) ? GLAZES[state.glaze].name : null;
+    return glazeName ? `${base} in ${glazeName}` : `Bare-clay ${base.toLowerCase()}`;
+}
+
 async function savePot() {
     // If a partner is paused in memory, generate a shared set id so
     // both pieces save together. The active piece is written first
@@ -3520,7 +3582,7 @@ async function savePot() {
         sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
         setId,
-        title: null, // user can name from the gallery
+        title: defaultPotTitle(), // pre-named; user can rename in the gallery
         isLid: state.isLid,
         handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
         handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
@@ -3557,7 +3619,7 @@ async function savePot() {
                 sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
                 thumb: captureThumb(),
                 setId,
-                title: null,
+                title: defaultPotTitle(),
                 isLid: state.isLid,
                 handle: !state.isLid && state.handle.on,
                 handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
@@ -4028,10 +4090,30 @@ function swapActivePiece() {
 }
 
 function flashSaved() {
+    // The save button is icon-only — swap its glyph to a checkmark and
+    // glow it accent for a beat (a wax seal on the piece), then restore.
     const b = document.getElementById("saveBtn");
-    if (!b) return;
-    b.textContent = "Saved ✓";
-    setTimeout(() => { b.textContent = "Save"; }, 1300);
+    if (b) {
+        const use = b.querySelector("use");
+        if (use) use.setAttribute("href", "#icon-check");
+        b.classList.add("is-saved");
+        setTimeout(() => {
+            if (use) use.setAttribute("href", "#icon-save");
+            b.classList.remove("is-saved");
+        }, 1300);
+    }
+    pulseSaveFlash();   // soft flashbulb bloom over the pot
+    haptic(15);         // tactile confirm on Android
+}
+
+// One-shot white bloom over the pot canvas on save. Retrigger-safe:
+// remove the class + force a reflow so a rapid re-save replays it.
+function pulseSaveFlash() {
+    const el = document.getElementById("saveFlash");
+    if (!el) return;
+    el.classList.remove("is-pulsing");
+    void el.offsetWidth; // reflow so the animation restarts
+    el.classList.add("is-pulsing");
 }
 
 // Restore a saved pot into the scene as a finished (fired) piece.
@@ -4227,6 +4309,20 @@ function renderGalleryTile(grid, members) {
     }
     item.appendChild(thumbWrap);
 
+    // Shelf view: a 1px inset hairline tinted to the pot's fired glaze
+    // colour, so the shelf reads as a curated portfolio rather than a
+    // plain thumbnail grid. Rendered as an overlay so it sits above the
+    // thumbnail image (an inset box-shadow would hide behind it).
+    if (isShelf) {
+        const gid = members[0].glaze;
+        if (gid && GLAZES[gid]) {
+            const ring = document.createElement("div");
+            ring.className = "thumb-glaze-ring";
+            ring.style.boxShadow = `inset 0 0 0 1px ${hexToRgba(GLAZES[gid].fired.color, 0.5)}`;
+            thumbWrap.appendChild(ring);
+        }
+    }
+
     // Metadata column (shelf view only): title (tap to rename) + glaze
     // name + saved-on date. Title acts as the portfolio caption.
     if (isShelf) {
@@ -4256,6 +4352,12 @@ function renderGalleryTile(grid, members) {
     del.setAttribute("aria-label", isSet ? "Delete set" : "Delete pot");
     del.addEventListener("click", async (e) => {
         e.stopPropagation();
+        const ok = await showConfirm(
+            isSet ? "Delete this set? This can't be undone."
+                  : "Delete this pot? This can't be undone.",
+            { confirmLabel: "Delete", cancelLabel: "Keep" }
+        );
+        if (!ok) return;
         await Promise.all(members.map((m) => dbDelete(m.id)));
         openGallery();
     });
@@ -4276,6 +4378,12 @@ function renameTile(p) {
 function glazeNameFor(p) {
     if (!p.glaze || !GLAZES[p.glaze]) return "Bare clay";
     return GLAZES[p.glaze].name;
+}
+
+// 0xRRGGBB integer → "rgba(r, g, b, a)" string.
+function hexToRgba(hex, a) {
+    const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
 function formatPotDate(ts) {
@@ -4325,11 +4433,15 @@ function tick() {
     // user works, the hum quiets to near-silent; restored when idle.
     if (state.sfxOn) {
         const ratio = Math.max(0, state.spin / SPIN_SPEED);
+        // Ease the hum in from silence after Begin (time constant ~0.3s)
+        // so it doesn't pop to full volume the first frame on some devices.
+        const targetGain = wheelStarted ? 1 : 0;
+        wheelGain += (targetGain - wheelGain) * (1 - Math.exp(-dt * 3));
         // Pitch dips to ~0.65x at full-stop and recovers to 1.0x at
         // full spin — the hum sounds heavier as the wheel slows down,
         // which is what real motors do.
         playSfx("wheel", {
-            volume: ratio * SFX_SOURCES.wheel.vol,
+            volume: ratio * SFX_SOURCES.wheel.vol * wheelGain,
             rate: 0.65 + 0.35 * ratio,
         });
     } else {
@@ -4427,6 +4539,10 @@ function dismissLanding() {
     if (l) l.classList.add("is-gone");
     // The Begin tap is a user gesture — safe to start audio here.
     if (state.musicOn && music) music.play().catch(() => {});
+    // Ramp the wheel hum in from silence instead of popping to full.
+    wheelStarted = true;
+    // First install: offer the control hints after a short idle beat.
+    scheduleFirstRunHint();
     // Same window for the video backdrop: iOS Safari + Low-Power Mode
     // can block muted autoplay on load; retry now that we have a gesture.
     const bg = BACKGROUNDS.find((b) => b.id === state.background);
@@ -4440,6 +4556,71 @@ function dismissLanding() {
 function showLanding() {
     const l = document.getElementById("landing");
     if (l) { l.hidden = false; l.classList.remove("is-gone"); }
+    // Clear any pending / visible first-run hint without marking it seen —
+    // the user hasn't touched the clay yet, so it can re-offer next Begin.
+    if (firstRunTimer) { clearTimeout(firstRunTimer); firstRunTimer = null; }
+    hideFirstRunHintEl();
+    updateShapeHint();
+}
+
+// --- First-launch control hints ---------------------------------
+function hasSeenFirstRun() {
+    try { return localStorage.getItem(FIRST_RUN_KEY) === "1"; }
+    catch (_) { return true; } // storage blocked → never nag
+}
+function markFirstRunSeen() {
+    try { localStorage.setItem(FIRST_RUN_KEY, "1"); } catch (_) {}
+}
+// After Begin on a fresh install, wait out a short idle beat before
+// surfacing the hints — an eager user who starts sculpting immediately
+// never sees them; a hesitant one gets a gentle nudge.
+function scheduleFirstRunHint() {
+    if (hasSeenFirstRun()) return;
+    if (firstRunTimer) clearTimeout(firstRunTimer);
+    firstRunTimer = setTimeout(showFirstRunHint, 2600);
+}
+function showFirstRunHint() {
+    firstRunTimer = null;
+    if (hasSeenFirstRun()) return;
+    // Don't surface over the gallery, photo modal, or the title screen.
+    const gallery = document.getElementById("gallery");
+    const photo   = document.getElementById("photoModal");
+    const landing = document.getElementById("landing");
+    if ((gallery && !gallery.hidden) || (photo && !photo.hidden) ||
+        (landing && !landing.hidden && !landing.classList.contains("is-gone"))) return;
+    const el = document.getElementById("firstRunHint");
+    if (!el) return;
+    el.hidden = false;
+    // Next tick (not rAF — rAF is throttled when the tab is backgrounded)
+    // so the browser paints the hidden→shown initial state before the
+    // opacity transition kicks in.
+    setTimeout(() => el.classList.add("is-visible"), 20);
+}
+// The user engaged — fade the hints out and never show them again.
+function dismissFirstRunHint() {
+    if (firstRunTimer) { clearTimeout(firstRunTimer); firstRunTimer = null; }
+    if (hasSeenFirstRun()) return;
+    markFirstRunSeen();
+    hideFirstRunHintEl();
+    updateShapeHint();
+}
+// Fade + hide the overlay element without touching the seen flag.
+function hideFirstRunHintEl() {
+    const el = document.getElementById("firstRunHint");
+    if (!el || el.hidden) return;
+    el.classList.remove("is-visible");
+    setTimeout(() => { el.hidden = true; }, 600);
+}
+// The landing's "Pick a starter shape" caption shows only until the
+// first pot is made (same flag as the in-studio hints).
+function updateShapeHint() {
+    const h = document.getElementById("shapeHint");
+    if (h) h.hidden = hasSeenFirstRun();
+}
+
+// Light haptic tick on Android; silent no-op on desktop / iOS Safari.
+function haptic(ms) {
+    if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (_) {} }
 }
 
 // Generic confirm dialog — a centered card over a dimmed backdrop,

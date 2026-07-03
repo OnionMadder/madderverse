@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=82" />
+    <link rel="stylesheet" href="style.css?v=83" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -81,6 +81,9 @@
             <path d="M6 9 L10 13 L14 9"/>
             <path d="M4 16 L16 16"/>
         </symbol>
+        <symbol id="icon-check" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 10.5 L8.5 15 L16 5.5"/>
+        </symbol>
         <symbol id="icon-taller" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 17 L16 17"/>
             <path d="M10 14 L10 4"/>
@@ -100,6 +103,44 @@
         <div class="kiln-inner-glow"></div>
     </div>
 
+    <!-- A soft white "flashbulb" pulse over the pot on save — matches the
+         kiln's warm-glow vocabulary. JS toggles .is-pulsing to fire it. -->
+    <div id="saveFlash" class="save-flash" aria-hidden="true"></div>
+
+    <!-- First-launch control hints. Hidden until the studio has been idle
+         for a couple of seconds on a fresh install (the slip-seen-first-run
+         flag suppresses it forever after the first interaction). Fades out
+         on the first touch. pointer-events:none so the dismissing tap goes
+         straight through to the pot. -->
+    <div id="firstRunHint" class="first-run-hint" aria-hidden="true" hidden>
+        <div class="first-run-hint-inner">
+            <div class="hint-row">
+                <svg viewBox="0 0 40 40" aria-hidden="true">
+                    <path d="M13 14 C 13 9, 27 9, 27 14" />
+                    <path d="M13 14 C 13 23, 27 23, 27 14" />
+                    <path d="M20 23 L20 31" />
+                    <circle cx="20" cy="34" r="2.4" fill="currentColor" stroke="none" />
+                </svg>
+                <span>Drag the pot to shape it</span>
+            </div>
+            <div class="hint-row">
+                <svg viewBox="0 0 40 40" aria-hidden="true">
+                    <path d="M12 20 L20 20 M16 16 L12 20 L16 24" />
+                    <path d="M28 20 L20 20 M24 16 L28 20 L24 24" />
+                </svg>
+                <span>Pinch to zoom</span>
+            </div>
+            <div class="hint-row">
+                <svg viewBox="0 0 40 40" aria-hidden="true">
+                    <circle cx="15" cy="20" r="2.6" fill="currentColor" stroke="none" />
+                    <circle cx="25" cy="20" r="2.6" fill="currentColor" stroke="none" />
+                    <path d="M9 28 L31 28 M27 24 L31 28 L27 32" />
+                </svg>
+                <span>Two-finger drag to look around</span>
+            </div>
+        </div>
+    </div>
+
     <a class="home" href="../" aria-label="Back to Madderverse" title="Back to Madderverse">&#x2302;</a>
     <button class="title-btn" id="titleBtn" type="button" aria-label="Back to title" title="Title screen">&#x21A9;</button>
     <button class="gallery-open" id="galleryBtn" type="button" aria-label="Your pots" title="Your pots">&#x25A6;</button>
@@ -115,6 +156,7 @@
         <h1 class="landing-title">Slip Studio</h1>
         <p class="landing-tag">a calm place to shape clay</p>
         <div class="shape-picker" id="shapePicker" role="group" aria-label="Starter shape"></div>
+        <p class="shape-hint" id="shapeHint" hidden>Pick a starter shape to throw</p>
         <div class="bg-picker" id="bgPicker" role="group" aria-label="Backdrop"></div>
         <div class="sound-toggles">
             <button class="music-toggle" id="musicToggle" type="button" aria-pressed="true">&#9834; Music on</button>
@@ -215,6 +257,7 @@
             <button class="tool-btn" id="photoClose" type="button">Close</button>
         </div>
         <div class="photo-preview-wrap">
+            <span class="photo-preview-tag">Preview</span>
             <canvas id="photoPreview" class="photo-preview" aria-label="Photo preview"></canvas>
         </div>
         <div class="photo-row" id="photoStyles" role="group" aria-label="Style">
@@ -224,6 +267,7 @@
         </div>
         <div class="photo-row" id="photoAspects" role="group" aria-label="Aspect">
             <button class="photo-chip" data-aspect="square" type="button">Square</button>
+            <button class="photo-chip" data-aspect="feed" type="button">4 : 5</button>
             <button class="photo-chip" data-aspect="portrait" type="button">9 : 16</button>
         </div>
         <button id="photoSave" class="landing-btn" type="button">Save photo</button>
@@ -257,7 +301,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=82"></script>
+    <script type="module" src="main.js?v=83"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
