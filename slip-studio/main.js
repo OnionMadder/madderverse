@@ -1196,40 +1196,52 @@ function renderDips() {
     if (state.dipTex) state.dipTex.needsUpdate = true;
 }
 
-// One dip: glaze rises from the foot (canvas bottom) up to line v, with a
-// soft feathered top edge (the gradient) and optional drips reaching up
-// past the line.
+// One dip: glaze coats from the RIM (canvas top) DOWN to line v, with a
+// soft feathered lower edge (the gradient) and drips that hang DOWN from
+// that edge over the bare clay below — real molten-glaze gravity drips.
+// d.v = the line height (0 foot, 1 rim); glaze covers [v .. rim].
 function paintDip(ctx, d) {
-    const yLine = GLAZE_H * (1 - d.v);        // v=0 foot(bottom), v=1 rim(top)
-    const feath = Math.max(3, (d.feather || DIP_FEATHER) * d.v * GLAZE_H);
-    // Solid fill below the feather band, down to the foot.
+    const yLine = GLAZE_H * (1 - d.v);        // canvas y of the lower edge
+    const feath = Math.max(4, (d.feather || DIP_FEATHER) * (1 - d.v) * GLAZE_H);
+    const solidBottom = Math.max(0, yLine - feath);
+    // Solid glaze from the rim (y=0) down to the feather band.
     ctx.fillStyle = rgba(d.hex, 1);
-    ctx.fillRect(0, yLine + feath, GLAZE_W, GLAZE_H - (yLine + feath));
-    // Feather band: alpha ramps 0 (at the line) → 1 (into the solid).
-    const fg = ctx.createLinearGradient(0, yLine, 0, yLine + feath);
-    fg.addColorStop(0, rgba(d.hex, 0));
-    fg.addColorStop(1, rgba(d.hex, 1));
+    ctx.fillRect(0, 0, GLAZE_W, solidBottom);
+    // Feather band: alpha 1 (glaze) → 0 (bare) across the lower edge.
+    const fg = ctx.createLinearGradient(0, solidBottom, 0, yLine);
+    fg.addColorStop(0, rgba(d.hex, 1));
+    fg.addColorStop(1, rgba(d.hex, 0));
     ctx.fillStyle = fg;
-    ctx.fillRect(0, yLine, GLAZE_W, feath);
-    // Drips: tapering tendrils of the same glaze reaching up from the line.
-    if (d.drips) {
-        ctx.save();
-        ctx.lineCap = "round";
-        for (const dr of d.drips) {
-            const x = dr.u * GLAZE_W;
-            const topY = yLine - dr.len * GLAZE_H;
-            const g = ctx.createLinearGradient(0, yLine, 0, topY);
-            g.addColorStop(0, rgba(d.hex, 1));
-            g.addColorStop(1, rgba(d.hex, 0));
-            ctx.strokeStyle = g;
-            ctx.lineWidth = dr.w * GLAZE_W;
-            ctx.beginPath();
-            ctx.moveTo(x, yLine + feath * 0.4);
-            ctx.lineTo(x, topY);
-            ctx.stroke();
-        }
-        ctx.restore();
+    ctx.fillRect(0, solidBottom, GLAZE_W, yLine - solidBottom);
+    if (d.drips) paintDrips(ctx, d, yLine);
+}
+
+// Drips: solid, rounded tendrils of the glaze colour hanging DOWN from
+// the dip's lower edge, each ending in a fatter droplet bulb (a hanging
+// bead of glaze). Opaque — a running glaze reads as the glaze colour, not
+// a fade. Lengths + widths vary for an organic run.
+function paintDrips(ctx, d, yLine) {
+    ctx.save();
+    ctx.fillStyle = rgba(d.hex, 1);
+    ctx.strokeStyle = rgba(d.hex, 1);
+    ctx.lineCap = "round";
+    for (const dr of d.drips) {
+        const x = dr.u * GLAZE_W;
+        const w = dr.w * GLAZE_W;
+        const yEnd = yLine + dr.len * GLAZE_H;
+        // The running tendril: a round-capped stroke starting a touch
+        // inside the band so it fuses with the glaze, tapering to the tip.
+        ctx.lineWidth = w;
+        ctx.beginPath();
+        ctx.moveTo(x, yLine - w * 1.4);
+        ctx.lineTo(x, yEnd);
+        ctx.stroke();
+        // The droplet: a fatter bead hanging at the very end.
+        ctx.beginPath();
+        ctx.arc(x, yEnd, w * 1.05, 0, Math.PI * 2);
+        ctx.fill();
     }
+    ctx.restore();
 }
 
 // A preset "dip set": a full-height gradient at full coverage.
@@ -1242,16 +1254,21 @@ function paintPresetDip(ctx, id) {
     ctx.fillRect(0, 0, GLAZE_W, GLAZE_H);
 }
 
-// Random drips for a committed dip, count from the current drip amount.
+// Random drips for a committed dip. They hang DOWN from the line into the
+// bare zone below it (uv height v), so clamp lengths to that room. Varied
+// length + width read as an organic run; a couple are notably longer.
 function makeDrips(v) {
     const n = DRIP_COUNTS[state.dripAmount] || 0;
+    const room = Math.max(0.02, v);   // bare space below the line, in uv
     const drips = [];
     for (let i = 0; i < n; i++) {
         const slot = (i + 0.5) / n;
+        const long = Math.random() < 0.35;             // some runners go further
+        const len = (long ? 0.14 + Math.random() * 0.14 : 0.05 + Math.random() * 0.10);
         drips.push({
             u: (slot + (Math.random() - 0.5) * (0.7 / n) + 1) % 1,
-            len: Math.min(v * 0.9, 0.03 + Math.random() * 0.09), // don't overshoot the rim
-            w: 0.006 + Math.random() * 0.012,
+            len: Math.min(room * 0.92, len),
+            w: 0.009 + Math.random() * 0.013,
         });
     }
     return drips;
@@ -2727,7 +2744,7 @@ function buildDipBar() {
     const hint = document.createElement("p");
     hint.className = "dip-hint";
     hint.id = "dipHint";
-    hint.textContent = "Drag up the pot to dip · tap a glaze to change colour · or tap a preset";
+    hint.textContent = "Drag the pot to pour glaze down · tap a glaze to recolour · or tap a preset";
     wrap.appendChild(hint);
 
     updateDipBar();
