@@ -2196,6 +2196,26 @@ function ensureHandleMesh() {
         metalness: initial.metalness != null ? initial.metalness : 0,
     });
     state.handle.material = mat;
+    // Apply the glaze DIP layer to the handle too, sampled by height so
+    // its gradient band lines up with the pot body at the same height.
+    // The handle geometry's local y is profile-space (0..TOP), the same
+    // space the pot's dip UV.y lives in, so v = position.y / TOP matches.
+    // Drips are a body detail — we sample a fixed u (0.5) for the gradient.
+    mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uDipMap = { value: state.dipTex };
+        shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", "varying float vHandleV;\n#include <common>")
+            .replace("#include <begin_vertex>", `#include <begin_vertex>\n vHandleV = position.y / ${TOP.toFixed(4)};`);
+        shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", "uniform sampler2D uDipMap;\nvarying float vHandleV;\n#include <common>")
+            .replace(
+                "#include <map_fragment>",
+                `#include <map_fragment>
+                 vec4 _hdip = texture2D( uDipMap, vec2( 0.5, clamp( vHandleV, 0.0, 1.0 ) ) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _hdip.rgb, vec3( 2.2 ) ), _hdip.a );`,
+            );
+    };
+    mat.customProgramCacheKey = () => "handle-dip-v1";
     const geo = buildHandleGeometry();
     // Right ear (canonical geometry).
     const right = new THREE.Mesh(geo, mat);
