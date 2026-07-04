@@ -3042,7 +3042,7 @@ function updateToolbar() {
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
     const handleStylePicker = document.getElementById("handleStylePicker");
-    if (handleStylePicker) handleStylePicker.hidden = !(state.handle.on && !state.isLid && cs === "wet");
+    if (handleStylePicker) handleStylePicker.hidden = !(state.handle.on && !state.isLid && cs === "leather");
     // Hide Save + Photo while the kiln animation is still running —
     // cs flips to "fired" the instant advanceStage commits, so without
     // this guard both buttons appear during the 4.5 s firing sequence
@@ -3091,7 +3091,9 @@ function updateToolbar() {
     // remove so a single button covers both directions.
     const handleBtn = document.getElementById("handleBtn");
     if (handleBtn) {
-        const canHandle = !state.isLid && cs === "wet";
+        // Handles are a finishing step now: attach + reshape them at the
+        // Decorate stage, on the finalized shape (not while sculpting wet).
+        const canHandle = !state.isLid && cs === "leather";
         handleBtn.hidden = !canHandle;
         // Icon-only: the .is-active ring shows the on-state; aria-label
         // + title flip between Add/Remove so screen readers + hover
@@ -3466,22 +3468,28 @@ function onPointerDown(ev) {
     }
 
     if (state.clayState === "wet") {
-        // Handle phase — the finishing step. The wheel is stopped (see
-        // tick) and the piece is static. Three targets, checked in order:
-        //   1. an ear  → grab it to edit its shape + placement
-        //   2. the wheel → drag it to spin the piece and inspect it
-        //   3. the pot body / empty space → nothing; the pot is NEVER
-        //      moved by touching it (only the wheel turns your work)
-        // Body sculpting is suppressed while a handle is on — remove the
-        // handle to keep shaping the pot.
+        // Pure shaping: no handles here anymore (they're a Decorate-stage
+        // finishing step), so a touch on the pot always sculpts.
+        const p = pointerToProfile(ev);
+        if (!p) return;
+        if (p.y < -0.05 || p.y > TOP + 0.15) return;
+        if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
+        sculpting = true;
+        sculptToward(p.y, p.r);
+        maybeSquelch();
+        ev.preventDefault();
+    } else if (state.clayState === "leather") {
+        // Handle editing takes top priority: if an ear is grabbed, reshape
+        // it (move / resize). Grabbing the pot body falls through to dip /
+        // trim / paint below — different hit targets, so no conflict.
         if (state.handle.on && !state.isLid) {
             const hit = raycastHandleMeshes(ev);
             if (hit) {
                 const local = pointerToHandleLocal(ev);
                 if (local) {
                     // Which end of the ear did you grab? Top third → move
-                    // the shoulder end; bottom third → move the belly end;
-                    // middle → move both together (placement).
+                    // the shoulder end; bottom third → the belly end;
+                    // middle → both together (placement).
                     const { yBot, yTop } = handleAttachYs();
                     const f = yTop > yBot ? (local.y - yBot) / (yTop - yBot) : 0.5;
                     const zone = f > 0.65 ? "top" : (f < 0.35 ? "bottom" : "mid");
@@ -3498,23 +3506,7 @@ function onPointerDown(ev) {
                     return;
                 }
             }
-            if (raycastWheel(ev)) {
-                state.userRotating = true;
-                viewPrevX = ev.clientX;
-            }
-            // Pot body or empty space → do nothing.
-            ev.preventDefault();
-            return;
         }
-        const p = pointerToProfile(ev);
-        if (!p) return;
-        if (p.y < -0.05 || p.y > TOP + 0.15) return;
-        if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
-        sculpting = true;
-        sculptToward(p.y, p.r);
-        maybeSquelch();
-        ev.preventDefault();
-    } else if (state.clayState === "leather") {
         // Glaze dipping takes priority when the dip tool is armed with a
         // colour: dragging on the pot sets the glaze line (uv.y = height),
         // previewed live and committed on release.
@@ -4965,10 +4957,9 @@ function tick() {
     // painting), while you manually spin, and whenever zoomed in —
     // then drifts back up once you're idle at the default framing.
     const zoomed = state.zoom > 1.02;
-    // The handle stage is the finishing step — the wheel stops so the
-    // piece stands still while you add + inspect the ears.
-    const handlePhase = state.handle.on && !state.isLid && state.clayState === "wet";
-    const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing || handlePhase || dipping;
+    // A handle reshape drag holds the wheel still so the ear doesn't move
+    // under your finger; otherwise the pot spins for viewing/decorating.
+    const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing || dipping || !!handleDrag;
     const targetSpin = busy ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
