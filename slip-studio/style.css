@@ -1180,6 +1180,10 @@ html, body {
     padding-top: 8px;
     border-top: 1px solid var(--ink-faint);
 }
+/* The .deco-stack tray is pointer-events:none (so the pot behind stays
+   draggable); every interactive control must opt back in, or taps fall
+   THROUGH to the canvas. This is why the Dip button/presets did nothing. */
+.dip-toggle, .dip-preset, .dip-chip { pointer-events: auto; }
 .dip-row {
     display: flex;
     align-items: center;
