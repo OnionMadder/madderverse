@@ -799,6 +799,17 @@ html, body {
     pointer-events: none;
 }
 .lid-style-picker[hidden] { display: none; }
+/* The handle-thickness picker rides INSIDE the decorate tray (handles
+   are attached at the leather stage, where the tray is open). Cancel the
+   fixed bottom:132px the lid picker uses at the wet stage — that dropped
+   it on top of the decorate size row. Let it flow as a centred row at the
+   top of the tray instead. Targeted by id so it wins regardless of order. */
+#handleStylePicker.handle-thickness-picker {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    margin-bottom: 2px;
+}
 .lid-style-btn {
     pointer-events: auto;
     -webkit-tap-highlight-color: transparent;
