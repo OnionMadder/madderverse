@@ -1253,6 +1253,15 @@ html, body {
 }
 .dip-chip.dip-action { margin-left: 2px; }
 .dip-chip:disabled { opacity: 0.4; cursor: default; }
+.dip-hint {
+    margin: 2px 0 0;
+    text-align: center;
+    font-size: 0.66rem;
+    font-style: italic;
+    letter-spacing: 0.02em;
+    color: var(--ink-dim);
+}
+.dip-hint[hidden] { display: none; }
 
 /* Gradient (secondary glaze) row — same swatches a half-step smaller,
    prefixed by a quiet "Bottom" label so users understand what the row

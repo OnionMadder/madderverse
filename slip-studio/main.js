@@ -2723,12 +2723,30 @@ function buildDipBar() {
     clear.addEventListener("click", clearDips);
     row2.appendChild(clear);
     wrap.appendChild(row2);
+
+    const hint = document.createElement("p");
+    hint.className = "dip-hint";
+    hint.id = "dipHint";
+    hint.textContent = "Drag up the pot to dip · tap a glaze to change colour · or tap a preset";
+    wrap.appendChild(hint);
+
     updateDipBar();
 }
 
 function setDipMode(on) {
     state.dipMode = !!on;
-    if (!state.dipMode) state.dipColor = null;
+    if (state.dipMode) {
+        // Arm a colour immediately so a drag WORKS right away — otherwise
+        // nothing happens until you also tap a glaze, which isn't obvious.
+        // Default to the first swatch of the active pack; tap any glaze to
+        // change it (the swatch highlights to show what's loaded).
+        if (state.dipColor == null) {
+            const first = currentPackIds()[0];
+            if (first && GLAZES[first]) state.dipColor = GLAZES[first].fired.color;
+        }
+    } else {
+        state.dipColor = null;
+    }
     updateDipBar();
     updateGlazeBar();
 }
@@ -2772,6 +2790,8 @@ function updateDipBar() {
     }
     const tools = document.getElementById("dipTools");
     if (tools) tools.hidden = !state.dipMode;
+    const hint = document.getElementById("dipHint");
+    if (hint) hint.hidden = !state.dipMode;
     document.querySelectorAll("#dipBar .dip-chip[data-drip]").forEach((b) => {
         b.classList.toggle("is-active", b.dataset.drip === state.dripAmount);
     });
