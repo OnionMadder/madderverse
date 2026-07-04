@@ -1225,30 +1225,63 @@ function paintDip(ctx, d) {
     if (d.drips) paintDrips(ctx, d, yLine);
 }
 
-// Drips: solid, rounded tendrils of the glaze colour hanging DOWN from
-// the dip's lower edge, each ending in a fatter droplet bulb (a hanging
-// bead of glaze). Opaque — a running glaze reads as the glaze colour, not
-// a fade. Lengths + widths vary for an organic run.
+// Drips: soft, blobby tendrils of the glaze colour hanging DOWN from the
+// dip's lower edge, each ending in a rounded droplet bead. Opaque — a
+// running glaze reads as the glaze colour, not a fade. Each run is drawn
+// as a column of overlapping circles (so the edges read soft + irregular,
+// not a rigid line), tapering toward the tip, with a gentle sideways
+// meander. All the per-drip variation is baked into makeDrips so replays
+// stay identical — nothing random is rolled here at render time.
 function paintDrips(ctx, d, yLine) {
     ctx.save();
     ctx.fillStyle = rgba(d.hex, 1);
-    ctx.strokeStyle = rgba(d.hex, 1);
-    ctx.lineCap = "round";
     for (const dr of d.drips) {
-        const x = dr.u * GLAZE_W;
-        const w = dr.w * GLAZE_W;
-        const yEnd = yLine + dr.len * GLAZE_H;
-        // The running tendril: a round-capped stroke starting a touch
-        // inside the band so it fuses with the glaze, tapering to the tip.
-        ctx.lineWidth = w;
-        ctx.beginPath();
-        ctx.moveTo(x, yLine - w * 1.4);
-        ctx.lineTo(x, yEnd);
-        ctx.stroke();
-        // The droplet: a bead hanging at the very end, size varies per drip.
-        ctx.beginPath();
-        ctx.arc(x, yEnd, w * (dr.bulb != null ? dr.bulb : 1.05), 0, Math.PI * 2);
-        ctx.fill();
+        const x0    = dr.u * GLAZE_W;
+        const wPx   = dr.w * GLAZE_W;
+        const lenPx = dr.len * GLAZE_H;
+        const yStart = yLine - wPx * 1.4;          // fuse up into the band
+        const yEnd   = yLine + lenPx;
+        const drift  = (dr.drift || 0) * GLAZE_W;  // overall sideways lean
+        const wob    = dr.wobble || 0;             // meander phase
+        const wobAmp = (dr.wobbleAmp || 0) * wPx;  // meander strength
+        const seed   = dr.seed || 0;               // edge-jitter phase
+        // Path of the run: overall drift + a gentle meander that grows
+        // toward the tip, so the tendril wanders rather than falling straight.
+        const xAt = (t) => x0 + drift * t + Math.sin(wob + t * 3.0) * wobAmp * t;
+        // Overlapping circles down the run: fat where it leaves the glaze
+        // band, necking down to a thin tip, with a subtle baked edge jitter
+        // so the sides read blobby/irregular rather than a clean line.
+        const steps = Math.max(7, Math.round(lenPx / Math.max(2, wPx * 0.45)));
+        for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const y = yStart + (yEnd - yStart) * t;
+            const neck = Math.pow(1 - t, 1.6);
+            const jit  = 1 + 0.16 * Math.sin(seed * 37 + t * 21);
+            const r = Math.max(wPx * 0.26, wPx * (0.36 + 0.85 * neck) * jit);
+            ctx.beginPath();
+            ctx.arc(xAt(t), y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Optional mid-run belly — a little swell partway down for character.
+        if (dr.midT) {
+            const y = yStart + (yEnd - yStart) * dr.midT;
+            ctx.beginPath();
+            ctx.arc(xAt(dr.midT), y, wPx * (dr.midR || 1), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Terminal droplet — a hanging teardrop: a neck circle that merges
+        // with the run, then a slightly elongated bead below it. Not every
+        // drip beads (some just run thin and stop).
+        if (dr.hasBead !== false) {
+            const bx = xAt(1);
+            const br = wPx * (dr.bulb != null ? dr.bulb : 1.1);
+            ctx.beginPath();
+            ctx.arc(bx, yEnd - br * 0.55, Math.max(wPx * 0.3, br * 0.55), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(bx, yEnd, br * 0.9, br * 1.08, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
     }
     ctx.restore();
 }
@@ -1264,8 +1297,11 @@ function paintPresetDip(ctx, id) {
 }
 
 // Random drips for a committed dip. They hang DOWN from the line into the
-// bare zone below it (uv height v), so clamp lengths to that room. Varied
-// length + width read as an organic run; a couple are notably longer.
+// bare zone below it (uv height v), so clamp lengths to that room. Gentle
+// runs: length skews SHORT (strong low-bias) and is capped well shy of the
+// full bare zone, so drips read as a light gravity run, not a curtain. All
+// the shape variation (drift, meander, beads) is rolled here and stored on
+// the drip so paintDrips can replay it identically.
 function makeDrips(v) {
     const n = DRIP_COUNTS[state.dripAmount] || 0;
     const room = Math.max(0.02, v);   // bare space below the line, in uv
@@ -1274,13 +1310,22 @@ function makeDrips(v) {
         // One drip per slot but at a RANDOM spot within it — irregular
         // spacing all the way round, sometimes two nearly touching.
         const slot = (i + Math.random()) / n;
-        // Length skews short with the odd long runner (pow biases low).
-        const len = room * (0.1 + Math.pow(Math.random(), 1.9) * 0.9);
+        // Short-biased length (pow 2.4) capped at ~62% of the bare zone.
+        const lenFrac = 0.05 + Math.pow(Math.random(), 2.4) * 0.55;
+        const len = Math.max(0.012, Math.min(room * 0.62, room * lenFrac));
         drips.push({
             u: (slot + 1) % 1,
-            len: Math.max(0.015, Math.min(room * 0.95, len)),
-            w: 0.007 + Math.random() * 0.016,
-            bulb: 0.45 + Math.random() * 1.05,   // per-drip droplet size
+            len,
+            w: 0.0045 + Math.random() * 0.010,      // thin tendrils
+            bulb: 0.9 + Math.random() * 1.3,        // droplet size (× w)
+            drift: (Math.random() - 0.5) * 0.024,   // sideways lean (uv)
+            wobble: Math.random() * Math.PI * 2,    // meander phase
+            wobbleAmp: 0.5 + Math.random() * 1.4,   // meander strength (× w)
+            hasBead: Math.random() < 0.8,           // most bead, some run out
+            // Occasional mid-run belly, position + size baked in.
+            midT: Math.random() < 0.28 ? (0.4 + Math.random() * 0.25) : 0,
+            midR: 0.6 + Math.random() * 0.5,
+            seed: Math.random(),                    // edge-jitter phase
         });
     }
     return drips;
