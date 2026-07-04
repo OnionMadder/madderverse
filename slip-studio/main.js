@@ -142,6 +142,12 @@ const BACK_LABEL    = { leather: "&larr; Re-wet" };
 // extra clearcoat). The reveal is raw → fired on the glaze fire.
 const GLAZE_RAW   = { roughness: 0.92, clearcoat: 0.03, clearcoatRoughness: 0.95, envMapIntensity: 0.32, bump: 0.012, metalness: 0.00 };
 const GLAZE_FIRED = { roughness: 0.30, clearcoat: 0.72, clearcoatRoughness: 0.14, envMapIntensity: 0.85, bump: 0.004, metalness: 0.00 };
+// Surface finish for a DIPPED pot (glaze applied via the dip layer, so
+// state.glaze is null). Same glossy fired / chalky raw params as a glaze,
+// with a bare-clay base colour showing through wherever the dip doesn't
+// cover. Without this a dipped pot fell back to the matte bare-clay look.
+const DIP_FIRED = { ...GLAZE_FIRED, color: CLAY_STATES.fired.color };
+const DIP_RAW   = { ...GLAZE_RAW,   color: CLAY_STATES.leather.color };
 function glaze(name, rawHex, firedHex, firedOver) {
     return {
         name,
@@ -798,6 +804,9 @@ let sculpting = false;
 let handleDrag = null;
 // True while dragging a glaze dip line (leather + dip tool).
 let dipping = false;
+// The dip currently being dragged (live preview), or null. Declared up
+// here (not by renderDips) because currentLook() reads it during init().
+let dipPreview = null;
 
 // Hoisted from the handle constants section further down — UI build
 // in init() reads HANDLE_THICKNESS_IDS for the picker chips, and
@@ -1179,9 +1188,6 @@ function makeGlazeDipLayer() {
     return tex;
 }
 
-// The dip currently being dragged (live preview), or null.
-let dipPreview = null;
-
 // Replay the ordered dip list (plus any in-progress preview) into the
 // glaze canvas. Non-destructive: editing/removing a dip = re-render.
 function renderDips() {
@@ -1194,6 +1200,9 @@ function renderDips() {
         else paintDip(ctx, d);
     }
     if (state.dipTex) state.dipTex.needsUpdate = true;
+    // Keep the surface finish in sync — a dipped pot goes glossy, an
+    // un-dipped one drops back to bare clay (see currentLook).
+    if (state.clayMaterial) state.clayTarget = currentLook();
 }
 
 // One dip: glaze coats from the RIM (canvas top) DOWN to line v, with a
@@ -1236,9 +1245,9 @@ function paintDrips(ctx, d, yLine) {
         ctx.moveTo(x, yLine - w * 1.4);
         ctx.lineTo(x, yEnd);
         ctx.stroke();
-        // The droplet: a fatter bead hanging at the very end.
+        // The droplet: a bead hanging at the very end, size varies per drip.
         ctx.beginPath();
-        ctx.arc(x, yEnd, w * 1.05, 0, Math.PI * 2);
+        ctx.arc(x, yEnd, w * (dr.bulb != null ? dr.bulb : 1.05), 0, Math.PI * 2);
         ctx.fill();
     }
     ctx.restore();
@@ -1262,13 +1271,16 @@ function makeDrips(v) {
     const room = Math.max(0.02, v);   // bare space below the line, in uv
     const drips = [];
     for (let i = 0; i < n; i++) {
-        const slot = (i + 0.5) / n;
-        const long = Math.random() < 0.35;             // some runners go further
-        const len = (long ? 0.14 + Math.random() * 0.14 : 0.05 + Math.random() * 0.10);
+        // One drip per slot but at a RANDOM spot within it — irregular
+        // spacing all the way round, sometimes two nearly touching.
+        const slot = (i + Math.random()) / n;
+        // Length skews short with the odd long runner (pow biases low).
+        const len = room * (0.1 + Math.pow(Math.random(), 1.9) * 0.9);
         drips.push({
-            u: (slot + (Math.random() - 0.5) * (0.7 / n) + 1) % 1,
-            len: Math.min(room * 0.92, len),
-            w: 0.009 + Math.random() * 0.013,
+            u: (slot + 1) % 1,
+            len: Math.max(0.015, Math.min(room * 0.95, len)),
+            w: 0.007 + Math.random() * 0.016,
+            bulb: 0.45 + Math.random() * 1.05,   // per-drip droplet size
         });
     }
     return drips;
@@ -2529,8 +2541,11 @@ function sculptToward(y, targetR) {
 // earthenware).
 function currentLook() {
     const cs = state.clayState;
-    if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].fired : CLAY_STATES.fired;
-    if (cs === "leather") return state.glaze ? GLAZES[state.glaze].raw   : CLAY_STATES.leather;
+    // A uniform glaze wins; else if the pot has been dipped, use the glossy
+    // dip finish; else bare clay.
+    const dipped = state.dips.length > 0 || !!dipPreview;
+    if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].fired : (dipped ? DIP_FIRED : CLAY_STATES.fired);
+    if (cs === "leather") return state.glaze ? GLAZES[state.glaze].raw   : (dipped ? DIP_RAW   : CLAY_STATES.leather);
     return CLAY_STATES.wet;
 }
 
