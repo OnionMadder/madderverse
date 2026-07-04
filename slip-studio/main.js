@@ -4960,7 +4960,11 @@ function tick() {
     // A handle reshape drag holds the wheel still so the ear doesn't move
     // under your finger; otherwise the pot spins for viewing/decorating.
     const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing || dipping || !!handleDrag;
-    const targetSpin = busy ? 0 : SPIN_SPEED;
+    // The Decorate stage stands still — a static pot to attach/reshape
+    // handles, dip and paint against. Turn it by dragging the wheel or
+    // empty space (or two-finger). Wet throws on a live wheel; fired spins
+    // to show off / photograph the finished piece.
+    const targetSpin = (busy || state.clayState === "leather") ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
     // Wheel hum tracks the spin: as the auto-spin eases out while the
