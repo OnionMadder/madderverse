@@ -3086,9 +3086,10 @@ function updateToolbar() {
         const canMatch = state.isLid && cs === "wet" && !!state.savedPot;
         matchRimBtn.hidden = !canMatch;
     }
-    // Handle toggle: only on the pot, only at wet (handles aren't
-    // edited after the clay firms). Label flips between add and
-    // remove so a single button covers both directions.
+    // Handle toggle: only on the pot, only at the Decorate (leather)
+    // stage — handles are a finishing step, attached + reshaped on the
+    // finalized shape, not while sculpting wet. Label flips between add
+    // and remove so a single button covers both directions.
     const handleBtn = document.getElementById("handleBtn");
     if (handleBtn) {
         // Handles are a finishing step now: attach + reshape them at the

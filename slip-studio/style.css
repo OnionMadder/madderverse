@@ -1449,6 +1449,11 @@ html, body {
     display: block;
     pointer-events: none; /* events land on the button, not the SVG */
 }
+/* The explicit `display` above outranks the UA `[hidden]` rule, so a
+   `hidden` icon button would stay visible (the handle button leaked into
+   the wet/sculpting stage this way). Restore hiding with a selector that
+   outranks it. Same trap as .brush-bar / .deco-stack elsewhere. */
+.tool-btn.tool-btn-icon[hidden] { display: none; }
 
 /* ---------- Gallery open button (top-right) ---------- */
 .gallery-open {
