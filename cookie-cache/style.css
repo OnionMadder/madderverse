@@ -264,6 +264,57 @@ body {
     outline-offset: 3px;
 }
 
+/* ── Short-viewport menu (phone landscape) ───────────────────────────
+   In landscape a phone's CSS viewport height is only ~360–430px, far
+   shorter than the menu card (200px mascot + title + toggle + START +
+   hints). The card is flex-centered in a fixed-height, overflow-hidden
+   screen, so both the title (top) and START (bottom) were being clipped.
+   Below ~540px tall we (a) let the menu + feast screens scroll as a safety
+   net and (b) shrink the mascot/feast-stage (now height-driven via vh/dvh),
+   titles, gaps, and buttons so each card fits without scrolling on a typical
+   phone. Scoped to #screen-menu / #screen-feast so gameplay (absolute
+   cookies) is untouched. */
+@media (max-height: 540px) {
+    #screen-menu,
+    #screen-feast {
+        overflow-y: auto;
+        justify-content: flex-start;
+        padding-top: max(env(safe-area-inset-top, 0), 10px);
+        padding-bottom: max(env(safe-area-inset-bottom, 0), 10px);
+    }
+    #screen-menu .menu-card,
+    #screen-feast .feast-card {
+        margin: auto;               /* center when it fits, scroll when it doesn't */
+        padding: clamp(10px, 2.2vh, 20px) clamp(18px, 5vw, 40px);
+        gap: clamp(4px, 1.2vh, 10px);
+        width: clamp(300px, 96vw, 560px);
+    }
+    .menu-title    { font-size: clamp(1.4rem, 6vw, 2.2rem); }
+    .menu-subtitle { font-size: clamp(0.68rem, 2.2vw, 0.9rem); }
+    .menu-mascot {
+        width:  clamp(74px, 24vh, 130px);
+        height: clamp(74px, 24vh, 130px);
+    }
+    .menu-mascot-hint { font-size: clamp(0.52rem, 1.5vw, 0.68rem); margin-top: -2px; }
+    .menu-hint { font-size: clamp(0.62rem, 1.7vw, 0.78rem); margin-top: 0; }
+    .btn-xl { font-size: clamp(1.1rem, 4vw, 1.5rem); padding: 10px 34px; }
+    .mode-btn { padding: 6px 12px; }
+
+    /* Feast screen: shrink the title + stage (and Tub inside it, which is
+       vw-sized and would otherwise overflow the shorter stage) so the score,
+       rank, best, and PLAY AGAIN all stay on-screen. These are id-scoped
+       (#screen-feast) on purpose: the base .feast-* rules appear LATER in the
+       file, so a bare .feast-stage override would lose the source-order tie —
+       the id raises specificity so the short-viewport sizes win. */
+    #screen-feast .feast-title { font-size: clamp(1.2rem, 4.5vw, 1.8rem); }
+    #screen-feast .feast-stage { height: clamp(84px, 24dvh, 170px); }
+    #screen-feast .feast-tub {
+        width:  clamp(76px, 20dvh, 140px);
+        height: clamp(76px, 20dvh, 140px);
+    }
+    #screen-feast .feast-stats { font-size: clamp(0.78rem, 2.4vw, 1rem); line-height: 1.25; }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    GAME SCREEN
    ═══════════════════════════════════════════════════════════════════ */

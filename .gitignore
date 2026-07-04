@@ -9,6 +9,7 @@ hole-up/assets/Models/GLB format/
 all-munkis-app/
 pootery-app/
 slip-studio-app/
+cookie-cache-app/
 
 # Backend — deployed to NearlyFreeSpeech (PHP+MySQL), not GitHub Pages
 nfsn-api/
