@@ -1083,9 +1083,14 @@ html, body {
     width: 40px;
     padding: 0;
     background-color: #efe7db;
-    background-size: 66% 66%;
+    background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
+}
+/* Enamel pattern swatches show the full-colour tile filling the chip. */
+.pattern-thumb {
+    background-color: transparent;
+    background-size: cover;
 }
 .motif-upload { font-size: 1.25rem; font-weight: 400; }
 /* Motif pack selector — small text chips above the thumbnails. */

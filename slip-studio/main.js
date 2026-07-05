@@ -314,11 +314,33 @@ const OVERLAY_PATTERNS = [
 // pack's silhouettes live at assets/img/motifs/<id>.svg. New themed packs
 // (curated authentic art) = one entry here + the SVGs; the "+" upload is
 // always available regardless of pack.
+// Each id is a filename under assets/img/motifs/ (SVG or PNG, subfolders
+// allowed) so a pack can mix vector shapes and raster art (e.g. sumi-e ink
+// drawings). Silhouette conversion (buildMotifMask) handles either.
 const MOTIF_PACKS = {
-    basics: { label: "Basics", ids: ["bird", "fish", "leaf", "sun", "star", "spiral"] },
-    aegean: { label: "Aegean", ids: ["greekkey", "amphora", "column", "wave", "palmette"] },
+    basics: { label: "Basics", ids: ["bird.svg", "fish.svg", "leaf.svg", "sun.svg", "star.svg", "spiral.svg"] },
+    aegean: { label: "Aegean", ids: ["greekkey.svg", "amphora.svg", "column.svg", "wave.svg", "palmette.svg"] },
+    sumieAnimals: { label: "Sumi-e Animals", ids: [
+        "japan-animals/carp.png", "japan-animals/kitten.png", "japan-animals/rabbits.png",
+        "japan-animals/snake.png", "japan-animals/tanooki.png", "japan-animals/javelina.png",
+    ] },
+    sumiePlants: { label: "Sumi-e Plants", ids: [
+        "japan-vegetables/eggplant.png", "japan-vegetables/cucumber.png", "japan-vegetables/mushrooms.png",
+        "japan-vegetables/pears.png", "japan-vegetables/bulbs.png", "japan-vegetables/firethorn.png",
+        "japan-vegetables/bread.png",
+    ] },
 };
-const MOTIF_PACK_IDS = ["basics", "aegean"];
+const MOTIF_PACK_IDS = ["basics", "aegean", "sumieAnimals", "sumiePlants"];
+// Allover enamel patterns (Chinese cloisonné style): a one-tap full-colour
+// tiled fill via the Pattern tool. Square 512 tiles → exact 4× wrap.
+const PATTERN_SETS = [
+    { file: "chinese-enamel/blue-floral.jpg", label: "Blue floral" },
+    { file: "chinese-enamel/lotus.jpg",       label: "Lotus" },
+    { file: "chinese-enamel/petals.jpg",      label: "Petals" },
+    { file: "chinese-enamel/wildflowers.jpg", label: "Wildflowers" },
+    { file: "chinese-enamel/abstract.jpg",    label: "Abstract" },
+    { file: "chinese-enamel/dark.jpg",        label: "Dark" },
+];
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
 
@@ -947,6 +969,7 @@ function init() {
     document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
     document.getElementById("toolCarve")?.addEventListener("click", () => setDecoTool("carve"));
     document.getElementById("toolMotif")?.addEventListener("click", () => setDecoTool("motif"));
+    document.getElementById("toolPattern")?.addEventListener("click", () => setDecoTool("pattern"));
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
     // Motif size slider + upload (image reduced to a silhouette on-device).
     const motifSlider = document.getElementById("motifSize");
@@ -3417,7 +3440,8 @@ function setDecoTool(name) {
     state.decoTool = name;
     [["toolBrush", "brush"], ["toolSplatter", "splatter"],
      ["toolStamp", "stamp"], ["toolOverlay", "overlay"],
-     ["toolCarve", "carve"], ["toolMotif", "motif"]].forEach(([id, t]) => {
+     ["toolCarve", "carve"], ["toolMotif", "motif"],
+     ["toolPattern", "pattern"]].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
         const on = name === t;
@@ -3458,15 +3482,32 @@ function setMotifPack(id) {
 function updateDecoSub() {
     const sub = document.getElementById("decoSub");
     if (!sub) return;
-    // The Motif tool swaps the brush-size dots for a size slider + shows
-    // a pack selector above the silhouette thumbnails.
+    // The Motif tool swaps the brush-size dots for a size slider + shows a
+    // pack selector above the silhouette thumbnails. The Pattern tool shows
+    // full-colour enamel tiles that fill the pot on tap.
     const isMotif = state.decoTool === "motif";
+    const isPattern = state.decoTool === "pattern";
     const sizesEl = document.getElementById("decoSizes");
-    if (sizesEl) sizesEl.style.display = isMotif ? "none" : "";
+    if (sizesEl) sizesEl.style.display = (isMotif || isPattern) ? "none" : "";
     const slider = document.getElementById("motifSize");
     if (slider) slider.hidden = !isMotif;
     const packTabs = document.getElementById("motifPackTabs");
     if (packTabs) packTabs.hidden = !isMotif;
+    if (isPattern) {
+        sub.hidden = false;
+        sub.innerHTML = "";
+        PATTERN_SETS.forEach((p) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "deco-sub-btn motif-thumb pattern-thumb";
+            b.style.backgroundImage = "url(" + motifSrc(p.file) + ")";
+            b.setAttribute("aria-label", p.label + " pattern");
+            b.setAttribute("title", p.label);
+            b.addEventListener("click", () => applyPattern(p.file));
+            sub.appendChild(b);
+        });
+        return;
+    }
     if (isMotif) {
         if (!MOTIF_PACKS[motifPack]) motifPack = MOTIF_PACK_IDS[0];
         // Pack selector chips.
@@ -3489,8 +3530,8 @@ function updateDecoSub() {
             const b = document.createElement("button");
             b.type = "button";
             b.className = "deco-sub-btn motif-thumb";
-            b.style.backgroundImage = "url(assets/img/motifs/" + id + ".svg)";
-            b.setAttribute("aria-label", id + " motif");
+            b.style.backgroundImage = "url(" + motifSrc(id) + ")";
+            b.setAttribute("aria-label", motifLabel(id) + " motif");
             b.classList.toggle("is-active", motifStarter === id);
             b.addEventListener("click", () => loadStarterMotif(id));
             sub.appendChild(b);
@@ -3594,12 +3635,32 @@ function loadMotifImage(img) {
     if (state.decoColor == null) setDecoColor(DECO_COLORS[1]); // arm near-black
     updateDecoSub();
 }
+function motifSrc(id) { return "assets/img/motifs/" + id; }
+function motifLabel(id) { return id.split("/").pop().replace(/\.[a-z0-9]+$/i, ""); }
 function loadStarterMotif(id) {
     motifStarter = id;
     const im = new Image();
     im.onload = () => loadMotifImage(im);
-    im.src = "assets/img/motifs/" + id + ".svg";
+    im.src = motifSrc(id);
     updateDecoSub();
+}
+// Pattern tool: fill the whole deco canvas with a repeating full-colour
+// enamel tile (allover texture). 512 tiles wrap exactly 4× around the pot.
+function applyPattern(file) {
+    const img = new Image();
+    img.onload = () => {
+        const ctx = state.decoCtx;
+        const pat = ctx.createPattern(img, "repeat");
+        if (!pat) return;
+        ctx.save();
+        ctx.fillStyle = pat;
+        ctx.fillRect(0, 0, DECO_W, DECO_H);
+        ctx.restore();
+        if (state.decoTex) state.decoTex.needsUpdate = true;
+        state.dirty = true;
+        maybeSquelch();
+    };
+    img.src = motifSrc(file);
 }
 // The tinted, scaled silhouette ready to stamp onto the deco canvas.
 function tintedMotif(hex, sizePx) {
