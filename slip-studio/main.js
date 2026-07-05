@@ -317,36 +317,57 @@ const OVERLAY_PATTERNS = [
 // Each id is a filename under assets/img/motifs/ (SVG or PNG, subfolders
 // allowed) so a pack can mix vector shapes and raster art (e.g. sumi-e ink
 // drawings). Silhouette conversion (buildMotifMask) handles either.
+// ids are paths under assets/ (motifs/, frames/, gems/, patterns/). Basics
+// + Aegean placeholder SVGs are unlisted for now.
 const MOTIF_PACKS = {
-    // Basics + Aegean (my placeholder SVGs) are removed from the picker for
-    // now; the files stay at assets/img/motifs/ if we want them back.
     sumieAnimals: { label: "Sumi-e Animals", ids: [
-        "japan-animals/carp.png", "japan-animals/kitten.png", "japan-animals/rabbits.png",
-        "japan-animals/snake.png", "japan-animals/tanooki.png", "japan-animals/javelina.png",
+        "motifs/japan-animals/carp.png", "motifs/japan-animals/kitten.png", "motifs/japan-animals/rabbits.png",
+        "motifs/japan-animals/snake.png", "motifs/japan-animals/tanooki.png", "motifs/japan-animals/javelina.png",
     ] },
     sumiePlants: { label: "Sumi-e Plants", ids: [
-        "japan-vegetables/eggplant.png", "japan-vegetables/cucumber.png", "japan-vegetables/mushrooms.png",
-        "japan-vegetables/bulbs.png", "japan-vegetables/firethorn.png", "japan-vegetables/bread.png",
+        "motifs/japan-vegetables/eggplant.png", "motifs/japan-vegetables/cucumber.png", "motifs/japan-vegetables/mushrooms.png",
+        "motifs/japan-vegetables/bulbs.png", "motifs/japan-vegetables/firethorn.png", "motifs/japan-vegetables/bread.png",
     ] },
     berries: { label: "Dutch Berries", ids: [
-        "netherlands-berries/strawberries.png", "netherlands-berries/raspberries.png", "netherlands-berries/blackberries.png",
-        "netherlands-berries/blackcurrants.png", "netherlands-berries/red-plums.png", "netherlands-berries/yellow-plums.png",
+        "motifs/netherlands-berries/strawberries.png", "motifs/netherlands-berries/raspberries.png", "motifs/netherlands-berries/blackberries.png",
+        "motifs/netherlands-berries/blackcurrants.png", "motifs/netherlands-berries/red-plums.png", "motifs/netherlands-berries/yellow-plums.png",
     ] },
     roman: { label: "Roman", ids: [
-        "roman-costumes/ares.png", "roman-costumes/bacchus.png", "roman-costumes/consul.png",
-        "roman-costumes/roman-warrior.png", "roman-costumes/greek-warrior.png", "roman-costumes/tumbler.png",
+        "motifs/roman-costumes/ares.png", "motifs/roman-costumes/bacchus.png", "motifs/roman-costumes/consul.png",
+        "motifs/roman-costumes/roman-warrior.png", "motifs/roman-costumes/greek-warrior.png", "motifs/roman-costumes/tumbler.png",
+    ] },
+    egyptian: { label: "Egyptian", ids: [
+        "motifs/egyptian-heiroglyphs/one.png", "motifs/egyptian-heiroglyphs/two.png", "motifs/egyptian-heiroglyphs/three.png",
+        "motifs/egyptian-heiroglyphs/four.png", "motifs/egyptian-heiroglyphs/five.png", "motifs/egyptian-heiroglyphs/six.png",
+    ] },
+    frames: { label: "Frames", ids: [
+        "frames/floral.png", "frames/gold.png", "frames/greek.png",
+        "frames/landscape.png", "frames/portrait.png", "frames/mirrored.png",
     ] },
 };
-const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "berries", "roman"];
-// Allover enamel patterns (Chinese cloisonné style): a one-tap full-colour
-// tiled fill via the Pattern tool. Square 512 tiles → exact 4× wrap.
+const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "berries", "roman", "egyptian", "frames"];
+// Gems: a dedicated tool that places full-colour jewels like stickers.
+const GEMS = [
+    "gems/circle.png", "gems/oval.png", "gems/square.png",
+    "gems/rectangle.png", "gems/heart.png", "gems/raw.png",
+];
+// Allover patterns: one-tap full-colour tiled fill via the Pattern tool.
+// Square 512 tiles → exact 4× wrap. (Enamels + Egyptian + shima-shima.)
 const PATTERN_SETS = [
-    { file: "chinese-enamel/blue-floral.jpg", label: "Blue floral" },
-    { file: "chinese-enamel/lotus.jpg",       label: "Lotus" },
-    { file: "chinese-enamel/petals.jpg",      label: "Petals" },
-    { file: "chinese-enamel/wildflowers.jpg", label: "Wildflowers" },
-    { file: "chinese-enamel/abstract.jpg",    label: "Abstract" },
-    { file: "chinese-enamel/dark.jpg",        label: "Dark" },
+    { file: "patterns/blue-floral.jpg", label: "Blue floral" },
+    { file: "patterns/lotus.jpg",       label: "Lotus" },
+    { file: "patterns/petals.jpg",      label: "Petals" },
+    { file: "patterns/wildflowers.jpg", label: "Wildflowers" },
+    { file: "patterns/abstract.jpg",    label: "Abstract" },
+    { file: "patterns/dark.jpg",        label: "Dark" },
+    { file: "patterns/egyptian.png",    label: "Egyptian" },
+    { file: "patterns/egyptian-frescos.png", label: "Frescos" },
+    { file: "motifs/shima-shima/stripes.jpg",      label: "Stripes" },
+    { file: "motifs/shima-shima/blue.jpg",         label: "Blue" },
+    { file: "motifs/shima-shima/green.jpg",        label: "Green" },
+    { file: "motifs/shima-shima/bright-green.jpg", label: "Bright" },
+    { file: "motifs/shima-shima/columns.jpg",      label: "Columns" },
+    { file: "motifs/shima-shima/lanterns.jpg",     label: "Lanterns" },
 ];
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
@@ -978,7 +999,9 @@ function init() {
     document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
     document.getElementById("toolCarve")?.addEventListener("click", () => setDecoTool("carve"));
     document.getElementById("toolMotif")?.addEventListener("click", () => setDecoTool("motif"));
+    document.getElementById("toolGems")?.addEventListener("click", () => setDecoTool("gems"));
     document.getElementById("toolPattern")?.addEventListener("click", () => setDecoTool("pattern"));
+    document.getElementById("decoUndo")?.addEventListener("click", undoDeco);
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
     // Motif size slider + upload (image reduced to a silhouette on-device).
     const motifSlider = document.getElementById("motifSize");
@@ -1642,12 +1665,58 @@ function paintStroke(au, av, bu, bv) {
 
 function clearDeco() {
     if (!state.decoCtx) return;
+    pushDecoHistory(); // a Clear is undoable
     state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
     state.decoTex.needsUpdate = true;
     // Clear wipes both paint AND sgraffito carving — one button, full
     // reset of the decorate surface. (The glaze itself is separate and
     // is cleared by tapping the active glaze swatch again.)
     clearSgraffito();
+}
+
+// --- Decorate undo history --------------------------------------
+// Snapshot the deco + sgraffito canvases BEFORE each decorate action so
+// the Undo button can step back one at a time. Bounded stack (memory).
+const DECO_HISTORY_MAX = 10;
+let decoHistory = [];
+function snapDecoCanvas(src) {
+    const c = document.createElement("canvas");
+    c.width = src.width; c.height = src.height;
+    c.getContext("2d").drawImage(src, 0, 0);
+    return c;
+}
+// decoSrc lets a caller record a pre-action deco snapshot it already made
+// (the motif placement keeps motifBase = the deco before the motif).
+function pushDecoHistory(decoSrc) {
+    if (!state.decoCanvas) return;
+    decoHistory.push({
+        deco: snapDecoCanvas(decoSrc || state.decoCanvas),
+        sgraffito: state.sgraffitoCanvas ? snapDecoCanvas(state.sgraffitoCanvas) : null,
+    });
+    if (decoHistory.length > DECO_HISTORY_MAX) decoHistory.shift();
+    updateUndoBtn();
+}
+function undoDeco() {
+    const snap = decoHistory.pop();
+    if (!snap) return;
+    state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
+    state.decoCtx.drawImage(snap.deco, 0, 0);
+    if (state.decoTex) state.decoTex.needsUpdate = true;
+    if (state.sgraffitoCtx && snap.sgraffito) {
+        state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
+        state.sgraffitoCtx.drawImage(snap.sgraffito, 0, 0);
+        if (state.sgraffitoTex) state.sgraffitoTex.needsUpdate = true;
+    }
+    state.dirty = true;
+    maybeSquelch();
+    updateUndoBtn();
+}
+// Wipe the history when the whole surface is replaced (new pot / load /
+// piece swap) so Undo can't bleed a previous pot's decoration in.
+function resetDecoHistory() { decoHistory = []; updateUndoBtn(); }
+function updateUndoBtn() {
+    const b = document.getElementById("decoUndo");
+    if (b) b.disabled = decoHistory.length === 0;
 }
 
 // Sgraffito carving: a needle scribed across wet slip. NOT a paint
@@ -1841,6 +1910,7 @@ function stampAt(u, v) {
 // --- Overlays (one tap fills the whole surface) -----------------
 function applyOverlay(id) {
     if (state.decoColor == null) return;
+    pushDecoHistory();
     state.dirty = true;
     const ctx = state.decoCtx, hex = state.decoColor;
     const cell = DECO_SIZES[state.decoSizeIndex].px * 2.4;
@@ -3092,6 +3162,7 @@ function resetPot() {
     dipPreview = null;
     renderDips();
     clearDeco();
+    resetDecoHistory(); // fresh pot → no undo carryover
     resetBumpLayer();
     // Clear the handle on reset — a fresh pot starts handle-less.
     state.handle.on = false;
@@ -3455,7 +3526,7 @@ function setDecoTool(name) {
     [["toolBrush", "brush"], ["toolSplatter", "splatter"],
      ["toolStamp", "stamp"], ["toolOverlay", "overlay"],
      ["toolCarve", "carve"], ["toolMotif", "motif"],
-     ["toolPattern", "pattern"]].forEach(([id, t]) => {
+     ["toolGems", "gems"], ["toolPattern", "pattern"]].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
         const on = name === t;
@@ -3500,22 +3571,40 @@ function updateDecoSub() {
     // pack selector above the silhouette thumbnails. The Pattern tool shows
     // full-colour enamel tiles that fill the pot on tap.
     const isMotif = state.decoTool === "motif";
+    const isGems = state.decoTool === "gems";
     const isPattern = state.decoTool === "pattern";
+    const isPlacer = isMotif || isGems; // both drag-to-place with a size slider
     const sizesEl = document.getElementById("decoSizes");
-    if (sizesEl) sizesEl.style.display = (isMotif || isPattern) ? "none" : "";
+    if (sizesEl) sizesEl.style.display = (isPlacer || isPattern) ? "none" : "";
     const slider = document.getElementById("motifSize");
-    if (slider) slider.hidden = !isMotif;
+    if (slider) slider.hidden = !isPlacer;
     const packTabs = document.getElementById("motifPackTabs");
     if (packTabs) packTabs.hidden = !isMotif;
-    // Full-colour toggle (motif only). In full colour the paint-colour row
-    // doesn't apply, so hide it; patterns don't use it either.
+    // Full-colour toggle (motif only — gems are always full colour). In
+    // full colour the paint-colour row doesn't apply, so hide it; patterns
+    // and gems don't use it either.
     const colorToggle = document.getElementById("motifColorToggle");
     if (colorToggle) {
         colorToggle.hidden = !isMotif;
         colorToggle.classList.toggle("is-active", motifFullColor);
     }
     const decoColorsEl = document.getElementById("decoColors");
-    if (decoColorsEl) decoColorsEl.hidden = isPattern || (isMotif && motifFullColor);
+    if (decoColorsEl) decoColorsEl.hidden = isPattern || isGems || (isMotif && motifFullColor);
+    if (isGems) {
+        sub.hidden = false;
+        sub.innerHTML = "";
+        GEMS.forEach((id) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "deco-sub-btn motif-thumb pattern-thumb"; // full-colour swatch look
+            b.style.backgroundImage = "url(" + motifSrc(id) + ")";
+            b.setAttribute("aria-label", motifLabel(id) + " gem");
+            b.classList.toggle("is-active", motifStarter === id);
+            b.addEventListener("click", () => loadStarterMotif(id));
+            sub.appendChild(b);
+        });
+        return;
+    }
     if (isPattern) {
         sub.hidden = false;
         sub.innerHTML = "";
@@ -3677,7 +3766,7 @@ function setMotifFullColor(on) {
     if (motifPlacing && motifLastUV) renderMotifPreview(motifLastUV);
     updateDecoSub();
 }
-function motifSrc(id) { return "assets/img/motifs/" + id; }
+function motifSrc(id) { return "assets/" + id; }
 function motifLabel(id) { return id.split("/").pop().replace(/\.[a-z0-9]+$/i, ""); }
 function loadStarterMotif(id) {
     motifStarter = id;
@@ -3694,6 +3783,7 @@ function applyPattern(file) {
         const ctx = state.decoCtx;
         const pat = ctx.createPattern(img, "repeat");
         if (!pat) return;
+        pushDecoHistory();
         ctx.save();
         ctx.fillStyle = pat;
         ctx.fillRect(0, 0, DECO_W, DECO_H);
@@ -3723,8 +3813,9 @@ function tintedMotif(hex, sizePx) {
 function drawMotifOnDeco(ctx, u, v) {
     if (!motifMask) return;
     const sizePx = motifSizePx();
+    const fullColor = motifFullColor || state.decoTool === "gems"; // gems are always full colour
     let src, w, h;
-    if (motifFullColor && motifImage) {
+    if (fullColor && motifImage) {
         src = motifImage;
         const s = sizePx / Math.max(src.width, src.height);
         w = src.width * s; h = src.height * s;
@@ -3762,6 +3853,9 @@ function renderMotifPreview(uv) {
     state.decoTex.needsUpdate = true;
 }
 function commitMotifPlace() {
+    // Record the pre-placement deco (motifBase) so Undo removes just this
+    // motif. Only on a real commit — a cancelled placement never gets here.
+    if (motifBase) pushDecoHistory(motifBase);
     motifPlacing = false;
     motifBase = null;
     motifLastUV = null;
@@ -3986,10 +4080,10 @@ function onPointerDown(ev) {
                 return;
             }
         }
-        // Motif tool: drag on the pot to place/position a silhouette
-        // (takes priority over trim/paint). With no motif chosen yet, the
-        // tool falls through to a spin rather than painting.
-        if (state.decoTool === "motif") {
+        // Motif / Gems: drag on the pot to place/position a picture (takes
+        // priority over trim/paint). With none chosen yet, falls through to
+        // a spin rather than painting.
+        if (state.decoTool === "motif" || state.decoTool === "gems") {
             const uvm = pointerToUV(ev);
             if (motifMask && uvm && beginMotifPlace(uvm)) { ev.preventDefault(); return; }
             state.userRotating = true;
@@ -4017,6 +4111,7 @@ function onPointerDown(ev) {
         const carveActive = state.decoTool === "carve";
         const paintActive = state.decoColor != null && state.decoTool !== "overlay" && state.decoTool !== "carve";
         if (carveActive || paintActive) {
+            pushDecoHistory(); // snapshot before the stroke starts
             state.painting = true;
             const uv = pointerToUV(ev);
             if (uv) { decoApplyAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
@@ -4675,6 +4770,7 @@ function capturePieceState() {
 // live editable state. Phase is set last so the toolbar refreshes
 // against the fully-restored state.
 function restorePieceState(saved) {
+    resetDecoHistory(); // switching pieces replaces the deco surface
     for (let i = 0; i < saved.profile.length; i++) profile[i] = saved.profile[i];
     profileDirty = true;
     state.glaze = saved.glaze;
@@ -5156,6 +5252,7 @@ async function loadPot(entry) {
     state.savedPot = null;
     state.savedLid = null;
     state.dirty = false; // loaded piece reflects the gallery snapshot
+    resetDecoHistory();  // a loaded pot starts with a clean undo history
 
     for (let i = 0; i < profile.length; i++) profile[i] = entry.profile?.[i] ?? 0;
     profileDirty = true;
