@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=102" />
+    <link rel="stylesheet" href="style.css?v=103" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -107,38 +107,39 @@
          kiln's warm-glow vocabulary. JS toggles .is-pulsing to fire it. -->
     <div id="saveFlash" class="save-flash" aria-hidden="true"></div>
 
-    <!-- First-launch control hints. Hidden until the studio has been idle
-         for a couple of seconds on a fresh install (the slip-seen-first-run
-         flag suppresses it forever after the first interaction). Fades out
-         on the first touch. pointer-events:none so the dismissing tap goes
-         straight through to the pot. -->
-    <div id="firstRunHint" class="first-run-hint" aria-hidden="true" hidden>
-        <div class="first-run-hint-inner">
-            <div class="hint-row">
-                <svg viewBox="0 0 40 40" aria-hidden="true">
-                    <path d="M13 14 C 13 9, 27 9, 27 14" />
-                    <path d="M13 14 C 13 23, 27 23, 27 14" />
-                    <path d="M20 23 L20 31" />
-                    <circle cx="20" cy="34" r="2.4" fill="currentColor" stroke="none" />
-                </svg>
-                <span>Drag the pot to shape it</span>
-            </div>
-            <div class="hint-row">
-                <svg viewBox="0 0 40 40" aria-hidden="true">
-                    <path d="M12 20 L20 20 M16 16 L12 20 L16 24" />
-                    <path d="M28 20 L20 20 M24 16 L28 20 L24 24" />
-                </svg>
-                <span>Pinch to zoom</span>
-            </div>
-            <div class="hint-row">
-                <svg viewBox="0 0 40 40" aria-hidden="true">
-                    <circle cx="15" cy="20" r="2.6" fill="currentColor" stroke="none" />
-                    <circle cx="25" cy="20" r="2.6" fill="currentColor" stroke="none" />
-                    <path d="M9 28 L31 28 M27 24 L31 28 L27 32" />
-                </svg>
-                <span>Two-finger drag to look around</span>
+    <!-- Guiding hand: per-stage coach marks over the LIVE pot. A minimal SVG
+         motion line shows the gesture path; the hand image is the actor that
+         moves along it. Shown once on first arrival at each stage (gated by
+         per-stage slip-coach-* flags), faded on the first real gesture.
+         pointer-events:none so the dismissing touch goes to the pot.
+         Positioned + animated from main.js (buildCoach / showCoachFor). -->
+    <div id="coach" class="coach" aria-hidden="true" hidden>
+        <div class="coach-group">
+            <svg class="coach-svg" viewBox="0 0 260 260" aria-hidden="true">
+                <g class="cl cl-inout">
+                    <path d="M52 138 H208"/>
+                    <path d="M52 138 l16 -10 M52 138 l16 10"/>
+                    <path d="M208 138 l-16 -10 M208 138 l-16 10"/>
+                </g>
+                <g class="cl cl-updown">
+                    <path d="M130 60 V216"/>
+                    <path d="M130 60 l-10 16 M130 60 l10 16"/>
+                    <path d="M130 216 l-10 -16 M130 216 l10 -16"/>
+                </g>
+                <g class="cl cl-dip">
+                    <path d="M130 54 q28 68 2 132"/>
+                    <path d="M132 186 l-12 -15 M132 186 l12 -13"/>
+                </g>
+                <g class="cl cl-spin">
+                    <path d="M66 118 a64 46 0 1 1 2 40"/>
+                    <path d="M68 158 l-11 4 M68 158 l4 -12"/>
+                </g>
+            </svg>
+            <div class="coach-hand-wrap">
+                <img class="coach-hand" src="assets/img/tutorial/hand.png" alt=""/>
             </div>
         </div>
+        <p class="coach-cap" id="coachCap"></p>
     </div>
 
     <a class="home" href="../" aria-label="Back to Madderverse" title="Back to Madderverse">&#x2302;</a>
@@ -164,6 +165,7 @@
         </div>
         <button id="beginBtn" class="landing-btn" type="button">Begin</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
+        <button id="landingHowto" class="landing-link" type="button">How to play</button>
         <a id="landingAppLink" class="landing-link landing-app-link" href="https://play.google.com/store/apps/details?id=org.madderverse.slipstudio" target="_blank" rel="noopener">Get the Android app &#x2197;</a>
     </div>
 
@@ -303,7 +305,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=102"></script>
+    <script type="module" src="main.js?v=103"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

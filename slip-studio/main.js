@@ -1028,6 +1028,11 @@ function init() {
         dismissLanding();
         openGallery();
     });
+    // "How to play": start the studio and replay the coach hands stage by stage.
+    document.getElementById("landingHowto")?.addEventListener("click", () => {
+        dismissLanding();
+        replayCoaching();
+    });
     // The Get-the-app link is for the web build only — hide it inside
     // the Capacitor Android wrap (Capacitor injects window.Capacitor).
     if (window.Capacitor) {
@@ -2666,6 +2671,7 @@ function setPhase(name) {
 // The forward control: dry → fire → new pot.
 function advanceStage() {
     dismissFirstRunHint(); // progressing the arc counts as engaged
+    dismissCoach();
     switch (state.clayState) {
         case "wet":
             setPhase("leather"); // firms to leather-hard, ready to decorate
@@ -2679,6 +2685,7 @@ function advanceStage() {
             if (state.savedPot && state.savedPot.clayState === "wet") state.savedPot.clayState = "leather";
             if (state.savedLid && state.savedLid.clayState === "wet") state.savedLid.clayState = "leather";
             state.dirty = true;
+            scheduleCoach("leather"); // first time at Decorate → teach the dip
             break;
         case "leather":
             setPhase("fired");
@@ -2742,6 +2749,7 @@ function endFiringMoment() {
     if (state.savedLid) state.savedLid.clayState = "fired";
     // Save + Photo were gated on !state.firing — bring them back now.
     updateToolbar();
+    scheduleCoach("fired"); // first fired pot → teach spin / save / photo
 }
 
 // 0..1 ease for smooth-in/out transitions inside the firing phases.
@@ -3516,6 +3524,7 @@ function pointerToHandleLocal(ev) {
 function onPointerDown(ev) {
     // Any touch on the studio dismisses the first-run hints for good.
     dismissFirstRunHint();
+    dismissCoach();
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
 
     if (pointers.size >= 2) {
@@ -5146,8 +5155,9 @@ function dismissLanding() {
     if (state.musicOn && music) music.play().catch(() => {});
     // Ramp the wheel hum in from silence instead of popping to full.
     wheelStarted = true;
-    // First install: offer the control hints after a short idle beat.
-    scheduleFirstRunHint();
+    // First install: offer the shape coach after a short idle beat.
+    scheduleFirstRunHint();   // (legacy legend is gone; keeps the shape-hint flag)
+    scheduleCoach("wet");
     // Same window for the video backdrop: iOS Safari + Low-Power Mode
     // can block muted autoplay on load; retry now that we have a gesture.
     const bg = BACKGROUNDS.find((b) => b.id === state.background);
@@ -5165,6 +5175,7 @@ function showLanding() {
     // the user hasn't touched the clay yet, so it can re-offer next Begin.
     if (firstRunTimer) { clearTimeout(firstRunTimer); firstRunTimer = null; }
     hideFirstRunHintEl();
+    hideCoach(false);   // clear any showing coach without marking it seen
     updateShapeHint();
 }
 
@@ -5221,6 +5232,76 @@ function hideFirstRunHintEl() {
 function updateShapeHint() {
     const h = document.getElementById("shapeHint");
     if (h) h.hidden = hasSeenFirstRun();
+}
+
+// --- Guiding-hand coach marks -----------------------------------
+// One coach per clay stage, shown the FIRST time you arrive there, then
+// remembered per-stage so it never nags again. A minimal SVG motion line
+// (index.html #coach) shows the gesture; the hand image demonstrates it.
+// Dismissed on the first real gesture (onPointerDown) or on progressing.
+const COACH_CAPTIONS = {
+    wet:     "Drag the pot wall to shape it — in, out, up, down.",
+    leather: "Tap Dip, then drag down — glaze pours to your finger.",
+    fired:   "Spin to admire. Save it, or take a photo.",
+};
+const coachKey = (stage) => "slip-coach-" + stage;
+let coachStage = null;   // the stage currently being coached (or null)
+let coachTimer = null;
+function coachSeen(stage) {
+    try { return localStorage.getItem(coachKey(stage)) === "1"; }
+    catch (_) { return true; } // storage blocked → never nag
+}
+function markCoachSeen(stage) {
+    try { localStorage.setItem(coachKey(stage), "1"); } catch (_) {}
+}
+// Wait out a short beat after arriving so an eager user who dives in never
+// sees it; a hesitant one gets the nudge.
+function scheduleCoach(stage) {
+    if (!(stage in COACH_CAPTIONS) || coachSeen(stage)) return;
+    if (coachTimer) clearTimeout(coachTimer);
+    coachTimer = setTimeout(() => showCoachFor(stage), 1500);
+}
+function showCoachFor(stage) {
+    coachTimer = null;
+    if (!(stage in COACH_CAPTIONS)) return;
+    // Never surface over the gallery, photo modal, or the title screen.
+    const gallery = document.getElementById("gallery");
+    const photo   = document.getElementById("photoModal");
+    const landing = document.getElementById("landing");
+    if ((gallery && !gallery.hidden) || (photo && !photo.hidden) ||
+        (landing && !landing.hidden && !landing.classList.contains("is-gone"))) return;
+    const el  = document.getElementById("coach");
+    const cap = document.getElementById("coachCap");
+    if (!el) return;
+    el.classList.remove("g-wet", "g-leather", "g-fired");
+    el.classList.add("g-" + stage);
+    if (cap) cap.textContent = COACH_CAPTIONS[stage];
+    coachStage = stage;
+    el.hidden = false;
+    setTimeout(() => el.classList.add("is-visible"), 20); // paint hidden state first
+}
+// Fade the coach out. `seen` marks the stage done (the real dismiss);
+// a silent hide (returning to the title) leaves the flag so it re-offers.
+function hideCoach(seen) {
+    if (coachTimer) { clearTimeout(coachTimer); coachTimer = null; }
+    if (seen && coachStage) markCoachSeen(coachStage);
+    coachStage = null;
+    const el = document.getElementById("coach");
+    if (!el || el.hidden) return;
+    el.classList.remove("is-visible");
+    setTimeout(() => { el.hidden = true; }, 450);
+}
+function dismissCoach() { if (coachStage) hideCoach(true); }
+// "How to play": forget every coach flag so the hands replay as you go,
+// and show the current stage's coach right away if you're in the studio.
+function replayCoaching() {
+    Object.keys(COACH_CAPTIONS).forEach((s) => {
+        try { localStorage.removeItem(coachKey(s)); } catch (_) {}
+    });
+    hideCoach(false);
+    const landing = document.getElementById("landing");
+    const inStudio = !(landing && !landing.hidden && !landing.classList.contains("is-gone"));
+    if (inStudio) showCoachFor(state.clayState);
 }
 
 // Light haptic tick on Android; silent no-op on desktop / iOS Safari.
