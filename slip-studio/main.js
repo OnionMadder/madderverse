@@ -1216,15 +1216,21 @@ function makeGlazeDipLayer() {
 
 // Replay the ordered dip list (plus any in-progress preview) into the
 // glaze canvas. Non-destructive: editing/removing a dip = re-render.
-function renderDips() {
-    const ctx = state.dipCtx;
-    if (!ctx) return;
+// Paint an ordered dip list into a glaze canvas ctx. Shared by the live
+// pot (renderDips) and the partner mesh (syncPartnerMesh) so a dipped
+// lid/pot keeps its glaze in the assembled set.
+function paintDipList(ctx, list) {
     ctx.clearRect(0, 0, GLAZE_W, GLAZE_H);
-    const list = dipPreview ? state.dips.concat(dipPreview) : state.dips;
     for (const d of list) {
         if (d.type === "preset") paintPresetDip(ctx, d.id);
         else paintDip(ctx, d);
     }
+}
+function renderDips() {
+    const ctx = state.dipCtx;
+    if (!ctx) return;
+    const list = dipPreview ? state.dips.concat(dipPreview) : state.dips;
+    paintDipList(ctx, list);
     if (state.dipTex) state.dipTex.needsUpdate = true;
     // Keep the surface finish in sync — a dipped pot goes glossy, an
     // un-dipped one drops back to bare clay (see currentLook).
@@ -4374,6 +4380,20 @@ function buildPartnerMesh() {
     pst.anisotropy = 4;
     state.partnerSgraffitoTex = pst;
 
+    // Partner's own glaze-dip canvas + texture — mirrors the live pot's
+    // makeGlazeDipLayer so a dipped lid/pot keeps its glaze in the set.
+    const pdipc = document.createElement("canvas");
+    pdipc.width  = GLAZE_W;
+    pdipc.height = GLAZE_H;
+    state.partnerDipCanvas = pdipc;
+    state.partnerDipCtx    = pdipc.getContext("2d");
+    const pdipt = new THREE.CanvasTexture(pdipc);
+    pdipt.colorSpace = THREE.SRGBColorSpace;
+    pdipt.wrapS = THREE.RepeatWrapping;
+    pdipt.wrapT = THREE.ClampToEdgeWrapping;
+    pdipt.anisotropy = 4;
+    state.partnerDipTex = pdipt;
+
     const mat = new THREE.MeshPhysicalMaterial({
         color: CLAY_STATES.fired.color,
         roughness: CLAY_STATES.fired.roughness,
@@ -4391,6 +4411,7 @@ function buildPartnerMesh() {
         shader.uniforms.uClayColor     = { value: state.partnerClayBaseColor };
         shader.uniforms.uGradientColor = { value: state.partnerGradientColor };
         shader.uniforms.uGradientMix   = { value: state.partnerGradientMix };
+        shader.uniforms.uDipMap        = { value: pdipt };
         mat.userData.shaderUniforms = shader.uniforms;
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
@@ -4398,13 +4419,15 @@ function buildPartnerMesh() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
                  float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
+                 vec4 _dip = texture2D( uDipMap, vDecoUv );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
@@ -4412,7 +4435,7 @@ function buildPartnerMesh() {
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-v3-partner";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v1-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -4442,9 +4465,16 @@ function syncPartnerMesh(saved) {
     state.partnerSgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (saved.sgraffitoCanvas) state.partnerSgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
     state.partnerSgraffitoTex.needsUpdate = true;
+    // Partner glaze-dip layer — replay the saved piece's dips so a dipped
+    // lid/pot renders (and fires) with its glaze, not bare clay.
+    if (state.partnerDipCtx) {
+        paintDipList(state.partnerDipCtx, saved.dips || []);
+        if (state.partnerDipTex) state.partnerDipTex.needsUpdate = true;
+    }
     state.partnerClayBaseColor.setHex(CLAY_STATES[saved.clayState || "fired"].color);
+    const dipped  = !!(saved.dips && saved.dips.length);
     const initial = lookForPiece(saved);
-    const target  = saved.glaze ? GLAZES[saved.glaze].fired : CLAY_STATES.fired;
+    const target  = saved.glaze ? GLAZES[saved.glaze].fired : (dipped ? DIP_FIRED : CLAY_STATES.fired);
     const mat = state.partnerMaterial;
     mat.color.setHex(initial.color);
     mat.roughness          = initial.roughness;
@@ -4474,8 +4504,9 @@ function syncPartnerMesh(saved) {
 // the live state. Used for the partner mesh which lives in memory.
 function lookForPiece(piece) {
     const cs = piece.clayState;
-    if (cs === "fired")   return piece.glaze ? GLAZES[piece.glaze].fired : CLAY_STATES.fired;
-    if (cs === "leather") return piece.glaze ? GLAZES[piece.glaze].raw   : CLAY_STATES.leather;
+    const dipped = !!(piece.dips && piece.dips.length);
+    if (cs === "fired")   return piece.glaze ? GLAZES[piece.glaze].fired : (dipped ? DIP_FIRED : CLAY_STATES.fired);
+    if (cs === "leather") return piece.glaze ? GLAZES[piece.glaze].raw   : (dipped ? DIP_RAW   : CLAY_STATES.leather);
     return CLAY_STATES.wet;
 }
 
