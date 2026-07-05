@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=104" />
+    <link rel="stylesheet" href="style.css?v=105" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -205,6 +205,7 @@
                 <button class="deco-tool" id="toolStamp" type="button" aria-pressed="false">Stamp</button>
                 <button class="deco-tool" id="toolOverlay" type="button" aria-pressed="false">Overlay</button>
                 <button class="deco-tool" id="toolCarve" type="button" aria-pressed="false" title="Scratch through the glaze to reveal the clay">Carve</button>
+                <button class="deco-tool" id="toolMotif" type="button" aria-pressed="false" title="Place a picture on the pot as a silhouette">Motif</button>
                 <button class="deco-tool deco-clear" id="decoClear" type="button">Clear</button>
             </div>
             <div class="deco-strip" id="decoOptions">
@@ -214,8 +215,10 @@
                     <button class="deco-size" type="button" aria-label="Large" aria-pressed="false"><span class="brush-dot brush-dot-l"></span></button>
                 </span>
                 <span class="deco-sub" id="decoSub" role="group" aria-label="Shape or pattern" hidden></span>
+                <input type="range" id="motifSize" class="motif-size" min="10" max="100" value="42" aria-label="Motif size" hidden />
             </div>
             <div class="deco-strip" id="decoColors" role="group" aria-label="Paint colour"></div>
+            <input type="file" id="motifUpload" accept="image/*" hidden />
         </div>
     </div>
 
@@ -305,7 +308,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=104"></script>
+    <script type="module" src="main.js?v=105"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

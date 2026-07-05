@@ -1077,6 +1077,47 @@ html, body {
     border-color: var(--accent);
     background: rgba(201, 138, 100, 0.18);
 }
+/* Motif starter thumbnails: the dark silhouette on a light chip so it
+   reads against the dark tray. */
+.motif-thumb {
+    width: 40px;
+    padding: 0;
+    background-color: #efe7db;
+    background-size: 66% 66%;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+.motif-upload { font-size: 1.25rem; font-weight: 400; }
+/* Motif size slider — sits where the brush dots normally are. */
+.motif-size {
+    pointer-events: auto;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 128px;
+    height: 4px;
+    margin: 0 8px;
+    border-radius: 999px;
+    background: var(--ink-faint);
+    outline: none;
+}
+.motif-size::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+}
+.motif-size::-moz-range-thumb {
+    width: 17px;
+    height: 17px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+}
+.motif-size[hidden] { display: none; }
 .deco-tool {
     -webkit-tap-highlight-color: transparent;
     -webkit-appearance: none;

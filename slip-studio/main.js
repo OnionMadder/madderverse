@@ -306,6 +306,12 @@ const OVERLAY_PATTERNS = [
     { id: "chevron",   label: "Chevron" },
     { id: "crosses",   label: "Crosses" },
 ];
+// Motif tool: drop a single-colour silhouette on the pot. Starters ship
+// as SVGs (assets/img/motifs/<id>.svg); the user can also upload their own
+// image, reduced to a silhouette on-device (never uploaded anywhere). The
+// motif bakes into the deco canvas, so it wraps + saves like the rest.
+const MOTIF_STARTERS = ["bird", "fish", "leaf", "sun", "star", "spiral"];
+const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
 
 // --- Ambiance: backdrops + music --------------------------------
@@ -797,6 +803,16 @@ const state = {
 let lastPaintUV = null;         // for continuous paint strokes
 let music = null;               // looping ambient track
 
+// Motif tool transient state. motifMask = the current silhouette (black
+// shape, alpha = coverage); the fill colour is state.decoColor. Declared
+// early so no function hits a TDZ reading them (cf. dipPreview).
+let motifMask = null;
+let motifStarter = null;        // which starter id is active (or null = upload)
+let motifSize = 0.42;           // 0..1 slider position → MOTIF_MIN/MAX_PX
+let motifPlacing = false;       // dragging to position a motif
+let motifBase = null;           // deco-canvas snapshot during a placement
+let motifLastUV = null;
+
 // First-launch control hints: shown once, after a short idle beat in the
 // studio on a fresh install; suppressed forever once the user interacts.
 const FIRST_RUN_KEY = "slip-seen-first-run";
@@ -921,7 +937,27 @@ function init() {
     document.getElementById("toolStamp")?.addEventListener("click", () => setDecoTool("stamp"));
     document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
     document.getElementById("toolCarve")?.addEventListener("click", () => setDecoTool("carve"));
+    document.getElementById("toolMotif")?.addEventListener("click", () => setDecoTool("motif"));
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
+    // Motif size slider + upload (image reduced to a silhouette on-device).
+    const motifSlider = document.getElementById("motifSize");
+    if (motifSlider) {
+        motifSlider.value = String(Math.round(motifSize * 100));
+        motifSlider.addEventListener("input", () => {
+            motifSize = THREE.MathUtils.clamp(parseInt(motifSlider.value, 10) / 100, 0, 1);
+            if (motifPlacing && motifLastUV) renderMotifPreview(motifLastUV);
+        });
+    }
+    document.getElementById("motifUpload")?.addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const url = URL.createObjectURL(f);
+        const im = new Image();
+        im.onload = () => { motifStarter = null; loadMotifImage(im); URL.revokeObjectURL(url); };
+        im.onerror = () => URL.revokeObjectURL(url);
+        im.src = url;
+        e.target.value = ""; // allow re-picking the same file
+    });
     document.getElementById("tabGlaze")?.addEventListener("click", () => setDecoTab("glaze"));
     document.getElementById("tabDecorate")?.addEventListener("click", () => setDecoTab("decorate"));
     document.getElementById("saveBtn")?.addEventListener("click", () => savePot());
@@ -3318,7 +3354,7 @@ function setDecoTool(name) {
     state.decoTool = name;
     [["toolBrush", "brush"], ["toolSplatter", "splatter"],
      ["toolStamp", "stamp"], ["toolOverlay", "overlay"],
-     ["toolCarve", "carve"]].forEach(([id, t]) => {
+     ["toolCarve", "carve"], ["toolMotif", "motif"]].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
         const on = name === t;
@@ -3352,6 +3388,35 @@ function setStampShape(id) {
 function updateDecoSub() {
     const sub = document.getElementById("decoSub");
     if (!sub) return;
+    // The Motif tool swaps the brush-size dots for a size slider.
+    const isMotif = state.decoTool === "motif";
+    const sizesEl = document.getElementById("decoSizes");
+    if (sizesEl) sizesEl.style.display = isMotif ? "none" : "";
+    const slider = document.getElementById("motifSize");
+    if (slider) slider.hidden = !isMotif;
+    if (isMotif) {
+        sub.hidden = false;
+        sub.innerHTML = "";
+        MOTIF_STARTERS.forEach((id) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "deco-sub-btn motif-thumb";
+            b.style.backgroundImage = "url(assets/img/motifs/" + id + ".svg)";
+            b.setAttribute("aria-label", id + " motif");
+            b.classList.toggle("is-active", motifStarter === id);
+            b.addEventListener("click", () => loadStarterMotif(id));
+            sub.appendChild(b);
+        });
+        const up = document.createElement("button");
+        up.type = "button";
+        up.className = "deco-sub-btn motif-upload";
+        up.textContent = "＋"; // ＋
+        up.setAttribute("aria-label", "Upload your own picture");
+        up.setAttribute("title", "Upload your own picture");
+        up.addEventListener("click", () => document.getElementById("motifUpload")?.click());
+        sub.appendChild(up);
+        return;
+    }
     if (state.decoTool === "stamp") {
         sub.hidden = false;
         sub.innerHTML = "";
@@ -3397,6 +3462,112 @@ function setDecoSize(i) {
 function setDecoColor(hex) {
     state.decoColor = state.decoColor === hex ? null : hex;
     updateDecoSwatches();
+}
+
+// --- Motif tool -------------------------------------------------
+// Drop a single-colour silhouette (a starter or an uploaded image) onto
+// the pot, drag to place, size with a slider. The image is reduced to a
+// mask entirely on-device; the fill colour is state.decoColor.
+function motifSizePx() {
+    return MOTIF_MIN_PX + (MOTIF_MAX_PX - MOTIF_MIN_PX) * THREE.MathUtils.clamp(motifSize, 0, 1);
+}
+// Reduce an image to a silhouette MASK: black shape, alpha = coverage.
+// Art with transparency uses its own alpha; a flat image falls back to a
+// luminance cut (darker = figure), which suits the black-figure look.
+function buildMotifMask(img) {
+    const MAXD = 512;
+    const s = MAXD / Math.max(img.width || MAXD, img.height || MAXD);
+    const w = Math.max(1, Math.round((img.width || MAXD) * s));
+    const h = Math.max(1, Math.round((img.height || MAXD) * s));
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, w, h);
+    const id = ctx.getImageData(0, 0, w, h);
+    const d = id.data;
+    let hasAlpha = false;
+    for (let i = 3; i < d.length; i += 4) { if (d[i] < 240) { hasAlpha = true; break; } }
+    for (let i = 0; i < d.length; i += 4) {
+        let a;
+        if (hasAlpha) {
+            a = d[i + 3];
+        } else {
+            const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            a = 255 - lum;          // dark → opaque figure
+            if (a < 64) a = 0;      // drop the light background
+        }
+        d[i] = 0; d[i + 1] = 0; d[i + 2] = 0; d[i + 3] = a;
+    }
+    ctx.putImageData(id, 0, 0);
+    return c;
+}
+function loadMotifImage(img) {
+    motifMask = buildMotifMask(img);
+    if (state.decoColor == null) setDecoColor(DECO_COLORS[1]); // arm near-black
+    updateDecoSub();
+}
+function loadStarterMotif(id) {
+    motifStarter = id;
+    const im = new Image();
+    im.onload = () => loadMotifImage(im);
+    im.src = "assets/img/motifs/" + id + ".svg";
+    updateDecoSub();
+}
+// The tinted, scaled silhouette ready to stamp onto the deco canvas.
+function tintedMotif(hex, sizePx) {
+    const m = motifMask;
+    const s = sizePx / Math.max(m.width, m.height);
+    const w = Math.max(1, Math.round(m.width * s));
+    const h = Math.max(1, Math.round(m.height * s));
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(m, 0, 0, w, h);
+    ctx.globalCompositeOperation = "source-in";
+    ctx.fillStyle = "#" + (hex >>> 0).toString(16).padStart(6, "0");
+    ctx.fillRect(0, 0, w, h);
+    return c;
+}
+// Draw the motif centred at UV onto a ctx, wrapping across the u-seam.
+function drawMotifOnDeco(ctx, u, v) {
+    if (!motifMask) return;
+    const hex = state.decoColor != null ? state.decoColor : DECO_COLORS[1];
+    const t = tintedMotif(hex, motifSizePx());
+    const cx = u * DECO_W, cy = (1 - v) * DECO_H;
+    const dx = cx - t.width / 2, dy = cy - t.height / 2;
+    ctx.drawImage(t, dx, dy);
+    if (cx < t.width) ctx.drawImage(t, dx + DECO_W, dy);
+    else if (cx > DECO_W - t.width) ctx.drawImage(t, dx - DECO_W, dy);
+}
+// Non-destructive placement: snapshot the committed deco, then redraw
+// base + motif live on each move; on release it's already baked in.
+function beginMotifPlace(uv) {
+    if (!motifMask) return false;
+    if (!motifBase) {
+        motifBase = document.createElement("canvas");
+        motifBase.width = DECO_W; motifBase.height = DECO_H;
+    }
+    const bctx = motifBase.getContext("2d");
+    bctx.clearRect(0, 0, DECO_W, DECO_H);
+    bctx.drawImage(state.decoCanvas, 0, 0);
+    motifPlacing = true;
+    motifLastUV = uv;
+    renderMotifPreview(uv);
+    return true;
+}
+function renderMotifPreview(uv) {
+    const ctx = state.decoCtx;
+    ctx.clearRect(0, 0, DECO_W, DECO_H);
+    ctx.drawImage(motifBase, 0, 0);
+    drawMotifOnDeco(ctx, uv.x, uv.y);
+    state.decoTex.needsUpdate = true;
+}
+function commitMotifPlace() {
+    motifPlacing = false;
+    motifBase = null;
+    motifLastUV = null;
+    state.dirty = true;
+    maybeSquelch();
 }
 
 function buildDecoBar() {
@@ -3539,6 +3710,17 @@ function onPointerDown(ev) {
         sculpting = false;
         handleDrag = null;
         if (dipping) { dipping = false; dipPreview = null; renderDips(); }
+        // Cancel an in-progress motif placement — restore the pre-drag deco.
+        if (motifPlacing) {
+            motifPlacing = false;
+            if (motifBase) {
+                const c = state.decoCtx;
+                c.clearRect(0, 0, DECO_W, DECO_H);
+                c.drawImage(motifBase, 0, 0);
+                if (state.decoTex) state.decoTex.needsUpdate = true;
+                motifBase = null;
+            }
+        }
         state.painting = false;
         lastPaintUV = null;
         state.userRotating = true;
@@ -3601,6 +3783,17 @@ function onPointerDown(ev) {
                 ev.preventDefault();
                 return;
             }
+        }
+        // Motif tool: drag on the pot to place/position a silhouette
+        // (takes priority over trim/paint). With no motif chosen yet, the
+        // tool falls through to a spin rather than painting.
+        if (state.decoTool === "motif") {
+            const uvm = pointerToUV(ev);
+            if (motifMask && uvm && beginMotifPlace(uvm)) { ev.preventDefault(); return; }
+            state.userRotating = true;
+            viewPrevX = ev.clientX;
+            ev.preventDefault();
+            return;
         }
         // Two actions live here. A silhouette grab in the foot zone
         // is a trim (constrained inward sculpt). Anything else, when
@@ -3684,6 +3877,12 @@ function onPointerMove(ev) {
         ev.preventDefault();
         return;
     }
+    if (motifPlacing) {
+        const uv = pointerToUV(ev);
+        if (uv) { motifLastUV = uv; renderMotifPreview(uv); }
+        ev.preventDefault();
+        return;
+    }
     if (sculpting) {
         const p = pointerToProfile(ev);
         if (p) {
@@ -3726,6 +3925,9 @@ function onPointerUp(ev) {
     if (pointers.size === 0) {
         sculpting = false;
         handleDrag = null;
+        // A placed motif is already baked into the deco canvas — just clear
+        // the placement state so it stays put.
+        if (motifPlacing) commitMotifPlace();
         // Commit an in-progress dip: freeze it with drips into the list.
         if (dipping) {
             if (dipPreview) {
