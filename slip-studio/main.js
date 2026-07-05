@@ -172,6 +172,15 @@ const GLAZES = {
     ironred:  glaze("Iron red", 0xb87055, 0xa53a1f, { roughness: 0.42, envMapIntensity: 0.92 }),
     mint:     glaze("Mint",     0xc5ddcd, 0x84b899),
     pearl:    glaze("Pearl",    0xe8dfd2, 0xf2ead8, { clearcoat: 0.88, clearcoatRoughness: 0.08, envMapIntensity: 1.00 }),
+    // Garden pack — fresh, saturated naturals.
+    teal:       glaze("Teal",       0x9dc2c4, 0x2f7d84),
+    lilac:      glaze("Lilac",      0xccc2dd, 0x8a72b8),
+    terracotta: glaze("Terracotta", 0xd2a082, 0xb5502f),
+    olive:      glaze("Olive",      0xc2bd94, 0x7a7233),
+    indigo:     glaze("Indigo",     0x9aa0c4, 0x33356e),
+    coral:      glaze("Coral",      0xe0a998, 0xd96a4f),
+    charcoal:   glaze("Charcoal",   0x9a9a94, 0x33332f),
+    seafoam:    glaze("Seafoam",    0xbfe0d4, 0x6fb59a),
     // Rainbow is a special glaze: its colour comes from a vertical height
     // ramp painted in the shader (see RAINBOW_STOPS / uRampMix), not from
     // this base hex — the white base just avoids a flash while the ramp
@@ -200,14 +209,19 @@ const DIP_SETS = {
     sunset:  { label: "Sunset",  stops: [[0, "#ffd76b"], [0.42, "#ff9e4a"], [0.72, "#e6533f"], [1, "#7a2a6b"]] },
     ocean:   { label: "Ocean",   stops: [[0, "#9ce8dc"], [0.45, "#39a0c4"], [1, "#123a6b"]] },
     ember:   { label: "Ember",   stops: [[0, "#ffe08a"], [0.5, "#f2762a"], [1, "#5a1414"]] },
+    meadow:  { label: "Meadow",  stops: [[0, "#d6ecae"], [0.5, "#7cbd76"], [1, "#2f6b4e"]] },
+    orchid:  { label: "Orchid",  stops: [[0, "#f2d9ec"], [0.45, "#c98ac0"], [1, "#552e6b"]] },
+    terra:   { label: "Terra",   stops: [[0, "#f0cf9c"], [0.5, "#d1874f"], [1, "#7a3320"]] },
+    storm:   { label: "Storm",   stops: [[0, "#d2d9df"], [0.5, "#7d8a99"], [1, "#2b3540"]] },
 };
-const DIP_SET_IDS = ["rainbow", "sunset", "ocean", "ember"];
+const DIP_SET_IDS = ["rainbow", "sunset", "ocean", "ember", "meadow", "orchid", "terra", "storm"];
 const DIP_FEATHER = 0.14;              // soft top-edge fraction of the dip's own span
 const DRIP_COUNTS = { off: 0, few: 4, lots: 9 };
 const GLAZE_IDS = [
     "celadon", "cobalt", "oatmeal", "honey", "tenmoku",
     "blush", "forest", "slate", "plum", "sand",
     "gold", "copper", "platinum", "ironred", "mint", "pearl",
+    "teal", "lilac", "terracotta", "olive", "indigo", "coral", "charcoal", "seafoam",
 ];
 
 // Swappable glaze packs — each pack curates 8 glazes that read well
@@ -223,6 +237,10 @@ const GLAZE_PACKS = {
     modern: {
         label: "Modern",
         ids: ["plum", "sand", "gold", "copper", "platinum", "ironred", "mint", "pearl"],
+    },
+    garden: {
+        label: "Garden",
+        ids: ["teal", "lilac", "terracotta", "olive", "indigo", "coral", "charcoal", "seafoam"],
     },
 };
 const DEFAULT_GLAZE_PACK = "studio";
@@ -241,7 +259,10 @@ function packContaining(glazeId) {
 // Painted onto the surface (over the glaze) by dragging on the pot.
 // One unwrapped RGBA canvas wraps the pot via UVs; a shader overlays
 // it on the clay. Brush = soft dab; splatter = scattered droplets.
-const DECO_COLORS = [0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86, 0x6e4a6b, 0x4a5a68];
+const DECO_COLORS = [
+    0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86, 0x6e4a6b, 0x4a5a68,
+    0xffffff, 0x8c2f2f, 0xc94f3a, 0xd9a441, 0x2f7d5b, 0x2f6f8f, 0x2a356b, 0x6b4a2f,
+];
 const DECO_W = 2048, DECO_H = 1024; // unwrapped surface (≈ circumference:height)
 // Bump canvas. The procedural clay grain is rendered into it once at
 // pot reset; the texture stays static for v2 (earlier prototypes of
