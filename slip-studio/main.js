@@ -318,8 +318,8 @@ const OVERLAY_PATTERNS = [
 // allowed) so a pack can mix vector shapes and raster art (e.g. sumi-e ink
 // drawings). Silhouette conversion (buildMotifMask) handles either.
 const MOTIF_PACKS = {
-    basics: { label: "Basics", ids: ["bird.svg", "fish.svg", "leaf.svg", "sun.svg", "star.svg", "spiral.svg"] },
-    aegean: { label: "Aegean", ids: ["greekkey.svg", "amphora.svg", "column.svg", "wave.svg", "palmette.svg"] },
+    // Basics + Aegean (my placeholder SVGs) are removed from the picker for
+    // now; the files stay at assets/img/motifs/ if we want them back.
     sumieAnimals: { label: "Sumi-e Animals", ids: [
         "japan-animals/carp.png", "japan-animals/kitten.png", "japan-animals/rabbits.png",
         "japan-animals/snake.png", "japan-animals/tanooki.png", "japan-animals/javelina.png",
@@ -329,7 +329,7 @@ const MOTIF_PACKS = {
         "japan-vegetables/bulbs.png", "japan-vegetables/firethorn.png", "japan-vegetables/bread.png",
     ] },
 };
-const MOTIF_PACK_IDS = ["basics", "aegean", "sumieAnimals", "sumiePlants"];
+const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants"];
 // Allover enamel patterns (Chinese cloisonné style): a one-tap full-colour
 // tiled fill via the Pattern tool. Square 512 tiles → exact 4× wrap.
 const PATTERN_SETS = [
@@ -836,7 +836,7 @@ let music = null;               // looping ambient track
 // shape, alpha = coverage); the fill colour is state.decoColor. Declared
 // early so no function hits a TDZ reading them (cf. dipPreview).
 let motifMask = null;
-let motifPack = "basics";       // active motif pack (key into MOTIF_PACKS)
+let motifPack = "sumieAnimals"; // active motif pack (key into MOTIF_PACKS)
 let motifStarter = null;        // which starter id is active (or null = upload)
 let motifSize = 0.42;           // 0..1 slider position → MOTIF_MIN/MAX_PX
 let motifPlacing = false;       // dragging to position a motif
