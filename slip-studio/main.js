@@ -328,6 +328,10 @@ const MOTIF_PACKS = {
         "motifs/japan-vegetables/eggplant.png", "motifs/japan-vegetables/cucumber.png", "motifs/japan-vegetables/mushrooms.png",
         "motifs/japan-vegetables/bulbs.png", "motifs/japan-vegetables/firethorn.png", "motifs/japan-vegetables/bread.png",
     ] },
+    dogs: { label: "Dogs", ids: [
+        "motifs/austrian-dogs/bulldog.png", "motifs/austrian-dogs/collie.png", "motifs/austrian-dogs/greyhound.png",
+        "motifs/austrian-dogs/poodle.png", "motifs/austrian-dogs/terrier.png", "motifs/austrian-dogs/whippet.png",
+    ] },
     berries: { label: "Dutch Berries", ids: [
         "motifs/netherlands-berries/strawberries.png", "motifs/netherlands-berries/raspberries.png", "motifs/netherlands-berries/blackberries.png",
         "motifs/netherlands-berries/blackcurrants.png", "motifs/netherlands-berries/red-plums.png", "motifs/netherlands-berries/yellow-plums.png",
@@ -345,30 +349,23 @@ const MOTIF_PACKS = {
         "frames/landscape.png", "frames/portrait.png", "frames/mirrored.png",
     ] },
 };
-const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "berries", "roman", "egyptian", "frames"];
-// Gems: a dedicated tool that places full-colour jewels like stickers.
-const GEMS = [
-    "gems/circle.png", "gems/oval.png", "gems/square.png",
-    "gems/rectangle.png", "gems/heart.png", "gems/raw.png",
-];
-// Allover patterns: one-tap full-colour tiled fill via the Pattern tool.
-// Square 512 tiles → exact 4× wrap. (Enamels + Egyptian + shima-shima.)
-const PATTERN_SETS = [
-    { file: "patterns/blue-floral.jpg", label: "Blue floral" },
-    { file: "patterns/lotus.jpg",       label: "Lotus" },
-    { file: "patterns/petals.jpg",      label: "Petals" },
-    { file: "patterns/wildflowers.jpg", label: "Wildflowers" },
-    { file: "patterns/abstract.jpg",    label: "Abstract" },
-    { file: "patterns/dark.jpg",        label: "Dark" },
-    { file: "patterns/egyptian.png",    label: "Egyptian" },
-    { file: "patterns/egyptian-frescos.png", label: "Frescos" },
-    { file: "motifs/shima-shima/stripes.jpg",      label: "Stripes" },
-    { file: "motifs/shima-shima/blue.jpg",         label: "Blue" },
-    { file: "motifs/shima-shima/green.jpg",        label: "Green" },
-    { file: "motifs/shima-shima/bright-green.jpg", label: "Bright" },
-    { file: "motifs/shima-shima/columns.jpg",      label: "Columns" },
-    { file: "motifs/shima-shima/lanterns.jpg",     label: "Lanterns" },
-];
+const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "dogs", "berries", "roman", "egyptian", "frames"];
+// Allover patterns, grouped into packs (a pack selector like the motifs).
+// A tap does a one-tap full-colour tiled fill; square 512 tiles wrap 4×.
+const PATTERN_PACKS = {
+    enamel: { label: "Enamel", files: [
+        "patterns/enamel/blue-floral.jpg", "patterns/enamel/lotus.jpg", "patterns/enamel/petals.jpg",
+        "patterns/enamel/wildflowers.jpg", "patterns/enamel/abstract.jpg", "patterns/enamel/dark.jpg",
+    ] },
+    overlays: { label: "Overlays", files: [
+        "patterns/overlays/egyptian.png", "patterns/overlays/egyptian-frescos.png",
+    ] },
+    shima: { label: "Shima-shima", files: [
+        "patterns/shima-shima/stripes.jpg", "patterns/shima-shima/blue.jpg", "patterns/shima-shima/green.jpg",
+        "patterns/shima-shima/bright-green.jpg", "patterns/shima-shima/columns.jpg", "patterns/shima-shima/lanterns.jpg",
+    ] },
+};
+const PATTERN_PACK_IDS = ["enamel", "overlays", "shima"];
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
 
@@ -868,6 +865,7 @@ let motifMask = null;
 let motifImage = null;          // full-colour source (canvas) for the colour toggle
 let motifFullColor = false;     // place original colours vs a tinted silhouette
 let motifPack = "sumieAnimals"; // active motif pack (key into MOTIF_PACKS)
+let patternPack = "enamel";     // active pattern pack (key into PATTERN_PACKS)
 let motifStarter = null;        // which starter id is active (or null = upload)
 let motifSize = 0.42;           // 0..1 slider position → MOTIF_MIN/MAX_PX
 let motifPlacing = false;       // dragging to position a motif
@@ -999,7 +997,6 @@ function init() {
     document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
     document.getElementById("toolCarve")?.addEventListener("click", () => setDecoTool("carve"));
     document.getElementById("toolMotif")?.addEventListener("click", () => setDecoTool("motif"));
-    document.getElementById("toolGems")?.addEventListener("click", () => setDecoTool("gems"));
     document.getElementById("toolPattern")?.addEventListener("click", () => setDecoTool("pattern"));
     document.getElementById("decoUndo")?.addEventListener("click", undoDeco);
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
@@ -3526,7 +3523,7 @@ function setDecoTool(name) {
     [["toolBrush", "brush"], ["toolSplatter", "splatter"],
      ["toolStamp", "stamp"], ["toolOverlay", "overlay"],
      ["toolCarve", "carve"], ["toolMotif", "motif"],
-     ["toolGems", "gems"], ["toolPattern", "pattern"]].forEach(([id, t]) => {
+     ["toolPattern", "pattern"]].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
         const on = name === t;
@@ -3561,6 +3558,11 @@ function setMotifPack(id) {
     motifPack = id;
     updateDecoSub();
 }
+function setPatternPack(id) {
+    if (!PATTERN_PACKS[id]) return;
+    patternPack = id;
+    updateDecoSub();
+}
 
 // Build the contextual sub-palette: stamp shapes, or overlay patterns,
 // or nothing (brush/splatter).
@@ -3571,51 +3573,47 @@ function updateDecoSub() {
     // pack selector above the silhouette thumbnails. The Pattern tool shows
     // full-colour enamel tiles that fill the pot on tap.
     const isMotif = state.decoTool === "motif";
-    const isGems = state.decoTool === "gems";
     const isPattern = state.decoTool === "pattern";
-    const isPlacer = isMotif || isGems; // both drag-to-place with a size slider
     const sizesEl = document.getElementById("decoSizes");
-    if (sizesEl) sizesEl.style.display = (isPlacer || isPattern) ? "none" : "";
+    if (sizesEl) sizesEl.style.display = (isMotif || isPattern) ? "none" : "";
     const slider = document.getElementById("motifSize");
-    if (slider) slider.hidden = !isPlacer;
+    if (slider) slider.hidden = !isMotif;
+    // Both Motif and Pattern show a pack selector above their thumbnails.
     const packTabs = document.getElementById("motifPackTabs");
-    if (packTabs) packTabs.hidden = !isMotif;
-    // Full-colour toggle (motif only — gems are always full colour). In
-    // full colour the paint-colour row doesn't apply, so hide it; patterns
-    // and gems don't use it either.
+    if (packTabs) packTabs.hidden = !(isMotif || isPattern);
+    // Full-colour toggle (motif only). In full colour the paint-colour row
+    // doesn't apply, so hide it; patterns don't use it either.
     const colorToggle = document.getElementById("motifColorToggle");
     if (colorToggle) {
         colorToggle.hidden = !isMotif;
         colorToggle.classList.toggle("is-active", motifFullColor);
     }
     const decoColorsEl = document.getElementById("decoColors");
-    if (decoColorsEl) decoColorsEl.hidden = isPattern || isGems || (isMotif && motifFullColor);
-    if (isGems) {
-        sub.hidden = false;
-        sub.innerHTML = "";
-        GEMS.forEach((id) => {
-            const b = document.createElement("button");
-            b.type = "button";
-            b.className = "deco-sub-btn motif-thumb pattern-thumb"; // full-colour swatch look
-            b.style.backgroundImage = "url(" + motifSrc(id) + ")";
-            b.setAttribute("aria-label", motifLabel(id) + " gem");
-            b.classList.toggle("is-active", motifStarter === id);
-            b.addEventListener("click", () => loadStarterMotif(id));
-            sub.appendChild(b);
-        });
-        return;
-    }
+    if (decoColorsEl) decoColorsEl.hidden = isPattern || (isMotif && motifFullColor);
     if (isPattern) {
+        if (!PATTERN_PACKS[patternPack]) patternPack = PATTERN_PACK_IDS[0];
+        if (packTabs) {
+            packTabs.innerHTML = "";
+            PATTERN_PACK_IDS.forEach((pid) => {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "motif-pack-tab";
+                b.textContent = PATTERN_PACKS[pid].label;
+                b.classList.toggle("is-active", pid === patternPack);
+                b.addEventListener("click", () => setPatternPack(pid));
+                packTabs.appendChild(b);
+            });
+        }
         sub.hidden = false;
         sub.innerHTML = "";
-        PATTERN_SETS.forEach((p) => {
+        PATTERN_PACKS[patternPack].files.forEach((file) => {
             const b = document.createElement("button");
             b.type = "button";
             b.className = "deco-sub-btn motif-thumb pattern-thumb";
-            b.style.backgroundImage = "url(" + motifSrc(p.file) + ")";
-            b.setAttribute("aria-label", p.label + " pattern");
-            b.setAttribute("title", p.label);
-            b.addEventListener("click", () => applyPattern(p.file));
+            b.style.backgroundImage = "url(" + motifSrc(file) + ")";
+            b.setAttribute("aria-label", motifLabel(file) + " pattern");
+            b.setAttribute("title", motifLabel(file));
+            b.addEventListener("click", () => applyPattern(file));
             sub.appendChild(b);
         });
         return;
@@ -3813,7 +3811,7 @@ function tintedMotif(hex, sizePx) {
 function drawMotifOnDeco(ctx, u, v) {
     if (!motifMask) return;
     const sizePx = motifSizePx();
-    const fullColor = motifFullColor || state.decoTool === "gems"; // gems are always full colour
+    const fullColor = motifFullColor;
     let src, w, h;
     if (fullColor && motifImage) {
         src = motifImage;
@@ -4080,10 +4078,10 @@ function onPointerDown(ev) {
                 return;
             }
         }
-        // Motif / Gems: drag on the pot to place/position a picture (takes
+        // Motif tool: drag on the pot to place/position a picture (takes
         // priority over trim/paint). With none chosen yet, falls through to
         // a spin rather than painting.
-        if (state.decoTool === "motif" || state.decoTool === "gems") {
+        if (state.decoTool === "motif") {
             const uvm = pointerToUV(ev);
             if (motifMask && uvm && beginMotifPlace(uvm)) { ev.preventDefault(); return; }
             state.userRotating = true;

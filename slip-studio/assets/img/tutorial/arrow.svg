@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 24" width="48" height="24">
+  <!-- PLACEHOLDER direction arrow — points RIGHT at 0deg. The tutorial code
+       rotates/mirrors this one file for in/out, up/down, and drag-down, so a
+       single neutral right-pointing arrow is all you need (overwrite to
+       restyle). Contact/point is the RIGHT tip (~44,12). -->
+  <g stroke="#3a332c" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 12 H40"/>
+    <path d="M30 4 L42 12 L30 20"/>
+  </g>
+</svg>
