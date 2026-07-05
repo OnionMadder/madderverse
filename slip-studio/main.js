@@ -3827,8 +3827,11 @@ function onPointerDown(ev) {
         }
         // Glaze dipping takes priority when the dip tool is armed with a
         // colour: dragging on the pot sets the glaze line (uv.y = height),
-        // previewed live and committed on release.
-        if (state.dipMode && state.dipColor != null) {
+        // previewed live and committed on release. Only while the GLAZE tab
+        // is showing — otherwise a still-armed dip would hijack paint/motif
+        // drags in the Decorate tab and pile dark glaze onto the pot.
+        const glazeTabActive = !document.getElementById("panelGlaze")?.hidden;
+        if (glazeTabActive && state.dipMode && state.dipColor != null) {
             const uvd = pointerToUV(ev);
             if (uvd) {
                 dipping = true;
