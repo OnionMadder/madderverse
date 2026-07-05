@@ -39,7 +39,7 @@ const CAM_TARGET  = new THREE.Vector3(0, 0.66, 0);
 // Pulled-back framing for the assembled set view (lid on pot).
 const CAM_ASSEMBLED_BASE   = new THREE.Vector3(0, 1.85, 5.6);
 const CAM_ASSEMBLED_TARGET = new THREE.Vector3(0, 1.35, 0);
-const ZOOM_MIN    = 1, ZOOM_MAX = 3.2;
+const ZOOM_MIN    = 0.6, ZOOM_MAX = 3.2; // <1 dollies the camera OUT (see the whole pot + handles)
 const ROTATE_SENS = 0.009;    // radians of pot spin per px of drag
 
 // --- Pot surface resolution + bounds ----------------------------
@@ -4348,6 +4348,8 @@ function captureThumb(size = 320) {
 function captureAssemblyThumb(size = 360) {
     if (!state.assemblyShown) return null;
     tickMaterial(10);
+    tickPartnerMaterial(10); // snap the LID to its fired look too (else it
+    updateDipRemap();        // captures mid-tween with the wrong colour)
     const cam = state.camera;
     const prevAspect = cam.aspect;
     const prevPos = cam.position.clone();
@@ -4396,6 +4398,7 @@ function captureAssemblyThumb(size = 360) {
 function captureScenePot(size) {
     size = size || 1024;
     tickMaterial(10); // snap the glaze to its fired look
+    if (state.assemblyShown) { tickPartnerMaterial(10); updateDipRemap(); } // …and the lid
     const cam = state.camera;
     const prevAspect = cam.aspect;
     const prevPos = cam.position.clone();
