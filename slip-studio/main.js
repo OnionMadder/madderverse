@@ -326,8 +326,7 @@ const MOTIF_PACKS = {
     ] },
     sumiePlants: { label: "Sumi-e Plants", ids: [
         "japan-vegetables/eggplant.png", "japan-vegetables/cucumber.png", "japan-vegetables/mushrooms.png",
-        "japan-vegetables/pears.png", "japan-vegetables/bulbs.png", "japan-vegetables/firethorn.png",
-        "japan-vegetables/bread.png",
+        "japan-vegetables/bulbs.png", "japan-vegetables/firethorn.png", "japan-vegetables/bread.png",
     ] },
 };
 const MOTIF_PACK_IDS = ["basics", "aegean", "sumieAnimals", "sumiePlants"];
