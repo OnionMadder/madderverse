@@ -1,3 +1,22 @@
+// Dev build marker — bump this every test build so the phone shows which
+// build it's actually running (helps catch stale-cache installs). Injected
+// into a tiny corner tag in init(). REMOVE before the production release.
+const BUILD_TAG = 'BUILD I';
+
+// Diagnostic overlay: yellow circles on each cookie hitbox + a magenta
+// pointer crosshair (both drawn on the blade canvas) + a live geometry
+// readout. Reveals any canvas↔DOM or pointer↔stage coordinate mismatch on
+// the real device. REMOVE (set false) before release.
+const DEBUG = false;
+
+// Respect the OS "reduce motion" setting — we thin out particle bursts and skip
+// screen shake for motion-sensitive players (CSS handles the rest via a
+// prefers-reduced-motion media query). Read live so it tracks a settings change.
+function reduceMotion() {
+    try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch (_) { return false; }
+}
+
 // ── Sprite-sheet data (precise coords from JSON, used by applySprite) ──
 const SHEETS = {
     before: { url: 'assets/img/cookies-before.png', w: 4325, h: 2434 },
@@ -90,22 +109,36 @@ const WALK_CYCLE = ['frame-one','frame-two','frame-three','frame-five','frame-si
 //
 // CLASSIC is the original arcade curve. COZY is for the youngest players
 // (4–5): slower cookies, a much gentler ramp, fewer veggies, and NO score
-// penalty for a stray veggie tap (a wrong tap still breaks the streak, but
-// never drives the score down — nothing to cry about).
+// penalty for a stray veggie tap. ZEN is a calm, no-fail mode: no bombs, no
+// Frenzy storms, a constant slow pace, and dropping a cookie costs nothing
+// (missBreaksStreak false) — just relaxed slicing.
+//
+// Behaviour flags (all modes set them): missBreaksStreak — does letting a
+// cookie fall break the streak; allowFrenzy — can frenzy cookies spawn.
 const MODES = {
     classic: {
         streakSpeedBase: 1.04, streakSpeedCap: 50,
         spawnStart: 800,  spawnEnd: 250,
         baseSpeedStart: 1.0,  baseSpeedEnd: 1.5,
         spawnJitter: 0.25, difficultyExp: 1.6,
-        veggieRatio: 0.18, vegPenalty: 20,
+        veggieRatio: 0.12, vegPenalty: 20,
+        missBreaksStreak: true, allowFrenzy: true,
     },
     cozy: {
         streakSpeedBase: 1.02, streakSpeedCap: 30,
         spawnStart: 1000, spawnEnd: 500,
         baseSpeedStart: 0.85, baseSpeedEnd: 1.05,
         spawnJitter: 0.25, difficultyExp: 2.2,
-        veggieRatio: 0.10, vegPenalty: 0,
+        veggieRatio: 0.06, vegPenalty: 0,
+        missBreaksStreak: true, allowFrenzy: true,
+    },
+    zen: {
+        streakSpeedBase: 1.0, streakSpeedCap: 0,   // no streak speedup — steady calm pace
+        spawnStart: 1100, spawnEnd: 800,
+        baseSpeedStart: 0.8, baseSpeedEnd: 0.9,
+        spawnJitter: 0.25, difficultyExp: 2.5,
+        veggieRatio: 0, vegPenalty: 0,             // no bombs
+        missBreaksStreak: false, allowFrenzy: false,
     },
 };
 
@@ -272,11 +305,13 @@ function renderMenuBest() {
 // Which preset the START button will launch. Persists so a parent can set
 // Cozy once for a young child and it stays put across sessions.
 const MODE_KEY = 'cookie-cache-mode';
+const VALID_MODES = ['cozy', 'classic', 'zen'];
+const MODE_LABELS = { cozy: 'COZY', classic: 'CLASSIC', zen: 'ZEN' };
 
 function loadMode() {
     try {
         const m = localStorage.getItem(MODE_KEY);
-        return (m === 'cozy' || m === 'classic') ? m : 'classic';
+        return VALID_MODES.includes(m) ? m : 'classic';
     } catch (_) { return 'classic'; }
 }
 
@@ -285,7 +320,7 @@ function saveMode(m) {
 }
 
 function setMode(m) {
-    state.mode = (m === 'cozy') ? 'cozy' : 'classic';
+    state.mode = VALID_MODES.includes(m) ? m : 'classic';
     saveMode(state.mode);
     renderModeToggle();
 }
@@ -406,6 +441,27 @@ function stopLevelMusic() {
         SFX_LEVEL_MUSIC.pause();
         SFX_LEVEL_MUSIC.currentTime = 0;
     } catch (_) {}
+}
+
+// Ramp the level music down over `ms` then stop it — a soft landing for the
+// round-end transition instead of a hard cut. Volume is restored afterwards so
+// the next round starts at full.
+function fadeOutLevelMusic(ms) {
+    if (!SFX_LEVEL_MUSIC || SFX_LEVEL_MUSIC.paused) { stopLevelMusic(); return; }
+    const startVol = SFX_LEVEL_MUSIC.volume;
+    const steps = 14;
+    let i = 0;
+    const step = () => {
+        i++;
+        try { SFX_LEVEL_MUSIC.volume = Math.max(0, startVol * (1 - i / steps)); } catch (_) {}
+        if (i >= steps) {
+            stopLevelMusic();
+            try { SFX_LEVEL_MUSIC.volume = audio.levelMusicVol; } catch (_) {}
+        } else {
+            setTimeout(step, ms / steps);
+        }
+    };
+    setTimeout(step, ms / steps);
 }
 
 // Synthesized "streak break" — quick descending sawtooth, ~300ms.
@@ -539,6 +595,8 @@ function abortRound() {
     state.rafId = null;
     state.cookies.forEach(c => c.el && c.el.remove());
     state.cookies = [];
+    clearBlade();
+    endFrenzy();
     stopStartSfx();
     stopLevelMusic();
     stopGlitches();
@@ -578,9 +636,14 @@ function setEaterFrame(el, frameName) {
 }
 
 function measureStage() {
-    const r = els.stage.getBoundingClientRect();
-    state.stageW = r.width;
-    state.stageH = r.height;
+    // clientWidth/Height = untransformed layout box (see resizeBlade). Cookies
+    // are placed and hit-tested in this same layout space, and real play only
+    // happens after the fade-in settles to scale(1), so pointer coordinates
+    // (from getBoundingClientRect) line up with it.
+    state.stageW = els.stage.clientWidth;
+    state.stageH = els.stage.clientHeight;
+    resizeBlade();
+    if (DEBUG) dbgUpdate();
 }
 
 // ── Hacker-terminal background layers ─────────────────────────────
@@ -606,11 +669,22 @@ function initCodeRain() {
         col.textContent = block + block;
         col.style.left = ((i + 0.5) / N * 100) + '%';
         const dur = rand(6, 16);
+        col.dataset.baseDur = dur;              // remembered so Frenzy can speed it up
         col.style.animationDuration = dur + 's';
         col.style.animationDelay    = (-rand(0, dur)) + 's';
         layer.appendChild(col);
     }
     els.stage.appendChild(layer);
+}
+
+// Scale every code-rain column's fall speed (mult < 1 = faster). Used to make
+// the background race during a Frenzy and settle back after.
+function setCodeRainSpeed(mult) {
+    if (!els.stage) return;
+    els.stage.querySelectorAll('.code-rain-col').forEach(col => {
+        const base = parseFloat(col.dataset.baseDur) || 10;
+        col.style.animationDuration = (base * mult) + 's';
+    });
 }
 
 function spawnGlitchBar() {
@@ -637,55 +711,77 @@ function stopGlitches() {
     state.glitchTimer = 0;
 }
 
-function spawnCookie() {
-    const W = state.stageW;
-    const H = state.stageH;
-    if (W < 50 || H < 50) return;
+// ── Toss tuning ───────────────────────────────────────────────────
+// peakY is measured from the TOP, so HIGH (smaller fraction) = a taller arc.
+// Cookies peak somewhere between these; raise LAUNCH_PEAK_LOW toward 0 for
+// consistently higher tosses. WAVE_CHANCE is the odds a spawn tick launches
+// a 2–3 cookie fan instead of a single cookie.
+const LAUNCH_PEAK_HIGH = 0.16;
+const LAUNCH_PEAK_LOW  = 0.46;
+const WAVE_CHANCE      = 0.28;
 
-    const fromLeft = Math.random() < 0.5;
-    const isVeggie = Math.random() < TUNE.veggieRatio;
-    // Element aspect tracks sheet-cell aspect: cookies are 4:3, veggies
-    // are 1:1. This is what kills the "neighbour cookie chunks" bleed —
-    // when the element matches the cell exactly, the scaled sheet image
-    // has no empty space inside the element to leak adjacent cells.
-    //
-    // Rounded to integers + applied via inline style below so the element
-    // box exactly matches the size we pass to applySprite. The CSS class
-    // sets a 18vw default, but that uses *viewport* width while we use
-    // *stage* width (smaller after the new frame padding) — and the CSS
-    // height uses an independent 13.5vw clamp that can drift off 4:3 at
-    // some viewports. Both mismatches were showing up as mobile bleed.
-    const cookieW = Math.round(Math.min(Math.max(W * 0.18, 72), 120));
+// ── Specials ──────────────────────────────────────────────────────
+// Only plain cookies can roll a special, and never while a Frenzy is already
+// running. GOLDEN = a rare high-value cookie. FRENZY = slicing it kicks off a
+// short cookie storm: rapid spawns, no bombs, double points.
+const GOLDEN_CHANCE   = 0.05;  // odds a plain cookie is golden
+const FRENZY_CHANCE   = 0.03;  // odds a plain cookie is a frenzy trigger
+const GOLDEN_MULT     = 5;     // golden cookie scores this × a normal catch
+const FRENZY_MULT     = 2;     // every catch scores ×this while Frenzy is on
+const FRENZY_MS       = 5000;  // how long a Frenzy lasts
+const FRENZY_SPAWN_MS = 200;   // spawn interval during a Frenzy (fast!)
+
+// Launch one cookie (or veggie) UP from just below the bottom edge, tossed
+// like a Fruit-Ninja fruit: a strong upward velocity + gentle horizontal
+// drift biased toward the centre; gravity arcs it back down. startXFrac is
+// 0..1 across the stage width.
+function launchCookie(startXFrac) {
+    const W = state.stageW, H = state.stageH;
+    // No bombs during a Frenzy — it's a pure reward window. Only plain cookies
+    // can roll a special, and not while a Frenzy is already running.
+    const isVeggie = !state.frenzy && Math.random() < TUNE.veggieRatio;
+    let special = null;
+    if (!isVeggie && !state.frenzy) {
+        const r = Math.random();
+        if (TUNE.allowFrenzy && r < FRENZY_CHANCE)   special = 'frenzy';
+        else if (r < FRENZY_CHANCE + GOLDEN_CHANCE)  special = 'golden';
+    }
+    // Element aspect tracks the sheet cell (cookies 4:3, veggies 1:1) so the
+    // scaled sprite fills the box with no neighbour-cell bleed.
+    const cookieW = Math.round(Math.min(Math.max(W * 0.16, 66), 108));
     const cookieH = isVeggie ? cookieW : Math.round(cookieW * 0.75);
 
-    const startX = fromLeft ? -cookieW : W + cookieW;
-    const startY = rand(H * 0.55, H * 0.85);
-    const flightTime = rand(1.6, 2.4);
-    const targetX    = fromLeft ? W + cookieW : -cookieW;
-    const vx = (targetX - startX) / flightTime;
-    const peakY = rand(H * CFG.minPeakRatio, H * CFG.maxPeakRatio);
-    const dy = Math.max(20, startY - peakY);
-    const vy = -Math.sqrt(2 * CFG.gravity * dy);
+    const startX = startXFrac * W;
+    const startY = H + cookieH;                       // just below the bottom edge
+    // Peak in the upper part of the stage so the cookie is catchable near the
+    // top of its arc. (Tune LAUNCH_PEAK_* to change how high tosses go.)
+    const peakY  = rand(H * LAUNCH_PEAK_HIGH, H * LAUNCH_PEAK_LOW);
+    const rise   = Math.max(40, startY - peakY);
+    const vy = -Math.sqrt(2 * CFG.gravity * rise);    // upward launch speed
+    // Horizontal drift: gentler than the launch, biased toward centre so
+    // cookies hang over the stage instead of sailing off the sides.
+    const toCentre = startX < W / 2 ? 1 : -1;
+    const vx = toCentre * rand(30, 150);
 
     const entry  = choice(isVeggie ? VEGGIES : COOKIES);
-    // Veggies are a single sprite; cookies use their whole-cookie sprite and
-    // get a CSS bite (applyBite) on catch instead of a separate eaten image.
     const sprite = isVeggie ? entry : entry.before;
 
     const el = document.createElement('div');
     el.className = isVeggie ? 'flying-veggie' : 'flying-cookie';
+    if (special === 'golden')      el.classList.add('golden');
+    else if (special === 'frenzy') el.classList.add('frenzy-cookie');
     el.style.left = '0px';
     el.style.top  = '0px';
     el.style.width  = cookieW + 'px';
     el.style.height = cookieH + 'px';
     applySprite(el, sprite.sheet, sprite.frame, cookieW, cookieH);
 
-    // Lock in the speed multiplier at spawn time. Streak speedup AND the
-    // round's base-speed curve both multiply in — so cookies already in
-    // flight keep their pace even as the streak or round progress changes.
-    const progress    = 1 - (state.timeLeftMs / (CFG.duration * 1000));
-    const baseSpeed   = lerp(TUNE.baseSpeedStart, TUNE.baseSpeedEnd, roundEase(progress));
-    const timeMult    = streakSpeedMult(state.streakHits) * baseSpeed;
+    // Lock in the speed multiplier at spawn: streak speedup × the round's
+    // base-speed ramp. Time-scaling the arc keeps the same height but makes
+    // later/high-streak tosses rise and fall faster.
+    const progress  = 1 - (state.timeLeftMs / (CFG.duration * 1000));
+    const baseSpeed = lerp(TUNE.baseSpeedStart, TUNE.baseSpeedEnd, roundEase(progress));
+    const timeMult  = streakSpeedMult(state.streakHits) * baseSpeed;
 
     const cookie = {
         el,
@@ -697,30 +793,408 @@ function spawnCookie() {
         vrot:  rand(-220, 220),
         w:     cookieW,
         h:     cookieH,
-        alive: true,
-        popped: false,
+        alive:   true,
+        popped:  false,
+        entered: false,   // becomes true once it rises into view; gates the miss check
         isVeggie,
+        special,          // null | 'golden' | 'frenzy'
         sprite,
         timeMult,
     };
 
-    const onTap = (e) => {
-        e.preventDefault();
-        if (!cookie.alive || cookie.popped) return;
-        if (cookie.isVeggie) hitVeggie(cookie);
-        else                 catchCookie(cookie);
-    };
-    el.addEventListener('pointerdown', onTap, { passive: false });
-
+    // No per-cookie tap listener — the stage-level pointer tracker (see the
+    // "Blade / swipe-slice" section) hit-tests every cookie geometrically.
     els.stage.appendChild(el);
     state.cookies.push(cookie);
     placeCookieEl(cookie);
+}
+
+// Loop spawn tick: usually one toss, sometimes a small fanned wave so the
+// player can slice several cookies in a single swipe (where combos come from).
+function spawnCookie() {
+    const W = state.stageW, H = state.stageH;
+    if (W < 50 || H < 50) return;
+    const waveN = Math.random() < WAVE_CHANCE ? randI(2, 3) : 1;
+    if (waveN === 1) {
+        launchCookie(rand(0.12, 0.88));
+        return;
+    }
+    // Fan the wave across a band so the arcs spread out instead of stacking.
+    const bandLeft = rand(0.12, 0.9 - 0.15 * (waveN - 1));
+    for (let i = 0; i < waveN; i++) {
+        const frac = bandLeft + i * 0.15 + rand(-0.03, 0.03);
+        launchCookie(Math.max(0.08, Math.min(0.92, frac)));
+    }
 }
 
 function placeCookieEl(c) {
     c.el.style.left = (c.x - c.w / 2) + 'px';
     c.el.style.top  = (c.y - c.h / 2) + 'px';
     c.el.style.transform = `rotate(${c.rot}deg)`;
+}
+
+// ── Blade / swipe-slice ────────────────────────────────────────────
+// One pointer tracker on the stage drives BOTH gestures: a tap slices the
+// cookie under the finger; a drag carves a glowing blade trail that slices
+// every cookie it crosses, and 2+ in a single stroke pays a combo bonus.
+// A tap is just a zero-length swipe, so the two share all this code.
+const COMBO_BONUS_PER = 5;   // extra points per cookie in a 2+ swipe
+const BLADE_LIFE_MS   = 140; // how long a trail point lingers before fading
+const BLADE_MAX_PTS   = 24;
+
+state.blade = { active: false, pointerId: null, pts: [], sliced: 0, lastX: null, lastY: null };
+
+// ── Frenzy ─────────────────────────────────────────────────────────
+// A short cookie-storm reward, started by slicing a frenzy cookie: rapid
+// spawns, no bombs, double points, a warm screen glow. Auto-ends after
+// FRENZY_MS (checked in the loop).
+state.frenzy = false;
+state.frenzyUntil = 0;
+
+function startFrenzy() {
+    const now = performance.now();
+    const wasOn = state.frenzy;
+    state.frenzy = true;
+    state.frenzyUntil = now + FRENZY_MS;          // slicing another extends it
+    if (!wasOn) {
+        els.stage.classList.add('frenzy-active');
+        flashMilestoneBanner('FRENZY!');
+        playComboSfx(6);
+        shakeStage(true);
+        setCodeRainSpeed(0.35);   // cache "overload" — rain races
+    }
+}
+
+// natural=true when the Frenzy timer ran out mid-play (show a wind-down
+// flash); false/omitted when it's just teardown on reset/end/abort.
+function endFrenzy(natural) {
+    const wasOn = state.frenzy;
+    state.frenzy = false;
+    state.frenzyUntil = 0;
+    els.stage.classList.remove('frenzy-active');
+    setCodeRainSpeed(1);   // back to the calm background drift
+    if (wasOn && natural && state.running) {
+        spawnStageFlash(state.stageW / 2, state.stageH / 2, 'rgba(255,170,0,0.4)');
+        flashMilestoneBanner('PHEW!');
+    }
+}
+
+let bladeCanvas = null, bladeCtx = null;
+
+function initBlade() {
+    if (!els.stage || bladeCanvas) return;
+    bladeCanvas = document.createElement('canvas');
+    bladeCanvas.className = 'blade-layer';
+    els.stage.appendChild(bladeCanvas);
+    bladeCtx = bladeCanvas.getContext('2d');
+    resizeBlade();
+
+    els.stage.addEventListener('pointerdown',  onBladeDown);
+    els.stage.addEventListener('pointermove',  onBladeMove);
+    els.stage.addEventListener('pointerup',    onBladeUp);
+    els.stage.addEventListener('pointercancel',onBladeUp);
+}
+
+function resizeBlade() {
+    if (!bladeCanvas || !bladeCtx || !els.stage) return;
+    // Size the backing store from clientWidth/Height — the untransformed
+    // LAYOUT box. getBoundingClientRect would fold in the .screen fade-in
+    // scale(1.03), sizing the canvas 3% off (and a transform doesn't fire
+    // ResizeObserver, so it'd never self-correct) — that mis-scale is what
+    // made the blade trail drift off the finger, worst near the edges.
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    bladeCanvas.width  = Math.max(1, Math.round(els.stage.clientWidth  * dpr));
+    bladeCanvas.height = Math.max(1, Math.round(els.stage.clientHeight * dpr));
+    bladeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// Wipe the whole backing store regardless of the current transform / any
+// stale logical size, so no old trail pixels linger.
+function clearBladeCanvas() {
+    if (!bladeCtx || !bladeCanvas) return;
+    bladeCtx.save();
+    bladeCtx.setTransform(1, 0, 0, 1, 0, 0);
+    bladeCtx.clearRect(0, 0, bladeCanvas.width, bladeCanvas.height);
+    bladeCtx.restore();
+}
+
+function clearBlade() {
+    state.blade.active = false;
+    state.blade.pointerId = null;
+    state.blade.pts = [];
+    state.blade.sliced = 0;
+    clearBladeCanvas();
+}
+
+function stageLocalPoint(e) {
+    const r = els.stage.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+// Distance from a cookie centre to the swept segment p0→p1.
+function distToSegment(px, py, ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+function sliceHit(c) {
+    if (!c.alive || c.popped) return;
+    if (c.isVeggie) {
+        hitVeggie(c);           // bomb — penalty + streak break, no combo credit
+    } else {
+        catchCookie(c);
+        state.blade.sliced += 1;
+    }
+}
+
+// Slice any cookie whose hitbox the segment p0→p1 crosses (p0===p1 for a tap).
+function sliceSegment(ax, ay, bx, by) {
+    for (const c of state.cookies) {
+        if (!c.alive || c.popped) continue;
+        const r = Math.max(c.w, c.h) * 0.55;   // generous so fast cookies still catch
+        if (distToSegment(c.x, c.y, ax, ay, bx, by) <= r) sliceHit(c);
+    }
+}
+
+function onBladeDown(e) {
+    if (!state.running) return;
+    const p = stageLocalPoint(e);
+    state.blade.active = true;
+    state.blade.pointerId = e.pointerId;
+    state.blade.sliced = 0;
+    state.blade.pts = [{ x: p.x, y: p.y, t: performance.now() }];
+    state.blade.lastX = p.x; state.blade.lastY = p.y;
+    try { els.stage.setPointerCapture(e.pointerId); } catch (_) {}
+    if (DEBUG) dbgUpdate('ptr client ' + Math.round(e.clientX) + ',' + Math.round(e.clientY) +
+                         ' -> local ' + Math.round(p.x) + ',' + Math.round(p.y));
+    sliceSegment(p.x, p.y, p.x, p.y);   // tap: slice under the finger
+}
+
+function onBladeMove(e) {
+    if (!state.blade.active || e.pointerId !== state.blade.pointerId) return;
+    const p = stageLocalPoint(e);
+    state.blade.lastX = p.x; state.blade.lastY = p.y;
+    const pts = state.blade.pts;
+    const prev = pts[pts.length - 1];
+    const tnow = performance.now();
+    pts.push({ x: p.x, y: p.y, t: tnow });
+    if (pts.length > BLADE_MAX_PTS) pts.shift();
+    if (DEBUG) dbgUpdate('ptr client ' + Math.round(e.clientX) + ',' + Math.round(e.clientY) +
+                         ' -> local ' + Math.round(p.x) + ',' + Math.round(p.y));
+    if (prev) {
+        // Blade "whoosh": throttled, scaled to swipe speed (px/ms).
+        const dtm = tnow - prev.t;
+        const speed = dtm > 0 ? Math.hypot(p.x - prev.x, p.y - prev.y) / dtm : 0;
+        if (speed > 0.35 && tnow - _lastWhooshAt > 105) {
+            _lastWhooshAt = tnow;
+            playWhoosh(Math.min(1, speed / 2.2));
+        }
+        sliceSegment(prev.x, prev.y, p.x, p.y);
+    }
+}
+
+// Blade "whoosh" — a short band-passed noise burst that sweeps down, its pitch
+// and volume scaled to how fast you swiped. Cached noise buffer; reuses the
+// shared tone AudioContext.
+let _whooshBuf = null, _lastWhooshAt = 0;
+function playWhoosh(intensity) {
+    if (audio.muted) return;
+    try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!_streakBreakCtx) _streakBreakCtx = new Ctor();
+        const ctx = _streakBreakCtx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        if (!_whooshBuf) {
+            const len = Math.floor(ctx.sampleRate * 0.25);
+            _whooshBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+            const d = _whooshBuf.getChannelData(0);
+            for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        }
+        const now = ctx.currentTime;
+        const src = ctx.createBufferSource();
+        src.buffer = _whooshBuf;
+        const bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.Q.value = 0.9;
+        const f0 = 650 + intensity * 950;
+        bp.frequency.setValueAtTime(f0, now);
+        bp.frequency.exponentialRampToValueAtTime(Math.max(180, f0 * 0.4), now + 0.14);
+        const g = ctx.createGain();
+        const vol = Math.min(0.24, 0.05 + intensity * 0.22);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(vol, now + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+        src.connect(bp); bp.connect(g); g.connect(ctx.destination);
+        src.start(now);
+        src.stop(now + 0.2);
+    } catch (_) {}
+}
+
+function onBladeUp(e) {
+    if (!state.blade.active || e.pointerId !== state.blade.pointerId) return;
+    const n = state.blade.sliced;
+    if (n >= 2) {
+        const pts = state.blade.pts;
+        const mid = pts.length ? pts[Math.floor(pts.length / 2)]
+                               : { x: state.stageW / 2, y: state.stageH / 2 };
+        awardCombo(n, mid.x, mid.y);
+    }
+    state.blade.active = false;
+    state.blade.pointerId = null;
+    state.blade.sliced = 0;
+    // pts are kept so the trail fades out over BLADE_LIFE_MS in drawBlade().
+}
+
+// Combo payoff, escalating with how many cookies fell to one swipe:
+//   ×2      quiet — bonus + a small banner + a short rising chime
+//   ×3–4    a cyan screen flash, confetti, a longer chime, a light buzz
+//   ×5+     "SLICE FRENZY!", a magenta flash, a jackpot bonus, big buzz
+// Bonus is on TOP of the per-cookie score each slice already banked.
+function awardCombo(n, x, y) {
+    let bonus = COMBO_BONUS_PER * n;
+    if (n >= 5) bonus += 50;                 // slice-frenzy jackpot
+    state.score += bonus;
+    els.hudScore.textContent = state.score;
+    bumpHud(els.hudScore);
+
+    let label;
+    if (n >= 5) {
+        label = 'SLICE FRENZY! ×' + n + '  +' + bonus;
+        spawnStageFlash(x, y, 'rgba(255,0,255,0.55)');
+        spawnConfetti(x, y, 24);
+        comboBuzz([20, 30, 25]);
+        shakeStage(true);
+    } else if (n >= 3) {
+        label = 'COMBO ×' + n + '!  +' + bonus;
+        spawnStageFlash(x, y, 'rgba(0,255,204,0.5)');
+        spawnConfetti(x, y, 14);
+        comboBuzz(25);
+    } else {
+        label = 'COMBO ×' + n + '  +' + bonus;
+    }
+    playComboSfx(n);
+    flashMilestoneBanner(label);
+}
+
+function comboBuzz(pattern) {
+    if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (_) {} }
+}
+
+// Rising arpeggio of n notes — the "combo!" flourish. It literally gets
+// longer and higher for bigger combos. Reuses the shared tone AudioContext.
+function playComboSfx(n) {
+    if (audio.muted) return;
+    try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!_streakBreakCtx) _streakBreakCtx = new Ctor();
+        const ctx = _streakBreakCtx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const now = ctx.currentTime;
+        const steps = Math.min(n, 7);
+        for (let i = 0; i < steps; i++) {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'triangle';
+            const t = now + i * 0.05;
+            o.frequency.setValueAtTime(440 * Math.pow(2, i / 6), t);   // ascending
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.17, t + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+            o.connect(g);
+            g.connect(ctx.destination);
+            o.start(t);
+            o.stop(t + 0.14);
+        }
+    } catch (_) {}
+}
+
+// Draw the glowing blade trail: a soft outer glow pass under a bright core,
+// with stale points pruned so the tail fades once the finger stops.
+function drawBlade() {
+    if (!bladeCtx) return;
+    clearBladeCanvas();
+    if (DEBUG) drawDebugOverlay();
+    const now = performance.now();
+    const pts = state.blade.pts;
+    while (pts.length && now - pts[0].t > BLADE_LIFE_MS) pts.shift();
+    if (pts.length < 2) return;
+    bladeCtx.lineCap = 'round';
+    bladeCtx.lineJoin = 'round';
+    // Trail reacts to game state: rainbow during a Frenzy, gold on a hot
+    // streak, cyan otherwise.
+    let glow, core;
+    if (state.frenzy) {
+        const h = (now / 6) % 360;                       // cycling hue
+        glow = `hsla(${h}, 100%, 60%, 0.28)`;
+        core = `hsla(${h}, 100%, 85%, 0.95)`;
+    } else if (state.streakHits >= 15) {
+        glow = 'rgba(255,190,40,0.28)';
+        core = 'rgba(255,240,180,0.95)';
+    } else {
+        glow = 'rgba(0,255,204,0.22)';
+        core = 'rgba(190,255,244,0.9)';
+    }
+    for (const pass of [{ w: 16, c: glow }, { w: 6, c: core }]) {
+        bladeCtx.beginPath();
+        bladeCtx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 1; i < pts.length; i++) bladeCtx.lineTo(pts[i].x, pts[i].y);
+        bladeCtx.strokeStyle = pass.c;
+        bladeCtx.lineWidth = pass.w;
+        bladeCtx.stroke();
+    }
+}
+
+// ── Diagnostic overlay (DEBUG) ─────────────────────────────────────
+// Drawn on the blade canvas: a yellow circle at each cookie's hitbox and a
+// magenta crosshair at the last pointer position. If the yellow circles do
+// NOT sit on the cookie sprites, the canvas coordinate space is offset from
+// the DOM (that's the blade misalignment). If the crosshair isn't under the
+// finger, pointer→stage conversion is wrong. The #dbg text box prints the
+// live geometry. All gated on DEBUG; remove for release.
+function drawDebugOverlay() {
+    if (!bladeCtx) return;
+    bladeCtx.lineWidth = 2;
+    bladeCtx.strokeStyle = 'rgba(255,240,0,0.9)';
+    for (const c of state.cookies) {
+        if (!c.alive || c.popped) continue;
+        bladeCtx.beginPath();
+        bladeCtx.arc(c.x, c.y, Math.max(c.w, c.h) * 0.55, 0, Math.PI * 2);
+        bladeCtx.stroke();
+    }
+    const b = state.blade;
+    if (b.lastX != null) {
+        bladeCtx.strokeStyle = 'rgba(255,0,255,0.95)';
+        bladeCtx.lineWidth = 2;
+        bladeCtx.beginPath();
+        bladeCtx.arc(b.lastX, b.lastY, 16, 0, Math.PI * 2);
+        bladeCtx.moveTo(b.lastX - 26, b.lastY); bladeCtx.lineTo(b.lastX + 26, b.lastY);
+        bladeCtx.moveTo(b.lastX, b.lastY - 26); bladeCtx.lineTo(b.lastX, b.lastY + 26);
+        bladeCtx.stroke();
+    }
+}
+
+function dbgUpdate(extra) {
+    if (!DEBUG) return;
+    const d = document.getElementById('dbg');
+    if (!d || !els.stage) return;
+    const r = els.stage.getBoundingClientRect();
+    const vv = window.visualViewport;
+    d.textContent =
+        'inner ' + window.innerWidth + 'x' + window.innerHeight + '\n' +
+        (vv ? 'vv ' + Math.round(vv.width) + 'x' + Math.round(vv.height) +
+              ' s' + vv.scale.toFixed(2) + ' off ' + Math.round(vv.offsetLeft) + ',' + Math.round(vv.offsetTop) + '\n'
+            : 'vv n/a\n') +
+        'rect ' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' +
+                  Math.round(r.width) + 'x' + Math.round(r.height) + '\n' +
+        'client ' + els.stage.clientWidth + 'x' + els.stage.clientHeight + '\n' +
+        'dpr ' + (window.devicePixelRatio || 1) +
+        ' canvas ' + (bladeCanvas ? bladeCanvas.width : 0) + 'x' + (bladeCanvas ? bladeCanvas.height : 0) + '\n' +
+        (extra || '');
 }
 
 // ── Catch ──────────────────────────────────────────────────────────
@@ -780,21 +1254,19 @@ function breakStreak() {
 
 function catchCookie(c) {
     c.popped = true;
-    c.alive  = false; // freeze in place — punch then fly-to-tub takes over
+    c.alive  = false; // freeze in place — the slice-split takes over
     c.el.classList.add('popped');
-
-    // "Eaten" look: punch a CSS bite out of the whole-cookie sprite the
-    // moment the player taps. No sprite swap, no reshape — the element keeps
-    // its 4:3 cookie box, so nothing jumps.
-    applyBite(c.el);
 
     // Streak persists across spawns — only misses or veggies break it. Empty
     // screens between cookies do NOT reset.
     const prevStreak = state.streakHits;
     state.streakHits += 1;
     state.lastHitAt   = performance.now();
-    const tier   = comboTier(state.streakHits);
-    const earned = CFG.points * tier.mult;
+    const tier       = comboTier(state.streakHits);
+    const isGolden   = c.special === 'golden';
+    const frenzyMult = state.frenzy ? FRENZY_MULT : 1;
+    const goldMult   = isGolden ? GOLDEN_MULT : 1;
+    const earned     = CFG.points * tier.mult * frenzyMult * goldMult;
     updateStreakHud();
 
     // Crossing a tier threshold (10, 25, 50) triggers a centered banner.
@@ -812,12 +1284,13 @@ function catchCookie(c) {
     bumpHud(els.hudScore);
     bumpHud(els.hudPile);
 
-    // Combo tiers always pop big with the tier label; outside of combo,
-    // ~18% of catches still get a fun random label for flavor.
+    // Golden always pops big + gold; combo tiers pop big with the tier label;
+    // otherwise ~18% of catches get a fun random label for flavor.
     const flavorBig = Math.random() < 0.18;
-    const big = tier.mult > 1 || flavorBig;
+    const big = isGolden || tier.mult > 1 || flavorBig;
     let popText;
-    if (tier.mult > 1)      popText = `${tier.label} +${earned}`;
+    if (isGolden)           popText = `GOLDEN! +${earned}`;
+    else if (tier.mult > 1) popText = `${tier.label} +${earned}`;
     else if (flavorBig)     popText = `${choice(SCORE_LABELS)} +${earned}`;
     else                    popText = `+${earned}`;
 
@@ -826,6 +1299,10 @@ function catchCookie(c) {
     pop.textContent = popText;
     pop.style.left  = c.x + 'px';
     pop.style.top   = c.y + 'px';
+    if (isGolden) {
+        pop.style.color = '#ffd54a';
+        pop.style.textShadow = '0 0 18px rgba(255,213,74,0.9), 0 3px 8px rgba(0,0,0,0.9)';
+    }
     els.stage.appendChild(pop);
     pop.addEventListener('animationend', () => pop.remove(), { once: true });
 
@@ -836,16 +1313,51 @@ function catchCookie(c) {
     spawnSparks(c.x, c.y);
     spawnChunks(c.x, c.y);
     spawnConfetti(c.x, c.y, big ? 18 : 10);
-    cookiePunch(c);
-
-    addPileThumb(c.sprite);
-    flashTubChomp();
     playSfx('catch');
 
-    const targetX = (els.tub.offsetLeft || 0) + (els.tub.offsetWidth || 0) * 0.6;
-    const targetY = (els.tub.offsetTop || 0)  + (els.tub.offsetHeight || 0) * 0.45;
-    // brief delay so the punch reads before the cookie shoots off
-    setTimeout(() => flyToTub(c, targetX, targetY), 60);
+    // Specials: golden = extra gold burst + chime; frenzy = start the storm.
+    if (isGolden) {
+        spawnConfetti(c.x, c.y, 22);
+        spawnSparks(c.x, c.y);
+        playComboSfx(4);
+        shakeStage(false);
+    } else if (c.special === 'frenzy') {
+        startFrenzy();
+    }
+
+    // Slice the cookie in two — the halves tumble apart and fade. The pile
+    // count already ticked up above; Tub eats that pile at the feast. There's
+    // no in-play Tub or pile-zone to fly toward anymore (removed to give the
+    // cookies the whole stage), so the split IS the catch payoff.
+    sliceSplitCookie(c);
+}
+
+// Replace a caught cookie with two halves that fly apart under gravity and
+// fade — the Fruit-Ninja "sliced" payoff. Halves are fresh elements masked to
+// each side of a near-vertical cut; the original element is removed.
+function sliceSplitCookie(c) {
+    c.el.remove();
+    const halves = [
+        { mask: 'linear-gradient(100deg, #000 46%, transparent 54%)', dir: -1 },
+        { mask: 'linear-gradient(100deg, transparent 46%, #000 54%)', dir:  1 },
+    ];
+    for (const h of halves) {
+        const half = document.createElement('div');
+        half.className = 'cookie-half';
+        half.style.width  = c.w + 'px';
+        half.style.height = c.h + 'px';
+        half.style.left = (c.x - c.w / 2) + 'px';
+        half.style.top  = (c.y - c.h / 2) + 'px';
+        applySprite(half, c.sprite.sheet, c.sprite.frame, c.w, c.h);
+        half.style.webkitMaskImage = h.mask;
+        half.style.maskImage = h.mask;
+        half.style.setProperty('--split-x', (h.dir * rand(40, 85)) + 'px');
+        half.style.setProperty('--split-y', rand(35, 80) + 'px');
+        half.style.setProperty('--split-rot', (h.dir * rand(120, 260)) + 'deg');
+        els.stage.appendChild(half);
+        half.addEventListener('animationend', () => half.remove(), { once: true });
+        setTimeout(() => { if (half.parentNode) half.remove(); }, 900); // safety net
+    }
 }
 
 const VEG_SPLATTER_COLORS = ['#ff6b6b', '#c0392b', '#2ed573', '#27ae60', '#a29bfe', '#74b9ff', '#ffaa00'];
@@ -980,6 +1492,17 @@ function spawnTapRing(cx, cy, outer) {
 // Singleton stage-flash: skip if one is already animating. Stacking these
 // (full-stage radial-gradients) crushes mobile GPUs.
 let _activeStageFlash = null;
+// Brief screen shake on triumphant beats (golden slice, ×5 combo, Frenzy).
+// Skipped under reduce-motion. `big` = a stronger shake.
+function shakeStage(big) {
+    if (reduceMotion() || !els.stage) return;
+    const cls = big ? 'stage-shake-big' : 'stage-shake';
+    els.stage.classList.remove('stage-shake', 'stage-shake-big');
+    void els.stage.offsetWidth;
+    els.stage.classList.add(cls);
+    setTimeout(() => els.stage.classList.remove(cls), 420);
+}
+
 function spawnStageFlash(cx, cy, color) {
     if (_activeStageFlash) return;
     const stageR = els.stage.getBoundingClientRect();
@@ -1167,17 +1690,22 @@ function loop(ts) {
         c.rot += c.vrot * cdt;
         placeCookieEl(c);
 
-        if (c.y - c.h / 2 > H + 60 ||
-            c.x < -c.w * 2 || c.x > W + c.w * 2) {
-            // A real cookie that flew off uncaught is a "miss" — break the
-            // streak (no point loss; this is a kids' game). Veggies escaping
-            // are good news for the player, so leave the streak alone.
-            if (!c.popped && !c.isVeggie) {
-                const edge = (c.y - c.h / 2 > H + 60) ? 'bottom'
-                           : (c.x < -c.w * 2)         ? 'left'
-                           :                            'right';
-                const along = edge === 'bottom' ? c.x : c.y;
-                spawnMissTrail(edge, along);
+        // Mark the cookie "entered" once it rises into view — until then the
+        // bottom-drop miss check is suppressed (it launches from below the
+        // bottom edge and must be allowed to rise).
+        if (!c.entered && c.y < H) c.entered = true;
+
+        const offBottom = c.y - c.h / 2 > H + 60;
+        const offSide   = c.x < -c.w * 2 || c.x > W + c.w * 2;
+        if ((c.entered && offBottom) || offSide) {
+            // A cookie the player let drop back off the bottom is a "miss" —
+            // break the streak (no point loss; this is a kids' game). Veggies
+            // dropping are good news, and a rare side exit isn't the player's
+            // fault, so neither of those breaks the streak.
+            // In Zen (missBreaksStreak false) a dropped cookie costs nothing —
+            // no red trail, no streak break. Otherwise it's a miss.
+            if (!c.popped && !c.isVeggie && c.entered && offBottom && TUNE.missBreaksStreak) {
+                spawnMissTrail('bottom', c.x);
                 breakStreak();
             }
             c.alive = false;
@@ -1189,11 +1717,21 @@ function loop(ts) {
     // make it grow unbounded over a round.
     state.cookies = state.cookies.filter(c => c.alive);
 
+    drawBlade();
+
+    // Frenzy auto-ends after its window (with a wind-down flash).
+    if (state.frenzy && performance.now() > state.frenzyUntil) endFrenzy(true);
+
     state.spawnInMs -= dt * 1000;
     if (state.spawnInMs <= 0) {
         spawnCookie();
-        const progress = 1 - (state.timeLeftMs / (CFG.duration * 1000));
-        const mean = lerp(TUNE.spawnStart, TUNE.spawnEnd, roundEase(progress));
+        let mean;
+        if (state.frenzy) {
+            mean = FRENZY_SPAWN_MS;                 // fast, steady storm
+        } else {
+            const progress = 1 - (state.timeLeftMs / (CFG.duration * 1000));
+            mean = lerp(TUNE.spawnStart, TUNE.spawnEnd, roundEase(progress));
+        }
         state.spawnInMs = mean * (1 + rand(-TUNE.spawnJitter, TUNE.spawnJitter));
     }
 
@@ -1202,6 +1740,11 @@ function loop(ts) {
     if (els.hudTime.textContent !== String(secs)) {
         els.hudTime.textContent = secs;
         if (secs <= 10 && secs > 0) bumpHud(els.hudTime);
+        // Final-5-seconds urgency — red edge pulse + a tick each second. Zen
+        // stays calm (no clock pressure), so it's skipped there.
+        const urgent = secs <= 5 && secs > 0 && state.mode !== 'zen';
+        els.stage.classList.toggle('time-low', urgent);
+        if (urgent) playTickSfx();
     }
 
     if (state.timeLeftMs <= 0) {
@@ -1225,6 +1768,11 @@ function resetState() {
 
     state.cookies.forEach(c => c.el && c.el.remove());
     state.cookies = [];
+    clearBlade();
+    endFrenzy();
+    els.stage.querySelectorAll('.round-end, .mode-flash, .swipe-hint').forEach(el => el.remove());  // clear last round's overlays
+    els.stage.classList.remove('time-low', 'frenzy-active', 'stage-shake', 'stage-shake-big');
+    setCodeRainSpeed(1);
     els.pileZone.innerHTML = '';
     els.feastPile.innerHTML = '';
     els.tub.classList.remove('chomp');
@@ -1249,17 +1797,48 @@ function startRound() {
     requestAnimationFrame(() => {
         resetState();
         measureStage();
+        showModeFlash();
         runCountdown(['3', '2', '1', 'GO!'], 600).then(() => {
             state.running = true;
             state.lastTs  = 0;
             state.rafId   = requestAnimationFrame(loop);
             scheduleNextGlitch();
+            maybeShowSwipeHint();
             // Hand off from the countdown jingle to the level music so the
             // two don't overlap, then start the round soundtrack.
             stopStartSfx();
             playLevelMusic();
         });
     });
+}
+
+// Brief banner at round start so the player knows which mode they launched
+// into. Sits in the upper third so it doesn't fight the centered countdown.
+function showModeFlash() {
+    const old = els.stage.querySelector('.mode-flash');
+    if (old) old.remove();
+    const el = document.createElement('div');
+    el.className = 'mode-flash mode-flash-' + state.mode;
+    el.textContent = (MODE_LABELS[state.mode] || 'CLASSIC') + ' MODE';
+    els.stage.appendChild(el);
+    el.addEventListener('animationend', () => el.remove(), { once: true });
+    setTimeout(() => { if (el.parentNode) el.remove(); }, 2200);   // safety net
+}
+
+// First-run onboarding: the star mechanic is swiping, so show a one-time
+// animated "SWIPE TO SLICE!" demo on the player's very first round.
+const SWIPE_HINT_KEY = 'cookie-cache-seen-swipe';
+function maybeShowSwipeHint() {
+    let seen = false;
+    try { seen = localStorage.getItem(SWIPE_HINT_KEY) === '1'; } catch (_) {}
+    if (seen) return;
+    try { localStorage.setItem(SWIPE_HINT_KEY, '1'); } catch (_) {}
+    const hint = document.createElement('div');
+    hint.className = 'swipe-hint';
+    hint.innerHTML = '<div class="swipe-hint-demo"></div>' +
+                     '<div class="swipe-hint-text">SWIPE TO SLICE!</div>';
+    els.stage.appendChild(hint);
+    setTimeout(() => hint.remove(), 3200);
 }
 
 function runCountdown(steps, perStepMs) {
@@ -1278,20 +1857,100 @@ function runCountdown(steps, perStepMs) {
     });
 }
 
+// How long the "TIME'S UP!" beat holds before the feast takes over.
+const ROUND_END_MS = 1400;
+
 function endRound() {
     state.running = false;
     if (state.rafId) cancelAnimationFrame(state.rafId);
     state.rafId = null;
-    state.cookies.forEach(c => c.el && c.el.remove());
-    state.cookies = [];
+    clearBlade();
+    endFrenzy();
     stopStartSfx();
-    stopLevelMusic();
+    fadeOutLevelMusic(ROUND_END_MS);   // soft landing instead of a hard cut
     stopGlitches();
+    els.stage.classList.remove('time-low');
     document.body.classList.remove('in-game');
     unlockOrientation();
-    // Note: fullscreen is kept through the feast screen so PLAY AGAIN
-    // feels seamless. Esc or abortRound() exits fullscreen when needed.
-    setTimeout(showFeast, 400);
+
+    // Land the round on a "TIME'S UP!" beat instead of cutting straight to the
+    // feast: dim the stage, pop the title, let the last cookies fade in place,
+    // then hand off to the feast (whose screen fades in over this).
+    state.cookies.forEach(c => c.el && c.el.classList.add('cookie-timesup'));
+    showRoundEndOverlay();
+    playTimeUpSfx();
+
+    setTimeout(() => {
+        state.cookies.forEach(c => c.el && c.el.remove());
+        state.cookies = [];
+        showFeast();
+    }, ROUND_END_MS);
+    // fullscreen is kept through the feast so PLAY AGAIN feels seamless.
+}
+
+// The dim + "TIME'S UP!" title shown over the stage between play and feast.
+function showRoundEndOverlay() {
+    const old = els.stage.querySelector('.round-end');
+    if (old) old.remove();
+    const ov = document.createElement('div');
+    ov.className = 'round-end';
+    const title = document.createElement('div');
+    title.className = 'round-end-title';
+    title.textContent = "TIME'S UP!";
+    ov.appendChild(title);
+    els.stage.appendChild(ov);
+}
+
+// A bright rising three-note "ta-da" — signals the round is complete (distinct
+// from the faster combo arpeggio). Reuses the shared tone AudioContext.
+function playTimeUpSfx() {
+    if (audio.muted) return;
+    try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!_streakBreakCtx) _streakBreakCtx = new Ctor();
+        const ctx = _streakBreakCtx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const now = ctx.currentTime;
+        [660, 880, 1175].forEach((f, i) => {
+            const o = ctx.createOscillator();
+            const g = ctx.createGain();
+            o.type = 'triangle';
+            const t = now + i * 0.12;
+            o.frequency.setValueAtTime(f, t);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+            o.connect(g);
+            g.connect(ctx.destination);
+            o.start(t);
+            o.stop(t + 0.32);
+        });
+    } catch (_) {}
+}
+
+// Short high click for the final-5-seconds countdown.
+function playTickSfx() {
+    if (audio.muted) return;
+    try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!_streakBreakCtx) _streakBreakCtx = new Ctor();
+        const ctx = _streakBreakCtx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const now = ctx.currentTime;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'square';
+        o.frequency.setValueAtTime(1400, now);
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.1, now + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(now);
+        o.stop(now + 0.08);
+    } catch (_) {}
 }
 
 function showFeast() {
@@ -1327,7 +1986,30 @@ function showFeast() {
 
         const pileImgs = buildFeastPile(stageR);
         chompPile(pileImgs);
+        if (isNewBest) feastConfettiBurst();
     });
+}
+
+// Confetti raining over Tub's feast when the player beats their best.
+function feastConfettiBurst() {
+    if (reduceMotion()) return;
+    const stage = document.getElementById('feast-stage');
+    if (!stage) return;
+    const r = stage.getBoundingClientRect();
+    const fall = (r.height || 300) + 40;
+    for (let k = 0; k < 40; k++) {
+        const c = document.createElement('div');
+        c.className = 'feast-confetti';
+        c.style.left = rand(0, r.width || 300) + 'px';
+        c.style.setProperty('--fc-color', choice(CONFETTI_COLORS));
+        c.style.setProperty('--fc-fall', fall + 'px');
+        c.style.setProperty('--fc-rot', rand(-540, 540) + 'deg');
+        c.style.setProperty('--fc-dur', rand(1.4, 2.4) + 's');
+        c.style.animationDelay = (k * 25) + 'ms';
+        stage.appendChild(c);
+        c.addEventListener('animationend', () => c.remove(), { once: true });
+        setTimeout(() => { if (c.parentNode) c.remove(); }, 3200);
+    }
 }
 
 function rankFor(score) {
@@ -1390,49 +2072,53 @@ function chompPile(imgs) {
         els.feastTitle.textContent = 'NOTHING TO EAT...';
         return;
     }
-    const inDelay = imgs.length * 35 + 320;
+    // Always three bites — chomp, chomp, swallow — no matter how big the
+    // pile is. Split the cookies into three groups (the last takes the
+    // remainder) and clear one whole group per bite at a fixed pace, so the
+    // finale stays snappy whether the pile is 3 cookies or 28.
+    const n = imgs.length;
+    const cut1 = Math.ceil(n / 3);
+    const cut2 = Math.ceil((2 * n) / 3);
+    const groups = [imgs.slice(0, cut1), imgs.slice(cut1, cut2), imgs.slice(cut2)];
+
+    const inDelay = imgs.length * 35 + 320;   // wait for the pile to finish appearing
+    const BITE_MS = 470;                       // fixed per-bite pace, size-independent
 
     setTimeout(() => {
-        let i = imgs.length - 1;
-        let bites = 0;
-        const stepMs = Math.max(CFG.feastMinDelay, CFG.feastChompMs - imgs.length * 3);
-        const closeMs = Math.min(180, Math.max(90, stepMs - 50));
+        let bite = 0;
 
-        const eatNext = () => {
-            if (i < 0) {
-                // Final close + a satisfied lick, then a happy burp
+        const doBite = () => {
+            if (bite >= 3) {
+                // Satisfied settle + a happy burp after the swallow.
                 setEaterFrame(els.feastTub, 'frame-one');
                 els.feastTub.style.animation = 'tub-breathe 2.4s ease-in-out infinite';
                 els.feastTitle.textContent = 'YUM!';
-                playSfx('lick');
-                setTimeout(playBurpSfx, 380);
+                setTimeout(playBurpSfx, 320);
                 return;
             }
-            // Mouth opens — frame-four is the open-mouth chomp pose
+
+            // Mouth opens (frame-four) + chomp squash.
             setEaterFrame(els.feastTub, 'frame-four');
             els.feastTub.style.animation = 'none';
             void els.feastTub.offsetWidth;
             els.feastTub.style.animation = 'tub-chomp 0.32s ease-out';
 
-            // Sound aligned to the action: chomp on bite, occasional lick
-            // between bites. Throttle prevents pile-up at fast pacing.
-            const useLick = bites > 0 && bites % 4 === 0;
-            playSfx(useLick ? 'lick' : 'chomp');
+            // First two bites chomp; the third is the swallow (a satisfied lick).
+            playSfx(bite === 2 ? 'lick' : 'chomp');
 
-            // Mouth closes onto a walking-sequence pose before the next bite
-            const walkFrame = WALK_CYCLE[bites % WALK_CYCLE.length];
-            setTimeout(() => {
-                setEaterFrame(els.feastTub, walkFrame);
-            }, closeMs);
+            // Clear this bite's whole group of cookies at once.
+            for (const el of groups[bite]) {
+                el.classList.add('gone');
+                setTimeout(() => el.remove(), 350);
+            }
 
-            const target = imgs[i];
-            target.classList.add('gone');
-            setTimeout(() => target.remove(), 350);
-            i--;
-            bites++;
-            setTimeout(eatNext, stepMs);
+            // Mouth closes onto a walking-sequence pose between bites.
+            setTimeout(() => setEaterFrame(els.feastTub, WALK_CYCLE[bite % WALK_CYCLE.length]), 170);
+
+            bite++;
+            setTimeout(doBite, BITE_MS);
         };
-        eatNext();
+        doBite();
     }, inDelay);
 }
 
@@ -1503,6 +2189,21 @@ function init() {
     preload();
     loadSfxPools();
     initCodeRain();
+    initBlade();
+    // Build stamp only inside the packaged app (catches stale sideloads) — the
+    // live web build stays clean.
+    if (window.Capacitor) {
+        const tag = document.createElement('div');
+        tag.className = 'build-tag';
+        tag.textContent = BUILD_TAG;
+        document.body.appendChild(tag);
+    }
+    if (DEBUG) {
+        const dbg = document.createElement('div');
+        dbg.id = 'dbg';
+        dbg.className = 'dbg';
+        document.body.appendChild(dbg);
+    }
     state.best = loadBest();
     renderMenuBest();
     state.mode = loadMode();
@@ -1520,9 +2221,16 @@ function init() {
     if (els.lorePrev)     els.lorePrev.addEventListener('click', () => loreSetPage(state.lorePage - 1));
     if (els.loreNext)     els.loreNext.addEventListener('click', () => loreSetPage(state.lorePage + 1));
 
-    window.addEventListener('resize', () => {
-        if (state.running) measureStage();
-    });
+    window.addEventListener('resize', measureStage);
+    // A ResizeObserver on the stage is the reliable signal: fullscreen enter,
+    // the immersive bars hiding, and rotation all resize the stage AFTER the
+    // initial measureStage(), and some don't fire a window 'resize'. Keeping
+    // state.stageW/H + the blade canvas in lockstep with the real stage box is
+    // what makes the blade land under the finger and the off-screen cull use
+    // the true bottom edge.
+    if (window.ResizeObserver && els.stage) {
+        new ResizeObserver(() => measureStage()).observe(els.stage);
+    }
 
     els.stage.addEventListener('contextmenu', e => e.preventDefault());
     els.stage.addEventListener('dragstart',   e => e.preventDefault());

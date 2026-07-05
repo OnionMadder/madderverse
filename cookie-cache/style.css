@@ -221,6 +221,7 @@ body {
 /* ── Difficulty toggle (menu) ─────────────────────────────────────── */
 .mode-toggle {
     display: flex;
+    flex-wrap: wrap;      /* three modes wrap instead of overflowing a narrow screen */
     gap: 10px;
     justify-content: center;
     margin: 2px 0;
@@ -331,13 +332,20 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    width: 100%;
-    padding: 12px clamp(12px, 4vw, 24px);
+    /* Overlay across the top of the full-bleed stage rather than taking a
+       layout row — the play field runs edge-to-edge behind it. Safe-area
+       insets keep the score/time clear of a notch or rounded corners. */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px)
+             calc(env(safe-area-inset-right, 0px) + clamp(12px, 4vw, 24px))
+             12px
+             calc(env(safe-area-inset-left, 0px) + clamp(12px, 4vw, 24px));
     background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 100%);
     z-index: 30;
     pointer-events: none;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(0,255,204,0.12);
 }
 .hud-block {
     display: flex;
@@ -411,48 +419,17 @@ body {
 }
 
 /* ── Game frame ──────────────────────────────────────────────────
-   Wraps .game-stage with a non-tappable padding buffer so the playable
-   area doesn't touch the device's edge (kills accidental OS-gesture
-   taps and accidental cookie misses near the bezel). The decorative
-   border is on the ::before pseudo-element (pointer-events: none).
-   ─────────────────────────────────────────────────────────────── */
+   Full-bleed: the stage fills the entire screen edge-to-edge (the HUD
+   floats over it as an overlay — see .game-hud). The old inset padding +
+   decorative cyan border were removed so cookies get the whole display,
+   into the display cutout on notched phones. ──────────────────────── */
 .game-frame {
     position: relative;
     flex: 1 1 auto;
     width: 100%;
-    padding: clamp(10px, 2vw, 18px);
-    box-sizing: border-box;
     background: transparent;
     display: flex;
     min-height: 0;     /* allow .game-stage to actually fill in flex column */
-}
-.game-frame::before {
-    content: '';
-    position: absolute;
-    inset: clamp(4px, 1vw, 10px);
-    pointer-events: none;
-    z-index: 50;
-    border: 2px solid rgba(0, 255, 204, 0.55);
-    box-shadow:
-        inset 0 0 0 1px rgba(0, 0, 0, 0.6),
-        inset 0 0 26px rgba(0, 255, 204, 0.16),
-        0 0 22px rgba(0, 255, 204, 0.28);
-    border-radius: 3px;
-}
-/* Subtle pink corner accents — match the hacker-terminal palette */
-.game-frame::after {
-    content: '';
-    position: absolute;
-    inset: clamp(4px, 1vw, 10px);
-    pointer-events: none;
-    z-index: 51;
-    background:
-        radial-gradient(circle at 0% 0%,     var(--accent-pink) 0%, var(--accent-pink) 4px, transparent 5px),
-        radial-gradient(circle at 100% 0%,   var(--accent-pink) 0%, var(--accent-pink) 4px, transparent 5px),
-        radial-gradient(circle at 0% 100%,   var(--accent-pink) 0%, var(--accent-pink) 4px, transparent 5px),
-        radial-gradient(circle at 100% 100%, var(--accent-pink) 0%, var(--accent-pink) 4px, transparent 5px);
-    filter: drop-shadow(0 0 6px var(--accent-pink));
-    border-radius: 3px;
 }
 
 .game-stage {
@@ -464,6 +441,55 @@ body {
         radial-gradient(ellipse at 50% 110%, rgba(0,255,204,0.10) 0%, transparent 65%),
         linear-gradient(180deg, #04060d 0%, #07101e 50%, #050a16 100%);
     cursor: crosshair;
+    /* Swipe-slice needs the raw pointer stream — stop the browser from
+       hijacking drags for scroll / pull-to-refresh / pinch on touch. */
+    touch-action: none;
+}
+
+/* Blade trail canvas — drawn each frame in the game loop, above the flying
+   cookies (z 6) but below the HUD (z 30). Non-interactive; the pointer
+   events it visualizes are handled on .game-stage itself. */
+.blade-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* MUST set an explicit CSS size: <canvas> is a replaced element, so
+       `inset:0` does NOT stretch it — without width/height it displays at its
+       backing-pixel size (stageW × dpr), which on a high-DPI phone renders the
+       blade trail at 2× scale, anchored top-left, so it drifts off the
+       cookies. width/height 100% pins the display box to the stage. */
+    width: 100%;
+    height: 100%;
+    z-index: 7;
+    pointer-events: none;
+}
+
+/* Diagnostic geometry readout (see DEBUG in game.js). Remove for release. */
+.dbg {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 46px);
+    left: calc(env(safe-area-inset-left, 0px) + 8px);
+    font: 700 11px/1.35 'JetBrains Mono', 'Fira Code', monospace;
+    color: #6f6;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 7px;
+    border-radius: 4px;
+    white-space: pre;
+    z-index: 300;
+    pointer-events: none;
+}
+
+/* Dev build marker (see BUILD_TAG in game.js) — tiny corner stamp so a
+   test device shows which build it's running. Remove before release. */
+.build-tag {
+    position: fixed;
+    left: calc(env(safe-area-inset-left, 0px) + 6px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
+    font: 700 10px/1 'JetBrains Mono', 'Fira Code', monospace;
+    letter-spacing: 1px;
+    color: rgba(0, 255, 204, 0.5);
+    z-index: 200;
+    pointer-events: none;
 }
 
 /* ── Hacker-terminal background layers ──────────────────────────
@@ -540,6 +566,9 @@ body {
 
 /* ── Tub Butter sitting in the corner ─────────────────────────── */
 .tub-butter {
+    /* Hidden during the catch phase — cookies get the whole stage now, and
+       Tub reappears to eat the pile at the feast (#feast-tub). */
+    display: none;
     position: absolute;
     bottom: 8px;
     left: 8px;
@@ -569,8 +598,32 @@ body {
     100% { transform: scale(1)    translateY(0);    }
 }
 
+/* ── Sliced cookie halves ─────────────────────────────────────────
+   When a cookie is caught it's replaced by two of these (masked to each
+   side of the cut) that tumble apart under a fake gravity and fade. Per-
+   half direction/spin come from --split-x/y/rot set in sliceSplitCookie. */
+.cookie-half {
+    position: absolute;
+    background-repeat: no-repeat;
+    -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+    pointer-events: none;
+    z-index: 6;
+    filter: drop-shadow(0 0 8px rgba(0,255,204,0.35)) drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+    animation: cookie-split 0.55s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
+    will-change: transform, opacity;
+}
+@keyframes cookie-split {
+    0%   { transform: translate(0, 0) rotate(0) scale(1); opacity: 1; }
+    18%  { opacity: 1; }
+    100% { transform: translate(var(--split-x), var(--split-y)) rotate(var(--split-rot)) scale(0.85); opacity: 0; }
+}
+
 /* ── Pile zone next to Tub Butter ─────────────────────────────── */
 .pile-zone {
+    /* Hidden during the catch phase (see .tub-butter). The PILE count still
+       ticks in the HUD; the stacked thumbnails just aren't shown in play. */
+    display: none;
     position: absolute;
     bottom: 14px;
     left: clamp(80px, 22vw, 130px);
@@ -599,7 +652,11 @@ body {
 .flying-veggie {
     position: absolute;
     background-repeat: no-repeat;
-    pointer-events: auto;
+    /* Input is handled by one stage-level pointer tracker that hit-tests
+       cookies geometrically (see "Blade / swipe-slice" in game.js), so the
+       elements themselves ignore pointer events — this lets a swipe glide
+       continuously across the stage instead of being caught per-element. */
+    pointer-events: none;
     cursor: pointer;
     will-change: transform, left, top;
     z-index: 6;
@@ -660,6 +717,47 @@ body {
     0%   { transform: scale(1)    rotate(0);     opacity: 1; }
     25%  { transform: scale(1.45) rotate(12deg); opacity: 0.95; }
     100% { transform: scale(0.25) rotate(-40deg); opacity: 0; }
+}
+
+/* ── Special cookies ─────────────────────────────────────────────────
+   These animate ONLY `filter` (glow / hue), never `transform` — the flying
+   cookie's rotation is written to `transform` inline every frame by
+   placeCookieEl(), and a transform animation would clobber it. */
+.flying-cookie.golden {
+    animation: golden-pulse 0.7s ease-in-out infinite;
+}
+@keyframes golden-pulse {
+    0%, 100% {
+        filter: brightness(1.1) sepia(0.5) saturate(2.4) hue-rotate(-12deg)
+                drop-shadow(0 0 8px rgba(255, 210, 60, 0.9));
+    }
+    50% {
+        filter: brightness(1.28) sepia(0.5) saturate(2.7) hue-rotate(-12deg)
+                drop-shadow(0 0 18px rgba(255, 210, 60, 1))
+                drop-shadow(0 0 28px rgba(255, 170, 0, 0.7));
+    }
+}
+.flying-cookie.frenzy-cookie {
+    animation: frenzy-cookie-hue 0.9s linear infinite;
+}
+@keyframes frenzy-cookie-hue {
+    0%   { filter: saturate(2) hue-rotate(0deg)
+                   drop-shadow(0 0 12px rgba(0, 255, 204, 0.9))
+                   drop-shadow(0 0 22px rgba(255, 0, 255, 0.55)); }
+    100% { filter: saturate(2) hue-rotate(360deg)
+                   drop-shadow(0 0 12px rgba(0, 255, 204, 0.9))
+                   drop-shadow(0 0 22px rgba(255, 0, 255, 0.55)); }
+}
+
+/* Frenzy screen tint — a warm pulsing inset glow behind the cookies. */
+.game-stage.frenzy-active {
+    animation: frenzy-tint 0.8s ease-in-out infinite;
+}
+@keyframes frenzy-tint {
+    0%, 100% { box-shadow: inset 0 0 60px rgba(255, 120, 0, 0.22),
+                           inset 0 0 150px rgba(255, 0, 150, 0.16); }
+    50%      { box-shadow: inset 0 0 95px rgba(255, 150, 0, 0.38),
+                           inset 0 0 190px rgba(255, 0, 160, 0.26); }
 }
 
 /* large magenta zap-ring (onioncore "danger" accent) */
@@ -945,6 +1043,175 @@ body {
     25%  { opacity: 1; transform: scale(1.2); }
     70%  { opacity: 1; transform: scale(1);   }
     100% { opacity: 0; transform: scale(1.4); }
+}
+
+/* ── Level-end transition ("TIME'S UP!") ─────────────────────────────
+   Dims the stage and pops the title for ROUND_END_MS before the feast
+   screen fades in over it. Built in endRound(), torn down in resetState(). */
+.round-end {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 45%,
+                rgba(4, 10, 20, 0.25) 0%, rgba(2, 4, 10, 0.82) 80%);
+    animation: round-end-in 0.45s ease both;
+}
+@keyframes round-end-in { from { opacity: 0; } to { opacity: 1; } }
+.round-end-title {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-weight: 900;
+    font-size: clamp(2rem, 10vw, 4.5rem);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #fff;
+    text-shadow: 0 0 22px var(--accent-cyan), 0 0 46px rgba(0, 255, 204, 0.5),
+                 0 4px 10px rgba(0, 0, 0, 0.85);
+    animation: round-end-pop 0.55s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+@keyframes round-end-pop {
+    0%   { transform: scale(0.3) rotate(-4deg); opacity: 0; }
+    60%  { transform: scale(1.12) rotate(1deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0);       opacity: 1; }
+}
+/* The frozen cookies fade out under the dim. */
+.flying-cookie.cookie-timesup,
+.flying-veggie.cookie-timesup {
+    animation: cookie-timesup 0.55s ease forwards;
+}
+@keyframes cookie-timesup { to { opacity: 0; } }
+
+/* ── Round-start mode banner ─────────────────────────────────────────
+   Shown in the upper third during the countdown so the player knows which
+   mode they launched into. Colour cues the mode's vibe. */
+.mode-flash {
+    position: absolute;
+    top: 20%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 900;
+    font-size: clamp(1.1rem, 5vw, 2.4rem);
+    letter-spacing: 5px;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 18px rgba(0, 255, 204, 0.7), 0 3px 8px rgba(0, 0, 0, 0.8);
+    z-index: 45;
+    pointer-events: none;
+    animation: mode-flash 2.1s ease forwards;
+}
+.mode-flash-cozy {
+    color: #ffd54a;
+    text-shadow: 0 0 18px rgba(255, 213, 74, 0.8), 0 3px 8px rgba(0, 0, 0, 0.8);
+}
+.mode-flash-zen {
+    color: #a29bfe;
+    text-shadow: 0 0 18px rgba(162, 155, 254, 0.85), 0 3px 8px rgba(0, 0, 0, 0.8);
+}
+@keyframes mode-flash {
+    0%   { opacity: 0; transform: translateY(-16px) scale(0.9); }
+    12%  { opacity: 1; transform: translateY(0) scale(1); }
+    78%  { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-10px) scale(1.05); }
+}
+
+/* ── Screen shake (golden slice / ×5 combo / Frenzy) ─────────────── */
+.game-stage.stage-shake     { animation: stage-shake 0.4s ease; }
+.game-stage.stage-shake-big { animation: stage-shake-big 0.42s ease; }
+@keyframes stage-shake {
+    0%,100% { transform: translate(0, 0); }
+    20% { transform: translate(-4px, 3px); }
+    40% { transform: translate(4px, -3px); }
+    60% { transform: translate(-3px, -2px); }
+    80% { transform: translate(3px, 2px); }
+}
+@keyframes stage-shake-big {
+    0%,100% { transform: translate(0, 0); }
+    15% { transform: translate(-8px, 5px); }
+    30% { transform: translate(7px, -6px); }
+    45% { transform: translate(-6px, 6px); }
+    60% { transform: translate(6px, -4px); }
+    80% { transform: translate(-4px, 3px); }
+}
+
+/* ── Final-seconds urgency (Classic/Cozy only) ───────────────────── */
+.game-stage.time-low { animation: time-low-pulse 1s ease-in-out infinite; }
+@keyframes time-low-pulse {
+    0%,100% { box-shadow: inset 0 0 50px rgba(255, 40, 40, 0.14); }
+    50%     { box-shadow: inset 0 0 95px rgba(255, 30, 30, 0.42); }
+}
+
+/* ── First-run "SWIPE TO SLICE!" hint ────────────────────────────── */
+.swipe-hint {
+    position: absolute;
+    inset: 0;
+    z-index: 44;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    animation: swipe-hint-out 0.5s ease 2.7s forwards;
+}
+.swipe-hint-demo {
+    width: clamp(120px, 40vw, 260px);
+    height: 8px;
+    border-radius: 8px;
+    background: linear-gradient(90deg, transparent, var(--accent-cyan), #fff);
+    box-shadow: 0 0 16px var(--accent-cyan);
+    transform-origin: left center;
+    animation: swipe-hint-sweep 1.3s ease-in-out infinite;
+}
+.swipe-hint-text {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 900;
+    font-size: clamp(1rem, 4.5vw, 2rem);
+    letter-spacing: 3px;
+    color: #fff;
+    text-shadow: 0 0 16px var(--accent-cyan), 0 3px 8px rgba(0, 0, 0, 0.85);
+    animation: swipe-hint-pulse 1s ease-in-out infinite;
+}
+@keyframes swipe-hint-sweep {
+    0%   { opacity: 0; transform: translateX(-45px) scaleX(0.2); }
+    28%  { opacity: 1; transform: translateX(-45px) scaleX(0.25); }
+    68%  { opacity: 1; transform: translateX(45px) scaleX(1); }
+    100% { opacity: 0; transform: translateX(66px) scaleX(1); }
+}
+@keyframes swipe-hint-pulse { 0%,100% { opacity: 0.65; } 50% { opacity: 1; } }
+@keyframes swipe-hint-out  { to { opacity: 0; } }
+
+/* ── Feast confetti (new personal best) ──────────────────────────── */
+.feast-confetti {
+    position: absolute;
+    top: -14px;
+    width: 9px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--fc-color, #fff);
+    z-index: 8;
+    pointer-events: none;
+    animation: feast-confetti-fall var(--fc-dur, 1.8s) linear forwards;
+}
+@keyframes feast-confetti-fall {
+    0%   { transform: translateY(0) rotate(0); opacity: 1; }
+    90%  { opacity: 1; }
+    100% { transform: translateY(var(--fc-fall, 320px)) rotate(var(--fc-rot, 360deg)); opacity: 0; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────
+   Near-zero durations (not 0) so animationend still fires and JS particle
+   cleanup keeps working — decorative motion just snaps to its end state.
+   Canvas blade + rAF gameplay physics are unaffected (they're core, not CSS). */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
