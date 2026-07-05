@@ -1271,6 +1271,54 @@ function renderDips() {
     // Keep the surface finish in sync — a dipped pot goes glossy, an
     // un-dipped one drops back to bare clay (see currentLook).
     if (state.clayMaterial) state.clayTarget = currentLook();
+    updateDipRemap();
+}
+
+// --- Continuous set gradient ------------------------------------
+// When a pot has a lid (a set), the two pieces should share ONE gradient
+// running unbroken from the top of the lid to the pot's foot — instead of
+// each piece showing its own full gradient. We do this by remapping each
+// piece's dip-sample height (uDipVScale/uDipVOffset) to its own slice of
+// the combined height: the lid gets the top slice (the gradient's start),
+// the pot gets the rest, and they meet seamlessly at the rim.
+function dipSetHeights() {
+    const partner = state.isLid ? state.savedPot : state.savedLid;
+    if (!partner) return null; // lone piece → identity remap
+    const activeHS  = state.heightScale != null ? state.heightScale : 1;
+    const partnerHS = partner.heightScale != null ? partner.heightScale : 1;
+    let potH, lidH, lidCapV;
+    if (state.isLid) {
+        const cap = state.lidMaxY != null ? state.lidMaxY : lidCapFromProfile(profile);
+        lidH = cap * activeHS;  lidCapV = cap / TOP;
+        potH = TOP * partnerHS;
+    } else {
+        const cap = lidCapFromProfile(partner.profile || profile);
+        lidH = cap * partnerHS; lidCapV = cap / TOP;
+        potH = TOP * activeHS;
+    }
+    return { potH, lidH, lidCapV };
+}
+// scale/offset so a piece's local v (0 foot → 1 rim/dome) samples the dip
+// texture at its slice of the shared gradient.
+function dipRemap(isLid, potH, lidH, lidCapV) {
+    const potFrac = potH / Math.max(1e-4, potH + lidH);
+    if (!isLid) return { scale: potFrac, offset: 0 };          // pot = bottom slice
+    const cv = lidCapV > 0.02 ? lidCapV : 1;
+    return { scale: (1 - potFrac) / cv, offset: potFrac };     // lid = top slice
+}
+function setDipRemap(mat, r) {
+    const u = mat && mat.userData && mat.userData.shaderUniforms;
+    if (u && u.uDipVScale) { u.uDipVScale.value = r.scale; u.uDipVOffset.value = r.offset; }
+}
+function updateDipRemap() {
+    const h = dipSetHeights();
+    let active = { scale: 1, offset: 0 }, partner = { scale: 1, offset: 0 };
+    if (h) {
+        active  = dipRemap(state.isLid,  h.potH, h.lidH, h.lidCapV);
+        partner = dipRemap(!state.isLid, h.potH, h.lidH, h.lidCapV);
+    }
+    setDipRemap(state.clayMaterial, active);
+    setDipRemap(state.partnerMaterial, partner);
 }
 
 // One dip: glaze coats from the RIM (canvas top) DOWN to line v, with a
@@ -1971,6 +2019,8 @@ function buildPot() {
         shader.uniforms.uGradientColor = { value: state.gradientColor };
         shader.uniforms.uGradientMix   = { value: state.gradientMix };
         shader.uniforms.uDipMap        = { value: dipTex };
+        shader.uniforms.uDipVScale     = { value: 1 };
+        shader.uniforms.uDipVOffset    = { value: 0 };
         // Stash the uniform map on the material so tickMaterial can
         // poke the scalar uGradientMix each frame without re-running
         // onBeforeCompile. The Color uniforms hold a reference to the
@@ -1983,7 +2033,7 @@ function buildPot() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
@@ -1998,7 +2048,11 @@ function buildPot() {
                  // presets) mixed over the base by its own alpha. Applied
                  // over the base + gradient but UNDER paint/carve, so
                  // decoration can sit on a dipped pot.
-                 vec4 _dip = texture2D( uDipMap, vDecoUv );
+                 // uDipVScale/uDipVOffset remap the dip's height so a
+                 // pot+lid set shares ONE continuous gradient (each piece
+                 // samples its own slice). Identity (1,0) for a lone piece.
+                 float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
+                 vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
@@ -2011,7 +2065,7 @@ function buildPot() {
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v5";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v6";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -4614,6 +4668,8 @@ function buildPartnerMesh() {
         shader.uniforms.uGradientColor = { value: state.partnerGradientColor };
         shader.uniforms.uGradientMix   = { value: state.partnerGradientMix };
         shader.uniforms.uDipMap        = { value: pdipt };
+        shader.uniforms.uDipVScale     = { value: 1 };
+        shader.uniforms.uDipVOffset    = { value: 0 };
         mat.userData.shaderUniforms = shader.uniforms;
         shader.vertexShader = shader.vertexShader
             .replace("#include <common>", "varying vec2 vDecoUv;\n#include <common>")
@@ -4621,14 +4677,18 @@ function buildPartnerMesh() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
                  float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
-                 vec4 _dip = texture2D( uDipMap, vDecoUv );
+                 // uDipVScale/uDipVOffset remap the dip's height so a
+                 // pot+lid set shares ONE continuous gradient (each piece
+                 // samples its own slice). Identity (1,0) for a lone piece.
+                 float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
+                 vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
@@ -4637,7 +4697,7 @@ function buildPartnerMesh() {
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v1-partner";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v2-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -5354,6 +5414,9 @@ function tick() {
     }
     tickMaterial(dt);
     tickPartnerMaterial(dt);
+    // Keep the continuous-set dip remap live while a set exists (also
+    // (re)applies once the partner material has compiled its shader).
+    if (state.savedPot || state.savedLid) updateDipRemap();
     // Wet-clay reactive sheen: water on the surface catches the room
     // light when the finger is sliding across it. Fast attack so the
     // glint pops, slow decay so it settles. Applied as a temporary
