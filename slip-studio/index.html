@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=111" />
+    <link rel="stylesheet" href="style.css?v=112" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -218,6 +218,7 @@
                 </span>
                 <span class="deco-sub" id="decoSub" role="group" aria-label="Shape or pattern" hidden></span>
                 <input type="range" id="motifSize" class="motif-size" min="10" max="100" value="42" aria-label="Motif size" hidden />
+                <button type="button" id="motifColorToggle" class="motif-color-toggle" aria-pressed="false" title="Place motifs in full colour instead of a tinted silhouette" hidden>Full colour</button>
             </div>
             <div class="deco-strip" id="decoColors" role="group" aria-label="Paint colour"></div>
             <input type="file" id="motifUpload" accept="image/*" hidden />
@@ -310,7 +311,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=111"></script>
+    <script type="module" src="main.js?v=112"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

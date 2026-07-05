@@ -1143,6 +1143,30 @@ html, body {
     cursor: pointer;
 }
 .motif-size[hidden] { display: none; }
+/* Silhouette ↔ full-colour toggle chip (motif tool). */
+.motif-color-toggle {
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    font: inherit;
+    font-size: 0.64rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    background: transparent;
+    border: 1px solid var(--ink-faint);
+    border-radius: 999px;
+    padding: 5px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.motif-color-toggle.is-active {
+    color: var(--ink);
+    border-color: var(--accent);
+    background: rgba(201, 138, 100, 0.18);
+}
+.motif-color-toggle[hidden] { display: none; }
 .deco-tool {
     -webkit-tap-highlight-color: transparent;
     -webkit-appearance: none;

@@ -328,8 +328,16 @@ const MOTIF_PACKS = {
         "japan-vegetables/eggplant.png", "japan-vegetables/cucumber.png", "japan-vegetables/mushrooms.png",
         "japan-vegetables/bulbs.png", "japan-vegetables/firethorn.png", "japan-vegetables/bread.png",
     ] },
+    berries: { label: "Dutch Berries", ids: [
+        "netherlands-berries/strawberries.png", "netherlands-berries/raspberries.png", "netherlands-berries/blackberries.png",
+        "netherlands-berries/blackcurrants.png", "netherlands-berries/red-plums.png", "netherlands-berries/yellow-plums.png",
+    ] },
+    roman: { label: "Roman", ids: [
+        "roman-costumes/ares.png", "roman-costumes/bacchus.png", "roman-costumes/consul.png",
+        "roman-costumes/roman-warrior.png", "roman-costumes/greek-warrior.png", "roman-costumes/tumbler.png",
+    ] },
 };
-const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants"];
+const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "berries", "roman"];
 // Allover enamel patterns (Chinese cloisonné style): a one-tap full-colour
 // tiled fill via the Pattern tool. Square 512 tiles → exact 4× wrap.
 const PATTERN_SETS = [
@@ -836,6 +844,8 @@ let music = null;               // looping ambient track
 // shape, alpha = coverage); the fill colour is state.decoColor. Declared
 // early so no function hits a TDZ reading them (cf. dipPreview).
 let motifMask = null;
+let motifImage = null;          // full-colour source (canvas) for the colour toggle
+let motifFullColor = false;     // place original colours vs a tinted silhouette
 let motifPack = "sumieAnimals"; // active motif pack (key into MOTIF_PACKS)
 let motifStarter = null;        // which starter id is active (or null = upload)
 let motifSize = 0.42;           // 0..1 slider position → MOTIF_MIN/MAX_PX
@@ -979,6 +989,11 @@ function init() {
             if (motifPlacing && motifLastUV) renderMotifPreview(motifLastUV);
         });
     }
+    document.getElementById("motifColorToggle")?.addEventListener("click", () => {
+        setMotifFullColor(!motifFullColor);
+        const b = document.getElementById("motifColorToggle");
+        if (b) b.setAttribute("aria-pressed", motifFullColor ? "true" : "false");
+    });
     document.getElementById("motifUpload")?.addEventListener("change", (e) => {
         const f = e.target.files && e.target.files[0];
         if (!f) return;
@@ -3492,6 +3507,15 @@ function updateDecoSub() {
     if (slider) slider.hidden = !isMotif;
     const packTabs = document.getElementById("motifPackTabs");
     if (packTabs) packTabs.hidden = !isMotif;
+    // Full-colour toggle (motif only). In full colour the paint-colour row
+    // doesn't apply, so hide it; patterns don't use it either.
+    const colorToggle = document.getElementById("motifColorToggle");
+    if (colorToggle) {
+        colorToggle.hidden = !isMotif;
+        colorToggle.classList.toggle("is-active", motifFullColor);
+    }
+    const decoColorsEl = document.getElementById("decoColors");
+    if (decoColorsEl) decoColorsEl.hidden = isPattern || (isMotif && motifFullColor);
     if (isPattern) {
         sub.hidden = false;
         sub.innerHTML = "";
@@ -3629,9 +3653,25 @@ function buildMotifMask(img) {
     ctx.putImageData(id, 0, 0);
     return c;
 }
+function downscaleToCanvas(img, maxd) {
+    const w0 = img.width || maxd, h0 = img.height || maxd;
+    const s = maxd / Math.max(w0, h0);
+    const w = Math.max(1, Math.round(w0 * s)), h = Math.max(1, Math.round(h0 * s));
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    c.getContext("2d").drawImage(img, 0, 0, w, h);
+    return c;
+}
 function loadMotifImage(img) {
     motifMask = buildMotifMask(img);
-    if (state.decoColor == null) setDecoColor(DECO_COLORS[1]); // arm near-black
+    motifImage = downscaleToCanvas(img, 512); // kept for full-colour placement
+    if (state.decoColor == null) setDecoColor(DECO_COLORS[1]); // arm near-black (silhouette tint)
+    updateDecoSub();
+}
+// Toggle: place motifs in their own colours vs as a tinted silhouette.
+function setMotifFullColor(on) {
+    motifFullColor = !!on;
+    if (motifPlacing && motifLastUV) renderMotifPreview(motifLastUV);
     updateDecoSub();
 }
 function motifSrc(id) { return "assets/img/motifs/" + id; }
@@ -3679,13 +3719,21 @@ function tintedMotif(hex, sizePx) {
 // Draw the motif centred at UV onto a ctx, wrapping across the u-seam.
 function drawMotifOnDeco(ctx, u, v) {
     if (!motifMask) return;
-    const hex = state.decoColor != null ? state.decoColor : DECO_COLORS[1];
-    const t = tintedMotif(hex, motifSizePx());
+    const sizePx = motifSizePx();
+    let src, w, h;
+    if (motifFullColor && motifImage) {
+        src = motifImage;
+        const s = sizePx / Math.max(src.width, src.height);
+        w = src.width * s; h = src.height * s;
+    } else {
+        src = tintedMotif(state.decoColor != null ? state.decoColor : DECO_COLORS[1], sizePx);
+        w = src.width; h = src.height;
+    }
     const cx = u * DECO_W, cy = (1 - v) * DECO_H;
-    const dx = cx - t.width / 2, dy = cy - t.height / 2;
-    ctx.drawImage(t, dx, dy);
-    if (cx < t.width) ctx.drawImage(t, dx + DECO_W, dy);
-    else if (cx > DECO_W - t.width) ctx.drawImage(t, dx - DECO_W, dy);
+    const dx = cx - w / 2, dy = cy - h / 2;
+    ctx.drawImage(src, dx, dy, w, h);
+    if (cx < w) ctx.drawImage(src, dx + DECO_W, dy, w, h);
+    else if (cx > DECO_W - w) ctx.drawImage(src, dx - DECO_W, dy, w, h);
 }
 // Non-destructive placement: snapshot the committed deco, then redraw
 // base + motif live on each move; on release it's already baked in.
