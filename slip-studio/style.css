@@ -1150,21 +1150,23 @@ html, body {
     -webkit-appearance: none;
     appearance: none;
     font: inherit;
-    font-size: 0.64rem;
-    letter-spacing: 0.06em;
+    font-size: 0.66rem;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
-    color: var(--ink-dim);
-    background: transparent;
+    color: var(--ink);
+    background: var(--chip);
     border: 1px solid var(--ink-faint);
     border-radius: 999px;
-    padding: 5px 12px;
+    padding: 7px 14px;
     cursor: pointer;
     white-space: nowrap;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
 }
 .motif-color-toggle.is-active {
-    color: var(--ink);
+    color: var(--bg);
     border-color: var(--accent);
-    background: rgba(201, 138, 100, 0.18);
+    background: var(--accent);
 }
 .motif-color-toggle[hidden] { display: none; }
 .deco-tool {
