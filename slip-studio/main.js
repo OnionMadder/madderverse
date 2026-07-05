@@ -310,7 +310,15 @@ const OVERLAY_PATTERNS = [
 // as SVGs (assets/img/motifs/<id>.svg); the user can also upload their own
 // image, reduced to a silhouette on-device (never uploaded anywhere). The
 // motif bakes into the deco canvas, so it wraps + saves like the rest.
-const MOTIF_STARTERS = ["bird", "fish", "leaf", "sun", "star", "spiral"];
+// Motifs are grouped into swappable packs (like the glaze packs). Each
+// pack's silhouettes live at assets/img/motifs/<id>.svg. New themed packs
+// (curated authentic art) = one entry here + the SVGs; the "+" upload is
+// always available regardless of pack.
+const MOTIF_PACKS = {
+    basics: { label: "Basics", ids: ["bird", "fish", "leaf", "sun", "star", "spiral"] },
+    aegean: { label: "Aegean", ids: ["greekkey", "amphora", "column", "wave", "palmette"] },
+};
+const MOTIF_PACK_IDS = ["basics", "aegean"];
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
 
@@ -807,6 +815,7 @@ let music = null;               // looping ambient track
 // shape, alpha = coverage); the fill colour is state.decoColor. Declared
 // early so no function hits a TDZ reading them (cf. dipPreview).
 let motifMask = null;
+let motifPack = "basics";       // active motif pack (key into MOTIF_PACKS)
 let motifStarter = null;        // which starter id is active (or null = upload)
 let motifSize = 0.42;           // 0..1 slider position → MOTIF_MIN/MAX_PX
 let motifPlacing = false;       // dragging to position a motif
@@ -3437,21 +3446,46 @@ function setStampShape(id) {
     updateDecoSub();
 }
 
+// Switch the active motif pack (rebuilds the thumbnail row).
+function setMotifPack(id) {
+    if (!MOTIF_PACKS[id]) return;
+    motifPack = id;
+    updateDecoSub();
+}
+
 // Build the contextual sub-palette: stamp shapes, or overlay patterns,
 // or nothing (brush/splatter).
 function updateDecoSub() {
     const sub = document.getElementById("decoSub");
     if (!sub) return;
-    // The Motif tool swaps the brush-size dots for a size slider.
+    // The Motif tool swaps the brush-size dots for a size slider + shows
+    // a pack selector above the silhouette thumbnails.
     const isMotif = state.decoTool === "motif";
     const sizesEl = document.getElementById("decoSizes");
     if (sizesEl) sizesEl.style.display = isMotif ? "none" : "";
     const slider = document.getElementById("motifSize");
     if (slider) slider.hidden = !isMotif;
+    const packTabs = document.getElementById("motifPackTabs");
+    if (packTabs) packTabs.hidden = !isMotif;
     if (isMotif) {
+        if (!MOTIF_PACKS[motifPack]) motifPack = MOTIF_PACK_IDS[0];
+        // Pack selector chips.
+        if (packTabs) {
+            packTabs.innerHTML = "";
+            MOTIF_PACK_IDS.forEach((pid) => {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "motif-pack-tab";
+                b.textContent = MOTIF_PACKS[pid].label;
+                b.classList.toggle("is-active", pid === motifPack);
+                b.addEventListener("click", () => setMotifPack(pid));
+                packTabs.appendChild(b);
+            });
+        }
+        // The active pack's silhouettes + the always-available upload.
         sub.hidden = false;
         sub.innerHTML = "";
-        MOTIF_STARTERS.forEach((id) => {
+        MOTIF_PACKS[motifPack].ids.forEach((id) => {
             const b = document.createElement("button");
             b.type = "button";
             b.className = "deco-sub-btn motif-thumb";
