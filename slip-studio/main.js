@@ -3621,7 +3621,10 @@ function setDecoColor(hex) {
 // the pot, drag to place, size with a slider. The image is reduced to a
 // mask entirely on-device; the fill colour is state.decoColor.
 function motifSizePx() {
-    return MOTIF_MIN_PX + (MOTIF_MAX_PX - MOTIF_MIN_PX) * THREE.MathUtils.clamp(motifSize, 0, 1);
+    const base = MOTIF_MIN_PX + (MOTIF_MAX_PX - MOTIF_MIN_PX) * THREE.MathUtils.clamp(motifSize, 0, 1);
+    // Divide by zoom like decoRadius (brush/stamp): the motif keeps a
+    // consistent on-screen size, so zooming in places a finer motif.
+    return base / Math.max(0.5, state.zoom);
 }
 // Reduce an image to a silhouette MASK: black shape, alpha = coverage.
 // Art with transparency uses its own alpha; a flat image falls back to a
