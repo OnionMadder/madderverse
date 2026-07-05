@@ -194,7 +194,8 @@ html, body {
 .coach-cap {
     position: absolute;
     left: 50%;
-    bottom: 15%;
+    top: 19%;              /* above the hand — was bottom:15%, hidden behind the deco tray */
+    bottom: auto;
     transform: translateX(-50%);
     margin: 0;
     padding: 8px 16px;
@@ -1093,6 +1094,8 @@ html, body {
     background-size: cover;
 }
 .motif-upload { font-size: 1.25rem; font-weight: 400; }
+/* Undo dims when there's nothing to step back to. */
+.deco-tool:disabled { opacity: 0.38; cursor: default; }
 /* Motif pack selector — small text chips above the thumbnails. */
 .motif-pack-tabs[hidden] { display: none; }
 .motif-pack-tab {
