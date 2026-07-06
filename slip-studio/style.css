@@ -1218,6 +1218,19 @@ html, body {
     color: var(--ink-dim);
 }
 .deco-tool-icon.is-active { color: var(--ink); }
+/* Illustrated family icons (raster). Can't recolour via currentColor, so
+   the active one reads full-strength while the rest sit dimmed; the button
+   chip already tints on .is-active for extra feedback. */
+.deco-tool-icon img {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    opacity: 0.5;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+    pointer-events: none;
+}
+.deco-tool-icon.is-active img { opacity: 1; transform: scale(1.04); }
+.deco-tool-icon:not(.is-active):hover img { opacity: 0.8; }
 /* Edit ACTIONS (Adjust / Undo / Clear): their own quiet centred row at
    the bottom of the tray, set slightly smaller + muted so they read as
    secondary to the tools. */
