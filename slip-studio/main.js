@@ -597,12 +597,12 @@ const BAND_PACK_IDS = ["egyptian"];
 // below. Single-tool families (Stamp/Carve/Picture) select directly.
 // Declared here (before init() runs) so the family functions can use them.
 const DECO_FAMILIES = [
-    { id: "paint",   btn: "famPaint",   tools: ["brush", "splatter"] },
+    { id: "paint",   btn: "famPaint",   tools: ["brush", "splatter", "slip"] },
     { id: "carve",   btn: "famCarve",   tools: ["carve"] },
     { id: "picture", btn: "famPicture", tools: ["motif"] },
     { id: "pattern", btn: "famPattern", tools: ["overlay", "pattern", "band"] },
 ];
-const TOOL_LABELS = { brush: "Brush", splatter: "Splatter", stamp: "Stamp",
+const TOOL_LABELS = { brush: "Brush", splatter: "Splatter", slip: "Slip", stamp: "Stamp",
     carve: "Carve", overlay: "Overlay", motif: "Motif", pattern: "Tile", band: "Band" };
 const familyLastTool = {}; // family id -> last tool used within it (remembered)
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
@@ -2234,6 +2234,15 @@ function paintAt(u, v) {
             const r = Math.max(2, size * (0.18 + Math.random() * 0.42));
             dabWrap(cx + Math.cos(a) * d, cy + Math.sin(a) * d, state.decoColor, r, 0.85);
         }
+    } else if (state.decoTool === "slip") {
+        // Slip trailing: a raised, opaque bead of coloured slip, like piped
+        // icing. Deposit colour into the paint layer AND positive relief
+        // into the bump canvas along the stroke, so the line stands proud.
+        const beadR = Math.max(2.5, size * 0.42);
+        dabWrap(cx, cy, state.decoColor, beadR, 1.0);
+        const bumpR = Math.max(2, beadR * (BUMP_W / DECO_W));
+        bumpDabWrap(u * BUMP_W, (1 - v) * BUMP_H, true, bumpR, 0.6);
+        if (state.bumpTex) state.bumpTex.needsUpdate = true;
     } else {
         dabWrap(cx, cy, state.decoColor, size, 0.9);
     }
@@ -2284,6 +2293,9 @@ function pushDecoHistory() {
         paint: snapDecoCanvas(state.paintCanvas),
         placements: state.placements.map((p) => ({ ...p })), // shallow: canvases/img are immutable
         sgraffito: state.sgraffitoCanvas ? snapDecoCanvas(state.sgraffitoCanvas) : null,
+        // Bump too, so relief-writing tools (slip trailing, carve grooves)
+        // fully reverse on Undo instead of leaving a colourless impression.
+        bump: state.bumpCanvas ? snapDecoCanvas(state.bumpCanvas) : null,
     });
     if (decoHistory.length > DECO_HISTORY_MAX) decoHistory.shift();
     updateUndoBtn();
@@ -2303,6 +2315,11 @@ function undoDeco() {
         state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
         state.sgraffitoCtx.drawImage(snap.sgraffito, 0, 0);
         if (state.sgraffitoTex) state.sgraffitoTex.needsUpdate = true;
+    }
+    if (state.bumpCtx && snap.bump) {
+        state.bumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
+        state.bumpCtx.drawImage(snap.bump, 0, 0);
+        if (state.bumpTex) state.bumpTex.needsUpdate = true;
     }
     state.dirty = true;
     maybeSquelch();
