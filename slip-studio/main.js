@@ -291,6 +291,111 @@ function packContaining(glazeId) {
     return null;
 }
 
+// --- Glaze chemistry (overlapping-dip colour reactions) ----------
+// When two glaze dips OVERLAP, the overlap fires as an emergent THIRD
+// colour instead of the upper dip simply hiding the lower — real glaze
+// chemistry, and a little discovery reward. Signature pairs are curated
+// below (blue+amber → moss, ruby+sapphire → amethyst, …); any pair not
+// listed falls back to a subtractive-but-luminous blend, so an overlap
+// always reads as a believable mix and never crushes to mud.
+const FIRED_HEX_TO_ID = (() => {
+    const m = {};
+    for (const [id, g] of Object.entries(GLAZES)) {
+        if (id === "rainbow") continue;          // shader ramp, not a flat hex
+        m[g.fired.color] = id;
+    }
+    return m;
+})();
+// Curated reactions keyed by an unordered id pair (ids sorted, "|"-joined),
+// so lookup is order-independent. Values are fired hexes. Chosen along
+// intuitive colour theory (blue+yellow=green, blue+red=purple, red+yellow
+// =orange) plus a few kiln surprises, favouring pairs within the same pack.
+const REACTION_PAIRS = (() => {
+    const raw = {
+        // Studio
+        "cobalt|honey":     0x3f6b3a,   // blue over amber → moss green
+        "cobalt|forest":    0x244f4a,   // blue + green → deep teal
+        "cobalt|blush":     0x6e4a6b,   // blue + rose → plum
+        "celadon|honey":    0x6f7a33,   // green + amber → olive
+        "honey|tenmoku":    0x7a481f,   // amber over iron → tortoiseshell (kaki)
+        "blush|celadon":    0x9a8a5e,   // rose + green → soft khaki
+        // Modern
+        "ironred|copper":   0x8a3a1f,   // reds deepen → oxblood
+        "plum|mint":        0x5e6b7a,   // violet + green → slate
+        "gold|copper":      0xc07a2f,   // metals → rich bronze
+        // Garden
+        "indigo|coral":     0x6b3a6b,   // blue + coral → mulberry
+        "teal|terracotta":  0x6b6b3a,   // teal + rust → bronze-olive
+        "olive|lilac":      0x7a6b4a,   // olive + lilac → muted taupe
+        // Jewel
+        "ruby|sapphire":    0x5e2d8a,   // red + blue → amethyst
+        "sapphire|topaz":   0x0f6b45,   // blue + gold → emerald
+        "ruby|topaz":       0xc9552f,   // red + gold → burnt orange
+        "emerald|garnet":   0x5a5a24,   // green + wine → deep olive
+        "turquoise|garnet": 0x4a5a5e,   // aqua + wine → petrol
+        // Sorbet
+        "lemon|sky":        0xa6d68a,   // yellow + blue → pistachio
+        "bubblegum|sky":    0xc4b0ec,   // pink + blue → lavender
+        "lemon|bubblegum":  0xf2b98a,   // yellow + pink → peach
+        "lavender|peach":   0xe0b8c4,   // lavender + peach → dusty rose
+    };
+    const m = {};
+    for (const [k, v] of Object.entries(raw)) {
+        m[k.split("|").sort().join("|")] = v;
+    }
+    return m;
+})();
+// sRGB 0..255 ↔ linear-light helpers, so blends mix in the space light
+// actually adds in (a flat sRGB average of blue+yellow reads grey; a
+// linear one reads green).
+function _s2l(c) { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function _l2s(c) { c = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(Math.max(0, c), 1 / 2.4) - 0.055; return Math.round(Math.min(1, Math.max(0, c)) * 255); }
+function hexRgb(hex) { return { r: (hex >> 16) & 255, g: (hex >> 8) & 255, b: hex & 255 }; }
+function rgbNum(r, g, b) {
+    const c = (v) => Math.min(255, Math.max(0, Math.round(v)));
+    return (c(r) << 16) | (c(g) << 8) | c(b);
+}
+// Default fallback blend: geometric mean in linear light (subtractive-ish,
+// so overlaps darken like layered glaze) with a mild saturation lift so a
+// blue+yellow overlap reads as a real green rather than a muddy grey.
+function blendGlaze(hexA, hexB) {
+    const a = hexRgb(hexA), b = hexRgb(hexB);
+    let rl = Math.sqrt(_s2l(a.r) * _s2l(b.r));
+    let gl = Math.sqrt(_s2l(a.g) * _s2l(b.g));
+    let bl = Math.sqrt(_s2l(a.b) * _s2l(b.b));
+    const L = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl, k = 1.28;
+    rl = L + (rl - L) * k; gl = L + (gl - L) * k; bl = L + (bl - L) * k;
+    return (_l2s(rl) << 16) | (_l2s(gl) << 8) | _l2s(bl);
+}
+const _reactCache = new Map();
+// The emergent colour where glaze A already sits and glaze B is added.
+function reactGlaze(hexA, hexB) {
+    if (hexA === hexB) return hexA;
+    const key = hexA < hexB ? (hexA << 24) ^ hexB : (hexB << 24) ^ hexA;
+    let out = _reactCache.get(key);
+    if (out !== undefined) return out;
+    const ia = FIRED_HEX_TO_ID[hexA], ib = FIRED_HEX_TO_ID[hexB];
+    if (ia && ib) {
+        const pair = REACTION_PAIRS[[ia, ib].sort().join("|")];
+        out = pair != null ? pair : blendGlaze(hexA, hexB);
+    } else {
+        out = blendGlaze(hexA, hexB);
+    }
+    _reactCache.set(key, out);
+    return out;
+}
+// Sample a preset's authored stops (position 0 = rim) at fraction p.
+function sampleStops(stops, p) {
+    p = Math.min(1, Math.max(0, p));
+    let i = 0;
+    while (i < stops.length - 1 && p > stops[i + 1][0]) i++;
+    const s0 = stops[i], s1 = stops[Math.min(i + 1, stops.length - 1)];
+    const t = s1[0] > s0[0] ? (p - s0[0]) / (s1[0] - s0[0]) : 0;
+    const c0 = parseInt(s0[1].slice(1), 16), c1 = parseInt(s1[1].slice(1), 16);
+    const a = hexRgb(c0), b = hexRgb(c1);
+    return { r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t };
+}
+
 // --- Decoration -------------------------------------------------
 // Painted onto the surface (over the glaze) by dragging on the pot.
 // One unwrapped RGBA canvas wraps the pot via UVs; a shader overlays
@@ -1672,11 +1777,51 @@ function makeGlazeDipLayer() {
 // Paint an ordered dip list into a glaze canvas ctx. Shared by the live
 // pot (renderDips) and the partner mesh (syncPartnerMesh) so a dipped
 // lid/pot keeps its glaze in the assembled set.
+// Coverage alpha of a single solid dip at height h (0 foot, 1 rim): the
+// glaze covers [v .. rim] with a soft feathered lower edge over its own
+// span (matches the old solid+feather band, now resolved per-row so dips
+// can react where they stack).
+function dipCoverage(h, v, feather) {
+    if (h <= v) return 0;
+    const fs = Math.max((feather != null ? feather : DIP_FEATHER) * (1 - v), 4 / GLAZE_H);
+    if (h >= v + fs) return 1;
+    return (h - v) / fs;
+}
+// Paint an ordered dip list into a glaze canvas ctx. Resolved per horizontal
+// row so OVERLAPPING dips fire as an emergent third colour (reactGlaze)
+// rather than the top dip simply hiding the one beneath. Bands are uniform
+// across the width, so one fillRect per row is enough; drips (thin, per-dip)
+// are painted on top in each dip's own colour.
 function paintDipList(ctx, list) {
     ctx.clearRect(0, 0, GLAZE_W, GLAZE_H);
+    if (!list || !list.length) return;
+    for (let y = 0; y < GLAZE_H; y++) {
+        const h = 1 - (y + 0.5) / GLAZE_H;      // row height (0 foot, 1 rim)
+        let cr = 0, cg = 0, cb = 0, ca = 0, has = false;
+        for (const d of list) {
+            if (d.type === "preset") {
+                const set = DIP_SETS[d.id];
+                if (!set) continue;
+                const c = sampleStops(set.stops, 1 - h);   // stop pos 0 = rim
+                cr = c.r; cg = c.g; cb = c.b; ca = 1; has = true;
+                continue;
+            }
+            const a = dipCoverage(h, d.v, d.feather);
+            if (a <= 0) continue;
+            if (!has) { const dc = hexRgb(d.hex); cr = dc.r; cg = dc.g; cb = dc.b; ca = a; has = true; }
+            else {
+                const rc = hexRgb(reactGlaze(rgbNum(cr, cg, cb), d.hex));
+                cr += (rc.r - cr) * a; cg += (rc.g - cg) * a; cb += (rc.b - cb) * a;
+                ca = Math.max(ca, a);
+            }
+        }
+        if (!has || ca <= 0) continue;
+        ctx.fillStyle = `rgba(${Math.round(cr)},${Math.round(cg)},${Math.round(cb)},${ca})`;
+        ctx.fillRect(0, y, GLAZE_W, 1);
+    }
     for (const d of list) {
-        if (d.type === "preset") paintPresetDip(ctx, d.id);
-        else paintDip(ctx, d);
+        if (d.type === "preset" || !d.drips) continue;
+        paintDrips(ctx, d, GLAZE_H * (1 - d.v));
     }
 }
 function renderDips() {
@@ -1738,25 +1883,6 @@ function updateDipRemap() {
     setDipRemap(state.partnerMaterial, partner);
 }
 
-// One dip: glaze coats from the RIM (canvas top) DOWN to line v, with a
-// soft feathered lower edge (the gradient) and drips that hang DOWN from
-// that edge over the bare clay below — real molten-glaze gravity drips.
-// d.v = the line height (0 foot, 1 rim); glaze covers [v .. rim].
-function paintDip(ctx, d) {
-    const yLine = GLAZE_H * (1 - d.v);        // canvas y of the lower edge
-    const feath = Math.max(4, (d.feather || DIP_FEATHER) * (1 - d.v) * GLAZE_H);
-    const solidBottom = Math.max(0, yLine - feath);
-    // Solid glaze from the rim (y=0) down to the feather band.
-    ctx.fillStyle = rgba(d.hex, 1);
-    ctx.fillRect(0, 0, GLAZE_W, solidBottom);
-    // Feather band: alpha 1 (glaze) → 0 (bare) across the lower edge.
-    const fg = ctx.createLinearGradient(0, solidBottom, 0, yLine);
-    fg.addColorStop(0, rgba(d.hex, 1));
-    fg.addColorStop(1, rgba(d.hex, 0));
-    ctx.fillStyle = fg;
-    ctx.fillRect(0, solidBottom, GLAZE_W, yLine - solidBottom);
-    if (d.drips) paintDrips(ctx, d, yLine);
-}
 
 // Drips: soft, blobby tendrils of the glaze colour hanging DOWN from the
 // dip's lower edge, each ending in a rounded droplet bead. Opaque — a
@@ -1819,15 +1945,6 @@ function paintDrips(ctx, d, yLine) {
     ctx.restore();
 }
 
-// A preset "dip set": a full-height gradient at full coverage.
-function paintPresetDip(ctx, id) {
-    const set = DIP_SETS[id];
-    if (!set) return;
-    const g = ctx.createLinearGradient(0, 0, 0, GLAZE_H); // 0 = rim (top)
-    set.stops.forEach(([p, c]) => g.addColorStop(p, c));
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, GLAZE_W, GLAZE_H);
-}
 
 // Random drips for a committed dip. They hang DOWN from the line into the
 // bare zone below it (uv height v), so clamp lengths to that room. Gentle
