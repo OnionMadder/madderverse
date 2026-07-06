@@ -802,6 +802,10 @@ const state = {
         // Tube-radius preset id (key into HANDLE_THICKNESSES). Mirrors
         // the lid-style picker — small chip row at handle-on + wet.
         thickness: "medium",
+        // 1 = a single ear (mug / pitcher); 2 = a matched pair (amphora /
+        // urn). The pair is one mesh + its mirror, so a single handle is
+        // just the mirror hidden. A style pref, kept across on/off toggles.
+        count: 2,
     },
     pendingSetId: null,                   // carried across save → reset for lid pairs
     // Has the user done anything that isn't reflected in the gallery?
@@ -1079,6 +1083,7 @@ function init() {
     buildBgPicker();
     buildLidStylePicker();
     buildHandleStylePicker();
+    buildHandleCountPicker();
     let savedBg = DEFAULT_BG, savedMusic = true, savedSfx = true;
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
     try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
@@ -1156,7 +1161,7 @@ function init() {
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze,
             setDipMode, setDipColor, applyDipPreset, undoDip, clearDips, setDripAmount, renderDips,
-            setHandleOn, setHandleThickness,
+            setHandleOn, setHandleThickness, setHandleCount,
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
@@ -2476,26 +2481,37 @@ function ensureHandleMesh() {
         metalness: initial.metalness != null ? initial.metalness : 0,
     });
     state.handle.material = mat;
-    // Apply the glaze DIP layer to the handle too, sampled by height so
-    // its gradient band lines up with the pot body at the same height.
-    // The handle geometry's local y is profile-space (0..TOP), the same
-    // space the pot's dip UV.y lives in, so v = position.y / TOP matches.
-    // Drips are a body detail — we sample a fixed u (0.5) for the gradient.
+    // Apply the glaze DIP layer AND the decoration layer (patterns,
+    // enamels, motifs, paint) to the handle so it isn't left bare while
+    // the pot body is decorated. Both are sampled in the pot's cylindrical
+    // space so they line up with the body:
+    //   v = position.y / TOP  → height (profile-space, same as the pot's
+    //       dip/deco UV.y), so horizontal band patterns + dip gradients
+    //       meet the pot at the same height.
+    //   u = angle around the axis (atan2 of the local x/z) → the same
+    //       0..1 wrap the lathe pot uses, so allover patterns/enamels wrap
+    //       the handle at the pot's density and roughly continue from it.
+    // The dip is radially symmetric (glaze bands) so it keeps its fixed
+    // u=0.5 column; only the deco needs the real angular u.
     mat.onBeforeCompile = (shader) => {
         shader.uniforms.uDipMap = { value: state.dipTex };
+        shader.uniforms.decoMap = { value: state.decoTex };
         shader.vertexShader = shader.vertexShader
-            .replace("#include <common>", "varying float vHandleV;\n#include <common>")
-            .replace("#include <begin_vertex>", `#include <begin_vertex>\n vHandleV = position.y / ${TOP.toFixed(4)};`);
+            .replace("#include <common>", "varying float vHandleV;\nvarying float vHandleU;\n#include <common>")
+            .replace("#include <begin_vertex>", `#include <begin_vertex>\n vHandleV = position.y / ${TOP.toFixed(4)};\n vHandleU = atan( position.z, position.x ) * 0.15915494 + 0.5;`);
         shader.fragmentShader = shader.fragmentShader
-            .replace("#include <common>", "uniform sampler2D uDipMap;\nvarying float vHandleV;\n#include <common>")
+            .replace("#include <common>", "uniform sampler2D uDipMap;\nuniform sampler2D decoMap;\nvarying float vHandleV;\nvarying float vHandleU;\n#include <common>")
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
-                 vec4 _hdip = texture2D( uDipMap, vec2( 0.5, clamp( vHandleV, 0.0, 1.0 ) ) );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _hdip.rgb, vec3( 2.2 ) ), _hdip.a );`,
+                 float _hv = clamp( vHandleV, 0.0, 1.0 );
+                 vec4 _hdip = texture2D( uDipMap, vec2( 0.5, _hv ) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _hdip.rgb, vec3( 2.2 ) ), _hdip.a );
+                 vec4 _hdeco = texture2D( decoMap, vec2( vHandleU, _hv ) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _hdeco.rgb, vec3( 2.2 ) ), _hdeco.a );`,
             );
     };
-    mat.customProgramCacheKey = () => "handle-dip-v1";
+    mat.customProgramCacheKey = () => "handle-deco-dip-v2";
     const geo = buildHandleGeometry();
     // Right ear (canonical geometry).
     const right = new THREE.Mesh(geo, mat);
@@ -2546,6 +2562,7 @@ function setHandleOn(on) {
     }
     updateHandleVisibility();
     updateHandleStylePicker();
+    updateHandleCountPicker();
     state.dirty = true;
     updateToolbar();
 }
@@ -2553,7 +2570,8 @@ function setHandleOn(on) {
 function updateHandleVisibility() {
     const visible = state.handle.on && !state.isLid;
     if (state.handle.mesh)       state.handle.mesh.visible       = visible;
-    if (state.handle.mirrorMesh) state.handle.mirrorMesh.visible = visible;
+    // The mirror ear is the SECOND handle — hidden for a single-handle pot.
+    if (state.handle.mirrorMesh) state.handle.mirrorMesh.visible = visible && state.handle.count !== 1;
 }
 
 // Tube-radius preset swap. New geometry uses the new thickness; the
@@ -2565,6 +2583,42 @@ function setHandleThickness(id) {
     if (state.handle.on) rebuildHandleGeometry();
     updateHandleStylePicker();
     state.dirty = true;
+}
+
+// Single vs. paired handle. count 1 hides the mirror ear (mug / pitcher);
+// count 2 shows both (amphora / urn). Kept across on/off toggles, like
+// thickness — it's a style choice, not a per-session drag.
+function setHandleCount(n) {
+    const count = n === 1 ? 1 : 2;
+    if (state.handle.count === count) return;
+    state.handle.count = count;
+    updateHandleVisibility();
+    updateHandleCountPicker();
+    state.dirty = true;
+}
+
+// Count picker chips (mirrors the thickness picker structure).
+function buildHandleCountPicker() {
+    const wrap = document.getElementById("handleCountPicker");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    [[1, "One"], [2, "Two"]].forEach(([n, txt]) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "lid-style-btn"; // reuses the lid-style chip look
+        b.dataset.count = n;
+        b.textContent = txt;
+        b.setAttribute("aria-label", n === 1 ? "One handle" : "Two handles");
+        b.title = n === 1 ? "One handle" : "Two handles";
+        b.addEventListener("click", () => setHandleCount(n));
+        wrap.appendChild(b);
+    });
+    updateHandleCountPicker();
+}
+function updateHandleCountPicker() {
+    document.querySelectorAll("#handleCountPicker .lid-style-btn").forEach((b) => {
+        b.classList.toggle("is-active", +b.dataset.count === state.handle.count);
+    });
 }
 
 // Thickness picker chips (mirrors the lid-style picker structure).
@@ -3167,8 +3221,10 @@ function resetPot() {
     state.handle.topOffset = 0;
     state.handle.bottomOffset = 0;
     state.handle.thickness = DEFAULT_HANDLE_THICKNESS;
+    state.handle.count = 2;
     updateHandleVisibility();
     updateHandleStylePicker();
+    updateHandleCountPicker();
     // Reset the per-piece vertical stretch — fresh pot, default height.
     setHeightScale(1.0);
     setPhase(INITIAL_STATE);
@@ -3325,8 +3381,11 @@ function updateToolbar() {
     if (brushBar) brushBar.hidden = cs !== "wet";
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
+    const handleControlsOn = state.handle.on && !state.isLid && cs === "leather";
     const handleStylePicker = document.getElementById("handleStylePicker");
-    if (handleStylePicker) handleStylePicker.hidden = !(state.handle.on && !state.isLid && cs === "leather");
+    if (handleStylePicker) handleStylePicker.hidden = !handleControlsOn;
+    const handleCountPicker = document.getElementById("handleCountPicker");
+    if (handleCountPicker) handleCountPicker.hidden = !handleControlsOn;
     // Hide Save + Photo while the kiln animation is still running —
     // cs flips to "fired" the instant advanceStage commits, so without
     // this guard both buttons appear during the 4.5 s firing sequence
@@ -4708,6 +4767,7 @@ async function savePot() {
         handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset      : 0,
         handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset   : 0,
         handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
+        handleCount:  !state.isLid && state.handle.on ? state.handle.count : 2,
         heightScale:  state.heightScale,
         assemblyThumb,
     };
@@ -4746,6 +4806,8 @@ async function savePot() {
                 handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
                 handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset    : 0,
                 handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset : 0,
+                handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
+                handleCount:  !state.isLid && state.handle.on ? state.handle.count : 2,
                 assemblyThumb, // same shared shot
             };
             await dbPut(partnerEntry);
@@ -5336,11 +5398,16 @@ async function loadPot(entry) {
     state.handle.bottomOffset = state.handle.on ? (entry.handleBottom ?? entry.handleHeight ?? 0) : 0;
     state.handle.thickness    = (state.handle.on && HANDLE_THICKNESSES[entry.handleThickness])
         ? entry.handleThickness : DEFAULT_HANDLE_THICKNESS;
+    // Single vs. paired handle. Older entries predate the count field →
+    // default to the paired look they were saved with.
+    state.handle.count = (state.handle.on && entry.handleCount === 1) ? 1 : 2;
     if (state.handle.on) {
         ensureHandleMesh();
         rebuildHandleGeometry();
     }
     updateHandleVisibility();
+    updateHandleStylePicker();
+    updateHandleCountPicker();
 
     // If this entry is part of a set, also load the partner so the
     // assembly view auto-triggers at setPhase("fired") below.

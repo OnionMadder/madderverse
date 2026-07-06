@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=123" />
+    <link rel="stylesheet" href="style.css?v=125" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -183,6 +183,9 @@
              where the tray is already open. Shown only when a handle is on
              (see main.js updateToolbar). -->
         <div class="lid-style-picker handle-thickness-picker" id="handleStylePicker" role="group" aria-label="Handle thickness" hidden></div>
+        <!-- Single vs. paired handle (ONE / TWO). Same chip row, shown with
+             the thickness picker whenever a handle is on. -->
+        <div class="lid-style-picker handle-count-picker" id="handleCountPicker" role="group" aria-label="Handle count" hidden></div>
         <div class="deco-tabs" role="tablist">
             <button class="deco-tab is-active" id="tabGlaze" type="button" role="tab" aria-selected="true">Glaze</button>
             <button class="deco-tab" id="tabDecorate" type="button" role="tab" aria-selected="false">Decorate</button>
@@ -312,7 +315,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=123"></script>
+    <script type="module" src="main.js?v=125"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

@@ -860,7 +860,8 @@ html, body {
    fixed bottom:132px the lid picker uses at the wet stage — that dropped
    it on top of the decorate size row. Let it flow as a centred row at the
    top of the tray instead. Targeted by id so it wins regardless of order. */
-#handleStylePicker.handle-thickness-picker {
+#handleStylePicker.handle-thickness-picker,
+#handleCountPicker.handle-count-picker {
     position: static;
     inset: auto;
     z-index: auto;
