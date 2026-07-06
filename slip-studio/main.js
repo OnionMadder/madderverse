@@ -1163,7 +1163,7 @@ const state = {
             return (saved && GLAZE_PACKS[saved]) ? saved : DEFAULT_GLAZE_PACK;
         } catch (_) { return DEFAULT_GLAZE_PACK; }
     })(),
-    photoStyle: "studio",                // studio | sunlit | museum
+    photoStyle: "studio",                // studio | sunlit | museum | spotlight | pastel
     photoAspect: "square",               // square | portrait
     bgCategory: null,                    // resolved by buildBgPicker
     zoom: 1,                    // 1 = default framing; up to ZOOM_MAX
@@ -5409,6 +5409,29 @@ function composeStyledPhoto(potCanvas, bgImage, style, aspect, target) {
         const glaze = (state.glaze && GLAZES[state.glaze])
             ? GLAZES[state.glaze].name : "Bare clay";
         ctx.fillText(`SLIP STUDIO · ${glaze.toUpperCase()}`, W / 2, stripY + stripH / 2);
+    } else if (style === "spotlight") {
+        // Dark gallery vignette with a bright pool of light on the piece.
+        const vig = ctx.createRadialGradient(W / 2, H * 0.42, W * 0.2, W / 2, H * 0.5, W * 0.8);
+        vig.addColorStop(0, "rgba(8,6,5,0)");
+        vig.addColorStop(1, "rgba(5,4,3,0.74)");
+        ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+        const pool = ctx.createRadialGradient(W / 2, baseY + 20, 20, W / 2, baseY + 20, W * 0.5);
+        pool.addColorStop(0, "rgba(255,244,214,0.28)");
+        pool.addColorStop(1, "rgba(255,244,214,0)");
+        ctx.fillStyle = pool; ctx.fillRect(0, baseY - 40, W, 170);
+        const sh = ctx.createRadialGradient(W / 2, baseY + 34, 24, W / 2, baseY + 34, W * 0.4);
+        sh.addColorStop(0, "rgba(0,0,0,0.5)"); sh.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = sh; ctx.fillRect(0, baseY - 20, W, 120);
+    } else if (style === "pastel") {
+        // Soft, cheerful pastel wash — a diagonal pink→sky→mint veil.
+        const g = ctx.createLinearGradient(0, 0, W, H);
+        g.addColorStop(0,   "rgba(255, 214, 232, 0.42)");
+        g.addColorStop(0.5, "rgba(210, 232, 255, 0.30)");
+        g.addColorStop(1,   "rgba(226, 255, 224, 0.40)");
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+        const sh = ctx.createRadialGradient(W / 2, baseY + 28, 30, W / 2, baseY + 28, W * 0.44);
+        sh.addColorStop(0, "rgba(120,90,110,0.30)"); sh.addColorStop(1, "rgba(120,90,110,0)");
+        ctx.fillStyle = sh; ctx.fillRect(0, baseY - 20, W, 120);
     }
 
     // 3) Pot render — square pot fills full width, vertically anchored.
@@ -5442,7 +5465,7 @@ function renderPhotoPreview() {
 }
 
 function setPhotoStyle(name) {
-    if (!["studio", "sunlit", "museum"].includes(name)) return;
+    if (!["studio", "sunlit", "museum", "spotlight", "pastel"].includes(name)) return;
     state.photoStyle = name;
     syncPhotoChips();
     renderPhotoPreview();
