@@ -200,6 +200,18 @@ const GLAZES = {
     peach:      glaze("Peach",      0xf2ddca, 0xf2b98a),
     periwinkle: glaze("Periwinkle", 0xd4d9f2, 0xa6b0ec),
     rosewater:  glaze("Rosewater",  0xf2e0e2, 0xf0c2c6),
+    // Stoneware pack — kiln-textured earthies. These carry a surface FX
+    // (iron speckle or a raku crackle network, see GLAZE_FX) that paints
+    // into the glaze dip layer, so the texture shows when the glaze is
+    // DIPPED and fires with the glossy dip finish.
+    ash:       glaze("Ash",       0xb9b7ad, 0x8f8c80),
+    shino:     glaze("Shino",     0xd8b48c, 0xc07a3f),
+    tessha:    glaze("Tessha",    0x9a8a76, 0x6b5238),
+    pebble:    glaze("Pebble",    0xb0aa9c, 0x8a8272),
+    mossware:  glaze("Moss",      0xa8b096, 0x6f7a52),
+    dune:      glaze("Dune",      0xd4c4a0, 0xc2a866),
+    rakublue:  glaze("Raku Blue", 0x9ab0c4, 0x3a6b8a, { clearcoat: 0.85, clearcoatRoughness: 0.10 }),
+    rakupearl: glaze("Raku Pearl", 0xe6e0d4, 0xdcd2c0, { clearcoat: 0.90, clearcoatRoughness: 0.08 }),
     // Rainbow is a special glaze: its colour comes from a vertical height
     // ramp painted in the shader (see RAINBOW_STOPS / uRampMix), not from
     // this base hex — the white base just avoids a flash while the ramp
@@ -250,6 +262,7 @@ const GLAZE_IDS = [
     "teal", "lilac", "terracotta", "olive", "indigo", "coral", "charcoal", "seafoam",
     "ruby", "sapphire", "emerald", "amethyst", "topaz", "turquoise", "garnet", "onyx",
     "bubblegum", "lemon", "sky", "pistachio", "lavender", "peach", "periwinkle", "rosewater",
+    "ash", "shino", "tessha", "pebble", "mossware", "dune", "rakublue", "rakupearl",
 ];
 
 // Swappable glaze packs — each pack curates 8 glazes that read well
@@ -277,6 +290,10 @@ const GLAZE_PACKS = {
     sorbet: {
         label: "Sorbet",
         ids: ["bubblegum", "lemon", "sky", "pistachio", "lavender", "peach", "periwinkle", "rosewater"],
+    },
+    stoneware: {
+        label: "Stoneware",
+        ids: ["ash", "shino", "tessha", "pebble", "mossware", "dune", "rakublue", "rakupearl"],
     },
 };
 const DEFAULT_GLAZE_PACK = "studio";
@@ -394,6 +411,38 @@ function sampleStops(stops, p) {
     const c0 = parseInt(s0[1].slice(1), 16), c1 = parseInt(s1[1].slice(1), 16);
     const a = hexRgb(c0), b = hexRgb(c1);
     return { r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t };
+}
+
+// --- Glaze surface FX (speckle / crackle) ------------------------
+// Some glazes carry a kiln texture that paints INTO the dip layer over
+// the glaze band: iron speckle (Stoneware) or a raku crackle network.
+// It rides the dip canvas, so it wraps seamlessly around the pot and
+// takes the glossy fired finish. Amounts 0..1; colours default to a
+// dark iron / craze line if not given. Only glazes listed here are
+// textured — every other glaze dips perfectly smooth.
+const GLAZE_FX = {
+    ash:      { speckle: 0.45 },
+    shino:    { speckle: 0.62, speckleColor: 0x6b3a1f },
+    tessha:   { speckle: 0.95, speckleColor: 0x241a12 },   // heavy iron spotting
+    pebble:   { speckle: 0.5 },
+    mossware: { speckle: 0.6,  speckleColor: 0x3a4327 },
+    dune:     { speckle: 0.4 },
+    rakublue: { crackle: 0.85, crackleColor: 0x14232e },
+    rakupearl:{ crackle: 0.95, crackleColor: 0x4a4038 },
+};
+const FX_SPECKLE_COLOR = 0x2c2118;   // default fleck (dark iron)
+const FX_CRACKLE_COLOR = 0x39302a;   // default craze line
+function glazeFx(id) { return id ? GLAZE_FX[id] : null; }
+// Small deterministic PRNG so a committed dip's speckle/crackle replays
+// bit-for-bit from its stored seed (same contract as makeDrips).
+function mulberry32(seed) {
+    let a = (seed >>> 0) || 1;
+    return function () {
+        a |= 0; a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
 }
 
 // --- Decoration -------------------------------------------------
@@ -988,6 +1037,7 @@ const state = {
     dips: [],
     dipMode: false,
     dipColor: null,
+    dipFxId: null,          // glaze id of the armed dip, for surface FX (speckle/crackle)
     dripAmount: "few",
     // Editable bump layer: painted into by wet-clay texture stamps
     // (positive relief) and leather-hard carving (negative grooves).
@@ -1820,9 +1870,62 @@ function paintDipList(ctx, list) {
         ctx.fillRect(0, y, GLAZE_W, 1);
     }
     for (const d of list) {
-        if (d.type === "preset" || !d.drips) continue;
-        paintDrips(ctx, d, GLAZE_H * (1 - d.v));
+        if (d.type === "preset") continue;
+        if (d.fxId) paintGlazeFx(ctx, d);
+        if (d.drips) paintDrips(ctx, d, GLAZE_H * (1 - d.v));
     }
+}
+// Kiln surface texture for a textured glaze dip (see GLAZE_FX): iron
+// speckle and/or a raku crackle network, painted into the dip band
+// [rim .. line] and clipped there so it never bleeds onto bare clay.
+// Deterministic from d.seed so a saved pot replays identically.
+function paintGlazeFx(ctx, d) {
+    const fx = glazeFx(d.fxId);
+    if (!fx) return;
+    const yBot = GLAZE_H * (1 - d.v);          // the glaze line (band = 0..yBot)
+    if (yBot <= 1) return;
+    const rng = mulberry32((d.seed || 1) ^ 0x9e3779b9);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, GLAZE_W, yBot);
+    ctx.clip();
+    if (fx.speckle > 0) {
+        const col = fx.speckleColor != null ? fx.speckleColor : FX_SPECKLE_COLOR;
+        const count = Math.min(4200, Math.round(fx.speckle * (GLAZE_W * yBot) / 260));
+        for (let i = 0; i < count; i++) {
+            const x = rng() * GLAZE_W, y = rng() * yBot;
+            const r = 0.6 + rng() * 1.9;
+            ctx.fillStyle = rgba(col, 0.22 + rng() * 0.5);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            if (x > GLAZE_W - 3) { ctx.beginPath(); ctx.arc(x - GLAZE_W, y, r, 0, Math.PI * 2); ctx.fill(); }
+        }
+    }
+    if (fx.crackle > 0) {
+        const col = fx.crackleColor != null ? fx.crackleColor : FX_CRACKLE_COLOR;
+        const lines = Math.round(fx.crackle * 30);
+        for (let i = 0; i < lines; i++) {
+            let x = rng() * GLAZE_W, y = rng() * yBot;
+            let ang = rng() * Math.PI * 2;
+            const seg = 8 + Math.floor(rng() * 10);
+            const step = (0.5 + rng() * 0.9) * (GLAZE_H / seg);
+            ctx.strokeStyle = rgba(col, 0.28 + rng() * 0.34);
+            ctx.lineWidth = 0.7 + rng() * 0.9;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for (let s = 0; s < seg; s++) {
+                ang += (rng() - 0.5) * 0.9;                 // gentle meander
+                x += Math.cos(ang) * step;
+                y += Math.sin(ang) * step;
+                const wx = ((x % GLAZE_W) + GLAZE_W) % GLAZE_W;  // wrap seam
+                if (Math.abs(wx - x) > 0.5) { ctx.moveTo(wx, y); x = wx; }
+                else ctx.lineTo(wx, y);
+            }
+            ctx.stroke();
+        }
+    }
+    ctx.restore();
 }
 function renderDips() {
     const ctx = state.dipCtx;
@@ -3509,7 +3612,7 @@ function setGlaze(id) {
     // In dip mode, a glaze swatch just LOADS that colour for the next dip
     // (drag on the pot to apply) rather than flooding the whole pot.
     if (state.dipMode) {
-        setDipColor(GLAZES[id].fired.color);
+        setDipColor(GLAZES[id].fired.color, id);
         updateGlazeBar();
         return;
     }
@@ -3612,16 +3715,18 @@ function setDipMode(on) {
         // change it (the swatch highlights to show what's loaded).
         if (state.dipColor == null) {
             const first = currentPackIds()[0];
-            if (first && GLAZES[first]) state.dipColor = GLAZES[first].fired.color;
+            if (first && GLAZES[first]) { state.dipColor = GLAZES[first].fired.color; state.dipFxId = first; }
         }
     } else {
         state.dipColor = null;
+        state.dipFxId = null;
     }
     updateDipBar();
     updateGlazeBar();
 }
-function setDipColor(hex) {
+function setDipColor(hex, fxId) {
     state.dipColor = hex;
+    state.dipFxId = fxId || null;   // glaze id, so a committed dip keeps its surface FX
     updateDipBar();
 }
 function setDripAmount(name) {
@@ -4694,7 +4799,7 @@ function onPointerDown(ev) {
             const uvd = pointerToUV(ev);
             if (uvd) {
                 dipping = true;
-                dipPreview = { type: "dip", v: THREE.MathUtils.clamp(uvd.y, 0.02, 1), hex: state.dipColor, feather: DIP_FEATHER };
+                dipPreview = { type: "dip", v: THREE.MathUtils.clamp(uvd.y, 0.02, 1), hex: state.dipColor, feather: DIP_FEATHER, fxId: state.dipFxId, seed: 1 };
                 renderDips();
                 ev.preventDefault();
                 return;
@@ -4848,6 +4953,7 @@ function onPointerUp(ev) {
         if (dipping) {
             if (dipPreview) {
                 dipPreview.drips = makeDrips(dipPreview.v);
+                dipPreview.seed = (Math.random() * 1e9) | 0;   // freeze FX pattern
                 state.dips.push(dipPreview);
                 dipPreview = null;
                 state.dirty = true;
