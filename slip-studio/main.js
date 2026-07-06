@@ -181,6 +181,25 @@ const GLAZES = {
     coral:      glaze("Coral",      0xe0a998, 0xd96a4f),
     charcoal:   glaze("Charcoal",   0x9a9a94, 0x33332f),
     seafoam:    glaze("Seafoam",    0xbfe0d4, 0x6fb59a),
+    // Jewel pack — deep, saturated gem tones (a couple carry a light metal
+    // or extra-glossy finish so they read like polished stone).
+    ruby:      glaze("Ruby",      0xc99a9e, 0x9e1f3a),
+    sapphire:  glaze("Sapphire",  0x9aa6c9, 0x1c3a8e),
+    emerald:   glaze("Emerald",   0x9ac4ad, 0x0f6b45),
+    amethyst:  glaze("Amethyst",  0xbfa6cc, 0x5e2d8a),
+    topaz:     glaze("Topaz",     0xd9c48f, 0xc98a1f, { metalness: 0.30, roughness: 0.30, envMapIntensity: 1.05 }),
+    turquoise: glaze("Turquoise", 0x9ad6cf, 0x0f8a8a),
+    garnet:    glaze("Garnet",    0xc49a92, 0x6e1f2a),
+    onyx:      glaze("Onyx",      0x8a8683, 0x161412, { clearcoat: 0.90, clearcoatRoughness: 0.06, roughness: 0.34, envMapIntensity: 1.10 }),
+    // Sorbet pack — soft pastels.
+    bubblegum:  glaze("Bubblegum",  0xf2d9e4, 0xf2a6c4),
+    lemon:      glaze("Lemon",      0xf2ecc4, 0xf2e070),
+    sky:        glaze("Sky",        0xcfe4f2, 0x8fc8ec),
+    pistachio:  glaze("Pistachio",  0xdae8bc, 0xc0dd8a),
+    lavender:   glaze("Lavender",   0xe0d9f0, 0xc4b0ec),
+    peach:      glaze("Peach",      0xf2ddca, 0xf2b98a),
+    periwinkle: glaze("Periwinkle", 0xd4d9f2, 0xa6b0ec),
+    rosewater:  glaze("Rosewater",  0xf2e0e2, 0xf0c2c6),
     // Rainbow is a special glaze: its colour comes from a vertical height
     // ramp painted in the shader (see RAINBOW_STOPS / uRampMix), not from
     // this base hex — the white base just avoids a flash while the ramp
@@ -213,8 +232,15 @@ const DIP_SETS = {
     orchid:  { label: "Orchid",  stops: [[0, "#f2d9ec"], [0.45, "#c98ac0"], [1, "#552e6b"]] },
     terra:   { label: "Terra",   stops: [[0, "#f0cf9c"], [0.5, "#d1874f"], [1, "#7a3320"]] },
     storm:   { label: "Storm",   stops: [[0, "#d2d9df"], [0.5, "#7d8a99"], [1, "#2b3540"]] },
+    lagoon:  { label: "Lagoon",  stops: [[0, "#a6f0e0"], [0.5, "#2fb8c4"], [1, "#123a7a"]] },
+    grape:   { label: "Grape",   stops: [[0, "#e6d4f2"], [0.5, "#a678d6"], [1, "#3a2a6b"]] },
+    citrus:  { label: "Citrus",  stops: [[0, "#fff0a6"], [0.4, "#ffc23a"], [0.7, "#ff7a2f"], [1, "#e63a3a"]] },
+    dawn:    { label: "Dawn",    stops: [[0, "#ffe0d6"], [0.4, "#ffb0c4"], [0.7, "#b088e0"], [1, "#5a6bd6"]] },
+    autumn:  { label: "Autumn",  stops: [[0, "#f2d68a"], [0.4, "#e0902f"], [0.7, "#b5442a"], [1, "#5a2a20"]] },
+    ink:     { label: "Ink",     stops: [[0, "#e8e8ea"], [0.5, "#8a8a90"], [1, "#1a1a1e"]] },
 };
-const DIP_SET_IDS = ["rainbow", "sunset", "ocean", "ember", "meadow", "orchid", "terra", "storm"];
+const DIP_SET_IDS = ["rainbow", "sunset", "ocean", "ember", "meadow", "orchid", "terra", "storm",
+    "lagoon", "grape", "citrus", "dawn", "autumn", "ink"];
 const DIP_FEATHER = 0.14;              // soft top-edge fraction of the dip's own span
 const DRIP_COUNTS = { off: 0, few: 4, lots: 9 };
 const GLAZE_IDS = [
@@ -222,6 +248,8 @@ const GLAZE_IDS = [
     "blush", "forest", "slate", "plum", "sand",
     "gold", "copper", "platinum", "ironred", "mint", "pearl",
     "teal", "lilac", "terracotta", "olive", "indigo", "coral", "charcoal", "seafoam",
+    "ruby", "sapphire", "emerald", "amethyst", "topaz", "turquoise", "garnet", "onyx",
+    "bubblegum", "lemon", "sky", "pistachio", "lavender", "peach", "periwinkle", "rosewater",
 ];
 
 // Swappable glaze packs — each pack curates 8 glazes that read well
@@ -241,6 +269,14 @@ const GLAZE_PACKS = {
     garden: {
         label: "Garden",
         ids: ["teal", "lilac", "terracotta", "olive", "indigo", "coral", "charcoal", "seafoam"],
+    },
+    jewel: {
+        label: "Jewel",
+        ids: ["ruby", "sapphire", "emerald", "amethyst", "topaz", "turquoise", "garnet", "onyx"],
+    },
+    sorbet: {
+        label: "Sorbet",
+        ids: ["bubblegum", "lemon", "sky", "pistachio", "lavender", "peach", "periwinkle", "rosewater"],
     },
 };
 const DEFAULT_GLAZE_PACK = "studio";
@@ -262,6 +298,7 @@ function packContaining(glazeId) {
 const DECO_COLORS = [
     0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86, 0x6e4a6b, 0x4a5a68,
     0xffffff, 0x8c2f2f, 0xc94f3a, 0xd9a441, 0x2f7d5b, 0x2f6f8f, 0x2a356b, 0x6b4a2f,
+    0xe85a9c, 0xef7d2a, 0x8fc23a, 0x5aa6e0, 0x7a4ad6, 0x2fb8a6, 0xf2d04a, 0x8a8a86,
 ];
 const DECO_W = 2048, DECO_H = 1024; // unwrapped surface (≈ circumference:height)
 // Bump canvas. The procedural clay grain is rendered into it once at
@@ -389,7 +426,6 @@ const BAND_PACK_IDS = ["egyptian"];
 // Declared here (before init() runs) so the family functions can use them.
 const DECO_FAMILIES = [
     { id: "paint",   btn: "famPaint",   tools: ["brush", "splatter"] },
-    { id: "stamp",   btn: "famStamp",   tools: ["stamp"] },
     { id: "carve",   btn: "famCarve",   tools: ["carve"] },
     { id: "picture", btn: "famPicture", tools: ["motif"] },
     { id: "pattern", btn: "famPattern", tools: ["overlay", "pattern", "band"] },
@@ -685,6 +721,29 @@ const SHAPES = {
             [0.22, 1.00], [0.20, 1.18], [0.22, 1.32], [0.20, 1.40],
         ],
     },
+    plate: {
+        label: "Plate",
+        controls: [
+            [0.00, 0.00], [0.46, 0.00], [0.54, 0.05], [0.68, 0.14],
+            [0.80, 0.26], [0.88, 0.40], [0.90, 0.52], [0.88, 0.60],
+        ],
+    },
+    jar: {
+        label: "Jar",
+        controls: [
+            [0.00, 0.00], [0.36, 0.00], [0.40, 0.06], [0.45, 0.22],
+            [0.47, 0.55], [0.46, 0.86], [0.42, 1.06], [0.33, 1.16],
+            [0.30, 1.24], [0.31, 1.33], [0.30, 1.40],
+        ],
+    },
+    egg: {
+        label: "Egg",
+        controls: [
+            [0.00, 0.00], [0.16, 0.00], [0.24, 0.06], [0.40, 0.24],
+            [0.52, 0.50], [0.54, 0.74], [0.48, 0.98], [0.34, 1.18],
+            [0.20, 1.32], [0.13, 1.40],
+        ],
+    },
 };
 
 // Lid silhouettes — keyed by style. Each entry generates control
@@ -746,12 +805,28 @@ const LID_STYLES = {
         [0.00,     0.70],
         [0.00,     1.40],
     ],
+    // Pointed: a graceful steeple cone rising to a tiny finial bulb.
+    // ~68% of pot height.
+    pointed: (k) => [
+        [0.00,     0.00],
+        [k,        0.00],
+        [k,        0.04],
+        [k * 0.88, 0.09],
+        [k * 0.64, 0.20],
+        [k * 0.40, 0.32],
+        [k * 0.22, 0.44],
+        [k * 0.11, 0.54],
+        [k * 0.17, 0.60],   // tiny finial bulb
+        [k * 0.08, 0.65],
+        [0.00,     0.68],
+        [0.00,     1.40],
+    ],
 };
-const LID_STYLE_IDS = ["flat", "domed", "tall"];
+const LID_STYLE_IDS = ["flat", "domed", "tall", "pointed"];
 
 // Lids are now generated parametrically from the source pot's rim
 // (see seedLidForRim) — no preset silhouette needed.
-const SHAPE_IDS = ["vase", "bowl", "cup", "bottle"]; // picker order; lid is set-only
+const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "plate", "jar", "egg"]; // picker order; lid is set-only
 const DEFAULT_SHAPE = "vase";
 
 const state = {
@@ -2331,9 +2406,8 @@ function applyOverlay(id) {
 
 // Dispatch a pot-touch to the active decorate tool.
 function decoApplyAt(u, v) {
-    if (state.decoTool === "stamp")     stampAt(u, v);
-    else if (state.decoTool === "carve") scratchAt(u, v);
-    else                                 paintAt(u, v); // brush / splatter
+    if (state.decoTool === "carve") scratchAt(u, v);
+    else                            paintAt(u, v); // brush / splatter
     state.dirty = true;
 }
 
@@ -3231,6 +3305,16 @@ function advanceStage() {
             scheduleCoach("leather"); // first time at Decorate → teach the dip
             break;
         case "leather":
+            // A handle is bound to the ACTIVE mesh; the partner mesh has
+            // none. So if we're firing a set with the lid active while the
+            // pot carries a handle, swap the pot in first — then it fires as
+            // the active piece (bottom of the assembly) with its handle
+            // showing, and the lid rides along as the partner on top.
+            if (state.isLid && state.savedPot && state.handle.on) {
+                swapActivePiece();
+                if (state.handle.on) rebuildHandleGeometry();
+                updateHandleVisibility();
+            }
             setPhase("fired");
             playSfx("kiln");
             haptic(30); // a firmer rumble for the commitment to fire
@@ -4067,20 +4151,7 @@ function updateDecoSub() {
         sub.appendChild(up);
         return;
     }
-    if (state.decoTool === "stamp") {
-        sub.hidden = false;
-        sub.innerHTML = "";
-        STAMP_SHAPES.forEach((sh) => {
-            const b = document.createElement("button");
-            b.type = "button";
-            b.className = "deco-sub-btn";
-            b.textContent = sh.glyph;
-            b.setAttribute("aria-label", sh.id + " stamp");
-            b.classList.toggle("is-active", sh.id === state.stampShape);
-            b.addEventListener("click", () => setStampShape(sh.id));
-            sub.appendChild(b);
-        });
-    } else if (state.decoTool === "overlay") {
+    if (state.decoTool === "overlay") {
         sub.hidden = false;
         sub.innerHTML = "";
         OVERLAY_PATTERNS.forEach((p) => {
@@ -4628,12 +4699,7 @@ function onPointerMove(ev) {
     } else if (state.painting) {
         const uv = pointerToUV(ev);
         if (uv) {
-            if (state.decoTool === "stamp") {
-                // Place spaced stamps along the drag.
-                const moved = !lastPaintUV ? Infinity : Math.hypot(
-                    (uv.x - lastPaintUV.x) * DECO_W, (uv.y - lastPaintUV.y) * DECO_H);
-                if (moved > decoRadius() * 1.8) { stampAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
-            } else if (state.decoTool === "carve") {
+            if (state.decoTool === "carve") {
                 if (lastPaintUV) scratchStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
                 else scratchAt(uv.x, uv.y);
                 lastPaintUV = { x: uv.x, y: uv.y };
@@ -5743,6 +5809,17 @@ function pulseSaveFlash() {
 
 // Restore a saved pot into the scene as a finished (fired) piece.
 async function loadPot(entry) {
+    // For a handled SET, always load the POT (the handle-bearer) as the
+    // active piece — the handle binds to the active mesh, and the lid can't
+    // carry it, so loading the lid side would show a handle-less assembly.
+    // Redirect a lid entry to its handled-pot partner.
+    if (entry.setId && lookupIsLid(entry)) {
+        try {
+            const all = await dbAll();
+            const potMember = all.find((p) => p.setId === entry.setId && !lookupIsLid(p) && p.handle);
+            if (potMember) entry = potMember;
+        } catch (_) { /* gallery read failed — load the entry as-is */ }
+    }
     // Reset set state first; populated below if the loaded entry pairs.
     state.savedPot = null;
     state.savedLid = null;
