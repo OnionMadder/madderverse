@@ -887,13 +887,6 @@ const SHAPES = {
             [0.22, 1.00], [0.20, 1.18], [0.22, 1.32], [0.20, 1.40],
         ],
     },
-    plate: {
-        label: "Plate",
-        controls: [
-            [0.00, 0.00], [0.46, 0.00], [0.54, 0.05], [0.68, 0.14],
-            [0.80, 0.26], [0.88, 0.40], [0.90, 0.52], [0.88, 0.60],
-        ],
-    },
     jar: {
         label: "Jar",
         controls: [
@@ -931,14 +924,6 @@ const SHAPES = {
             [0.00, 0.00], [0.18, 0.00], [0.22, 0.05], [0.34, 0.22],
             [0.40, 0.40], [0.30, 0.56], [0.16, 0.72], [0.12, 0.96],
             [0.12, 1.20], [0.14, 1.34], [0.17, 1.40],
-        ],
-    },
-    tumbler: {
-        label: "Tumbler",
-        controls: [
-            [0.00, 0.00], [0.34, 0.00], [0.36, 0.05], [0.37, 0.30],
-            [0.38, 0.60], [0.39, 0.90], [0.40, 1.15], [0.41, 1.32],
-            [0.42, 1.40],
         ],
     },
     // Mug: a stout straight-walled cup that auto-attaches a single handle
@@ -1034,8 +1019,8 @@ const LID_STYLE_IDS = ["flat", "domed", "tall", "pointed"];
 
 // Lids are now generated parametrically from the source pot's rim
 // (see seedLidForRim) — no preset silhouette needed.
-const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "plate", "jar", "egg",
-    "planter", "goblet", "budvase", "tumbler", "mug"]; // picker order; lid is set-only
+const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "jar", "egg",
+    "planter", "goblet", "budvase", "mug"]; // picker order; lid is set-only
 const DEFAULT_SHAPE = "vase";
 
 const state = {
