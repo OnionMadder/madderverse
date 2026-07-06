@@ -1339,14 +1339,21 @@ html, body {
 /* Pack-picker tabs above the glaze swatches. Visually mirror the
    backdrop category tabs so the whole picker grammar reads as one
    design language. Compact, low-contrast inactive, chip-style active. */
-.glaze-pack-tabs {
+.glaze-pack-tabs, .dip-pack-tabs {
     display: flex;
     justify-content: center;
     gap: 4px;
     margin-bottom: 2px;
+    flex-wrap: wrap;
     pointer-events: auto;
 }
-.glaze-pack-tab {
+/* The dip pack tabs live in the pointer-events:none deco tray. */
+.dip-pack-tab { pointer-events: auto; }
+/* The preset chips are a display:contents wrapper so they sit directly in
+   the dip row's flex like they used to (the wrapper just lets us rebuild
+   them on a pack switch without touching the Dip toggle beside them). */
+.dip-presets { display: contents; }
+.glaze-pack-tab, .dip-pack-tab {
     -webkit-tap-highlight-color: transparent;
     -webkit-appearance: none;
     appearance: none;
@@ -2076,7 +2083,7 @@ html, body {
    chip, a subtle brighten on hover, and a bright cream fill with
    dark text when active. Placed last so it wins the cascade.
    ============================================================ */
-.deco-tab, .bg-tab, .glaze-pack-tab, .motif-pack-tab,
+.deco-tab, .bg-tab, .glaze-pack-tab, .motif-pack-tab, .dip-pack-tab,
 .dip-toggle, .dip-chip, .deco-variant, .deco-act,
 .photo-chip, .lid-style-btn {
     background: var(--chip);
@@ -2087,6 +2094,7 @@ html, body {
 .bg-tab:not(.is-active):not(:disabled):hover,
 .glaze-pack-tab:not(.is-active):not(:disabled):hover,
 .motif-pack-tab:not(.is-active):not(:disabled):hover,
+.dip-pack-tab:not(.is-active):not(:disabled):hover,
 .dip-toggle:not(.is-active):not(:disabled):hover,
 .dip-chip:not(.is-active):not(:disabled):hover,
 .deco-variant:not(.is-active):not(:disabled):hover,
@@ -2098,7 +2106,8 @@ html, body {
     background: var(--chip-hi);
 }
 .deco-tab.is-active, .bg-tab.is-active, .glaze-pack-tab.is-active,
-.motif-pack-tab.is-active, .dip-toggle.is-active, .dip-chip.is-active,
+.motif-pack-tab.is-active, .dip-pack-tab.is-active,
+.dip-toggle.is-active, .dip-chip.is-active,
 .deco-variant.is-active, .deco-act.is-active,
 .photo-chip.is-active, .lid-style-btn.is-active {
     color: var(--pill-active-ink);

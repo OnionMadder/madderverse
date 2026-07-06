@@ -253,24 +253,65 @@ const RAINBOW_STOPS = [
 // up from each line. "Dip sets" are one-tap full-height gradient presets.
 const GLAZE_W = 1024, GLAZE_H = 512;   // dip layer resolution
 // Preset dip sets — full-height gradients, stops authored rim (0) → foot (1).
+// Grouped into themed packs (like the glaze packs): a pack selector above
+// the preset chips shows one themed assortment at a time. Every id stays
+// unique + permanent so saved pots keep resolving their preset dip.
 const DIP_SETS = {
+    // Sky — dawns, dusks, auroras, the rainbow.
     rainbow: { label: "Rainbow", stops: RAINBOW_STOPS },
-    sunset:  { label: "Sunset",  stops: [[0, "#ffd76b"], [0.42, "#ff9e4a"], [0.72, "#e6533f"], [1, "#7a2a6b"]] },
-    ocean:   { label: "Ocean",   stops: [[0, "#9ce8dc"], [0.45, "#39a0c4"], [1, "#123a6b"]] },
-    ember:   { label: "Ember",   stops: [[0, "#ffe08a"], [0.5, "#f2762a"], [1, "#5a1414"]] },
-    meadow:  { label: "Meadow",  stops: [[0, "#d6ecae"], [0.5, "#7cbd76"], [1, "#2f6b4e"]] },
-    orchid:  { label: "Orchid",  stops: [[0, "#f2d9ec"], [0.45, "#c98ac0"], [1, "#552e6b"]] },
-    terra:   { label: "Terra",   stops: [[0, "#f0cf9c"], [0.5, "#d1874f"], [1, "#7a3320"]] },
-    storm:   { label: "Storm",   stops: [[0, "#d2d9df"], [0.5, "#7d8a99"], [1, "#2b3540"]] },
-    lagoon:  { label: "Lagoon",  stops: [[0, "#a6f0e0"], [0.5, "#2fb8c4"], [1, "#123a7a"]] },
-    grape:   { label: "Grape",   stops: [[0, "#e6d4f2"], [0.5, "#a678d6"], [1, "#3a2a6b"]] },
-    citrus:  { label: "Citrus",  stops: [[0, "#fff0a6"], [0.4, "#ffc23a"], [0.7, "#ff7a2f"], [1, "#e63a3a"]] },
     dawn:    { label: "Dawn",    stops: [[0, "#ffe0d6"], [0.4, "#ffb0c4"], [0.7, "#b088e0"], [1, "#5a6bd6"]] },
+    sunset:  { label: "Sunset",  stops: [[0, "#ffd76b"], [0.42, "#ff9e4a"], [0.72, "#e6533f"], [1, "#7a2a6b"]] },
+    dusk:    { label: "Dusk",    stops: [[0, "#ffd0a6"], [0.4, "#e08ab0"], [0.7, "#8a6bc4"], [1, "#3a3a7a"]] },
+    aurora:  { label: "Aurora",  stops: [[0, "#c6f0d6"], [0.4, "#5ad6b0"], [0.7, "#3a9ed6"], [1, "#3a3a8a"]] },
+    morning: { label: "Morning", stops: [[0, "#fff2d6"], [0.5, "#ffd0b0"], [1, "#e88aa0"]] },
+    // Sea — blues, greens, water.
+    ocean:   { label: "Ocean",   stops: [[0, "#9ce8dc"], [0.45, "#39a0c4"], [1, "#123a6b"]] },
+    lagoon:  { label: "Lagoon",  stops: [[0, "#a6f0e0"], [0.5, "#2fb8c4"], [1, "#123a7a"]] },
+    tide:    { label: "Tide",    stops: [[0, "#d6f0ea"], [0.45, "#6bc4c4"], [1, "#1a5a7a"]] },
+    reef:    { label: "Reef",    stops: [[0, "#a6f0d6"], [0.4, "#2fb8a6"], [0.7, "#2f7d9e"], [1, "#243a6b"]] },
+    mist:    { label: "Mist",    stops: [[0, "#e0eaea"], [0.5, "#a6bcc4"], [1, "#5a6b7a"]] },
+    storm:   { label: "Storm",   stops: [[0, "#d2d9df"], [0.5, "#7d8a99"], [1, "#2b3540"]] },
+    // Ember — fire, heat, citrus.
+    ember:   { label: "Ember",   stops: [[0, "#ffe08a"], [0.5, "#f2762a"], [1, "#5a1414"]] },
+    molten:  { label: "Molten",  stops: [[0, "#ffe08a"], [0.4, "#ff9e2a"], [0.7, "#e63a2a"], [1, "#6b1414"]] },
+    citrus:  { label: "Citrus",  stops: [[0, "#fff0a6"], [0.4, "#ffc23a"], [0.7, "#ff7a2f"], [1, "#e63a3a"]] },
+    coral:   { label: "Coral",   stops: [[0, "#ffe0d0"], [0.4, "#ff9e8a"], [0.7, "#e65a6b"], [1, "#8a2a5a"]] },
+    spice:   { label: "Spice",   stops: [[0, "#f0c98a"], [0.4, "#d98a3a"], [0.7, "#a53a2a"], [1, "#5a2420"]] },
     autumn:  { label: "Autumn",  stops: [[0, "#f2d68a"], [0.4, "#e0902f"], [0.7, "#b5442a"], [1, "#5a2a20"]] },
+    // Garden — greens + florals.
+    meadow:  { label: "Meadow",  stops: [[0, "#d6ecae"], [0.5, "#7cbd76"], [1, "#2f6b4e"]] },
+    fern:    { label: "Fern",    stops: [[0, "#e0f0c4"], [0.45, "#8abd5a"], [1, "#2f6b3a"]] },
+    moss:    { label: "Moss",    stops: [[0, "#dce8b0"], [0.5, "#8a9e4a"], [1, "#3a5a2f"]] },
+    orchid:  { label: "Orchid",  stops: [[0, "#f2d9ec"], [0.45, "#c98ac0"], [1, "#552e6b"]] },
+    bloom:   { label: "Bloom",   stops: [[0, "#f2d9ec"], [0.4, "#e08ac4"], [0.7, "#b05aa6"], [1, "#5a2a6b"]] },
+    grape:   { label: "Grape",   stops: [[0, "#e6d4f2"], [0.5, "#a678d6"], [1, "#3a2a6b"]] },
+    // Earth — clay, sand, neutrals, ink.
+    terra:   { label: "Terra",   stops: [[0, "#f0cf9c"], [0.5, "#d1874f"], [1, "#7a3320"]] },
+    clay:    { label: "Clay",    stops: [[0, "#f0d9b0"], [0.5, "#d19a6b"], [1, "#8a4a30"]] },
+    sand:    { label: "Sand",    stops: [[0, "#f2e8c4"], [0.5, "#d9c48a"], [1, "#a68a4a"]] },
+    umber:   { label: "Umber",   stops: [[0, "#e0c4a0"], [0.5, "#a67a4a"], [1, "#4a3020"]] },
+    ash:     { label: "Ash",     stops: [[0, "#e0e0e0"], [0.5, "#9a9a94"], [1, "#3a3a38"]] },
     ink:     { label: "Ink",     stops: [[0, "#e8e8ea"], [0.5, "#8a8a90"], [1, "#1a1a1e"]] },
 };
-const DIP_SET_IDS = ["rainbow", "sunset", "ocean", "ember", "meadow", "orchid", "terra", "storm",
-    "lagoon", "grape", "citrus", "dawn", "autumn", "ink"];
+// Themed dip-set packs — mirror GLAZE_PACKS; the picker shows one at a time.
+const DIP_SET_PACKS = {
+    sky:    { label: "Sky",    ids: ["rainbow", "dawn", "sunset", "dusk", "aurora", "morning"] },
+    sea:    { label: "Sea",    ids: ["ocean", "lagoon", "tide", "reef", "mist", "storm"] },
+    ember:  { label: "Ember",  ids: ["ember", "molten", "citrus", "coral", "spice", "autumn"] },
+    garden: { label: "Garden", ids: ["meadow", "fern", "moss", "orchid", "bloom", "grape"] },
+    earth:  { label: "Earth",  ids: ["terra", "clay", "sand", "umber", "ash", "ink"] },
+};
+const DIP_SET_PACK_IDS = ["sky", "sea", "ember", "garden", "earth"];
+const DEFAULT_DIP_PACK = "sky";
+function currentDipPackIds() {
+    return (DIP_SET_PACKS[state.dipPack] || DIP_SET_PACKS[DEFAULT_DIP_PACK]).ids;
+}
+function dipPackContaining(presetId) {
+    for (const pid of DIP_SET_PACK_IDS) {
+        if (DIP_SET_PACKS[pid].ids.includes(presetId)) return pid;
+    }
+    return null;
+}
 const DIP_FEATHER = 0.14;              // soft top-edge fraction of the dip's own span
 const DRIP_COUNTS = { off: 0, few: 4, lots: 9 };
 const GLAZE_IDS = [
@@ -1151,6 +1192,12 @@ const state = {
             const saved = localStorage.getItem("slip-glaze-pack");
             return (saved && GLAZE_PACKS[saved]) ? saved : DEFAULT_GLAZE_PACK;
         } catch (_) { return DEFAULT_GLAZE_PACK; }
+    })(),
+    dipPack: (() => {
+        try {
+            const saved = localStorage.getItem("slip-dip-pack");
+            return (saved && DIP_SET_PACKS[saved]) ? saved : DEFAULT_DIP_PACK;
+        } catch (_) { return DEFAULT_DIP_PACK; }
     })(),
     photoStyle: "studio",                // studio | sunlit | museum | spotlight | pastel
     photoAspect: "square",               // square | portrait
@@ -3767,6 +3814,22 @@ function buildDipBar() {
     const wrap = document.getElementById("dipBar");
     if (!wrap) return;
     wrap.innerHTML = "";
+    // Themed dip-set pack tabs (Sky / Sea / Ember / Garden / Earth) — the
+    // preset chips below show one themed assortment at a time, like glazes.
+    const packRow = document.createElement("div");
+    packRow.className = "dip-pack-tabs";
+    packRow.id = "dipPackTabs";
+    DIP_SET_PACK_IDS.forEach((pid) => {
+        const t = document.createElement("button");
+        t.type = "button";
+        t.className = "dip-pack-tab";
+        t.dataset.dipPack = pid;
+        t.textContent = DIP_SET_PACKS[pid].label;
+        t.addEventListener("click", () => setDipPack(pid));
+        packRow.appendChild(t);
+    });
+    wrap.appendChild(packRow);
+
     const row1 = document.createElement("div");
     row1.className = "dip-row";
     const toggle = document.createElement("button");
@@ -3776,19 +3839,13 @@ function buildDipBar() {
     toggle.textContent = "Dip";
     toggle.addEventListener("click", () => setDipMode(!state.dipMode));
     row1.appendChild(toggle);
-    DIP_SET_IDS.forEach((id) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "dip-preset";
-        b.dataset.preset = id;
-        const stops = DIP_SETS[id].stops.map(([p, c]) => `${c} ${Math.round(p * 100)}%`).join(", ");
-        b.style.background = `linear-gradient(180deg, ${stops})`;
-        b.title = DIP_SETS[id].label + " dip set";
-        b.setAttribute("aria-label", DIP_SETS[id].label + " dip set");
-        b.addEventListener("click", () => applyDipPreset(id));
-        row1.appendChild(b);
-    });
+    // Preset gradient chips for the active pack; rebuilt on pack switch.
+    const presets = document.createElement("span");
+    presets.className = "dip-presets";
+    presets.id = "dipPresets";
+    row1.appendChild(presets);
     wrap.appendChild(row1);
+    renderDipPresetChips();
 
     const row2 = document.createElement("div");
     row2.className = "dip-row dip-row-tools";
@@ -3825,6 +3882,31 @@ function buildDipBar() {
     updateDipBar();
 }
 
+// (Re)build the preset gradient chips for the active dip pack.
+function renderDipPresetChips() {
+    const wrap = document.getElementById("dipPresets");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    currentDipPackIds().forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dip-preset";
+        b.dataset.preset = id;
+        const stops = DIP_SETS[id].stops.map(([p, c]) => `${c} ${Math.round(p * 100)}%`).join(", ");
+        b.style.background = `linear-gradient(180deg, ${stops})`;
+        b.title = DIP_SETS[id].label + " dip set";
+        b.setAttribute("aria-label", DIP_SETS[id].label + " dip set");
+        b.addEventListener("click", () => applyDipPreset(id));
+        wrap.appendChild(b);
+    });
+}
+function setDipPack(id) {
+    if (!DIP_SET_PACKS[id]) return;
+    state.dipPack = id;
+    try { localStorage.setItem("slip-dip-pack", id); } catch (_) {}
+    renderDipPresetChips();
+    updateDipBar();
+}
 function setDipMode(on) {
     state.dipMode = !!on;
     if (state.dipMode) {
@@ -3884,6 +3966,9 @@ function updateDipBar() {
     }
     const tools = document.getElementById("dipTools");
     if (tools) tools.hidden = !state.dipMode;
+    document.querySelectorAll("#dipPackTabs .dip-pack-tab").forEach((b) => {
+        b.classList.toggle("is-active", b.dataset.dipPack === state.dipPack);
+    });
     const hint = document.getElementById("dipHint");
     if (hint) hint.hidden = !state.dipMode;
     document.querySelectorAll("#dipBar .dip-chip[data-drip]").forEach((b) => {
