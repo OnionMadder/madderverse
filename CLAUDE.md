@@ -334,7 +334,12 @@ Big feature run. **Cache-bust is now v119.** All of this is on `main` and live a
 
 ### Big feature + value run (2026-07-05, v120 → v140)
 
-A large same-day run. **Cache-bust is now v140.** **Ship state:** **v136 is the deployed/live web build AND is on Play as AAB vc13 / versionName 2.4.0 (uploaded 2026-07-05, awaiting Google review).** Everything from **v137 onward** (Lane-1 content + stamps removal + set-handle fix) is the **NEXT batch — HELD from web deploy and Play until vc13 is approved** (Onion's call, so the reviewed build and the live trial match). After approval: deploy web + rebuild the Play AAB as **vc14**.
+A large same-day run. **Cache-bust is now v140.**
+
+**⚠ Ship / git state (READ THIS before touching Slip Studio):**
+- **`main` = web v136** = exactly what Play AAB **vc13 / versionName 2.4.0** bundles (uploaded to Play 2026-07-05, **awaiting Google review**) and what is **live** at madderverse.org/slip-studio/. So on `main`, `index.html` still reads `?v=136` — that's correct, not stale.
+- The **NEXT batch (v137–140)** — Lane-1 content, stamps removed, the set-handle fix, and this doc update — is **committed on branch `slip-next-batch` (pushed to `origin`), deliberately HELD OFF `main`.** **Nothing in v137–140 is deployed or on Play.** It's parked off main because **Pages auto-deploys on any push to `main`**, and while vc13 is in review the reviewed build + the live trial must stay matched (Onion's call).
+- **When vc13 is approved:** `git checkout main && git merge slip-next-batch` → deploy web (verify live `?v=140`) → rebuild the Play AAB as **vc14** (bump versionCode 13→14 / versionName). Until then, continue the batch **on `slip-next-batch`**, not main.
 
 **Lid-dip colour fixes (v120–121).** A dipped pot+lid SET recoloured the lid. (1) `savePot` nulled `state.savedPot/savedLid` while the assembly was still on screen, killing the continuous-set dip remap (the lid reverted to identity → sampled the gradient's maroon foot instead of its yellow top slice) — fix: KEEP the partner refs after save (duplicate-save guarded by `state.dirty`). (2) Gallery card + exported photo captured the lid at an identity remap because rendering to a `WebGLRenderTarget` compiles a separate program variant whose dip uniforms reset to defaults AFTER `updateDipRemap` ran — fix: `captureRender()` warm-up-renders, re-applies the material snap + remap, then renders for real (wired into captureThumb / captureAssemblyThumb / captureScenePot).
 
