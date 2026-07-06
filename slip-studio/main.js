@@ -4487,10 +4487,14 @@ function onPointerDown(ev) {
         }
         // Adjust mode: a pot press grabs the placed motif/band under it to
         // move (bands slide vertically, motifs move freely). A miss clears
-        // the selection and falls through to a spin.
+        // the selection and spins the pot (never paints in adjust mode).
         if (state.adjustMode) {
             const uva = pointerToUV(ev);
             if (uva && startPlacementMove(uva)) { ev.preventDefault(); return; }
+            state.userRotating = true;
+            viewPrevX = ev.clientX;
+            ev.preventDefault();
+            return;
         }
         // Glaze dipping takes priority when the dip tool is armed with a
         // colour: dragging on the pot sets the glaze line (uv.y = height),
@@ -4539,15 +4543,20 @@ function onPointerDown(ev) {
         const carveActive = state.decoTool === "carve";
         const paintActive = state.decoColor != null && state.decoTool !== "overlay" && state.decoTool !== "carve";
         if (carveActive || paintActive) {
-            pushDecoHistory(); // snapshot before the stroke starts
-            state.painting = true;
             const uv = pointerToUV(ev);
-            if (uv) { decoApplyAt(uv.x, uv.y); lastPaintUV = { x: uv.x, y: uv.y }; }
-            else lastPaintUV = null;
-            ev.preventDefault();
-            return;
+            // Only paint when the finger is actually ON the pot. A press that
+            // misses (the wheel, the backdrop) falls through to a spin — so
+            // dragging off the pot always rotates it, even with a tool armed.
+            if (uv) {
+                pushDecoHistory(); // snapshot before the stroke starts
+                state.painting = true;
+                decoApplyAt(uv.x, uv.y);
+                lastPaintUV = { x: uv.x, y: uv.y };
+                ev.preventDefault();
+                return;
+            }
         }
-        // No tool engaged — fall through to spin.
+        // No tool engaged, or the press missed the pot — spin to inspect.
         state.userRotating = true;
         viewPrevX = ev.clientX;
         ev.preventDefault();
