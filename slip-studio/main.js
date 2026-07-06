@@ -3596,6 +3596,13 @@ function advanceStage() {
             scheduleCoach("leather"); // first time at Decorate → teach the dip
             break;
         case "leather":
+            // A partner lid thrown fresh at the decorate stage (the leather-
+            // flow) may still be at wet — and since the arc is now driven from
+            // the pot, its Fire has to bring the lid along. Promote a wet
+            // partner to leather so it enters the kiln at the same raw-glaze →
+            // fired look as the pot instead of firing as wet clay.
+            if (state.savedLid && state.savedLid.clayState === "wet") state.savedLid.clayState = "leather";
+            if (state.savedPot && state.savedPot.clayState === "wet") state.savedPot.clayState = "leather";
             // A handle is bound to the ACTIVE mesh; the partner mesh has
             // none. So if we're firing a set with the lid active while the
             // pot carries a handle, swap the pot in first — then it fires as
@@ -4066,7 +4073,14 @@ function updateToolbar() {
     const brushBar = document.getElementById("brushBar");
     const decoStack = document.getElementById("decoStack");
     if (label) label.textContent = stageLabelText();
-    if (advance) advance.textContent = ADVANCE_LABEL[cs];
+    if (advance) {
+        advance.textContent = ADVANCE_LABEL[cs];
+        // The clay arc is driven from the POT only. On the lid screen there's
+        // no Dry / Fire button — the user switches back to the pot to move on,
+        // so a set always advances together (the pot's Dry/Fire carries the
+        // lid along). "New pot" at fired is a full reset, allowed either way.
+        advance.hidden = state.isLid && cs !== "fired";
+    }
     if (back) {
         back.hidden = cs === "wet" || cs === "fired";
         if (!back.hidden) back.innerHTML = BACK_LABEL[cs] || "&larr; Back";
