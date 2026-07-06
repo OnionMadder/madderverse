@@ -1,14 +1,3 @@
-// Dev build marker — bump this every test build so the phone shows which
-// build it's actually running (helps catch stale-cache installs). Injected
-// into a tiny corner tag in init(). REMOVE before the production release.
-const BUILD_TAG = 'BUILD I';
-
-// Diagnostic overlay: yellow circles on each cookie hitbox + a magenta
-// pointer crosshair (both drawn on the blade canvas) + a live geometry
-// readout. Reveals any canvas↔DOM or pointer↔stage coordinate mismatch on
-// the real device. REMOVE (set false) before release.
-const DEBUG = false;
-
 // Respect the OS "reduce motion" setting — we thin out particle bursts and skip
 // screen shake for motion-sensitive players (CSS handles the rest via a
 // prefers-reduced-motion media query). Read live so it tracks a settings change.
@@ -643,7 +632,6 @@ function measureStage() {
     state.stageW = els.stage.clientWidth;
     state.stageH = els.stage.clientHeight;
     resizeBlade();
-    if (DEBUG) dbgUpdate();
 }
 
 // ── Hacker-terminal background layers ─────────────────────────────
@@ -968,8 +956,6 @@ function onBladeDown(e) {
     state.blade.pts = [{ x: p.x, y: p.y, t: performance.now() }];
     state.blade.lastX = p.x; state.blade.lastY = p.y;
     try { els.stage.setPointerCapture(e.pointerId); } catch (_) {}
-    if (DEBUG) dbgUpdate('ptr client ' + Math.round(e.clientX) + ',' + Math.round(e.clientY) +
-                         ' -> local ' + Math.round(p.x) + ',' + Math.round(p.y));
     sliceSegment(p.x, p.y, p.x, p.y);   // tap: slice under the finger
 }
 
@@ -982,8 +968,6 @@ function onBladeMove(e) {
     const tnow = performance.now();
     pts.push({ x: p.x, y: p.y, t: tnow });
     if (pts.length > BLADE_MAX_PTS) pts.shift();
-    if (DEBUG) dbgUpdate('ptr client ' + Math.round(e.clientX) + ',' + Math.round(e.clientY) +
-                         ' -> local ' + Math.round(p.x) + ',' + Math.round(p.y));
     if (prev) {
         // Blade "whoosh": throttled, scaled to swipe speed (px/ms).
         const dtm = tnow - prev.t;
@@ -1118,7 +1102,6 @@ function playComboSfx(n) {
 function drawBlade() {
     if (!bladeCtx) return;
     clearBladeCanvas();
-    if (DEBUG) drawDebugOverlay();
     const now = performance.now();
     const pts = state.blade.pts;
     while (pts.length && now - pts[0].t > BLADE_LIFE_MS) pts.shift();
@@ -1147,54 +1130,6 @@ function drawBlade() {
         bladeCtx.lineWidth = pass.w;
         bladeCtx.stroke();
     }
-}
-
-// ── Diagnostic overlay (DEBUG) ─────────────────────────────────────
-// Drawn on the blade canvas: a yellow circle at each cookie's hitbox and a
-// magenta crosshair at the last pointer position. If the yellow circles do
-// NOT sit on the cookie sprites, the canvas coordinate space is offset from
-// the DOM (that's the blade misalignment). If the crosshair isn't under the
-// finger, pointer→stage conversion is wrong. The #dbg text box prints the
-// live geometry. All gated on DEBUG; remove for release.
-function drawDebugOverlay() {
-    if (!bladeCtx) return;
-    bladeCtx.lineWidth = 2;
-    bladeCtx.strokeStyle = 'rgba(255,240,0,0.9)';
-    for (const c of state.cookies) {
-        if (!c.alive || c.popped) continue;
-        bladeCtx.beginPath();
-        bladeCtx.arc(c.x, c.y, Math.max(c.w, c.h) * 0.55, 0, Math.PI * 2);
-        bladeCtx.stroke();
-    }
-    const b = state.blade;
-    if (b.lastX != null) {
-        bladeCtx.strokeStyle = 'rgba(255,0,255,0.95)';
-        bladeCtx.lineWidth = 2;
-        bladeCtx.beginPath();
-        bladeCtx.arc(b.lastX, b.lastY, 16, 0, Math.PI * 2);
-        bladeCtx.moveTo(b.lastX - 26, b.lastY); bladeCtx.lineTo(b.lastX + 26, b.lastY);
-        bladeCtx.moveTo(b.lastX, b.lastY - 26); bladeCtx.lineTo(b.lastX, b.lastY + 26);
-        bladeCtx.stroke();
-    }
-}
-
-function dbgUpdate(extra) {
-    if (!DEBUG) return;
-    const d = document.getElementById('dbg');
-    if (!d || !els.stage) return;
-    const r = els.stage.getBoundingClientRect();
-    const vv = window.visualViewport;
-    d.textContent =
-        'inner ' + window.innerWidth + 'x' + window.innerHeight + '\n' +
-        (vv ? 'vv ' + Math.round(vv.width) + 'x' + Math.round(vv.height) +
-              ' s' + vv.scale.toFixed(2) + ' off ' + Math.round(vv.offsetLeft) + ',' + Math.round(vv.offsetTop) + '\n'
-            : 'vv n/a\n') +
-        'rect ' + Math.round(r.left) + ',' + Math.round(r.top) + ' ' +
-                  Math.round(r.width) + 'x' + Math.round(r.height) + '\n' +
-        'client ' + els.stage.clientWidth + 'x' + els.stage.clientHeight + '\n' +
-        'dpr ' + (window.devicePixelRatio || 1) +
-        ' canvas ' + (bladeCanvas ? bladeCanvas.width : 0) + 'x' + (bladeCanvas ? bladeCanvas.height : 0) + '\n' +
-        (extra || '');
 }
 
 // ── Catch ──────────────────────────────────────────────────────────
@@ -2190,20 +2125,6 @@ function init() {
     loadSfxPools();
     initCodeRain();
     initBlade();
-    // Build stamp only inside the packaged app (catches stale sideloads) — the
-    // live web build stays clean.
-    if (window.Capacitor) {
-        const tag = document.createElement('div');
-        tag.className = 'build-tag';
-        tag.textContent = BUILD_TAG;
-        document.body.appendChild(tag);
-    }
-    if (DEBUG) {
-        const dbg = document.createElement('div');
-        dbg.id = 'dbg';
-        dbg.className = 'dbg';
-        document.body.appendChild(dbg);
-    }
     state.best = loadBest();
     renderMenuBest();
     state.mode = loadMode();

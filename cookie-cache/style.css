@@ -464,34 +464,6 @@ body {
     pointer-events: none;
 }
 
-/* Diagnostic geometry readout (see DEBUG in game.js). Remove for release. */
-.dbg {
-    position: fixed;
-    top: calc(env(safe-area-inset-top, 0px) + 46px);
-    left: calc(env(safe-area-inset-left, 0px) + 8px);
-    font: 700 11px/1.35 'JetBrains Mono', 'Fira Code', monospace;
-    color: #6f6;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 4px 7px;
-    border-radius: 4px;
-    white-space: pre;
-    z-index: 300;
-    pointer-events: none;
-}
-
-/* Dev build marker (see BUILD_TAG in game.js) — tiny corner stamp so a
-   test device shows which build it's running. Remove before release. */
-.build-tag {
-    position: fixed;
-    left: calc(env(safe-area-inset-left, 0px) + 6px);
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 4px);
-    font: 700 10px/1 'JetBrains Mono', 'Fira Code', monospace;
-    letter-spacing: 1px;
-    color: rgba(0, 255, 204, 0.5);
-    z-index: 200;
-    pointer-events: none;
-}
-
 /* ── Hacker-terminal background layers ──────────────────────────
    ::before — CRT scanlines (z 1)
    .code-rain-layer — falling chars (z 2, JS-generated)
