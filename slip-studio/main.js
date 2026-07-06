@@ -155,6 +155,24 @@ function glaze(name, rawHex, firedHex, firedOver) {
         fired: { ...GLAZE_FIRED, color: firedHex, ...(firedOver || {}) },
     };
 }
+// Surface finish — a GLOBAL choice (Glossy / Matte / Lustre) layered over
+// the FIRED look of whatever glaze is on the pot, dipped or flooded. Raw
+// (pre-fire) is unaffected — the finish is how it comes out of the kiln.
+// Matte knocks back gloss + reflection; Lustre adds an iridescent sheen
+// (MeshPhysicalMaterial.iridescence). Empty `fired` = leave the glaze as-is.
+const FINISHES = {
+    glossy: { label: "Glossy", fired: null },
+    matte:  { label: "Matte",  fired: { roughness: 0.88, clearcoat: 0.05, clearcoatRoughness: 0.72, envMapIntensity: 0.40, iridescence: 0 } },
+    lustre: { label: "Lustre", fired: { roughness: 0.20, clearcoat: 0.82, clearcoatRoughness: 0.09, envMapIntensity: 1.02, iridescence: 0.7, iridescenceIOR: 1.32 } },
+};
+const FINISH_IDS = ["glossy", "matte", "lustre"];
+const DEFAULT_FINISH = "glossy";
+// Merge the active finish into a fired look. Called for both the live pot
+// (currentLook) and the partner piece (lookForPiece) so a set matches.
+function withFinish(firedLook, finishId) {
+    const f = FINISHES[finishId || DEFAULT_FINISH];
+    return f && f.fired ? { ...firedLook, ...f.fired } : firedLook;
+}
 const GLAZES = {
     celadon:  glaze("Celadon",  0xb9c3b3, 0x7d9b7e),
     cobalt:   glaze("Cobalt",   0x9aa3b6, 0x37507e),
@@ -1038,6 +1056,7 @@ const state = {
     dipMode: false,
     dipColor: null,
     dipFxId: null,          // glaze id of the armed dip, for surface FX (speckle/crackle)
+    finish: "glossy",       // global fired finish: glossy | matte | lustre
     dripAmount: "few",
     // Editable bump layer: painted into by wet-clay texture stamps
     // (positive relief) and leather-hard carving (negative grooves).
@@ -1428,6 +1447,7 @@ function init() {
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze,
             setDipMode, setDipColor, applyDipPreset, undoDip, clearDips, setDripAmount, renderDips,
+            setFinish,
             setHandleOn, setHandleThickness, setHandleCount,
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
@@ -2692,6 +2712,11 @@ function buildPot() {
         envMapIntensity: s0.envMapIntensity,
         bumpMap: bumpTex,               // clay grain + throwing lines + edits
         bumpScale: s0.bump,
+        // Tiny non-zero iridescence so USE_IRIDESCENCE compiles into the
+        // program up front; the Lustre finish tweens it up, other finishes
+        // tween it back toward ~0 (no recompile — see tickMaterial).
+        iridescence: 0.001,
+        iridescenceIOR: 1.3,
         side: THREE.DoubleSide,         // open vase — render the inner wall too
     });
     state.clayMaterial = mat;
@@ -3053,6 +3078,8 @@ function ensureHandleMesh() {
         clearcoatRoughness: initial.clearcoatRoughness,
         envMapIntensity: initial.envMapIntensity,
         metalness: initial.metalness != null ? initial.metalness : 0,
+        iridescence: 0.001,             // compile the path; Lustre tweens it up
+        iridescenceIOR: 1.3,
     });
     state.handle.material = mat;
     // Apply the glaze DIP layer AND the decoration layer (patterns,
@@ -3472,7 +3499,10 @@ function currentLook() {
     // A uniform glaze wins; else if the pot has been dipped, use the glossy
     // dip finish; else bare clay.
     const dipped = state.dips.length > 0 || !!dipPreview;
-    if (cs === "fired")   return state.glaze ? GLAZES[state.glaze].fired : (dipped ? DIP_FIRED : CLAY_STATES.fired);
+    if (cs === "fired") {
+        const glazed = state.glaze ? GLAZES[state.glaze].fired : (dipped ? DIP_FIRED : null);
+        return glazed ? withFinish(glazed, state.finish) : CLAY_STATES.fired; // finish only on a glazed/dipped pot
+    }
     if (cs === "leather") return state.glaze ? GLAZES[state.glaze].raw   : (dipped ? DIP_RAW   : CLAY_STATES.leather);
     return CLAY_STATES.wet;
 }
@@ -3639,6 +3669,47 @@ function setGradientGlaze(id) {
     if (!wasActive) playSfx("pour");
     if (state.clayState === "leather") setPhase("leather");
     updateGlazeBar();
+}
+
+// --- Surface finish UI ------------------------------------------
+// Three chips (Glossy / Matte / Lustre) choosing how the pot comes out
+// of the kiln. Global — applies to whatever glaze/dip is on the pot.
+function buildFinishBar() {
+    const wrap = document.getElementById("finishBar");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    const label = document.createElement("span");
+    label.className = "dip-label";
+    label.textContent = "Finish";
+    wrap.appendChild(label);
+    FINISH_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dip-chip finish-chip";
+        b.dataset.finish = id;
+        b.textContent = FINISHES[id].label;
+        b.addEventListener("click", () => setFinish(id));
+        wrap.appendChild(b);
+    });
+    updateFinishBar();
+}
+function setFinish(id) {
+    if (!FINISHES[id]) return;
+    state.finish = id;
+    state.dirty = true;
+    // Re-point the material tween so the change is visible immediately
+    // (live when already fired; otherwise it lands on the next firing).
+    if (state.clayMaterial) state.clayTarget = currentLook();
+    const partnerPiece = state.isLid ? state.savedPot : state.savedLid;
+    if (state.partnerMaterial && partnerPiece) state.partnerTarget = lookForPiece(partnerPiece);
+    updateFinishBar();
+}
+function updateFinishBar() {
+    document.querySelectorAll("#finishBar .finish-chip").forEach((b) => {
+        const on = b.dataset.finish === state.finish;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
 }
 
 // --- Glaze dip UI -----------------------------------------------
@@ -3896,6 +3967,8 @@ function tickMaterial(dt) {
     m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
     m.bumpScale          += (t.bump               - m.bumpScale)          * k;
     m.metalness          += ((t.metalness != null ? t.metalness : 0) - m.metalness) * k;
+    m.iridescence        += ((t.iridescence != null ? t.iridescence : 0) - m.iridescence) * k;
+    if (t.iridescenceIOR != null) m.iridescenceIOR += (t.iridescenceIOR - m.iridescenceIOR) * k;
     // Bare-clay base colour for the sgraffito carve uniform. Always
     // tracks the CURRENT CLAY STATE'S colour (NOT the glaze), so
     // carved-through regions show the right tone — leather brown at
@@ -3927,6 +4000,8 @@ function tickMaterial(dt) {
         hm.clearcoatRoughness += (t.clearcoatRoughness - hm.clearcoatRoughness) * k;
         hm.envMapIntensity    += (t.envMapIntensity    - hm.envMapIntensity)    * k;
         hm.metalness          += ((t.metalness != null ? t.metalness : 0) - hm.metalness) * k;
+        hm.iridescence        += ((t.iridescence != null ? t.iridescence : 0) - hm.iridescence) * k;
+        if (t.iridescenceIOR != null) hm.iridescenceIOR += (t.iridescenceIOR - hm.iridescenceIOR) * k;
     }
 }
 
@@ -4072,6 +4147,7 @@ function buildGlazeBar() {
     // load, converted to a rainbow dip.)
     buildGradientBar();
     buildDipBar();
+    buildFinishBar();
     updateGlazeBar();
 }
 
@@ -5422,6 +5498,7 @@ async function savePot() {
         profile: Array.from(profile, (x) => +x.toFixed(4)),
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
+        finish: state.finish,
         dips: state.dips.map((d) => ({ ...d })),
         deco: state.decoCanvas.toDataURL("image/png"),        // composite (thumbnails, partner, legacy)
         paintDeco: state.paintCanvas.toDataURL("image/png"),  // baked freehand layer (editable reload)
@@ -5464,6 +5541,7 @@ async function savePot() {
                 ts: Date.now() + 1,
                 profile: Array.from(profile, (x) => +x.toFixed(4)),
                 glaze: state.glaze,
+                finish: state.finish,
                 dips: state.dips.map((d) => ({ ...d })),
                 deco: state.decoCanvas.toDataURL("image/png"),
                 paintDeco: state.paintCanvas.toDataURL("image/png"),
@@ -5527,6 +5605,7 @@ function capturePieceState() {
         profile: Float32Array.from(profile),
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
+        finish: state.finish,
         dips: state.dips.map((d) => ({ ...d })),
         decoCanvas: decoCopy,
         paintCanvas: paintCopy,
@@ -5548,6 +5627,7 @@ function restorePieceState(saved) {
     profileDirty = true;
     state.glaze = saved.glaze;
     state.glazeGradient = saved.glazeGradient || null;
+    state.finish = saved.finish || DEFAULT_FINISH;
     state.dips = saved.dips ? saved.dips.map((d) => ({ ...d })) : [];
     renderDips();
     state.isLid = saved.isLid;
@@ -5687,6 +5767,8 @@ function buildPartnerMesh() {
         envMapIntensity: CLAY_STATES.fired.envMapIntensity,
         bumpMap: pbt,
         bumpScale: CLAY_STATES.fired.bump,
+        iridescence: 0.001,             // compile the path; Lustre tweens it up
+        iridescenceIOR: 1.3,
         side: THREE.DoubleSide,
     });
     mat.onBeforeCompile = (shader) => {
@@ -5795,7 +5877,13 @@ function syncPartnerMesh(saved) {
 function lookForPiece(piece) {
     const cs = piece.clayState;
     const dipped = !!(piece.dips && piece.dips.length);
-    if (cs === "fired")   return piece.glaze ? GLAZES[piece.glaze].fired : (dipped ? DIP_FIRED : CLAY_STATES.fired);
+    // The finish is global (state.finish); a saved piece carries its own so
+    // a re-opened set keeps its look, falling back to the live one.
+    const finishId = piece.finish || state.finish;
+    if (cs === "fired") {
+        const glazed = piece.glaze ? GLAZES[piece.glaze].fired : (dipped ? DIP_FIRED : null);
+        return glazed ? withFinish(glazed, finishId) : CLAY_STATES.fired;
+    }
     if (cs === "leather") return piece.glaze ? GLAZES[piece.glaze].raw   : (dipped ? DIP_RAW   : CLAY_STATES.leather);
     return CLAY_STATES.wet;
 }
@@ -5820,6 +5908,8 @@ function tickPartnerMaterial(dt) {
     m.envMapIntensity    += (t.envMapIntensity    - m.envMapIntensity)    * k;
     m.bumpScale          += (t.bump               - m.bumpScale)          * k;
     m.metalness          += ((t.metalness != null ? t.metalness : 0) - m.metalness) * k;
+    m.iridescence        += ((t.iridescence != null ? t.iridescence : 0) - m.iridescence) * k;
+    if (t.iridescenceIOR != null) m.iridescenceIOR += (t.iridescenceIOR - m.iridescenceIOR) * k;
     // Partner sgraffito base colour tracks the saved partner's CURRENT
     // clay state (set in syncPartnerMesh) and the live clay state at
     // firing time. We read the active state during firing so both
@@ -6053,6 +6143,7 @@ async function loadPot(entry) {
     profileDirty = true;
     state.glaze = entry.glaze || null;
     state.glazeGradient = entry.glazeGradient || null;
+    state.finish = entry.finish || DEFAULT_FINISH;
     // Glaze dips. Back-compat: pots saved with the old whole-pot "rainbow"
     // glaze had no dips — turn that into a rainbow dip preset instead.
     state.dips = Array.isArray(entry.dips) ? entry.dips.map((d) => ({ ...d })) : [];

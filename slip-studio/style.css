@@ -1402,6 +1402,19 @@ html, body {
     padding-top: 8px;
     border-top: 1px solid var(--ink-faint);
 }
+/* Fired-finish chips (Glossy / Matte / Lustre) — a centered row under the
+   dip bar. Chips reuse .dip-chip styling (incl. pointer-events:auto). */
+.finish-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ink-faint);
+    pointer-events: auto;
+}
 /* The .deco-stack tray is pointer-events:none (so the pot behind stays
    draggable); every interactive control must opt back in, or taps fall
    THROUGH to the canvas. This is why the Dip button/presets did nothing. */
