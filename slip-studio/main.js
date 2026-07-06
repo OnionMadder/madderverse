@@ -599,11 +599,12 @@ const BAND_PACK_IDS = ["egyptian"];
 const DECO_FAMILIES = [
     { id: "paint",   btn: "famPaint",   tools: ["brush", "splatter", "slip"] },
     { id: "carve",   btn: "famCarve",   tools: ["carve"] },
+    { id: "resist",  btn: "famResist",  tools: ["resist"] },
     { id: "picture", btn: "famPicture", tools: ["motif"] },
     { id: "pattern", btn: "famPattern", tools: ["overlay", "pattern", "band"] },
 ];
 const TOOL_LABELS = { brush: "Brush", splatter: "Splatter", slip: "Slip", stamp: "Stamp",
-    carve: "Carve", overlay: "Overlay", motif: "Motif", pattern: "Tile", band: "Band" };
+    carve: "Carve", resist: "Resist", overlay: "Overlay", motif: "Motif", pattern: "Tile", band: "Band" };
 const familyLastTool = {}; // family id -> last tool used within it (remembered)
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
@@ -1028,6 +1029,11 @@ const state = {
     // scratch through a slip layer.
     sgraffitoCanvas: null, sgraffitoCtx: null, sgraffitoTex: null,
     partnerSgraffitoCanvas: null, partnerSgraffitoCtx: null, partnerSgraffitoTex: null,
+    // Wax-resist mask layer: another paintable alpha-only canvas. Where
+    // resist alpha > 0 the shader skips glaze/dip/decoration and shows
+    // bare clay — like brushing wax on before dipping so glaze beads off.
+    resistCanvas: null, resistCtx: null, resistTex: null,
+    partnerResistCanvas: null, partnerResistCtx: null, partnerResistTex: null,
     // The current bare-clay base colour as a THREE.Color — tweened in
     // tickMaterial alongside the glaze so carved areas pass through the
     // kiln smoothly (leather brown -> fired terracotta). The shader
@@ -1447,7 +1453,7 @@ function init() {
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze,
             setDipMode, setDipColor, applyDipPreset, undoDip, clearDips, setDripAmount, renderDips,
-            setFinish,
+            setFinish, resistAt, resistStroke, clearResist,
             setHandleOn, setHandleThickness, setHandleCount,
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
@@ -2126,6 +2132,26 @@ function makeSgraffitoLayer() {
     return tex;
 }
 
+// --- Wax-resist layer -------------------------------------------
+// An alpha-only mask (same UV grid as the deco layer). Where resist
+// alpha > 0 the clay shader forces bare clay, skipping glaze/dip/deco —
+// like brushing wax on before dipping so the glaze beads off and fires
+// bare. Non-destructive: the mask is a separate canvas, saved with the pot.
+function makeResistLayer() {
+    const canvas = document.createElement("canvas");
+    canvas.width = DECO_W;
+    canvas.height = DECO_H;
+    state.resistCanvas = canvas;
+    state.resistCtx = canvas.getContext("2d");
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.NoColorSpace; // mask data, not colour
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 4;
+    state.resistTex = tex;
+    return tex;
+}
+
 // --- Editable bump layer ----------------------------------------
 // A paintable grayscale canvas that ADDS to the procedural clay
 // grain in the bump shader. Neutral grey (0.5) = no change; brighter
@@ -2268,10 +2294,11 @@ function clearDeco() {
     state.selectedPlacement = null;
     composeDeco();
     updateAdjustBtn();
-    // Clear wipes both paint AND sgraffito carving — one button, full
-    // reset of the decorate surface. (The glaze itself is separate and
-    // is cleared by tapping the active glaze swatch again.)
+    // Clear wipes paint, sgraffito carving AND the wax-resist mask — one
+    // button, full reset of the decorate surface. (The glaze itself is
+    // separate and is cleared by tapping the active glaze swatch again.)
     clearSgraffito();
+    clearResist();
 }
 
 // --- Decorate undo history --------------------------------------
@@ -2296,6 +2323,7 @@ function pushDecoHistory() {
         // Bump too, so relief-writing tools (slip trailing, carve grooves)
         // fully reverse on Undo instead of leaving a colourless impression.
         bump: state.bumpCanvas ? snapDecoCanvas(state.bumpCanvas) : null,
+        resist: state.resistCanvas ? snapDecoCanvas(state.resistCanvas) : null,
     });
     if (decoHistory.length > DECO_HISTORY_MAX) decoHistory.shift();
     updateUndoBtn();
@@ -2320,6 +2348,11 @@ function undoDeco() {
         state.bumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
         state.bumpCtx.drawImage(snap.bump, 0, 0);
         if (state.bumpTex) state.bumpTex.needsUpdate = true;
+    }
+    if (state.resistCtx && snap.resist) {
+        state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
+        state.resistCtx.drawImage(snap.resist, 0, 0);
+        if (state.resistTex) state.resistTex.needsUpdate = true;
     }
     state.dirty = true;
     maybeSquelch();
@@ -2444,6 +2477,34 @@ function clearSgraffito() {
     // they're permanent surface impressions, same model as the bump
     // stamps. Re-throwing or starting a new pot is the way to get a
     // clean bump.
+}
+
+// --- Wax resist tool --------------------------------------------
+// A broad wax brush: drag on the pot to mask an area so it fires as
+// bare clay. Paints white into the resist mask (reusing the sgraffito
+// mask segment drawer). Broader than the needle — you wax patches, not
+// hairlines — so it scales with the brush size buttons.
+function resistLineWidthDeco() {
+    return Math.max(6, DECO_SIZES[state.decoSizeIndex].px * 1.4 / Math.max(0.5, state.zoom));
+}
+function resistAt(u, v) { resistStroke(u, v, u, v); }
+function resistStroke(au, av, bu, bv) {
+    const rCtx = state.resistCtx;
+    if (!rCtx) return;
+    state.dirty = true;
+    if (Math.abs(bu - au) > 0.5) { resistStroke(bu, bv, bu, bv); return; }
+    const w = resistLineWidthDeco();
+    const ax = au * DECO_W, ay = (1 - av) * DECO_H;
+    const bx = bu * DECO_W, by = (1 - bv) * DECO_H;
+    drawSgraffitoMaskSegment(rCtx, ax, ay, bx, by, w);
+    if (ax < w || bx < w) drawSgraffitoMaskSegment(rCtx, ax + DECO_W, ay, bx + DECO_W, by, w);
+    else if (ax > DECO_W - w || bx > DECO_W - w) drawSgraffitoMaskSegment(rCtx, ax - DECO_W, ay, bx - DECO_W, by, w);
+    if (state.resistTex) state.resistTex.needsUpdate = true;
+}
+function clearResist() {
+    if (!state.resistCtx) return;
+    state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (state.resistTex) state.resistTex.needsUpdate = true;
 }
 
 // --- Stamps -----------------------------------------------------
@@ -2663,8 +2724,9 @@ function applyOverlay(id) {
 
 // Dispatch a pot-touch to the active decorate tool.
 function decoApplyAt(u, v) {
-    if (state.decoTool === "carve") scratchAt(u, v);
-    else                            paintAt(u, v); // brush / splatter
+    if (state.decoTool === "carve")       scratchAt(u, v);
+    else if (state.decoTool === "resist") resistAt(u, v);
+    else                                  paintAt(u, v); // brush / splatter / slip
     state.dirty = true;
 }
 
@@ -2745,10 +2807,12 @@ function buildPot() {
     // through both glaze and paint, not just through the base coat.
     const decoTex = makeDecoLayer();
     const sgraffitoTex = makeSgraffitoLayer();
+    const resistTex = makeResistLayer();
     const dipTex = makeGlazeDipLayer();
     mat.onBeforeCompile = (shader) => {
         shader.uniforms.decoMap        = { value: decoTex };
         shader.uniforms.sgraffitoMap   = { value: sgraffitoTex };
+        shader.uniforms.resistMap      = { value: resistTex };
         shader.uniforms.uClayColor     = { value: state.clayBaseColor };
         shader.uniforms.uGradientColor = { value: state.gradientColor };
         shader.uniforms.uGradientMix   = { value: state.gradientMix };
@@ -2767,16 +2831,21 @@ function buildPot() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D resistMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
+                 // Wax resist: where the mask is painted, the area fires as
+                 // bare clay — so scale down every glaze/deco contribution
+                 // below by (1 - resist) and let the clay base show through.
+                 float _resist = texture2D( resistMap, vDecoUv ).a;
+                 float _keep = 1.0 - _resist;
                  // Gradient glaze: mix the diffuse toward a secondary
                  // glaze colour at the bottom of the pot. Smoothstep
                  // along vDecoUv.y (0 = foot, 1 = rim) so the
                  // transition is soft. uGradientMix is the on/off fade.
-                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
+                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix * _keep;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
                  // Glaze dip layer: 2-D applied glaze (dips / drips /
                  // presets) mixed over the base by its own alpha. Applied
@@ -2787,19 +2856,22 @@ function buildPot() {
                  // samples its own slice). Identity (1,0) for a lone piece.
                  float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
                  vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a * _keep );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) * _keep );
                  // Inside a sgraffito cut, the wall is recessed — small
                  // shadow from the surrounding surface. Mixing toward a
                  // darkened clay tone gives the cut visible depth on
                  // top of the bump-shader's normal perturbation.
                  vec3 _carveColor = uClayColor * 0.78;
-                 diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
+                 diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );
+                 // Wax resist wins last: force bare clay where masked, so it
+                 // reads as bare clay whether the pot was dipped or flooded.
+                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v6";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v7";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -4926,9 +4998,12 @@ function onPointerDown(ev) {
         // scratches into a separate mask layer. Brush / Splatter / Stamp
         // still gate on decoColor (no colour, no paint). Overlay is its
         // own one-tap action.
-        const carveActive = state.decoTool === "carve";
-        const paintActive = state.decoColor != null && state.decoTool !== "overlay" && state.decoTool !== "carve";
-        if (carveActive || paintActive) {
+        // Mask tools (carve, wax resist) scratch/paint a mask layer and
+        // don't need a paint colour; brush/splatter/slip gate on decoColor.
+        const maskActive = state.decoTool === "carve" || state.decoTool === "resist";
+        const paintActive = state.decoColor != null && state.decoTool !== "overlay"
+            && state.decoTool !== "carve" && state.decoTool !== "resist";
+        if (maskActive || paintActive) {
             const uv = pointerToUV(ev);
             // Only paint when the finger is actually ON the pot. A press that
             // misses (the wheel, the backdrop) falls through to a spin — so
@@ -5017,6 +5092,10 @@ function onPointerMove(ev) {
             if (state.decoTool === "carve") {
                 if (lastPaintUV) scratchStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
                 else scratchAt(uv.x, uv.y);
+                lastPaintUV = { x: uv.x, y: uv.y };
+            } else if (state.decoTool === "resist") {
+                if (lastPaintUV) resistStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
+                else resistAt(uv.x, uv.y);
                 lastPaintUV = { x: uv.x, y: uv.y };
             } else {
                 if (lastPaintUV) paintStroke(lastPaintUV.x, lastPaintUV.y, uv.x, uv.y);
@@ -5522,6 +5601,7 @@ async function savePot() {
         placements: serializePlacements(),                    // movable motifs + bands
         bump: state.bumpCanvas.toDataURL("image/png"),
         sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
+        resist: state.resistCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
         setId,
         title: defaultPotTitle(), // pre-named; user can rename in the gallery
@@ -5565,6 +5645,7 @@ async function savePot() {
                 placements: serializePlacements(),
                 bump: state.bumpCanvas.toDataURL("image/png"),
                 sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
+                resist: state.resistCanvas.toDataURL("image/png"),
                 thumb: captureThumb(),
                 setId,
                 title: defaultPotTitle(),
@@ -5618,6 +5699,10 @@ function capturePieceState() {
     sgraffitoCopy.width = DECO_W;
     sgraffitoCopy.height = DECO_H;
     sgraffitoCopy.getContext("2d").drawImage(state.sgraffitoCanvas, 0, 0);
+    const resistCopy = document.createElement("canvas");
+    resistCopy.width = DECO_W;
+    resistCopy.height = DECO_H;
+    resistCopy.getContext("2d").drawImage(state.resistCanvas, 0, 0);
     return {
         profile: Float32Array.from(profile),
         glaze: state.glaze,
@@ -5629,6 +5714,7 @@ function capturePieceState() {
         placements: state.placements.map((p) => ({ ...p })), // shares immutable canvases/img
         bumpCanvas: bumpCopy,
         sgraffitoCanvas: sgraffitoCopy,
+        resistCanvas: resistCopy,
         isLid: state.isLid,
         clayState: state.clayState,
         heightScale: state.heightScale,
@@ -5675,6 +5761,12 @@ function restorePieceState(saved) {
     state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (saved.sgraffitoCanvas) state.sgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
     state.sgraffitoTex.needsUpdate = true;
+    // Wax-resist mask (older snapshots pre-date it — guard).
+    if (state.resistCtx) {
+        state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
+        if (saved.resistCanvas) state.resistCtx.drawImage(saved.resistCanvas, 0, 0);
+        if (state.resistTex) state.resistTex.needsUpdate = true;
+    }
     // Restore the snapshot's vertical stretch — older snapshots that
     // pre-date heightScale default to 1.0 (the pre-stretch original).
     setHeightScale(saved.heightScale != null ? saved.heightScale : 1.0);
@@ -5761,6 +5853,20 @@ function buildPartnerMesh() {
     pst.anisotropy = 4;
     state.partnerSgraffitoTex = pst;
 
+    // Partner's own wax-resist mask canvas + texture (mirrors the active
+    // mesh so a lid/pot set keeps its resisted bare-clay areas).
+    const prc = document.createElement("canvas");
+    prc.width  = DECO_W;
+    prc.height = DECO_H;
+    state.partnerResistCanvas = prc;
+    state.partnerResistCtx    = prc.getContext("2d");
+    const prt = new THREE.CanvasTexture(prc);
+    prt.colorSpace = THREE.NoColorSpace;
+    prt.wrapS = THREE.RepeatWrapping;
+    prt.wrapT = THREE.ClampToEdgeWrapping;
+    prt.anisotropy = 4;
+    state.partnerResistTex = prt;
+
     // Partner's own glaze-dip canvas + texture — mirrors the live pot's
     // makeGlazeDipLayer so a dipped lid/pot keeps its glaze in the set.
     const pdipc = document.createElement("canvas");
@@ -5791,6 +5897,7 @@ function buildPartnerMesh() {
     mat.onBeforeCompile = (shader) => {
         shader.uniforms.decoMap        = { value: pdt };
         shader.uniforms.sgraffitoMap   = { value: pst };
+        shader.uniforms.resistMap      = { value: prt };
         shader.uniforms.uClayColor     = { value: state.partnerClayBaseColor };
         shader.uniforms.uGradientColor = { value: state.partnerGradientColor };
         shader.uniforms.uGradientMix   = { value: state.partnerGradientMix };
@@ -5804,27 +5911,30 @@ function buildPartnerMesh() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D resistMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
-                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
+                 float _resist = texture2D( resistMap, vDecoUv ).a;
+                 float _keep = 1.0 - _resist;
+                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix * _keep;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
                  // uDipVScale/uDipVOffset remap the dip's height so a
                  // pot+lid set shares ONE continuous gradient (each piece
                  // samples its own slice). Identity (1,0) for a lone piece.
                  float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
                  vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a * _keep );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) * _keep );
                  vec3 _carveColor = uClayColor * 0.78;
-                 diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );`,
+                 diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-v2-partner";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v3-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -5854,6 +5964,12 @@ function syncPartnerMesh(saved) {
     state.partnerSgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (saved.sgraffitoCanvas) state.partnerSgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
     state.partnerSgraffitoTex.needsUpdate = true;
+    // Partner wax-resist mask (older captures may not carry it).
+    if (state.partnerResistCtx) {
+        state.partnerResistCtx.clearRect(0, 0, DECO_W, DECO_H);
+        if (saved.resistCanvas) state.partnerResistCtx.drawImage(saved.resistCanvas, 0, 0);
+        if (state.partnerResistTex) state.partnerResistTex.needsUpdate = true;
+    }
     // Partner glaze-dip layer — replay the saved piece's dips so a dipped
     // lid/pot renders (and fires) with its glaze, not bare clay.
     if (state.partnerDipCtx) {
@@ -6205,6 +6321,9 @@ async function loadPot(entry) {
     // Sgraffito mask. Older entries don't carry it; treat as empty.
     await loadImageOntoCanvas(entry.sgraffito, state.sgraffitoCtx, DECO_W, DECO_H, clearSgraffito);
     state.sgraffitoTex.needsUpdate = true;
+    // Wax-resist mask. Older entries don't carry it; treat as empty.
+    await loadImageOntoCanvas(entry.resist, state.resistCtx, DECO_W, DECO_H, clearResist);
+    if (state.resistTex) state.resistTex.needsUpdate = true;
     // Handle: only meaningful for pot entries. If loading the lid side
     // of a set, the pot's handle stays in the partner's saved data but
     // isn't rendered in the v1 assembled view (state.handle attaches
@@ -6294,14 +6413,22 @@ async function loadAsCapturedState(entry) {
     if (entry.sgraffito) {
         await loadImageOntoCanvas(entry.sgraffito, sgraffitoCanvas.getContext("2d"), DECO_W, DECO_H);
     }
+    const resistCanvas = document.createElement("canvas");
+    resistCanvas.width  = DECO_W;
+    resistCanvas.height = DECO_H;
+    if (entry.resist) {
+        await loadImageOntoCanvas(entry.resist, resistCanvas.getContext("2d"), DECO_W, DECO_H);
+    }
     return {
         profile: Float32Array.from(entry.profile || []),
         glaze: entry.glaze || null,
         glazeGradient: entry.glazeGradient || null,
+        finish: entry.finish || DEFAULT_FINISH,
         dips: Array.isArray(entry.dips) ? entry.dips.map((d) => ({ ...d })) : [],
         decoCanvas,
         bumpCanvas,
         sgraffitoCanvas,
+        resistCanvas,
         isLid: lookupIsLid(entry),
         clayState: "fired",
     };
