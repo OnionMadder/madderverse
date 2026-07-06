@@ -1218,31 +1218,13 @@ html, body {
     color: var(--ink-dim);
 }
 .deco-tool-icon.is-active { color: var(--ink); }
-/* Family buttons (NOT the square Adjust/Undo/Clear actions) carry a
-   one-word caption under the illustrated icon, so they lay out as a
-   short auto-width column instead of a fixed square. */
-.deco-tool-icon:not(.deco-act) {
-    flex-direction: column;
-    gap: 2px;
-    width: auto;
-    min-width: 50px;
-    height: auto;
-    padding: 5px 8px 4px;
-}
-.deco-tool-cap {
-    font-size: 0.5rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    line-height: 1;
-    color: inherit;
-    pointer-events: none;
-}
 /* Illustrated family icons (raster). Can't recolour via currentColor, so
-   the active one reads full-strength while the rest sit dimmed; the caption
-   + button chip tint give extra active feedback. */
+   the active one reads full-strength while the rest sit dimmed; the button
+   chip also tints on .is-active. The one-word name is the hover label
+   (the button's title attribute), not printed on the button. */
 .deco-tool-icon img {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     object-fit: contain;
     opacity: 0.5;
     transition: opacity 0.2s ease, transform 0.15s ease;
