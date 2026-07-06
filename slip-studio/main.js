@@ -486,20 +486,9 @@ const DECO_SIZES = [{ label: "S", px: 30 }, { label: "M", px: 62 }, { label: "L"
 const DEFAULT_DECO_SIZE = 1;
 const SPLATTER_DROPS = 9;
 
-// Stamp shapes (tap/drag to place) and overlay patterns (one tap fills
-// the whole surface). Both reuse the paint layer + current colour/size.
-const STAMP_SHAPES = [
-    { id: "dot",      glyph: "●" },
-    { id: "ring",     glyph: "◯" },
-    { id: "star",     glyph: "★" },
-    { id: "spark",    glyph: "✦" },
-    { id: "heart",    glyph: "♥" },
-    { id: "flower",   glyph: "✿" },
-    { id: "cross",    glyph: "✚" },
-    { id: "triangle", glyph: "▲" },
-    { id: "diamond",  glyph: "◆" },
-    { id: "square",   glyph: "■" },
-];
+// Overlay patterns: one tap fills the whole surface, reusing the paint
+// layer + current colour. (The old tap-to-place Stamp tool was removed;
+// its shape table / drawing helpers went with it.)
 const OVERLAY_PATTERNS = [
     { id: "dots",     label: "Dots" },
     { id: "rings",    label: "Rings" },
@@ -603,7 +592,7 @@ const DECO_FAMILIES = [
     { id: "picture", btn: "famPicture", tools: ["motif"] },
     { id: "pattern", btn: "famPattern", tools: ["overlay", "pattern", "band"] },
 ];
-const TOOL_LABELS = { brush: "Brush", splatter: "Splatter", slip: "Slip", stamp: "Stamp",
+const TOOL_LABELS = { brush: "Brush", splatter: "Splatter", slip: "Slip",
     carve: "Carve", resist: "Resist", overlay: "Overlay", motif: "Motif", pattern: "Tile", band: "Band" };
 const familyLastTool = {}; // family id -> last tool used within it (remembered)
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
@@ -1062,7 +1051,6 @@ const state = {
     decoTool: "brush",          // brush | splatter | stamp | overlay | motif | pattern | band
     decoColor: null,            // paint colour (hex), or null = painting off
     decoSizeIndex: DEFAULT_DECO_SIZE,
-    stampShape: "dot",
     adjustMode: false,          // Adjust toggle: tap+drag a placed motif/band to move it
     painting: false,
     decoCanvas: null, decoCtx: null, decoTex: null,
@@ -1492,7 +1480,7 @@ function init() {
             setAdjustMode, addBand, startMotifPlacement, startPlacementMove,
             movePlacementTo, endPlacementDrag, placementAt, loadStarterMotif,
             composeDeco, serializePlacements,
-            setStampShape, stampAt, applyOverlay,
+            applyOverlay,
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze,
             setDipMode, setDipColor, applyDipPreset, undoDip, clearDips, setDripAmount, renderDips,
@@ -2548,81 +2536,6 @@ function clearResist() {
     if (!state.resistCtx) return;
     state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (state.resistTex) state.resistTex.needsUpdate = true;
-}
-
-// --- Stamps -----------------------------------------------------
-function starPath(ctx, r, points = 5) {
-    ctx.beginPath();
-    for (let i = 0; i < points * 2; i++) {
-        const rad = i % 2 === 0 ? r : r * 0.45;
-        const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
-        const fn = i === 0 ? "moveTo" : "lineTo";
-        ctx[fn](Math.cos(a) * rad, Math.sin(a) * rad);
-    }
-    ctx.closePath();
-}
-function heartPath(ctx, r) {
-    const s = r / 16;
-    ctx.beginPath();
-    ctx.moveTo(0, 6 * s);
-    ctx.bezierCurveTo(0, 1 * s, -8 * s, -6 * s, -13 * s, -1 * s);
-    ctx.bezierCurveTo(-18 * s, 5 * s, -8 * s, 12 * s, 0, 17 * s);
-    ctx.bezierCurveTo(8 * s, 12 * s, 18 * s, 5 * s, 13 * s, -1 * s);
-    ctx.bezierCurveTo(8 * s, -6 * s, 0, 1 * s, 0, 6 * s);
-    ctx.closePath();
-}
-function drawStamp(cx, cy, r, shape, hex) {
-    const ctx = state.paintCtx;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.fillStyle = rgba(hex, 0.95);
-    ctx.strokeStyle = rgba(hex, 0.95);
-    if (shape === "dot") {
-        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
-    } else if (shape === "ring") {
-        ctx.lineWidth = r * 0.34; ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, Math.PI * 2); ctx.stroke();
-    } else if (shape === "star") {
-        starPath(ctx, r); ctx.fill();
-    } else if (shape === "spark") {
-        starPath(ctx, r, 4); ctx.fill();
-    } else if (shape === "triangle") {
-        ctx.beginPath();
-        ctx.moveTo(0, -r);
-        ctx.lineTo(r * 0.92, r * 0.7);
-        ctx.lineTo(-r * 0.92, r * 0.7);
-        ctx.closePath(); ctx.fill();
-    } else if (shape === "diamond") {
-        ctx.beginPath();
-        ctx.moveTo(0, -r); ctx.lineTo(r * 0.8, 0); ctx.lineTo(0, r); ctx.lineTo(-r * 0.8, 0);
-        ctx.closePath(); ctx.fill();
-    } else if (shape === "square") {
-        ctx.fillRect(-r * 0.8, -r * 0.8, r * 1.6, r * 1.6);
-    } else if (shape === "heart") {
-        heartPath(ctx, r); ctx.fill();
-    } else if (shape === "flower") {
-        for (let i = 0; i < 6; i++) {
-            const a = (i / 6) * Math.PI * 2;
-            ctx.beginPath();
-            ctx.arc(Math.cos(a) * r * 0.55, Math.sin(a) * r * 0.55, r * 0.42, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.beginPath(); ctx.arc(0, 0, r * 0.4, 0, Math.PI * 2); ctx.fill();
-    } else if (shape === "cross") {
-        const w = r * 0.5, l = r * 1.7;
-        ctx.fillRect(-w / 2, -l / 2, w, l);
-        ctx.fillRect(-l / 2, -w / 2, l, w);
-    }
-    ctx.restore();
-}
-function stampAt(u, v) {
-    if (state.decoColor == null) return;
-    state.dirty = true;
-    const r = decoRadius() * 1.25;
-    const cx = u * DECO_W, cy = (1 - v) * DECO_H;
-    drawStamp(cx, cy, r, state.stampShape, state.decoColor);
-    if (cx < r * 2) drawStamp(cx + DECO_W, cy, r, state.stampShape, state.decoColor);
-    else if (cx > DECO_W - r * 2) drawStamp(cx - DECO_W, cy, r, state.stampShape, state.decoColor);
-    composeDeco();
 }
 
 // --- Overlays (one tap fills the whole surface) -----------------
@@ -4447,11 +4360,6 @@ function setDecoTab(name) {
 }
 
 // Pick which stamp shape to place.
-function setStampShape(id) {
-    state.stampShape = id;
-    updateDecoSub();
-}
-
 // Switch the active motif pack (rebuilds the thumbnail row).
 function setMotifPack(id) {
     if (!MOTIF_PACKS[id]) return;
