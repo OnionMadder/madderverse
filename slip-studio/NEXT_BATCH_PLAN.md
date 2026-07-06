@@ -7,14 +7,15 @@ Approved, local-only gallery). Calm/meditative brand throughout.
 
 ---
 
-## ⚠ Ship state & git workflow — READ FIRST
-- **`main` = web v136** = what Play AAB **vc13 / 2.4.0** bundles (uploaded, **in Google review**) = live at madderverse.org/slip-studio/. `?v=136` on main is correct.
-- This plan's work continues on branch **`slip-next-batch`** (already holds v137–140: Lane-1 content, stamps removed, set-handle fix). **Stay on this branch. Do NOT push to `main`** — Pages auto-deploys on any push to main, and the reviewed build + live trial must stay matched until vc13 is approved.
-- **After vc13 is approved:** `git checkout main && git merge slip-next-batch` → deploy web (verify live `?v=`) → rebuild the Play AAB as **vc14** (bump versionCode 13→14 / versionName). See CLAUDE.md "Big feature + value run" + the `project_slip_studio_android_build` memory.
+## ⚠ Ship state & git workflow — READ FIRST (updated 2026-07-06)
+- **`main` = web v140 = LIVE** at madderverse.org/slip-studio/. The v137–140 batch (Lane-1 content, stamps removed, set-handle fix, this plan doc) that was meant to be HELD off main got **accidentally pushed to `origin/main`** by a concurrent Pootery session (a bare `git push origin HEAD:main` swept up commits already layered on local main) and deployed. Onion was asked and **chose to leave it live** — no revert/git surgery. So **`main` is now the base**; `?v=140` on main is correct.
+- **`slip-next-batch` is retired.** History is linear and `origin/main` is strictly ahead of `origin/slip-next-batch` — that branch has nothing main lacks. **Do NOT plan a `slip-next-batch → main` merge** (already there; would only risk double-apply confusion). Continue this batch's remaining work (Phases A–F below) **from `main`**.
+- **Isolation:** a concurrent Pootery session shares the OneDrive checkout — that cross-contamination is what shipped this batch early. Work in a **git worktree** off `origin/main` (current one: `C:\Users\kelly\slip-next-worktree`, branch `slip-next`, upstream intentionally unset so a bare push can't auto-deploy). Push to main only with an explicit refspec (`git push origin HEAD:main`) when Onion says to deploy.
+- **Android/version:** live web is now **v140** but Play still has **vc13 = v136 in review** → web/Play are intentionally MISMATCHED (accepted). Next AAB = **vc14 bundling v140** (bump versionCode 13→14 / versionName). See CLAUDE.md "Big feature + value run" + the `project_slip_studio_android_build` memory.
 
 ## How to work
 - **Verify in the preview** via the `?dev` `window.__slip` handle + `preview_eval` (numeric/state checks). **WebGL screenshots time out** on this app — don't rely on them; measure state/pixels or use `preview_resize` for layout. Serve on a free port (8796 is the canonical `slip-studio` config; others may be held by concurrent sessions).
-- **Cache-bust every web change:** bump `main.js?v=N` + `style.css?v=N` in `index.html` (currently v140 on the branch). The module `<script>`/`<link>` URL is what actually reloads — the page `&t=` does not.
+- **Cache-bust every web change:** bump `main.js?v=N` + `style.css?v=N` in `index.html` (currently v140, live on main — start next change at v141). The module `<script>`/`<link>` URL is what actually reloads — the page `&t=` does not.
 - **Optimize any new art** with `scratchpad/optimize_assets.py` (Pillow: 640px q82 JPEG for opaque tiles; 256-colour FASTOCTREE PNG preserving alpha for transparent art). Keeps size near-free.
 - Key code map: decoration = baked `paintCanvas` + `placements[]` → `composeDeco()` → `decoCanvas`; clay shader `onBeforeCompile` (cache key `clay-gradient-sgraffito-dip-v6`) samples decoMap + sgraffitoMap + uDipMap; glaze dips live in the dip canvas (`state.dips[]`, `renderDips`/`paintDip`); bump relief in `bumpCanvas` (`bumpDab`/`bumpDabWrap`); shapes in `SHAPES`, lids in `LID_STYLES`; firing arc wet→leather→fired (`advanceStage`/`startFiringMoment`/`endFiringMoment`).
 
