@@ -508,11 +508,31 @@ function mulberry32(seed) {
 // Painted onto the surface (over the glaze) by dragging on the pot.
 // One unwrapped RGBA canvas wraps the pot via UVs; a shader overlays
 // it on the clay. Brush = soft dab; splatter = scattered droplets.
-const DECO_COLORS = [
-    0xf4efe6, 0x2b2622, 0x37507e, 0x7d9b7e, 0xc98a3c, 0xc97f86, 0x6e4a6b, 0x4a5a68,
-    0xffffff, 0x8c2f2f, 0xc94f3a, 0xd9a441, 0x2f7d5b, 0x2f6f8f, 0x2a356b, 0x6b4a2f,
-    0xe85a9c, 0xef7d2a, 0x8fc23a, 0x5aa6e0, 0x7a4ad6, 0x2fb8a6, 0xf2d04a, 0x8a8a86,
-];
+// Paint colours, grouped into themed packs like the glaze + dip packs:
+// a pack selector above the swatch grid shows one themed set of eight at
+// a time. DECO_COLORS stays the flat list of ALL colours so saved pots
+// keep resolving regardless of the active pack.
+const DECO_COLOR_PACKS = {
+    basics: { label: "Basics", colors: [
+        0xf4efe6, 0xffffff, 0xd6ccbb, 0x8a8a86, 0x6b4a2f, 0x4a5a68, 0x3a3632, 0x2b2622,
+    ] },
+    warm: { label: "Warm", colors: [
+        0x8c2f2f, 0xc94f3a, 0xb5502f, 0xef7d2a, 0xc98a3c, 0xd9a441, 0xf2d04a, 0xc97f86,
+    ] },
+    cool: { label: "Cool", colors: [
+        0x37507e, 0x2a356b, 0x2f6f8f, 0x5aa6e0, 0x2f7d5b, 0x7d9b7e, 0x8fcbb0, 0x2fb8a6,
+    ] },
+    bright: { label: "Bright", colors: [
+        0xe85a9c, 0xff3d8b, 0x7a4ad6, 0x9b5de5, 0x8fc23a, 0x3ddc84, 0x2f7dff, 0x6e4a6b,
+    ] },
+};
+const DECO_COLOR_PACK_IDS = ["basics", "warm", "cool", "bright"];
+const DEFAULT_DECO_COLOR_PACK = "basics";
+const DECO_COLORS = DECO_COLOR_PACK_IDS.flatMap((id) => DECO_COLOR_PACKS[id].colors);
+const DECO_DEFAULT_COLOR = 0x2b2622; // near-black silhouette tint (motif default)
+function currentDecoPackColors() {
+    return (DECO_COLOR_PACKS[state.decoPack] || DECO_COLOR_PACKS[DEFAULT_DECO_COLOR_PACK]).colors;
+}
 const DECO_W = 2048, DECO_H = 1024; // unwrapped surface (≈ circumference:height)
 // Bump canvas. The procedural clay grain is rendered into it once at
 // pot reset; the texture stays static for v2 (earlier prototypes of
@@ -1199,6 +1219,12 @@ const state = {
             return (saved && DIP_SET_PACKS[saved]) ? saved : DEFAULT_DIP_PACK;
         } catch (_) { return DEFAULT_DIP_PACK; }
     })(),
+    decoPack: (() => {
+        try {
+            const saved = localStorage.getItem("slip-deco-pack");
+            return (saved && DECO_COLOR_PACKS[saved]) ? saved : DEFAULT_DECO_COLOR_PACK;
+        } catch (_) { return DEFAULT_DECO_COLOR_PACK; }
+    })(),
     photoStyle: "studio",                // studio | sunlit | museum | spotlight | pastel
     photoAspect: "square",               // square | portrait
     bgCategory: null,                    // resolved by buildBgPicker
@@ -1736,7 +1762,7 @@ function drawPlacement(ctx, p) {
         const s = p.size / Math.max(src.width, src.height);
         w = src.width * s; h = src.height * s;
     } else if (p.mask) {
-        src = tintMask(p.mask, p.color != null ? p.color : DECO_COLORS[1], p.size);
+        src = tintMask(p.mask, p.color != null ? p.color : DECO_DEFAULT_COLOR, p.size);
         w = src.width; h = src.height;
     } else return;
     drawSpriteWrapped(ctx, src, p.u, p.v, w, h);
@@ -4670,7 +4696,7 @@ function downscaleToCanvas(img, maxd) {
 function loadMotifImage(img) {
     motifMask = buildMotifMask(img);
     motifImage = downscaleToCanvas(img, 512); // kept for full-colour placement
-    if (state.decoColor == null) setDecoColor(DECO_COLORS[1]); // arm near-black (silhouette tint)
+    if (state.decoColor == null) setDecoColor(DECO_DEFAULT_COLOR); // arm near-black (silhouette tint)
     updateDecoSub();
 }
 // Toggle: place motifs in their own colours vs as a tinted silhouette.
@@ -4739,7 +4765,7 @@ function drawMotifOnDeco(ctx, u, v) {
         const s = sizePx / Math.max(src.width, src.height);
         w = src.width * s; h = src.height * s;
     } else {
-        src = tintedMotif(state.decoColor != null ? state.decoColor : DECO_COLORS[1], sizePx);
+        src = tintedMotif(state.decoColor != null ? state.decoColor : DECO_DEFAULT_COLOR, sizePx);
         w = src.width; h = src.height;
     }
     const cx = u * DECO_W, cy = (1 - v) * DECO_H;
@@ -4760,7 +4786,7 @@ function startMotifPlacement(uv) {
     const p = addPlacement({
         type: "motif", src: motifStarter,
         u: uv.x, v: uv.y, size: motifSizePx(),
-        color: state.decoColor != null ? state.decoColor : DECO_COLORS[1],
+        color: state.decoColor != null ? state.decoColor : DECO_DEFAULT_COLOR,
         fullColor: !!motifFullColor,
         mask: motifMask, imgCanvas: motifImage || null,
     });
@@ -4798,25 +4824,57 @@ function endPlacementDrag() {
 }
 
 function buildDecoBar() {
+    const tabs = document.getElementById("decoColorPackTabs");
+    if (tabs) {
+        tabs.innerHTML = "";
+        DECO_COLOR_PACK_IDS.forEach((pid) => {
+            const t = document.createElement("button");
+            t.type = "button";
+            t.className = "dip-pack-tab";
+            t.dataset.decoPack = pid;
+            t.textContent = DECO_COLOR_PACKS[pid].label;
+            t.addEventListener("click", () => setDecoColorPack(pid));
+            tabs.appendChild(t);
+        });
+    }
+    renderDecoSwatches();
+}
+// (Re)build the swatch grid for the active colour pack.
+function renderDecoSwatches() {
     const wrap = document.getElementById("decoColors");
     if (!wrap) return;
-    DECO_COLORS.forEach((hex) => {
+    wrap.innerHTML = "";
+    currentDecoPackColors().forEach((hex) => {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "deco-swatch";
+        b.dataset.hex = hex;
         b.style.background = "#" + hex.toString(16).padStart(6, "0");
         b.setAttribute("aria-label", "Paint colour");
         b.setAttribute("aria-pressed", "false");
         b.addEventListener("click", () => setDecoColor(hex));
         wrap.appendChild(b);
     });
+    updateDecoSwatches();
+}
+function setDecoColorPack(id) {
+    if (!DECO_COLOR_PACKS[id]) return;
+    state.decoPack = id;
+    try { localStorage.setItem("slip-deco-pack", id); } catch (_) {}
+    renderDecoSwatches();
+    document.querySelectorAll("#decoColorPackTabs .dip-pack-tab").forEach((b) => {
+        b.classList.toggle("is-active", b.dataset.decoPack === state.decoPack);
+    });
 }
 
 function updateDecoSwatches() {
     const wrap = document.getElementById("decoColors");
     if (!wrap) return;
-    Array.from(wrap.children).forEach((b, i) => {
-        const on = DECO_COLORS[i] === state.decoColor;
+    document.querySelectorAll("#decoColorPackTabs .dip-pack-tab").forEach((b) => {
+        b.classList.toggle("is-active", b.dataset.decoPack === state.decoPack);
+    });
+    Array.from(wrap.children).forEach((b) => {
+        const on = Number(b.dataset.hex) === state.decoColor;
         b.classList.toggle("is-active", on);
         b.setAttribute("aria-pressed", on ? "true" : "false");
     });
