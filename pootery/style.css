@@ -23,6 +23,9 @@
     --pink-bright:  #ff5cab;
     --pink-deep:    #b81866;
 
+    --spark:        #ffd257;     /* earned-sparks currency (✦) */
+    --spark-dim:    #b89235;
+
     --ink:          #eaf6f4;     /* main text on dark */
     --ink-dim:      #9fb8b6;
     --ink-low:      #5a7773;
@@ -3100,6 +3103,10 @@ a:focus-visible {
     border-color: var(--pink-bright);
     box-shadow: 0 0 14px rgba(255, 46, 136, 0.3);
 }
+.stats-tile.accent-spark {
+    border-color: var(--spark);
+    box-shadow: 0 0 14px rgba(255, 210, 87, 0.3);
+}
 
 .stats-val {
     font-family: var(--font-title, var(--font-mono));
@@ -3116,6 +3123,7 @@ a:focus-visible {
 }
 .stats-tile.accent-gold .stats-val { color: #ffea00; text-shadow: 0 0 10px rgba(255, 234, 0, 0.5); }
 .stats-tile.accent-pink .stats-val { color: var(--pink-bright); text-shadow: 0 0 10px rgba(255, 46, 136, 0.5); }
+.stats-tile.accent-spark .stats-val { color: var(--spark); text-shadow: 0 0 10px rgba(255, 210, 87, 0.5); }
 
 .stats-lbl {
     font-family: var(--font-mono);
@@ -3139,6 +3147,61 @@ a:focus-visible {
     max-width: 540px;
     margin-left: auto;
     margin-right: auto;
+}
+
+/* Sparks balance banner — the earned currency that unlocks the
+   points packs. Shown above the pack grid so kids learn it exists. */
+.shop-sparks {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 auto 16px;
+    padding: 8px 16px;
+    max-width: 540px;
+    border: 1px solid var(--spark-dim);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 210, 87, 0.06);
+}
+.shop-sparks-icon {
+    color: var(--spark);
+    font-size: 18px;
+    line-height: 1;
+    text-shadow: 0 0 8px rgba(255, 210, 87, 0.6);
+}
+.shop-sparks-val {
+    color: var(--spark);
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+.shop-sparks-lbl {
+    color: var(--spark);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2px;
+}
+.shop-sparks-hint {
+    color: var(--ink-dim);
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    flex-basis: 100%;
+    text-align: center;
+}
+
+/* Spark-locked (points) packs: an affordable one glows gold to
+   invite the unlock; a still-out-of-reach one shows the cost dimmed
+   so the target reads as a goal, not a paywall. */
+.shop-card.is-spark-locked .shop-status { color: var(--spark-dim); }
+.shop-card.is-spark-locked.is-affordable {
+    border-color: var(--spark);
+    box-shadow: 0 0 0 1px var(--spark), 0 0 18px rgba(255, 210, 87, 0.25);
+}
+.shop-card.is-spark-locked.is-affordable .shop-status {
+    color: var(--spark);
+    text-shadow: 0 0 8px rgba(255, 210, 87, 0.5);
 }
 
 .shop-grid {
@@ -3547,6 +3610,26 @@ a:focus-visible {
     background: rgba(255, 46, 136, 0.18);
     color: #fff;
 }
+/* Spark-locked pack: gold "UNLOCK" when affordable, dimmed
+   "X ✦ TO GO" goal when not yet reachable. */
+.pack-modal.is-spark-locked .pack-modal-action {
+    border-color: var(--spark-dim);
+    color: var(--spark-dim);
+    background: rgba(255, 210, 87, 0.06);
+}
+.pack-modal.is-spark-locked.is-affordable .pack-modal-action {
+    border-color: var(--spark);
+    color: var(--spark);
+    background: rgba(255, 210, 87, 0.12);
+    box-shadow: 0 0 16px rgba(255, 210, 87, 0.25);
+}
+.pack-modal.is-spark-locked.is-affordable .pack-modal-action:hover {
+    background: rgba(255, 210, 87, 0.22);
+    color: #fff;
+}
+/* Also tint the modal status pill to match the spark theme. */
+.pack-modal.is-spark-locked .pack-modal-status { color: var(--spark-dim); }
+.pack-modal.is-spark-locked.is-affordable .pack-modal-status { color: var(--spark); }
 
 /* Narrow phones: tighten the modal so it fills the viewport
    nicely and the stamp grid stays at least 4 columns wide. */

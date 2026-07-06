@@ -5309,7 +5309,8 @@
             buildSubject: "bear",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
             surfaceTextures: ["builder/plushie", "builder/plushie-blue", "builder/plushie-pink"],
-            unlock: "points",   /* coming soon — unlocked with earned points (economy TBD) */
+            unlock: "points",   /* earned, not bought — unlocked with sparks */
+            sparkCost: 250,     /* cheapest points pack — first goal */
             backgroundSvg: "plush",    /* assets/backgrounds/plush.svg (optional) */
             description: "Teddy brown, pastel pink, soft plush palette.",
             coverEmoji: "\u{1F9F8}",   /* teddy bear */
@@ -5336,7 +5337,8 @@
             packType: "crafter",
             sheet: "modded",
             surfaceTextures: ["modded", "modded-aluminum", "modded-led"],
-            unlock: "points",   /* coming soon — unlocked with earned points (economy TBD) */
+            unlock: "points",   /* earned, not bought — unlocked with sparks */
+            sparkCost: 800,     /* flashiest points pack — the big goal */
             backgroundSvg: "modded",   /* assets/backgrounds/modded.svg (optional) */
             description: "RGB cycle + neon + brushed aluminum. PC-builder vibes.",
             coverEmoji: "\u{1F5A5}",   /* desktop computer */
@@ -5460,7 +5462,8 @@
             packType: "crafter",
             sheet: "breakfast",
             surfaceTextures: ["breakfast-egg", "breakfast-pancake", "breakfast-strawberry"],
-            unlock: "points",   /* coming soon — unlocked with earned points (economy TBD) */
+            unlock: "points",   /* earned, not bought — unlocked with sparks */
+            sparkCost: 500,     /* mid-tier points pack */
             backgroundSvg: "breakfast",/* assets/backgrounds/breakfast.svg (optional) */
             description: "Maple syrup, golden butter, berry jam, espresso.",
             coverEmoji: "\u{1F95E}",   /* pancakes */
@@ -5519,7 +5522,7 @@
             sheet: "chickens",
             surfaceTextures: ["chickens", "chickens-clay", "chickens-skin"],
             backgroundSvg: "chickens", /* assets/backgrounds/chickens.svg (optional) */
-            description: "Final description coming soon.",
+            description: "Ten hen-house glazes and a whole flock of costume stamps — ninja, pirate, astronaut, robocluck and more. Dress your pot's very own chicken.",
             coverEmoji: "\u{1F414}",   /* chicken */
             priceCents: 199,
             glazes: [
@@ -5553,7 +5556,7 @@
             sheet: "aliens",
             surfaceTextures: ["aliens", "aliens-mars", "aliens-venus"],
             backgroundSvg: "aliens",   /* assets/backgrounds/aliens.svg (optional) */
-            description: "Final description coming soon.",
+            description: "Cosmic greens, ray-gun cyans and saucer chrome, plus eight little visitors from far-off worlds. Beam an alien onto your pot.",
             coverEmoji: "\u{1F47D}",   /* alien */
             priceCents: 199,
             glazes: [
@@ -5587,7 +5590,7 @@
             sheet: "literally-moons",   /* sheet file is hyphenated */
             surfaceTextures: ["literally-moons", "literally-moons-sponge", "literally-moons-stars"],
             backgroundSvg: "moons",    /* assets/backgrounds/moons.svg (optional) */
-            description: "Final description coming soon.",
+            description: "Ten lunar glazes from lunar grey to comet gold, with a sky full of moons in every phase and color. Give your pot the whole night sky.",
             coverEmoji: "\u{1F319}",   /* crescent moon */
             priceCents: 199,
             glazes: [
@@ -5965,8 +5968,79 @@
         return loadOwnedPacks().has(pack.id);
     }
 
-    /* True for the not-yet-purchasable points packs. */
-    function isPackComingSoon(pack) {
+    /* ============================================================
+       SPARKS — the earned-currency economy (✦)
+       ============================================================
+       Sparks are a PURE DERIVED readout of durable creative history
+       — the same sources computeStats() reads: gallery entries +
+       the trophy cache + egg flags. Nothing is stored as a mutable
+       balance, so it can't drift or be gamed by poking localStorage:
+
+           balance = earned − Σ(sparkCost of owned points-packs)
+
+       "earned" is recomputed from what you've actually made; "spent"
+       is inferred from which points-packs you already own (unlocking
+       is permanent, so the pack itself IS the receipt).
+
+       No dark patterns: sparks only accrue from real creative acts —
+       no daily-login timer, no grind counter, nothing time-gated. */
+    const SPARK_RATES = {
+        fired:  8,    /* each pot successfully fired */
+        shared: 12,   /* each pot shared to the public gallery */
+        egg:    20,   /* each easter egg discovered */
+        trophy: 40    /* each battle trophy won */
+    };
+
+    /* The spark price of a points pack (0 for anything else). */
+    function sparkCost(pack) {
+        return (pack && pack.unlock === "points") ? (pack.sparkCost || 0) : 0;
+    }
+
+    /* Total sparks the player has earned across their whole history. */
+    function sparksEarned() {
+        const entries = loadGalleryEntries();
+        let fired = 0, shared = 0;
+        for (let i = 0; i < entries.length; i++) {
+            if (entries[i].fired)    fired++;
+            if (entries[i].publicId) shared++;
+        }
+        const trophies = Object.keys(trophyCacheLoad()).length;
+        let eggs = 0;
+        if (typeof EGG === "object" && EGG) {
+            ["konami", "pingas", "overheatTriggered", "overclocked",
+             "sentient", "infiniteClay", "oneFrameFire"]
+                .forEach(function (k) { if (EGG[k]) eggs++; });
+        }
+        return fired    * SPARK_RATES.fired  +
+               shared   * SPARK_RATES.shared +
+               eggs     * SPARK_RATES.egg    +
+               trophies * SPARK_RATES.trophy;
+    }
+
+    /* Sparks already spent = the cost of every points-pack owned. */
+    function sparksSpent() {
+        const owned = loadOwnedPacks();
+        let spent = 0;
+        GLAZE_PACKS.forEach(function (p) {
+            if (p.unlock === "points" && owned.has(p.id)) spent += sparkCost(p);
+        });
+        return spent;
+    }
+
+    /* Spendable balance (never negative). */
+    function sparksBalance() {
+        return Math.max(0, sparksEarned() - sparksSpent());
+    }
+
+    /* A points pack the player can unlock right now. */
+    function isPackAffordable(pack) {
+        return !!(pack && pack.unlock === "points" && !isPackOwned(pack) &&
+                  sparksBalance() >= sparkCost(pack));
+    }
+
+    /* True for a points pack that isn't unlocked yet (regardless of
+       whether it's currently affordable). */
+    function isPackSparkLocked(pack) {
         return !!(pack && pack.unlock === "points" && !isPackOwned(pack));
     }
 
@@ -11954,6 +12028,9 @@
             count.textContent = ownedCount + " / " + total + " OWNED";
         }
 
+        const sparksVal = document.getElementById("shopSparksVal");
+        if (sparksVal) sparksVal.textContent = sparksBalance();
+
         /* Sort: owned first (free + bought), then unreleased
            paid (drops soon), then released paid (buy now). */
         const sorted = GLAZE_PACKS.slice().sort(function (a, b) {
@@ -11982,7 +12059,10 @@
         if (owned)                    card.classList.add("is-owned");
         if (!released)                card.classList.add("is-queued");
         if (free)                     card.classList.add("is-free");
-        if (isPackComingSoon(p))      card.classList.add("is-coming-soon");
+        if (isPackSparkLocked(p)) {
+            card.classList.add("is-spark-locked");
+            if (isPackAffordable(p)) card.classList.add("is-affordable");
+        }
         /* MEGA tier (the $1.99 "special" themed packs) gets the pink
            glow, matching shared pots in the vault. */
         if (p.packType === "special") card.classList.add("is-mega");
@@ -12047,7 +12127,8 @@
     }
 
     function shopStatusText(p) {
-        if (p.unlock === "points") return isPackOwned(p) ? "OWNED" : "COMING SOON";
+        if (p.unlock === "points") return isPackOwned(p) ? "OWNED"
+            : (sparkCost(p) + " ✦");
         if (!p.priceCents) return "FREE";
         if (isPackOwned(p)) return "OWNED";
         if (!isPackReleased(p)) {
@@ -12061,7 +12142,11 @@
     }
 
     function shopCtaText(p) {
-        if (p.unlock === "points")    return isPackOwned(p) ? "PLAY" : "COMING SOON";
+        if (p.unlock === "points") {
+            if (isPackOwned(p))      return "PLAY";
+            if (isPackAffordable(p)) return "UNLOCK · " + sparkCost(p) + " ✦";
+            return (sparkCost(p) - sparksBalance()) + " ✦ TO GO";
+        }
         if (!p.priceCents)            return "PLAY";
         if (isPackOwned(p))           return "PLAY";
         if (!isPackReleased(p))       return "NOTIFY ME";
@@ -12085,11 +12170,32 @@
        inline shop-card CTA used to do. */
     function performPackAction(p) {
         if (!p) return;
-        /* Points packs aren't purchasable yet — friendly "coming soon". */
-        if (isPackComingSoon(p)) {
-            alert(p.label + " is coming soon!\n\n" +
-                  "Earn points by making pots, finding secrets, sharing your " +
-                  "pots, and voting — then you'll be able to unlock it.");
+        /* Points packs unlock with earned sparks (✦), not money. */
+        if (isPackSparkLocked(p)) {
+            const cost = sparkCost(p);
+            const bal  = sparksBalance();
+            if (bal < cost) {
+                const need = cost - bal;
+                alert(p.label + " unlocks for " + cost + " ✦ sparks.\n\n" +
+                      "You have " + bal + " — just " + need + " to go!\n\n" +
+                      "Earn sparks by firing pots (+" + SPARK_RATES.fired +
+                      "), sharing them (+" + SPARK_RATES.shared +
+                      "), finding secrets (+" + SPARK_RATES.egg +
+                      "), and winning battles (+" + SPARK_RATES.trophy + ").");
+                return;
+            }
+            const ok = confirm("Unlock " + p.label + " for " + cost +
+                " ✦ sparks?\n\nYou have " + bal + " sparks — you'll have " +
+                (bal - cost) + " left.");
+            if (!ok) return;
+            markPackOwned(p.id);          /* permanent; also charges the cost */
+            toastSparks(p, cost);
+            closePackPreviewModal();
+            if (typeof refreshShopScreen === "function") refreshShopScreen();
+            /* Drop straight into shaping with the freshly-unlocked pack. */
+            D.activePackId = p.id;
+            SHAPE.needsLump = false;
+            showScreen("shape");
             return;
         }
         const free  = !p.priceCents;
@@ -12160,10 +12266,16 @@
 
         /* Pack-state classes mirror the card so the modal accents
            match (owned = green, queued = pink, free/paid = teal). */
-        card.classList.remove("is-owned", "is-queued", "is-free");
+        card.classList.remove("is-owned", "is-queued", "is-free",
+                              "is-spark-locked", "is-affordable");
         if (isPackOwned(p))         card.classList.add("is-owned");
         if (!isPackReleased(p))     card.classList.add("is-queued");
-        if (!p.priceCents)          card.classList.add("is-free");
+        /* Free = no price AND not a spark-unlock pack. */
+        if (!p.priceCents && p.unlock !== "points") card.classList.add("is-free");
+        if (isPackSparkLocked(p)) {
+            card.classList.add("is-spark-locked");
+            if (isPackAffordable(p)) card.classList.add("is-affordable");
+        }
 
         card.innerHTML = "";
 
@@ -12371,6 +12483,8 @@
             { label: "SHARED PUBLIC",    val: stats.publicShared },
             { label: "TROPHIES WON",     val: stats.trophyCount,
               accent: stats.trophyCount > 0 ? "gold" : null },
+            { label: "SPARKS",           val: sparksBalance(),
+              accent: "spark" },
             { label: "REMIXED BY OTHERS", val: "—",
               tile: "remixedByOthersTile", accent: "pink" },
             { label: "EGGS FOUND",       val: stats.eggsFound,
@@ -13191,9 +13305,11 @@
         if (!t) return;
         const ic = document.getElementById("achToastIcon");
         const txt = document.getElementById("achToastText");
+        const eye = t.querySelector(".ach-toast-eyebrow");
         if (ic) ic.textContent = a.icon || "★";
-        /* Title only -- the "ACHIEVEMENT UNLOCKED" eyebrow is
-           static in the markup. */
+        /* Reset the eyebrow — toastSparks() borrows this same toast
+           and rewrites it, so restore the default here. */
+        if (eye) eye.textContent = "ACHIEVEMENT UNLOCKED";
         if (txt) txt.textContent = a.title;
         t.hidden = false;
         /* clone+replace restarts the animation when a second
@@ -13224,6 +13340,26 @@
             osc.start(t0 + offset);
             osc.stop(t0 + offset + 0.35);
         });
+    }
+
+    /* Celebration when a points pack is unlocked with sparks. Borrows
+       the achievement toast element, swapping the eyebrow to read
+       "PACK UNLOCKED" (toastAch resets it back). */
+    function toastSparks(p, cost) {
+        const t = document.getElementById("achToast");
+        if (t) {
+            const ic  = document.getElementById("achToastIcon");
+            const txt = document.getElementById("achToastText");
+            const eye = t.querySelector(".ach-toast-eyebrow");
+            if (ic)  ic.textContent  = p.coverEmoji || "✦";
+            if (eye) eye.textContent = "PACK UNLOCKED · −" + cost + " ✦";
+            if (txt) txt.textContent = p.label;
+            t.hidden = false;
+            const fresh = t.cloneNode(true);
+            t.parentNode.replaceChild(fresh, t);
+            setTimeout(function () { fresh.hidden = true; }, 4800);
+        }
+        playAchFanfare();
     }
 
     /* ============================================================

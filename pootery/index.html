@@ -54,7 +54,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=61" />
+    <link rel="stylesheet" href="style.css?v=62" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -1077,6 +1077,12 @@
         New paid packs drop every week. All purchases are one-time —
         no subscription. Free packs always included.
     </p>
+    <div class="shop-sparks" id="shopSparks">
+        <span class="shop-sparks-icon" aria-hidden="true">✦</span>
+        <span class="shop-sparks-val" id="shopSparksVal">0</span>
+        <span class="shop-sparks-lbl">SPARKS</span>
+        <span class="shop-sparks-hint">earn by firing, sharing, secrets &amp; battles</span>
+    </div>
     <div class="shop-grid" id="shopGrid"></div>
 </main>
 
@@ -1497,7 +1503,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=61"></script>
+<script src="game.js?v=62"></script>
 
 </body>
 </html>
