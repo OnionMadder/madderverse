@@ -383,6 +383,20 @@ const BAND_PACKS = {
     ] },
 };
 const BAND_PACK_IDS = ["egyptian"];
+// Tool families: the decorate row shows one icon per family; the multi-
+// tool families (Paint, Pattern) expand into variant chips in the row
+// below. Single-tool families (Stamp/Carve/Picture) select directly.
+// Declared here (before init() runs) so the family functions can use them.
+const DECO_FAMILIES = [
+    { id: "paint",   btn: "famPaint",   tools: ["brush", "splatter"] },
+    { id: "stamp",   btn: "famStamp",   tools: ["stamp"] },
+    { id: "carve",   btn: "famCarve",   tools: ["carve"] },
+    { id: "picture", btn: "famPicture", tools: ["motif"] },
+    { id: "pattern", btn: "famPattern", tools: ["overlay", "pattern", "band"] },
+];
+const TOOL_LABELS = { brush: "Brush", splatter: "Splatter", stamp: "Stamp",
+    carve: "Carve", overlay: "Overlay", motif: "Motif", pattern: "Tile", band: "Band" };
+const familyLastTool = {}; // family id -> last tool used within it (remembered)
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
 
@@ -1013,14 +1027,7 @@ function init() {
     buildGlazePackTabs();
     buildGlazeBar();
     buildDecoBar();
-    document.getElementById("toolBrush")?.addEventListener("click", () => setDecoTool("brush"));
-    document.getElementById("toolSplatter")?.addEventListener("click", () => setDecoTool("splatter"));
-    document.getElementById("toolStamp")?.addEventListener("click", () => setDecoTool("stamp"));
-    document.getElementById("toolOverlay")?.addEventListener("click", () => setDecoTool("overlay"));
-    document.getElementById("toolCarve")?.addEventListener("click", () => setDecoTool("carve"));
-    document.getElementById("toolMotif")?.addEventListener("click", () => setDecoTool("motif"));
-    document.getElementById("toolPattern")?.addEventListener("click", () => setDecoTool("pattern"));
-    document.getElementById("toolBand")?.addEventListener("click", () => setDecoTool("band"));
+    buildDecoFamilies(); // wires the 5 family icon buttons
     document.getElementById("decoAdjust")?.addEventListener("click", () => setAdjustMode(!state.adjustMode));
     document.getElementById("decoUndo")?.addEventListener("click", undoDeco);
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
@@ -1385,14 +1392,17 @@ function drawPlacement(ctx, p) {
     if (p.type === "band") {
         const img = p.img;
         if (!img || !img.complete || !(img.naturalWidth || img.width)) return;
-        const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+        const ih = img.naturalHeight || img.height;
+        // Draw only the content columns (trim transparent end-padding) so the
+        // repeats meet with no gap at each tile boundary.
+        const b = bandContentBounds(img);
+        const sx = b.x0, sw = Math.max(1, b.x1 - b.x0 + 1);
         const bandH = Math.max(4, p.height);           // canvas px
-        const tileW = bandH * (iw / ih);
+        const tileW = bandH * (sw / ih);
         const reps = Math.max(1, Math.round(DECO_W / tileW)); // integer → seamless wrap
         const w = DECO_W / reps;
         const top = (1 - p.v) * DECO_H - bandH / 2;
-        for (let i = 0; i < reps; i++) ctx.drawImage(img, i * w, top, w, bandH);
-        // wrap not needed: full-width tiling already covers the seam
+        for (let i = 0; i < reps; i++) ctx.drawImage(img, sx, 0, sw, ih, i * w, top, w, bandH);
         return;
     }
     // motif
@@ -1478,6 +1488,32 @@ function bandImage(file) {
         bandImgCache[file] = img;
     }
     return img;
+}
+// Horizontal content bounds (first/last columns with a non-transparent
+// pixel), cached on the image. Used to trim end-padding so a band's
+// repeats butt together with no blank gap at each tile boundary. Only the
+// EDGE margins are dropped — internal transparent spacing (the frieze's
+// own rhythm) is preserved.
+function bandContentBounds(img) {
+    if (img._cx0 != null) return { x0: img._cx0, x1: img._cx1 };
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    let x0 = 0, x1 = iw - 1;
+    try {
+        const c = document.createElement("canvas");
+        c.width = iw; c.height = ih;
+        const cx = c.getContext("2d");
+        cx.drawImage(img, 0, 0);
+        const d = cx.getImageData(0, 0, iw, ih).data;
+        let lo = iw, hi = -1;
+        for (let x = 0; x < iw; x++) {
+            for (let y = 0; y < ih; y++) {
+                if (d[(y * iw + x) * 4 + 3] > 10) { if (x < lo) lo = x; if (x > hi) hi = x; break; }
+            }
+        }
+        if (hi >= lo) { x0 = lo; x1 = hi; }
+    } catch (_) { /* tainted/unreadable → use the full width */ }
+    img._cx0 = x0; img._cx1 = x1;
+    return { x0, x1 };
 }
 // Tap a fresco thumbnail → drop a band at mid-height, selected + ready to
 // slide. The size slider sets its thickness; Adjust mode slides it.
@@ -3821,18 +3857,59 @@ function updateGlazeBar() {
 }
 
 // --- Decoration UI ----------------------------------------------
-function setDecoTool(name) {
-    state.decoTool = name;
-    [["toolBrush", "brush"], ["toolSplatter", "splatter"],
-     ["toolStamp", "stamp"], ["toolOverlay", "overlay"],
-     ["toolCarve", "carve"], ["toolMotif", "motif"],
-     ["toolPattern", "pattern"], ["toolBand", "band"]].forEach(([id, t]) => {
-        const el = document.getElementById(id);
+// (DECO_FAMILIES / TOOL_LABELS / familyLastTool are declared up top with
+// the other deco constants — init() runs before this point, so they must
+// exist before the family functions are first called.)
+function familyForTool(tool) { return DECO_FAMILIES.find((f) => f.tools.includes(tool)) || DECO_FAMILIES[0]; }
+// Tapping a family icon selects its remembered variant (or first tool).
+function setDecoFamily(id) {
+    const fam = DECO_FAMILIES.find((f) => f.id === id);
+    if (!fam) return;
+    const remembered = familyLastTool[id];
+    setDecoTool(fam.tools.includes(remembered) ? remembered : fam.tools[0]);
+}
+function buildDecoFamilies() {
+    DECO_FAMILIES.forEach((f) => {
+        document.getElementById(f.btn)?.addEventListener("click", () => setDecoFamily(f.id));
+        familyLastTool[f.id] = f.tools[0]; // seed remembered variant
+    });
+    updateDecoFamilies();
+    updateVariantRow();
+}
+function updateDecoFamilies() {
+    const activeFam = familyForTool(state.decoTool).id;
+    DECO_FAMILIES.forEach((f) => {
+        const el = document.getElementById(f.btn);
         if (!el) return;
-        const on = name === t;
+        const on = f.id === activeFam;
         el.classList.toggle("is-active", on);
         el.setAttribute("aria-pressed", on ? "true" : "false");
     });
+}
+// Variant chips for the active family — only shown when it has >1 tool.
+function updateVariantRow() {
+    const wrap = document.getElementById("decoVariants");
+    if (!wrap) return;
+    const fam = familyForTool(state.decoTool);
+    if (!fam || fam.tools.length < 2) { wrap.hidden = true; wrap.innerHTML = ""; return; }
+    wrap.hidden = false;
+    wrap.innerHTML = "";
+    fam.tools.forEach((t) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "deco-variant" + (t === state.decoTool ? " is-active" : "");
+        b.textContent = TOOL_LABELS[t] || t;
+        b.addEventListener("click", () => setDecoTool(t));
+        wrap.appendChild(b);
+    });
+}
+
+function setDecoTool(name) {
+    state.decoTool = name;
+    const fam = familyForTool(name);
+    if (fam) familyLastTool[fam.id] = name;
+    updateDecoFamilies();
+    updateVariantRow();
     updateDecoSub();
 }
 

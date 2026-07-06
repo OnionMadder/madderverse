@@ -1045,10 +1045,7 @@ html, body {
 }
 /* Push the destructive Clear button visually away from the tool cluster
    so it doesn't read as just another tool. Spacer + lighter contrast.*/
-.deco-tool.deco-clear {
-    margin-left: 14px;
-    color: var(--ink-faint);
-}
+.deco-tool.deco-clear { color: var(--ink-faint); }
 .deco-tool.deco-clear:hover,
 .deco-tool.deco-clear:focus-visible {
     color: var(--ink);
@@ -1203,6 +1200,69 @@ html, body {
     color: var(--ink);
     border-color: var(--accent);
     background: rgba(201, 138, 100, 0.18);
+}
+/* Icon tool buttons (families + actions): a square chip with a centred
+   glyph, replacing the wide text pills. */
+.deco-tool-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    color: var(--ink-dim);
+}
+.deco-tool-icon.is-active { color: var(--ink); }
+/* Edit ACTIONS (Adjust / Undo / Clear): their own quiet centred row at
+   the bottom of the tray, set slightly smaller + muted so they read as
+   secondary to the tools. */
+.deco-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 2px;
+    pointer-events: none;
+}
+.deco-actions > * { pointer-events: auto; }
+.deco-act {
+    width: 38px;
+    height: 38px;
+    color: var(--ink-faint);
+}
+.deco-act:not(:disabled):hover,
+.deco-act:not(:disabled):focus-visible { color: var(--ink); }
+.deco-act.is-active { color: var(--ink); border-color: var(--accent); background: rgba(201, 138, 100, 0.18); }
+/* Variant chips (Brush/Splatter, Overlay/Tile/Band) for multi-tool families. */
+.deco-variant {
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    font: inherit;
+    font-size: 0.68rem;
+    letter-spacing: 0.04em;
+    color: var(--ink-dim);
+    background: var(--chip);
+    border: 1px solid var(--ink-faint);
+    border-radius: 999px;
+    padding: 5px 15px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.deco-variant.is-active {
+    color: var(--ink);
+    border-color: var(--accent);
+    background: rgba(201, 138, 100, 0.18);
+}
+/* Colours: a tidy centred grid (8 per row → two rows) instead of one
+   long horizontal scroll. */
+#decoColors {
+    display: grid;
+    grid-template-columns: repeat(8, auto);
+    gap: 7px;
+    justify-content: center;
+    overflow: visible;
+    max-width: 92vw;
 }
 .deco-sizes {
     display: inline-flex;

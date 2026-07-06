@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=128" />
+    <link rel="stylesheet" href="style.css?v=135" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -93,6 +93,50 @@
             <path d="M4 3 L16 3"/>
             <path d="M10 6 L10 16"/>
             <path d="M7 13 L10 16 L13 13"/>
+        </symbol>
+        <!-- Decorate tool-family icons -->
+        <symbol id="tool-paint" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13.5 5 L15.5 7 L11.5 11 L9.5 9 Z"/>
+            <path d="M9.5 9 C 6 11, 4.5 13.5, 4 16.5 C 7 16, 9.5 14, 11.5 11 Z"/>
+        </symbol>
+        <symbol id="tool-stamp" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="3.5" width="8" height="6" rx="1.3"/>
+            <path d="M8.4 9.5 L8 13 L12 13 L11.6 9.5"/>
+            <line x1="4.5" y1="16" x2="15.5" y2="16"/>
+        </symbol>
+        <symbol id="tool-carve" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 5 L16 7 L8.5 14.5 L5 16 L6.5 12.5 Z"/>
+            <path d="M6.5 12.5 L8.5 14.5"/>
+        </symbol>
+        <symbol id="tool-picture" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.5" y="5" width="13" height="10" rx="1.5"/>
+            <circle cx="7.5" cy="9" r="1.1"/>
+            <path d="M4 14.5 L8 10.5 L11 13.5"/>
+            <path d="M11 13 L13.5 10.5 L16 13.2"/>
+        </symbol>
+        <symbol id="tool-pattern" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="5" height="5" rx="0.9"/>
+            <rect x="11" y="4" width="5" height="5" rx="0.9"/>
+            <rect x="4" y="11" width="5" height="5" rx="0.9"/>
+            <rect x="11" y="11" width="5" height="5" rx="0.9"/>
+        </symbol>
+        <symbol id="tool-adjust" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 3 L10 17"/>
+            <path d="M3 10 L17 10"/>
+            <path d="M8 5 L10 3 L12 5"/>
+            <path d="M8 15 L10 17 L12 15"/>
+            <path d="M5 8 L3 10 L5 12"/>
+            <path d="M15 8 L17 10 L15 12"/>
+        </symbol>
+        <symbol id="icon-undo" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6.5 10 L4 7.5 L6.5 5"/>
+            <path d="M4 7.5 L12 7.5 C 15 7.5, 16.5 9.5, 16.5 12 C 16.5 14, 14.5 15.5, 11.5 15.5"/>
+        </symbol>
+        <symbol id="icon-trash" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.5 6 L15.5 6"/>
+            <path d="M8 6 L8 4 L12 4 L12 6"/>
+            <path d="M6 6.5 L7 16 L13 16 L14 6.5"/>
+            <path d="M9 9 L9 13 M11 9 L11 13"/>
         </symbol>
     </svg>
 
@@ -202,19 +246,19 @@
         </div>
 
         <div class="deco-panel" id="panelDecorate" hidden>
+            <!-- Tool families (icons). Paint + Pattern expand into variants
+                 in the row below; Stamp / Carve / Picture are single tools.
+                 Edit ACTIONS (Adjust / Undo / Clear) live in their own row
+                 at the bottom of the tray. -->
             <div class="deco-row" role="group" aria-label="Decorate tools">
-                <button class="deco-tool" id="toolBrush" type="button" aria-pressed="true">Brush</button>
-                <button class="deco-tool" id="toolSplatter" type="button" aria-pressed="false">Splatter</button>
-                <button class="deco-tool" id="toolStamp" type="button" aria-pressed="false">Stamp</button>
-                <button class="deco-tool" id="toolOverlay" type="button" aria-pressed="false">Overlay</button>
-                <button class="deco-tool" id="toolCarve" type="button" aria-pressed="false" title="Scratch through the glaze to reveal the clay">Carve</button>
-                <button class="deco-tool" id="toolMotif" type="button" aria-pressed="false" title="Place a picture on the pot as a silhouette">Motif</button>
-                <button class="deco-tool" id="toolPattern" type="button" aria-pressed="false" title="Fill the pot with a repeating pattern">Pattern</button>
-                <button class="deco-tool" id="toolBand" type="button" aria-pressed="false" title="Wrap a repeating frieze band around the pot">Band</button>
-                <button class="deco-tool deco-adjust" id="decoAdjust" type="button" aria-pressed="false" title="Move or resize a placed motif or band" disabled>Adjust</button>
-                <button class="deco-tool deco-undo" id="decoUndo" type="button" title="Undo the last decoration" disabled>Undo</button>
-                <button class="deco-tool deco-clear" id="decoClear" type="button">Clear</button>
+                <button class="deco-tool deco-tool-icon" id="famPaint" type="button" aria-pressed="true" title="Paint" aria-label="Paint"><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#tool-paint"/></svg></button>
+                <button class="deco-tool deco-tool-icon" id="famStamp" type="button" aria-pressed="false" title="Stamp" aria-label="Stamp"><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#tool-stamp"/></svg></button>
+                <button class="deco-tool deco-tool-icon" id="famCarve" type="button" aria-pressed="false" title="Carve — scratch through to the clay" aria-label="Carve"><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#tool-carve"/></svg></button>
+                <button class="deco-tool deco-tool-icon" id="famPicture" type="button" aria-pressed="false" title="Picture — place a motif" aria-label="Picture"><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#tool-picture"/></svg></button>
+                <button class="deco-tool deco-tool-icon" id="famPattern" type="button" aria-pressed="false" title="Pattern — overlay, tile or band" aria-label="Pattern"><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#tool-pattern"/></svg></button>
             </div>
+            <!-- Variant chips for the multi-tool families (Brush/Splatter, Overlay/Tile/Band). -->
+            <div class="deco-strip deco-variants" id="decoVariants" role="group" aria-label="Tool variant" hidden></div>
             <div class="deco-strip motif-pack-tabs" id="motifPackTabs" role="tablist" aria-label="Motif pack" hidden></div>
             <div class="deco-strip" id="decoOptions">
                 <span class="deco-sizes" id="decoSizes">
@@ -227,6 +271,12 @@
                 <button type="button" id="motifColorToggle" class="motif-color-toggle" aria-pressed="false" title="Place motifs in full color instead of a tinted silhouette" hidden>Full color</button>
             </div>
             <div class="deco-strip" id="decoColors" role="group" aria-label="Paint colour"></div>
+            <!-- Edit actions: their own utility row so they don't crowd the tools. -->
+            <div class="deco-actions" role="group" aria-label="Edit">
+                <button class="deco-tool deco-tool-icon deco-act" id="decoAdjust" type="button" aria-pressed="false" title="Move or resize a placed motif or band" aria-label="Adjust" disabled><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#tool-adjust"/></svg></button>
+                <button class="deco-tool deco-tool-icon deco-act deco-undo" id="decoUndo" type="button" title="Undo the last decoration" aria-label="Undo" disabled><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#icon-undo"/></svg></button>
+                <button class="deco-tool deco-tool-icon deco-act deco-clear" id="decoClear" type="button" title="Clear all decoration" aria-label="Clear"><svg viewBox="0 0 20 20" width="22" height="22" aria-hidden="true"><use href="#icon-trash"/></svg></button>
+            </div>
             <input type="file" id="motifUpload" accept="image/*" hidden />
         </div>
     </div>
@@ -317,7 +367,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=128"></script>
+    <script type="module" src="main.js?v=135"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
