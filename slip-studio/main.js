@@ -542,12 +542,16 @@ const MOTIF_PACKS = {
         "motifs/egyptian-heiroglyphs/one.png", "motifs/egyptian-heiroglyphs/two.png", "motifs/egyptian-heiroglyphs/three.png",
         "motifs/egyptian-heiroglyphs/four.png", "motifs/egyptian-heiroglyphs/five.png", "motifs/egyptian-heiroglyphs/six.png",
     ] },
+    myth: { label: "Mythical", ids: [
+        "motifs/mythological-creatures/dragon.png", "motifs/mythological-creatures/phoenix.png", "motifs/mythological-creatures/griffin.png",
+        "motifs/mythological-creatures/unicorn.png", "motifs/mythological-creatures/roc.png", "motifs/mythological-creatures/beast.png",
+    ] },
     frames: { label: "Frames", ids: [
         "frames/floral.png", "frames/gold.png", "frames/greek.png",
         "frames/landscape.png", "frames/portrait.png", "frames/mirrored.png",
     ] },
 };
-const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "dogs", "berries", "roman", "egyptian", "frames"];
+const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "dogs", "berries", "roman", "egyptian", "myth", "frames"];
 // Allover patterns, grouped into packs (a pack selector like the motifs).
 // A tap does a one-tap full-colour tiled fill; square 512 tiles wrap 4×.
 const PATTERN_PACKS = {
