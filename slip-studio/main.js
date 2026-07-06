@@ -1383,6 +1383,7 @@ function init() {
     document.getElementById("shorterBtn")?.addEventListener("click", () => nudgeHeight(-HEIGHT_STEP));
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
+    document.getElementById("galleryShelfBtn")?.addEventListener("click", () => exportShelfPhoto());
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
         setGalleryView(state.galleryView === "shelf" ? "compact" : "shelf");
     });
@@ -1491,7 +1492,7 @@ function init() {
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
             makeLidPartner, swapActivePiece, matchLidRim, capturePieceState, restorePieceState,
-            loadPot, openGallery, closeGallery,
+            loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas,
             dbAll, dbDelete, dismissLanding,
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
@@ -5480,30 +5481,36 @@ function syncPhotoChips() {
     });
 }
 
-async function finalizePhoto() {
-    if (!photoPotCache) return;
-    const out = document.createElement("canvas");
-    composeStyledPhoto(photoPotCache, photoBgCache, state.photoStyle, state.photoAspect, out);
-    const filename = photoFilename();
-    const blob = await new Promise((res) => out.toBlob(res, "image/png"));
+// Share a PNG blob via the Web Share sheet, falling back to an anchor
+// download. Shared by the single-pot photo and the whole-shelf photo.
+async function shareOrDownloadBlob(blob, filename, title) {
     try {
         if (blob && navigator.canShare) {
             const file = new File([blob], filename, { type: "image/png" });
             if (navigator.canShare({ files: [file] })) {
-                await navigator.share({ files: [file], title: "Slip Studio pot" });
-                flashPhotoSave();
-                return;
+                await navigator.share({ files: [file], title });
+                return true;
             }
         }
     } catch (_) { /* user cancelled or share blocked — fall through to download */ }
-    const url = blob ? URL.createObjectURL(blob) : out.toDataURL("image/png");
+    if (!blob) return false;
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
     try { a.remove(); } catch (_) {}
-    if (blob) setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return true;
+}
+
+async function finalizePhoto() {
+    if (!photoPotCache) return;
+    const out = document.createElement("canvas");
+    composeStyledPhoto(photoPotCache, photoBgCache, state.photoStyle, state.photoAspect, out);
+    const blob = await new Promise((res) => out.toBlob(res, "image/png"));
+    await shareOrDownloadBlob(blob, photoFilename(), "Slip Studio pot");
     flashPhotoSave();
 }
 
@@ -6417,6 +6424,135 @@ async function openGallery() {
     });
     syncGalleryViewToggle();
     document.getElementById("gallery").hidden = false;
+}
+
+// --- Kiln-shelf photo -------------------------------------------
+// Composite every saved pot's thumbnail into ONE warm "pottery shelf"
+// image and export it — turning the gallery into a proud, printable
+// keepsake. Pure 2-D compositing of the thumbs already stored on each
+// entry (no multi-pot 3-D render), so it stays cheap.
+function loadImageEl(src) {
+    return new Promise((res) => {
+        if (!src) { res(null); return; }
+        const img = new Image();
+        img.onload = () => res(img);
+        img.onerror = () => res(null);
+        img.src = src;
+    });
+}
+function roundRectPath(ctx, x, y, w, h, r) {
+    const rr = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + rr, y);
+    ctx.arcTo(x + w, y, x + w, y + h, rr);
+    ctx.arcTo(x + w, y + h, x, y + h, rr);
+    ctx.arcTo(x, y + h, x, y, rr);
+    ctx.arcTo(x, y, x + w, y, rr);
+    ctx.closePath();
+}
+async function exportShelfPhoto() {
+    const btn = document.getElementById("galleryShelfBtn");
+    let pots = [];
+    try { pots = await dbAll(); } catch (_) {}
+    pots.sort((a, b) => b.ts - a.ts);
+    // One tile per pot, but collapse set-mates to a single representative
+    // (prefer the pot half over the lid) so a set isn't shown twice.
+    const seen = new Set();
+    const tiles = [];
+    for (const p of pots) {
+        if (p.setId) {
+            if (seen.has(p.setId)) continue;
+            seen.add(p.setId);
+            const members = pots.filter((q) => q.setId === p.setId);
+            tiles.push(members.find((m) => !m.isLid) || members[0]);
+        } else {
+            tiles.push(p);
+        }
+    }
+    if (!tiles.length) { if (btn) { const t = btn.textContent; btn.textContent = "No pots yet"; setTimeout(() => (btn.textContent = t), 1400); } return; }
+    if (btn) btn.disabled = true;
+
+    const imgs = await Promise.all(tiles.map((t) => loadImageEl(t.thumb)));
+    const items = tiles.map((t, i) => ({ img: imgs[i], title: t.title || "" })).filter((x) => x.img);
+    const cv = renderShelfCanvas(items);
+    const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
+    await shareOrDownloadBlob(blob, "slip-studio-shelf.png", "My Slip Studio pottery shelf");
+    if (btn) { btn.disabled = false; const t = "Shelf photo"; btn.textContent = "Saved ✓"; setTimeout(() => (btn.textContent = t), 1400); }
+}
+
+// Composite the loaded thumbnail items into the warm shelf image.
+function renderShelfCanvas(items) {
+    const n = items.length;
+    const cols = n <= 1 ? 1 : n <= 4 ? n : n <= 9 ? 3 : 4;
+    const rows = Math.ceil(n / cols);
+    // Layout metrics (device px).
+    const card = 300, gap = 46, plankH = 30, titleH = 40;
+    const margin = 70, banner = 150;
+    const gridW = cols * card + (cols - 1) * gap;
+    const W = margin * 2 + gridW;
+    const H = banner + margin + rows * (card + titleH + plankH) + (rows - 1) * gap + margin;
+
+    const cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d");
+    // Warm cream studio wall.
+    const wall = ctx.createLinearGradient(0, 0, 0, H);
+    wall.addColorStop(0, "#f5ecdc"); wall.addColorStop(1, "#e6d4ba");
+    ctx.fillStyle = wall; ctx.fillRect(0, 0, W, H);
+    // Banner title.
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#5a4632";
+    ctx.font = "600 62px Georgia, 'Times New Roman', serif";
+    ctx.fillText("My Pottery Shelf", W / 2, banner - 58);
+    ctx.fillStyle = "#8a745a";
+    ctx.font = "400 26px Georgia, serif";
+    ctx.fillText(`${n} ${n === 1 ? "piece" : "pieces"} · made in Slip Studio`, W / 2, banner - 20);
+
+    for (let i = 0; i < n; i++) {
+        const r = Math.floor(i / cols), c = i % cols;
+        // Center the last (possibly short) row.
+        const inRow = Math.min(cols, n - r * cols);
+        const rowW = inRow * card + (inRow - 1) * gap;
+        const x0 = (W - rowW) / 2 + c * (card + gap);
+        const yTop = banner + margin + r * (card + titleH + plankH + gap);
+        const cardY = yTop;
+        // Card shadow.
+        ctx.save();
+        ctx.shadowColor = "rgba(60,40,20,0.28)";
+        ctx.shadowBlur = 22; ctx.shadowOffsetY = 12;
+        roundRectPath(ctx, x0, cardY, card, card, 20);
+        ctx.fillStyle = "#efe6d5"; ctx.fill();
+        ctx.restore();
+        // Thumb, clipped to the rounded card.
+        ctx.save();
+        roundRectPath(ctx, x0 + 8, cardY + 8, card - 16, card - 16, 14);
+        ctx.clip();
+        ctx.drawImage(items[i].img, x0 + 8, cardY + 8, card - 16, card - 16);
+        ctx.restore();
+        // Thin frame.
+        roundRectPath(ctx, x0 + 8, cardY + 8, card - 16, card - 16, 14);
+        ctx.lineWidth = 2; ctx.strokeStyle = "rgba(90,70,50,0.35)"; ctx.stroke();
+        // Title under the card.
+        if (items[i].title) {
+            ctx.fillStyle = "#5a4632";
+            ctx.font = "500 24px Georgia, serif";
+            const t = items[i].title.length > 22 ? items[i].title.slice(0, 21) + "…" : items[i].title;
+            ctx.fillText(t, x0 + card / 2, cardY + card + 28);
+        }
+        // Wooden shelf plank under the card + title.
+        const plankY = cardY + card + titleH;
+        const plankX = x0 - 14, plankW = card + 28;
+        const wood = ctx.createLinearGradient(0, plankY, 0, plankY + plankH);
+        wood.addColorStop(0, "#a9784b"); wood.addColorStop(0.5, "#94623a"); wood.addColorStop(1, "#7c4f2c");
+        ctx.save();
+        ctx.shadowColor = "rgba(60,40,20,0.25)"; ctx.shadowBlur = 14; ctx.shadowOffsetY = 8;
+        roundRectPath(ctx, plankX, plankY, plankW, plankH, 6);
+        ctx.fillStyle = wood; ctx.fill();
+        ctx.restore();
+        ctx.strokeStyle = "rgba(50,32,18,0.35)"; ctx.lineWidth = 1.5;
+        roundRectPath(ctx, plankX, plankY, plankW, plankH, 6); ctx.stroke();
+    }
+    return cv;
 }
 
 function renderGalleryTile(grid, members) {
