@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=125" />
+    <link rel="stylesheet" href="style.css?v=128" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -210,6 +210,8 @@
                 <button class="deco-tool" id="toolCarve" type="button" aria-pressed="false" title="Scratch through the glaze to reveal the clay">Carve</button>
                 <button class="deco-tool" id="toolMotif" type="button" aria-pressed="false" title="Place a picture on the pot as a silhouette">Motif</button>
                 <button class="deco-tool" id="toolPattern" type="button" aria-pressed="false" title="Fill the pot with a repeating pattern">Pattern</button>
+                <button class="deco-tool" id="toolBand" type="button" aria-pressed="false" title="Wrap a repeating frieze band around the pot">Band</button>
+                <button class="deco-tool deco-adjust" id="decoAdjust" type="button" aria-pressed="false" title="Move or resize a placed motif or band" disabled>Adjust</button>
                 <button class="deco-tool deco-undo" id="decoUndo" type="button" title="Undo the last decoration" disabled>Undo</button>
                 <button class="deco-tool deco-clear" id="decoClear" type="button">Clear</button>
             </div>
@@ -315,7 +317,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=125"></script>
+    <script type="module" src="main.js?v=128"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

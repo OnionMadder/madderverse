@@ -364,8 +364,25 @@ const PATTERN_PACKS = {
         "patterns/shima-shima/stripes.jpg", "patterns/shima-shima/blue.jpg", "patterns/shima-shima/green.jpg",
         "patterns/shima-shima/bright-green.jpg", "patterns/shima-shima/columns.jpg", "patterns/shima-shima/lanterns.jpg",
     ] },
+    artNouveau: { label: "Art Nouveau", files: [
+        "patterns/art-nouveau/one.jpg", "patterns/art-nouveau/two.jpg", "patterns/art-nouveau/three.jpg",
+        "patterns/art-nouveau/four.jpg", "patterns/art-nouveau/five.jpg", "patterns/art-nouveau/six.jpg",
+    ] },
 };
-const PATTERN_PACK_IDS = ["enamel", "overlays", "shima"];
+const PATTERN_PACK_IDS = ["enamel", "overlays", "shima", "artNouveau"];
+// Band packs (the "Band" tool). Each file is a horizontal frieze that
+// wraps the pot as a single band: it repeats HORIZONTALLY (an integer
+// number of times, seamless at the u-seam) but NOT vertically, and the
+// user slides it up/down + sizes its thickness. Transparent PNGs so the
+// clay/glaze shows around the frieze.
+const BAND_PACKS = {
+    egyptian: { label: "Egyptian", files: [
+        "frescoes/element-download--1783299972.png", "frescoes/element-download--1783300000.png",
+        "frescoes/element-download--1783300035.png", "frescoes/element-download--1783300065.png",
+        "frescoes/element-download--1783300399.png", "frescoes/element-download--1783300461.png",
+    ] },
+};
+const BAND_PACK_IDS = ["egyptian"];
 const MOTIF_MIN_PX = 180, MOTIF_MAX_PX = 900; // size-slider range on the deco canvas
 
 
@@ -737,10 +754,11 @@ const state = {
     glaze: null,                // chosen glaze id (once glazing), else null
     brushIndex: DEFAULT_BRUSH,  // index into BRUSHES
     spin: SPIN_SPEED,           // current angular speed (eases to 0 while busy)
-    decoTool: "brush",          // brush | splatter | stamp | overlay
+    decoTool: "brush",          // brush | splatter | stamp | overlay | motif | pattern | band
     decoColor: null,            // paint colour (hex), or null = painting off
     decoSizeIndex: DEFAULT_DECO_SIZE,
     stampShape: "dot",
+    adjustMode: false,          // Adjust toggle: tap+drag a placed motif/band to move it
     painting: false,
     decoCanvas: null, decoCtx: null, decoTex: null,
     // Sgraffito mask layer: a paintable greyscale (alpha-only canvas)
@@ -1002,6 +1020,8 @@ function init() {
     document.getElementById("toolCarve")?.addEventListener("click", () => setDecoTool("carve"));
     document.getElementById("toolMotif")?.addEventListener("click", () => setDecoTool("motif"));
     document.getElementById("toolPattern")?.addEventListener("click", () => setDecoTool("pattern"));
+    document.getElementById("toolBand")?.addEventListener("click", () => setDecoTool("band"));
+    document.getElementById("decoAdjust")?.addEventListener("click", () => setAdjustMode(!state.adjustMode));
     document.getElementById("decoUndo")?.addEventListener("click", undoDeco);
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
     // Motif size slider + upload (image reduced to a silhouette on-device).
@@ -1010,7 +1030,14 @@ function init() {
         motifSlider.value = String(Math.round(motifSize * 100));
         motifSlider.addEventListener("input", () => {
             motifSize = THREE.MathUtils.clamp(parseInt(motifSlider.value, 10) / 100, 0, 1);
-            if (motifPlacing && motifLastUV) renderMotifPreview(motifLastUV);
+            // In Adjust mode the slider resizes the selected placement live.
+            const sel = selectedPlacementObj();
+            if (sel) {
+                if (sel.type === "band") sel.height = DECO_H * bandSizeFrac();
+                else sel.size = motifSizePx();
+                state.dirty = true;
+                composeDeco();
+            }
         });
     }
     document.getElementById("motifColorToggle")?.addEventListener("click", () => {
@@ -1157,6 +1184,9 @@ function init() {
             bumpDab, resetBumpLayer,
             playSfx, stopSfx,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
+            setAdjustMode, addBand, startMotifPlacement, startPlacementMove,
+            movePlacementTo, endPlacementDrag, placementAt, loadStarterMotif,
+            composeDeco, serializePlacements,
             setStampShape, stampAt, applyOverlay,
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze,
@@ -1286,11 +1316,28 @@ function paintProceduralClayGrain(ctx) {
 // A transparent RGBA canvas that wraps the pot (u around, v height).
 // Painting draws into it; a shader overlays it on the clay diffuse.
 function makeDecoLayer() {
+    // COMPOSITE canvas: what the shader samples and what gets saved. It is
+    // (re)built by composeDeco() from the baked freehand layer plus the
+    // ordered list of movable placements (motifs, bands). Downstream code
+    // (save, partner mesh, thumbnails, shader) keeps reading decoCanvas, so
+    // it never has to know about the split.
     const canvas = document.createElement("canvas");
     canvas.width = DECO_W;
     canvas.height = DECO_H;
     state.decoCanvas = canvas;
     state.decoCtx = canvas.getContext("2d");
+    // BAKED freehand layer: brush / splatter / stamp / overlay / pattern
+    // fill paint straight into this. Kept separate so movable placements
+    // can slide over it without disturbing hand-painted work.
+    const baked = document.createElement("canvas");
+    baked.width = DECO_W;
+    baked.height = DECO_H;
+    state.paintCanvas = baked;
+    state.paintCtx = baked.getContext("2d");
+    // Movable decoration objects composited ON TOP of the baked layer, in
+    // order. Each is { id, type:"motif"|"band", ... } (see drawPlacement).
+    state.placements = [];
+    state.selectedPlacement = null; // id of the placement being adjusted
     const tex = new THREE.CanvasTexture(canvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.RepeatWrapping;        // wraps around the pot
@@ -1298,6 +1345,194 @@ function makeDecoLayer() {
     tex.anisotropy = 4;
     state.decoTex = tex;
     return tex;
+}
+
+// --- Placement compositing (movable motifs + bands) -------------
+// The sampled deco texture = the baked freehand layer with every
+// placement drawn on top, in order. Called after any paint or placement
+// change/move so the pot always shows the current composite.
+function composeDeco() {
+    const ctx = state.decoCtx;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, DECO_W, DECO_H);
+    if (state.paintCanvas) ctx.drawImage(state.paintCanvas, 0, 0);
+    for (const p of state.placements) drawPlacement(ctx, p);
+    if (state.decoTex) state.decoTex.needsUpdate = true;
+}
+// Draw a sprite centred at (u,v), wrapping across the u=0/1 seam.
+function drawSpriteWrapped(ctx, src, u, v, w, h) {
+    const cx = u * DECO_W, cy = (1 - v) * DECO_H;
+    const dx = cx - w / 2, dy = cy - h / 2;
+    ctx.drawImage(src, dx, dy, w, h);
+    if (cx < w) ctx.drawImage(src, dx + DECO_W, dy, w, h);
+    else if (cx > DECO_W - w) ctx.drawImage(src, dx - DECO_W, dy, w, h);
+}
+// Tint a silhouette MASK canvas to a solid colour at a target px size.
+function tintMask(mask, hex, sizePx) {
+    const s = sizePx / Math.max(mask.width, mask.height);
+    const w = Math.max(1, Math.round(mask.width * s));
+    const h = Math.max(1, Math.round(mask.height * s));
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(mask, 0, 0, w, h);
+    ctx.globalCompositeOperation = "source-in";
+    ctx.fillStyle = "#" + (hex >>> 0).toString(16).padStart(6, "0");
+    ctx.fillRect(0, 0, w, h);
+    return c;
+}
+function drawPlacement(ctx, p) {
+    if (p.type === "band") {
+        const img = p.img;
+        if (!img || !img.complete || !(img.naturalWidth || img.width)) return;
+        const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+        const bandH = Math.max(4, p.height);           // canvas px
+        const tileW = bandH * (iw / ih);
+        const reps = Math.max(1, Math.round(DECO_W / tileW)); // integer → seamless wrap
+        const w = DECO_W / reps;
+        const top = (1 - p.v) * DECO_H - bandH / 2;
+        for (let i = 0; i < reps; i++) ctx.drawImage(img, i * w, top, w, bandH);
+        // wrap not needed: full-width tiling already covers the seam
+        return;
+    }
+    // motif
+    let src, w, h;
+    if (p.fullColor && p.imgCanvas) {
+        src = p.imgCanvas;
+        const s = p.size / Math.max(src.width, src.height);
+        w = src.width * s; h = src.height * s;
+    } else if (p.mask) {
+        src = tintMask(p.mask, p.color != null ? p.color : DECO_COLORS[1], p.size);
+        w = src.width; h = src.height;
+    } else return;
+    drawSpriteWrapped(ctx, src, p.u, p.v, w, h);
+}
+
+// --- Placement CRUD + selection ---------------------------------
+let placementSeq = 0;
+function addPlacement(p) {
+    p.id = "pl" + (++placementSeq);
+    state.placements.push(p);
+    state.selectedPlacement = p.id;
+    state.dirty = true;
+    composeDeco();
+    updateAdjustBtn();
+    return p;
+}
+function selectedPlacementObj() {
+    return state.placements.find((p) => p.id === state.selectedPlacement) || null;
+}
+// Half-extents in UV, for hit-testing + slider sizing.
+function placementBounds(p) {
+    if (p.type === "band") return { hu: 1, hv: (p.height / DECO_H) / 2 };
+    return { hu: (p.size / DECO_W) / 2, hv: (p.size / DECO_H) / 2 };
+}
+// Topmost placement under (u,v), or null. Bands span all u.
+function placementAt(u, v) {
+    for (let i = state.placements.length - 1; i >= 0; i--) {
+        const p = state.placements[i];
+        const b = placementBounds(p);
+        if (Math.abs(v - p.v) > b.hv) continue;
+        if (p.type === "band") return p;
+        let du = Math.abs(u - p.u); du = Math.min(du, 1 - du); // wrap
+        if (du <= b.hu) return p;
+    }
+    return null;
+}
+function deletePlacement(id) {
+    const i = state.placements.findIndex((p) => p.id === id);
+    if (i < 0) return;
+    pushDecoHistory();
+    state.placements.splice(i, 1);
+    if (state.selectedPlacement === id) state.selectedPlacement = null;
+    state.dirty = true;
+    composeDeco();
+    updateAdjustBtn();
+}
+
+// --- Adjust mode (move/size placed motifs + bands) --------------
+function setAdjustMode(on) {
+    state.adjustMode = !!on;
+    if (!state.adjustMode) state.selectedPlacement = null;
+    updateAdjustBtn();
+    updateDecoSub();
+}
+function updateAdjustBtn() {
+    const b = document.getElementById("decoAdjust");
+    if (!b) return;
+    const has = state.placements.length > 0;
+    b.disabled = !has;
+    if (!has && state.adjustMode) state.adjustMode = false;
+    b.classList.toggle("is-active", !!state.adjustMode);
+    b.setAttribute("aria-pressed", state.adjustMode ? "true" : "false");
+}
+
+// --- Band creation (fresco friezes) -----------------------------
+let bandPack = "egyptian";              // active band pack
+const bandImgCache = {};                // src -> HTMLImageElement
+function bandImage(file) {
+    let img = bandImgCache[file];
+    if (!img) {
+        img = new Image();
+        img.src = motifSrc(file);
+        bandImgCache[file] = img;
+    }
+    return img;
+}
+// Tap a fresco thumbnail → drop a band at mid-height, selected + ready to
+// slide. The size slider sets its thickness; Adjust mode slides it.
+function addBand(file) {
+    pushDecoHistory();
+    const img = bandImage(file);
+    const place = { type: "band", src: file, v: 0.5, height: DECO_H * bandSizeFrac(), img };
+    if (!img.complete || !img.naturalWidth) {
+        img.addEventListener("load", () => composeDeco(), { once: true });
+    }
+    playSfx("pour");
+    return addPlacement(place);
+}
+// Band thickness fraction of the pot height, from the shared size slider.
+function bandSizeFrac() {
+    return 0.10 + 0.34 * THREE.MathUtils.clamp(motifSize, 0, 1); // 10%..44% tall
+}
+
+// --- Placement save / load --------------------------------------
+// Serialize placements to plain data (drop the in-memory canvases/img —
+// they're rebuilt from src on load).
+function serializePlacements() {
+    return state.placements.map((p) => p.type === "band"
+        ? { type: "band", src: p.src, v: p.v, height: p.height }
+        : { type: "motif", src: p.src, u: p.u, v: p.v, size: p.size, color: p.color, fullColor: !!p.fullColor });
+}
+function loadImg(src) {
+    return new Promise((res) => {
+        const im = new Image();
+        im.onload = () => res(im);
+        im.onerror = () => res(null);
+        im.src = src;
+    });
+}
+// Rebuild placements from serialized data: reload each source image and
+// regenerate its mask / full-colour canvas (motifs) or cached image (bands).
+async function loadPlacements(list) {
+    state.placements = [];
+    state.selectedPlacement = null;
+    if (!Array.isArray(list)) return;
+    for (const s of list) {
+        if (s.type === "band") {
+            const img = bandImage(s.src);
+            if (!img.complete || !img.naturalWidth) img.addEventListener("load", () => composeDeco(), { once: true });
+            state.placements.push({ id: "pl" + (++placementSeq), type: "band", src: s.src, v: s.v, height: s.height, img });
+        } else {
+            const im = await loadImg(motifSrc(s.src));
+            if (!im) continue;
+            state.placements.push({
+                id: "pl" + (++placementSeq), type: "motif", src: s.src,
+                u: s.u, v: s.v, size: s.size, color: s.color, fullColor: !!s.fullColor,
+                mask: buildMotifMask(im), imgCanvas: downscaleToCanvas(im, 512),
+            });
+        }
+    }
 }
 
 // --- Glaze dip layer --------------------------------------------
@@ -1607,9 +1842,9 @@ function rgba(hex, a) {
     return `rgba(${(hex >> 16) & 255},${(hex >> 8) & 255},${hex & 255},${a})`;
 }
 
-// One soft dab (radial falloff).
+// One soft dab (radial falloff). Paints into the baked freehand layer.
 function dab(cx, cy, hex, radius, alpha) {
-    const ctx = state.decoCtx;
+    const ctx = state.paintCtx;
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
     g.addColorStop(0, rgba(hex, alpha));
     g.addColorStop(0.55, rgba(hex, alpha * 0.9));
@@ -1651,7 +1886,7 @@ function paintAt(u, v) {
     } else {
         dabWrap(cx, cy, state.decoColor, size, 0.9);
     }
-    state.decoTex.needsUpdate = true;
+    composeDeco();
 }
 
 // A continuous stroke between two UVs (skip if it crossed the seam).
@@ -1668,8 +1903,11 @@ function paintStroke(au, av, bu, bv) {
 function clearDeco() {
     if (!state.decoCtx) return;
     pushDecoHistory(); // a Clear is undoable
-    state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
-    state.decoTex.needsUpdate = true;
+    if (state.paintCtx) state.paintCtx.clearRect(0, 0, DECO_W, DECO_H);
+    state.placements = [];
+    state.selectedPlacement = null;
+    composeDeco();
+    updateAdjustBtn();
     // Clear wipes both paint AND sgraffito carving — one button, full
     // reset of the decorate surface. (The glaze itself is separate and
     // is cleared by tapping the active glaze swatch again.)
@@ -1687,12 +1925,13 @@ function snapDecoCanvas(src) {
     c.getContext("2d").drawImage(src, 0, 0);
     return c;
 }
-// decoSrc lets a caller record a pre-action deco snapshot it already made
-// (the motif placement keeps motifBase = the deco before the motif).
-function pushDecoHistory(decoSrc) {
-    if (!state.decoCanvas) return;
+// Snapshot the baked freehand layer + the placement list + the sgraffito
+// mask before each decorate action, so Undo steps back one at a time.
+function pushDecoHistory() {
+    if (!state.paintCanvas) return;
     decoHistory.push({
-        deco: snapDecoCanvas(decoSrc || state.decoCanvas),
+        paint: snapDecoCanvas(state.paintCanvas),
+        placements: state.placements.map((p) => ({ ...p })), // shallow: canvases/img are immutable
         sgraffito: state.sgraffitoCanvas ? snapDecoCanvas(state.sgraffitoCanvas) : null,
     });
     if (decoHistory.length > DECO_HISTORY_MAX) decoHistory.shift();
@@ -1701,9 +1940,14 @@ function pushDecoHistory(decoSrc) {
 function undoDeco() {
     const snap = decoHistory.pop();
     if (!snap) return;
-    state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
-    state.decoCtx.drawImage(snap.deco, 0, 0);
-    if (state.decoTex) state.decoTex.needsUpdate = true;
+    if (state.paintCtx) {
+        state.paintCtx.clearRect(0, 0, DECO_W, DECO_H);
+        state.paintCtx.drawImage(snap.paint, 0, 0);
+    }
+    state.placements = snap.placements ? snap.placements.map((p) => ({ ...p })) : [];
+    if (!selectedPlacementObj()) state.selectedPlacement = null;
+    composeDeco();
+    updateAdjustBtn();
     if (state.sgraffitoCtx && snap.sgraffito) {
         state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
         state.sgraffitoCtx.drawImage(snap.sgraffito, 0, 0);
@@ -1856,7 +2100,7 @@ function heartPath(ctx, r) {
     ctx.closePath();
 }
 function drawStamp(cx, cy, r, shape, hex) {
-    const ctx = state.decoCtx;
+    const ctx = state.paintCtx;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.fillStyle = rgba(hex, 0.95);
@@ -1906,7 +2150,7 @@ function stampAt(u, v) {
     drawStamp(cx, cy, r, state.stampShape, state.decoColor);
     if (cx < r * 2) drawStamp(cx + DECO_W, cy, r, state.stampShape, state.decoColor);
     else if (cx > DECO_W - r * 2) drawStamp(cx - DECO_W, cy, r, state.stampShape, state.decoColor);
-    state.decoTex.needsUpdate = true;
+    composeDeco();
 }
 
 // --- Overlays (one tap fills the whole surface) -----------------
@@ -1914,7 +2158,7 @@ function applyOverlay(id) {
     if (state.decoColor == null) return;
     pushDecoHistory();
     state.dirty = true;
-    const ctx = state.decoCtx, hex = state.decoColor;
+    const ctx = state.paintCtx, hex = state.decoColor;
     const cell = DECO_SIZES[state.decoSizeIndex].px * 2.4;
     ctx.save();
     ctx.fillStyle = rgba(hex, 0.85);
@@ -2046,7 +2290,7 @@ function applyOverlay(id) {
         }
     }
     ctx.restore();
-    state.decoTex.needsUpdate = true;
+    composeDeco();
 }
 
 // Dispatch a pot-touch to the active decorate tool.
@@ -3582,7 +3826,7 @@ function setDecoTool(name) {
     [["toolBrush", "brush"], ["toolSplatter", "splatter"],
      ["toolStamp", "stamp"], ["toolOverlay", "overlay"],
      ["toolCarve", "carve"], ["toolMotif", "motif"],
-     ["toolPattern", "pattern"]].forEach(([id, t]) => {
+     ["toolPattern", "pattern"], ["toolBand", "band"]].forEach(([id, t]) => {
         const el = document.getElementById(id);
         if (!el) return;
         const on = name === t;
@@ -3633,13 +3877,16 @@ function updateDecoSub() {
     // full-colour enamel tiles that fill the pot on tap.
     const isMotif = state.decoTool === "motif";
     const isPattern = state.decoTool === "pattern";
+    const isBand = state.decoTool === "band";
     const sizesEl = document.getElementById("decoSizes");
-    if (sizesEl) sizesEl.style.display = (isMotif || isPattern) ? "none" : "";
+    if (sizesEl) sizesEl.style.display = (isMotif || isPattern || isBand) ? "none" : "";
+    // The size slider serves the Motif + Band tools, and Adjust mode (where
+    // it resizes the selected placement live).
     const slider = document.getElementById("motifSize");
-    if (slider) slider.hidden = !isMotif;
-    // Both Motif and Pattern show a pack selector above their thumbnails.
+    if (slider) slider.hidden = !(isMotif || isBand || state.adjustMode);
+    // Motif, Pattern and Band each show a pack selector above their thumbs.
     const packTabs = document.getElementById("motifPackTabs");
-    if (packTabs) packTabs.hidden = !(isMotif || isPattern);
+    if (packTabs) packTabs.hidden = !(isMotif || isPattern || isBand);
     // Full-colour toggle (motif only). In full colour the paint-colour row
     // doesn't apply, so hide it; patterns don't use it either.
     const colorToggle = document.getElementById("motifColorToggle");
@@ -3648,7 +3895,7 @@ function updateDecoSub() {
         colorToggle.classList.toggle("is-active", motifFullColor);
     }
     const decoColorsEl = document.getElementById("decoColors");
-    if (decoColorsEl) decoColorsEl.hidden = isPattern || (isMotif && motifFullColor);
+    if (decoColorsEl) decoColorsEl.hidden = isPattern || isBand || (isMotif && motifFullColor);
     if (isPattern) {
         if (!PATTERN_PACKS[patternPack]) patternPack = PATTERN_PACK_IDS[0];
         if (packTabs) {
@@ -3673,6 +3920,34 @@ function updateDecoSub() {
             b.setAttribute("aria-label", motifLabel(file) + " pattern");
             b.setAttribute("title", motifLabel(file));
             b.addEventListener("click", () => applyPattern(file));
+            sub.appendChild(b);
+        });
+        return;
+    }
+    if (isBand) {
+        if (!BAND_PACKS[bandPack]) bandPack = BAND_PACK_IDS[0];
+        if (packTabs) {
+            packTabs.innerHTML = "";
+            BAND_PACK_IDS.forEach((pid) => {
+                const b = document.createElement("button");
+                b.type = "button";
+                b.className = "motif-pack-tab";
+                b.textContent = BAND_PACKS[pid].label;
+                b.classList.toggle("is-active", pid === bandPack);
+                b.addEventListener("click", () => { bandPack = pid; updateDecoSub(); });
+                packTabs.appendChild(b);
+            });
+        }
+        sub.hidden = false;
+        sub.innerHTML = "";
+        BAND_PACKS[bandPack].files.forEach((file) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "deco-sub-btn motif-thumb band-thumb";
+            b.style.backgroundImage = "url(" + motifSrc(file) + ")";
+            b.setAttribute("aria-label", "Add band");
+            b.setAttribute("title", "Wrap this band around the pot");
+            b.addEventListener("click", () => addBand(file));
             sub.appendChild(b);
         });
         return;
@@ -3820,7 +4095,13 @@ function loadMotifImage(img) {
 // Toggle: place motifs in their own colours vs as a tinted silhouette.
 function setMotifFullColor(on) {
     motifFullColor = !!on;
-    if (motifPlacing && motifLastUV) renderMotifPreview(motifLastUV);
+    // In Adjust mode, re-colour the selected motif live.
+    const sel = selectedPlacementObj();
+    if (sel && sel.type === "motif") {
+        sel.fullColor = motifFullColor;
+        state.dirty = true;
+        composeDeco();
+    }
     updateDecoSub();
 }
 function motifSrc(id) { return "assets/" + id; }
@@ -3837,7 +4118,7 @@ function loadStarterMotif(id) {
 function applyPattern(file) {
     const img = new Image();
     img.onload = () => {
-        const ctx = state.decoCtx;
+        const ctx = state.paintCtx;
         const pat = ctx.createPattern(img, "repeat");
         if (!pat) return;
         pushDecoHistory();
@@ -3845,7 +4126,7 @@ function applyPattern(file) {
         ctx.fillStyle = pat;
         ctx.fillRect(0, 0, DECO_W, DECO_H);
         ctx.restore();
-        if (state.decoTex) state.decoTex.needsUpdate = true;
+        composeDeco();
         state.dirty = true;
         maybeSquelch();
     };
@@ -3888,34 +4169,49 @@ function drawMotifOnDeco(ctx, u, v) {
 }
 // Non-destructive placement: snapshot the committed deco, then redraw
 // base + motif live on each move; on release it's already baked in.
-function beginMotifPlace(uv) {
+// --- Motif / band placement drag (create + adjust-move) ---------
+let placementDrag = null; // { id, mode:"create"|"move", grabU, grabV, startU, startV }
+// Motif tool: pressing on the pot drops the loaded motif as a placement
+// and lets you drag to position it. It stays a movable object after.
+function startMotifPlacement(uv) {
     if (!motifMask) return false;
-    if (!motifBase) {
-        motifBase = document.createElement("canvas");
-        motifBase.width = DECO_W; motifBase.height = DECO_H;
-    }
-    const bctx = motifBase.getContext("2d");
-    bctx.clearRect(0, 0, DECO_W, DECO_H);
-    bctx.drawImage(state.decoCanvas, 0, 0);
-    motifPlacing = true;
-    motifLastUV = uv;
-    renderMotifPreview(uv);
+    pushDecoHistory();
+    const p = addPlacement({
+        type: "motif", src: motifStarter,
+        u: uv.x, v: uv.y, size: motifSizePx(),
+        color: state.decoColor != null ? state.decoColor : DECO_COLORS[1],
+        fullColor: !!motifFullColor,
+        mask: motifMask, imgCanvas: motifImage || null,
+    });
+    placementDrag = { id: p.id, mode: "create", grabU: uv.x, grabV: uv.y, startU: uv.x, startV: uv.y };
     return true;
 }
-function renderMotifPreview(uv) {
-    const ctx = state.decoCtx;
-    ctx.clearRect(0, 0, DECO_W, DECO_H);
-    ctx.drawImage(motifBase, 0, 0);
-    drawMotifOnDeco(ctx, uv.x, uv.y);
-    state.decoTex.needsUpdate = true;
+// Adjust mode: pressing on a placed motif/band grabs it to move (bands
+// move vertically only; motifs move freely). A miss clears the selection.
+function startPlacementMove(uv) {
+    const hit = placementAt(uv.x, uv.y);
+    state.selectedPlacement = hit ? hit.id : null;
+    if (!hit) { composeDeco(); return false; }
+    pushDecoHistory();
+    placementDrag = { id: hit.id, mode: "move", grabU: uv.x, grabV: uv.y,
+                      startU: hit.u != null ? hit.u : 0, startV: hit.v };
+    composeDeco();
+    return true;
 }
-function commitMotifPlace() {
-    // Record the pre-placement deco (motifBase) so Undo removes just this
-    // motif. Only on a real commit — a cancelled placement never gets here.
-    if (motifBase) pushDecoHistory(motifBase);
-    motifPlacing = false;
-    motifBase = null;
-    motifLastUV = null;
+function movePlacementTo(uv) {
+    if (!placementDrag) return;
+    const p = state.placements.find((q) => q.id === placementDrag.id);
+    if (!p) return;
+    if (p.type !== "band") {
+        let nu = placementDrag.startU + (uv.x - placementDrag.grabU);
+        p.u = ((nu % 1) + 1) % 1; // wrap around the seam
+    }
+    p.v = THREE.MathUtils.clamp(placementDrag.startV + (uv.y - placementDrag.grabV), 0.03, 0.97);
+    composeDeco();
+}
+function endPlacementDrag() {
+    if (!placementDrag) return;
+    placementDrag = null;
     state.dirty = true;
     maybeSquelch();
 }
@@ -4060,17 +4356,8 @@ function onPointerDown(ev) {
         sculpting = false;
         handleDrag = null;
         if (dipping) { dipping = false; dipPreview = null; renderDips(); }
-        // Cancel an in-progress motif placement — restore the pre-drag deco.
-        if (motifPlacing) {
-            motifPlacing = false;
-            if (motifBase) {
-                const c = state.decoCtx;
-                c.clearRect(0, 0, DECO_W, DECO_H);
-                c.drawImage(motifBase, 0, 0);
-                if (state.decoTex) state.decoTex.needsUpdate = true;
-                motifBase = null;
-            }
-        }
+        // End any in-progress placement drag (the placement stays put).
+        if (placementDrag) placementDrag = null;
         state.painting = false;
         lastPaintUV = null;
         state.userRotating = true;
@@ -4121,6 +4408,13 @@ function onPointerDown(ev) {
                 }
             }
         }
+        // Adjust mode: a pot press grabs the placed motif/band under it to
+        // move (bands slide vertically, motifs move freely). A miss clears
+        // the selection and falls through to a spin.
+        if (state.adjustMode) {
+            const uva = pointerToUV(ev);
+            if (uva && startPlacementMove(uva)) { ev.preventDefault(); return; }
+        }
         // Glaze dipping takes priority when the dip tool is armed with a
         // colour: dragging on the pot sets the glaze line (uv.y = height),
         // previewed live and committed on release. Only while the GLAZE tab
@@ -4142,7 +4436,7 @@ function onPointerDown(ev) {
         // a spin rather than painting.
         if (state.decoTool === "motif") {
             const uvm = pointerToUV(ev);
-            if (motifMask && uvm && beginMotifPlace(uvm)) { ev.preventDefault(); return; }
+            if (motifMask && uvm && startMotifPlacement(uvm)) { ev.preventDefault(); return; }
             state.userRotating = true;
             viewPrevX = ev.clientX;
             ev.preventDefault();
@@ -4231,9 +4525,9 @@ function onPointerMove(ev) {
         ev.preventDefault();
         return;
     }
-    if (motifPlacing) {
+    if (placementDrag) {
         const uv = pointerToUV(ev);
-        if (uv) { motifLastUV = uv; renderMotifPreview(uv); }
+        if (uv) movePlacementTo(uv);
         ev.preventDefault();
         return;
     }
@@ -4279,9 +4573,8 @@ function onPointerUp(ev) {
     if (pointers.size === 0) {
         sculpting = false;
         handleDrag = null;
-        // A placed motif is already baked into the deco canvas — just clear
-        // the placement state so it stays put.
-        if (motifPlacing) commitMotifPlace();
+        // Finish a motif/band placement drag — it stays a movable object.
+        if (placementDrag) endPlacementDrag();
         // Commit an in-progress dip: freeze it with drips into the list.
         if (dipping) {
             if (dipPreview) {
@@ -4755,7 +5048,9 @@ async function savePot() {
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
         dips: state.dips.map((d) => ({ ...d })),
-        deco: state.decoCanvas.toDataURL("image/png"),
+        deco: state.decoCanvas.toDataURL("image/png"),        // composite (thumbnails, partner, legacy)
+        paintDeco: state.paintCanvas.toDataURL("image/png"),  // baked freehand layer (editable reload)
+        placements: serializePlacements(),                    // movable motifs + bands
         bump: state.bumpCanvas.toDataURL("image/png"),
         sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
         thumb: captureThumb(),
@@ -4796,6 +5091,8 @@ async function savePot() {
                 glaze: state.glaze,
                 dips: state.dips.map((d) => ({ ...d })),
                 deco: state.decoCanvas.toDataURL("image/png"),
+                paintDeco: state.paintCanvas.toDataURL("image/png"),
+                placements: serializePlacements(),
                 bump: state.bumpCanvas.toDataURL("image/png"),
                 sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
                 thumb: captureThumb(),
@@ -4838,7 +5135,11 @@ function capturePieceState() {
     const decoCopy = document.createElement("canvas");
     decoCopy.width = DECO_W;
     decoCopy.height = DECO_H;
-    decoCopy.getContext("2d").drawImage(state.decoCanvas, 0, 0);
+    decoCopy.getContext("2d").drawImage(state.decoCanvas, 0, 0); // composite (partner sync)
+    const paintCopy = document.createElement("canvas");
+    paintCopy.width = DECO_W;
+    paintCopy.height = DECO_H;
+    paintCopy.getContext("2d").drawImage(state.paintCanvas, 0, 0); // baked layer (editable)
     const bumpCopy = document.createElement("canvas");
     bumpCopy.width = BUMP_W;
     bumpCopy.height = BUMP_H;
@@ -4853,6 +5154,8 @@ function capturePieceState() {
         glazeGradient: state.glazeGradient,
         dips: state.dips.map((d) => ({ ...d })),
         decoCanvas: decoCopy,
+        paintCanvas: paintCopy,
+        placements: state.placements.map((p) => ({ ...p })), // shares immutable canvases/img
         bumpCanvas: bumpCopy,
         sgraffitoCanvas: sgraffitoCopy,
         isLid: state.isLid,
@@ -4878,9 +5181,20 @@ function restorePieceState(saved) {
     // cap check at sculptToward is a no-op and the lid can regrow
     // above its collapsed rings.
     state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
-    state.decoCtx.clearRect(0, 0, DECO_W, DECO_H);
-    state.decoCtx.drawImage(saved.decoCanvas, 0, 0);
-    state.decoTex.needsUpdate = true;
+    // Restore the baked freehand layer + placements. Older captured states
+    // (and disk-loaded partners) carry only the flattened composite — treat
+    // it as the baked layer with no movable placements.
+    state.paintCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (saved.paintCanvas) {
+        state.paintCtx.drawImage(saved.paintCanvas, 0, 0);
+        state.placements = saved.placements ? saved.placements.map((p) => ({ ...p })) : [];
+    } else {
+        if (saved.decoCanvas) state.paintCtx.drawImage(saved.decoCanvas, 0, 0);
+        state.placements = [];
+    }
+    state.selectedPlacement = null;
+    composeDeco();
+    updateAdjustBtn();
     state.bumpCtx.clearRect(0, 0, BUMP_W, BUMP_H);
     state.bumpCtx.drawImage(saved.bumpCanvas, 0, 0);
     state.bumpTex.needsUpdate = true;
@@ -5378,8 +5692,20 @@ async function loadPot(entry) {
     // loaded lids don't render with the sharp pinprick they were
     // saved with.
     smoothLidApex();
-    await loadImageOntoCanvas(entry.deco, state.decoCtx, DECO_W, DECO_H, clearDeco);
-    state.decoTex.needsUpdate = true;
+    // Decoration: baked freehand layer + movable placements. Legacy saves
+    // carry only the flattened composite `deco` — load it as the baked
+    // layer with no placements.
+    const clearPaint = () => state.paintCtx.clearRect(0, 0, DECO_W, DECO_H);
+    if (entry.paintDeco || entry.placements) {
+        await loadImageOntoCanvas(entry.paintDeco || entry.deco, state.paintCtx, DECO_W, DECO_H, clearPaint);
+        await loadPlacements(entry.placements);
+    } else {
+        await loadImageOntoCanvas(entry.deco, state.paintCtx, DECO_W, DECO_H, clearPaint);
+        state.placements = [];
+        state.selectedPlacement = null;
+    }
+    composeDeco();
+    updateAdjustBtn();
     await loadImageOntoCanvas(entry.bump, state.bumpCtx, BUMP_W, BUMP_H, resetBumpLayer);
     state.bumpTex.needsUpdate = true;
     // Sgraffito mask. Older entries don't carry it; treat as empty.
