@@ -917,6 +917,48 @@ const SHAPES = {
             [0.20, 1.32], [0.13, 1.40],
         ],
     },
+    planter: {
+        label: "Planter",
+        controls: [
+            [0.00, 0.00], [0.34, 0.00], [0.38, 0.05], [0.44, 0.30],
+            [0.52, 0.70], [0.60, 1.10], [0.66, 1.30], [0.66, 1.40],
+        ],
+    },
+    goblet: {
+        label: "Goblet",
+        controls: [
+            [0.00, 0.00], [0.36, 0.00], [0.38, 0.03], [0.14, 0.10],
+            [0.08, 0.30], [0.08, 0.55], [0.16, 0.66], [0.36, 0.88],
+            [0.47, 1.12], [0.50, 1.32], [0.50, 1.40],
+        ],
+    },
+    budvase: {
+        label: "Bud vase",
+        controls: [
+            [0.00, 0.00], [0.18, 0.00], [0.22, 0.05], [0.34, 0.22],
+            [0.40, 0.40], [0.30, 0.56], [0.16, 0.72], [0.12, 0.96],
+            [0.12, 1.20], [0.14, 1.34], [0.17, 1.40],
+        ],
+    },
+    tumbler: {
+        label: "Tumbler",
+        controls: [
+            [0.00, 0.00], [0.34, 0.00], [0.36, 0.05], [0.37, 0.30],
+            [0.38, 0.60], [0.39, 0.90], [0.40, 1.15], [0.41, 1.32],
+            [0.42, 1.40],
+        ],
+    },
+    // Mug: a stout straight-walled cup that auto-attaches a single handle
+    // when you reach the Decorate stage (see setShape / advanceStage).
+    mug: {
+        label: "Mug",
+        handle: true,
+        controls: [
+            [0.00, 0.00], [0.38, 0.00], [0.40, 0.06], [0.41, 0.30],
+            [0.42, 0.60], [0.42, 0.90], [0.42, 1.14], [0.43, 1.32],
+            [0.43, 1.40],
+        ],
+    },
 };
 
 // Lid silhouettes — keyed by style. Each entry generates control
@@ -999,7 +1041,8 @@ const LID_STYLE_IDS = ["flat", "domed", "tall", "pointed"];
 
 // Lids are now generated parametrically from the source pot's rim
 // (see seedLidForRim) — no preset silhouette needed.
-const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "plate", "jar", "egg"]; // picker order; lid is set-only
+const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "plate", "jar", "egg",
+    "planter", "goblet", "budvase", "tumbler", "mug"]; // picker order; lid is set-only
 const DEFAULT_SHAPE = "vase";
 
 const state = {
@@ -3640,6 +3683,12 @@ function advanceStage() {
             // stays where it is.
             if (state.savedPot && state.savedPot.clayState === "wet") state.savedPot.clayState = "leather";
             if (state.savedLid && state.savedLid.clayState === "wet") state.savedLid.clayState = "leather";
+            // Mug preset: arrive at Decorate with a single handle already
+            // attached (still reshapable / removable like any handle).
+            if (SHAPES[state.shape] && SHAPES[state.shape].handle && !state.isLid && !state.handle.on) {
+                setHandleCount(1);
+                setHandleOn(true);
+            }
             state.dirty = true;
             scheduleCoach("leather"); // first time at Decorate → teach the dip
             break;
