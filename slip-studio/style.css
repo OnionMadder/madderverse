@@ -30,6 +30,15 @@
     --chip-hi:   rgba(44, 38, 32, 0.74);
     --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    /* Sunlit studio veil + warm shelf-card tokens, shared by the full-
+       screen overlays (gallery, photo modal) so they read as the same
+       airy, warm room rather than a cold dark box. */
+    --veil:
+        radial-gradient(135% 100% at 50% -12%, rgba(226, 170, 118, 0.34), rgba(226, 170, 118, 0) 58%),
+        linear-gradient(178deg, rgba(49, 38, 30, 0.90), rgba(33, 26, 21, 0.94));
+    --g-card:        rgba(244, 232, 217, 0.085);
+    --g-card-line:   rgba(244, 232, 217, 0.16);
+    --g-card-shadow: 0 8px 22px rgba(26, 16, 9, 0.24);
 }
 
 * { box-sizing: border-box; }
@@ -1641,9 +1650,13 @@ html, body {
     position: fixed;
     inset: 0;
     z-index: 60;
-    background: rgba(20, 18, 16, 0.96);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    /* Sunlit studio veil (shared token): a warm, luminous wash rather than
+       a cold near-black sheet, so the gallery reads as the same airy room
+       as the wheel. The live backdrop diffuses through the heavy blur into
+       warm light; the warm-dark base keeps the off-white ink legible. */
+    background: var(--veil);
+    backdrop-filter: blur(20px) saturate(1.12);
+    -webkit-backdrop-filter: blur(20px) saturate(1.12);
     display: flex;
     flex-direction: column;
     padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px;
@@ -1682,10 +1695,11 @@ html, body {
 .gallery-item {
     position: relative;
     aspect-ratio: 1 / 1;
-    border-radius: 14px;
+    border-radius: 16px;
     overflow: hidden;
-    border: 1px solid var(--ink-faint);
-    background: var(--bg);
+    border: 1px solid var(--g-card-line);
+    background: var(--g-card);
+    box-shadow: var(--g-card-shadow);
 }
 .gallery-item img {
     width: 100%;
@@ -1708,7 +1722,7 @@ html, body {
     overflow: hidden;
 }
 .gallery-item.gallery-set:not(.is-shelf):not(.has-assembly) .gallery-half + .gallery-half {
-    border-left: 1px solid var(--ink-faint);
+    border-left: 1px solid var(--g-card-line);
 }
 
 /* Shelf-mode tile: thumbnail on the left, metadata on the right. */
@@ -1717,7 +1731,15 @@ html, body {
     height: 180px;
     display: grid;
     grid-template-columns: 180px 1fr;
-    background: var(--chip);
+    background: var(--g-card);
+    border-radius: 16px;
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.gallery-item.is-shelf:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(26, 16, 9, 0.30);
 }
 .gallery-item.is-shelf .pot-thumb-wrap {
     position: relative;
@@ -1752,7 +1774,7 @@ html, body {
     object-fit: cover;
 }
 .gallery-item.is-shelf.gallery-set:not(.has-assembly) .gallery-half + .gallery-half {
-    border-top: 1px solid var(--ink-faint);
+    border-top: 1px solid var(--g-card-line);
 }
 /* When a single assembly thumb is captured, render it as ONE image
    filling the thumb area — the set reveal in miniature. */
@@ -1777,8 +1799,10 @@ html, body {
     text-align: left;
     padding: 0;
     font: inherit;
-    font-size: 0.95rem;
+    font-family: var(--font-display);
+    font-size: 1.04rem;
     font-weight: 500;
+    letter-spacing: 0.005em;
     color: var(--ink);
     cursor: pointer;
     width: 100%;
@@ -1813,9 +1837,9 @@ html, body {
     position: fixed;
     inset: 0;
     z-index: 70;
-    background: rgba(20, 18, 16, 0.96);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: var(--veil); /* same sunlit studio veil as the gallery */
+    backdrop-filter: blur(20px) saturate(1.12);
+    -webkit-backdrop-filter: blur(20px) saturate(1.12);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1839,10 +1863,11 @@ html, body {
     justify-content: center;
     width: 100%;
     max-width: 360px;
-    background: var(--bg);
-    border-radius: 14px;
+    background: var(--g-card);
+    border-radius: 16px;
     overflow: hidden;
-    border: 1px solid var(--ink-faint);
+    border: 1px solid var(--g-card-line);
+    box-shadow: var(--g-card-shadow);
 }
 /* A small pill marking the render as a frozen snapshot, not a live view. */
 .photo-preview-tag {
@@ -1852,7 +1877,7 @@ html, body {
     z-index: 1;
     padding: 3px 9px;
     border-radius: 999px;
-    background: rgba(20, 18, 16, 0.62);
+    background: rgba(38, 28, 21, 0.6);
     color: rgba(243, 237, 230, 0.72);
     font-family: var(--font-display);
     font-size: 0.62rem;
@@ -1879,8 +1904,8 @@ html, body {
     font-size: 0.78rem;
     letter-spacing: 0.04em;
     color: var(--ink-dim);
-    background: var(--chip);
-    border: 1px solid var(--ink-faint);
+    background: rgba(244, 232, 217, 0.10);
+    border: 1px solid var(--g-card-line);
     border-radius: 999px;
     padding: 8px 16px;
     cursor: pointer;
@@ -1897,23 +1922,35 @@ html, body {
 }
 .gallery-del {
     position: absolute;
-    top: 5px;
-    right: 5px;
-    width: 24px;
-    height: 24px;
+    top: 7px;
+    right: 7px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    border: none;
-    background: rgba(0, 0, 0, 0.55);
-    color: #fff;
-    font-size: 16px;
+    border: 1px solid rgba(244, 232, 217, 0.14);
+    background: rgba(38, 28, 21, 0.5);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    color: rgba(243, 237, 230, 0.85);
+    font-size: 15px;
     line-height: 1;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.gallery-del:hover,
+.gallery-del:focus-visible {
+    background: rgba(151, 74, 52, 0.72); /* warm terracotta-red on intent */
+    color: var(--ink);
+    outline: none;
 }
 .gallery-empty {
     margin: auto;
-    color: var(--ink-faint);
-    font-size: 0.85rem;
+    color: rgba(243, 237, 230, 0.42);
+    font-family: var(--font-display);
+    font-size: 0.95rem;
+    font-style: italic;
+    letter-spacing: 0.01em;
     text-align: center;
     padding: 0 2rem;
 }

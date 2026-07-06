@@ -4288,6 +4288,25 @@ async function dbDelete(id) {
     });
 }
 
+// Render the scene into the currently-bound render target for a capture.
+// Rendering to a render target compiles a SEPARATE program variant from
+// the live canvas (different tone-mapping / colour-space), and the clay
+// materials' custom dip/gradient uniforms (uDipVScale/uDipVOffset, set
+// from outside via mat.userData.shaderUniforms) reset to their shader
+// defaults on that (re)compile. So we render once to force the RT variant
+// to compile, re-apply the material snap + continuous-set dip remap onto
+// the freshly-compiled uniforms, then render again for the pixels we read
+// back. Without the warm-up pass a dipped lid/pot captures at an IDENTITY
+// dip remap — it samples the gradient's foot instead of its own slice, so
+// the set thumbnail and exported photo show the lid the wrong colour.
+function captureRender(cam) {
+    state.renderer.render(state.scene, cam); // warm-up: compile the RT program variant
+    tickMaterial(10);
+    tickPartnerMaterial(10);                 // no-op when the partner mesh is hidden
+    updateDipRemap();
+    state.renderer.render(state.scene, cam); // real capture, correct uniforms
+}
+
 // A square thumbnail of the pot. Rendered into an offscreen render
 // target and read back with readRenderTargetPixels — reliable on every
 // device (unlike toDataURL on the live canvas, which returns blank on
@@ -4312,7 +4331,7 @@ function captureThumb(size = 320) {
     state.renderer.setRenderTarget(rt);
     state.renderer.setClearColor(BG_COLOR, 1); // opaque warm bg for the thumb
     state.renderer.clear();
-    state.renderer.render(state.scene, cam);
+    captureRender(cam);
     const buf = new Uint8Array(size * size * 4);
     state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
     state.renderer.setRenderTarget(null);
@@ -4362,7 +4381,7 @@ function captureAssemblyThumb(size = 360) {
     state.renderer.setRenderTarget(rt);
     state.renderer.setClearColor(BG_COLOR, 1);
     state.renderer.clear();
-    state.renderer.render(state.scene, cam);
+    captureRender(cam);
     const buf = new Uint8Array(size * size * 4);
     state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
     state.renderer.setRenderTarget(null);
@@ -4414,7 +4433,7 @@ function captureScenePot(size) {
     state.renderer.setRenderTarget(rt);
     state.renderer.setClearAlpha(0);
     state.renderer.clear();
-    state.renderer.render(state.scene, cam);
+    captureRender(cam);
     const buf = new Uint8Array(size * size * 4);
     state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
     state.renderer.setRenderTarget(null);
@@ -4655,6 +4674,13 @@ async function savePot() {
     // using the live canvases; the partner is restored briefly so its
     // thumb captures the right look, then the active piece is put back.
     const partner = state.savedPot || state.savedLid;
+    // A set that's already saved and unchanged mustn't be written again on
+    // a second tap — that would duplicate both pieces in the gallery. We
+    // now KEEP the partner refs after saving (so the assembled view keeps
+    // its continuous-gradient lid — see below), so unlike the old flow the
+    // partner is still present on a re-tap. Nothing dirty → already saved.
+    // (Also correctly no-ops re-saving a freshly loaded, unedited set.)
+    if (partner && !state.dirty) { flashSaved(); return; }
     let setId = state.pendingSetId || null;
     if (partner && !setId) {
         setId = "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
@@ -4725,8 +4751,14 @@ async function savePot() {
             await dbPut(partnerEntry);
             restorePieceState(active);
             tickMaterial(10);
-            state.savedPot = null;
-            state.savedLid = null;
+            // Keep state.savedPot/savedLid intact: the assembly is STILL on
+            // screen after saving, and the continuous-set dip remap
+            // (updateDipRemap, driven each frame in tick) is gated on these
+            // refs. Nulling them here left the visible lid stuck at an
+            // identity remap — it sampled the foot of the gradient instead
+            // of its top slice, so saving visibly recoloured the lid. The
+            // refs reset naturally on a new pot / gallery load; the
+            // duplicate-save guard at the top of savePot() covers re-taps.
         }
     } catch (e) {
         console.warn("save failed", e);
@@ -5523,8 +5555,16 @@ function renameTile(p) {
 }
 
 function glazeNameFor(p) {
-    if (!p.glaze || !GLAZES[p.glaze]) return "Bare clay";
-    return GLAZES[p.glaze].name;
+    if (p.glaze && GLAZES[p.glaze]) return GLAZES[p.glaze].name;
+    // A dipped-but-unglazed pot isn't "bare" — name it by its dip: a preset
+    // dip (Ember, Ocean, …) names the piece; a hand-poured colour dip reads
+    // as a generic "Glaze dip".
+    const dips = Array.isArray(p.dips) ? p.dips : [];
+    if (dips.length) {
+        const preset = dips.find((d) => d.type === "preset" && DIP_SETS[d.id]);
+        return preset ? DIP_SETS[preset.id].label : "Glaze dip";
+    }
+    return "Bare clay";
 }
 
 // 0xRRGGBB integer → "rgba(r, g, b, a)" string.
