@@ -28,6 +28,11 @@
     /* Dark translucent chip behind controls — readable over any backdrop. */
     --chip:      rgba(24, 21, 18, 0.62);
     --chip-hi:   rgba(44, 38, 32, 0.74);
+    /* Unified "pill" toggle — every text tab/chip across the app shares this:
+       always a transparent-black chip; the active one gets a bright warm
+       cream fill with dark text. (Sizing stays per-control.) */
+    --pill-active-bg:  rgba(243, 237, 230, 0.94);
+    --pill-active-ink: #23201c;
     --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --font-display: "Fraunces", Georgia, "Times New Roman", serif;
     /* Sunlit studio veil + warm shelf-card tokens, shared by the full-
@@ -2058,3 +2063,45 @@ html, body {
     transition: color 0.2s ease;
 }
 .footer a:hover { color: var(--ink); }
+
+/* ============================================================
+   Unified pill toggles
+   ------------------------------------------------------------
+   One look + behaviour for every text "pill" across the app —
+   the GLAZE/DECORATE tabs, glaze- & motif-pack tabs, backdrop
+   tabs, the DIP toggle, dip/finish chips, decorate variants &
+   actions, photo-style chips, and lid-style buttons. Each keeps
+   its own font-size / padding (set in its own rule above); this
+   block only unifies the surface: always a transparent-black
+   chip, a subtle brighten on hover, and a bright cream fill with
+   dark text when active. Placed last so it wins the cascade.
+   ============================================================ */
+.deco-tab, .bg-tab, .glaze-pack-tab, .motif-pack-tab,
+.dip-toggle, .dip-chip, .deco-variant, .deco-act,
+.photo-chip, .lid-style-btn {
+    background: var(--chip);
+    border: 1px solid var(--ink-faint);
+    color: var(--ink-dim);
+}
+.deco-tab:not(.is-active):not(:disabled):hover,
+.bg-tab:not(.is-active):not(:disabled):hover,
+.glaze-pack-tab:not(.is-active):not(:disabled):hover,
+.motif-pack-tab:not(.is-active):not(:disabled):hover,
+.dip-toggle:not(.is-active):not(:disabled):hover,
+.dip-chip:not(.is-active):not(:disabled):hover,
+.deco-variant:not(.is-active):not(:disabled):hover,
+.deco-act:not(.is-active):not(:disabled):hover,
+.photo-chip:not(.is-active):not(:disabled):hover,
+.lid-style-btn:not(.is-active):not(:disabled):hover {
+    color: var(--ink);
+    border-color: var(--ink-dim);
+    background: var(--chip-hi);
+}
+.deco-tab.is-active, .bg-tab.is-active, .glaze-pack-tab.is-active,
+.motif-pack-tab.is-active, .dip-toggle.is-active, .dip-chip.is-active,
+.deco-variant.is-active, .deco-act.is-active,
+.photo-chip.is-active, .lid-style-btn.is-active {
+    color: var(--pill-active-ink);
+    background: var(--pill-active-bg);
+    border-color: transparent;
+}
