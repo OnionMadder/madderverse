@@ -2391,55 +2391,77 @@
     }
 
     /* ============================================================
-       CLAY TEXTURES — tilable surface PNGs at assets/textures/
+       CLAY TEXTURES — generated procedurally (no PNGs to ship)
        ============================================================
-       Five 128x128 seamless textures, one per clay type. Each is
-       applied on top of the linear gradient fill via a soft-light
-       composite so the existing global shading (the cross-pot
-       gradient + highlight strip + throwing rings) still reads
-       clearly, but the surface picks up grit / specks / brush
-       marks that flat color can't sell.
+       Six 128x128 seamless tiles, one per clay type, built in a
+       canvas from the same seeded-noise system as the surface skins
+       below (stRng / stMottle / stFiber / stSparkle + the per-pixel
+       grain loop). Each is applied on top of the linear gradient
+       fill via a soft-light composite so the existing global shading
+       (the cross-pot gradient + highlight strip + throwing rings)
+       still reads clearly, but the surface picks up grit / specks /
+       cloudy mottle that flat color can't sell.
 
-       Textures load asynchronously; renderPotScene falls back to
-       the gradient-only look until each image decodes. Patterns
-       are cached per (ctx, clayId) the first time they paint, so
-       there's no per-frame allocation in the render hot path.
-       ============================================================ */
-    /* Clay textures live in assets/textures/clay/, named to match
-       each clay material (earth / porcy / stone / basalt / galaxy
-       / void) rather than the old color-based names. void is the
-       MASTER_POTTER unlock clay; its texture loads alongside the
-       rest (the clay itself stays hidden in the picker until
-       earned, but pre-loading the texture costs nothing). */
-    const CLAY_TEXTURE_FILES = {
-        earthenware: "earth",
-        porcelain:   "porcy",
-        stoneware:   "stone",
-        basalt:      "basalt",
-        galaxy:      "galaxy",
-        void:        "void"
+       Built lazily on first use (well after the st* helpers below are
+       defined) and cached; the per-(ctx,clayId) Pattern is cached the
+       first time it paints, so there's no per-frame allocation in the
+       render hot path. void is the MASTER_POTTER unlock clay; its tile
+       builds on demand like the rest. */
+    const CLAY_SIZE = 128;
+    const CLAY_TEXTURE_RECIPES = {
+        earthenware: { base: "#a8502a", style: "mottle", blobs: 14, grain: 13, grit: 0.03 },
+        porcelain:   { base: "#e9e6df", style: "grit",   grain: 8,  grit: 0.11 },
+        stoneware:   { base: "#877a67", style: "mottle", blobs: 14, grain: 12, grit: 0.04 },
+        basalt:      { base: "#1f1f22", style: "grit",   grain: 10, grit: 0.02, speckLight: true },
+        galaxy:      { base: "#24386a", style: "mottle", blobs: 12, grain: 9 },
+        void:        { base: "#4c2a7e", style: "mottle", blobs: 12, grain: 12 }
     };
-    const CLAY_TEXTURES = Object.create(null);          /* matId -> Image */
+    const CLAY_TEXTURE_CACHE = Object.create(null);     /* matId -> {canvas,url} */
     const CLAY_PATTERN_CACHE = new WeakMap();           /* ctx -> {matId:Pattern} */
 
-    /* CSS-side helper: the texture PNG url for a clay id (or "" if
-       the clay has no texture file). Used so the drag-a-lump balls
-       + clay-picker discs show the same grain as the rendered pot,
-       not a flat swatch color. */
-    function clayTextureUrl(matId) {
-        const file = CLAY_TEXTURE_FILES[matId];
-        return file ? ("assets/textures/clay/" + file + ".png") : "";
+    /* Same construction as buildSurfaceTexture (base fill -> per-pixel
+       grain -> one style pass), seeded per clay id so it's stable. */
+    function buildClayTexture(matId) {
+        const rec = CLAY_TEXTURE_RECIPES[matId];
+        const W = CLAY_SIZE, H = CLAY_SIZE;
+        const cv = document.createElement("canvas");
+        cv.width = W; cv.height = H;
+        const ctx = cv.getContext("2d");
+        const rng = stRng(stHash("clay-" + matId));
+        ctx.fillStyle = rec.base;
+        ctx.fillRect(0, 0, W, H);
+        const gr = rec.grain == null ? 16 : rec.grain;
+        const grit = rec.grit || 0, speckSign = rec.speckLight ? 1 : -1;
+        const img = ctx.getImageData(0, 0, W, H), d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+            let j = (rng() * 2 - 1) * gr;
+            if (grit && rng() < grit) j += speckSign * (28 + rng() * 42);
+            d[i]     = Math.max(0, Math.min(255, d[i]     + j));
+            d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + j));
+            d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + j));
+        }
+        ctx.putImageData(img, 0, 0);
+        if (rec.style === "mottle")       stMottle(ctx, W, H, rng, rec);
+        else if (rec.style === "fiber")   stFiber(ctx, W, H, rng, rec);
+        else if (rec.style === "sparkle") stSparkle(ctx, W, H, rng, rec);
+        return cv;
+    }
+    function getClayTexture(matId) {
+        if (!CLAY_TEXTURE_RECIPES[matId]) return null;
+        let e = CLAY_TEXTURE_CACHE[matId];
+        if (!e) { e = { canvas: buildClayTexture(matId), url: null }; CLAY_TEXTURE_CACHE[matId] = e; }
+        return e;
     }
 
-    function loadClayTextures() {
-        Object.keys(CLAY_TEXTURE_FILES).forEach(function (matId) {
-            const img = new Image();
-            img.src = "assets/textures/clay/" +
-                      CLAY_TEXTURE_FILES[matId] + ".png";
-            CLAY_TEXTURES[matId] = img;
-        });
+    /* CSS-side helper: a data-URL of the generated tile (or "" if the
+       clay has no texture) so the drag-a-lump balls + clay-picker discs
+       show the same grain as the rendered pot, not a flat swatch color. */
+    function clayTextureUrl(matId) {
+        const e = getClayTexture(matId);
+        if (!e) return "";
+        if (!e.url) e.url = e.canvas.toDataURL("image/png");
+        return e.url;
     }
-    loadClayTextures();
 
     function getClayPattern(ctx, matId) {
         if (!ctx) return null;
@@ -2449,13 +2471,13 @@
             CLAY_PATTERN_CACHE.set(ctx, cache);
         }
         if (cache[matId]) return cache[matId];
-        const img = CLAY_TEXTURES[matId];
-        if (!img || !img.complete || img.naturalWidth === 0) return null;
+        const e = getClayTexture(matId);
+        if (!e) return null;
         try {
-            const pat = ctx.createPattern(img, "repeat");
+            const pat = ctx.createPattern(e.canvas, "repeat");
             cache[matId] = pat;
             return pat;
-        } catch (e) {
+        } catch (err) {
             return null;
         }
     }
@@ -2576,7 +2598,8 @@
        the clay color (with a hint of underlying paint peeking
        through at high-contrast spots).
        ============================================================ */
-    const SURFACE_TEXTURES = Object.create(null);          /* fileId -> Image */
+    /* Surface skins are generated procedurally (see the PROCEDURAL
+       block below) — no image map, just the per-ctx pattern cache. */
     const SURFACE_PATTERN_CACHE = new WeakMap();           /* ctx -> {fileId:Pattern} */
 
     /* Per-texture render flags, keyed by texture FILE id. The default
@@ -2611,13 +2634,201 @@
         return isTranslucentTexture(id) ? 1 : 0.92;
     }
 
+    /* ============================================================
+       PROCEDURAL surface textures (no image files shipped).
+       ============================================================
+       The pack skins used to be ~36 uploaded PNGs (~870 KB). They
+       are now generated on-device as seamless, tileable clay grains
+       — one recipe per texture FILE id (a tint pulled from the
+       pack's own palette + a grain STYLE). This keeps every pack's
+       "3 textures" while shipping zero texture bytes.
+
+       Each id maps to { base, style, ... }. Styles:
+         grit    — fine clay speckle (per-pixel; inherently seamless)
+         mottle  — soft cloudy blotches (crater/slime/scale look)
+         fiber   — short soft strokes (fur / feathers / brushed metal)
+         sparkle — dark base + star pinpoints + faint glows (cosmic)
+       Low-frequency features are drawn with ±tile wrap copies so the
+       128² tile repeats without a visible seam. Grain is seeded off
+       the id, so a given skin looks the same every time it renders. */
+    const ST_SIZE = 128;
+    const SURFACE_TEXTURE_CACHE = Object.create(null);   /* id -> {canvas,url} */
+    const SURFACE_TEXTURE_RECIPES = {
+        /* BASIC */
+        "basic":                         { base: "#b06a3a", style: "grit",    grit: 0.05 },
+        "basic-feathers":                { base: "#6f9a68", style: "fiber" },
+        "basic-pattern":                 { base: "#d9a94a", style: "mottle" },
+        /* CANDY */
+        "candy":                         { base: "#d64b57", style: "grit",    grit: 0.14, speckLight: true },
+        "candy-chocolate":               { base: "#5a3418", style: "grit",    grit: 0.06 },
+        "candy-lemon":                   { base: "#cfe04a", style: "grit",    grit: 0.14, speckLight: true },
+        /* PLUSH (fur) */
+        "builder/plushie":               { base: "#a07050", style: "fiber" },
+        "builder/plushie-blue":          { base: "#b8d8ed", style: "fiber" },
+        "builder/plushie-pink":          { base: "#ffc8e0", style: "fiber" },
+        /* MODDED (tech) */
+        "modded":                        { base: "#141414", style: "grit",    grit: 0.05, grain: 12 },
+        "modded-aluminum":               { base: "#b8b8b8", style: "fiber",   fiberAngle: Math.PI / 2, fibers: 340 },
+        "modded-led":                    { base: "#181818", style: "sparkle", glow: "60,255,120", stars: 40, glows: 8 },
+        /* GAMER */
+        "builder/gamer":                 { base: "#2f8f4a", style: "mottle" },
+        "builder/gamer-black":           { base: "#2a3a3a", style: "grit",    grit: 0.05 },
+        "builder/gamer-crt":             { base: "#5a2a8a", style: "mottle" },
+        /* SPACE (cosmic) */
+        "space":                         { base: "#07061a", style: "sparkle", glow: "150,120,255" },
+        "space-galaxy":                  { base: "#3a1f55", style: "sparkle", glow: "210,120,255" },
+        "space-blackhole":               { base: "#0a0818", style: "sparkle", glow: "90,120,255" },
+        /* DINOSAUR (scales) */
+        "builder/dinosaur":              { base: "#3f5d2a", style: "mottle" },
+        "builder/dinosaur-blue":         { base: "#2b5f80", style: "mottle" },
+        "builder/dinosaur-purpleorange": { base: "#6a3a7a", style: "mottle" },
+        /* BREAKFAST */
+        "breakfast-egg":                 { base: "#f3e6c8", style: "mottle" },
+        "breakfast-pancake":             { base: "#cdb98a", style: "mottle" },
+        "breakfast-strawberry":          { base: "#c84a3a", style: "grit",    grit: 0.12, speckLight: true },
+        /* MUSIC */
+        "music":                         { base: "#101010", style: "fiber",   fiberAngle: Math.PI / 2, fibers: 300, grain: 10 },
+        "music-neon":                    { base: "#201025", style: "sparkle", glow: "255,60,160", stars: 30, glows: 9 },
+        "music-vinyl":                   { base: "#1a1a1a", style: "fiber",   fiberAngle: Math.PI / 2, fibers: 340, grain: 10 },
+        /* CHICKENS (feathers) */
+        "chickens":                      { base: "#efe8d8", style: "fiber" },
+        "chickens-clay":                 { base: "#6b4a2a", style: "grit",    grit: 0.06 },
+        "chickens-skin":                 { base: "#e0982a", style: "mottle" },
+        /* ALIENS (slime) */
+        "aliens":                        { base: "#5fbf2a", style: "mottle" },
+        "aliens-mars":                   { base: "#c8472e", style: "mottle" },
+        "aliens-venus":                  { base: "#e6c15c", style: "mottle" },
+        /* MOONS (cratered) */
+        "literally-moons":               { base: "#cfc8b8", style: "mottle" },
+        "literally-moons-sponge":        { base: "#8a6fc4", style: "mottle" },
+        "literally-moons-stars":         { base: "#0a0a1f", style: "sparkle", glow: "200,200,255" }
+    };
+
+    function stHash(str) {
+        let h = 2166136261 >>> 0;
+        for (let i = 0; i < str.length; i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+    }
+    function stRng(seed) {                 /* xorshift32 — deterministic per id */
+        let s = seed >>> 0 || 1;
+        return function () {
+            s ^= s << 13; s >>>= 0;
+            s ^= s >> 17;
+            s ^= s << 5;  s >>>= 0;
+            return s / 4294967296;
+        };
+    }
+    function stRgb(hex) {
+        hex = String(hex).replace("#", "");
+        if (hex.length === 3) hex = hex.split("").map(function (c) { return c + c; }).join("");
+        const n = parseInt(hex, 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    /* Draw a primitive at its position + the 8 ±tile neighbours so any
+       feature crossing an edge appears on the opposite side → seamless. */
+    function stWrap(W, H, x, y, draw) {
+        for (let ox = -1; ox <= 1; ox++)
+            for (let oy = -1; oy <= 1; oy++)
+                draw(x + ox * W, y + oy * H);
+    }
+    function stMottle(ctx, W, H, rng, rec) {
+        const n = rec.blobs || 11;
+        for (let k = 0; k < n; k++) {
+            const x = rng() * W, y = rng() * H, r = W * (0.12 + rng() * 0.22);
+            const c = rng() < 0.5 ? "255,255,255" : "0,0,0";
+            const a = 0.10 + rng() * 0.15;
+            stWrap(W, H, x, y, function (px, py) {
+                const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+                g.addColorStop(0, "rgba(" + c + "," + a + ")");
+                g.addColorStop(1, "rgba(" + c + ",0)");
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+            });
+        }
+    }
+    function stFiber(ctx, W, H, rng, rec) {
+        const n = rec.fibers || 260, baseAng = rec.fiberAngle || 0;
+        ctx.lineCap = "round";
+        for (let k = 0; k < n; k++) {
+            const x = rng() * W, y = rng() * H;
+            const len = 3 + rng() * 7, ang = baseAng + (rng() - 0.5) * 0.7;
+            const dx = Math.sin(ang) * len, dy = Math.cos(ang) * len;
+            const c = rng() < 0.5 ? "255,255,255" : "0,0,0";
+            ctx.strokeStyle = "rgba(" + c + "," + (0.09 + rng() * 0.17) + ")";
+            ctx.lineWidth = 0.8 + rng() * 0.9;
+            stWrap(W, H, x, y, function (px, py) {
+                ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + dx, py + dy); ctx.stroke();
+            });
+        }
+    }
+    function stSparkle(ctx, W, H, rng, rec) {
+        const glows = rec.glows == null ? 6 : rec.glows, tint = rec.glow || "180,150,255";
+        for (let k = 0; k < glows; k++) {
+            const x = rng() * W, y = rng() * H, r = 6 + rng() * 16;
+            stWrap(W, H, x, y, function (px, py) {
+                const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+                g.addColorStop(0, "rgba(" + tint + ",0.22)");
+                g.addColorStop(1, "rgba(" + tint + ",0)");
+                ctx.fillStyle = g;
+                ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+            });
+        }
+        const stars = rec.stars == null ? 90 : rec.stars;  /* pinpoints: high-freq, seam-safe */
+        for (let k = 0; k < stars; k++) {
+            const big = rng() < 0.15 ? 2 : 1;
+            ctx.fillStyle = "rgba(255,255,255," + (0.5 + rng() * 0.5) + ")";
+            ctx.fillRect(rng() * W, rng() * H, big, big);
+        }
+    }
+    function buildSurfaceTexture(id) {
+        const rec = SURFACE_TEXTURE_RECIPES[id] || { base: "#b08050", style: "grit" };
+        const W = ST_SIZE, H = ST_SIZE;
+        const cv = document.createElement("canvas");
+        cv.width = W; cv.height = H;
+        const ctx = cv.getContext("2d");
+        const rng = stRng(stHash(id));
+        ctx.fillStyle = rec.base;
+        ctx.fillRect(0, 0, W, H);
+        /* Per-pixel grain — pure high-frequency noise tiles with no seam. */
+        const gr = rec.grain == null ? 16 : rec.grain;
+        const grit = rec.grit || 0, speckSign = rec.speckLight ? 1 : -1;
+        const img = ctx.getImageData(0, 0, W, H), d = img.data;
+        for (let i = 0; i < d.length; i += 4) {
+            let j = (rng() * 2 - 1) * gr;
+            if (grit && rng() < grit) j += speckSign * (28 + rng() * 42);
+            d[i]     = Math.max(0, Math.min(255, d[i]     + j));
+            d[i + 1] = Math.max(0, Math.min(255, d[i + 1] + j));
+            d[i + 2] = Math.max(0, Math.min(255, d[i + 2] + j));
+        }
+        ctx.putImageData(img, 0, 0);
+        if (rec.style === "mottle")       stMottle(ctx, W, H, rng, rec);
+        else if (rec.style === "fiber")   stFiber(ctx, W, H, rng, rec);
+        else if (rec.style === "sparkle") stSparkle(ctx, W, H, rng, rec);
+        return cv;
+    }
+    function getSurfaceTexture(id) {
+        if (LEGACY_TEXTURE_ALIASES[id]) id = LEGACY_TEXTURE_ALIASES[id];
+        let e = SURFACE_TEXTURE_CACHE[id];
+        if (!e) { e = { canvas: buildSurfaceTexture(id), url: null }; SURFACE_TEXTURE_CACHE[id] = e; }
+        return e;
+    }
+    /* Data URL of the generated tile, for CSS background-image swatches
+       (decorate palette + shop pack modal). Built lazily, then cached. */
+    function surfaceTextureUrl(id) {
+        const e = getSurfaceTexture(id);
+        if (!e.url) e.url = e.canvas.toDataURL("image/png");
+        return e.url;
+    }
+
     function loadSurfaceTextures(packs) {
+        /* Pre-warm the canvases so the first decorate open / render is
+           instant. Cheap: 39 small seeded 128² tiles. */
         packs.forEach(function (p) {
             (p.surfaceTextures || []).forEach(function (id) {
-                if (!id || SURFACE_TEXTURES[id]) return;   /* already loading */
-                const img = new Image();
-                img.src = "assets/textures/" + id + ".png";
-                SURFACE_TEXTURES[id] = img;
+                if (id) getSurfaceTexture(id);
             });
         });
     }
@@ -2652,10 +2863,10 @@
             SURFACE_PATTERN_CACHE.set(ctx, cache);
         }
         if (cache[fileId]) return cache[fileId];
-        const img = SURFACE_TEXTURES[fileId];
-        if (!img || !img.complete || img.naturalWidth === 0) return null;
+        const canvas = getSurfaceTexture(fileId).canvas;   /* procedural tile */
+        if (!canvas) return null;
         try {
-            const pat = ctx.createPattern(img, "repeat");
+            const pat = ctx.createPattern(canvas, "repeat");
             cache[fileId] = pat;
             return pat;
         } catch (_) { return null; }
@@ -7518,7 +7729,7 @@
                the PNG's alpha lets the checker show, just like the clay
                shows through on the pot. */
             btn.dataset.texture = tid;
-            const texUrl = 'url("assets/textures/' + tid + '.png")';
+            const texUrl = 'url("' + surfaceTextureUrl(tid) + '")';
             if (isTranslucentTexture(tid)) {
                 /* Stack the texture over a light checker so the swatch
                    reads as see-through (not flat purple on the dark
@@ -12373,7 +12584,7 @@
                 const tile = document.createElement("div");
                 tile.className = "pack-modal-texture";
                 tile.style.backgroundImage =
-                    'url("assets/textures/' + tid + '.png")';
+                    'url("' + surfaceTextureUrl(tid) + '")';
                 tile.title = tid;
                 textures.appendChild(tile);
             });
