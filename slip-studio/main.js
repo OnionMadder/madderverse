@@ -1573,7 +1573,7 @@ function init() {
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
             makeLidPartner, swapActivePiece, matchLidRim, capturePieceState, restorePieceState,
-            loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb, stageThumb, ensureGalleryBgImg,
+            loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb, stageThumb, keyOutThumbBg, ensureGalleryBgImg,
             dbAll, dbDelete, dismissLanding,
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
@@ -6777,15 +6777,45 @@ async function ensureGalleryBgImg() {
     _galleryBgImgId = id;
     return _galleryBgImg;
 }
-// Composite a TRANSPARENT pot thumbnail onto the chosen showcase backdrop,
-// sat on that scene's display surface with a soft contact shadow. Legacy
-// opaque thumbs (pre-transparent) are returned unchanged.
+// Knock the flat capture background out of a LEGACY opaque thumbnail (pot
+// rendered on BG_COLOR) so it can sit on a backdrop like the new transparent
+// thumbs. Flood-fills near-bg pixels inward from the edges, so only the actual
+// background is removed — dark glazes INSIDE the pot silhouette are protected
+// (they aren't connected to the edge), and edges are feathered by distance.
+function keyOutThumbBg(ctx, S) {
+    const br = (BG_COLOR >> 16) & 255, bgc = (BG_COLOR >> 8) & 255, bb = BG_COLOR & 255;
+    const T2 = 46 * 46, CORE2 = 13 * 13; // generous — connectivity guards the pot
+    const img = ctx.getImageData(0, 0, S, S), d = img.data;
+    const dist2 = (p) => { const i = p * 4, dr = d[i] - br, dg = d[i + 1] - bgc, db = d[i + 2] - bb; return dr * dr + dg * dg + db * db; };
+    const near = (p) => dist2(p) < T2;
+    const seen = new Uint8Array(S * S), stack = [];
+    const push = (p) => { if (!seen[p] && near(p)) { seen[p] = 1; stack.push(p); } };
+    for (let x = 0; x < S; x++) { push(x); push((S - 1) * S + x); }
+    for (let y = 0; y < S; y++) { push(y * S); push(y * S + S - 1); }
+    while (stack.length) {
+        const p = stack.pop(), x = p % S, y = (p / S) | 0, dd = dist2(p);
+        d[p * 4 + 3] = dd < CORE2 ? 0 : Math.round(d[p * 4 + 3] * Math.min(1, (dd - CORE2) / (T2 - CORE2)));
+        if (x > 0) push(p - 1);
+        if (x < S - 1) push(p + 1);
+        if (y > 0) push(p - S);
+        if (y < S - 1) push(p + S);
+    }
+    ctx.putImageData(img, 0, 0);
+}
+// Composite a pot thumbnail onto the chosen showcase backdrop, sat on that
+// scene's display surface with a soft contact shadow. New thumbs are already
+// transparent PNGs; legacy opaque thumbs get their flat bg keyed out first.
 async function stageThumb(thumbURL) {
-    if (!thumbURL || !/^data:image\/png/.test(thumbURL)) return thumbURL;
+    if (!thumbURL) return thumbURL;
     const bd = GALLERY_BACKDROPS[state.galleryBg] || GALLERY_BACKDROPS[DEFAULT_GALLERY_BACKDROP];
     const [bg, pot] = await Promise.all([ensureGalleryBgImg(), loadImageEl(thumbURL)]);
     if (!pot) return thumbURL;
     const S = 360;
+    // Isolate the pot as a transparent layer.
+    const potC = document.createElement("canvas"); potC.width = potC.height = S;
+    const pc = potC.getContext("2d");
+    pc.drawImage(pot, 0, 0, S, S);
+    if (!/^data:image\/png/.test(thumbURL)) keyOutThumbBg(pc, S); // legacy opaque
     const c = document.createElement("canvas"); c.width = c.height = S;
     const ctx = c.getContext("2d");
     if (bg) {                                   // backdrop, cover-fit + centre-crop
@@ -6804,7 +6834,7 @@ async function stageThumb(thumbURL) {
     ctx.restore();
     // Pot: scaled, centred at centerX, foot landing on the surface.
     const dw = k * S, dh = k * S;
-    ctx.drawImage(pot, cx - dw / 2, sy - POT_FOOT_FRAC * dh, dw, dh);
+    ctx.drawImage(potC, cx - dw / 2, sy - POT_FOOT_FRAC * dh, dw, dh);
     return c.toDataURL("image/jpeg", 0.9);
 }
 function setGalleryBg(id) {
