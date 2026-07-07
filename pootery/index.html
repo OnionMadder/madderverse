@@ -54,7 +54,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=63" />
+    <link rel="stylesheet" href="style.css?v=64" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -83,6 +83,8 @@
                 if (f) f.remove();
                 var ib = document.getElementById("btnInstall");
                 if (ib) ib.remove();
+                var hm = document.querySelector(".madder-home");
+                if (hm) hm.remove();
                 var links = document.querySelectorAll(
                     'link[href*="site-footer.css"]');
                 for (var i = 0; i < links.length; i++) {
@@ -1503,7 +1505,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=63"></script>
+<script src="game.js?v=64"></script>
 
 </body>
 </html>
