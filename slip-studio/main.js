@@ -4285,11 +4285,22 @@ function updateToolbar() {
     if (label) label.textContent = stageLabelText();
     if (advance) {
         advance.textContent = ADVANCE_LABEL[cs];
-        // The clay arc is driven from the POT only. On the lid screen there's
-        // no Dry / Fire button — the user switches back to the pot to move on,
-        // so a set always advances together (the pot's Dry/Fire carries the
-        // lid along). "New pot" at fired is a full reset, allowed either way.
-        advance.hidden = state.isLid && cs !== "fired";
+        // The advance button only PROGRESSES the clay arc (Dry → Fire). At
+        // fired there's nothing to progress — starting over is the corner
+        // "New pot" (title) button — so hide it. Also hidden on the lid screen
+        // (the pot's Dry/Fire carries the lid along).
+        advance.hidden = cs === "fired" || (state.isLid && cs !== "fired");
+    }
+    // The corner return arrow becomes a "New pot" pill once fired (starting
+    // over = returnToTitle → reset + shape picker); a round ↩ icon otherwise.
+    const titleBtn = document.getElementById("titleBtn");
+    if (titleBtn) {
+        const isFired = cs === "fired";
+        titleBtn.classList.toggle("is-newpot", isFired);
+        if (isFired) titleBtn.textContent = "New pot";
+        else titleBtn.innerHTML = "&#x21A9;";
+        titleBtn.setAttribute("aria-label", isFired ? "New pot" : "Back to title");
+        titleBtn.setAttribute("title", isFired ? "New pot" : "Title screen");
     }
     if (back) {
         back.hidden = cs === "wet" || cs === "fired";

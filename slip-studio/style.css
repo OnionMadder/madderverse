@@ -817,6 +817,16 @@ html, body {
     background: var(--chip-hi);
     outline: none;
 }
+/* On the fired screen the arrow becomes a visible "New pot" pill (there's no
+   bottom-right advance button then — start over from here). */
+.title-btn.is-newpot {
+    width: auto;
+    border-radius: 999px;
+    padding: 0 16px;
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+}
 
 /* ---------- Minimal home affordance ---------- */
 .home {
