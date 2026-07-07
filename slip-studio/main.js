@@ -318,8 +318,8 @@ const GALLERY_BACKDROPS = {
 const GALLERY_BACKDROP_IDS = ["showcase", "forest", "gallery"];
 const DEFAULT_GALLERY_BACKDROP = "showcase";
 // The pot's foot sits at ~this fraction of the square thumbnail (fixed by the
-// capture camera). Used to place the pot on a backdrop's surface.
-const POT_FOOT_FRAC = 0.875;
+// capture camera, wheel hidden). Used to place the pot on a backdrop's surface.
+const POT_FOOT_FRAC = 0.753;
 function currentDipPackIds() {
     return (DIP_SET_PACKS[state.dipPack] || DIP_SET_PACKS[DEFAULT_DIP_PACK]).ids;
 }
@@ -5426,6 +5426,8 @@ function captureThumb(size = 320) {
     // even if the live view is the assembled set.
     const prevPartnerVisible = state.partnerMesh && state.partnerMesh.visible;
     if (prevPartnerVisible) state.partnerMesh.visible = false;
+    const prevWheelVisible = state.wheel && state.wheel.visible;
+    if (state.wheel) state.wheel.visible = false; // the pot alone — no wheel base in the gallery
     const prevPotY = state.pot.position.y;
     state.pot.position.y = 0;
     cam.aspect = 1;
@@ -5450,6 +5452,7 @@ function captureThumb(size = 320) {
     cam.updateProjectionMatrix();
     state.pot.position.y = prevPotY;
     if (prevPartnerVisible) state.partnerMesh.visible = true;
+    if (state.wheel) state.wheel.visible = prevWheelVisible;
 
     // GL pixels are bottom-up; flip the transparent pot into its own canvas,
     // then composite it over the lit gallery backdrop.
@@ -5480,6 +5483,8 @@ function captureAssemblyThumb(size = 360) {
     const cam = state.camera;
     const prevAspect = cam.aspect;
     const prevPos = cam.position.clone();
+    const prevWheelVisible = state.wheel && state.wheel.visible;
+    if (state.wheel) state.wheel.visible = false; // no wheel base in the gallery
     cam.aspect = 1;
     cam.position.copy(CAM_ASSEMBLED_BASE);
     cam.lookAt(CAM_ASSEMBLED_TARGET);
@@ -5499,6 +5504,7 @@ function captureAssemblyThumb(size = 360) {
     cam.position.copy(prevPos);
     cam.lookAt(CAM_TARGET);
     cam.updateProjectionMatrix();
+    if (state.wheel) state.wheel.visible = prevWheelVisible;
 
     const potC = document.createElement("canvas");
     potC.width = potC.height = size;
@@ -6832,9 +6838,14 @@ async function stageThumb(thumbURL) {
     sh.addColorStop(0, "rgba(0,0,0,0.42)"); sh.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, k * S * 0.34, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    // Pot: scaled, centred at centerX, foot landing on the surface.
+    // Pot: scaled, centred at centerX, foot landing on the surface. Clip at the
+    // surface line so nothing below the foot draws — this hides the wheel base
+    // baked into legacy thumbs so the pot sits cleanly on the stage.
     const dw = k * S, dh = k * S;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, S, sy + 1); ctx.clip();
     ctx.drawImage(potC, cx - dw / 2, sy - POT_FOOT_FRAC * dh, dw, dh);
+    ctx.restore();
     return c.toDataURL("image/jpeg", 0.9);
 }
 function setGalleryBg(id) {
