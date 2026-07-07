@@ -130,6 +130,46 @@ Still no ads. Still no IAP. Still no internet needed.
 
 (Future "What's new" blocks should stay short — one screen of text, not a changelog.)
 
+## What's new  (v2.5.0 / vc14 — THIS RELEASE, paste into Play Console "What's new")
+
+Bundles everything from web v137 → v168 (vc13 was web v136). Kept under Play's
+500-char release-notes limit.
+
+```
+Slip Studio v2.5 — glaze chemistry, wax resist, and a gallery for your pots.
+
+• Overlapping dip glazes now react into new colors.
+• Wax resist: paint wax, glaze over it, then peel it back to reveal the color underneath.
+• Finishes: glossy, matte, or pearl lustre.
+• Slip trailing, 40 glazes, and themed color packs.
+• New shapes: planter, goblet, bud vase, mug.
+• Show off your pots on a studio podium, forest pedestal, or sunlit shelf.
+
+Still ad-free. No purchases. No internet needed.
+```
+
+## Store event — "Major update" (Play Console → Promotional content → Add event)
+
+For the promotional event card on the store. Voice stays calm/confident.
+
+- **Event type:** Major update
+- **Name (≤ ~30 chars):** `Glaze, wax & a gallery`
+- **Short description:** `New glaze chemistry, wax resist, and a gallery to display your pots.`
+- **Full description:**
+```
+The biggest Slip Studio update yet. Layer dip glazes and watch the overlaps
+react into new colors. Brush on wax, glaze over it, then peel the wax back to
+reveal the color it protected. Finish a piece glossy, soft-matte, or in a
+shimmering pearl lustre. Throw new shapes — planter, goblet, bud vase, a mug
+with a handle — decorate with 40 glazes and themed color packs, then stage your
+whole collection in a gallery: a studio podium, a forest pedestal, or a sunlit
+shelf. Still ad-free, still no purchases, still works with no internet.
+```
+- **Timing:** start it when the vc14 release goes live (Major-update events run best
+  in the first days after publish); a ~2-week window is typical.
+- **Graphic:** reuse a bright fired-pot screenshot (the gallery/showcase shot reads well
+  as the event image). Play wants an event image ~1200×628-ish; a promo video is optional.
+
 ---
 
 ## App display name  (under-the-icon name + Console "App name")
