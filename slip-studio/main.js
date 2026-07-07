@@ -617,11 +617,13 @@ const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "dogs", "berries", "roman
 // A tap does a one-tap full-colour tiled fill; square 512 tiles wrap 4×.
 const PATTERN_PACKS = {
     enamel: { label: "Enamel", files: [
-        "patterns/enamel/blue-floral.jpg", "patterns/enamel/lotus.jpg", "patterns/enamel/petals.jpg",
-        "patterns/enamel/wildflowers.jpg", "patterns/enamel/abstract.jpg", "patterns/enamel/dark.jpg",
+        "patterns/enamels/blue-floral.jpg", "patterns/enamels/lotus.jpg", "patterns/enamels/petals.jpg",
+        "patterns/enamels/wildflowers.jpg", "patterns/enamels/abstract.jpg", "patterns/enamels/dark.jpg",
     ] },
-    overlays: { label: "Overlays", files: [
-        "patterns/overlays/egyptian.png", "patterns/overlays/egyptian-frescos.png",
+    frescoes: { label: "Frescoes", files: [
+        "patterns/frescoes/egyptian.png", "patterns/frescoes/egyptian-two.png", "patterns/frescoes/chinese.png",
+        "patterns/frescoes/indian.png", "patterns/frescoes/floral.png", "patterns/frescoes/lace.png",
+        "patterns/frescoes/last-supper.png",
     ] },
     shima: { label: "Shima-shima", files: [
         "patterns/shima-shima/stripes.jpg", "patterns/shima-shima/blue.jpg", "patterns/shima-shima/green.jpg",
@@ -632,7 +634,7 @@ const PATTERN_PACKS = {
         "patterns/art-nouveau/four.jpg", "patterns/art-nouveau/five.jpg", "patterns/art-nouveau/six.jpg",
     ] },
 };
-const PATTERN_PACK_IDS = ["enamel", "overlays", "shima", "artNouveau"];
+const PATTERN_PACK_IDS = ["enamel", "frescoes", "shima", "artNouveau"];
 // Band packs (the "Band" tool). Each file is a horizontal frieze that
 // wraps the pot as a single band: it repeats HORIZONTALLY (an integer
 // number of times, seamless at the u-seam) but NOT vertically, and the
@@ -640,9 +642,9 @@ const PATTERN_PACK_IDS = ["enamel", "overlays", "shima", "artNouveau"];
 // clay/glaze shows around the frieze.
 const BAND_PACKS = {
     egyptian: { label: "Egyptian", files: [
-        "frescoes/element-download--1783299972.png", "frescoes/element-download--1783300000.png",
-        "frescoes/element-download--1783300035.png", "frescoes/element-download--1783300065.png",
-        "frescoes/element-download--1783300399.png", "frescoes/element-download--1783300461.png",
+        "bands/element-download--1783299972.png", "bands/element-download--1783300000.png",
+        "bands/element-download--1783300035.png", "bands/element-download--1783300065.png",
+        "bands/element-download--1783300399.png", "bands/element-download--1783300461.png",
     ] },
 };
 const BAND_PACK_IDS = ["egyptian"];
@@ -4711,7 +4713,13 @@ function setMotifFullColor(on) {
     }
     updateDecoSub();
 }
-function motifSrc(id) { return "assets/" + id; }
+function motifSrc(id) {
+    // Legacy remap: the band friezes moved from assets/frescoes/ to
+    // assets/bands/ (2026-07). Saved-pot band placements store the old
+    // "frescoes/…" path, so redirect them here or they'd fail to load.
+    if (id && id.startsWith("frescoes/")) id = "bands/" + id.slice(9);
+    return "assets/" + id;
+}
 function motifLabel(id) { return id.split("/").pop().replace(/\.[a-z0-9]+$/i, ""); }
 function loadStarterMotif(id) {
     motifStarter = id;
