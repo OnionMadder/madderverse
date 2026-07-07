@@ -35,12 +35,12 @@
     --pill-active-ink: #23201c;
     --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --font-display: "Fraunces", Georgia, "Times New Roman", serif;
-    /* Sunlit studio veil + warm shelf-card tokens, shared by the full-
-       screen overlays (gallery, photo modal) so they read as the same
-       airy, warm room rather than a cold dark box. */
+    /* Full-screen overlay veil (gallery, photo modal): a transparent
+       charcoal — the same calm smoked-glass wash the wheel screen uses —
+       over the heavily-blurred scene, rather than a heavy brown sheet. */
     --veil:
-        radial-gradient(135% 100% at 50% -12%, rgba(226, 170, 118, 0.34), rgba(226, 170, 118, 0) 58%),
-        linear-gradient(178deg, rgba(49, 38, 30, 0.90), rgba(33, 26, 21, 0.94));
+        radial-gradient(120% 90% at 50% -8%, rgba(160, 158, 150, 0.08), rgba(160, 158, 150, 0) 52%),
+        linear-gradient(180deg, rgba(27, 24, 21, 0.80), rgba(20, 18, 15, 0.88));
     --g-card:        rgba(244, 232, 217, 0.085);
     --g-card-line:   rgba(244, 232, 217, 0.16);
     --g-card-shadow: 0 8px 22px rgba(26, 16, 9, 0.24);

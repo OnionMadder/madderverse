@@ -5392,6 +5392,38 @@ function captureRender(cam) {
 // target and read back with readRenderTargetPixels — reliable on every
 // device (unlike toDataURL on the live canvas, which returns blank on
 // some mobile GPUs). Framed square at the default (zoom-1) view.
+// A warm, softly-lit "gallery alcove" drawn behind a saved pot's thumbnail:
+// a gentle wall wash, a spotlight pool on the piece, and a grounding contact
+// shadow — so cards read as pieces displayed under gallery light, not a pot
+// floating in a black void. (Swappable for an uploaded shelf/stand image.)
+function drawGalleryBackdrop(ctx, S) {
+    const baseY = S * 0.68; // ~ the pot's foot in the framed thumb
+    const wall = ctx.createLinearGradient(0, 0, 0, S);
+    wall.addColorStop(0,   "#34302b");
+    wall.addColorStop(0.5, "#272320");
+    wall.addColorStop(1,   "#15120f");
+    ctx.fillStyle = wall; ctx.fillRect(0, 0, S, S);
+    // Spotlight glow on the piece.
+    const pool = ctx.createRadialGradient(S / 2, S * 0.40, S * 0.04, S / 2, S * 0.46, S * 0.60);
+    pool.addColorStop(0, "rgba(255, 240, 212, 0.24)");
+    pool.addColorStop(1, "rgba(255, 240, 212, 0)");
+    ctx.fillStyle = pool; ctx.fillRect(0, 0, S, S);
+    // Floor falloff below the piece.
+    const floor = ctx.createLinearGradient(0, baseY - S * 0.05, 0, S);
+    floor.addColorStop(0, "rgba(9, 7, 5, 0)");
+    floor.addColorStop(1, "rgba(9, 7, 5, 0.72)");
+    ctx.fillStyle = floor; ctx.fillRect(0, baseY - S * 0.05, S, S);
+    // Soft elliptical contact shadow.
+    ctx.save();
+    ctx.translate(S / 2, baseY + S * 0.03);
+    ctx.scale(1, 0.24);
+    const sh = ctx.createRadialGradient(0, 0, 2, 0, 0, S * 0.30);
+    sh.addColorStop(0, "rgba(0, 0, 0, 0.55)");
+    sh.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, S * 0.30, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+}
+
 function captureThumb(size = 320) {
     tickMaterial(10); // snap the glaze to its final look (skip the tween)
     const cam = state.camera;
@@ -5410,13 +5442,12 @@ function captureThumb(size = 320) {
 
     const rt = new THREE.WebGLRenderTarget(size, size);
     state.renderer.setRenderTarget(rt);
-    state.renderer.setClearColor(BG_COLOR, 1); // opaque warm bg for the thumb
+    state.renderer.setClearAlpha(0); // transparent — composited over the backdrop
     state.renderer.clear();
     captureRender(cam);
     const buf = new Uint8Array(size * size * 4);
     state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
     state.renderer.setRenderTarget(null);
-    state.renderer.setClearAlpha(0); // back to transparent for the live canvas
     rt.dispose();
 
     // restore everything
@@ -5426,19 +5457,24 @@ function captureThumb(size = 320) {
     cam.updateProjectionMatrix();
     state.pot.position.y = prevPotY;
     if (prevPartnerVisible) state.partnerMesh.visible = true;
-    // (rest of the function returns the thumb data URL below)
 
-    // GL pixels are bottom-up; flip into a 2D canvas, then encode.
-    const c = document.createElement("canvas");
-    c.width = c.height = size;
-    const ctx = c.getContext("2d");
-    const img = ctx.createImageData(size, size);
+    // GL pixels are bottom-up; flip the transparent pot into its own canvas,
+    // then composite it over the lit gallery backdrop.
+    const potC = document.createElement("canvas");
+    potC.width = potC.height = size;
+    const pctx = potC.getContext("2d");
+    const img = pctx.createImageData(size, size);
     for (let y = 0; y < size; y++) {
         const src = (size - 1 - y) * size * 4;
         img.data.set(buf.subarray(src, src + size * 4), y * size * 4);
     }
-    ctx.putImageData(img, 0, 0);
-    return c.toDataURL("image/jpeg", 0.85);
+    pctx.putImageData(img, 0, 0);
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const ctx = c.getContext("2d");
+    drawGalleryBackdrop(ctx, size);
+    ctx.drawImage(potC, 0, 0);
+    return c.toDataURL("image/jpeg", 0.9);
 }
 
 // Capture the assembled lid-on-pot view as a square thumbnail. Used
@@ -5460,13 +5496,12 @@ function captureAssemblyThumb(size = 360) {
 
     const rt = new THREE.WebGLRenderTarget(size, size);
     state.renderer.setRenderTarget(rt);
-    state.renderer.setClearColor(BG_COLOR, 1);
+    state.renderer.setClearAlpha(0); // transparent — composited over the backdrop
     state.renderer.clear();
     captureRender(cam);
     const buf = new Uint8Array(size * size * 4);
     state.renderer.readRenderTargetPixels(rt, 0, 0, size, size, buf);
     state.renderer.setRenderTarget(null);
-    state.renderer.setClearAlpha(0);
     rt.dispose();
 
     cam.aspect = prevAspect;
@@ -5474,16 +5509,21 @@ function captureAssemblyThumb(size = 360) {
     cam.lookAt(CAM_TARGET);
     cam.updateProjectionMatrix();
 
-    const c = document.createElement("canvas");
-    c.width = c.height = size;
-    const ctx = c.getContext("2d");
-    const img = ctx.createImageData(size, size);
+    const potC = document.createElement("canvas");
+    potC.width = potC.height = size;
+    const pctx = potC.getContext("2d");
+    const img = pctx.createImageData(size, size);
     for (let y = 0; y < size; y++) {
         const src = (size - 1 - y) * size * 4;
         img.data.set(buf.subarray(src, src + size * 4), y * size * 4);
     }
-    ctx.putImageData(img, 0, 0);
-    return c.toDataURL("image/jpeg", 0.86);
+    pctx.putImageData(img, 0, 0);
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const ctx = c.getContext("2d");
+    drawGalleryBackdrop(ctx, size);
+    ctx.drawImage(potC, 0, 0);
+    return c.toDataURL("image/jpeg", 0.9);
 }
 
 // --- Photo modal ------------------------------------------------
@@ -5774,8 +5814,11 @@ function flashPhotoSave() {
 // The user can still tap the title in the gallery to rename it.
 function defaultPotTitle() {
     const base = state.isLid ? "Lid" : (SHAPES[state.shape]?.label || "Pot");
-    const glazeName = (state.glaze && GLAZES[state.glaze]) ? GLAZES[state.glaze].name : null;
-    return glazeName ? `${base} in ${glazeName}` : `Bare-clay ${base.toLowerCase()}`;
+    // Reuse the gallery's glaze/dip naming against the live state so a DIPPED
+    // pot is named by its dip (Ocean, Rainbow, …) — not "Bare clay".
+    const look = glazeNameFor({ glaze: state.glaze, dips: state.dips });
+    if (look === "Bare clay") return `Bare-clay ${base.toLowerCase()}`;
+    return `${base} in ${look}`;
 }
 
 async function savePot() {
