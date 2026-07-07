@@ -1128,36 +1128,6 @@ html, body {
     white-space: nowrap;
 }
 .motif-pack-tab.is-active { color: var(--ink); background: var(--chip); }
-/* Motif size slider — sits where the brush dots normally are. */
-.motif-size {
-    pointer-events: auto;
-    -webkit-appearance: none;
-    appearance: none;
-    width: 128px;
-    height: 4px;
-    margin: 0 8px;
-    border-radius: 999px;
-    background: var(--ink-faint);
-    outline: none;
-}
-.motif-size::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 17px;
-    height: 17px;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-}
-.motif-size::-moz-range-thumb {
-    width: 17px;
-    height: 17px;
-    border: none;
-    border-radius: 50%;
-    background: var(--accent);
-    cursor: pointer;
-}
-.motif-size[hidden] { display: none; }
 /* Silhouette ↔ full-colour toggle chip (motif tool). */
 .motif-color-toggle {
     pointer-events: auto;

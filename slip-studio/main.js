@@ -607,12 +607,8 @@ const MOTIF_PACKS = {
         "motifs/mythological-creatures/dragon.png", "motifs/mythological-creatures/phoenix.png", "motifs/mythological-creatures/griffin.png",
         "motifs/mythological-creatures/unicorn.png", "motifs/mythological-creatures/roc.png", "motifs/mythological-creatures/beast.png",
     ] },
-    frames: { label: "Frames", ids: [
-        "frames/floral.png", "frames/gold.png", "frames/greek.png",
-        "frames/landscape.png", "frames/portrait.png", "frames/mirrored.png",
-    ] },
 };
-const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "dogs", "berries", "roman", "egyptian", "myth", "frames"];
+const MOTIF_PACK_IDS = ["sumieAnimals", "sumiePlants", "dogs", "berries", "roman", "egyptian", "myth"];
 // Allover patterns, grouped into packs (a pack selector like the motifs).
 // A tap does a one-tap full-colour tiled fill; square 512 tiles wrap 4×.
 const PATTERN_PACKS = {
@@ -1117,6 +1113,10 @@ const state = {
     // bare clay — like brushing wax on before dipping so glaze beads off.
     resistCanvas: null, resistCtx: null, resistTex: null,
     partnerResistCanvas: null, partnerResistCtx: null, partnerResistTex: null,
+    // Wax is shown as a milky sheen while you work (showWax); "Clear wax"
+    // drops it to reveal the protected colour underneath. The resist mask
+    // keeps repelling glaze either way.
+    showWax: true,
     // The current bare-clay base colour as a THREE.Color — tweened in
     // tickMaterial alongside the glaze so carved areas pass through the
     // kiln smoothly (leather brown -> fired terracotta). The shader
@@ -1381,26 +1381,16 @@ function init() {
     document.getElementById("decoAdjust")?.addEventListener("click", () => setAdjustMode(!state.adjustMode));
     document.getElementById("decoUndo")?.addEventListener("click", undoDeco);
     document.getElementById("decoClear")?.addEventListener("click", clearDeco);
-    // Motif size slider + upload (image reduced to a silhouette on-device).
-    const motifSlider = document.getElementById("motifSize");
-    if (motifSlider) {
-        motifSlider.value = String(Math.round(motifSize * 100));
-        motifSlider.addEventListener("input", () => {
-            motifSize = THREE.MathUtils.clamp(parseInt(motifSlider.value, 10) / 100, 0, 1);
-            // In Adjust mode the slider resizes the selected placement live.
-            const sel = selectedPlacementObj();
-            if (sel) {
-                if (sel.type === "band") sel.height = DECO_H * bandSizeFrac();
-                else sel.size = motifSizePx();
-                state.dirty = true;
-                composeDeco();
-            }
-        });
-    }
+    // No size slider: motif/band size is driven by zoom (zoom in to place a
+    // smaller motif), so motifSize stays at its default. Upload below.
     document.getElementById("motifColorToggle")?.addEventListener("click", () => {
         setMotifFullColor(!motifFullColor);
         const b = document.getElementById("motifColorToggle");
         if (b) b.setAttribute("aria-pressed", motifFullColor ? "true" : "false");
+    });
+    document.getElementById("waxClearBtn")?.addEventListener("click", () => {
+        setShowWax(false);       // peel the wax → reveal the colour underneath
+        updateDecoSub();
     });
     document.getElementById("motifUpload")?.addEventListener("change", (e) => {
         const f = e.target.files && e.target.files[0];
@@ -1549,14 +1539,14 @@ function init() {
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze,
             setDipMode, setDipColor, applyDipPreset, undoDip, clearDips, setDripAmount, renderDips,
-            setFinish, resistAt, resistStroke, clearResist,
+            setFinish, resistAt, resistStroke, clearResist, setShowWax, setMotifFullColor,
             setHandleOn, setHandleThickness, setHandleCount,
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
             makeLidPartner, swapActivePiece, matchLidRim, capturePieceState, restorePieceState,
-            loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas,
+            loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb,
             dbAll, dbDelete, dismissLanding,
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
@@ -2588,6 +2578,7 @@ function resistStroke(au, av, bu, bv) {
     const rCtx = state.resistCtx;
     if (!rCtx) return;
     state.dirty = true;
+    if (!state.showWax) setShowWax(true); // fresh wax is visible again
     if (Math.abs(bu - au) > 0.5) { resistStroke(bu, bv, bu, bv); return; }
     const w = resistLineWidthDeco();
     const ax = au * DECO_W, ay = (1 - av) * DECO_H;
@@ -2601,6 +2592,17 @@ function clearResist() {
     if (!state.resistCtx) return;
     state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (state.resistTex) state.resistTex.needsUpdate = true;
+}
+// Show/hide the milky wax sheen. The resist mask keeps repelling glaze
+// either way; this only toggles whether the wax is visible on top. Clearing
+// it (false) "peels the wax off" to reveal the protected colour underneath.
+function setShowWax(on) {
+    state.showWax = !!on;
+    const v = state.showWax ? 1 : 0;
+    for (const m of [state.clayMaterial, state.partnerMaterial]) {
+        const u = m && m.userData && m.userData.shaderUniforms;
+        if (u && u.uShowWax) u.uShowWax.value = v;
+    }
 }
 
 // --- Overlays (one tap fills the whole surface) -----------------
@@ -2834,6 +2836,7 @@ function buildPot() {
         shader.uniforms.decoMap        = { value: decoTex };
         shader.uniforms.sgraffitoMap   = { value: sgraffitoTex };
         shader.uniforms.resistMap      = { value: resistTex };
+        shader.uniforms.uShowWax       = { value: state.showWax ? 1 : 0 };
         shader.uniforms.uClayColor     = { value: state.clayBaseColor };
         shader.uniforms.uGradientColor = { value: state.gradientColor };
         shader.uniforms.uGradientMix   = { value: state.gradientMix };
@@ -2852,47 +2855,46 @@ function buildPot() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D resistMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D resistMap;\nuniform float uShowWax;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
-                 // Wax resist: where the mask is painted, the area fires as
-                 // bare clay — so scale down every glaze/deco contribution
-                 // below by (1 - resist) and let the clay base show through.
+                 // Wax resist: the mask REPELS glaze (dip + gradient) so the
+                 // colour/decoration under the wax is protected, then shows
+                 // through when the wax is cleared. It does NOT block the
+                 // decoration itself (that's what the wax is protecting).
                  float _resist = texture2D( resistMap, vDecoUv ).a;
                  float _keep = 1.0 - _resist;
+                 // A FLOOD glaze is the base diffuse colour, so repel it to
+                 // bare clay under the wax before anything else layers on —
+                 // this is what gets revealed when the wax is cleared.
+                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );
                  // Gradient glaze: mix the diffuse toward a secondary
-                 // glaze colour at the bottom of the pot. Smoothstep
-                 // along vDecoUv.y (0 = foot, 1 = rim) so the
-                 // transition is soft. uGradientMix is the on/off fade.
+                 // glaze colour at the bottom of the pot. Repelled by wax.
                  float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix * _keep;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
-                 // Glaze dip layer: 2-D applied glaze (dips / drips /
-                 // presets) mixed over the base by its own alpha. Applied
-                 // over the base + gradient but UNDER paint/carve, so
-                 // decoration can sit on a dipped pot.
-                 // uDipVScale/uDipVOffset remap the dip's height so a
-                 // pot+lid set shares ONE continuous gradient (each piece
-                 // samples its own slice). Identity (1,0) for a lone piece.
+                 // Glaze dip layer (dips / drips / presets), also repelled
+                 // by wax. uDipVScale/uDipVOffset remap height so a pot+lid
+                 // set shares ONE continuous gradient.
                  float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
                  vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a * _keep );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) * _keep );
-                 // Inside a sgraffito cut, the wall is recessed — small
-                 // shadow from the surrounding surface. Mixing toward a
-                 // darkened clay tone gives the cut visible depth on
-                 // top of the bump-shader's normal perturbation.
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
+                 // Inside a sgraffito cut, the wall is recessed — a small
+                 // shadow gives the cut visible depth.
                  vec3 _carveColor = uClayColor * 0.78;
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );
-                 // Wax resist wins last: force bare clay where masked, so it
-                 // reads as bare clay whether the pot was dipped or flooded.
-                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );`,
+                 // Wax sheen: while the wax is on (uShowWax), coat the resisted
+                 // area in a milky wax so the player SEES where they've waxed.
+                 // "Clear wax" drops uShowWax to 0, peeling it off to reveal
+                 // the protected colour underneath.
+                 diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.93,0.90,0.84), _resist * uShowWax * 0.6 );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v7";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v8";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -4020,6 +4022,7 @@ function stepBack() {
 // Start a fresh wet pot.
 function resetPot() {
     state.isLid = false; // back to regular pot rules — wheel constrains the foot
+    setShowWax(true);    // fresh pot: wax is visible again when applied
     state.lidMaxY = null;
     state.savedPot = null;
     state.savedLid = null;
@@ -4502,10 +4505,6 @@ function updateDecoSub() {
     const isBand = state.decoTool === "band";
     const sizesEl = document.getElementById("decoSizes");
     if (sizesEl) sizesEl.style.display = (isMotif || isPattern || isBand) ? "none" : "";
-    // The size slider serves the Motif + Band tools, and Adjust mode (where
-    // it resizes the selected placement live).
-    const slider = document.getElementById("motifSize");
-    if (slider) slider.hidden = !(isMotif || isBand || state.adjustMode);
     // Motif, Pattern and Band each show a pack selector above their thumbs.
     const packTabs = document.getElementById("motifPackTabs");
     if (packTabs) packTabs.hidden = !(isMotif || isPattern || isBand);
@@ -4516,6 +4515,9 @@ function updateDecoSub() {
         colorToggle.hidden = !isMotif;
         colorToggle.classList.toggle("is-active", motifFullColor);
     }
+    // Wax tool: offer "Clear wax" once there's wax on the pot to peel back.
+    const waxBtn = document.getElementById("waxClearBtn");
+    if (waxBtn) waxBtn.hidden = !(state.decoTool === "resist");
     const decoColorsEl = document.getElementById("decoColors");
     if (decoColorsEl) decoColorsEl.hidden = isPattern || isBand || (isMotif && motifFullColor);
     if (isPattern) {
@@ -4701,16 +4703,11 @@ function loadMotifImage(img) {
     if (state.decoColor == null) setDecoColor(DECO_DEFAULT_COLOR); // arm near-black (silhouette tint)
     updateDecoSub();
 }
-// Toggle: place motifs in their own colours vs as a tinted silhouette.
+// Toggle: place motifs in their own colours vs a tinted silhouette. This
+// only affects the NEXT motif you place — it deliberately does NOT recolour
+// an already-placed motif (that surprised people mid-placement).
 function setMotifFullColor(on) {
     motifFullColor = !!on;
-    // In Adjust mode, re-colour the selected motif live.
-    const sel = selectedPlacementObj();
-    if (sel && sel.type === "motif") {
-        sel.fullColor = motifFullColor;
-        state.dirty = true;
-        composeDeco();
-    }
     updateDecoSub();
 }
 function motifSrc(id) {
@@ -5709,6 +5706,9 @@ function defaultPotTitle() {
 }
 
 async function savePot() {
+    // A saved pot shows its FINISHED look: peel any wax off first so the
+    // gallery thumb + photo reveal the protected colour, not a milky coat.
+    setShowWax(false);
     // If a partner is paused in memory, generate a shared set id so
     // both pieces save together. The active piece is written first
     // using the live canvases; the partner is restored briefly so its
@@ -6039,6 +6039,7 @@ function buildPartnerMesh() {
         shader.uniforms.decoMap        = { value: pdt };
         shader.uniforms.sgraffitoMap   = { value: pst };
         shader.uniforms.resistMap      = { value: prt };
+        shader.uniforms.uShowWax       = { value: state.showWax ? 1 : 0 };
         shader.uniforms.uClayColor     = { value: state.partnerClayBaseColor };
         shader.uniforms.uGradientColor = { value: state.partnerGradientColor };
         shader.uniforms.uGradientMix   = { value: state.partnerGradientMix };
@@ -6052,30 +6053,31 @@ function buildPartnerMesh() {
         shader.fragmentShader = shader.fragmentShader
             .replace(
                 "#include <common>",
-                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D resistMap;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
+                "uniform sampler2D decoMap;\nuniform sampler2D sgraffitoMap;\nuniform sampler2D resistMap;\nuniform float uShowWax;\nuniform vec3 uClayColor;\nuniform vec3 uGradientColor;\nuniform float uGradientMix;\nuniform sampler2D uDipMap;\nuniform float uDipVScale;\nuniform float uDipVOffset;\nvarying vec2 vDecoUv;\n#include <common>",
             )
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
+                 // Wax resist (mirror the pot shader): wax repels glaze but
+                 // not the decoration underneath; a milky sheen shows the wax
+                 // until it's cleared (uShowWax -> 0), revealing the colour.
                  float _resist = texture2D( resistMap, vDecoUv ).a;
                  float _keep = 1.0 - _resist;
+                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );
                  float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix * _keep;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
-                 // uDipVScale/uDipVOffset remap the dip's height so a
-                 // pot+lid set shares ONE continuous gradient (each piece
-                 // samples its own slice). Identity (1,0) for a lone piece.
                  float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
                  vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a * _keep );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) * _keep );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
                  vec3 _carveColor = uClayColor * 0.78;
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );`,
+                 diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.93,0.90,0.84), _resist * uShowWax * 0.6 );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v3-partner";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v4-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -6396,6 +6398,7 @@ function pulseSaveFlash() {
 
 // Restore a saved pot into the scene as a finished (fired) piece.
 async function loadPot(entry) {
+    setShowWax(false); // a loaded pot shows its finished (wax-cleared) look
     // For a handled SET, always load the POT (the handle-bearer) as the
     // active piece — the handle binds to the active mesh, and the lid can't
     // carry it, so loading the lid side would show a handle-less assembly.
