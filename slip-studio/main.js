@@ -2664,59 +2664,67 @@ function applyOverlay(id) {
     if (state.decoColor == null) return;
     pushDecoHistory();
     state.dirty = true;
-    const ctx = state.paintCtx, hex = state.decoColor;
     const cell = DECO_SIZES[state.decoSizeIndex].px * 2.4;
+    drawOverlayPattern(state.paintCtx, DECO_W, DECO_H, state.decoColor, cell, id);
+    composeDeco();
+}
+// The procedural overlay patterns, drawn into an arbitrary ctx at W×H so the
+// SAME code fills the full deco canvas (applyOverlay) and renders the small
+// circular picker previews (overlayPreviewURL). `cell` = motif scale, `px` =
+// the equivalent brush size, `hex` = ink colour.
+function drawOverlayPattern(ctx, W, H, hex, cell, id) {
     ctx.save();
     ctx.fillStyle = rgba(hex, 0.85);
+    const px = cell / 2.4;
     if (id === "dots") {
-        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols;
-        const rows = Math.max(3, Math.round(DECO_H / cw)), rh = DECO_H / rows, dr = cw * 0.22;
+        const cols = Math.max(3, Math.round(W / cell)), cw = W / cols;
+        const rows = Math.max(3, Math.round(H / cw)), rh = H / rows, dr = cw * 0.22;
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
             let x = c * cw + cw * 0.5 + (r % 2 ? cw * 0.5 : 0);
-            if (x > DECO_W) x -= DECO_W;
+            if (x > W) x -= W;
             const y = r * rh + rh * 0.5;
             ctx.beginPath(); ctx.arc(x, y, dr, 0, Math.PI * 2); ctx.fill();
-            if (x < dr * 2) { ctx.beginPath(); ctx.arc(x + DECO_W, y, dr, 0, Math.PI * 2); ctx.fill(); }
+            if (x < dr * 2) { ctx.beginPath(); ctx.arc(x + W, y, dr, 0, Math.PI * 2); ctx.fill(); }
         }
     } else if (id === "rings") {
-        const rows = Math.max(3, Math.round(DECO_H / cell)), rh = DECO_H / rows, sh = rh * 0.32;
-        for (let r = 0; r < rows; r++) ctx.fillRect(0, r * rh + (rh - sh) / 2, DECO_W, sh);
+        const rows = Math.max(3, Math.round(H / cell)), rh = H / rows, sh = rh * 0.32;
+        for (let r = 0; r < rows; r++) ctx.fillRect(0, r * rh + (rh - sh) / 2, W, sh);
     } else if (id === "stripes") {
-        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols, sw = cw * 0.4;
-        for (let c = 0; c < cols; c++) ctx.fillRect(c * cw, 0, sw, DECO_H);
+        const cols = Math.max(3, Math.round(W / cell)), cw = W / cols, sw = cw * 0.4;
+        for (let c = 0; c < cols; c++) ctx.fillRect(c * cw, 0, sw, H);
     } else if (id === "grid") {
-        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols, lw = Math.max(2, cw * 0.08);
-        const rows = Math.max(3, Math.round(DECO_H / cw)), rh = DECO_H / rows;
-        for (let c = 0; c < cols; c++) ctx.fillRect(c * cw, 0, lw, DECO_H);
-        for (let r = 0; r < rows; r++) ctx.fillRect(0, r * rh, DECO_W, lw);
+        const cols = Math.max(3, Math.round(W / cell)), cw = W / cols, lw = Math.max(2, cw * 0.08);
+        const rows = Math.max(3, Math.round(H / cw)), rh = H / rows;
+        for (let c = 0; c < cols; c++) ctx.fillRect(c * cw, 0, lw, H);
+        for (let r = 0; r < rows; r++) ctx.fillRect(0, r * rh, W, lw);
     } else if (id === "scatter") {
-        const n = Math.round((DECO_W * DECO_H) / (cell * cell * 1.4));
+        const n = Math.round((W * H) / (cell * cell * 1.4));
         for (let i = 0; i < n; i++) {
-            const x = Math.random() * DECO_W, y = Math.random() * DECO_H;
-            const dr = DECO_SIZES[state.decoSizeIndex].px * (0.12 + Math.random() * 0.28);
+            const x = Math.random() * W, y = Math.random() * H;
+            const dr = px * (0.12 + Math.random() * 0.28);
             ctx.beginPath(); ctx.arc(x, y, dr, 0, Math.PI * 2); ctx.fill();
         }
     } else if (id === "checker") {
-        let cols = Math.max(4, Math.round(DECO_W / cell));
+        let cols = Math.max(4, Math.round(W / cell));
         if (cols % 2) cols++; // even cols → parity wraps seamlessly at the u-seam
-        const cw = DECO_W / cols;
-        const rows = Math.max(4, Math.round(DECO_H / cw)), rh = DECO_H / rows;
+        const cw = W / cols;
+        const rows = Math.max(4, Math.round(H / cw)), rh = H / rows;
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
             if ((r + c) % 2 === 0) ctx.fillRect(c * cw, r * rh, cw + 1, rh + 1);
         }
     } else if (id === "waves") {
-        const rows = Math.max(3, Math.round(DECO_H / cell)), rh = DECO_H / rows;
+        const rows = Math.max(3, Math.round(H / cell)), rh = H / rows;
         const amp = rh * 0.28, lw = Math.max(3, rh * 0.12);
-        const N = 256; // even segments; last point lands exactly on DECO_W
+        const N = 256; // even segments; last point lands exactly on W
         ctx.strokeStyle = rgba(hex, 0.85);
         ctx.lineWidth = lw;
         for (let r = 0; r < rows; r++) {
             const y = r * rh + rh * 0.5;
             ctx.beginPath();
             for (let i = 0; i <= N; i++) {
-                const x = (i / N) * DECO_W;
-                // 8 full cycles across the width → value matches at x=0 and x=DECO_W
-                const yy = y + Math.sin((x / DECO_W) * Math.PI * 8) * amp;
+                const x = (i / N) * W;
+                // 8 full cycles across the width → value matches at x=0 and x=W
+                const yy = y + Math.sin((x / W) * Math.PI * 8) * amp;
                 i === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy);
             }
             ctx.stroke();
@@ -2724,22 +2732,22 @@ function applyOverlay(id) {
     } else if (id === "diagonal") {
         // Sheared vertical stripes: integer columns wrap in u, and the
         // per-row x-shift (with wrap) makes it read diagonal but seamless.
-        const cols = Math.max(3, Math.round(DECO_W / cell)), cw = DECO_W / cols, sw = cw * 0.45;
+        const cols = Math.max(3, Math.round(W / cell)), cw = W / cols, sw = cw * 0.45;
         const slice = 3;
-        for (let y = 0; y < DECO_H; y += slice) {
-            const shift = y % DECO_W; // 45°: 1px of x per 1px of y
+        for (let y = 0; y < H; y += slice) {
+            const shift = y % W; // 45°: 1px of x per 1px of y
             for (let c = 0; c < cols; c++) {
-                const x = (c * cw + shift) % DECO_W;
+                const x = (c * cw + shift) % W;
                 ctx.fillRect(x, y, sw, slice + 1);
-                if (x > DECO_W - sw) ctx.fillRect(x - DECO_W, y, sw, slice + 1); // wrap overflow
+                if (x > W - sw) ctx.fillRect(x - W, y, sw, slice + 1); // wrap overflow
             }
         }
     } else if (id === "triangles") {
         // Aztec-style serrated bands: rows of filled triangles. Even col
         // count keeps the row seamless across the u-seam.
-        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
-        let cols = Math.max(4, Math.round(DECO_W / (rh * 0.9))); if (cols % 2) cols++;
-        const cw = DECO_W / cols, th = rh * 0.6;
+        const rows = Math.max(2, Math.round(H / cell)), rh = H / rows;
+        let cols = Math.max(4, Math.round(W / (rh * 0.9))); if (cols % 2) cols++;
+        const cw = W / cols, th = rh * 0.6;
         for (let r = 0; r < rows; r++) {
             const yb = r * rh + (rh + th) / 2;
             for (let c = 0; c < cols; c++) {
@@ -2751,8 +2759,8 @@ function applyOverlay(id) {
         }
     } else if (id === "diamonds") {
         // Rows of diamonds — one motif per cell, centred.
-        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
-        const cols = Math.max(3, Math.round(DECO_W / rh)), cw = DECO_W / cols;
+        const rows = Math.max(2, Math.round(H / cell)), rh = H / rows;
+        const cols = Math.max(3, Math.round(W / rh)), cw = W / cols;
         const hw = cw * 0.32, hh = rh * 0.32;
         for (let r = 0; r < rows; r++) {
             const cy = r * rh + rh / 2;
@@ -2767,9 +2775,9 @@ function applyOverlay(id) {
     } else if (id === "chevron") {
         // Rows of chevrons — a thick angular zigzag. Even col count so the
         // first and last vertex land at the same height at the seam.
-        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
-        let cols = Math.max(4, Math.round(DECO_W / rh)); if (cols % 2) cols++;
-        const cw = DECO_W / cols, amp = rh * 0.3, lw = Math.max(4, rh * 0.14);
+        const rows = Math.max(2, Math.round(H / cell)), rh = H / rows;
+        let cols = Math.max(4, Math.round(W / rh)); if (cols % 2) cols++;
+        const cw = W / cols, amp = rh * 0.3, lw = Math.max(4, rh * 0.14);
         ctx.strokeStyle = rgba(hex, 0.85);
         ctx.lineWidth = lw; ctx.lineJoin = "round"; ctx.lineCap = "round";
         for (let r = 0; r < rows; r++) {
@@ -2783,8 +2791,8 @@ function applyOverlay(id) {
         }
     } else if (id === "crosses") {
         // Rows of plus signs.
-        const rows = Math.max(2, Math.round(DECO_H / cell)), rh = DECO_H / rows;
-        const cols = Math.max(3, Math.round(DECO_W / rh)), cw = DECO_W / cols;
+        const rows = Math.max(2, Math.round(H / cell)), rh = H / rows;
+        const cols = Math.max(3, Math.round(W / rh)), cw = W / cols;
         const arm = Math.min(cw, rh) * 0.3, t = arm * 0.42;
         for (let r = 0; r < rows; r++) {
             const cy = r * rh + rh / 2;
@@ -2796,7 +2804,20 @@ function applyOverlay(id) {
         }
     }
     ctx.restore();
-    composeDeco();
+}
+// Cached small circular preview of each overlay pattern (light ink on the
+// dark chip) so the picker shows what each does — uniform with the motif +
+// tile thumbnails. Cheap: computed once per id and memoised.
+const _overlayPreviewCache = {};
+function overlayPreviewURL(id) {
+    if (_overlayPreviewCache[id]) return _overlayPreviewCache[id];
+    const P = 72;
+    const c = document.createElement("canvas");
+    c.width = P; c.height = P;
+    drawOverlayPattern(c.getContext("2d"), P, P, 0xf3ede6, 20, id); // cream ink, small cells
+    const url = c.toDataURL("image/png");
+    _overlayPreviewCache[id] = url;
+    return url;
 }
 
 // Dispatch a pot-touch to the active decorate tool.
@@ -4668,9 +4689,10 @@ function updateDecoSub() {
         OVERLAY_PATTERNS.forEach((p) => {
             const b = document.createElement("button");
             b.type = "button";
-            b.className = "deco-sub-btn deco-sub-text";
-            b.textContent = p.label;
+            b.className = "deco-sub-btn motif-thumb overlay-thumb";
+            b.style.backgroundImage = "url(" + overlayPreviewURL(p.id) + ")";
             b.setAttribute("aria-label", p.label + " overlay");
+            b.setAttribute("title", p.label);
             b.addEventListener("click", () => applyOverlay(p.id));
             sub.appendChild(b);
         });

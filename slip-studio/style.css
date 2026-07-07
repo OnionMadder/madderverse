@@ -1084,7 +1084,6 @@ html, body {
     -webkit-backdrop-filter: blur(6px);
     transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
-.deco-sub-text { font-size: 0.72rem; letter-spacing: 0.03em; }
 .deco-sub-btn.is-active {
     color: var(--ink);
     border-color: var(--accent);
@@ -1103,6 +1102,13 @@ html, body {
 /* Enamel pattern swatches show the full-colour tile filling the chip. */
 .pattern-thumb {
     background-color: transparent;
+    background-size: cover;
+}
+/* Overlay swatches: a small circular preview of the procedural pattern
+   (cream ink) sitting on the dark chip, so they read uniform with the tile
+   + motif thumbnails instead of plain text. */
+.overlay-thumb {
+    background-color: var(--chip);
     background-size: cover;
 }
 .motif-upload { font-size: 1.25rem; font-weight: 400; }
