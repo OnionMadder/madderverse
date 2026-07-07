@@ -303,6 +303,23 @@ const DIP_SET_PACKS = {
 };
 const DIP_SET_PACK_IDS = ["sky", "sea", "ember", "garden", "earth"];
 const DEFAULT_DIP_PACK = "sky";
+
+// Player-choosable gallery backdrops (product-showcase scenes). Each pot
+// thumbnail is a transparent PNG; the gallery card composites it over the
+// chosen backdrop, sat on that scene's display surface. surfaceY/centerX are
+// fractions of the (square) card where the pot's foot should land; scale is
+// the pot's size as a fraction of the card. Tuned per image. (Defined here,
+// above `state`, because state.galleryBg reads it at init.)
+const GALLERY_BACKDROPS = {
+    showcase: { label: "Studio",  src: "assets/backgrounds/gallery/showcase.jpg", surfaceY: 0.78, centerX: 0.50, scale: 0.82 },
+    forest:   { label: "Forest",  src: "assets/backgrounds/gallery/forest.jpg",   surfaceY: 0.74, centerX: 0.50, scale: 0.80 },
+    gallery:  { label: "Gallery", src: "assets/backgrounds/gallery/gallery.jpg",   surfaceY: 0.66, centerX: 0.60, scale: 0.72 },
+};
+const GALLERY_BACKDROP_IDS = ["showcase", "forest", "gallery"];
+const DEFAULT_GALLERY_BACKDROP = "showcase";
+// The pot's foot sits at ~this fraction of the square thumbnail (fixed by the
+// capture camera). Used to place the pot on a backdrop's surface.
+const POT_FOOT_FRAC = 0.875;
 function currentDipPackIds() {
     return (DIP_SET_PACKS[state.dipPack] || DIP_SET_PACKS[DEFAULT_DIP_PACK]).ids;
 }
@@ -1203,6 +1220,12 @@ const state = {
         try { return localStorage.getItem("slip-gallery-view") || "shelf"; }
         catch (_) { return "shelf"; }
     })(),
+    galleryBg: (() => {
+        try {
+            const s = localStorage.getItem("slip-gallery-bg");
+            return (s && GALLERY_BACKDROPS[s]) ? s : DEFAULT_GALLERY_BACKDROP;
+        } catch (_) { return DEFAULT_GALLERY_BACKDROP; }
+    })(),
     // Per-piece vertical stretch. 1.0 = the default TOP-tall silhouette;
     // > 1 pulls the rim higher (pot grows taller), < 1 squashes it down.
     // Implemented as a Group transform on potGroup so the geometry data
@@ -1443,6 +1466,8 @@ function init() {
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
         setGalleryView(state.galleryView === "shelf" ? "compact" : "shelf");
     });
+    document.querySelectorAll("#galleryBgPicker button[data-bg]").forEach((b) =>
+        b.addEventListener("click", () => setGalleryBg(b.dataset.bg)));
     document.querySelectorAll(".deco-size").forEach((b, idx) =>
         b.addEventListener("click", () => setDecoSize(idx)));
     setDecoTool("brush");
@@ -1548,7 +1573,7 @@ function init() {
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             setPhotoStyle, setPhotoAspect,
             makeLidPartner, swapActivePiece, matchLidRim, capturePieceState, restorePieceState,
-            loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb,
+            loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb, stageThumb, ensureGalleryBgImg,
             dbAll, dbDelete, dismissLanding,
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
@@ -5392,38 +5417,6 @@ function captureRender(cam) {
 // target and read back with readRenderTargetPixels — reliable on every
 // device (unlike toDataURL on the live canvas, which returns blank on
 // some mobile GPUs). Framed square at the default (zoom-1) view.
-// A warm, softly-lit "gallery alcove" drawn behind a saved pot's thumbnail:
-// a gentle wall wash, a spotlight pool on the piece, and a grounding contact
-// shadow — so cards read as pieces displayed under gallery light, not a pot
-// floating in a black void. (Swappable for an uploaded shelf/stand image.)
-function drawGalleryBackdrop(ctx, S) {
-    const baseY = S * 0.68; // ~ the pot's foot in the framed thumb
-    const wall = ctx.createLinearGradient(0, 0, 0, S);
-    wall.addColorStop(0,   "#34302b");
-    wall.addColorStop(0.5, "#272320");
-    wall.addColorStop(1,   "#15120f");
-    ctx.fillStyle = wall; ctx.fillRect(0, 0, S, S);
-    // Spotlight glow on the piece.
-    const pool = ctx.createRadialGradient(S / 2, S * 0.40, S * 0.04, S / 2, S * 0.46, S * 0.60);
-    pool.addColorStop(0, "rgba(255, 240, 212, 0.24)");
-    pool.addColorStop(1, "rgba(255, 240, 212, 0)");
-    ctx.fillStyle = pool; ctx.fillRect(0, 0, S, S);
-    // Floor falloff below the piece.
-    const floor = ctx.createLinearGradient(0, baseY - S * 0.05, 0, S);
-    floor.addColorStop(0, "rgba(9, 7, 5, 0)");
-    floor.addColorStop(1, "rgba(9, 7, 5, 0.72)");
-    ctx.fillStyle = floor; ctx.fillRect(0, baseY - S * 0.05, S, S);
-    // Soft elliptical contact shadow.
-    ctx.save();
-    ctx.translate(S / 2, baseY + S * 0.03);
-    ctx.scale(1, 0.24);
-    const sh = ctx.createRadialGradient(0, 0, 2, 0, 0, S * 0.30);
-    sh.addColorStop(0, "rgba(0, 0, 0, 0.55)");
-    sh.addColorStop(1, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, S * 0.30, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-}
-
 function captureThumb(size = 320) {
     tickMaterial(10); // snap the glaze to its final look (skip the tween)
     const cam = state.camera;
@@ -5469,12 +5462,10 @@ function captureThumb(size = 320) {
         img.data.set(buf.subarray(src, src + size * 4), y * size * 4);
     }
     pctx.putImageData(img, 0, 0);
-    const c = document.createElement("canvas");
-    c.width = c.height = size;
-    const ctx = c.getContext("2d");
-    drawGalleryBackdrop(ctx, size);
-    ctx.drawImage(potC, 0, 0);
-    return c.toDataURL("image/jpeg", 0.9);
+    // Transparent pot on its own — the gallery card composites it over the
+    // player's chosen backdrop (GALLERY_BACKDROPS), so switching backdrop
+    // restyles every pot at once.
+    return potC.toDataURL("image/png");
 }
 
 // Capture the assembled lid-on-pot view as a square thumbnail. Used
@@ -5518,12 +5509,7 @@ function captureAssemblyThumb(size = 360) {
         img.data.set(buf.subarray(src, src + size * 4), y * size * 4);
     }
     pctx.putImageData(img, 0, 0);
-    const c = document.createElement("canvas");
-    c.width = c.height = size;
-    const ctx = c.getContext("2d");
-    drawGalleryBackdrop(ctx, size);
-    ctx.drawImage(potC, 0, 0);
-    return c.toDataURL("image/jpeg", 0.9);
+    return potC.toDataURL("image/png"); // transparent set — composited on the card
 }
 
 // --- Photo modal ------------------------------------------------
@@ -6741,6 +6727,9 @@ async function openGallery() {
     grid.innerHTML = "";
     grid.classList.toggle("shelf",   state.galleryView === "shelf");
     grid.classList.toggle("compact", state.galleryView !== "shelf");
+    document.querySelectorAll("#galleryBgPicker button[data-bg]").forEach((b) =>
+        b.classList.toggle("is-active", b.dataset.bg === state.galleryBg));
+    await ensureGalleryBgImg(); // load the chosen backdrop once for all cards
     let pots = [];
     try { pots = await dbAll(); } catch (_) {}
     pots.sort((a, b) => b.ts - a.ts);
@@ -6776,6 +6765,54 @@ function loadImageEl(src) {
         img.src = src;
     });
 }
+
+// --- Gallery backdrop compositing -------------------------------
+// Cache the chosen backdrop image so we load it once per gallery render.
+let _galleryBgImg = null, _galleryBgImgId = null;
+async function ensureGalleryBgImg() {
+    const id = state.galleryBg;
+    if (_galleryBgImgId === id && _galleryBgImg) return _galleryBgImg;
+    const bd = GALLERY_BACKDROPS[id] || GALLERY_BACKDROPS[DEFAULT_GALLERY_BACKDROP];
+    _galleryBgImg = await loadImageEl(bd.src);
+    _galleryBgImgId = id;
+    return _galleryBgImg;
+}
+// Composite a TRANSPARENT pot thumbnail onto the chosen showcase backdrop,
+// sat on that scene's display surface with a soft contact shadow. Legacy
+// opaque thumbs (pre-transparent) are returned unchanged.
+async function stageThumb(thumbURL) {
+    if (!thumbURL || !/^data:image\/png/.test(thumbURL)) return thumbURL;
+    const bd = GALLERY_BACKDROPS[state.galleryBg] || GALLERY_BACKDROPS[DEFAULT_GALLERY_BACKDROP];
+    const [bg, pot] = await Promise.all([ensureGalleryBgImg(), loadImageEl(thumbURL)]);
+    if (!pot) return thumbURL;
+    const S = 360;
+    const c = document.createElement("canvas"); c.width = c.height = S;
+    const ctx = c.getContext("2d");
+    if (bg) {                                   // backdrop, cover-fit + centre-crop
+        const s = Math.max(S / bg.width, S / bg.height);
+        const w = bg.width * s, h = bg.height * s;
+        ctx.drawImage(bg, (S - w) / 2, (S - h) / 2, w, h);
+    } else { ctx.fillStyle = "#211d19"; ctx.fillRect(0, 0, S, S); }
+    const cx = bd.centerX * S, sy = bd.surfaceY * S, k = bd.scale;
+    // Contact shadow on the surface (drawn under the pot).
+    ctx.save();
+    ctx.translate(cx, sy + S * 0.008);
+    ctx.scale(1, 0.20);
+    const sh = ctx.createRadialGradient(0, 0, 2, 0, 0, k * S * 0.34);
+    sh.addColorStop(0, "rgba(0,0,0,0.42)"); sh.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(0, 0, k * S * 0.34, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // Pot: scaled, centred at centerX, foot landing on the surface.
+    const dw = k * S, dh = k * S;
+    ctx.drawImage(pot, cx - dw / 2, sy - POT_FOOT_FRAC * dh, dw, dh);
+    return c.toDataURL("image/jpeg", 0.9);
+}
+function setGalleryBg(id) {
+    if (!GALLERY_BACKDROPS[id]) return;
+    state.galleryBg = id;
+    try { localStorage.setItem("slip-gallery-bg", id); } catch (_) {}
+    openGallery(); // re-composite every card onto the new backdrop
+}
 function roundRectPath(ctx, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
     ctx.beginPath();
@@ -6808,7 +6845,9 @@ async function exportShelfPhoto() {
     if (!tiles.length) { if (btn) { const t = btn.textContent; btn.textContent = "No pots yet"; setTimeout(() => (btn.textContent = t), 1400); } return; }
     if (btn) btn.disabled = true;
 
-    const imgs = await Promise.all(tiles.map((t) => loadImageEl(t.thumb)));
+    // Stage each (transparent) thumb on the chosen showcase backdrop so the
+    // exported shelf matches the gallery cards; legacy opaque thumbs pass through.
+    const imgs = await Promise.all(tiles.map((t) => stageThumb(t.thumb).then(loadImageEl)));
     const items = tiles.map((t, i) => ({ img: imgs[i], title: t.title || "" })).filter((x) => x.img);
     const cv = renderShelfCanvas(items);
     const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
@@ -6909,7 +6948,7 @@ function renderGalleryTile(grid, members) {
         const half = document.createElement("div");
         half.className = "pot-thumb";
         const img = document.createElement("img");
-        img.src = assemblyThumb;
+        stageThumb(assemblyThumb).then((u) => { img.src = u; });
         img.alt = (members[0].title || "Saved set");
         img.loading = "lazy";
         img.addEventListener("click", async () => { await loadPot(members[0]); closeGallery(); });
@@ -6921,7 +6960,7 @@ function renderGalleryTile(grid, members) {
             const half = document.createElement("div");
             half.className = isSet ? "gallery-half" : "pot-thumb";
             const img = document.createElement("img");
-            img.src = p.thumb;
+            stageThumb(p.thumb).then((u) => { img.src = u; });
             img.alt = p.title || "Saved pot";
             img.loading = "lazy";
             img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
