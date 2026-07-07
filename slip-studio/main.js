@@ -1113,6 +1113,8 @@ const state = {
     // bare clay — like brushing wax on before dipping so glaze beads off.
     resistCanvas: null, resistCtx: null, resistTex: null,
     partnerResistCanvas: null, partnerResistCtx: null, partnerResistTex: null,
+    frozenDipCanvas: null, frozenDipCtx: null,
+    partnerFrozenDipCanvas: null, partnerFrozenDipCtx: null,
     // Wax is shown as a milky sheen while you work (showWax); "Clear wax"
     // drops it to reveal the protected colour underneath. The resist mask
     // keeps repelling glaze either way.
@@ -1539,7 +1541,7 @@ function init() {
             scratchAt, scratchStroke, clearSgraffito,
             setGradientGlaze,
             setDipMode, setDipColor, applyDipPreset, undoDip, clearDips, setDripAmount, renderDips,
-            setFinish, resistAt, resistStroke, clearResist, setShowWax, setMotifFullColor,
+            setFinish, resistAt, resistStroke, clearResist, setShowWax, freezeDipUnderWax, setMotifFullColor,
             setHandleOn, setHandleThickness, setHandleCount,
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
@@ -1931,7 +1933,45 @@ function makeGlazeDipLayer() {
     tex.wrapT = THREE.ClampToEdgeWrapping;
     tex.anisotropy = 4;
     state.dipTex = tex;
+    // Frozen dip: a snapshot of the glaze that was under the wax when it was
+    // applied. renderDips restores it into the waxed area so dips added AFTER
+    // the wax never reach under it — so lifting the wax reveals the ORIGINAL
+    // colour, not bare clay.
+    const frozen = document.createElement("canvas");
+    frozen.width = GLAZE_W; frozen.height = GLAZE_H;
+    state.frozenDipCanvas = frozen;
+    state.frozenDipCtx = frozen.getContext("2d");
     return tex;
+}
+
+// Restore the frozen dip (glaze sealed under the wax) into a dip canvas:
+// clear the dip where the wax is, then draw the frozen snapshot back — so
+// dips applied after the wax never appear under it.
+function applyFrozenDip(ctx, resistCanvas, frozenCanvas) {
+    if (!ctx || !resistCanvas || !frozenCanvas) return;
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.drawImage(resistCanvas, 0, 0, GLAZE_W, GLAZE_H);  // clear dip under wax
+    ctx.globalCompositeOperation = "source-over";
+    ctx.drawImage(frozenCanvas, 0, 0);                    // restore the frozen glaze
+    ctx.restore();
+}
+// Capture the CURRENT dip under the wax into the frozen layer. destination-
+// over keeps pixels frozen by earlier wax and fills only the newly-waxed
+// ones, so each area seals the glaze that was there when IT was waxed.
+function freezeDipUnderWax() {
+    if (!state.frozenDipCtx || !state.resistCanvas || !state.dipCanvas) return;
+    const tmp = document.createElement("canvas");
+    tmp.width = GLAZE_W; tmp.height = GLAZE_H;
+    const t = tmp.getContext("2d");
+    t.drawImage(state.dipCanvas, 0, 0);
+    t.globalCompositeOperation = "destination-in";
+    t.drawImage(state.resistCanvas, 0, 0, GLAZE_W, GLAZE_H); // keep dip only where wax
+    const f = state.frozenDipCtx;
+    f.globalCompositeOperation = "destination-over";
+    f.drawImage(tmp, 0, 0);
+    f.globalCompositeOperation = "source-over";
+    renderDips();   // re-seal immediately
 }
 
 // Replay the ordered dip list (plus any in-progress preview) into the
@@ -2044,6 +2084,7 @@ function renderDips() {
     if (!ctx) return;
     const list = dipPreview ? state.dips.concat(dipPreview) : state.dips;
     paintDipList(ctx, list);
+    applyFrozenDip(ctx, state.resistCanvas, state.frozenDipCanvas);
     if (state.dipTex) state.dipTex.needsUpdate = true;
     // Keep the surface finish in sync — a dipped pot goes glossy, an
     // un-dipped one drops back to bare clay (see currentLook).
@@ -2410,6 +2451,7 @@ function pushDecoHistory() {
         // fully reverse on Undo instead of leaving a colourless impression.
         bump: state.bumpCanvas ? snapDecoCanvas(state.bumpCanvas) : null,
         resist: state.resistCanvas ? snapDecoCanvas(state.resistCanvas) : null,
+        frozenDip: state.frozenDipCanvas ? snapDecoCanvas(state.frozenDipCanvas) : null,
     });
     if (decoHistory.length > DECO_HISTORY_MAX) decoHistory.shift();
     updateUndoBtn();
@@ -2439,6 +2481,11 @@ function undoDeco() {
         state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
         state.resistCtx.drawImage(snap.resist, 0, 0);
         if (state.resistTex) state.resistTex.needsUpdate = true;
+    }
+    if (state.frozenDipCtx) {
+        state.frozenDipCtx.clearRect(0, 0, GLAZE_W, GLAZE_H);
+        if (snap.frozenDip) state.frozenDipCtx.drawImage(snap.frozenDip, 0, 0);
+        renderDips(); // re-composite the seal against the restored wax
     }
     state.dirty = true;
     maybeSquelch();
@@ -2573,11 +2620,13 @@ function clearSgraffito() {
 function resistLineWidthDeco() {
     return Math.max(6, DECO_SIZES[state.decoSizeIndex].px * 1.4 / Math.max(0.5, state.zoom));
 }
+let waxStroked = false; // a wax stroke happened this pointer sequence → freeze on up
 function resistAt(u, v) { resistStroke(u, v, u, v); }
 function resistStroke(au, av, bu, bv) {
     const rCtx = state.resistCtx;
     if (!rCtx) return;
     state.dirty = true;
+    waxStroked = true;
     if (!state.showWax) setShowWax(true); // fresh wax is visible again
     if (Math.abs(bu - au) > 0.5) { resistStroke(bu, bv, bu, bv); return; }
     const w = resistLineWidthDeco();
@@ -2592,6 +2641,11 @@ function clearResist() {
     if (!state.resistCtx) return;
     state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (state.resistTex) state.resistTex.needsUpdate = true;
+    // Drop the frozen glaze seal too, and re-render so the sealed areas
+    // rejoin the live dip layer.
+    if (state.frozenDipCtx) state.frozenDipCtx.clearRect(0, 0, GLAZE_W, GLAZE_H);
+    setShowWax(true);
+    renderDips();
 }
 // Show/hide the milky wax sheen. The resist mask keeps repelling glaze
 // either way; this only toggles whether the wax is visible on top. Clearing
@@ -2860,26 +2914,23 @@ function buildPot() {
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
-                 // Wax resist: the mask REPELS glaze (dip + gradient) so the
-                 // colour/decoration under the wax is protected, then shows
-                 // through when the wax is cleared. It does NOT block the
-                 // decoration itself (that's what the wax is protecting).
+                 // Wax resist: the SEAL is baked into the dip texture (dips
+                 // added after the wax never reach under it — see
+                 // applyFrozenDip), so the glaze here is already the protected
+                 // colour. The shader just samples normally and, while the wax
+                 // is on (uShowWax), coats the masked area in a milky sheen so
+                 // the player can see where they've waxed.
                  float _resist = texture2D( resistMap, vDecoUv ).a;
-                 float _keep = 1.0 - _resist;
-                 // A FLOOD glaze is the base diffuse colour, so repel it to
-                 // bare clay under the wax before anything else layers on —
-                 // this is what gets revealed when the wax is cleared.
-                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );
-                 // Gradient glaze: mix the diffuse toward a secondary
-                 // glaze colour at the bottom of the pot. Repelled by wax.
-                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix * _keep;
+                 // Gradient glaze: mix the diffuse toward a secondary glaze
+                 // colour at the bottom of the pot.
+                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
-                 // Glaze dip layer (dips / drips / presets), also repelled
-                 // by wax. uDipVScale/uDipVOffset remap height so a pot+lid
-                 // set shares ONE continuous gradient.
+                 // Glaze dip layer (dips / drips / presets + frozen seal).
+                 // uDipVScale/uDipVOffset remap height so a pot+lid set shares
+                 // ONE continuous gradient.
                  float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
                  vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a * _keep );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
@@ -2887,14 +2938,11 @@ function buildPot() {
                  // shadow gives the cut visible depth.
                  vec3 _carveColor = uClayColor * 0.78;
                  diffuseColor.rgb = mix( diffuseColor.rgb, _carveColor, _scratch );
-                 // Wax sheen: while the wax is on (uShowWax), coat the resisted
-                 // area in a milky wax so the player SEES where they've waxed.
-                 // "Clear wax" drops uShowWax to 0, peeling it off to reveal
-                 // the protected colour underneath.
+                 // Milky wax sheen while the wax is on; "Clear wax" -> uShowWax 0.
                  diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.93,0.90,0.84), _resist * uShowWax * 0.6 );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v8";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v9";
 
     const pot = new THREE.Mesh(geo, mat);
     pot.castShadow = true;
@@ -5228,6 +5276,9 @@ function onPointerUp(ev) {
     if (pointers.size === 0) {
         sculpting = false;
         handleDrag = null;
+        // A wax stroke just ended: seal the glaze that's under the wax now,
+        // so later dips can't reach under it (revealed when the wax lifts).
+        if (waxStroked) { freezeDipUnderWax(); waxStroked = false; }
         // Finish a motif/band placement drag — it stays a movable object.
         if (placementDrag) endPlacementDrag();
         // Commit an in-progress dip: freeze it with drips into the list.
@@ -5743,6 +5794,7 @@ async function savePot() {
         bump: state.bumpCanvas.toDataURL("image/png"),
         sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
         resist: state.resistCanvas.toDataURL("image/png"),
+        frozenDip: state.frozenDipCanvas ? state.frozenDipCanvas.toDataURL("image/png") : null,
         thumb: captureThumb(),
         setId,
         title: defaultPotTitle(), // pre-named; user can rename in the gallery
@@ -5787,6 +5839,7 @@ async function savePot() {
                 bump: state.bumpCanvas.toDataURL("image/png"),
                 sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
                 resist: state.resistCanvas.toDataURL("image/png"),
+                frozenDip: state.frozenDipCanvas ? state.frozenDipCanvas.toDataURL("image/png") : null,
                 thumb: captureThumb(),
                 setId,
                 title: defaultPotTitle(),
@@ -5844,6 +5897,10 @@ function capturePieceState() {
     resistCopy.width = DECO_W;
     resistCopy.height = DECO_H;
     resistCopy.getContext("2d").drawImage(state.resistCanvas, 0, 0);
+    const frozenCopy = document.createElement("canvas");
+    frozenCopy.width = GLAZE_W;
+    frozenCopy.height = GLAZE_H;
+    if (state.frozenDipCanvas) frozenCopy.getContext("2d").drawImage(state.frozenDipCanvas, 0, 0);
     return {
         profile: Float32Array.from(profile),
         glaze: state.glaze,
@@ -5856,6 +5913,7 @@ function capturePieceState() {
         bumpCanvas: bumpCopy,
         sgraffitoCanvas: sgraffitoCopy,
         resistCanvas: resistCopy,
+        frozenDipCanvas: frozenCopy,
         isLid: state.isLid,
         clayState: state.clayState,
         heightScale: state.heightScale,
@@ -5902,12 +5960,20 @@ function restorePieceState(saved) {
     state.sgraffitoCtx.clearRect(0, 0, DECO_W, DECO_H);
     if (saved.sgraffitoCanvas) state.sgraffitoCtx.drawImage(saved.sgraffitoCanvas, 0, 0);
     state.sgraffitoTex.needsUpdate = true;
-    // Wax-resist mask (older snapshots pre-date it — guard).
+    // Wax-resist mask + frozen glaze seal (older snapshots pre-date them —
+    // guard). Restore both, then re-render dips so the seal composites
+    // against the restored wax.
     if (state.resistCtx) {
         state.resistCtx.clearRect(0, 0, DECO_W, DECO_H);
         if (saved.resistCanvas) state.resistCtx.drawImage(saved.resistCanvas, 0, 0);
         if (state.resistTex) state.resistTex.needsUpdate = true;
     }
+    if (state.frozenDipCtx) {
+        state.frozenDipCtx.clearRect(0, 0, GLAZE_W, GLAZE_H);
+        if (saved.frozenDipCanvas) state.frozenDipCtx.drawImage(saved.frozenDipCanvas, 0, 0);
+        renderDips();
+    }
+    setShowWax(false); // a restored/loaded piece shows its finished look
     // Restore the snapshot's vertical stretch — older snapshots that
     // pre-date heightScale default to 1.0 (the pre-stretch original).
     setHeightScale(saved.heightScale != null ? saved.heightScale : 1.0);
@@ -6015,6 +6081,10 @@ function buildPartnerMesh() {
     pdipc.height = GLAZE_H;
     state.partnerDipCanvas = pdipc;
     state.partnerDipCtx    = pdipc.getContext("2d");
+    const pfroz = document.createElement("canvas");
+    pfroz.width = GLAZE_W; pfroz.height = GLAZE_H;
+    state.partnerFrozenDipCanvas = pfroz;
+    state.partnerFrozenDipCtx    = pfroz.getContext("2d");
     const pdipt = new THREE.CanvasTexture(pdipc);
     pdipt.colorSpace = THREE.SRGBColorSpace;
     pdipt.wrapS = THREE.RepeatWrapping;
@@ -6058,17 +6128,15 @@ function buildPartnerMesh() {
             .replace(
                 "#include <map_fragment>",
                 `#include <map_fragment>
-                 // Wax resist (mirror the pot shader): wax repels glaze but
-                 // not the decoration underneath; a milky sheen shows the wax
-                 // until it's cleared (uShowWax -> 0), revealing the colour.
+                 // Wax resist (mirror the pot shader): the seal is baked into
+                 // the dip texture (applyFrozenDip), so sample normally and add
+                 // the milky wax sheen while uShowWax is on.
                  float _resist = texture2D( resistMap, vDecoUv ).a;
-                 float _keep = 1.0 - _resist;
-                 diffuseColor.rgb = mix( diffuseColor.rgb, uClayColor, _resist );
-                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix * _keep;
+                 float _gradT = smoothstep(0.15, 0.85, 1.0 - vDecoUv.y) * uGradientMix;
                  diffuseColor.rgb = mix(diffuseColor.rgb, uGradientColor, _gradT);
                  float _dipV = clamp( vDecoUv.y * uDipVScale + uDipVOffset, 0.0, 1.0 );
                  vec4 _dip = texture2D( uDipMap, vec2( vDecoUv.x, _dipV ) );
-                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a * _keep );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _dip.rgb, vec3( 2.2 ) ), _dip.a );
                  float _scratch = texture2D( sgraffitoMap, vDecoUv ).a;
                  vec4 _deco = texture2D( decoMap, vDecoUv );
                  diffuseColor.rgb = mix( diffuseColor.rgb, pow( _deco.rgb, vec3( 2.2 ) ), _deco.a * (1.0 - _scratch) );
@@ -6077,7 +6145,7 @@ function buildPartnerMesh() {
                  diffuseColor.rgb = mix( diffuseColor.rgb, vec3(0.93,0.90,0.84), _resist * uShowWax * 0.6 );`,
             );
     };
-    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v4-partner";
+    mat.customProgramCacheKey = () => "clay-gradient-sgraffito-dip-resist-v5-partner";
     state.partnerMaterial = mat;
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -6113,10 +6181,17 @@ function syncPartnerMesh(saved) {
         if (saved.resistCanvas) state.partnerResistCtx.drawImage(saved.resistCanvas, 0, 0);
         if (state.partnerResistTex) state.partnerResistTex.needsUpdate = true;
     }
+    // Partner frozen glaze seal (colour sealed under the lid's wax).
+    if (state.partnerFrozenDipCtx) {
+        state.partnerFrozenDipCtx.clearRect(0, 0, GLAZE_W, GLAZE_H);
+        if (saved.frozenDipCanvas) state.partnerFrozenDipCtx.drawImage(saved.frozenDipCanvas, 0, 0);
+    }
     // Partner glaze-dip layer — replay the saved piece's dips so a dipped
-    // lid/pot renders (and fires) with its glaze, not bare clay.
+    // lid/pot renders (and fires) with its glaze, not bare clay, then restore
+    // the frozen seal under its wax.
     if (state.partnerDipCtx) {
         paintDipList(state.partnerDipCtx, saved.dips || []);
+        applyFrozenDip(state.partnerDipCtx, state.partnerResistCanvas, state.partnerFrozenDipCanvas);
         if (state.partnerDipTex) state.partnerDipTex.needsUpdate = true;
     }
     state.partnerClayBaseColor.setHex(CLAY_STATES[saved.clayState || "fired"].color);
@@ -6468,6 +6543,15 @@ async function loadPot(entry) {
     // Wax-resist mask. Older entries don't carry it; treat as empty.
     await loadImageOntoCanvas(entry.resist, state.resistCtx, DECO_W, DECO_H, clearResist);
     if (state.resistTex) state.resistTex.needsUpdate = true;
+    // Frozen glaze seal (colour sealed under the wax). Load, then re-render
+    // dips so the seal composites against the restored wax, and show the
+    // finished (wax-cleared) look.
+    if (state.frozenDipCtx) {
+        await loadImageOntoCanvas(entry.frozenDip, state.frozenDipCtx, GLAZE_W, GLAZE_H,
+            () => state.frozenDipCtx.clearRect(0, 0, GLAZE_W, GLAZE_H));
+        renderDips();
+        setShowWax(false);
+    }
     // Handle: only meaningful for pot entries. If loading the lid side
     // of a set, the pot's handle stays in the partner's saved data but
     // isn't rendered in the v1 assembled view (state.handle attaches
@@ -6563,6 +6647,12 @@ async function loadAsCapturedState(entry) {
     if (entry.resist) {
         await loadImageOntoCanvas(entry.resist, resistCanvas.getContext("2d"), DECO_W, DECO_H);
     }
+    const frozenDipCanvas = document.createElement("canvas");
+    frozenDipCanvas.width  = GLAZE_W;
+    frozenDipCanvas.height = GLAZE_H;
+    if (entry.frozenDip) {
+        await loadImageOntoCanvas(entry.frozenDip, frozenDipCanvas.getContext("2d"), GLAZE_W, GLAZE_H);
+    }
     return {
         profile: Float32Array.from(entry.profile || []),
         glaze: entry.glaze || null,
@@ -6573,6 +6663,7 @@ async function loadAsCapturedState(entry) {
         bumpCanvas,
         sgraffitoCanvas,
         resistCanvas,
+        frozenDipCanvas,
         isLid: lookupIsLid(entry),
         clayState: "fired",
     };
