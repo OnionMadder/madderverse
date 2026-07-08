@@ -1755,8 +1755,6 @@ html, body {
     gap: 10px;
     margin-bottom: 16px;
 }
-/* Backdrop picker (Studio / Forest / Gallery) — reuses the unified pill tabs. */
-.gallery-bg-picker { display: flex; gap: 4px; flex-wrap: wrap; }
 .gallery-title {
     font-family: var(--font-display);
     font-size: 0.88rem;

@@ -312,10 +312,7 @@ const DEFAULT_DIP_PACK = "sky";
 // above `state`, because state.galleryBg reads it at init.)
 const GALLERY_BACKDROPS = {
     showcase: { label: "Studio",  src: "assets/backgrounds/gallery/showcase.jpg", surfaceY: 0.78, centerX: 0.50, scale: 0.82 },
-    forest:   { label: "Forest",  src: "assets/backgrounds/gallery/forest.jpg",   surfaceY: 0.74, centerX: 0.50, scale: 0.80 },
-    gallery:  { label: "Gallery", src: "assets/backgrounds/gallery/gallery.jpg",   surfaceY: 0.66, centerX: 0.60, scale: 0.72 },
 };
-const GALLERY_BACKDROP_IDS = ["showcase", "forest", "gallery"];
 const DEFAULT_GALLERY_BACKDROP = "showcase";
 // The pot's foot sits at ~this fraction of the square thumbnail (fixed by the
 // capture camera, wheel hidden). Used to place the pot on a backdrop's surface.
@@ -1239,12 +1236,7 @@ const state = {
         try { return localStorage.getItem("slip-gallery-view") || "shelf"; }
         catch (_) { return "shelf"; }
     })(),
-    galleryBg: (() => {
-        try {
-            const s = localStorage.getItem("slip-gallery-bg");
-            return (s && GALLERY_BACKDROPS[s]) ? s : DEFAULT_GALLERY_BACKDROP;
-        } catch (_) { return DEFAULT_GALLERY_BACKDROP; }
-    })(),
+    galleryBg: DEFAULT_GALLERY_BACKDROP, // single Studio backdrop for everyone
     // Per-piece vertical stretch. 1.0 = the default TOP-tall silhouette;
     // > 1 pulls the rim higher (pot grows taller), < 1 squashes it down.
     // Implemented as a Group transform on potGroup so the geometry data
@@ -1485,8 +1477,6 @@ function init() {
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
         setGalleryView(state.galleryView === "shelf" ? "compact" : "shelf");
     });
-    document.querySelectorAll("#galleryBgPicker button[data-bg]").forEach((b) =>
-        b.addEventListener("click", () => setGalleryBg(b.dataset.bg)));
     document.querySelectorAll(".deco-size").forEach((b, idx) =>
         b.addEventListener("click", () => setDecoSize(idx)));
     setDecoTool("brush");
@@ -6763,9 +6753,7 @@ async function openGallery() {
     grid.innerHTML = "";
     grid.classList.toggle("shelf",   state.galleryView === "shelf");
     grid.classList.toggle("compact", state.galleryView !== "shelf");
-    document.querySelectorAll("#galleryBgPicker button[data-bg]").forEach((b) =>
-        b.classList.toggle("is-active", b.dataset.bg === state.galleryBg));
-    await ensureGalleryBgImg(); // load the chosen backdrop once for all cards
+    await ensureGalleryBgImg(); // load the Studio backdrop once for all cards
     let pots = [];
     try { pots = await dbAll(); } catch (_) {}
     pots.sort((a, b) => b.ts - a.ts);
@@ -6877,12 +6865,6 @@ async function stageThumb(thumbURL, footFrac = POT_FOOT_FRAC) {
     ctx.drawImage(potC, cx - dw / 2, sy - footFrac * dh, dw, dh);
     ctx.restore();
     return c.toDataURL("image/jpeg", 0.9);
-}
-function setGalleryBg(id) {
-    if (!GALLERY_BACKDROPS[id]) return;
-    state.galleryBg = id;
-    try { localStorage.setItem("slip-gallery-bg", id); } catch (_) {}
-    openGallery(); // re-composite every card onto the new backdrop
 }
 function roundRectPath(ctx, x, y, w, h, r) {
     const rr = Math.min(r, w / 2, h / 2);
