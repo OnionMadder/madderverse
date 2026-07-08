@@ -320,6 +320,25 @@ const DEFAULT_GALLERY_BACKDROP = "showcase";
 // The pot's foot sits at ~this fraction of the square thumbnail (fixed by the
 // capture camera, wheel hidden). Used to place the pot on a backdrop's surface.
 const POT_FOOT_FRAC = 0.753;
+// Vertical screen fraction (0 = top, 1 = bottom) of the world foot point (0,0,0)
+// as seen by a capture camera. The pot foot sits at y=0 in both the solo and
+// assembly views, so the only thing that moves the foot up/down the thumbnail is
+// the camera. We reuse this to derive the assembly foot fraction from the tuned
+// solo one, instead of hand-guessing a second magic number.
+function footFracForCam(pos, target) {
+    const f = target.clone().sub(pos).normalize();
+    const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize();
+    const u = new THREE.Vector3().crossVectors(r, f);
+    const v = new THREE.Vector3(0, 0, 0).sub(pos);
+    const ndcY = (v.dot(u) / v.dot(f)) / Math.tan(THREE.MathUtils.degToRad(38) / 2); // 38 = camera vFOV
+    return (1 - ndcY) / 2;
+}
+// The lid-on-pot assembly thumb is captured with the pulled-back CAM_ASSEMBLED_*
+// camera, so its foot lands lower in the frame than a solo pot's — staging it
+// with POT_FOOT_FRAC sinks the set into the surface. Apply the camera-only delta
+// to the tuned solo value so the assembled set sits on the shelf too.
+const ASSEMBLY_FOOT_FRAC = POT_FOOT_FRAC
+    + (footFracForCam(CAM_ASSEMBLED_BASE, CAM_ASSEMBLED_TARGET) - footFracForCam(CAM_BASE, CAM_TARGET));
 function currentDipPackIds() {
     return (DIP_SET_PACKS[state.dipPack] || DIP_SET_PACKS[DEFAULT_DIP_PACK]).ids;
 }
@@ -6822,7 +6841,7 @@ function keyOutThumbBg(ctx, S) {
 // Composite a pot thumbnail onto the chosen showcase backdrop, sat on that
 // scene's display surface with a soft contact shadow. New thumbs are already
 // transparent PNGs; legacy opaque thumbs get their flat bg keyed out first.
-async function stageThumb(thumbURL) {
+async function stageThumb(thumbURL, footFrac = POT_FOOT_FRAC) {
     if (!thumbURL) return thumbURL;
     const bd = GALLERY_BACKDROPS[state.galleryBg] || GALLERY_BACKDROPS[DEFAULT_GALLERY_BACKDROP];
     const [bg, pot] = await Promise.all([ensureGalleryBgImg(), loadImageEl(thumbURL)]);
@@ -6855,7 +6874,7 @@ async function stageThumb(thumbURL) {
     const dw = k * S, dh = k * S;
     ctx.save();
     ctx.beginPath(); ctx.rect(0, 0, S, sy + 1); ctx.clip();
-    ctx.drawImage(potC, cx - dw / 2, sy - POT_FOOT_FRAC * dh, dw, dh);
+    ctx.drawImage(potC, cx - dw / 2, sy - footFrac * dh, dw, dh);
     ctx.restore();
     return c.toDataURL("image/jpeg", 0.9);
 }
@@ -6985,9 +7004,13 @@ function renderShelfCanvas(items) {
 function renderGalleryTile(grid, members) {
     const isShelf = state.galleryView === "shelf";
     const isSet = members.length > 1;
+    // The set's representative is the POT half, not the lid — members are
+    // ts-sorted so the later-saved lid would otherwise front the tile with
+    // its own name/glaze (matches exportShelfPhoto's pot-first pick).
+    const primary = isSet ? (members.find((m) => !m.isLid) || members[0]) : members[0];
     // For sets where we captured an assembly shot at save time, show
     // that single composite thumb instead of two stacked halves.
-    const assemblyThumb = isSet && members[0].assemblyThumb;
+    const assemblyThumb = isSet && primary.assemblyThumb;
     const item = document.createElement("div");
     item.className = "gallery-item" + (isSet ? " gallery-set" : "") + (isShelf ? " is-shelf" : "")
                    + (assemblyThumb ? " has-assembly" : "");
@@ -7000,10 +7023,12 @@ function renderGalleryTile(grid, members) {
         const half = document.createElement("div");
         half.className = "pot-thumb";
         const img = document.createElement("img");
-        stageThumb(assemblyThumb).then((u) => { img.src = u; });
-        img.alt = (members[0].title || "Saved set");
+        // Staged with the assembly foot fraction — the set was shot with the
+        // pulled-back camera, so POT_FOOT_FRAC would sink it into the surface.
+        stageThumb(assemblyThumb, ASSEMBLY_FOOT_FRAC).then((u) => { img.src = u; });
+        img.alt = (primary.title || "Saved set");
         img.loading = "lazy";
-        img.addEventListener("click", async () => { await loadPot(members[0]); closeGallery(); });
+        img.addEventListener("click", async () => { await loadPot(primary); closeGallery(); });
         half.appendChild(img);
         thumbWrap.appendChild(half);
     } else {
@@ -7027,7 +7052,7 @@ function renderGalleryTile(grid, members) {
     // plain thumbnail grid. Rendered as an overlay so it sits above the
     // thumbnail image (an inset box-shadow would hide behind it).
     if (isShelf) {
-        const gid = members[0].glaze;
+        const gid = primary.glaze;
         if (gid && GLAZES[gid]) {
             const ring = document.createElement("div");
             ring.className = "thumb-glaze-ring";
@@ -7043,16 +7068,16 @@ function renderGalleryTile(grid, members) {
         meta.className = "pot-meta";
         const titleBtn = document.createElement("button");
         titleBtn.type = "button";
-        const hasTitle = !!(members[0].title && members[0].title.length);
+        const hasTitle = !!(primary.title && primary.title.length);
         titleBtn.className = "pot-title" + (hasTitle ? "" : " is-empty");
-        titleBtn.textContent = hasTitle ? members[0].title : "Tap to name";
+        titleBtn.textContent = hasTitle ? primary.title : "Tap to name";
         titleBtn.title = "Rename this pot";
-        titleBtn.addEventListener("click", (e) => { e.stopPropagation(); renameTile(members[0]); });
+        titleBtn.addEventListener("click", (e) => { e.stopPropagation(); renameTile(primary); });
         meta.appendChild(titleBtn);
         const sub = document.createElement("div");
         sub.className = "pot-sub";
-        const dateStr = formatPotDate(members[0].ts);
-        const glaze = glazeNameFor(members[0]);
+        const dateStr = formatPotDate(primary.ts);
+        const glaze = glazeNameFor(primary);
         sub.textContent = isSet ? `Lid set · ${glaze} · ${dateStr}` : `${glaze} · ${dateStr}`;
         meta.appendChild(sub);
         item.appendChild(meta);
