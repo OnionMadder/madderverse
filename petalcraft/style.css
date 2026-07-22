@@ -618,11 +618,11 @@ body {
     border-radius: 62% 62% 58% 58%;
 }
 .flower[data-stage="3"][data-species="pansies"] .center {
-    width: 30%;
-    height: 30%;
-    top: 35%;
-    left: 35%;
-    background: radial-gradient(circle at 50% 45%, #F5D97E 30%, #7A5A2E 33%, #4A3320 100%);
+    width: 46%;
+    height: 46%;
+    top: 27%;
+    left: 27%;
+    background: radial-gradient(circle at 50% 45%, #F5D97E 20%, #7A5A2E 23%, #3E2A18 100%);
     box-shadow: none;
 }
 
