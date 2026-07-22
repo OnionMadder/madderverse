@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Petalcraft</title>
+    <link rel="canonical" href="https://madderverse.org/petalcraft/" />
+    <meta property="og:url" content="https://madderverse.org/petalcraft/" />
+    <meta name="twitter:url" content="https://madderverse.org/petalcraft/" />
+    <meta name="title" content="Petalcraft - Madderverse" />
+    <meta name="description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Bloombook. Ad-free, no accounts, plays offline." />
+    <meta name="keywords" content="Petalcraft, flower breeding game, cozy game, Mendelian genetics puzzle, Madderverse, Onion Madder, Mad Sundar LLC, free kids games, ad-free games" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Petalcraft - Madderverse" />
+    <meta property="og:description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Bloombook." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Petalcraft - Madderverse" />
+    <meta name="twitter:description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Bloombook." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#F7EFDD" />
+    <meta name="apple-mobile-web-app-title" content="Madderverse" />
+    <meta name="application-name" content="Madderverse" />
+    <link rel="stylesheet" href="style.css?v=1" />
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+
+<a class="madder-home" href="../" aria-label="Back to Madderverse" title="Back to Madderverse">&#x2302;</a>
+
+<main id="app" class="app">
+
+    <!-- ─── Header: clock + title ─────────────────────────────────── -->
+    <header class="topbar">
+        <div class="topbar-title">Petalcraft</div>
+        <div class="topbar-clock" id="clock" aria-live="polite" aria-atomic="true">
+            <span id="clock-day">Day 1</span>
+            <span id="clock-time" class="clock-time">morning</span>
+        </div>
+        <button id="btn-bloombook" class="topbar-btn" type="button" aria-label="Open Bloombook">
+            <span aria-hidden="true">📖</span>
+        </button>
+    </header>
+
+    <!-- ─── The garden grid ──────────────────────────────────────── -->
+    <section class="garden-wrap">
+        <div id="garden" class="garden" role="grid" aria-label="Garden grid"></div>
+    </section>
+
+    <!-- ─── Bottom toolbar: seed tray + actions ──────────────────── -->
+    <div class="tray" role="toolbar" aria-label="Actions and seeds">
+
+        <div class="tray-actions">
+            <button id="btn-water-all" class="tray-btn tray-btn-primary" type="button">
+                💧 Water all
+            </button>
+            <button id="btn-advance-day" class="tray-btn" type="button" title="Skip to next day (debug)">
+                ⏭ Next day
+            </button>
+        </div>
+
+        <div class="tray-seeds" id="seed-tray" aria-label="Seed inventory"></div>
+
+        <div class="tray-hint" id="tray-hint">Tap a seed, then tap an empty tile to plant.</div>
+    </div>
+
+</main>
+
+<!-- ─── Bloombook overlay ────────────────────────────────────── -->
+<div id="bloombook" class="modal" hidden aria-hidden="true" role="dialog" aria-labelledby="bloombook-title">
+    <div class="modal-card">
+        <header class="modal-head">
+            <h2 id="bloombook-title">The Bloombook</h2>
+            <button id="btn-close-bloombook" class="modal-close" type="button" aria-label="Close Bloombook">✕</button>
+        </header>
+        <div class="bloombook-tabs" id="bloombook-tabs" role="tablist"></div>
+        <div class="bloombook-body" id="bloombook-body"></div>
+    </div>
+</div>
+
+<!-- ─── Toast: discovery + status ────────────────────────────── -->
+<div id="toast" class="toast" hidden aria-live="polite"></div>
+
+<!-- ─── Site footer boilerplate (matches other Madderverse games) ─── -->
+<footer class="site-footer">
+    <span>© <span id="year"></span> Mad Sundar LLC · <a href="../">The Madderverse</a></span>
+</footer>
+
+<script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
+<script src="game.js?v=1"></script>
+
+</body>
+</html>
