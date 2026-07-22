@@ -27,7 +27,7 @@
     <meta name="theme-color" content="#F7EFDD" />
     <meta name="apple-mobile-web-app-title" content="Madderverse" />
     <meta name="application-name" content="Madderverse" />
-    <link rel="stylesheet" href="style.css?v=1" />
+    <link rel="stylesheet" href="style.css?v=2" />
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -45,13 +45,19 @@
             <span id="clock-day">Day 1</span>
             <span id="clock-time" class="clock-time">morning</span>
         </div>
-        <button id="btn-bloombook" class="topbar-btn" type="button" aria-label="Open Bloombook">
-            <span aria-hidden="true">📖</span>
-        </button>
+        <div class="topbar-actions">
+            <button id="btn-settings" class="topbar-btn" type="button" aria-label="Settings">
+                <span aria-hidden="true">⚙</span>
+            </button>
+            <button id="btn-bloombook" class="topbar-btn" type="button" aria-label="Open Bloombook">
+                <span aria-hidden="true">📖</span>
+            </button>
+        </div>
     </header>
 
     <!-- ─── The garden grid ──────────────────────────────────────── -->
     <section class="garden-wrap">
+        <div id="rain" class="rain-layer" hidden aria-hidden="true"></div>
         <div id="garden" class="garden" role="grid" aria-label="Garden grid"></div>
     </section>
 
@@ -70,6 +76,7 @@
         <div class="tray-seeds" id="seed-tray" aria-label="Seed inventory"></div>
 
         <div class="tray-hint" id="tray-hint">Tap a seed, then tap an empty tile to plant.</div>
+        <div class="tray-goal" id="tray-goal" aria-live="polite"></div>
     </div>
 
 </main>
@@ -86,6 +93,29 @@
     </div>
 </div>
 
+<!-- ─── Settings overlay ─────────────────────────────────────── -->
+<div id="settings" class="modal" hidden aria-hidden="true" role="dialog" aria-labelledby="settings-title">
+    <div class="modal-card">
+        <header class="modal-head">
+            <h2 id="settings-title">Settings</h2>
+            <button id="btn-close-settings" class="modal-close" type="button" aria-label="Close settings">✕</button>
+        </header>
+        <div class="settings-body" id="settings-body"></div>
+    </div>
+</div>
+
+<!-- ─── First-run coach overlay ──────────────────────────────── -->
+<div id="coach" class="coach" hidden>
+    <div class="coach-card">
+        <div class="coach-emoji" aria-hidden="true">🌱</div>
+        <p class="coach-text" id="coach-text"></p>
+        <div class="coach-actions">
+            <button id="coach-skip" class="coach-skip" type="button">Skip</button>
+            <button id="coach-next" class="coach-next" type="button">Next</button>
+        </div>
+    </div>
+</div>
+
 <!-- ─── Toast: discovery + status ────────────────────────────── -->
 <div id="toast" class="toast" hidden aria-live="polite"></div>
 
@@ -98,7 +128,7 @@
     document.getElementById("year").textContent = new Date().getFullYear();
 </script>
 
-<script src="game.js?v=1"></script>
+<script src="game.js?v=2"></script>
 
 </body>
 </html>

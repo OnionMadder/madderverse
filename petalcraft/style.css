@@ -337,8 +337,9 @@ body {
     border-radius: 4px;
 }
 
-/* Night: all flowers pull petals in (opacity dim) */
-.garden-wrap.night .flower[data-stage="3"] { opacity: 0.72; transform: scale(0.85); transition: transform 400ms ease, opacity 400ms ease; }
+/* Night: all flowers pull petals in (opacity dim). animation:none so the
+   idle sway (which also animates transform) doesn't override the scale. */
+.garden-wrap.night .flower[data-stage="3"] { opacity: 0.72; transform: scale(0.85); animation: none; transition: transform 400ms ease, opacity 400ms ease; }
 
 /* Discovery sparkle (used on new-hybrid tile briefly) */
 .tile.new-hybrid {
@@ -592,7 +593,272 @@ body {
     to   { transform: translate(-50%, 0); opacity: 1; }
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   Additions: settings, onboarding coach, weather, micro-goal, pansies
+   ══════════════════════════════════════════════════════════════════ */
+
+/* Topbar: settings + bloombook sit together on the right */
+.topbar-actions {
+    justify-self: end;
+    display: flex;
+    gap: 6px;
+}
+.topbar-actions .topbar-btn { justify-self: auto; }
+#btn-settings { font-size: 18px; }
+
+/* Colors added by pansies */
+:root { --f-blue: #7C96CF; }
+
+/* ─── Pansy bloom — a flat, rounded "face" with a dark center ─── */
+.flower[data-stage="3"][data-species="pansies"] .petal {
+    width: 52%;
+    height: 52%;
+    top: 24%;
+    left: 24%;
+    border-radius: 62% 62% 58% 58%;
+}
+.flower[data-stage="3"][data-species="pansies"] .center {
+    width: 30%;
+    height: 30%;
+    top: 35%;
+    left: 35%;
+    background: radial-gradient(circle at 50% 45%, #F5D97E 30%, #7A5A2E 33%, #4A3320 100%);
+    box-shadow: none;
+}
+
+/* A gentle drop shadow + idle sway for blooms (motion-gated) */
+.flower[data-stage="3"] .fl-body { filter: drop-shadow(0 2px 2px rgba(74,63,46,0.18)); }
+.flower[data-stage="3"] { animation: sway 6s ease-in-out infinite; transform-origin: 50% 90%; }
+.flower[data-stage="2"] { animation: sway 7s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes sway {
+    0%, 100% { transform: rotate(-1.5deg); }
+    50%      { transform: rotate(1.5deg); }
+}
+
+/* ─── Day / night / rain scene tint ───────────────────────────── */
+.garden-wrap { position: relative; overflow: hidden; }
+.garden-wrap.rainy {
+    background: radial-gradient(ellipse at center top, #C9D4DA, #AEBDC6 70%);
+}
+
+/* Watering droplet — a quick splash ring on the tile */
+.droplet {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin: -5px 0 0 -5px;
+    border-radius: 50%;
+    border: 2px solid rgba(126, 176, 196, 0.9);
+    pointer-events: none;
+    animation: splash 620ms ease-out forwards;
+}
+@keyframes splash {
+    0%   { transform: scale(0.3); opacity: 0.9; }
+    100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Rain — thin animated streaks over the garden */
+.rain-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+    background-image: repeating-linear-gradient(
+        105deg,
+        transparent 0 9px,
+        rgba(160, 190, 210, 0.28) 9px 10px);
+    background-size: 100% 24px;
+    animation: rainfall 0.5s linear infinite;
+    opacity: 0.7;
+}
+.rain-layer[hidden] { display: none; }
+@keyframes rainfall {
+    from { background-position: 0 0; }
+    to   { background-position: 12px 24px; }
+}
+
+/* ─── Micro-goal line under the tray hint ─────────────────────── */
+.tray-goal {
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink);
+    font-weight: 700;
+    background: var(--cream);
+    border: 1px solid var(--cream-shade);
+    border-radius: 999px;
+    padding: 5px 12px;
+    margin: 0 auto;
+    max-width: 100%;
+}
+.tray-goal::before { content: "🎯 "; opacity: 0.7; }
+
+/* ─── Bloombook flavor detail ──────────────────────────────────── */
+.dex-detail {
+    margin: 12px 2px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink);
+    border-top: 1px solid var(--cream-shade);
+    padding-top: 10px;
+    min-height: 20px;
+}
+.dex-detail .dex-date { color: var(--ink-soft); font-style: italic; }
+.dex-slot.filled { cursor: pointer; }
+
+/* ─── Settings panel ──────────────────────────────────────────── */
+.settings-body { padding: 8px 18px 20px; }
+.set-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 2px;
+    border-bottom: 1px solid var(--cream-shade);
+}
+.set-row:last-child { border-bottom: none; }
+.set-label {
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+}
+.set-sub {
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-style: italic;
+}
+
+/* Toggle switch */
+.set-toggle {
+    width: 48px;
+    height: 28px;
+    border-radius: 999px;
+    border: none;
+    background: var(--cream-shade);
+    position: relative;
+    cursor: pointer;
+    flex: 0 0 auto;
+    transition: background 160ms ease;
+}
+.set-toggle .knob {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: transform 160ms ease;
+}
+.set-toggle.on { background: var(--grass-dark); }
+.set-toggle.on .knob { transform: translateX(20px); }
+
+/* Segmented control (garden pace) */
+.set-seg {
+    display: flex;
+    background: var(--cream-warm);
+    border: 1px solid var(--cream-shade);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+.set-seg-btn {
+    border: none;
+    background: transparent;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+.set-seg-btn.active {
+    background: var(--accent);
+    color: white;
+}
+.set-text-btn {
+    border: 1px solid var(--cream-shade);
+    background: var(--cream-warm);
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    width: 100%;
+}
+
+/* ─── Onboarding coach overlay ─────────────────────────────────── */
+.coach {
+    position: fixed;
+    inset: 0;
+    background: rgba(74, 63, 46, 0.45);
+    display: grid;
+    place-items: center;
+    z-index: 400;
+    padding: 24px;
+    animation: fade-in 200ms ease;
+}
+.coach[hidden] { display: none; }
+.coach-card {
+    background: var(--cream);
+    border-radius: var(--radius);
+    max-width: 340px;
+    width: 100%;
+    padding: 24px 22px 18px;
+    text-align: center;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.3);
+}
+.coach-emoji { font-size: 40px; line-height: 1; margin-bottom: 8px; }
+.coach-text {
+    font-family: "Fraunces", "Georgia", serif;
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--ink);
+    margin: 0 0 18px;
+}
+.coach-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.coach-skip {
+    background: none;
+    border: none;
+    color: var(--ink-soft);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 10px;
+}
+.coach-next {
+    flex: 1;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 999px;
+    min-height: var(--tap);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 15px;
+    cursor: pointer;
+}
+.coach-next:active { transform: scale(0.97); }
+
 /* ─── Reduced motion ─────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+    .flower[data-stage="3"], .flower[data-stage="2"] { animation: none; transform: none; }
 }
+/* App-level reduced-motion (Settings toggle) mirrors the media query */
+body.reduce-motion .flower[data-stage="3"],
+body.reduce-motion .flower[data-stage="2"] { animation: none; transform: none; }
+body.reduce-motion .rain-layer { animation: none; }
