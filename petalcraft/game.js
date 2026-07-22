@@ -110,32 +110,32 @@ const SEED_COLORS = ["red", "yellow", "white"];
 // unlock from garden progress so the first ~15 min is one self-contained puzzle.
 const UNLOCK_ORDER = ["cosmos", "tulips", "pansies"];
 
-// Flavor text for the Bloombook. Placeholder lines — Onion to rewrite.
+// Flavor text for the Bloombook — written in Onion's voice.
 const FLAVOR = {
     cosmos: {
-        white:  "Common as garden clouds. A sensible place to start.",
-        yellow: "Sunny and slightly smug about it.",
-        red:    "Loud. Fun. Not subtle.",
-        pink:   "Kind of an accident, and lovelier for it.",
-        orange: "The kind of orange that thinks it's a red or a yellow depending on mood.",
-        black:  "Cross the right pair. Wait. Suddenly: this. Nobody quite believes it.",
+        white:  "Where most gardens begin. Plain isn't nothing — it's the start of everything else here.",
+        yellow: "Cheerful and easy, and a little glad you showed up.",
+        red:    "Bold, warm, no apologies. Some days you just want the loud one.",
+        pink:   "You didn't plan this one. A lot of the best things turn up that way.",
+        orange: "Red and yellow meeting halfway — proof that mixing what you already have can make something new.",
+        black:  "Cross the right pair, wait, and one morning it's simply there. Deep as dusk. Hardly anyone gets it on the first try.",
     },
     tulips: {
-        white:  "Sturdy. Photographs well.",
-        yellow: "The one your grandma has by the mailbox.",
-        red:    "Storybook red. Extremely satisfying to breed on purpose.",
-        pink:   "A rarity, and it acts like it knows.",
-        orange: "Bred more or less on accident. Kept on purpose.",
-        purple: "Two dominants and a lot of luck.",
-        black:  "Blackness in flowers is really deep-plum. This one is showing off.",
+        white:  "Sturdy and quiet. An honest place to start.",
+        yellow: "Sunny and reliable, like the ones by somebody's front step.",
+        red:    "Storybook red. Worth the patience it takes to grow one on purpose.",
+        pink:   "Softer and rarer than it looks. Keep this one.",
+        orange: "More accident than plan, kept because it turned out kind of perfect.",
+        purple: "Two strong colors and a little luck. You found your way here.",
+        black:  "The deepest plum there is. It looks like it knows how hard it was to grow.",
     },
     pansies: {
-        white:  "Plain in the best way. A steady base to work away from.",
-        yellow: "Cheerful without trying too hard.",
-        red:    "Velvety, and a little dramatic about it.",
-        orange: "Somewhere between a sunrise and a snack.",
-        blue:   "Not really blue — but close enough to make people lean in. Comes from white, of all things.",
-        purple: "Deep, regal, faintly smug. Worth the crossing.",
+        white:  "Small, plain, steady. Nearly everything else here grows out of flowers like this.",
+        yellow: "Bright without making a fuss. Easy to love.",
+        red:    "Velvety, and a little dramatic — in the best way.",
+        orange: "Somewhere between a sunrise and a snack. It'll grow on you.",
+        blue:   "Not quite blue, but close enough to make you look twice. And it comes from the plainest white — which is sort of the whole point.",
+        purple: "Deep and quietly proud. The reward for a few good crosses.",
     },
 };
 
