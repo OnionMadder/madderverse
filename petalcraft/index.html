@@ -27,7 +27,7 @@
     <meta name="theme-color" content="#F7EFDD" />
     <meta name="apple-mobile-web-app-title" content="Madderverse" />
     <meta name="application-name" content="Madderverse" />
-    <link rel="stylesheet" href="style.css?v=4" />
+    <link rel="stylesheet" href="style.css?v=6" />
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -57,7 +57,23 @@
 
     <!-- ─── The garden grid ──────────────────────────────────────── -->
     <section class="garden-wrap">
+        <!-- Living sky: continuous day→dusk→night gradient + sun/moon/stars -->
+        <div class="sky" id="sky" aria-hidden="true">
+            <div class="stars" id="stars"></div>
+            <div class="celestial sun" id="sun"></div>
+            <div class="celestial moon" id="moon"></div>
+            <div class="clouds" id="clouds"></div>
+            <div class="ground" id="ground"></div>
+        </div>
+        <!-- Earned garden keepsakes (bench, birdbath…) sit on the ground band -->
+        <div id="ornaments" class="ornaments" aria-hidden="true"></div>
+        <!-- Ambient particles: dew, fireflies, drifting flyers -->
+        <div id="ambient-fx" class="ambient-fx" aria-hidden="true"></div>
+        <!-- Night veil dims the whole plot after dark -->
+        <div id="scene-veil" class="scene-veil" aria-hidden="true"></div>
         <div id="rain" class="rain-layer" hidden aria-hidden="true"></div>
+        <!-- "Will breed tonight" connector lines, laid out over the plot by JS -->
+        <svg id="connectors" class="connectors" aria-hidden="true" preserveAspectRatio="none"></svg>
         <div id="garden" class="garden" role="grid" aria-label="Garden grid"></div>
     </section>
 
@@ -116,6 +132,19 @@
     </div>
 </div>
 
+<!-- ─── Rare-find celebration card ───────────────────────────── -->
+<div id="rare-celebrate" class="celebrate" hidden aria-hidden="true" role="dialog" aria-labelledby="celebrate-name">
+    <div class="celebrate-card">
+        <div class="celebrate-rays" aria-hidden="true"></div>
+        <div class="celebrate-badge">★ Rare find</div>
+        <div class="celebrate-thumb" aria-hidden="true"></div>
+        <h2 class="celebrate-name" id="celebrate-name"></h2>
+        <p class="celebrate-flavor"></p>
+        <p class="celebrate-sub"></p>
+        <button id="celebrate-close" class="celebrate-close" type="button">Lovely</button>
+    </div>
+</div>
+
 <!-- ─── Toast: discovery + status ────────────────────────────── -->
 <div id="toast" class="toast" hidden aria-live="polite"></div>
 
@@ -128,7 +157,7 @@
     document.getElementById("year").textContent = new Date().getFullYear();
 </script>
 
-<script src="game.js?v=4"></script>
+<script src="game.js?v=6"></script>
 
 </body>
 </html>

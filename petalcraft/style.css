@@ -169,6 +169,8 @@ body {
     gap: var(--tile-gap);
     width: min(100%, 420px);
     aspect-ratio: var(--gw, 6) / var(--gh, 4);
+    position: relative;
+    z-index: 2;
 }
 
 .tile {
@@ -195,7 +197,7 @@ body {
     outline-offset: -3px;
 }
 
-/* Water droplet indicator */
+/* Water droplet indicator — scales + fades with --wet as the day dries out */
 .tile.watered::after {
     content: "";
     position: absolute;
@@ -205,9 +207,17 @@ body {
     height: 8px;
     background: var(--water);
     border-radius: 50% 50% 50% 0;
-    transform: rotate(-45deg);
+    transform: rotate(-45deg) scale(calc(0.5 + 0.5 * var(--wet, 1)));
+    transform-origin: top right;
     box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-    opacity: 0.85;
+    opacity: calc(0.35 + 0.5 * var(--wet, 1));
+    transition: opacity 600ms ease, transform 600ms ease;
+}
+/* Damp-soil sheen also eases off as the tile dries */
+.tile.watered {
+    background: linear-gradient(180deg,
+        color-mix(in srgb, var(--soil-dark) calc(var(--wet, 1) * 100%), var(--soil)),
+        var(--soil));
 }
 
 /* ─── Flower shapes (CSS-only, no images for MVP) ──────────────── */
@@ -862,3 +872,578 @@ body {
 body.reduce-motion .flower[data-stage="3"],
 body.reduce-motion .flower[data-stage="2"] { animation: none; transform: none; }
 body.reduce-motion .rain-layer { animation: none; }
+body.reduce-motion .cloud,
+body.reduce-motion .firefly,
+body.reduce-motion .flyer,
+body.reduce-motion .stars { animation: none !important; }
+
+/* ══════════════════════════════════════════════════════════════════
+   PHASE 2 — living sky, ambient life, breeding hints, cozy motion
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── Living sky ───────────────────────────────────────────────── */
+.sky {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    background: linear-gradient(180deg, var(--sky-top, #bfe0e6) 0%, var(--sky-bot, #eaf3e0) 100%);
+    transition: background 500ms linear;
+    border-radius: var(--radius);
+}
+
+/* Soft ground band the plot sits on, so it reads as garden-on-earth */
+.ground {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 42%;
+    background: linear-gradient(180deg,
+        rgba(167, 192, 121, 0) 0%,
+        color-mix(in srgb, var(--grass) 55%, transparent) 26%,
+        color-mix(in srgb, var(--grass-dark) 78%, var(--soil-dark)) 100%);
+    filter: saturate(0.9);
+}
+/* Horizon glow line */
+.ground::before {
+    content: "";
+    position: absolute;
+    left: -5%; right: -5%; top: 0;
+    height: 2px;
+    background: rgba(255, 244, 214, 0.5);
+    filter: blur(1px);
+}
+
+/* Sun + moon share the .celestial arc; JS sets --cx/--cy (0..1) + opacity */
+.celestial {
+    position: absolute;
+    left: calc(var(--cx, 0.5) * 100%);
+    top: calc(var(--cy, 0.3) * 100%);
+    transform: translate(-50%, -50%);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    opacity: var(--vis, 0);
+    transition: opacity 700ms linear;
+    pointer-events: none;
+    will-change: left, top;
+}
+.sun {
+    background: radial-gradient(circle at 50% 45%, #FFF4CE 0%, #FCE07A 55%, #F6C85A 100%);
+    box-shadow: 0 0 22px 8px rgba(252, 224, 122, 0.55);
+}
+.moon {
+    background: radial-gradient(circle at 38% 38%, #FCFBF3 0%, #E7E3D0 70%, #CFC9B4 100%);
+    box-shadow: 0 0 16px 4px rgba(233, 233, 214, 0.4);
+}
+.moon::after {   /* a couple of soft craters */
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+        radial-gradient(circle at 62% 40%, rgba(180,176,158,0.5) 0 3px, transparent 4px),
+        radial-gradient(circle at 42% 62%, rgba(180,176,158,0.45) 0 4px, transparent 5px);
+}
+
+/* Stars — JS drives the whole layer's opacity by time of day */
+.stars {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 900ms linear;
+    background-image:
+        radial-gradient(1.4px 1.4px at 12% 22%, #fff 50%, transparent),
+        radial-gradient(1px 1px at 28% 12%, #fff 50%, transparent),
+        radial-gradient(1.2px 1.2px at 45% 30%, #fff 50%, transparent),
+        radial-gradient(1px 1px at 63% 16%, #fff 50%, transparent),
+        radial-gradient(1.5px 1.5px at 78% 26%, #fff 50%, transparent),
+        radial-gradient(1px 1px at 88% 12%, #fff 50%, transparent),
+        radial-gradient(1.1px 1.1px at 34% 44%, #fff 50%, transparent),
+        radial-gradient(1px 1px at 55% 40%, #fff 50%, transparent);
+    animation: twinkle 5s ease-in-out infinite;
+}
+@keyframes twinkle {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(0.6); }
+}
+
+/* Drifting clouds (JS injects .cloud children) */
+.clouds { position: absolute; inset: 0; pointer-events: none; }
+.cloud {
+    position: absolute;
+    width: var(--cw, 90px);
+    height: calc(var(--cw, 90px) * 0.42);
+    background:
+        radial-gradient(circle at 30% 60%, #fff 0 40%, transparent 42%),
+        radial-gradient(circle at 55% 45%, #fff 0 46%, transparent 48%),
+        radial-gradient(circle at 75% 62%, #fff 0 38%, transparent 40%),
+        linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.75));
+    background-repeat: no-repeat;
+    border-radius: 40px;
+    opacity: 0.7;
+    filter: blur(0.4px);
+    top: var(--cy, 20%);
+    left: -30%;
+    animation: drift var(--cdur, 60s) linear infinite;
+    animation-delay: var(--cdelay, 0s);
+}
+@keyframes drift {
+    from { transform: translateX(0); }
+    to   { transform: translateX(calc(100vw + 60%)); }
+}
+
+/* Night veil dims the whole plot after dark; JS sets its opacity */
+.scene-veil {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 50% 120%, rgba(44,48,80,0.15), rgba(30,32,58,0.5));
+    opacity: 0;
+    transition: opacity 700ms linear;
+    border-radius: var(--radius);
+    mix-blend-mode: multiply;
+}
+
+/* Morning dew — a faint cool sheen on soil that isn't watered yet */
+.garden-wrap.morning .tile:not(.watered)::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    background: rgba(190, 220, 230, 0.55);
+    box-shadow: 0 0 3px rgba(190, 220, 230, 0.5);
+    pointer-events: none;
+}
+
+/* ─── Ambient particle layer (dew, fireflies, flyers) ─────────── */
+.ambient-fx {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: var(--radius);
+}
+.firefly {
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #F6EF9B;
+    box-shadow: 0 0 8px 3px rgba(246, 239, 155, 0.7);
+    opacity: 0;
+    animation: firefly-float var(--fdur, 7s) ease-in-out infinite;
+    animation-delay: var(--fdelay, 0s);
+}
+@keyframes firefly-float {
+    0%   { opacity: 0; transform: translate(0, 0) scale(0.7); }
+    25%  { opacity: 0.9; }
+    50%  { opacity: 0.5; transform: translate(var(--fdx, 14px), var(--fdy, -12px)) scale(1); }
+    75%  { opacity: 0.9; }
+    100% { opacity: 0; transform: translate(calc(var(--fdx, 14px) * -0.5), calc(var(--fdy, -12px) * 1.4)) scale(0.7); }
+}
+/* A little bird / butterfly drifting across, occasionally */
+.flyer {
+    position: absolute;
+    font-size: 16px;
+    line-height: 1;
+    opacity: 0.85;
+    will-change: transform;
+    animation: fly-across var(--flydur, 9s) ease-in-out forwards;
+}
+@keyframes fly-across {
+    0%   { transform: translate(-12%, 0) scaleX(1); opacity: 0; }
+    12%  { opacity: 0.9; }
+    50%  { transform: translate(50vw, -14px) scaleX(1); }
+    88%  { opacity: 0.9; }
+    100% { transform: translate(112vw, 6px) scaleX(1); opacity: 0; }
+}
+
+/* ─── "Will breed tonight" connectors ─────────────────────────── */
+.connectors {
+    position: absolute;
+    z-index: 3;
+    pointer-events: none;
+    overflow: visible;
+}
+.connectors .link {
+    stroke: rgba(233, 168, 143, 0.85);
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-dasharray: 3 7;
+    filter: drop-shadow(0 0 3px rgba(233, 168, 143, 0.6));
+    animation: link-flow 1.4s linear infinite;
+}
+.connectors .link-heart {
+    fill: rgba(233, 168, 143, 0.9);
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: heart-pulse 2.2s ease-in-out infinite;
+}
+@keyframes link-flow {
+    to { stroke-dashoffset: -20; }
+}
+@keyframes heart-pulse {
+    0%, 100% { transform: scale(0.85); opacity: 0.6; }
+    50%      { transform: scale(1.15); opacity: 1; }
+}
+body.reduce-motion .connectors .link { animation: none; stroke-dasharray: 3 7; }
+body.reduce-motion .connectors .link-heart { animation: none; }
+
+/* ─── Cozy growth + breeding motion beats ─────────────────────── */
+/* A flower easing up into its next stage */
+.flower.grow-in { animation: grow-in 620ms cubic-bezier(0.34, 1.36, 0.64, 1) both; }
+@keyframes grow-in {
+    0%   { transform: scale(0.55) translateY(6%); opacity: 0.2; }
+    60%  { transform: scale(1.08) translateY(0); opacity: 1; }
+    100% { transform: scale(1); }
+}
+/* A brand-new seed dropping into fresh soil after a cross */
+.flower.sprout-in { animation: sprout-in 720ms cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+@keyframes sprout-in {
+    0%   { transform: translateY(-38%) scale(0.4); opacity: 0; }
+    55%  { transform: translateY(4%) scale(1.1); opacity: 1; }
+    100% { transform: translateY(0) scale(1); }
+}
+body.reduce-motion .flower.grow-in,
+body.reduce-motion .flower.sprout-in { animation: none; }
+
+/* Softer sparkle for a plain new sprout (vs. the discovery sparkle) */
+.tile.new-sprout { animation: sprout-glow 1100ms ease-out; }
+@keyframes sprout-glow {
+    0%   { box-shadow: 0 0 0 0 rgba(167, 192, 121, 0.85), inset 0 -2px 0 rgba(0,0,0,0.08); }
+    60%  { box-shadow: 0 0 0 10px rgba(167, 192, 121, 0), inset 0 -2px 0 rgba(0,0,0,0.08); }
+    100% { box-shadow: inset 0 -2px 0 rgba(0,0,0,0.08); }
+}
+
+/* ─── Toast: graceful fade instead of instant hide ────────────── */
+.toast {
+    opacity: 1;
+    transition: opacity 320ms ease, transform 320ms ease;
+}
+.toast.leaving { opacity: 0; transform: translate(-50%, 10px); }
+
+/* ─── Flower polish: gentle gradient + highlight on blooms ────── */
+.flower[data-stage="3"] .petal {
+    background:
+        radial-gradient(circle at 34% 30%, rgba(255,255,255,0.5), transparent 55%),
+        var(--fc, var(--f-red));
+}
+.flower[data-stage="2"] .fl-body {
+    background:
+        radial-gradient(circle at 38% 28%, rgba(255,255,255,0.4), transparent 60%),
+        var(--fc, var(--f-red));
+}
+
+/* ─── Settings: save backup/restore rows ──────────────────────── */
+.set-data-row { display: flex; gap: 8px; }
+.set-data-row .set-text-btn { width: auto; flex: 1; }
+.set-note {
+    font-size: 11px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin: 6px 2px 0;
+    text-align: center;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   PHASE 3 — hyacinths, ornaments, rare finds, richer Bloombook
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ─── Hyacinth bloom — a stacked "spike" of florets ────────────── */
+.flower[data-species="hyacinths"][data-stage="3"] .fl-body {
+    position: relative;
+    width: 62%;
+    height: 86%;
+}
+.flower[data-species="hyacinths"][data-stage="3"] .floret {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    /* widest at the base (i=5), tapering toward the tip (i=0) */
+    width: calc(38% + var(--i) * 4%);
+    height: 26%;
+    top: calc(var(--i) * 13.5%);
+    background:
+        radial-gradient(circle at 40% 32%, rgba(255,255,255,0.55), transparent 55%),
+        var(--fc, var(--f-purple));
+    border-radius: 50% 50% 50% 50% / 62% 62% 44% 44%;
+    box-shadow: inset -1px -1px 0 rgba(0,0,0,0.10);
+}
+.flower[data-species="hyacinths"][data-stage="3"] .fl-body::after {
+    content: "";
+    position: absolute;
+    left: 47%;
+    bottom: -14%;
+    width: 6%;
+    height: 22%;
+    background: var(--grass-dark);
+    border-radius: 3px;
+}
+
+/* ─── Garden ornaments (earned keepsakes on the ground band) ───── */
+.ornaments {
+    position: absolute;
+    inset: 0;
+    z-index: 1;               /* behind the plot (z-index 2), above the sky */
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: var(--radius);
+}
+.ornament {
+    position: absolute;
+    width: var(--ow, 34px);
+    line-height: 0;
+    opacity: 0;
+    animation: ornament-in 900ms ease forwards;
+    filter: drop-shadow(0 2px 2px rgba(74,63,46,0.20));
+}
+.ornament svg { width: 100%; height: auto; display: block; overflow: visible; }
+@keyframes ornament-in {
+    from { opacity: 0; transform: translateY(8px) scale(0.9); }
+    to   { opacity: 0.96; transform: none; }
+}
+body.reduce-motion .ornament { animation: none; opacity: 0.96; }
+
+/* ─── Rare-find tile sparkle (bigger + gold vs. a common discovery) ─ */
+.tile.new-rare { animation: rare-sparkle 2000ms ease-out; z-index: 5; }
+@keyframes rare-sparkle {
+    0%   { box-shadow: 0 0 0 0 rgba(247,214,92,0.95), 0 0 0 0 rgba(233,168,143,0.7), inset 0 -2px 0 rgba(0,0,0,0.08); }
+    45%  { box-shadow: 0 0 16px 9px rgba(247,214,92,0.55), 0 0 0 18px rgba(233,168,143,0), inset 0 -2px 0 rgba(0,0,0,0.08); }
+    100% { box-shadow: inset 0 -2px 0 rgba(0,0,0,0.08); }
+}
+body.reduce-motion .tile.new-rare { animation: none; }
+
+/* ─── Rare-find celebration card ───────────────────────────────── */
+.celebrate {
+    position: fixed;
+    inset: 0;
+    z-index: 500;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: rgba(74, 63, 46, 0.5);
+    animation: fade-in 220ms ease;
+}
+.celebrate[hidden] { display: none; }
+.celebrate-card {
+    position: relative;
+    overflow: hidden;
+    background: var(--cream);
+    border-radius: var(--radius);
+    max-width: 340px;
+    width: 100%;
+    padding: 26px 22px 20px;
+    text-align: center;
+    box-shadow: 0 16px 44px rgba(0,0,0,0.38);
+}
+.celebrate.burst .celebrate-card {
+    animation: card-pop 520ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+@keyframes card-pop {
+    0%   { transform: scale(0.82); opacity: 0.4; }
+    60%  { transform: scale(1.04); opacity: 1; }
+    100% { transform: scale(1); }
+}
+/* Slow golden rays behind the card content */
+.celebrate-rays {
+    position: absolute;
+    left: 50%; top: 34%;
+    width: 460px; height: 460px;
+    transform: translate(-50%, -50%);
+    background: conic-gradient(from 0deg,
+        rgba(247,214,92,0.22) 0 8deg, transparent 8deg 30deg,
+        rgba(247,214,92,0.22) 30deg 38deg, transparent 38deg 60deg,
+        rgba(247,214,92,0.22) 60deg 68deg, transparent 68deg 90deg,
+        rgba(247,214,92,0.22) 90deg 98deg, transparent 98deg 120deg,
+        rgba(247,214,92,0.22) 120deg 128deg, transparent 128deg 150deg,
+        rgba(247,214,92,0.22) 150deg 158deg, transparent 158deg 180deg,
+        rgba(247,214,92,0.22) 180deg 188deg, transparent 188deg 210deg,
+        rgba(247,214,92,0.22) 210deg 218deg, transparent 218deg 240deg,
+        rgba(247,214,92,0.22) 240deg 248deg, transparent 248deg 270deg,
+        rgba(247,214,92,0.22) 270deg 278deg, transparent 278deg 300deg,
+        rgba(247,214,92,0.22) 300deg 308deg, transparent 308deg 330deg,
+        rgba(247,214,92,0.22) 330deg 338deg, transparent 338deg 360deg);
+    pointer-events: none;
+    animation: rays-spin 18s linear infinite;
+}
+@keyframes rays-spin { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.celebrate-card > *:not(.celebrate-rays) { position: relative; z-index: 1; }
+body.reduce-motion .celebrate-rays { animation: none; }
+body.reduce-motion .celebrate.burst .celebrate-card { animation: none; }
+
+.celebrate-badge {
+    display: inline-block;
+    background: linear-gradient(180deg, #F7DE7E, #E7B94A);
+    color: #6b4a12;
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    padding: 4px 13px;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(227,184,78,0.4);
+}
+.celebrate-thumb {
+    width: 104px;
+    height: 104px;
+    margin: 14px auto 4px;
+    display: grid;
+    place-items: center;
+}
+.celebrate-thumb .flower { width: 90%; height: 90%; animation: none; transform: none; }
+.celebrate-name {
+    font-family: "Fraunces", "Georgia", serif;
+    font-weight: 700;
+    text-transform: capitalize;
+    font-size: 23px;
+    margin: 4px 0 8px;
+    color: var(--ink);
+}
+.celebrate-flavor {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
+    margin: 0 0 10px;
+}
+.celebrate-sub {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+}
+.celebrate-close {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    min-height: var(--tap);
+    width: 100%;
+    font-family: inherit;
+    font-weight: 800;
+    font-size: 15px;
+    cursor: pointer;
+}
+.celebrate-close:active { transform: scale(0.97); }
+
+/* ─── Bloombook: locked species tab + filter chips ────────────── */
+.bloombook-tab.locked {
+    opacity: 0.6;
+    background: var(--cream);
+    color: var(--ink-soft);
+    border-style: dashed;
+    cursor: help;
+}
+.dex-filters { display: flex; gap: 6px; margin: 0 0 12px; }
+.dex-filter {
+    padding: 5px 14px;
+    border-radius: 999px;
+    background: var(--cream-warm);
+    border: 1px solid var(--cream-shade);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--ink-soft);
+    cursor: pointer;
+}
+.dex-filter.active { background: var(--accent); color: #fff; border-color: transparent; }
+.dex-empty {
+    color: var(--ink-soft);
+    font-style: italic;
+    font-size: 13px;
+    text-align: center;
+    padding: 16px 8px;
+}
+
+/* ─── Bloombook: discovered/undiscovered flavor cards ─────────── */
+.dex-list { display: flex; flex-direction: column; gap: 10px; }
+.dex-card {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--cream-warm);
+    border: 1px solid var(--cream-shade);
+    border-radius: 12px;
+    padding: 10px 12px;
+}
+.dex-card.filled { background: var(--cream); border-color: var(--accent-soft); }
+.dex-card.unfilled { opacity: 0.9; }
+.dex-card.rare.filled {
+    border-color: #E3B84E;
+    background: linear-gradient(180deg, #FFFBF0, var(--cream));
+    box-shadow: 0 0 0 1px rgba(227,184,78,0.35), 0 2px 8px rgba(227,184,78,0.18);
+}
+.dex-thumb {
+    flex: 0 0 auto;
+    width: 54px;
+    height: 54px;
+    display: grid;
+    place-items: center;
+    background: var(--cream-warm);
+    border-radius: 10px;
+}
+.dex-card.filled .dex-thumb {
+    background: radial-gradient(circle at 50% 42%, #fff, var(--cream-warm));
+}
+.dex-thumb .flower { width: 88%; height: 88%; animation: none; transform: none; }
+.dex-thumb-q {
+    font-family: "Fraunces", "Georgia", serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--cream-shade);
+}
+.dex-card-text { flex: 1 1 auto; min-width: 0; }
+.dex-card-name {
+    font-weight: 800;
+    text-transform: capitalize;
+    color: var(--ink);
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.dex-card-name.muted { color: var(--ink-soft); font-weight: 700; font-size: 14px; text-transform: none; }
+.dex-ribbon {
+    background: linear-gradient(180deg, #F7DE7E, #E7B94A);
+    color: #6b4a12;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 999px;
+}
+.dex-card-flavor { margin: 4px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--ink); }
+.dex-card-flavor.muted { color: var(--ink-soft); font-style: italic; }
+.dex-card-date { margin-top: 5px; font-size: 11px; color: var(--ink-soft); font-style: italic; }
+
+/* ─── Bloombook: rares trophy shelf ────────────────────────────── */
+.dex-shelf-intro { font-size: 12px; color: var(--ink-soft); font-style: italic; margin: 0 0 12px; }
+.dex-shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 12px;
+}
+.trophy { text-align: center; }
+.trophy-plinth {
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    background: var(--cream-warm);
+    border: 1px solid var(--cream-shade);
+}
+.trophy.won .trophy-plinth {
+    background: linear-gradient(180deg, #FFFBF0, var(--cream));
+    border-color: #E3B84E;
+    box-shadow: 0 0 0 1px rgba(227,184,78,0.35), 0 3px 10px rgba(227,184,78,0.2);
+}
+.trophy-plinth .flower { width: 76%; height: 76%; animation: none; transform: none; }
+.trophy.empty .dex-thumb-q { font-size: 26px; }
+.trophy-cap { margin-top: 6px; font-size: 11px; font-weight: 700; text-transform: capitalize; color: var(--ink); }
+.trophy.empty .trophy-cap { color: var(--ink-soft); font-style: italic; text-transform: none; }

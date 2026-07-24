@@ -17,8 +17,15 @@
 
 // ─── 1. CONSTANTS ────────────────────────────────────────────────
 
+// The game's display name lives here (JS side) so a future rename is a
+// single-line edit for everything JS-driven: the topbar header, the browser
+// tab title, and any toast that names the game. The <title> tag and SEO meta
+// in index.html are separate (crawlers read the static HTML) and must be
+// updated there too on a rename — see the report for the exact spots.
+const GAME_NAME = "Petalcraft";
+
 const SAVE_KEY = "petalcraft-save";
-const SAVE_VERSION = 2;
+const SAVE_VERSION = 3;
 
 const GRID_W = 6;
 const GRID_H = 4;
@@ -66,6 +73,7 @@ const SPECIES = {
             "220": "black",  "221": "black",  "222": "red",
         },
         dex: ["white", "yellow", "red", "pink", "orange", "black"],
+        rare: ["black"],
     },
     tulips: {
         name: "Tulips",
@@ -83,6 +91,7 @@ const SPECIES = {
             "220": "purple", "221": "purple", "222": "purple",
         },
         dex: ["white", "yellow", "red", "pink", "orange", "purple", "black"],
+        rare: ["purple", "black"],
     },
     pansies: {
         name: "Pansies",
@@ -100,6 +109,31 @@ const SPECIES = {
             "220": "orange", "221": "orange", "222": "purple",
         },
         dex: ["white", "yellow", "red", "orange", "blue", "purple"],
+        rare: ["blue", "purple"],
+    },
+    // Hyacinths — the first progression-unlocked species. 3-gene, distinctive
+    // "spike" silhouette (a stacked cluster of florets). Phenotype table cross-
+    // verified 2026-07-24 against Joey Parrish's GPLv3 phenotypes.py source
+    // (hyacinth = expand3('wwu','yyw','yyy','rpw','oyy','oyy','rrr','urr','lll'),
+    // decoded w/y/r/p/o=blue(u)/purple(l)) — same lineage as the tables above.
+    // Seeds: red 201, yellow 020, white 001 — each resolves to its own color below.
+    hyacinths: {
+        name: "Hyacinths",
+        genes: 3,
+        seeds: { red: "201", yellow: "020", white: "001" },
+        table: {
+            "000": "white",  "001": "white",  "002": "blue",
+            "010": "yellow", "011": "yellow", "012": "white",
+            "020": "yellow", "021": "yellow", "022": "yellow",
+            "100": "red",    "101": "pink",   "102": "white",
+            "110": "orange", "111": "yellow", "112": "yellow",
+            "120": "orange", "121": "yellow", "122": "yellow",
+            "200": "red",    "201": "red",    "202": "red",
+            "210": "blue",   "211": "red",    "212": "red",
+            "220": "purple", "221": "purple", "222": "purple",
+        },
+        dex: ["white", "yellow", "red", "pink", "orange", "blue", "purple"],
+        rare: ["blue", "purple"],
     },
 };
 
@@ -108,7 +142,20 @@ const SEED_COLORS = ["red", "yellow", "white"];
 
 // Unlock schedule (DESIGN.md §4.2). cosmos is free from day 1; the others
 // unlock from garden progress so the first ~15 min is one self-contained puzzle.
-const UNLOCK_ORDER = ["cosmos", "tulips", "pansies"];
+// Order matters: it's how locked species queue up as "coming" tabs/hints.
+const UNLOCK_ORDER = ["cosmos", "tulips", "pansies", "hyacinths"];
+
+// A short, non-spoiling hint shown on each locked species' Bloombook tab. Says
+// the species exists and roughly why it's coming, never the exact trigger —
+// discovery stays a surprise (Madderverse Promise: you just haven't found it yet).
+const LOCKED_HINT = {
+    tulips:    "Grow your first cosmos hybrid and these arrive.",
+    pansies:   "A few more cosmos in the Bloombook and these open up.",
+    hyacinths: "Keep filling the Bloombook — these bloom into reach with time.",
+};
+
+// How many total discovered flowers (across species) unlocks hyacinths.
+const HYACINTH_UNLOCK_DEX = 10;
 
 // Flavor text for the Bloombook — written in Onion's voice.
 const FLAVOR = {
@@ -137,7 +184,103 @@ const FLAVOR = {
         blue:   "Not quite blue, but close enough to make you look twice. And it comes from the plainest white — which is sort of the whole point.",
         purple: "Deep and quietly proud. The reward for a few good crosses.",
     },
+    hyacinths: {
+        white:  "Tidy little bells, stacked neat as a stairway. A calm place to start.",
+        yellow: "Butter-bright and faintly sweet. The kind of smell you notice before you see it.",
+        red:    "A warm spire that leans toward the sun. Steady work got you here.",
+        pink:   "Softer than the red, and it seems to know it. A quiet favorite.",
+        orange: "Sunset stacked into a single stem. Turned up when two warm colors met.",
+        blue:   "The one people come to see. It rises out of the plainest white, which never stops feeling like a small trick you pulled off.",
+        purple: "Deep as evening and just as unhurried. A few good crosses and patience made this.",
+    },
 };
+
+// ─── Garden ornaments ─────────────────────────────────────────────
+// Cozy, gameplay-neutral keepsakes that appear in the garden scene as you
+// fill the Bloombook. Pure decoration — no stats, no timers, nothing to lose.
+// Each unlocks from progress the player makes anyway (DESIGN.md §4.7 reward loop),
+// so nobody has to grind FOR an ornament — they just turn up. `at` returns true
+// once earned; `svg` is drawn inline (zero art assets). `pos` places it on the
+// ground band behind the plot.
+const ORNAMENTS = [
+    {
+        id: "mushrooms", name: "a little ring of mushrooms",
+        at: (s) => totalDex() >= 4,
+        pos: { left: 8, bottom: 4 }, w: 34,
+        svg: `<svg viewBox="0 0 40 30"><g>
+            <ellipse cx="20" cy="27" rx="16" ry="3" fill="rgba(74,63,46,0.12)"/>
+            <path d="M6 18a6 5 0 0112 0z" fill="#C9695A"/><rect x="10" y="17" width="4" height="8" rx="2" fill="#F1E7CF"/>
+            <circle cx="8.5" cy="15.5" r="1" fill="#F7EFDD"/><circle cx="11" cy="16.6" r="0.8" fill="#F7EFDD"/>
+            <path d="M20 14a7 6 0 0114 0z" fill="#D8756A"/><rect x="25" y="13" width="4.5" height="11" rx="2.2" fill="#F1E7CF"/>
+            <circle cx="23" cy="11.5" r="1.1" fill="#F7EFDD"/><circle cx="26" cy="12.8" r="0.9" fill="#F7EFDD"/>
+        </g></svg>`,
+    },
+    {
+        id: "birdbath", name: "a stone birdbath",
+        at: (s) => rareCount() >= 1,
+        pos: { left: 78, bottom: 3 }, w: 40,
+        svg: `<svg viewBox="0 0 40 44"><g>
+            <ellipse cx="20" cy="41" rx="13" ry="3" fill="rgba(74,63,46,0.12)"/>
+            <rect x="17" y="20" width="6" height="20" rx="2" fill="#B8AE97"/>
+            <path d="M6 18h28a14 6 0 01-28 0z" fill="#CFC6AE"/>
+            <ellipse cx="20" cy="18" rx="14" ry="5" fill="#DDD5BF"/>
+            <ellipse cx="20" cy="18" rx="10" ry="3.2" fill="#8FC0CE"/>
+            <circle cx="30" cy="12" r="2.4" fill="#8A6FB0"/><path d="M30 12l3-1-3 2z" fill="#6E5691"/>
+        </g></svg>`,
+    },
+    {
+        id: "bench", name: "a garden bench",
+        at: (s) => speciesCompleteCount() >= 1,
+        pos: { left: 26, bottom: 3 }, w: 46,
+        svg: `<svg viewBox="0 0 52 34"><g>
+            <ellipse cx="26" cy="31" rx="20" ry="3" fill="rgba(74,63,46,0.12)"/>
+            <rect x="7" y="17" width="38" height="5" rx="2" fill="#B98C64"/>
+            <rect x="7" y="9" width="38" height="4" rx="2" fill="#C99A70"/>
+            <rect x="9" y="22" width="4" height="9" rx="1.5" fill="#8A6947"/>
+            <rect x="39" y="22" width="4" height="9" rx="1.5" fill="#8A6947"/>
+            <rect x="9" y="9" width="4" height="13" rx="1.5" fill="#A57B54"/>
+            <rect x="39" y="9" width="4" height="13" rx="1.5" fill="#A57B54"/>
+        </g></svg>`,
+    },
+    {
+        id: "sundial", name: "a sundial",
+        at: (s) => speciesCompleteCount() >= 2,
+        pos: { left: 60, bottom: 4 }, w: 34,
+        svg: `<svg viewBox="0 0 36 40"><g>
+            <ellipse cx="18" cy="37" rx="12" ry="3" fill="rgba(74,63,46,0.12)"/>
+            <rect x="15" y="18" width="6" height="19" rx="2" fill="#B8AE97"/>
+            <ellipse cx="18" cy="18" rx="12" ry="4" fill="#DDD5BF"/>
+            <ellipse cx="18" cy="17" rx="9" ry="3" fill="#CFC6AE"/>
+            <path d="M18 16l6-8-3 8z" fill="#8A6947"/>
+        </g></svg>`,
+    },
+    {
+        id: "lantern", name: "a paper lantern",
+        at: (s) => speciesCompleteCount() >= 3,
+        pos: { left: 44, bottom: 5 }, w: 26,
+        svg: `<svg viewBox="0 0 24 44"><g>
+            <ellipse cx="12" cy="41" rx="7" ry="2.4" fill="rgba(74,63,46,0.12)"/>
+            <rect x="11" y="2" width="2" height="8" fill="#8A6947"/>
+            <path d="M12 10c8 0 8 20 0 20s-8-20 0-20z" fill="#F0C070" opacity="0.92"/>
+            <ellipse cx="12" cy="20" rx="7.5" ry="9" fill="none" stroke="#D89A4A" stroke-width="0.8" opacity="0.5"/>
+            <rect x="8" y="30" width="8" height="10" rx="1.5" fill="#9C7A54"/>
+        </g></svg>`,
+    },
+    {
+        id: "topiary", name: "a flowering topiary",
+        at: (s) => speciesCompleteCount() >= 4,
+        pos: { left: 90, bottom: 3 }, w: 30,
+        svg: `<svg viewBox="0 0 32 46"><g>
+            <ellipse cx="16" cy="43" rx="10" ry="3" fill="rgba(74,63,46,0.12)"/>
+            <rect x="14" y="24" width="4" height="17" fill="#8A6947"/>
+            <circle cx="16" cy="16" r="12" fill="#7A9557"/>
+            <circle cx="16" cy="13" r="9" fill="#89A566" opacity="0.6"/>
+            <circle cx="11" cy="12" r="2" fill="#E89AB2"/><circle cx="20" cy="10" r="2" fill="#F1D65C"/>
+            <circle cx="22" cy="18" r="2" fill="#9B7BC0"/><circle cx="10" cy="20" r="2" fill="#E9925A"/>
+            <circle cx="16" cy="22" r="2" fill="#F3EEE0"/>
+        </g></svg>`,
+    },
+];
 
 const GROWTH_STAGES = ["seed", "sprout", "bud", "bloom"];
 
@@ -221,14 +364,17 @@ const state = {
         tiles: Array(GRID_W * GRID_H).fill(null),
     },
     seedInventory: {
-        cosmos:  { red: Infinity, yellow: Infinity, white: Infinity },
-        tulips:  { red: Infinity, yellow: Infinity, white: Infinity },
-        pansies: { red: Infinity, yellow: Infinity, white: Infinity },
+        cosmos:    { red: Infinity, yellow: Infinity, white: Infinity },
+        tulips:    { red: Infinity, yellow: Infinity, white: Infinity },
+        pansies:   { red: Infinity, yellow: Infinity, white: Infinity },
+        hyacinths: { red: Infinity, yellow: Infinity, white: Infinity },
     },
-    unlockedSpecies: ["cosmos"],   // tulips + pansies unlock via progress
-    flowerdex: { cosmos: {}, tulips: {}, pansies: {} },
+    unlockedSpecies: ["cosmos"],   // tulips, pansies, hyacinths unlock via progress
+    flowerdex: { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {} },
+    seenOrnaments: [],             // ornament ids already announced (persisted)
     settings: {
         sound: true,
+        ambient: true,      // quiet garden ambience (wind, birds, crickets)
         speed: DEFAULT_SPEED,
         reducedMotion: false,
     },
@@ -237,7 +383,8 @@ const state = {
     ui: {
         armedSeed: null,
         bloombookOpen: false,
-        bloombookTab: "cosmos",
+        bloombookTab: "cosmos",     // a species id, or "__rares" for the trophy shelf
+        bloombookFilter: "all",     // "all" | "found" | "rare"
     },
     lastSaveAt: 0,
 };
@@ -253,6 +400,43 @@ function inGameMinutesPerRealMs() {
 
 function dexCount(species) {
     return Object.keys(state.flowerdex[species] || {}).length;
+}
+
+/** Is `color` a signature "rare" flower for this species? */
+function isRare(species, color) {
+    const r = SPECIES[species] && SPECIES[species].rare;
+    return !!(r && r.includes(color));
+}
+
+/** Total DISTINCT colors discovered across every species (dex entries). */
+function totalDex() {
+    let n = 0;
+    for (const sp of UNLOCK_ORDER) {
+        const found = state.flowerdex[sp] || {};
+        n += SPECIES[sp].dex.filter(c => found[c]).length;
+    }
+    return n;
+}
+
+/** How many rare flowers the player has found (across all species). */
+function rareCount() {
+    let n = 0;
+    for (const sp of UNLOCK_ORDER) {
+        const found = state.flowerdex[sp] || {};
+        for (const c of (SPECIES[sp].rare || [])) if (found[c]) n++;
+    }
+    return n;
+}
+
+/** Is every color in this species' dex discovered? */
+function isSpeciesComplete(species) {
+    const found = state.flowerdex[species] || {};
+    return SPECIES[species].dex.every(c => found[c]);
+}
+
+/** Count of species whose dex is fully filled. */
+function speciesCompleteCount() {
+    return UNLOCK_ORDER.filter(isSpeciesComplete).length;
 }
 
 function systemReducedMotion() {
@@ -299,6 +483,7 @@ function plant(x, y, species, color) {
         genotype: SPECIES[species].seeds[color],
         stage: 0,
         watered: false,
+        wetLevel: 0,        // transient (not saved): drives the drying droplet
         failedBreeds: 0,
     });
     if (inv[color] !== Infinity) inv[color] -= 1;
@@ -309,13 +494,14 @@ function waterTile(x, y) {
     const t = tileAt(x, y);
     if (!t || t.watered) return false;
     t.watered = true;
+    t.wetLevel = 1;
     return true;
 }
 
 function waterAll() {
     let n = 0;
     for (const t of state.grid.tiles) {
-        if (t && !t.watered) { t.watered = true; n++; }
+        if (t && !t.watered) { t.watered = true; t.wetLevel = 1; n++; }
     }
     return n;
 }
@@ -364,7 +550,7 @@ function rollDay() {
                 if (spot) {
                     newBabies.push({
                         x: spot[0], y: spot[1],
-                        tile: { species: t.species, genotype: breed(t.genotype, n.genotype), stage: 0, watered: false, failedBreeds: 0 },
+                        tile: { species: t.species, genotype: breed(t.genotype, n.genotype), stage: 0, watered: false, wetLevel: 0, failedBreeds: 0 },
                     });
                 }
                 t.failedBreeds = 0;
@@ -378,24 +564,26 @@ function rollDay() {
 
     // 3. Place babies (deferred so they don't participate in this day's roll).
     const discoveries = [];
+    const babyCoords = [];
     for (const { x, y, tile } of newBabies) {
         if (tileAt(x, y) !== null) continue;
         setTile(x, y, tile);
+        babyCoords.push({ x, y });
         const color = phenotype(tile.species, tile.genotype);
         if (!state.flowerdex[tile.species][color]) {
             state.flowerdex[tile.species][color] = { firstSeen: isoDate(), genotype: tile.genotype };
-            discoveries.push({ species: tile.species, color, x, y });
+            discoveries.push({ species: tile.species, color, x, y, rare: isRare(tile.species, color) });
         }
     }
 
     // 4. Dry-out for the new day, then roll weather (rain re-waters everything).
-    for (const t of state.grid.tiles) { if (t) t.watered = false; }
+    for (const t of state.grid.tiles) { if (t) { t.watered = false; t.wetLevel = 0; } }
     state.clock.raining = Math.random() < RAIN_CHANCE;
     if (state.clock.raining) {
-        for (const t of state.grid.tiles) { if (t) t.watered = true; }
+        for (const t of state.grid.tiles) { if (t) { t.watered = true; t.wetLevel = 1; } }
     }
 
-    return { babies: newBabies.length, discoveries };
+    return { babies: newBabies.length, discoveries, babyCoords };
 }
 
 /**
@@ -412,11 +600,14 @@ function advanceTimeTo(targetMinutes) {
     let rollovers = Math.max(0, newDayIdx - prevDayIdx);
     const capped = Math.min(rollovers, MAX_CATCHUP_DAYS);
 
-    const agg = { babies: 0, discoveries: [], days: rollovers };
+    const agg = { babies: 0, discoveries: [], babyCoords: [], days: rollovers };
     for (let i = 0; i < capped; i++) {
         const r = rollDay();
         agg.babies += r.babies;
         agg.discoveries.push(...r.discoveries);
+        // Only the LAST rollover's sprouts still exist as sprouts (earlier ones
+        // grew), so keep just the final day's coords for the sparkle.
+        agg.babyCoords = r.babyCoords;
     }
     if (agg.discoveries.length) checkUnlocks();
     return agg;
@@ -480,6 +671,9 @@ function checkUnlocks() {
 
     if (!isUnlocked("tulips") && cosmosHybrids >= 1 && unlockSpecies("tulips")) newly.push("tulips");
     if (!isUnlocked("pansies") && cosmosColors.length >= 5 && unlockSpecies("pansies")) newly.push("pansies");
+    // Hyacinths open once the Bloombook has some breadth to it — a natural
+    // "you've been at this a while" gate, reachable at the player's own pace.
+    if (!isUnlocked("hyacinths") && totalDex() >= HYACINTH_UNLOCK_DEX && unlockSpecies("hyacinths")) newly.push("hyacinths");
     return newly;
 }
 
@@ -502,7 +696,27 @@ function serialize() {
         settings: { ...state.settings },
         seenOnboarding: state.seenOnboarding,
         goalIndex: state.goalIndex,
+        seenOrnaments: state.seenOrnaments.slice(),
     };
+}
+
+/**
+ * Bring an older save's shape up to the current schema. A no-op for v2 today,
+ * but every future breaking change adds a step here — a v1 save falls through
+ * every branch and lands whole. Called before deserialize().
+ */
+function migrateSave(data) {
+    if (!data || typeof data !== "object") return data;
+    let v = data.version || 1;
+    // v1 → v2: pansies bucket + clock.lastRealMs were added; deserialize already
+    // backfills both defensively, so nothing destructive is needed here.
+    if (v < 2) { v = 2; }
+    // v2 → v3: hyacinths species + seenOrnaments were added. Both are backfilled
+    // defensively in deserialize (dex/inventory buckets, seenOrnaments default []),
+    // so a v2 save falls through whole — no data touched.
+    if (v < 3) { v = 3; }
+    data.version = SAVE_VERSION;
+    return data;
 }
 
 function deserialize(data) {
@@ -518,17 +732,25 @@ function deserialize(data) {
         state.grid.w = data.grid.w || GRID_W;
         state.grid.h = data.grid.h || GRID_H;
         state.grid.tiles = data.grid.tiles.map(t => t === null ? null : {
-            species: t.s, genotype: t.g, stage: t.st ?? 0, watered: !!t.wet, failedBreeds: t.fb || 0,
+            species: t.s, genotype: t.g, stage: t.st ?? 0, watered: !!t.wet,
+            wetLevel: t.wet ? 0.6 : 0,   // transient; approximate on load
+            failedBreeds: t.fb || 0,
         });
     }
-    if (Array.isArray(data.unlocked)) state.unlockedSpecies = data.unlocked;
+    if (Array.isArray(data.unlocked)) {
+        // Keep only species we still ship (guards against a renamed/removed id).
+        state.unlockedSpecies = data.unlocked.filter(s => SPECIES[s]);
+        if (!state.unlockedSpecies.length) state.unlockedSpecies = ["cosmos"];
+    }
     if (data.dex && typeof data.dex === "object") {
-        // Ensure all three species buckets exist (v1 saves predate pansies).
-        state.flowerdex = { cosmos: {}, tulips: {}, pansies: {}, ...data.dex };
+        // Ensure every species bucket exists (older saves predate pansies/hyacinths).
+        state.flowerdex = { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {}, ...data.dex };
         for (const sp of UNLOCK_ORDER) if (!state.flowerdex[sp]) state.flowerdex[sp] = {};
     }
+    if (Array.isArray(data.seenOrnaments)) state.seenOrnaments = data.seenOrnaments.slice();
     if (data.settings && typeof data.settings === "object") {
         state.settings.sound = data.settings.sound !== false;
+        state.settings.ambient = data.settings.ambient !== false;
         state.settings.speed = SPEED_PRESETS[data.settings.speed] ? data.settings.speed : DEFAULT_SPEED;
         state.settings.reducedMotion = !!data.settings.reducedMotion;
     }
@@ -553,13 +775,56 @@ function saveSoon() {
     }, 500);
 }
 
+// Set true by loadFromStorage when a save existed but couldn't be read, so
+// init() can greet the player gently instead of silently wiping their garden.
+let loadWasCorrupt = false;
+
 function loadFromStorage() {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    let parsed;
     try {
-        const raw = localStorage.getItem(SAVE_KEY);
-        if (!raw) return false;
-        return deserialize(JSON.parse(raw));
+        parsed = JSON.parse(raw);
     } catch (e) {
-        console.warn("[petalcraft] load failed:", e);
+        console.warn("[petalcraft] save is unreadable; backing it up and starting fresh:", e);
+        stashCorruptSave(raw);
+        loadWasCorrupt = true;
+        return false;
+    }
+    try {
+        const ok = deserialize(migrateSave(parsed));
+        if (!ok) throw new Error("deserialize rejected the save shape");
+        return true;
+    } catch (e) {
+        console.warn("[petalcraft] save couldn't be applied; backing it up and starting fresh:", e);
+        stashCorruptSave(raw);
+        loadWasCorrupt = true;
+        return false;
+    }
+}
+
+/** Keep the last broken save around (once) so nothing is silently destroyed. */
+function stashCorruptSave(raw) {
+    try { localStorage.setItem(SAVE_KEY + "-corrupt", raw); } catch (e) { /* quota — nothing to do */ }
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+}
+
+/** Export the current save as a JSON string (for the Settings backup button). */
+function exportSaveString() {
+    return JSON.stringify(serialize());
+}
+
+/** Apply an imported save string. Returns true on success. */
+function importSaveString(str) {
+    let parsed;
+    try { parsed = JSON.parse(str); } catch (e) { return false; }
+    try {
+        const ok = deserialize(migrateSave(parsed));
+        if (!ok) return false;
+        localStorage.setItem(SAVE_KEY, JSON.stringify(serialize()));
+        return true;
+    } catch (e) {
+        console.warn("[petalcraft] import failed:", e);
         return false;
     }
 }
@@ -611,11 +876,125 @@ function sfx(name) {
             [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => blip(ctx, f, t + i * 0.10, 0.42, "sine", 0.13));
             break;
         }
+        case "rare": {                       // a rare find — grander, a bell-ring finish
+            // A fuller major arpeggio, a beat slower, then a shimmering octave chord.
+            [392.0, 523.25, 659.25, 783.99, 1046.5].forEach((f, i) => blip(ctx, f, t + i * 0.11, 0.5, "sine", 0.12));
+            [1046.5, 1318.5, 1568.0].forEach((f) => blip(ctx, f, t + 0.66, 1.4, "sine", 0.07));
+            break;
+        }
         case "unlock":                       // new seeds — two-note chime
             blip(ctx, 659.25, t, 0.5, "sine", 0.12);
             blip(ctx, 987.77, t + 0.12, 0.6, "sine", 0.1);
             break;
     }
+}
+
+// ─── 8b. AMBIENCE (synthesized, very quiet, toggleable) ──────────
+// A soft wind bed (filtered noise with slow gusts) plus the odd bird by day
+// and crickets by night. All generated — no audio files, works offline.
+
+let ambient = { on: false, wind: null, chirpTimer: 0 };
+
+function makeNoiseBuffer(ctx) {
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        last = (last + 0.02 * w) / 1.02;   // brown-ish: smoother, softer than white
+        d[i] = last * 3.2;
+    }
+    return buf;
+}
+
+function startAmbient() {
+    if (!state.settings.ambient) return;
+    const ctx = ensureAudio();
+    if (!ctx || ambient.wind) return;
+
+    const src = ctx.createBufferSource();
+    src.buffer = makeNoiseBuffer(ctx);
+    src.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 520;
+
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0;
+
+    // Slow gusts: an LFO gently swelling the wind volume.
+    const lfo = ctx.createOscillator();
+    const lfoGain = ctx.createGain();
+    lfo.frequency.value = 0.06;
+    lfoGain.gain.value = 0.010;
+    lfo.connect(lfoGain).connect(gain.gain);
+
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.014, ctx.currentTime + 3);   // fade in
+    src.start();
+    lfo.start();
+
+    ambient.wind = { src, filter, gain, lfo, lfoGain };
+    ambient.on = true;
+    scheduleChirp();
+}
+
+function stopAmbient() {
+    ambient.on = false;
+    clearTimeout(ambient.chirpTimer);
+    const w = ambient.wind;
+    if (!w) return;
+    ambient.wind = null;
+    try {
+        const ctx = audioCtx;
+        w.gain.gain.cancelScheduledValues(ctx.currentTime);
+        w.gain.gain.setValueAtTime(w.gain.gain.value, ctx.currentTime);
+        w.gain.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 1.2);
+        w.src.stop(ctx.currentTime + 1.3);
+        w.lfo.stop(ctx.currentTime + 1.3);
+    } catch (e) { /* already stopped */ }
+}
+
+function syncAmbient() {
+    if (state.settings.ambient && state.settings.sound !== false) startAmbient();
+    else stopAmbient();
+}
+
+function birdChirp(ctx) {
+    // Two or three quick rising notes — a small "tweet".
+    const t = ctx.currentTime;
+    const base = 1400 + Math.random() * 900;
+    const notes = 2 + (Math.random() < 0.5 ? 1 : 0);
+    for (let i = 0; i < notes; i++) {
+        const o = blip(ctx, base + i * 220, t + i * 0.09, 0.10, "sine", 0.028);
+        o.frequency.exponentialRampToValueAtTime(base + i * 220 + 300, t + i * 0.09 + 0.09);
+    }
+}
+
+function cricket(ctx) {
+    // A soft high tremolo pulse.
+    const t = ctx.currentTime;
+    for (let i = 0; i < 3; i++) blip(ctx, 2600, t + i * 0.07, 0.05, "triangle", 0.014);
+}
+
+function scheduleChirp() {
+    clearTimeout(ambient.chirpTimer);
+    if (!ambient.on) return;
+    const seg = currentSegment();
+    const dayish = seg === "morning" || seg === "afternoon";
+    // Birds by day are sparse; crickets by night steadier but quiet.
+    const delay = dayish ? 6000 + Math.random() * 12000 : 4000 + Math.random() * 6000;
+    ambient.chirpTimer = setTimeout(() => {
+        const ctx = audioCtx;
+        if (ambient.on && ctx && state.settings.sound !== false && !motionOff()) {
+            if (dayish) { if (Math.random() < 0.8) birdChirp(ctx); }
+            else if (seg === "night") { if (Math.random() < 0.7) cricket(ctx); }
+        }
+        scheduleChirp();
+    }, delay);
 }
 
 // ─── 9. RENDERING ────────────────────────────────────────────────
@@ -632,6 +1011,14 @@ const toastEl = document.getElementById("toast");
 const bloombookEl = document.getElementById("bloombook");
 const bloombookTabsEl = document.getElementById("bloombook-tabs");
 const bloombookBodyEl = document.getElementById("bloombook-body");
+const skyEl = document.getElementById("sky");
+const sunEl = document.getElementById("sun");
+const moonEl = document.getElementById("moon");
+const starsEl = document.getElementById("stars");
+const cloudsEl = document.getElementById("clouds");
+const sceneVeilEl = document.getElementById("scene-veil");
+const ambientFxEl = document.getElementById("ambient-fx");
+const connectorsEl = document.getElementById("connectors");
 
 gardenEl.style.setProperty("--gw", state.grid.w);
 gardenEl.style.setProperty("--gh", state.grid.h);
@@ -651,7 +1038,7 @@ function buildGrid() {
     }
 }
 
-function renderGrid(highlights) {
+function renderGrid(highlights, sprouts, rareHighlights) {
     const tiles = gardenEl.children;
     for (let i = 0; i < tiles.length; i++) {
         const el = tiles[i];
@@ -661,21 +1048,42 @@ function renderGrid(highlights) {
 
         el.classList.toggle("watered", !!(t && t.watered));
         el.classList.toggle("plant-target", !!state.ui.armedSeed && t === null);
+        if (!t || !t.watered) { el.style.removeProperty("--wet"); delete el.dataset.wet; }
 
+        const oldSig = el.dataset.sig;
         const sig = t === null ? "empty"
             : t.species + ":" + t.stage + ":" + phenotype(t.species, t.genotype);
-        if (el.dataset.sig !== sig) {
+        if (oldSig !== sig) {
             el.dataset.sig = sig;
             el.innerHTML = "";
-            if (t !== null) el.appendChild(makeFlowerEl(t));
+            if (t !== null) {
+                const fl = makeFlowerEl(t);
+                // Ease into the change: pop a brand-new sprout, grow an existing
+                // flower up into its next stage.
+                if (!motionOff()) {
+                    if (oldSig === "empty" || oldSig === undefined) fl.classList.add("sprout-in");
+                    else fl.classList.add("grow-in");
+                }
+                el.appendChild(fl);
+            }
         }
 
-        if (highlights && highlights.has(x + "," + y)) {
+        if (rareHighlights && rareHighlights.has(x + "," + y)) {
+            el.classList.remove("new-rare");
+            void el.offsetWidth;
+            el.classList.add("new-rare");
+        } else if (highlights && highlights.has(x + "," + y)) {
             el.classList.remove("new-hybrid");
             void el.offsetWidth;
             el.classList.add("new-hybrid");
+        } else if (sprouts && sprouts.has(x + "," + y)) {
+            el.classList.remove("new-sprout");
+            void el.offsetWidth;
+            el.classList.add("new-sprout");
         }
     }
+    updateWetVisuals();
+    layoutConnectors();
 }
 
 function makeFlowerEl(tile) {
@@ -690,8 +1098,16 @@ function makeFlowerEl(tile) {
     body.className = "fl-body";
     wrap.appendChild(body);
 
-    // Cosmos + pansies bloom as a petalled face; tulips use a CSS cup.
-    if (tile.stage === 3 && tile.species !== "tulips") {
+    // Bloom shapes differ by species: hyacinths = a stacked "spike" of florets,
+    // tulips = a CSS cup (::before), cosmos + pansies = a 5-petal face.
+    if (tile.stage === 3 && tile.species === "hyacinths") {
+        for (let i = 0; i < 6; i++) {
+            const fl = document.createElement("div");
+            fl.className = "floret";
+            fl.style.setProperty("--i", i);
+            body.appendChild(fl);
+        }
+    } else if (tile.stage === 3 && tile.species !== "tulips") {
         for (let i = 0; i < 5; i++) {
             const petal = document.createElement("div");
             petal.className = "petal";
@@ -715,7 +1131,11 @@ function renderClock() {
     const c = gardenWrapEl.classList;
     c.toggle("night", seg === "night");
     c.toggle("dusk", seg === "evening");
+    c.toggle("morning", seg === "morning");
     c.toggle("rainy", state.clock.raining);
+
+    updateSky(true);
+    updateFireflies();
 
     // Rain particle layer follows weather + motion pref.
     if (rainEl) rainEl.hidden = !(state.clock.raining && !motionOff());
@@ -727,6 +1147,322 @@ function currentSegment() {
         if (frac >= seg.start && frac < seg.end) return seg.name;
     }
     return "morning";
+}
+
+function dayFraction() {
+    return (state.clock.totalMinutes % MINUTES_PER_DAY) / MINUTES_PER_DAY;
+}
+
+// ─── 9b. LIVING SKY ──────────────────────────────────────────────
+// A continuous day→dusk→night→dawn gradient interpolated from these stops,
+// plus a sun/moon that arc across and stars that fade in after dark.
+
+const SKY_STOPS = [
+    { f: 0.00, top: "#2b3055", bot: "#4a4a6b", star: 1.00 },
+    { f: 0.22, top: "#4a4368", bot: "#8a6b7a", star: 0.80 },
+    { f: 0.28, top: "#f0b48a", bot: "#f6d6a8", star: 0.00 },
+    { f: 0.38, top: "#bfe0e6", bot: "#eaf3e0", star: 0.00 },
+    { f: 0.50, top: "#b9e2ee", bot: "#e9f4df", star: 0.00 },
+    { f: 0.72, top: "#cfe6e2", bot: "#f2ead2", star: 0.00 },
+    { f: 0.80, top: "#f4c98a", bot: "#f7d9a0", star: 0.00 },
+    { f: 0.86, top: "#d99a86", bot: "#e9b892", star: 0.18 },
+    { f: 0.92, top: "#6b5a86", bot: "#a97e8e", star: 0.55 },
+    { f: 1.00, top: "#2b3055", bot: "#4a4a6b", star: 1.00 },
+];
+
+function hexToRgb(h) {
+    const n = parseInt(h.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function lerp(a, b, t) { return a + (b - a) * t; }
+function lerpColor(a, b, t) {
+    const ca = hexToRgb(a), cb = hexToRgb(b);
+    return `rgb(${Math.round(lerp(ca[0], cb[0], t))},${Math.round(lerp(ca[1], cb[1], t))},${Math.round(lerp(ca[2], cb[2], t))})`;
+}
+
+function skyAt(f) {
+    for (let i = 0; i < SKY_STOPS.length - 1; i++) {
+        const a = SKY_STOPS[i], b = SKY_STOPS[i + 1];
+        if (f >= a.f && f <= b.f) {
+            const t = (f - a.f) / (b.f - a.f || 1);
+            return { top: lerpColor(a.top, b.top, t), bot: lerpColor(a.bot, b.bot, t), star: lerp(a.star, b.star, t) };
+        }
+    }
+    return { top: SKY_STOPS[0].top, bot: SKY_STOPS[0].bot, star: SKY_STOPS[0].star };
+}
+
+let lastSkyF = -1;
+function updateSky(force) {
+    if (!skyEl) return;
+    const f = dayFraction();
+    if (!force && Math.abs(f - lastSkyF) < 0.002) return;   // throttle DOM writes
+    lastSkyF = f;
+
+    const sky = skyAt(f);
+    skyEl.style.setProperty("--sky-top", sky.top);
+    skyEl.style.setProperty("--sky-bot", sky.bot);
+    if (starsEl) starsEl.style.opacity = sky.star.toFixed(2);
+    if (sceneVeilEl) sceneVeilEl.style.opacity = (sky.star * 0.6).toFixed(2);
+
+    // Sun arc: rises ~0.25, sets ~0.80. Moon takes the opposite span.
+    positionCelestial(sunEl, f, 0.25, 0.80);
+    positionCelestial(moonEl, f, 0.80, 1.25);   // wraps past midnight
+}
+
+function positionCelestial(el, f, rise, set) {
+    if (!el) return;
+    // Normalise f into the [rise, set] window (moon's set may exceed 1.0).
+    let ff = f;
+    if (set > 1 && f < rise) ff = f + 1;   // moon after midnight
+    const span = set - rise;
+    const p = (ff - rise) / span;          // 0 at rise, 1 at set
+    if (p < 0 || p > 1) { el.style.setProperty("--vis", "0"); return; }
+    const x = 0.08 + p * 0.84;             // left→right across the sky
+    const y = 0.62 - Math.sin(Math.PI * p) * 0.5;   // arc up then down
+    el.style.setProperty("--cx", x.toFixed(3));
+    el.style.setProperty("--cy", y.toFixed(3));
+    // Fade in near the horizon at both ends.
+    const vis = Math.min(1, Math.sin(Math.PI * p) * 2.2);
+    el.style.setProperty("--vis", Math.max(0, vis).toFixed(2));
+}
+
+// Drifting clouds — a few, seeded once. Motion-gated by CSS.
+function initClouds() {
+    if (!cloudsEl) return;
+    cloudsEl.innerHTML = "";
+    const specs = [
+        { w: 96, y: 12, dur: 74, delay: -8 },
+        { w: 64, y: 26, dur: 96, delay: -40 },
+        { w: 120, y: 6, dur: 120, delay: -70 },
+    ];
+    for (const s of specs) {
+        const c = document.createElement("div");
+        c.className = "cloud";
+        c.style.setProperty("--cw", s.w + "px");
+        c.style.setProperty("--cy", s.y + "%");
+        c.style.setProperty("--cdur", s.dur + "s");
+        c.style.setProperty("--cdelay", s.delay + "s");
+        cloudsEl.appendChild(c);
+    }
+}
+
+// ─── 9c. WATER EVAPORATION VISUALS ───────────────────────────────
+// wetLevel decays over the in-game day (breeding still keys off the boolean
+// `watered`, so this is purely the drying-droplet look — never a punishment).
+const WET_FLOOR = 0.22;
+const WET_DECAY_PER_MIN = 0.75 / 720;   // ~1.0 → floor over half an in-game day
+
+function decayWetness(inGameMinutes) {
+    if (inGameMinutes <= 0) return;
+    for (const t of state.grid.tiles) {
+        if (t && t.watered && t.wetLevel > WET_FLOOR) {
+            t.wetLevel = Math.max(WET_FLOOR, t.wetLevel - WET_DECAY_PER_MIN * inGameMinutes);
+        }
+    }
+}
+
+function updateWetVisuals() {
+    const tiles = gardenEl.children;
+    for (let i = 0; i < tiles.length; i++) {
+        const t = state.grid.tiles[i];
+        if (!t || !t.watered) continue;
+        const v = (t.wetLevel != null ? t.wetLevel : 1).toFixed(2);
+        if (tiles[i].dataset.wet !== v) {
+            tiles[i].dataset.wet = v;
+            tiles[i].style.setProperty("--wet", v);
+        }
+    }
+}
+
+// ─── 9d. "WILL BREED TONIGHT" CONNECTORS ─────────────────────────
+// A soft dashed link between each adjacent same-species pair that's eligible
+// to cross at the next rollover. A cozy hint about *where*, never the outcome.
+
+const SVGNS = "http://www.w3.org/2000/svg";
+
+function layoutConnectors() {
+    if (!connectorsEl) return;
+    // Match the SVG box to the garden's box within garden-wrap.
+    connectorsEl.style.left = gardenEl.offsetLeft + "px";
+    connectorsEl.style.top = gardenEl.offsetTop + "px";
+    connectorsEl.style.width = gardenEl.clientWidth + "px";
+    connectorsEl.style.height = gardenEl.clientHeight + "px";
+    connectorsEl.setAttribute("viewBox", `0 0 ${gardenEl.clientWidth} ${gardenEl.clientHeight}`);
+    renderConnectors();
+}
+
+function tileCenter(i) {
+    const el = gardenEl.children[i];
+    if (!el) return null;
+    return { x: el.offsetLeft + el.offsetWidth / 2, y: el.offsetTop + el.offsetHeight / 2 };
+}
+
+/** A pair is eligible when both are the same species, both bud+ , at least one watered. */
+function breedEligiblePairs() {
+    const pairs = [];
+    const seen = new Set();
+    const W = state.grid.w;
+    for (let i = 0; i < state.grid.tiles.length; i++) {
+        const t = state.grid.tiles[i];
+        if (!t || t.stage < 2) continue;
+        const x = i % W, y = Math.floor(i / W);
+        for (const [nx, ny] of neighborCoords(x, y)) {
+            const j = ny * W + nx;
+            const n = state.grid.tiles[j];
+            if (!n || n.species !== t.species || n.stage < 2) continue;
+            if (!t.watered && !n.watered) continue;
+            const key = pairKey(i, j);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            pairs.push([i, j]);
+        }
+    }
+    return pairs;
+}
+
+function renderConnectors() {
+    if (!connectorsEl) return;
+    connectorsEl.innerHTML = "";
+    for (const [i, j] of breedEligiblePairs()) {
+        const a = tileCenter(i), b = tileCenter(j);
+        if (!a || !b) continue;
+        const line = document.createElementNS(SVGNS, "line");
+        line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+        line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+        line.setAttribute("class", "link");
+        connectorsEl.appendChild(line);
+        const heart = document.createElementNS(SVGNS, "circle");
+        heart.setAttribute("cx", (a.x + b.x) / 2);
+        heart.setAttribute("cy", (a.y + b.y) / 2);
+        heart.setAttribute("r", 3.2);
+        heart.setAttribute("class", "link-heart");
+        connectorsEl.appendChild(heart);
+    }
+}
+
+// ─── 9e. AMBIENT LIFE (fireflies at dusk, the odd flyer) ─────────
+function updateFireflies() {
+    if (!ambientFxEl) return;
+    const seg = currentSegment();
+    const want = (seg === "evening") && !motionOff();
+    const have = ambientFxEl.querySelectorAll(".firefly").length > 0;
+    if (want && !have) {
+        for (let i = 0; i < 6; i++) {
+            const f = document.createElement("div");
+            f.className = "firefly";
+            f.style.left = (10 + Math.random() * 80) + "%";
+            f.style.top = (35 + Math.random() * 55) + "%";
+            f.style.setProperty("--fdur", (5 + Math.random() * 5).toFixed(1) + "s");
+            f.style.setProperty("--fdelay", (-Math.random() * 5).toFixed(1) + "s");
+            f.style.setProperty("--fdx", (Math.random() * 30 - 15).toFixed(0) + "px");
+            f.style.setProperty("--fdy", (-8 - Math.random() * 18).toFixed(0) + "px");
+            ambientFxEl.appendChild(f);
+        }
+    } else if (!want && have) {
+        ambientFxEl.querySelectorAll(".firefly").forEach(el => el.remove());
+    }
+}
+
+let flyerTimer = 0;
+function scheduleFlyer() {
+    clearTimeout(flyerTimer);
+    flyerTimer = setTimeout(() => {
+        const seg = currentSegment();
+        const dayish = seg === "morning" || seg === "afternoon";
+        if (dayish && ambientFxEl && !motionOff() && !document.hidden) {
+            const f = document.createElement("div");
+            f.className = "flyer";
+            f.textContent = Math.random() < 0.6 ? "🦋" : "🐦";
+            f.style.top = (12 + Math.random() * 40) + "%";
+            const dur = (8 + Math.random() * 6).toFixed(1);
+            f.style.setProperty("--flydur", dur + "s");
+            ambientFxEl.appendChild(f);
+            setTimeout(() => f.remove(), parseFloat(dur) * 1000 + 200);
+        }
+        scheduleFlyer();
+    }, 30000 + Math.random() * 45000);
+}
+
+// ─── 9f. GARDEN ORNAMENTS (progression keepsakes) ────────────────
+// Ornaments live on the ground band behind the plot. Pure decoration; earned
+// from progress you'd make anyway. refreshOrnaments() reconciles what's shown
+// with what's earned, and (when announce=true) toasts anything newly earned.
+
+const ornamentsEl = document.getElementById("ornaments");
+
+function earnedOrnaments() {
+    return ORNAMENTS.filter(o => { try { return o.at(state); } catch (e) { return false; } });
+}
+
+function renderOrnaments() {
+    if (!ornamentsEl) return;
+    ornamentsEl.innerHTML = "";
+    for (const o of earnedOrnaments()) {
+        const el = document.createElement("div");
+        el.className = "ornament";
+        el.style.left = o.pos.left + "%";
+        el.style.bottom = o.pos.bottom + "%";
+        el.style.setProperty("--ow", o.w + "px");
+        el.innerHTML = o.svg;
+        el.title = o.name;
+        ornamentsEl.appendChild(el);
+    }
+}
+
+/** Announce newly-earned ornaments, remember them, and (re)draw the scene. */
+function refreshOrnaments(announce) {
+    const earned = earnedOrnaments();
+    const fresh = earned.filter(o => !state.seenOrnaments.includes(o.id));
+    if (fresh.length) {
+        for (const o of fresh) state.seenOrnaments.push(o.id);
+        if (announce) {
+            // Stagger so several completing at once don't stomp each other.
+            fresh.forEach((o, i) => setTimeout(() => toast(`Your garden gained ${o.name}.`), 900 + i * 2600));
+        }
+        saveSoon();
+    }
+    renderOrnaments();
+    return fresh;
+}
+
+// ─── 9g. RARE-FIND CELEBRATION ───────────────────────────────────
+// A gentle full-card moment for a signature flower. Fired only for LIVE
+// discoveries (a rollover you were present for) — never on offline catch-up,
+// where a jarring modal on launch would be unwelcome.
+
+const celebrateEl = document.getElementById("rare-celebrate");
+let celebrateQueue = [];
+
+function queueCelebration(disc) {
+    celebrateQueue.push(disc);
+    if (celebrateEl && celebrateEl.hidden) showNextCelebration();
+}
+
+function showNextCelebration() {
+    if (!celebrateEl) return;
+    const disc = celebrateQueue.shift();
+    if (!disc) { celebrateEl.hidden = true; celebrateEl.setAttribute("aria-hidden", "true"); return; }
+
+    const entry = (state.flowerdex[disc.species] || {})[disc.color] || { genotype: disc.genotype, firstSeen: isoDate() };
+    const thumb = celebrateEl.querySelector(".celebrate-thumb");
+    const name = celebrateEl.querySelector(".celebrate-name");
+    const flavor = celebrateEl.querySelector(".celebrate-flavor");
+    const sub = celebrateEl.querySelector(".celebrate-sub");
+    thumb.innerHTML = "";
+    if (entry.genotype) thumb.appendChild(makeFlowerEl({ species: disc.species, genotype: entry.genotype, stage: 3 }));
+    name.textContent = `${disc.color} ${speciesShort(disc.species)}`;
+    flavor.textContent = FLAVOR[disc.species][disc.color] || "";
+    sub.textContent = celebrateQueue.length > 0
+        ? `A rare find — and there's another waiting.`
+        : `A rare find. One of the hardest crosses in the garden.`;
+
+    celebrateEl.hidden = false;
+    celebrateEl.setAttribute("aria-hidden", "false");
+    if (!motionOff()) {
+        celebrateEl.classList.remove("burst");
+        void celebrateEl.offsetWidth;
+        celebrateEl.classList.add("burst");
+    }
 }
 
 function renderSeedTray() {
@@ -756,10 +1492,13 @@ function renderSeedTray() {
     }
 }
 
+// Singular label for a species id (chips, dex names, toasts). Falls back to
+// trimming a trailing "s" so a newly-added species never silently reads as
+// "cosmos" (the old default hid the hyacinths mislabel).
+const SPECIES_SHORT = { cosmos: "cosmos", tulips: "tulip", pansies: "pansy", hyacinths: "hyacinth" };
 function speciesShort(species) {
-    if (species === "tulips") return "tulip";
-    if (species === "pansies") return "pansy";
-    return "cosmos";
+    if (SPECIES_SHORT[species]) return SPECIES_SHORT[species];
+    return species && species.endsWith("s") ? species.slice(0, -1) : (species || "flower");
 }
 
 function armSeed(species, color) {
@@ -783,74 +1522,209 @@ function renderGoal() {
 
 // ─── 10. BLOOMBOOK ───────────────────────────────────────────────
 
+const RARES_TAB = "__rares";
+
 function renderBloombook() {
     bloombookTabsEl.innerHTML = "";
-    for (const species of state.unlockedSpecies) {
-        const tab = document.createElement("button");
-        tab.type = "button";
-        tab.className = "bloombook-tab";
-        if (species === state.ui.bloombookTab) tab.classList.add("active");
-        tab.textContent = SPECIES[species].name;
-        tab.addEventListener("click", () => { sfx("tap"); state.ui.bloombookTab = species; renderBloombook(); });
-        bloombookTabsEl.appendChild(tab);
+
+    // Trophy shelf tab first — the place your signature finds live.
+    bloombookTabsEl.appendChild(makeTab(RARES_TAB, "★ Rares",
+        state.ui.bloombookTab === RARES_TAB, false));
+
+    // Unlocked species, in discovery order.
+    for (const species of UNLOCK_ORDER) {
+        if (!isUnlocked(species)) continue;
+        bloombookTabsEl.appendChild(makeTab(species, SPECIES[species].name,
+            species === state.ui.bloombookTab, false));
+    }
+    // Locked species show a muted "coming" tab — they reveal that MORE exists,
+    // with a soft hint, but never how to unlock it (no spoiler).
+    for (const species of UNLOCK_ORDER) {
+        if (isUnlocked(species)) continue;
+        bloombookTabsEl.appendChild(makeTab(species, "🔒 ？", false, true));
     }
 
-    // Guard: the active tab must be an unlocked species.
-    if (!isUnlocked(state.ui.bloombookTab)) state.ui.bloombookTab = state.unlockedSpecies[0];
-
-    const species = state.ui.bloombookTab;
-    const spec = SPECIES[species];
-    const found = state.flowerdex[species] || {};
+    // Guard: the active tab must be the rares shelf or an unlocked species.
+    if (state.ui.bloombookTab !== RARES_TAB && !isUnlocked(state.ui.bloombookTab)) {
+        state.ui.bloombookTab = state.unlockedSpecies[0];
+    }
 
     bloombookBodyEl.innerHTML = "";
+    if (state.ui.bloombookTab === RARES_TAB) renderRaresShelf();
+    else renderSpeciesPage(state.ui.bloombookTab);
+}
+
+function makeTab(id, label, active, locked) {
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "bloombook-tab" + (active ? " active" : "") + (locked ? " locked" : "");
+    tab.textContent = label;
+    if (locked) {
+        tab.setAttribute("aria-label", "Locked species");
+        tab.addEventListener("click", () => {
+            sfx("tap");
+            toast(LOCKED_HINT[id] || "Keep going — more will bloom into reach.");
+        });
+    } else {
+        tab.addEventListener("click", () => { sfx("tap"); state.ui.bloombookTab = id; renderBloombook(); });
+    }
+    return tab;
+}
+
+// ── Species page: filter bar + a scrollable list of flavor cards ──
+function renderSpeciesPage(species) {
+    const spec = SPECIES[species];
+    const found = state.flowerdex[species] || {};
+    const seen = spec.dex.filter(c => found[c]).length;
+
+    // Progress note.
+    const note = document.createElement("p");
+    note.className = "dex-note";
+    const complete = seen === spec.dex.length;
+    note.textContent = complete
+        ? `All ${spec.dex.length} discovered — this page is complete. ✿`
+        : `${seen} / ${spec.dex.length} discovered.`;
+    bloombookBodyEl.appendChild(note);
+
+    // Filter chips.
+    const filters = document.createElement("div");
+    filters.className = "dex-filters";
+    for (const [key, lbl] of [["all", "All"], ["found", "Found"], ["rare", "★ Rare"]]) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "dex-filter" + (state.ui.bloombookFilter === key ? " active" : "");
+        chip.textContent = lbl;
+        chip.addEventListener("click", () => { sfx("tap"); state.ui.bloombookFilter = key; renderBloombook(); });
+        filters.appendChild(chip);
+    }
+    bloombookBodyEl.appendChild(filters);
+
+    // Card list.
+    const list = document.createElement("div");
+    list.className = "dex-list";
+    const filter = state.ui.bloombookFilter;
+    let shown = 0;
+    for (const color of spec.dex) {
+        const filled = !!found[color];
+        const rare = isRare(species, color);
+        if (filter === "found" && !filled) continue;
+        if (filter === "rare" && !rare) continue;
+        list.appendChild(makeDexCard(species, color, filled, rare, found[color]));
+        shown++;
+    }
+    if (shown === 0) {
+        const empty = document.createElement("p");
+        empty.className = "dex-empty";
+        empty.textContent = filter === "rare"
+            ? "No rare finds here yet. They're the hardest crosses — keep at it."
+            : "Nothing discovered on this page yet. Cross a few and check back.";
+        list.appendChild(empty);
+    }
+    bloombookBodyEl.appendChild(list);
+}
+
+function makeDexCard(species, color, filled, rare, entry) {
+    const card = document.createElement("div");
+    card.className = "dex-card " + (filled ? "filled" : "unfilled") + (rare ? " rare" : "");
+
+    const thumb = document.createElement("div");
+    thumb.className = "dex-thumb";
+    if (filled && entry && entry.genotype) {
+        thumb.appendChild(makeFlowerEl({ species, genotype: entry.genotype, stage: 3 }));
+    } else {
+        const q = document.createElement("div");
+        q.className = "dex-thumb-q";
+        q.textContent = "?";
+        thumb.appendChild(q);
+    }
+    card.appendChild(thumb);
+
+    const text = document.createElement("div");
+    text.className = "dex-card-text";
+    if (filled) {
+        const h = document.createElement("div");
+        h.className = "dex-card-name";
+        h.innerHTML = `${color} ${speciesShort(species)}`;
+        if (rare) {
+            const rb = document.createElement("span");
+            rb.className = "dex-ribbon";
+            rb.textContent = "★ rare";
+            h.appendChild(rb);
+        }
+        text.appendChild(h);
+
+        const flavor = document.createElement("p");
+        flavor.className = "dex-card-flavor";
+        flavor.textContent = FLAVOR[species][color] || "";
+        text.appendChild(flavor);
+
+        const date = document.createElement("div");
+        date.className = "dex-card-date";
+        date.textContent = `First seen ${entry.firstSeen}`;
+        text.appendChild(date);
+    } else {
+        const h = document.createElement("div");
+        h.className = "dex-card-name muted";
+        h.textContent = rare ? "Undiscovered — a rare one" : "Undiscovered";
+        text.appendChild(h);
+        const flavor = document.createElement("p");
+        flavor.className = "dex-card-flavor muted";
+        flavor.textContent = "Something goes here. You'll know it when it turns up.";
+        text.appendChild(flavor);
+    }
+    card.appendChild(text);
+    return card;
+}
+
+// ── Rares trophy shelf — signature finds across every unlocked species ──
+function renderRaresShelf() {
+    const rares = [];
+    for (const species of UNLOCK_ORDER) {
+        if (!isUnlocked(species)) continue;
+        for (const color of (SPECIES[species].rare || [])) {
+            rares.push({ species, color, entry: (state.flowerdex[species] || {})[color] });
+        }
+    }
+    const foundN = rares.filter(r => r.entry).length;
 
     const note = document.createElement("p");
     note.className = "dex-note";
-    const seen = spec.dex.filter(c => found[c]).length;
-    note.textContent = `${seen} / ${spec.dex.length} discovered.`;
+    note.textContent = rares.length === 0
+        ? "The rarest flowers will be displayed here once you've unlocked more of the garden."
+        : `You've found ${foundN} of ${rares.length} signature flowers.`;
     bloombookBodyEl.appendChild(note);
 
-    const grid = document.createElement("div");
-    grid.className = "dex-grid";
-    for (const color of spec.dex) {
-        const filled = !!found[color];
-        const slot = document.createElement("div");
-        slot.className = "dex-slot " + (filled ? "filled" : "unfilled");
-        slot.style.setProperty("--sw", `var(--f-${color})`);
+    const intro = document.createElement("p");
+    intro.className = "dex-shelf-intro";
+    intro.textContent = "The hardest crosses in the garden. Each one earns a spot on the shelf.";
+    bloombookBodyEl.appendChild(intro);
 
-        const sw = document.createElement("div");
-        sw.className = "dex-swatch";
-        slot.appendChild(sw);
+    const shelf = document.createElement("div");
+    shelf.className = "dex-shelf";
+    for (const r of rares) {
+        const found = !!r.entry;
+        const item = document.createElement("div");
+        item.className = "trophy " + (found ? "won" : "empty");
 
-        const label = document.createElement("div");
-        label.className = "dex-label";
-        label.textContent = filled ? color : "?";
-        slot.appendChild(label);
-
-        if (filled) {
-            slot.title = `${color} ${speciesShort(species)}\n${FLAVOR[species][color] || ""}\nFirst seen: ${found[color].firstSeen}`;
-            slot.addEventListener("click", () => showDexDetail(species, color));
+        const plinth = document.createElement("div");
+        plinth.className = "trophy-plinth";
+        if (found && r.entry.genotype) {
+            plinth.appendChild(makeFlowerEl({ species: r.species, genotype: r.entry.genotype, stage: 3 }));
+        } else {
+            const q = document.createElement("div");
+            q.className = "dex-thumb-q";
+            q.textContent = "?";
+            plinth.appendChild(q);
         }
-        grid.appendChild(slot);
+        item.appendChild(plinth);
+
+        const cap = document.createElement("div");
+        cap.className = "trophy-cap";
+        cap.textContent = found ? `${r.color} ${speciesShort(r.species)}` : "not yet";
+        item.appendChild(cap);
+        shelf.appendChild(item);
     }
-    bloombookBodyEl.appendChild(grid);
-
-    // A place for the tapped-slot flavor line to live (kept below the grid).
-    const detail = document.createElement("p");
-    detail.className = "dex-detail";
-    detail.id = "dex-detail";
-    detail.textContent = seen === 0
-        ? "Nothing here yet. Cross a few flowers and check back."
-        : "Tap a discovered flower to read about it.";
-    bloombookBodyEl.appendChild(detail);
-}
-
-function showDexDetail(species, color) {
-    const el = document.getElementById("dex-detail");
-    if (!el) return;
-    const entry = state.flowerdex[species][color];
-    el.innerHTML = `<strong>${color} ${speciesShort(species)}</strong> — ${FLAVOR[species][color] || ""} <span class="dex-date">First seen ${entry.firstSeen}.</span>`;
-    sfx("tap");
+    bloombookBodyEl.appendChild(shelf);
 }
 
 function openBloombook() {
@@ -873,9 +1747,14 @@ const settingsBodyEl = document.getElementById("settings-body");
 function renderSettings() {
     settingsBodyEl.innerHTML = "";
 
-    // Sound toggle
-    settingsBodyEl.appendChild(toggleRow("Sound", state.settings.sound, (v) => {
-        state.settings.sound = v; if (v) sfx("tap"); saveSoon();
+    // Sound toggle (SFX — plips, chimes, discovery jingle)
+    settingsBodyEl.appendChild(toggleRow("Sound effects", state.settings.sound, (v) => {
+        state.settings.sound = v; if (v) sfx("tap"); syncAmbient(); saveSoon();
+    }));
+
+    // Ambient toggle (the quiet garden bed — wind, birds, crickets)
+    settingsBodyEl.appendChild(toggleRow("Garden ambience", state.settings.ambient, (v) => {
+        state.settings.ambient = v; syncAmbient(); if (v) sfx("tap"); saveSoon();
     }));
 
     // Clock speed — segmented
@@ -903,6 +1782,36 @@ function renderSettings() {
         state.settings.reducedMotion = v; applyMotionPref(); saveSoon(); renderClock();
     }));
 
+    // Back up / restore the garden (a plain JSON file — nothing leaves the device)
+    const dataRow = document.createElement("div");
+    dataRow.className = "set-row";
+    const dataWrap = document.createElement("div");
+    dataWrap.style.width = "100%";
+    const dataBtns = document.createElement("div");
+    dataBtns.className = "set-data-row";
+
+    const backupBtn = document.createElement("button");
+    backupBtn.type = "button";
+    backupBtn.className = "set-text-btn";
+    backupBtn.textContent = "Back up garden";
+    backupBtn.addEventListener("click", () => { sfx("tap"); downloadSave(); });
+    dataBtns.appendChild(backupBtn);
+
+    const restoreBtn = document.createElement("button");
+    restoreBtn.type = "button";
+    restoreBtn.className = "set-text-btn";
+    restoreBtn.textContent = "Restore";
+    restoreBtn.addEventListener("click", () => { sfx("tap"); saveImportInput.click(); });
+    dataBtns.appendChild(restoreBtn);
+
+    dataWrap.appendChild(dataBtns);
+    const note = document.createElement("p");
+    note.className = "set-note";
+    note.textContent = "Saves a file to your device. Nothing is uploaded.";
+    dataWrap.appendChild(note);
+    dataRow.appendChild(dataWrap);
+    settingsBodyEl.appendChild(dataRow);
+
     // Replay how-to
     const howRow = document.createElement("div");
     howRow.className = "set-row";
@@ -913,6 +1822,46 @@ function renderSettings() {
     howBtn.addEventListener("click", () => { closeSettings(); startCoaching(true); });
     howRow.appendChild(howBtn);
     settingsBodyEl.appendChild(howRow);
+}
+
+// Save file download + restore (a hidden <input type=file> lives in JS so no
+// HTML change is needed). Purely local: the file is generated on-device.
+const saveImportInput = document.createElement("input");
+saveImportInput.type = "file";
+saveImportInput.accept = "application/json,.json";
+saveImportInput.style.display = "none";
+document.body.appendChild(saveImportInput);
+saveImportInput.addEventListener("change", () => {
+    const file = saveImportInput.files && saveImportInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        if (importSaveString(String(reader.result))) {
+            toast("Garden restored.");
+            location.reload();
+        } else {
+            toast("That file didn't look like a Petalcraft save.");
+        }
+    };
+    reader.readAsText(file);
+    saveImportInput.value = "";
+});
+
+function downloadSave() {
+    try {
+        const blob = new Blob([exportSaveString()], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `petalcraft-garden-${isoDate()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast("Garden backed up.");
+    } catch (e) {
+        toast("Couldn't back up the garden here.");
+    }
 }
 
 function toggleRow(label, value, onChange) {
@@ -1050,11 +1999,17 @@ function onAdvanceDay() {
 
 /** Shared handling for rollovers (real-time, manual, and offline catch-up). */
 function applyRolloverResult(agg, live) {
-    const highlights = new Set(agg.discoveries.map(d => `${d.x},${d.y}`));
+    const rares = agg.discoveries.filter(d => d.rare);
+    const rareHi = new Set(rares.map(d => `${d.x},${d.y}`));
+    const hybridHi = new Set(agg.discoveries.filter(d => !d.rare).map(d => `${d.x},${d.y}`));
+    const sprouts = new Set((agg.babyCoords || [])
+        .map(b => `${b.x},${b.y}`)
+        .filter(k => !hybridHi.has(k) && !rareHi.has(k)));
     rotateGoal();
     renderClock();
-    renderGrid(highlights);
+    renderGrid(hybridHi, sprouts, rareHi);
     renderSeedTray();
+    refreshOrnaments(live);
     if (state.ui.bloombookOpen) renderBloombook();
 
     const newlyUnlocked = agg.newlyUnlocked || [];
@@ -1062,13 +2017,24 @@ function applyRolloverResult(agg, live) {
         const sp = SPECIES[newlyUnlocked[0]].name.toLowerCase();
         toast(`New seeds unlocked: ${sp}!`);
         sfx("unlock");
-    } else if (agg.discoveries.length > 0) {
+    } else if (agg.discoveries.length > 0 && !rares.length) {
         const first = agg.discoveries[0];
         const extra = agg.discoveries.length > 1 ? ` (+${agg.discoveries.length - 1} more)` : "";
         toast(`New in the Bloombook: ${first.color} ${speciesShort(first.species)}.${extra}`);
         if (live) sfx("discovery");
-    } else if (agg.babies > 0 && live) {
+    } else if (agg.babies > 0 && live && !rares.length) {
         toast(`${agg.babies} new sprout${agg.babies === 1 ? "" : "s"}.`);
+    }
+
+    // Rare finds get their own moment — a grander jingle + a keepsake card —
+    // independent of any unlock/discovery toast above. Live sessions only; the
+    // offline case is summarized by init's "while you were away" line instead.
+    if (rares.length && live) {
+        sfx("rare");
+        const first = rares[0];
+        const more = rares.length > 1 ? ` (+${rares.length - 1} more rare!)` : "";
+        toast(`A rare bloom: ${first.color} ${speciesShort(first.species)}!${more}`, 5000);
+        rares.forEach(queueCelebration);
     }
     saveSoon();
 }
@@ -1080,17 +2046,23 @@ function rotateGoal() {
 
 // ─── 14. TOAST ───────────────────────────────────────────────────
 
-let toastTimer = 0;
-function toast(msg, ms = 2600) {
-    toastEl.textContent = msg;
-    toastEl.hidden = false;
+let toastTimer = 0, toastHideTimer = 0;
+function toast(msg, ms = 3400) {
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { toastEl.hidden = true; }, ms);
+    clearTimeout(toastHideTimer);
+    toastEl.textContent = msg;
+    toastEl.classList.remove("leaving");
+    toastEl.hidden = false;
+    toastTimer = setTimeout(() => {
+        toastEl.classList.add("leaving");          // fade out
+        toastHideTimer = setTimeout(() => { toastEl.hidden = true; toastEl.classList.remove("leaving"); }, 340);
+    }, ms);
 }
 
 // ─── 15. REAL-TIME CLOCK LOOP ────────────────────────────────────
 
 let lastFrameMs = 0;
+let wetVisualAccum = 0;
 
 function tick() {
     const now = Date.now();
@@ -1101,7 +2073,8 @@ function tick() {
     if (dtMs > 0) {
         const beforeSeg = currentSegment();
         const beforeRain = state.clock.raining;
-        const target = state.clock.totalMinutes + dtMs * inGameMinutesPerRealMs();
+        const dtInGameMin = dtMs * inGameMinutesPerRealMs();
+        const target = state.clock.totalMinutes + dtInGameMin;
         const prevDayIdx = dayIndexFromMinutes(state.clock.totalMinutes);
         const newDayIdx = dayIndexFromMinutes(target);
 
@@ -1114,7 +2087,13 @@ function tick() {
         } else {
             state.clock.totalMinutes = target;
             state.clock.day = newDayIdx;
-            // Cheap: only touch the DOM when the visible segment/weather flips.
+            // Continuous sky is self-throttled (only writes on a visible change).
+            updateSky(false);
+            // Water dries out gradually through the day.
+            decayWetness(dtInGameMin);
+            wetVisualAccum += dtMs;
+            if (wetVisualAccum > 400) { wetVisualAccum = 0; updateWetVisuals(); }
+            // Segment / weather flips still get the full clock re-render.
             if (currentSegment() !== beforeSeg || state.clock.raining !== beforeRain) renderClock();
         }
     }
@@ -1143,12 +2122,27 @@ function init() {
         }
     }
 
+    // Single source of truth for the display name (JS side) — see GAME_NAME.
+    document.title = GAME_NAME;
+    const titleEl = document.querySelector(".topbar-title");
+    if (titleEl) titleEl.textContent = GAME_NAME;
+
     applyMotionPref();
     buildGrid();
+    initClouds();
     renderClock();
     renderGrid();
     renderSeedTray();
     renderGoal();
+    // Seed + draw ornaments already earned (silent — no toast flood on first
+    // load or on upgrade for a player who'd already completed a species).
+    refreshOrnaments(false);
+
+    // Tile offsets aren't reliable until first layout — re-place the connector
+    // overlay once the grid has actually painted, and whenever the box resizes.
+    requestAnimationFrame(() => layoutConnectors());
+    window.addEventListener("resize", () => layoutConnectors());
+    scheduleFlyer();
 
     document.getElementById("btn-water-all").addEventListener("click", onWaterAll);
     const advBtn = document.getElementById("btn-advance-day");
@@ -1167,8 +2161,20 @@ function init() {
     const coachSkip = document.getElementById("coach-skip");
     if (coachSkip) coachSkip.addEventListener("click", () => { sfx("tap"); dismissCoach(); });
 
-    // First real gesture wakes the audio context (autoplay policy).
-    window.addEventListener("pointerdown", () => ensureAudio(), { once: true });
+    // Rare-find celebration card: the button (and a backdrop tap) advances to
+    // the next queued rare, or closes when the queue is empty.
+    const celebrateBtn = document.getElementById("celebrate-close");
+    if (celebrateBtn) celebrateBtn.addEventListener("click", () => { sfx("tap"); showNextCelebration(); });
+    if (celebrateEl) celebrateEl.addEventListener("click", (e) => { if (e.target === celebrateEl) showNextCelebration(); });
+
+    // First real gesture wakes the audio context (autoplay policy) and, if the
+    // player wants it, starts the quiet garden ambience.
+    window.addEventListener("pointerdown", () => { ensureAudio(); syncAmbient(); }, { once: true });
+
+    // A save existed but couldn't be read — say so kindly rather than silently wiping.
+    if (loadWasCorrupt) {
+        setTimeout(() => toast("Your garden had a hiccup, so we started a fresh one. (The old save was kept, just in case.)", 5200), 300);
+    }
 
     // Show what happened while away, else greet / onboard.
     if (catchUp && (catchUp.discoveries.length || catchUp.babies || (catchUp.newlyUnlocked && catchUp.newlyUnlocked.length))) {
@@ -1176,9 +2182,11 @@ function init() {
         const bits = [];
         if (catchUp.babies) bits.push(`${catchUp.babies} new sprout${catchUp.babies === 1 ? "" : "s"}`);
         if (catchUp.discoveries.length) bits.push(`${catchUp.discoveries.length} new in the Bloombook`);
-        if (bits.length) setTimeout(() => toast(`While you were away: ${bits.join(", ")}.`), 400);
+        const awayRares = catchUp.discoveries.filter(d => d.rare).length;
+        if (awayRares) bits.push(`${awayRares} rare${awayRares === 1 ? "" : "s"} ✨`);
+        if (bits.length) setTimeout(() => toast(`While you were away: ${bits.join(", ")}.`, awayRares ? 5200 : 3400), 400);
     } else if (!loaded) {
-        toast("Welcome to Petalcraft.");
+        toast(`Welcome to ${GAME_NAME}.`);
     }
 
     if (!state.seenOnboarding) startCoaching(false);
@@ -1193,7 +2201,8 @@ window.__petalcraft = {
     state, breed, phenotype, SPECIES, SPEED_PRESETS,
     advanceDay: onAdvanceDay,
     setSpeed: (k) => { if (SPEED_PRESETS[k]) { state.settings.speed = k; saveSoon(); } },
-    unlockAll: () => { ["tulips", "pansies"].forEach(unlockSpecies); renderSeedTray(); },
+    unlockAll: () => { ["tulips", "pansies", "hyacinths"].forEach(unlockSpecies); renderSeedTray(); renderOrnaments(); },
+    isRare, totalDex, rareCount, speciesCompleteCount, refreshOrnaments,
     reset: () => { localStorage.removeItem(SAVE_KEY); location.reload(); },
 };
 
