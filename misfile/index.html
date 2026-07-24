@@ -1,0 +1,561 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Misfile — a paperwork emergency</title>
+  <style>
+    :root {
+      --beige: #ebe3cb;
+      --paper: #f6f0db;
+      --ink: #1c1816;
+      --stamp-good: #1e5b2a;
+      --stamp-bad: #8a1a1a;
+      --rule-flash: #b88c1a;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--beige);
+      color: var(--ink);
+      font-family: "Courier New", Courier, monospace;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    body {
+      display: flex; flex-direction: column;
+      height: 100vh;
+    }
+    header {
+      padding: 0.6rem 1rem 0.4rem;
+      border-bottom: 2px solid var(--ink);
+      display: flex; justify-content: space-between; align-items: baseline;
+      background: var(--beige);
+      flex: 0 0 auto;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.4rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+    }
+    #status {
+      font-size: 0.9rem;
+      letter-spacing: 0.1em;
+    }
+    #status .strike { color: var(--stamp-bad); font-weight: bold; }
+    #rule-banner {
+      background: var(--rule-flash);
+      color: var(--ink);
+      padding: 0.4rem 1rem;
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--ink);
+      text-align: center;
+      flex: 0 0 auto;
+      min-height: 1.8rem;
+    }
+    #rule-banner.flash {
+      animation: flash 0.35s ease-in-out 3;
+    }
+    @keyframes flash {
+      0%, 100% { background: var(--rule-flash); }
+      50% { background: #fff0a8; }
+    }
+    main {
+      flex: 1 1 auto;
+      position: relative;
+      overflow: hidden;
+    }
+    .doc {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%) rotate(var(--rot, -2deg));
+      width: min(420px, 88vw);
+      background: var(--paper);
+      border: 1px solid #00000022;
+      box-shadow:
+        0 1px 0 #00000018,
+        0 2px 6px #00000022,
+        0 12px 24px #00000018;
+      padding: 1rem 1.1rem 0.9rem;
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+    .doc h2 {
+      margin: 0 0 0.4rem;
+      font-size: 0.95rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      border-bottom: 1px dashed #00000044;
+      padding-bottom: 0.2rem;
+    }
+    .doc .row {
+      display: flex; justify-content: space-between; gap: 0.6rem;
+      padding: 0.18rem 0;
+      border-bottom: 1px dotted #00000020;
+    }
+    .doc .row .k {
+      flex: 0 0 7.5rem;
+      color: #00000088;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.7rem;
+      padding-top: 0.18rem;
+    }
+    .doc .row .v {
+      flex: 1 1 auto;
+      font-weight: bold;
+    }
+    .doc .row .v.blank {
+      color: #00000033;
+      font-style: italic;
+      font-weight: normal;
+    }
+    .doc .sig {
+      margin-top: 0.6rem;
+      border-top: 1px solid #00000044;
+      padding-top: 0.45rem;
+      min-height: 2.2rem;
+      display: flex; flex-direction: column; gap: 0.15rem;
+      font-size: 0.75rem;
+    }
+    .doc .sig .line {
+      border-bottom: 1px solid #00000088;
+      min-height: 1.1rem;
+      font-family: "Brush Script MT", "Snell Roundhand", cursive;
+      font-size: 1.05rem;
+      padding: 0 0.2rem;
+      letter-spacing: 0.02em;
+    }
+    .doc .sig .lbl {
+      color: #00000077;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.65rem;
+    }
+    .doc .stamp {
+      position: absolute;
+      top: 8%; right: 6%;
+      transform: rotate(8deg);
+      padding: 0.2rem 0.6rem;
+      border: 3px solid currentColor;
+      font-weight: bold;
+      letter-spacing: 0.2em;
+      opacity: 0.85;
+      text-transform: uppercase;
+      font-size: 1.2rem;
+      pointer-events: none;
+    }
+    .doc.approved .stamp { color: var(--stamp-good); }
+    .doc.voided .stamp { color: var(--stamp-bad); }
+    .doc.sua-sponte::after {
+      content: "VOIDED SUA SPONTE";
+      position: absolute;
+      bottom: 14%; left: 8%;
+      transform: rotate(-6deg);
+      color: var(--stamp-bad);
+      border: 3px solid currentColor;
+      padding: 0.15rem 0.5rem;
+      font-weight: bold;
+      font-size: 0.85rem;
+      letter-spacing: 0.15em;
+    }
+    .doc.leaving {
+      transition: transform 0.45s ease-in, opacity 0.45s ease-in;
+      opacity: 0;
+    }
+    .doc.leaving.up   { transform: translate(-50%, -260%) rotate(-12deg); }
+    .doc.leaving.down { transform: translate(-50%,  160%) rotate(14deg); }
+    footer {
+      display: flex; gap: 1px;
+      background: var(--ink);
+      border-top: 2px solid var(--ink);
+      flex: 0 0 auto;
+    }
+    footer button {
+      flex: 1;
+      padding: 0.9rem;
+      font-family: inherit;
+      font-size: 1rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      border: 0;
+      cursor: pointer;
+      background: var(--beige);
+      color: var(--ink);
+      font-weight: bold;
+    }
+    footer button:hover { background: #fff3d3; }
+    footer #approve { color: var(--stamp-good); }
+    footer #void    { color: var(--stamp-bad); }
+    footer button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #dismissal {
+      position: fixed; inset: 0;
+      background: #00000099;
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 50;
+    }
+    #dismissal.show { display: flex; }
+    #dismissal .order {
+      background: var(--paper);
+      max-width: min(540px, 92vw);
+      padding: 1.4rem 1.4rem 1.2rem;
+      border: 1px solid #00000044;
+      box-shadow: 0 18px 40px #00000066;
+      transform: rotate(-1.2deg);
+    }
+    #dismissal h2 {
+      margin: 0 0 0.4rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--ink);
+      padding-bottom: 0.3rem;
+      text-align: center;
+    }
+    #dismissal p { margin: 0.5rem 0; font-size: 0.95rem; line-height: 1.4; }
+    #dismissal .reason {
+      font-style: italic;
+      background: #00000010;
+      padding: 0.5rem 0.7rem;
+      border-left: 4px solid var(--stamp-bad);
+    }
+    #dismissal .meta {
+      margin-top: 0.7rem;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #00000099;
+      display: flex; justify-content: space-between;
+    }
+    #dismissal button {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.7rem;
+      background: var(--ink);
+      color: var(--paper);
+      border: 0;
+      font-family: inherit;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Misfile</h1>
+    <div id="status">
+      <span>Processed: <b id="processed">0</b></span>
+      &nbsp;&nbsp;
+      <span>Strikes: <span class="strike" id="strikes">0</span>/3</span>
+      &nbsp;&nbsp;
+      <span>Time: <b id="timer">60</b>s</span>
+    </div>
+  </header>
+
+  <div id="rule-banner">CURRENT RULE: a valid order has a judge&rsquo;s signature.</div>
+
+  <main id="desk"></main>
+
+  <footer>
+    <button id="approve">Approve</button>
+    <button id="void">Void</button>
+  </footer>
+
+  <div id="dismissal" aria-hidden="true">
+    <div class="order">
+      <h2>Order of Dismissal</h2>
+      <p>The above-captioned matter is hereby <b>DISMISSED WITH PREJUDICE</b> for the following reason:</p>
+      <p class="reason" id="dismissal-reason">Reason goes here.</p>
+      <p>You processed <b id="dismissal-score">0</b> documents. Of these, the court declines to comment on how many were correctly handled.</p>
+      <div class="meta">
+        <span>Case No. <span id="dismissal-case">27-CV-26-???</span></span>
+        <span>So ordered.</span>
+      </div>
+      <button id="restart">File a new case</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------------------------------------------
+    // Misfile — a 60-second paperwork emergency.
+    // The rules change. The signatures wander. Strangers' names show
+    // up on your docket. You stamp anyway because that is the job.
+    // ---------------------------------------------------------------
+
+    const STRANGER_NAMES = [
+      "MARGARET P. ELDRIDGE",
+      "RYAN B. KOWALSKI",
+      "DELORES Q. HEMINGWAY",
+      "JOSEPH T. ANDERSEN",
+      "PATRICIA L. NGUYEN",
+      "WALTER F. BRENNAN",
+      "AMARA J. OKONKWO",
+      "BRIAN R. SOLBERG",
+      "VERONICA M. CASTILLO",
+      "EDWARD C. WHITTAKER"
+    ];
+    const SIGNATURES = [
+      "Hon. R. Frank",
+      "Hon. M. Starr",
+      "Hon. L. Petersen",
+      "Hon. P. Olson",
+      "Hon. B. Hagen",
+      "Hon. T. Lindquist",
+      "Hon. C. Halvorson"
+    ];
+    const CASE_PREFIX = ["27-CV", "27-FA", "10-CV", "62-CV", "82-HR"];
+
+    const RULES = [
+      {
+        label: "a valid order has a judge’s signature.",
+        validator: (d) => d.signature !== null
+      },
+      {
+        label: "a valid order names you as respondent.",
+        validator: (d) => d.respondent === "KELLYE STRICKLAND"
+      },
+      {
+        label: "a valid order bears a past date.",
+        validator: (d) => d.dateNumeric <= Date.now()
+      },
+      {
+        label: "a valid order does NOT bear a judge’s signature.",
+        validator: (d) => d.signature === null
+      },
+      {
+        label: "a valid order has a case number starting with 27.",
+        validator: (d) => d.caseNumber.startsWith("27")
+      },
+      {
+        label: "all orders are valid (for the next 8 seconds).",
+        validator: () => true
+      },
+      {
+        label: "no orders are valid (for the next 8 seconds).",
+        validator: () => false
+      }
+    ];
+
+    const DISMISSAL_REASONS = [
+      "Petitioner failed to use the correct font on page 14.",
+      "The court observed insufficient enthusiasm from the respondent.",
+      "Filings exceeded the statutorily permitted level of accuracy.",
+      "The court takes judicial notice that paperwork is hard.",
+      "Respondent’s name is correctly spelled, which the court finds suspicious.",
+      "An unknown third party has been appointed real party in interest.",
+      "Sua sponte. No further explanation will be provided.",
+      "Insufficient stamps detected during initial review."
+    ];
+
+    const GAME_DURATION = 60;
+    const MAX_STRIKES = 3;
+    const DOC_INTERVAL_MS = 2400;
+    const RULE_CHANGE_MS = 7500;
+    const SUA_SPONTE_CHANCE = 0.08;
+
+    const $ = (id) => document.getElementById(id);
+    const desk = $("desk");
+    const banner = $("rule-banner");
+    const approveBtn = $("approve");
+    const voidBtn = $("void");
+
+    let state = null;
+
+    function startGame() {
+      $("dismissal").classList.remove("show");
+      desk.innerHTML = "";
+      state = {
+        processed: 0,
+        strikes: 0,
+        timer: GAME_DURATION,
+        currentDoc: null,
+        ruleIndex: 0,
+        running: true,
+        intervals: []
+      };
+      setRule(0);
+      $("processed").textContent = "0";
+      $("strikes").textContent = "0";
+      $("timer").textContent = GAME_DURATION;
+      approveBtn.disabled = false;
+      voidBtn.disabled = false;
+      spawnDoc();
+      const tickTimer = setInterval(tickTime, 1000);
+      const docTimer = setInterval(() => {
+        if (!state.currentDoc) spawnDoc();
+      }, DOC_INTERVAL_MS);
+      const ruleTimer = setInterval(rotateRule, RULE_CHANGE_MS);
+      state.intervals.push(tickTimer, docTimer, ruleTimer);
+    }
+
+    function endGame(reason) {
+      if (!state.running) return;
+      state.running = false;
+      state.intervals.forEach(clearInterval);
+      approveBtn.disabled = true;
+      voidBtn.disabled = true;
+      const caseNum = randomCaseNumber();
+      $("dismissal-case").textContent = caseNum;
+      $("dismissal-reason").textContent = reason;
+      $("dismissal-score").textContent = state.processed;
+      $("dismissal").classList.add("show");
+    }
+
+    function tickTime() {
+      state.timer -= 1;
+      $("timer").textContent = state.timer;
+      if (state.timer <= 0) {
+        endGame("60 seconds elapsed without resolution. Calendar is full.");
+      }
+    }
+
+    function setRule(idx) {
+      state.ruleIndex = idx;
+      banner.textContent = "CURRENT RULE: " + RULES[idx].label;
+      banner.classList.remove("flash");
+      // re-trigger animation
+      void banner.offsetWidth;
+      banner.classList.add("flash");
+    }
+
+    function rotateRule() {
+      let next = state.ruleIndex;
+      while (next === state.ruleIndex) {
+        next = Math.floor(Math.random() * RULES.length);
+      }
+      setRule(next);
+    }
+
+    function randomCaseNumber() {
+      const p = CASE_PREFIX[Math.floor(Math.random() * CASE_PREFIX.length)];
+      const y = 24 + Math.floor(Math.random() * 3);
+      const n = String(Math.floor(Math.random() * 90000) + 1000).padStart(5, "0");
+      return `${p}-${y}-${n}`;
+    }
+
+    function makeDoc() {
+      const respondentIsYou = Math.random() < 0.45;
+      const respondent = respondentIsYou
+        ? "KELLYE STRICKLAND"
+        : STRANGER_NAMES[Math.floor(Math.random() * STRANGER_NAMES.length)];
+
+      const petitioner = STRANGER_NAMES[Math.floor(Math.random() * STRANGER_NAMES.length)];
+
+      const hasSig = Math.random() < 0.55;
+      const signature = hasSig ? SIGNATURES[Math.floor(Math.random() * SIGNATURES.length)] : null;
+
+      // Mostly past dates; ~25% chance of a future date.
+      const dayOffset = Math.random() < 0.25
+        ? Math.floor(Math.random() * 400) + 5     // future
+        : -(Math.floor(Math.random() * 800) + 5); // past
+      const date = new Date(Date.now() + dayOffset * 86400 * 1000);
+      const dateStr = date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+
+      return {
+        caseNumber: randomCaseNumber(),
+        petitioner,
+        respondent,
+        signature,
+        date: dateStr,
+        dateNumeric: date.getTime(),
+        suaSponte: Math.random() < SUA_SPONTE_CHANCE,
+        rot: (Math.random() * 6 - 3).toFixed(2)
+      };
+    }
+
+    function renderDoc(doc) {
+      const el = document.createElement("article");
+      el.className = "doc";
+      el.style.setProperty("--rot", `${doc.rot}deg`);
+      el.innerHTML = `
+        <h2>Order on Harassment Restraining Petition</h2>
+        <div class="row"><span class="k">Case No.</span><span class="v">${doc.caseNumber}</span></div>
+        <div class="row"><span class="k">Petitioner</span><span class="v">${doc.petitioner}</span></div>
+        <div class="row"><span class="k">Respondent</span><span class="v">${doc.respondent}</span></div>
+        <div class="row"><span class="k">Issued</span><span class="v">${doc.date}</span></div>
+        <div class="sig">
+          <div class="line">${doc.signature ? doc.signature : ""}</div>
+          <div class="lbl">${doc.signature ? "Judge / Referee" : "(no signature on file)"}</div>
+        </div>
+      `;
+      if (doc.suaSponte) el.classList.add("sua-sponte");
+      desk.appendChild(el);
+      return el;
+    }
+
+    function spawnDoc() {
+      if (!state.running) return;
+      const doc = makeDoc();
+      const el = renderDoc(doc);
+      state.currentDoc = { doc, el };
+    }
+
+    function decide(playerChoice) {
+      if (!state.running || !state.currentDoc) return;
+      const { doc, el } = state.currentDoc;
+      const rule = RULES[state.ruleIndex];
+      let trueValid = rule.validator(doc);
+      let wasOverridden = false;
+      // SUA SPONTE: the system voids it regardless of what the player chose.
+      if (doc.suaSponte) {
+        wasOverridden = true;
+        trueValid = false; // the court has spoken
+      }
+
+      const playerSaysValid = (playerChoice === "approve");
+      const correct = playerSaysValid === trueValid && !wasOverridden;
+
+      const stamp = document.createElement("div");
+      stamp.className = "stamp";
+      if (wasOverridden) {
+        stamp.textContent = "VOID";
+        el.classList.add("voided");
+      } else if (playerSaysValid) {
+        stamp.textContent = "Approved";
+        el.classList.add("approved");
+      } else {
+        stamp.textContent = "Void";
+        el.classList.add("voided");
+      }
+      el.appendChild(stamp);
+
+      state.processed += 1;
+      $("processed").textContent = state.processed;
+      if (!correct) {
+        state.strikes += 1;
+        $("strikes").textContent = state.strikes;
+        if (state.strikes >= MAX_STRIKES) {
+          flyOut(el, playerSaysValid);
+          state.currentDoc = null;
+          endGame(DISMISSAL_REASONS[Math.floor(Math.random() * DISMISSAL_REASONS.length)]);
+          return;
+        }
+      }
+
+      flyOut(el, playerSaysValid);
+      state.currentDoc = null;
+      setTimeout(spawnDoc, 350);
+    }
+
+    function flyOut(el, up) {
+      el.classList.add("leaving", up ? "up" : "down");
+      setTimeout(() => el.remove(), 500);
+    }
+
+    approveBtn.addEventListener("click", () => decide("approve"));
+    voidBtn.addEventListener("click", () => decide("void"));
+    document.addEventListener("keydown", (e) => {
+      if (!state || !state.running) return;
+      if (e.key === "a" || e.key === "A" || e.key === "ArrowLeft") decide("approve");
+      if (e.key === "v" || e.key === "V" || e.key === "ArrowRight") decide("void");
+    });
+    $("restart").addEventListener("click", startGame);
+
+    startGame();
+  </script>
+</body>
+</html>

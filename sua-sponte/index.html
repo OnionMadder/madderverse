@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sua Sponte</title>
+  <style>
+    :root {
+      --beige: #ebe3cb;
+      --paper: #f6f0db;
+      --ink: #1c1816;
+      --warn: #c1411b;
+      --good: #1e5b2a;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: #1a1714;
+      color: var(--paper);
+      font-family: "Courier New", Courier, monospace;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    body {
+      display: flex; flex-direction: column;
+      height: 100vh;
+      align-items: center;
+    }
+    header {
+      width: 100%;
+      max-width: 820px;
+      padding: 0.5rem 0.8rem 0.3rem;
+      display: flex; justify-content: space-between; align-items: baseline;
+      border-bottom: 1px solid #4a3f30;
+    }
+    h1 {
+      margin: 0;
+      font-size: 1.2rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #d8c9a3;
+    }
+    h1 span { color: #c1411b; }
+    #hud {
+      font-size: 0.8rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #b6a684;
+    }
+    #hud b { color: #f6f0db; }
+    #banner {
+      width: 100%;
+      max-width: 820px;
+      background: #3a2e22;
+      color: #f4d488;
+      padding: 0.35rem 0.8rem;
+      font-size: 0.78rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      text-align: center;
+      min-height: 1.6rem;
+      border-bottom: 1px solid #4a3f30;
+    }
+    #banner.flash { animation: bflash 0.32s ease-in-out 3; }
+    @keyframes bflash {
+      0%, 100% { background: #3a2e22; }
+      50% { background: #745627; color: #fff; }
+    }
+    main {
+      flex: 1 1 auto;
+      width: 100%;
+      max-width: 820px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0.5rem;
+      position: relative;
+    }
+    canvas {
+      background: #ebe3cb;
+      border: 1px solid #4a3f30;
+      box-shadow: 0 12px 30px #00000088;
+      max-width: 100%;
+      height: auto;
+      image-rendering: pixelated;
+      cursor: none;
+    }
+    footer {
+      width: 100%;
+      max-width: 820px;
+      padding: 0.4rem 0.8rem 0.6rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #b6a684;
+      border-top: 1px solid #4a3f30;
+      display: flex; justify-content: space-between;
+    }
+    #dismissal {
+      position: fixed; inset: 0;
+      background: #00000099;
+      display: none;
+      align-items: center; justify-content: center;
+      z-index: 50;
+    }
+    #dismissal.show { display: flex; }
+    #dismissal .order {
+      background: var(--paper);
+      color: var(--ink);
+      max-width: min(520px, 92vw);
+      padding: 1.2rem 1.3rem 1rem;
+      border: 1px solid #00000044;
+      box-shadow: 0 18px 40px #00000088;
+      transform: rotate(-1.2deg);
+    }
+    #dismissal h2 {
+      margin: 0 0 0.4rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--ink);
+      padding-bottom: 0.3rem;
+      text-align: center;
+    }
+    #dismissal p { margin: 0.5rem 0; font-size: 0.92rem; line-height: 1.4; }
+    #dismissal .reason {
+      font-style: italic;
+      background: #00000010;
+      padding: 0.5rem 0.7rem;
+      border-left: 4px solid var(--warn);
+    }
+    #dismissal .meta {
+      margin-top: 0.7rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #00000099;
+      display: flex; justify-content: space-between;
+    }
+    #dismissal button {
+      margin-top: 1rem;
+      width: 100%;
+      padding: 0.65rem;
+      background: var(--ink);
+      color: var(--paper);
+      border: 0;
+      font-family: inherit;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sua <span>Sponte</span></h1>
+    <div id="hud">
+      <span>Surviving: <b id="time">0.0</b>s</span>
+      &nbsp;
+      <span>Best: <b id="best">0.0</b>s</span>
+    </div>
+  </header>
+
+  <div id="banner">The court will stamp you when it pleases. Don&rsquo;t be where the stamp lands.</div>
+
+  <main>
+    <canvas id="c" width="800" height="520"></canvas>
+  </main>
+
+  <footer>
+    <span>WASD / Arrows to flee</span>
+    <span>Shadow = imminent stamp</span>
+    <span>Pick up motions for relief</span>
+  </footer>
+
+  <div id="dismissal" aria-hidden="true">
+    <div class="order">
+      <h2>Order of Dismissal</h2>
+      <p>You have been stamped. The above-captioned matter is hereby <b>DISMISSED WITH PREJUDICE</b>.</p>
+      <p class="reason" id="dismissal-reason">Reason goes here.</p>
+      <p>You survived <b id="dismissal-time">0.0</b> seconds.</p>
+      <div class="meta">
+        <span>Case No. <span id="dismissal-case">27-CV-26-?????</span></span>
+        <span>So ordered, sua sponte.</span>
+      </div>
+      <button id="restart">File a new case</button>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+    const cvs = document.getElementById("c");
+    const ctx = cvs.getContext("2d");
+    const W = cvs.width, H = cvs.height;
+
+    const BANNERS = [
+      "Movement must be in writing. (you are slowed)",
+      "Continuance granted. (the hand pauses)",
+      "Hearing is on the record.",
+      "Per local rule 14, parties must keep moving.",
+      "The court takes judicial notice of paperwork.",
+      "Counsel is reminded to remain visible.",
+      "Filings have been received and disregarded.",
+      "Notice of stamp: forthcoming."
+    ];
+    const REASONS = [
+      "Failure to dodge in a timely manner.",
+      "The court found respondent improperly positioned.",
+      "Stamp pad needed reuse.",
+      "Petitioner&rsquo;s convenience.",
+      "Insufficient flight.",
+      "Court&rsquo;s own discretion. No further explanation will follow.",
+      "Respondent appeared. That alone was sufficient.",
+      "It was a Tuesday."
+    ];
+    const POWERUPS = [
+      { id: "quash",   label: "Mot. to Quash",   color: "#1e5b2a", effect: "freeze",     dur: 3.0 },
+      { id: "stay",    label: "Stay",            color: "#1e3c5b", effect: "invisible",  dur: 2.0 },
+      { id: "limit",   label: "Page Limit",      color: "#5b1e1e", effect: "shrinkStamp",dur: 6.0 }
+    ];
+
+    // -- World state ------------------------------------------------------
+    let state;
+    function reset() {
+      const best = state ? state.best : 0;
+      state = {
+        running: true,
+        elapsed: 0,
+        best,
+        player: { x: W / 2, y: H / 2, vx: 0, vy: 0, r: 9, speed: 220, alpha: 1 },
+        hand:   { x: 80, y: 80, targetX: W/2, targetY: H/2, speed: 75, state: "track", t: 0,
+                  windupAt: { x: 0, y: 0 }, slamRadius: 80, stampScale: 1 },
+        modifiers: { playerSpeedMul: 1, handPaused: 0, playerInvisible: 0, stampMul: 1 },
+        papers: makePapers(),
+        powerups: [],
+        nextPowerupAt: 4.0,
+        bannerT: 0,
+        keys: {},
+      };
+      document.getElementById("dismissal").classList.remove("show");
+      document.getElementById("time").textContent = "0.0";
+      document.getElementById("best").textContent = state.best.toFixed(1);
+    }
+
+    function makePapers() {
+      const arr = [];
+      for (let i = 0; i < 28; i++) {
+        arr.push({
+          x: Math.random() * (W - 60) + 30,
+          y: Math.random() * (H - 60) + 30,
+          w: 36 + Math.random() * 24,
+          h: 48 + Math.random() * 18,
+          rot: (Math.random() * 0.5 - 0.25),
+          tint: Math.random() < 0.3 ? "#e4d8b0" : "#f6f0db"
+        });
+      }
+      return arr;
+    }
+
+    // -- Input ------------------------------------------------------------
+    document.addEventListener("keydown", e => {
+      if (!state) return;
+      state.keys[e.key.toLowerCase()] = true;
+      if (["arrowup","arrowdown","arrowleft","arrowright"," "].includes(e.key.toLowerCase())) e.preventDefault();
+    });
+    document.addEventListener("keyup", e => {
+      if (!state) return;
+      state.keys[e.key.toLowerCase()] = false;
+    });
+
+    document.getElementById("restart").addEventListener("click", () => { reset(); state.running = true; loop(performance.now()); });
+
+    // -- Banner ----------------------------------------------------------
+    function flashBanner(text) {
+      const el = document.getElementById("banner");
+      el.textContent = text;
+      el.classList.remove("flash");
+      void el.offsetWidth;
+      el.classList.add("flash");
+    }
+    function maybeBanner(dt) {
+      state.bannerT -= dt;
+      if (state.bannerT <= 0) {
+        const msg = BANNERS[Math.floor(Math.random() * BANNERS.length)];
+        flashBanner(msg);
+        state.bannerT = 6 + Math.random() * 4;
+        // some banners have real effects
+        if (msg.startsWith("Movement")) {
+          state.modifiers.playerSpeedMul = 0.55;
+          setTimeout(() => state.modifiers.playerSpeedMul = 1, 2500);
+        } else if (msg.startsWith("Continuance")) {
+          state.modifiers.handPaused = 2.5;
+        }
+      }
+    }
+
+    // -- Powerups --------------------------------------------------------
+    function maybeSpawnPowerup(dt) {
+      state.nextPowerupAt -= dt;
+      if (state.nextPowerupAt <= 0) {
+        const def = POWERUPS[Math.floor(Math.random() * POWERUPS.length)];
+        state.powerups.push({
+          x: 60 + Math.random() * (W - 120),
+          y: 60 + Math.random() * (H - 120),
+          r: 14, life: 9.0, def
+        });
+        state.nextPowerupAt = 5 + Math.random() * 4;
+      }
+    }
+    function updatePowerups(dt) {
+      for (let i = state.powerups.length - 1; i >= 0; i--) {
+        const p = state.powerups[i];
+        p.life -= dt;
+        if (p.life <= 0) { state.powerups.splice(i, 1); continue; }
+        const dx = state.player.x - p.x, dy = state.player.y - p.y;
+        if (Math.hypot(dx, dy) < p.r + state.player.r) {
+          applyPowerup(p.def);
+          state.powerups.splice(i, 1);
+          flashBanner("Filed: " + p.def.label.toUpperCase());
+        }
+      }
+    }
+    function applyPowerup(def) {
+      if (def.effect === "freeze") state.modifiers.handPaused = def.dur;
+      if (def.effect === "invisible") state.modifiers.playerInvisible = def.dur;
+      if (def.effect === "shrinkStamp") state.modifiers.stampMul = 0.45;
+      if (def.effect === "shrinkStamp") {
+        setTimeout(() => state.modifiers.stampMul = 1, def.dur * 1000);
+      }
+    }
+
+    // -- Player & hand ---------------------------------------------------
+    function updatePlayer(dt) {
+      const k = state.keys, p = state.player;
+      let ax = 0, ay = 0;
+      if (k["a"] || k["arrowleft"])  ax -= 1;
+      if (k["d"] || k["arrowright"]) ax += 1;
+      if (k["w"] || k["arrowup"])    ay -= 1;
+      if (k["s"] || k["arrowdown"])  ay += 1;
+      if (ax !== 0 && ay !== 0) { ax *= 0.707; ay *= 0.707; }
+      const s = p.speed * state.modifiers.playerSpeedMul;
+      p.x = clamp(p.x + ax * s * dt, p.r + 4, W - p.r - 4);
+      p.y = clamp(p.y + ay * s * dt, p.r + 4, H - p.r - 4);
+      // tick down modifier timers
+      if (state.modifiers.playerInvisible > 0) {
+        state.modifiers.playerInvisible -= dt;
+        if (state.modifiers.playerInvisible < 0) state.modifiers.playerInvisible = 0;
+      }
+      // alpha for invisibility flicker
+      p.alpha = state.modifiers.playerInvisible > 0 ? 0.35 : 1;
+    }
+
+    function updateHand(dt) {
+      const h = state.hand, p = state.player;
+      // pause handling
+      if (state.modifiers.handPaused > 0) {
+        state.modifiers.handPaused -= dt;
+        return;
+      }
+      h.t += dt;
+      if (h.state === "track") {
+        // Move toward player
+        const dx = p.x - h.x, dy = p.y - h.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const visible = state.modifiers.playerInvisible <= 0;
+        if (visible) {
+          h.x += (dx / d) * h.speed * dt;
+          h.y += (dy / d) * h.speed * dt;
+        }
+        // Decide to wind up if close enough
+        const ready = h.t > 1.3 + Math.random() * 0.4;
+        if (visible && Math.hypot(dx, dy) < 220 && ready) {
+          h.state = "windup";
+          h.t = 0;
+          h.windupAt = { x: p.x, y: p.y };
+        }
+      } else if (h.state === "windup") {
+        // hold position over windupAt, grow the danger circle
+        if (h.t > 0.75) {
+          h.state = "slam";
+          h.t = 0;
+        }
+      } else if (h.state === "slam") {
+        // moment of impact
+        const wx = h.windupAt.x, wy = h.windupAt.y;
+        h.x += (wx - h.x) * 0.6;
+        h.y += (wy - h.y) * 0.6;
+        const r = h.slamRadius * state.modifiers.stampMul;
+        const dx = p.x - wx, dy = p.y - wy;
+        if (Math.hypot(dx, dy) < r * 0.8) {
+          // STAMPED
+          endGame();
+          return;
+        }
+        if (h.t > 0.25) {
+          h.state = "recover";
+          h.t = 0;
+        }
+      } else if (h.state === "recover") {
+        if (h.t > 0.6) {
+          h.state = "track";
+          h.t = 0;
+        }
+      }
+    }
+
+    function endGame() {
+      state.running = false;
+      if (state.elapsed > state.best) state.best = state.elapsed;
+      document.getElementById("dismissal-reason").textContent = REASONS[Math.floor(Math.random() * REASONS.length)];
+      document.getElementById("dismissal-time").textContent = state.elapsed.toFixed(1);
+      document.getElementById("dismissal-case").textContent = "27-CV-26-" + String(Math.floor(10000 + Math.random() * 89999));
+      document.getElementById("dismissal").classList.add("show");
+    }
+
+    // -- Rendering -------------------------------------------------------
+    function draw() {
+      // Background: beige with subtle hatch
+      ctx.fillStyle = "#ebe3cb";
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#00000008";
+      for (let y = 0; y < H; y += 24) ctx.fillRect(0, y, W, 1);
+
+      // Papers
+      for (const pp of state.papers) {
+        ctx.save();
+        ctx.translate(pp.x, pp.y);
+        ctx.rotate(pp.rot);
+        ctx.fillStyle = pp.tint;
+        ctx.fillRect(-pp.w/2, -pp.h/2, pp.w, pp.h);
+        ctx.strokeStyle = "#00000022";
+        ctx.strokeRect(-pp.w/2, -pp.h/2, pp.w, pp.h);
+        ctx.fillStyle = "#00000033";
+        for (let i = 0; i < 4; i++) ctx.fillRect(-pp.w/2 + 4, -pp.h/2 + 6 + i * 7, pp.w - 8, 2);
+        ctx.restore();
+      }
+
+      // Powerups
+      for (const pu of state.powerups) {
+        ctx.save();
+        ctx.translate(pu.x, pu.y);
+        const pulse = 1 + Math.sin(performance.now() / 220) * 0.08;
+        ctx.fillStyle = pu.def.color;
+        ctx.strokeStyle = "#1c1816";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, pu.r * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#f6f0db";
+        ctx.font = "bold 9px 'Courier New', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(pu.def.label, 0, -pu.r - 8);
+        ctx.restore();
+      }
+
+      // Stamp danger circle (during windup)
+      if (state.hand.state === "windup") {
+        const t = state.hand.t / 0.75;
+        const r = state.hand.slamRadius * state.modifiers.stampMul * (0.45 + t * 0.55);
+        ctx.save();
+        ctx.translate(state.hand.windupAt.x, state.hand.windupAt.y);
+        ctx.fillStyle = `rgba(193, 65, 27, ${0.18 + t * 0.25})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(193, 65, 27, ${0.45 + t * 0.4})`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+
+      // Slam burst
+      if (state.hand.state === "slam") {
+        const r = state.hand.slamRadius * state.modifiers.stampMul;
+        ctx.save();
+        ctx.translate(state.hand.windupAt.x, state.hand.windupAt.y);
+        ctx.fillStyle = `rgba(193, 65, 27, 0.6)`;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * (1 - state.hand.t / 0.25), 0, Math.PI * 2);
+        ctx.fill();
+        // STAMP text
+        ctx.fillStyle = "#1c1816";
+        ctx.font = "bold 22px 'Courier New', monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("STAMP", 0, 0);
+        ctx.restore();
+      }
+
+      // Player (small figure)
+      ctx.save();
+      ctx.globalAlpha = state.player.alpha;
+      ctx.translate(state.player.x, state.player.y);
+      // Body
+      ctx.fillStyle = "#1c1816";
+      ctx.fillRect(-4, -2, 8, 10);
+      // Head
+      ctx.beginPath();
+      ctx.arc(0, -7, 5, 0, Math.PI * 2);
+      ctx.fill();
+      // Legs - simple animation
+      const lf = Math.sin(performance.now() / 60) * 3;
+      ctx.fillRect(-4, 8, 3, 6 + lf);
+      ctx.fillRect( 1, 8, 3, 6 - lf);
+      // Briefcase tell
+      ctx.fillStyle = "#5b3e1e";
+      ctx.fillRect(4, 0, 5, 5);
+      ctx.restore();
+
+      // Hand
+      drawHand();
+
+      // Cursor of hand also: a tiny shadow at player
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.beginPath();
+      ctx.ellipse(state.player.x, state.player.y + 14, 9, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawHand() {
+      const h = state.hand;
+      let scale = 1;
+      if (h.state === "windup") scale = 0.85 + (h.t / 0.75) * 0.15;
+      if (h.state === "slam")   scale = 1.4 - (h.t / 0.25) * 0.4;
+      if (h.state === "recover") scale = 1.0 + Math.sin((h.t / 0.6) * Math.PI) * 0.05;
+
+      const cx = (h.state === "windup" || h.state === "slam") ? h.windupAt.x : h.x;
+      const cy = (h.state === "windup" || h.state === "slam") ? h.windupAt.y - 30 : h.y - 30;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(scale, scale);
+
+      // shadow under hand
+      ctx.fillStyle = "rgba(0,0,0,0.2)";
+      ctx.beginPath();
+      ctx.ellipse(0, 60, 36, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sleeve (black robe!)
+      ctx.fillStyle = "#1c1816";
+      ctx.beginPath();
+      ctx.moveTo(-30, -90);
+      ctx.lineTo(30, -90);
+      ctx.lineTo(36, 8);
+      ctx.lineTo(-36, 8);
+      ctx.closePath();
+      ctx.fill();
+      // Sleeve cuff
+      ctx.fillStyle = "#3a2f25";
+      ctx.fillRect(-36, 0, 72, 8);
+
+      // Hand (palm)
+      ctx.fillStyle = "#e4b89c";
+      ctx.strokeStyle = "#7d4a30";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 28, 26, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Fingers (4 stubs at bottom)
+      for (let i = -2; i <= 2; i++) {
+        ctx.fillStyle = "#e4b89c";
+        ctx.beginPath();
+        ctx.ellipse(i * 9, 48, 4, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      // Thumb
+      ctx.beginPath();
+      ctx.ellipse(-22, 32, 8, 5, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // The stamp head it grips
+      ctx.fillStyle = "#5b1e1e";
+      ctx.fillRect(-12, -10, 24, 18);
+      ctx.fillStyle = "#1c1816";
+      ctx.font = "bold 9px 'Courier New', monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "#f4d488";
+      ctx.fillText("DENIED", 0, 0);
+
+      ctx.restore();
+    }
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    // -- Loop ------------------------------------------------------------
+    let last = 0;
+    function loop(now) {
+      if (!state || !state.running) return;
+      const dt = Math.min(0.04, (now - last) / 1000 || 0.016);
+      last = now;
+      state.elapsed += dt;
+      document.getElementById("time").textContent = state.elapsed.toFixed(1);
+      maybeBanner(dt);
+      maybeSpawnPowerup(dt);
+      updatePlayer(dt);
+      updateHand(dt);
+      updatePowerups(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    reset();
+    last = performance.now();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>

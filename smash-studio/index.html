@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>Glass Gallery</title>
+
+    <link rel="canonical" href="https://madderverse.org/smash-studio/" />
+    <meta property="og:url" content="https://madderverse.org/smash-studio/" />
+    <meta name="twitter:url" content="https://madderverse.org/smash-studio/" />
+    <meta name="title" content="Glass Gallery — Smash the Glass. From The Madderverse." />
+    <meta name="description" content="Sling a glass marble and shatter the carnival trinkets into a pile of pieces. Free, ad-free, kid-friendly." />
+    <meta name="keywords" content="glass gallery, carnival game, smash, shatter, slingshot, kids game, The Madderverse, Onion Madder, Mad Sundar LLC, free kids games, ad-free games" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Glass Gallery — Smash the Glass" />
+    <meta property="og:description" content="Sling a glass marble and shatter the carnival trinkets into a pile of pieces. Free, ad-free, kid-friendly." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Glass Gallery — Smash the Glass" />
+    <meta name="twitter:description" content="Sling a glass marble and shatter the carnival trinkets into a pile of pieces." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#2a1f52" />
+    <meta name="apple-mobile-web-app-title" content="Glass Gallery" />
+    <meta name="application-name" content="Glass Gallery" />
+
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+    <a class="madder-home" href="../" aria-label="Back to The Madderverse" title="Back to The Madderverse">&#x2302;</a>
+
+    <div id="stage">
+        <canvas id="game"></canvas>
+        <div id="hint">drag the marble back &amp; let go — pop the glass</div>
+
+        <div id="hud">
+            <span id="hudLevel">Lvl 1</span>
+            <span id="hudGoal">0 / 5</span>
+            <span id="hudTimer">⏱ 30</span>
+            <span id="hudScore">★ 0</span>
+        </div>
+
+        <div id="overlay" hidden>
+            <div class="overlay-card">
+                <h2 id="overlayTitle"></h2>
+                <button id="overlayBtn" type="button">Next</button>
+            </div>
+        </div>
+
+        <div id="title">
+            <div class="title-card">
+                <h1>Glass Gallery</h1>
+                <p>Sling the marble &middot; smash the glass</p>
+                <button id="playBtn" type="button" disabled>Loading&hellip;</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="site-footer-slim" aria-label="Site info">
+        <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../">The Madderverse</a>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../about.html">About</a>
+    </footer>
+
+    <script src="game.js"></script>
+    <script>document.querySelectorAll('[data-year]').forEach(function (el) { el.textContent = new Date().getFullYear(); });</script>
+</body>
+</html>

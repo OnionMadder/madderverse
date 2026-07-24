@@ -1,0 +1,997 @@
+"use strict";
+
+/* Glass Gallery — prototype
+   Drag a marble back from the slingshot, release to lob it in an arc, and when
+   it hits a glass trinket the trinket fractures into Voronoi shards that fly,
+   tumble and pile on the floor. Everything is procedural so it runs offline;
+   the real rawpixel PNGs drop in by swapping ONE function (see makeTarget). */
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const hintEl = document.getElementById("hint");
+
+let W = 0, H = 0, DPR = 1;
+let anchor, shelfY, shelfYs, groundY;
+
+const GRAV = 0.42;        // marble gravity (px / frame^2)
+const SHARD_GRAV = 0.34;  // shards fall a touch slower — reads as light "glass"
+const MAX_PULL = 175;     // how far back you can stretch the sling (more arc range)
+const LAUNCH_K = 0.27;    // stronger launch so a high arc can reach the back rows
+const RELOAD_MS = 650;    // sling reloads this long after firing — no waiting for landing
+
+let trinkets = [];        // every trinket on the shelves (broken ones removed — no respawn)
+let basket = null;        // catch-basket for skill levels (null when none)
+let beltSpan = 0;         // conveyor wrap distance for moving levels (0 = static)
+let shards = [];          // flying + settled shards (the settled ones are the pile)
+let ball = null;          // the loaded, aimable marble at the sling (null while reloading)
+let flying = [];          // marbles in flight — multiple at once (fire without waiting)
+let reloadAt = 0;         // timestamp when the next marble loads into the sling
+let aiming = false;
+let launched = false;
+let pointer = { x: 0, y: 0 };
+let respawnAt = 0;
+
+/* ---------- canvas sizing ---------- */
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = canvas.clientWidth;
+  H = canvas.clientHeight;
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  layout();
+}
+function layout() {
+  anchor = { x: W / 2, y: H - 155 };          // slingshot centered: shoot left or right
+  shelfYs = [H * 0.22, H * 0.40, H * 0.58];   // three shelves spanning the full width
+  shelfY = shelfYs[1];                          // legacy single-shelf ref (slingshot/aim)
+  groundY = H - 54;
+  if (ball) { ball.x = anchor.x; ball.y = anchor.y; }
+}
+window.addEventListener("resize", resize);
+
+/* ---------- math helpers ---------- */
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function easeOut(t) { return 1 - (1 - t) * (1 - t); }
+function centroid(poly) {
+  let x = 0, y = 0;
+  for (const p of poly) { x += p[0]; y += p[1]; }
+  return [x / poly.length, y / poly.length];
+}
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
+
+/* ---------- Voronoi by half-plane clipping ----------
+   A Voronoi cell = every point closer to its seed than to any other seed.
+   So start each cell as the whole bounding box, then for every OTHER seed
+   slice away the half that's closer to that seed (clip by the perpendicular
+   bisector). What's left is the cell. n points toward the other seed, so the
+   side we keep is (p - midpoint)·n <= 0. */
+function rectPoly(b) {
+  return [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]];
+}
+function clipHalf(poly, mx, my, nx, ny) {
+  const out = [];
+  const L = poly.length;
+  for (let i = 0; i < L; i++) {
+    const A = poly[i], B = poly[(i + 1) % L];
+    const da = (A[0] - mx) * nx + (A[1] - my) * ny;
+    const db = (B[0] - mx) * nx + (B[1] - my) * ny;
+    const Ain = da <= 0, Bin = db <= 0;
+    if (Ain) out.push(A);
+    if (Ain !== Bin) {
+      const t = da / (da - db);  // where segment AB crosses the bisector
+      out.push([A[0] + t * (B[0] - A[0]), A[1] + t * (B[1] - A[1])]);
+    }
+  }
+  return out;
+}
+function voronoiCells(seeds, b) {
+  return seeds.map(s => {
+    let poly = rectPoly(b);
+    for (const t of seeds) {
+      if (t === s) continue;
+      poly = clipHalf(poly, (s[0] + t[0]) / 2, (s[1] + t[1]) / 2, t[0] - s[0], t[1] - s[1]);
+      if (poly.length < 3) break;
+    }
+    return poly;
+  });
+}
+
+/* ---------- the glass trinket (procedural placeholder art) ---------- */
+const SHAPES = ["heart", "star", "gem", "flower"];
+
+function shapePath(shape, cx, cy, R) {
+  const p = new Path2D();
+  if (shape === "gem") {
+    p.arc(cx, cy, R, 0, Math.PI * 2);
+  } else if (shape === "heart") {
+    for (let i = 0; i <= 64; i++) {
+      const a = i / 64 * Math.PI * 2;
+      const x = 16 * Math.pow(Math.sin(a), 3);
+      const y = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
+      const px = cx + x * (R / 17), py = cy - y * (R / 17);
+      i ? p.lineTo(px, py) : p.moveTo(px, py);
+    }
+    p.closePath();
+  } else if (shape === "star") {
+    const pts = 5;
+    for (let i = 0; i < pts * 2; i++) {
+      const r = i % 2 ? R * 0.46 : R;
+      const a = -Math.PI / 2 + i * Math.PI / pts;
+      const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+      i ? p.lineTo(px, py) : p.moveTo(px, py);
+    }
+    p.closePath();
+  } else { // flower
+    for (let i = 0; i <= 120; i++) {
+      const a = i / 120 * Math.PI * 2;
+      const r = R * (0.55 + 0.45 * Math.abs(Math.cos(3 * a)));
+      const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
+      i ? p.lineTo(px, py) : p.moveTo(px, py);
+    }
+    p.closePath();
+  }
+  return p;
+}
+
+function drawGlass(g, shape, w, h) {
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 14;
+  const hue = Math.floor(Math.random() * 360);
+  g.clearRect(0, 0, w, h);
+  const path = shapePath(shape, cx, cy, R);
+
+  g.save();
+  g.clip(path);
+  // translucent body
+  const body = g.createLinearGradient(0, cy - R, 0, cy + R);
+  body.addColorStop(0, `hsla(${hue},90%,82%,0.92)`);
+  body.addColorStop(0.55, `hsla(${hue},85%,63%,0.9)`);
+  body.addColorStop(1, `hsla(${hue + 18},80%,52%,0.94)`);
+  g.fillStyle = body;
+  g.fillRect(0, 0, w, h);
+  // depth toward the bottom
+  const glow = g.createRadialGradient(cx, cy + R * 0.25, R * 0.1, cx, cy + R * 0.2, R * 1.15);
+  glow.addColorStop(0, `hsla(${hue + 30},95%,70%,0)`);
+  glow.addColorStop(1, `hsla(${hue - 20},80%,38%,0.38)`);
+  g.fillStyle = glow;
+  g.fillRect(0, 0, w, h);
+  // specular highlights
+  g.fillStyle = "rgba(255,255,255,0.55)";
+  g.beginPath();
+  g.ellipse(cx - R * 0.32, cy - R * 0.42, R * 0.27, R * 0.16, -0.5, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = "rgba(255,255,255,0.3)";
+  g.beginPath();
+  g.ellipse(cx + R * 0.22, cy + R * 0.32, R * 0.12, R * 0.07, 0.4, 0, Math.PI * 2);
+  g.fill();
+  g.restore();
+
+  // bright rim
+  g.lineWidth = 3;
+  g.strokeStyle = `hsla(${hue},90%,92%,0.7)`;
+  g.stroke(path);
+}
+
+/* ---------- real-image roster (rawpixel sheets, auto-detected) ----------
+   Drop transparent-background PNG sheets into glass-gallery/assets/img/ and
+   list their filenames in SHEET_FILES. We load each, flood-fill the alpha
+   channel to find every separated opaque blob, and use those as the roster
+   of random trinkets. Image-agnostic: each item just becomes a source-rect
+   crop drawn into the same offscreen as the procedural placeholders. */
+// Each set is <material>-<theme>.png; the prefix (material) drives break + hits.
+const TRINKET_SHEETS = [
+  "glass-cute.png", "crystal-vaporwave.png", "jelly-tropical.png",
+  "metal-goth.png", "paint-blob.png", "wax-watchcraft.png", "jumbo-fish.png"
+];
+const MIN_ITEM_AREA = 400;       // discard noise-blobs smaller than this
+const ALPHA_THRESHOLD = 20;      // pixels below this alpha count as transparent
+
+// material -> how it breaks + how many hits it takes. Break styles other than
+// "shatter" (the Voronoi fracture) are STUBBED to shatter for now.
+// TODO: real disintegrate (metal), blobs/droplets (paint), soft globs (jelly), melt (wax).
+const MATERIALS = {
+  glass:   { break: "shatter",      hp: 1 },
+  crystal: { break: "shatter",      hp: 1 },
+  jelly:   { break: "shatter",      hp: 1 },
+  metal:   { break: "disintegrate", hp: 3 },   // heavier shooter clears it faster
+  paint:   { break: "blobs",        hp: 1 },
+  wax:     { break: "melt",         hp: 2 },
+  jumbo:   { break: "shatter",      hp: 6 }     // big, post-tutorial, many hits
+};
+const DEFAULT_MATERIAL = { break: "shatter", hp: 1 };
+
+// shooter type -> marble sprite + damage one hit deals (heavier = more).
+const SHOOTERS = {
+  glass:    { sprite: "assets/shooters/glass.png",    power: 1 },
+  metal:    { sprite: "assets/shooters/metal.png",    power: 2 },
+  electric: { sprite: "assets/shooters/electric.png", power: 1 }   // TODO: special ability
+};
+let activeShooter = "glass";
+
+let ROSTER = [];                 // normal trinkets: [{ img, sw, sh, material }, ...]
+let JUMBO = [];                  // jumbo trinkets, kept OUT of the random pool (level-gated)
+let assetsReady = false;
+
+function loadImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error("image failed: " + src));
+    img.src = src;
+  });
+}
+
+function extractItems(img) {
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const oc = document.createElement("canvas");
+  oc.width = w; oc.height = h;
+  const oct = oc.getContext("2d", { willReadFrequently: true });
+  oct.drawImage(img, 0, 0);
+  const data = oct.getImageData(0, 0, w, h).data;
+  const seen = new Uint8Array(w * h);
+  const items = [];
+
+  // 4-connected flood-fill: every opaque pixel walked once, tracking the
+  // bounding box and area of each connected blob. Iterative (no recursion)
+  // so huge sheets don't blow the call stack.
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (seen[i]) continue;
+      if (data[i * 4 + 3] < ALPHA_THRESHOLD) { seen[i] = 1; continue; }
+      const comp = [i];          // this blob's pixel indices
+      seen[i] = 1;
+      let head = 0, minX = x, maxX = x, minY = y, maxY = y;
+      while (head < comp.length) {
+        const idx = comp[head++];
+        const px = idx % w, py = (idx / w) | 0;
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+        const push = (nx, ny) => {
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) return;
+          const ni = ny * w + nx;
+          if (seen[ni]) return;
+          seen[ni] = 1;
+          if (data[ni * 4 + 3] >= ALPHA_THRESHOLD) comp.push(ni);
+        };
+        push(px + 1, py); push(px - 1, py); push(px, py + 1); push(px, py - 1);
+      }
+      if (comp.length < MIN_ITEM_AREA) continue;
+      // Copy ONLY this blob's pixels into a tight canvas. Drawing the whole
+      // bounding rectangle would catch disconnected bits of a neighbouring
+      // item that happen to overlap the rect — that was the "bleed".
+      const cw = maxX - minX + 1, ch = maxY - minY + 1;
+      const sprite = document.createElement("canvas");
+      sprite.width = cw; sprite.height = ch;
+      const sctx = sprite.getContext("2d");
+      const out = sctx.createImageData(cw, ch);
+      for (const idx of comp) {
+        const s = idx * 4;
+        const d = (((idx / w | 0) - minY) * cw + (idx % w - minX)) * 4;
+        out.data[d] = data[s];
+        out.data[d + 1] = data[s + 1];
+        out.data[d + 2] = data[s + 2];
+        out.data[d + 3] = data[s + 3];
+      }
+      sctx.putImageData(out, 0, 0);
+      items.push({ img: sprite, sw: cw, sh: ch });
+    }
+  }
+  return items;
+}
+
+async function loadAssets() {
+  for (const file of TRINKET_SHEETS) {
+    const material = file.split("-")[0];          // "metal-goth.png" -> "metal"
+    try {
+      const img = await loadImage("assets/trinkets/" + file);
+      const items = extractItems(img);
+      for (const it of items) {
+        it.material = material;
+        (material === "jumbo" ? JUMBO : ROSTER).push(it);
+      }
+      console.log("glass-gallery:", file, "→", items.length, material, "items");
+    } catch (e) {
+      console.warn("glass-gallery: skipping", file + " —", e.message);
+    }
+  }
+  assetsReady = ROSTER.length > 0;
+  if (assetsReady && trinkets.length) populateLevel();   // upgrade to real-image trinkets
+}
+
+let bgImage = null;
+async function loadBackground() {
+  try { bgImage = await loadImage("assets/backgrounds/carnival-booth.jpg"); }
+  catch (e) { console.warn("glass-gallery: no background —", e.message); }
+}
+
+const shooterImgs = {};          // type -> Image
+async function loadShooters() {
+  for (const type in SHOOTERS) {
+    try { shooterImgs[type] = await loadImage(SHOOTERS[type].sprite); }
+    catch (e) { console.warn("glass-gallery: no shooter sprite " + type + " —", e.message); }
+  }
+}
+
+let duckItem = null;             // single duck sprite used as the L3/L4 target
+async function loadDuck() {
+  try {
+    const img = await loadImage("assets/trinkets/duck.png");
+    const items = extractItems(img);
+    if (items[0]) { duckItem = items[0]; duckItem.material = "duck"; }
+    if (duckItem && LEVELS[levelIndex] && LEVELS[levelIndex].specific === "duck") populateLevel();
+  } catch (e) { console.warn("glass-gallery: no duck —", e.message); }
+}
+
+// one trinket, bottom-aligned to shelf `shy`, centered at `cx`
+function makeTrinket(cx, shy, moving, isDuck) {
+  const displaySide = clamp(Math.min(W, H) * 0.12, 44, 120);   // smaller — shelves are packed
+  const pad = Math.round(displaySide * 0.14);
+
+  let it = null;
+  if (isDuck && duckItem) it = duckItem;                       // L3/L4 target
+  else if (assetsReady && ROSTER.length) it = ROSTER[(Math.random() * ROSTER.length) | 0];
+
+  let dw, dh, paint, material = "glass";
+  if (it) {
+    material = it.material || "glass";
+    const scale = Math.sqrt((displaySide * displaySide) / (it.sw * it.sh));
+    dw = Math.round(it.sw * scale);
+    dh = Math.round(it.sh * scale);
+    paint = octx => octx.drawImage(it.img, pad, pad, dw, dh);
+  } else {
+    dw = dh = Math.round(displaySide);
+    paint = (octx, ow, oh) => drawGlass(octx, SHAPES[(Math.random() * SHAPES.length) | 0], ow, oh);
+  }
+  const mat = MATERIALS[material] || DEFAULT_MATERIAL;
+
+  const ow = dw + pad * 2, oh = dh + pad * 2;
+  const oc = document.createElement("canvas");
+  oc.width = ow; oc.height = oh;
+  const octx = oc.getContext("2d", { willReadFrequently: true });
+  paint(octx, ow, oh);
+
+  const driftSpeed = clamp(W * 0.0045, 1.8, 4.5);
+  return {
+    img: oc, octx, w: ow, h: oh,
+    x: Math.round(cx - ow / 2),
+    y: Math.round(shy - oh + pad + 3),       // bottom edge rests on the shelf
+    vx: moving ? (Math.random() < 0.5 ? -driftSpeed : driftSpeed) : 0,
+    data: octx.getImageData(0, 0, ow, oh).data,
+    born: performance.now(),
+    material, hp: mat.hp, maxHp: mat.hp, hitFlash: 0
+  };
+}
+
+// fill all three full-width shelves with trinkets for the current level
+function populateLevel() {
+  trinkets = [];
+  beltSpan = 0;
+  const L = LEVELS[levelIndex] || {};
+  const moving = !!L.moving;
+  const displaySide = clamp(Math.min(W, H) * 0.12, 44, 120);
+  const cellW = displaySide * 2.0 + 10;                        // wider gaps → lanes to thread to the back rows
+  const perShelf = Math.max(3, Math.floor(W / cellW));
+  const gap = W / perShelf;
+  const duckLevel = L.specific === "duck" && duckItem;
+
+  // Build the slot list. Moving levels are a CONVEYOR: each row gets 2 extra
+  // trinkets (so one is always off-stage entering/exiting) and a direction —
+  // the middle row runs opposite the top & bottom. Static levels just fill.
+  const slots = [];
+  if (moving) {
+    const nPer = perShelf + 2;
+    beltSpan = nPer * gap;                                      // wrap distance (seamless loop)
+    const baseDir = Math.random() < 0.5 ? 1 : -1;
+    shelfYs.forEach((shy, r) => {
+      const dir = (r === 1 ? -baseDir : baseDir);
+      for (let k = 0; k < nPer; k++) slots.push({ cx: (k - 1) * gap + gap / 2, shy, dir });
+    });
+  } else {
+    for (const shy of shelfYs) for (let i = 0; i < perShelf; i++) slots.push({ cx: gap * (i + 0.5), shy, dir: 0 });
+  }
+
+  // Duck levels GUARANTEE enough ducks to clear the goal; normal levels get a
+  // rare 1-in-35 duck as a surprise.
+  const duckIdx = new Set();
+  if (duckLevel) {
+    const want = Math.min(slots.length, (L.goal || 5) + 4);
+    while (duckIdx.size < want) duckIdx.add((Math.random() * slots.length) | 0);
+  }
+  const speed = clamp(W * 0.00225, 0.9, 2.25);                 // conveyor: ~half the old speed
+  slots.forEach((s, i) => {
+    const isDuck = duckIdx.has(i) || (!duckLevel && duckItem && Math.random() < 1 / 35);
+    const t = makeTrinket(s.cx, s.shy, false, isDuck);
+    if (s.dir) t.vx = s.dir * speed;                           // conveyor velocity
+    trinkets.push(t);
+  });
+}
+
+/* alpha at an offscreen pixel (0..255) */
+function alphaAt(t, lx, ly) {
+  if (lx < 0 || ly < 0 || lx >= t.w || ly >= t.h) return 0;
+  return t.data[((ly | 0) * t.w + (lx | 0)) * 4 + 3];
+}
+
+/* a hit: heavier shooters deal more damage; the trinket breaks only when hp runs out */
+function damageTrinket(t, ix, iy) {
+  if (!t || phase !== "playing") return;
+  t.hp -= (SHOOTERS[activeShooter] || { power: 1 }).power;
+  if (t.hp <= 0) shatter(t, ix, iy);                       // TODO: dispatch on material.break
+  else { t.hitFlash = performance.now(); playClink(); }    // survived — crack feedback
+}
+
+/* ---------- the smash ---------- */
+function shatter(t, ix, iy) {
+  if (!t) return;
+  const lix = ix - t.x, liy = iy - t.y;
+
+  // seeds: a sparse spread across the trinket + a dense cluster at the impact,
+  // so you get tight shards where it was hit and big lazy pieces at the edges.
+  const seeds = [];
+  for (let i = 0; i < 10; i++) seeds.push([Math.random() * t.w, Math.random() * t.h]);
+  for (let i = 0; i < 13; i++) {
+    const a = Math.random() * Math.PI * 2, rr = Math.random() * t.w * 0.18;
+    seeds.push([clamp(lix + Math.cos(a) * rr, 0, t.w), clamp(liy + Math.sin(a) * rr, 0, t.h)]);
+  }
+
+  const cells = voronoiCells(seeds, { x0: 0, y0: 0, x1: t.w, y1: t.h });
+  const R = t.w * 0.6;
+
+  for (const cell of cells) {
+    if (!cell || cell.length < 3) continue;
+    const c = centroid(cell);
+    if (alphaAt(t, c[0], c[1]) < 25) continue;   // skip empty shards outside the shape
+
+    // store polygon RELATIVE to its centroid so we can spin it about its middle;
+    // the trinket image is then drawn offset by -centroid so the slice lines up.
+    const rel = cell.map(p => [p[0] - c[0], p[1] - c[1]]);
+    const wx = t.x + c[0], wy = t.y + c[1];
+    const dx = wx - ix, dy = wy - iy;
+    const d = Math.hypot(dx, dy) || 1;
+    const burst = 1 - Math.min(d / R, 1);          // closer to impact = faster
+    const sp = 2 + burst * 7 + Math.random() * 2;
+
+    shards.push({
+      x: wx, y: wy,
+      vx: (dx / d) * sp + (ball ? ball.vx * 0.12 : 0) + (t.vx || 0) * 0.6 + (Math.random() - 0.5) * 1.5,
+      vy: (dy / d) * sp + (ball ? ball.vy * 0.12 : 0) - 2 - Math.random() * 2,
+      ang: 0,
+      va: (Math.random() - 0.5) * 0.26,
+      rel, cx: c[0], cy: c[1], img: t.img,
+      rest: groundY - Math.random() * 26 - 4,
+      settled: false
+    });
+  }
+
+  if (shards.length > 170) shards.splice(0, shards.length - 170);  // cap the pile
+  playShatter();
+  const idx = trinkets.indexOf(t);
+  if (idx >= 0) trinkets.splice(idx, 1);   // broken trinkets do NOT respawn
+  onTrinketBroken(t);   // count it toward the level goal (duck levels: ducks only)
+}
+
+/* ---------- per-frame updates ---------- */
+function updateTrinkets() {
+  for (const t of trinkets) {
+    if (!t.vx) continue;
+    t.x += t.vx;
+    if (beltSpan) {                                  // conveyor: exit one side, re-enter the other
+      if (t.vx > 0 && t.x > W) t.x -= beltSpan;
+      else if (t.vx < 0 && t.x + t.w < 0) t.x += beltSpan;
+    }
+  }
+}
+
+function updateFlying() {
+  const STEPS = 3;   // substep so a fast marble can't tunnel through a thin trinket
+  for (let bi = flying.length - 1; bi >= 0; bi--) {
+    const b = flying[bi];
+    let gone = false;
+    for (let k = 0; k < STEPS && !gone; k++) {
+      b.vy += GRAV / STEPS;
+      b.x += b.vx / STEPS;
+      b.y += b.vy / STEPS;
+      for (const t of trinkets) {
+        if (alphaAt(t, b.x - t.x, b.y - t.y) > 40) { damageTrinket(t, b.x, b.y); gone = true; break; }
+      }
+    }
+    if (gone || b.x < -50 || b.x > W + 50 || b.y > H + 60) flying.splice(bi, 1);
+  }
+}
+function updateShards() {
+  for (const s of shards) {
+    if (s.settled) continue;
+    s.vy += SHARD_GRAV;
+    s.vx *= 0.992;
+    const py = s.y;
+    s.x += s.vx; s.y += s.vy; s.ang += s.va;
+    // skill catch: a falling shard drops through the basket's mouth
+    if (basket && !s.caught && s.vy > 0) {
+      const rimY = basket.y - basket.h;
+      if (py < rimY && s.y >= rimY && s.x > basket.x - basket.w / 2 && s.x < basket.x + basket.w / 2) {
+        s.caught = true;
+        s.vx *= 0.3;
+        s.x = clamp(s.x, basket.x - basket.w * 0.38, basket.x + basket.w * 0.38);
+        s.rest = basket.y - 8 - Math.random() * 26;   // settle inside the basket
+        onShardCaught();
+      }
+    }
+    if (s.y >= s.rest) {
+      s.y = s.rest;
+      if (s.vy > 1.2) { s.vy *= -0.34; s.vx *= 0.6; s.va *= 0.5; }   // small bounce
+      else { s.settled = true; s.vy = 0; s.vx = 0; s.va = 0; }       // come to rest
+    }
+  }
+}
+
+/* ---------- rendering ---------- */
+function drawShards() {
+  for (const s of shards) {
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.ang);
+    ctx.beginPath();
+    ctx.moveTo(s.rel[0][0], s.rel[0][1]);
+    for (let i = 1; i < s.rel.length; i++) ctx.lineTo(s.rel[i][0], s.rel[i][1]);
+    ctx.closePath();
+    ctx.clip();
+    // The shard's shape comes from the image's own alpha, NOT a stroked cell
+    // outline — stroking the polygon would draw a "glass pane" border into the
+    // transparent area where the cell extends past the trinket's silhouette.
+    ctx.drawImage(s.img, -s.cx, -s.cy);
+    ctx.restore();
+  }
+}
+function drawTrinket(t) {
+  const age = (performance.now() - t.born) / 260;
+  const s = age < 1 ? 0.6 + 0.4 * easeOut(age) : 1;   // little pop-in
+  const cx = t.x + t.w / 2, cy = t.y + t.h / 2;
+  // brief shake when a hit lands but the trinket survives (multi-hit materials)
+  const shake = Math.max(0, 1 - (performance.now() - t.hitFlash) / 220);
+  const jx = (Math.random() - 0.5) * 11 * shake;
+  const jy = (Math.random() - 0.5) * 11 * shake;
+  ctx.save();
+  ctx.globalAlpha = age < 1 ? easeOut(age) : 1;
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 14;
+  ctx.shadowOffsetY = 7;
+  ctx.translate(cx + jx, cy + jy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+  ctx.drawImage(t.img, t.x, t.y);
+  ctx.restore();
+}
+function drawShelves() {
+  for (const y of shelfYs) {
+    const h = 16;
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.35)";
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 5;
+    const g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, "#b07a44");
+    g.addColorStop(1, "#6e431f");
+    ctx.fillStyle = g;
+    roundRect(ctx, -6, y, W + 12, h, 4); ctx.fill();   // full width, slight overhang
+    ctx.restore();
+    ctx.fillStyle = "rgba(255,255,255,0.2)";
+    roundRect(ctx, -6, y, W + 12, 5, 2); ctx.fill();
+  }
+}
+function drawSling() {
+  ctx.strokeStyle = "#3a2a1a";
+  ctx.lineWidth = 10;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(anchor.x, anchor.y + 78); ctx.lineTo(anchor.x, anchor.y + 6);
+  ctx.moveTo(anchor.x, anchor.y + 6); ctx.lineTo(anchor.x - 15, anchor.y - 15);
+  ctx.moveTo(anchor.x, anchor.y + 6); ctx.lineTo(anchor.x + 15, anchor.y - 15);
+  ctx.stroke();
+  if (ball && !aiming) {
+    ctx.strokeStyle = "rgba(90,55,30,0.9)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(anchor.x - 15, anchor.y - 15); ctx.lineTo(ball.x, ball.y);
+    ctx.moveTo(anchor.x + 15, anchor.y - 15); ctx.lineTo(ball.x, ball.y);
+    ctx.stroke();
+  }
+}
+function drawBall() {
+  const sprite = shooterImgs[activeShooter];
+  const one = (bx, by, r) => {
+    if (sprite) {
+      const d = r * 2.6, dh = d * sprite.naturalHeight / sprite.naturalWidth;
+      ctx.drawImage(sprite, bx - d / 2, by - dh / 2, d, dh);
+    } else {
+      const g = ctx.createRadialGradient(bx - 4, by - 4, 2, bx, by, r);
+      g.addColorStop(0, "#ffffff");
+      g.addColorStop(0.4, "#cfe3ff");
+      g.addColorStop(1, "#5a7bd6");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(bx, by, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+  for (const b of flying) one(b.x, b.y, b.r);
+  if (ball) one(ball.x, ball.y, ball.r);
+}
+function drawAim() {
+  const dx = anchor.x - ball.x, dy = anchor.y - ball.y;
+  if (Math.hypot(dx, dy) < 8) return;
+  // stretched bands
+  ctx.strokeStyle = "rgba(120,75,40,0.95)";
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(anchor.x - 15, anchor.y - 15); ctx.lineTo(ball.x, ball.y);
+  ctx.moveTo(anchor.x + 15, anchor.y - 15); ctx.lineTo(ball.x, ball.y);
+  ctx.stroke();
+  // dotted trajectory preview — the thing that makes aiming feel easy
+  let sx = ball.x, sy = ball.y, vx = dx * LAUNCH_K, vy = dy * LAUNCH_K;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+  for (let i = 0; i < 70; i++) {
+    vy += GRAV; sx += vx; sy += vy;
+    if (sy > H || sx < 0 || sx > W) break;
+    if (i % 2 === 0) {
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(1, 3.4 - i * 0.035), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+function drawCover(img) {
+  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const dw = img.naturalWidth * scale, dh = img.naturalHeight * scale;
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
+function makeBasket() {
+  const w = clamp(Math.min(W, H) * 0.17, 95, 150);
+  return { x: W * 0.62, y: groundY - 4, w, h: 72 };   // mouth spans [x±w/2] at (y - h)
+}
+function drawBasket() {            // body + dark opening, drawn BEHIND the shards
+  const b = basket, topY = b.y - b.h, halfTop = b.w / 2, halfBot = b.w * 0.34;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.3)"; ctx.shadowBlur = 12; ctx.shadowOffsetY = 6;
+  ctx.fillStyle = "#7a4a22";
+  ctx.beginPath();
+  ctx.moveTo(b.x - halfTop, topY);
+  ctx.lineTo(b.x + halfTop, topY);
+  ctx.lineTo(b.x + halfBot, b.y);
+  ctx.lineTo(b.x - halfBot, b.y);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "#311e0e";
+  ctx.beginPath();
+  ctx.ellipse(b.x, topY, halfTop, b.h * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+function drawBasketFront() {       // near lip, drawn OVER the shards = "contained"
+  const b = basket, topY = b.y - b.h, halfTop = b.w / 2;
+  ctx.strokeStyle = "#9a5f2e";
+  ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.ellipse(b.x, topY, halfTop, b.h * 0.15, 0, 0.05 * Math.PI, 0.95 * Math.PI);
+  ctx.stroke();
+}
+
+function render() {
+  if (bgImage) {
+    drawCover(bgImage);
+    // scrim: mute the busy sunburst a touch + darken the floor so glass reads
+    const scrim = ctx.createLinearGradient(0, 0, 0, H);
+    scrim.addColorStop(0, "rgba(18,10,38,0.30)");
+    scrim.addColorStop(0.45, "rgba(18,10,38,0.06)");
+    scrim.addColorStop(1, "rgba(8,4,20,0.58)");
+    ctx.fillStyle = scrim;
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, "#2a1f52");
+    bg.addColorStop(0.6, "#3a2566");
+    bg.addColorStop(1, "#1a1430");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  drawShelves();
+  if (basket) drawBasket();
+  drawShards();
+  if (basket) drawBasketFront();
+  for (const t of trinkets) drawTrinket(t);
+  drawSling();
+  drawBall();
+  if (aiming) drawAim();
+}
+
+/* ---------- input ---------- */
+function resetBall() { ball = { x: anchor.x, y: anchor.y, r: 13 }; }   // loads a fresh aimable marble
+function eventPos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function dragBall() {
+  let dx = pointer.x - anchor.x, dy = pointer.y - anchor.y;
+  const d = Math.hypot(dx, dy);
+  if (d > MAX_PULL) { dx *= MAX_PULL / d; dy *= MAX_PULL / d; }
+  ball.x = anchor.x + dx; ball.y = anchor.y + dy;
+}
+function launch() {
+  const dx = anchor.x - ball.x, dy = anchor.y - ball.y;
+  if (Math.hypot(dx, dy) < 8) { ball.x = anchor.x; ball.y = anchor.y; return; }   // too small — snap back
+  flying.push({ x: ball.x, y: ball.y, vx: dx * LAUNCH_K, vy: dy * LAUNCH_K, r: ball.r });
+  playThwip();
+  ball = null;                                   // sling empties; reloads after RELOAD_MS
+  reloadAt = performance.now() + RELOAD_MS;
+  if (!launched) { launched = true; hintEl.style.opacity = "0"; }
+}
+canvas.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  resumeAudio();
+  if (!ball) return;                             // reloading — nothing to aim yet
+  aiming = true;
+  pointer = eventPos(e);
+  dragBall();
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener("pointermove", e => {
+  if (!aiming) return;
+  pointer = eventPos(e);
+  dragBall();
+});
+function endAim() { if (aiming) { aiming = false; launch(); } }
+canvas.addEventListener("pointerup", endAim);
+canvas.addEventListener("pointercancel", endAim);
+
+/* ---------- audio: real break SFX (assets/sounds/) with a synth fallback ---------- */
+let actx = null;
+let breakBuffers = [];   // decoded break-1..8.mp3
+function resumeAudio() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  if (actx.state === "suspended") actx.resume();
+}
+async function loadSounds() {
+  if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+  for (let i = 1; i <= 8; i++) {
+    try {
+      const res = await fetch("assets/sounds/break-" + i + ".mp3");
+      breakBuffers.push(await actx.decodeAudioData(await res.arrayBuffer()));
+    } catch (e) { console.warn("glass-gallery: sound failed break-" + i + " —", e.message); }
+  }
+}
+function playShatter() {
+  if (breakBuffers.length && actx) {
+    const src = actx.createBufferSource();
+    src.buffer = breakBuffers[(Math.random() * breakBuffers.length) | 0];
+    const g = actx.createGain();
+    g.gain.value = 0.9;
+    src.connect(g); g.connect(actx.destination);
+    src.start();
+    return;
+  }
+  if (!actx) return;
+  const a = actx, t = a.currentTime;
+  // noise burst = the crash
+  const len = (a.sampleRate * 0.3) | 0;
+  const buf = a.createBuffer(1, len, a.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+  const noise = a.createBufferSource(); noise.buffer = buf;
+  const hp = a.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 2200;
+  const ng = a.createGain(); ng.gain.value = 0.32;
+  noise.connect(hp); hp.connect(ng); ng.connect(a.destination);
+  noise.start(t);
+  // a few glassy pings = the tinkle
+  for (let i = 0; i < 4; i++) {
+    const o = a.createOscillator(); o.type = "triangle";
+    o.frequency.value = 900 + Math.random() * 1800;
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18 + Math.random() * 0.15);
+    o.connect(g); g.connect(a.destination);
+    o.start(t + i * 0.004); o.stop(t + 0.5);
+  }
+}
+function playThwip() {
+  if (!actx) return;
+  const a = actx, t = a.currentTime;
+  const o = a.createOscillator(); o.type = "sine";
+  o.frequency.setValueAtTime(420, t);
+  o.frequency.exponentialRampToValueAtTime(120, t + 0.12);
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.16, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+  o.connect(g); g.connect(a.destination);
+  o.start(t); o.stop(t + 0.16);
+}
+function playClink() {
+  // reuse a break sample, pitched up + quiet = "cracked, but didn't break yet"
+  if (!breakBuffers.length || !actx) return;
+  const src = actx.createBufferSource();
+  src.buffer = breakBuffers[(Math.random() * breakBuffers.length) | 0];
+  src.playbackRate.value = 1.5;
+  const g = actx.createGain();
+  g.gain.value = 0.3;
+  src.connect(g); g.connect(actx.destination);
+  src.start();
+}
+function playCatch() {
+  // pleasant two-note chime when a shard lands in the basket — the skill reward
+  if (!actx) return;
+  const a = actx, t = a.currentTime;
+  [880, 1320].forEach((f, i) => {
+    const o = a.createOscillator(); o.type = "sine"; o.frequency.value = f;
+    const g = a.createGain();
+    g.gain.setValueAtTime(0.0001, t + i * 0.05);
+    g.gain.exponentialRampToValueAtTime(0.16, t + i * 0.05 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.05 + 0.2);
+    o.connect(g); g.connect(a.destination);
+    o.start(t + i * 0.05); o.stop(t + i * 0.05 + 0.22);
+  });
+}
+
+/* ---------- levels + progression ----------
+   5-level tutorial across 3 full-width shelves (broken trinkets don't respawn).
+   WORKING: break-goal, timer, basket/skill scoring, moving drift.
+   STUBBED: `specific:"duck"` targeting (L3/L4 currently count ANY break) and the
+   L5 jumbo+hand boss (plays as a normal break level for now). */
+const LEVELS = [
+  { name: "Smash!",       goal: 5,  time: 60, hint: "Break 5 trinkets!" },
+  { name: "Moving Day",   goal: 5,  time: 60, moving: true, hint: "Break 5 — the shelves are moving!" },
+  { name: "Duck Hunt",    goal: 5,  time: 70, basket: true, specific: "duck", hint: "Break 5 ducks — land the pieces in the basket" },
+  { name: "Moving Ducks", goal: 5,  time: 70, moving: true, basket: true, specific: "duck", hint: "Break 5 moving ducks into the basket" },
+  { name: "The Big One",  goal: 10, time: 75, jumbo: true, hand: true, basket: true, hint: "Smash the jumbo 10× — dodge the hand!" }
+];
+let levelIndex = 0, goalTotal = 0, goalDone = 0, timeLeft = 0, score = 0, phase = "title";
+
+const hud = {
+  level: document.getElementById("hudLevel"),
+  goal:  document.getElementById("hudGoal"),
+  timer: document.getElementById("hudTimer"),
+  score: document.getElementById("hudScore")
+};
+const overlayEl = document.getElementById("overlay");
+const overlayTitle = document.getElementById("overlayTitle");
+const overlayBtn = document.getElementById("overlayBtn");
+let overlayAction = null;
+
+function updateHUD() {
+  hud.level.textContent = "Lvl " + (levelIndex + 1);
+  hud.goal.textContent = goalDone + " / " + goalTotal;
+  hud.score.textContent = "★ " + score;
+}
+function showOverlay(title, btnLabel, action) {
+  overlayTitle.textContent = title;
+  overlayBtn.textContent = btnLabel;
+  overlayAction = action;
+  overlayEl.hidden = false;
+}
+function hideOverlay() { overlayEl.hidden = true; }
+overlayBtn.addEventListener("click", () => { const a = overlayAction; overlayAction = null; if (a) a(); });
+
+function loadLevel(i) {
+  levelIndex = ((i % LEVELS.length) + LEVELS.length) % LEVELS.length;
+  const L = LEVELS[levelIndex];
+  if (levelIndex === 0) score = 0;          // fresh run resets score
+  goalTotal = L.goal; goalDone = 0; timeLeft = L.time; phase = "playing";
+  if (L.shooter) activeShooter = L.shooter;
+  shards = []; flying = []; reloadAt = 0;
+  basket = L.basket ? makeBasket() : null;
+  resetBall();
+  populateLevel();
+  hintEl.textContent = L.hint; hintEl.style.opacity = "1"; launched = false;
+  hideOverlay();
+  updateHUD();
+}
+function onTrinketBroken(t) {
+  if (phase !== "playing") return;
+  score += 10;
+  const L = LEVELS[levelIndex];
+  const isBreakGoal = (L.goalType || "break") === "break";
+  const matchesTarget = !L.specific || (t && t.material === L.specific);   // duck levels: ducks only
+  if (isBreakGoal && matchesTarget) {
+    goalDone++;
+    if (goalDone >= goalTotal) winLevel();
+  }
+  updateHUD();
+}
+let lastCatchSound = 0;
+function onShardCaught() {
+  score += 5;   // the skill reward
+  if (phase === "playing" && LEVELS[levelIndex].goalType === "catch") {
+    goalDone++;
+    if (goalDone >= goalTotal) winLevel();
+  }
+  const now = performance.now();
+  if (now - lastCatchSound > 70) { playCatch(); lastCatchSound = now; }
+  updateHUD();
+}
+function winLevel() {
+  phase = "won";
+  const last = levelIndex >= LEVELS.length - 1;
+  showOverlay(last ? "You cleared them all! 🎉" : "Level " + (levelIndex + 1) + " cleared!",
+              last ? "Play again" : "Next level",
+              () => loadLevel(last ? 0 : levelIndex + 1));
+}
+function loseLevel() {
+  phase = "lost";
+  showOverlay("Out of time!", "Try again", () => loadLevel(levelIndex));
+}
+
+/* ---------- loop ---------- */
+let lastTick = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - lastTick) / 1000);   // clamp for tab-switch gaps
+  lastTick = now;
+  if (phase === "playing") {
+    timeLeft -= dt;
+    if (timeLeft <= 0) { timeLeft = 0; loseLevel(); }
+    updateTrinkets();
+    if (!ball && reloadAt && now >= reloadAt) { resetBall(); reloadAt = 0; }   // reload the sling
+  }
+  updateFlying();
+  updateShards();
+  render();
+  hud.timer.textContent = "⏱ " + Math.ceil(Math.max(0, timeLeft));
+  requestAnimationFrame(tick);
+}
+
+resize();
+resetBall();
+requestAnimationFrame(tick);
+loadAssets();   // async; when the sheets land, ROSTER fills and populateLevel uses them
+loadBackground();
+loadShooters();
+loadDuck();
+loadSounds();
+
+// title screen: stays up until the player taps Play (which also resumes audio),
+// giving assets time to load. Play enables once assets are ready (or after 8s).
+const titleEl = document.getElementById("title");
+const playBtn = document.getElementById("playBtn");
+playBtn.addEventListener("click", () => {
+  if (playBtn.disabled) return;
+  resumeAudio();
+  titleEl.hidden = true;
+  loadLevel(0);
+});
+let waited = 0;
+(function waitForAssets() {
+  if ((assetsReady && duckItem) || waited > 8000) {
+    playBtn.disabled = false;
+    playBtn.textContent = "Play";
+  } else {
+    waited += 200;
+    setTimeout(waitForAssets, 200);
+  }
+})();
+
+// TEMP dev control: number keys 1/2/3 switch shooter until the picker UI ships
+const SHOOTER_KEYS = { "1": "glass", "2": "metal", "3": "electric" };
+window.addEventListener("keydown", e => { if (SHOOTER_KEYS[e.key]) activeShooter = SHOOTER_KEYS[e.key]; });
+
+// poke from the console: __glass.trinkets, __glass.breakAt(0), __glass.loadLevel(i), __glass.setShooter('metal')
+window.__glass = {
+  get trinkets() { return trinkets; },
+  get shards() { return shards; },
+  get shooter() { return activeShooter; },
+  get roster() { return ROSTER; },
+  get jumbo() { return JUMBO; },
+  get level() { return { i: levelIndex, phase, done: goalDone, total: goalTotal, time: timeLeft, score }; },
+  get basket() { return basket; },
+  get ball() { return ball; },
+  get flying() { return flying; },
+  setShooter(t) { if (SHOOTERS[t]) activeShooter = t; },
+  loadLevel,
+  breakAt(n) { const t = trinkets[n || 0]; if (t) shatter(t, t.x + t.w / 2, t.y + t.h / 2); }
+};
