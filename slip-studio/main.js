@@ -499,6 +499,28 @@ const REACTION_PAIRS = (() => {
     }
     return m;
 })();
+// Poetic names for each curated reaction, keyed by the same sorted id pair,
+// so the recipe journal (see openRecipes) can label a discovered combo.
+const RECIPE_NAMES = (() => {
+    const raw = {
+        "cobalt|honey": "Moss", "cobalt|forest": "Deep teal", "cobalt|blush": "Plum",
+        "celadon|honey": "Olive", "honey|tenmoku": "Tortoiseshell", "blush|celadon": "Khaki",
+        "ironred|copper": "Oxblood", "plum|mint": "Slate", "gold|copper": "Bronze",
+        "indigo|coral": "Mulberry", "teal|terracotta": "Bronze olive", "olive|lilac": "Taupe",
+        "ruby|sapphire": "Amethyst", "sapphire|topaz": "Emerald", "ruby|topaz": "Burnt orange",
+        "emerald|garnet": "Deep olive", "turquoise|garnet": "Petrol",
+        "lemon|sky": "Pistachio", "bubblegum|sky": "Lavender", "lemon|bubblegum": "Peach",
+        "lavender|peach": "Dusty rose",
+    };
+    const m = {};
+    for (const [k, v] of Object.entries(raw)) m[k.split("|").sort().join("|")] = v;
+    return m;
+})();
+// Every discoverable recipe = a curated reacting pair. Keys are the sorted
+// "idA|idB" strings shared by REACTION_PAIRS / RECIPE_NAMES.
+const RECIPE_KEYS = Object.keys(REACTION_PAIRS).sort();
+const RECIPE_KEY_SET = new Set(RECIPE_KEYS);
+const RECIPES_STORE_KEY = "slip-recipes";
 // sRGB 0..255 ↔ linear-light helpers, so blends mix in the space light
 // actually adds in (a flat sRGB average of blue+yellow reads grey; a
 // linear one reads green).
@@ -1624,6 +1646,8 @@ function init() {
     document.getElementById("shorterBtn")?.addEventListener("click", () => nudgeHeight(-HEIGHT_STEP));
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
+    document.getElementById("galleryRecipes")?.addEventListener("click", openRecipes);
+    document.getElementById("recipeClose")?.addEventListener("click", closeRecipes);
     document.getElementById("galleryShelfBtn")?.addEventListener("click", () => exportShelfPhoto());
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
         setGalleryView(state.galleryView === "shelf" ? "compact" : "shelf");
@@ -1698,6 +1722,10 @@ function init() {
         dismissLanding();
         openGallery();
     });
+    document.getElementById("landingRecipes")?.addEventListener("click", () => {
+        dismissLanding();
+        openRecipes();
+    });
     // "How to play": start the studio and replay the coach hands stage by stage.
     document.getElementById("landingHowto")?.addEventListener("click", () => {
         dismissLanding();
@@ -1741,6 +1769,7 @@ function init() {
             makeLidPartner, swapActivePiece, matchLidRim, capturePieceState, restorePieceState,
             loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb, stageThumb, keyOutThumbBg, ensureGalleryBgImg,
             dbAll, dbDelete, dismissLanding,
+            openRecipes, closeRecipes, checkRecipeDiscoveries, loadDiscoveredRecipes, showToast,
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
             // the picker. installedPacks() returns a Set of category names.
@@ -4203,6 +4232,8 @@ function endFiringMoment() {
     if (state.savedLid) state.savedLid.clayState = "fired";
     // Save + Photo were gated on !state.firing — bring them back now.
     updateToolbar();
+    // The kiln reveals any glaze-chemistry recipes on this piece.
+    checkRecipeDiscoveries();
     scheduleCoach("fired"); // first fired pot → teach spin / save / photo
 }
 
@@ -7778,6 +7809,109 @@ function syncGalleryViewToggle() {
 function closeGallery() {
     const g = document.getElementById("gallery");
     if (g) g.hidden = true;
+}
+
+// --- Glaze recipes (discovery journal) --------------------------
+// The dip chemistry (REACTION_PAIRS) fires an emergent third colour where
+// two glazes overlap. The journal quietly records which curated pairs the
+// player has fired, as a growing collectible — no pressure, no unlocks
+// gating anything; just the joy of finding them (like the hidden genetics
+// in Florigami). Discovery happens at the kiln (checkRecipeDiscoveries).
+function loadDiscoveredRecipes() {
+    try {
+        const a = JSON.parse(localStorage.getItem(RECIPES_STORE_KEY) || "[]");
+        return new Set(Array.isArray(a) ? a.filter((k) => RECIPE_KEY_SET.has(k)) : []);
+    } catch (_) { return new Set(); }
+}
+function saveDiscoveredRecipes(set) {
+    try { localStorage.setItem(RECIPES_STORE_KEY, JSON.stringify([...set])); } catch (_) {}
+}
+// Scan the just-fired piece's dips for curated reacting pairs. Two single-
+// glaze dips always share the rim band (both coat from the rim down), so a
+// present pair means the reaction actually fired. Records new finds + toasts.
+function checkRecipeDiscoveries() {
+    const ids = [];
+    for (const d of state.dips) if (d && d.fxId && GLAZES[d.fxId]) ids.push(d.fxId);
+    const uniq = [...new Set(ids)];
+    if (uniq.length < 2) return;
+    const disc = loadDiscoveredRecipes();
+    const newly = [];
+    for (let i = 0; i < uniq.length; i++) {
+        for (let j = i + 1; j < uniq.length; j++) {
+            const key = [uniq[i], uniq[j]].sort().join("|");
+            if (RECIPE_KEY_SET.has(key) && !disc.has(key)) { disc.add(key); newly.push(key); }
+        }
+    }
+    if (!newly.length) return;
+    saveDiscoveredRecipes(disc);
+    showToast(newly.length === 1
+        ? `New glaze recipe: ${RECIPE_NAMES[newly[0]] || "?"} ✨`
+        : `${newly.length} new glaze recipes ✨`);
+}
+function hexCss(n) { return "#" + (n >>> 0).toString(16).padStart(6, "0"); }
+function renderRecipeGrid() {
+    const grid = document.getElementById("recipeGrid");
+    const countEl = document.getElementById("recipeCount");
+    if (!grid) return;
+    const disc = loadDiscoveredRecipes();
+    grid.innerHTML = "";
+    let found = 0;
+    for (const key of RECIPE_KEYS) {
+        const [a, b] = key.split("|");
+        const isFound = disc.has(key);
+        if (isFound) found++;
+        const card = document.createElement("div");
+        card.className = "recipe-card" + (isFound ? "" : " locked");
+        if (isFound) {
+            card.innerHTML =
+                `<div class="recipe-mix">
+                    <span class="recipe-swatch" style="background:${hexCss(GLAZES[a].fired.color)}"></span>
+                    <span class="recipe-op">+</span>
+                    <span class="recipe-swatch" style="background:${hexCss(GLAZES[b].fired.color)}"></span>
+                    <span class="recipe-op">&rarr;</span>
+                    <span class="recipe-swatch recipe-result" style="background:${hexCss(REACTION_PAIRS[key])}"></span>
+                </div>
+                <span class="recipe-name">${RECIPE_NAMES[key] || ""}</span>
+                <span class="recipe-sub">${GLAZES[a].name} + ${GLAZES[b].name}</span>`;
+        } else {
+            card.innerHTML =
+                `<div class="recipe-mix">
+                    <span class="recipe-swatch locked-swatch">?</span>
+                    <span class="recipe-op">+</span>
+                    <span class="recipe-swatch locked-swatch">?</span>
+                    <span class="recipe-op">&rarr;</span>
+                    <span class="recipe-swatch locked-swatch">?</span>
+                </div>
+                <span class="recipe-name recipe-locked">Undiscovered</span>`;
+        }
+        grid.appendChild(card);
+    }
+    if (countEl) countEl.textContent = `${found} / ${RECIPE_KEYS.length}`;
+}
+function openRecipes() {
+    renderRecipeGrid();
+    const m = document.getElementById("recipeModal");
+    if (m) m.hidden = false;
+}
+function closeRecipes() {
+    const m = document.getElementById("recipeModal");
+    if (m) m.hidden = true;
+}
+
+// Minimal transient toast (recipe discoveries + future gentle notices).
+let toastHideT = 0, toastGoneT = 0;
+function showToast(msg) {
+    const el = document.getElementById("toast");
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    el.classList.remove("show");
+    void el.offsetWidth;          // reflow so the transition replays
+    el.classList.add("show");
+    clearTimeout(toastHideT); clearTimeout(toastGoneT);
+    toastHideT = setTimeout(() => { el.classList.remove("show"); }, 2600);
+    toastGoneT = setTimeout(() => { el.hidden = true; }, 3100);
+    haptic(10);
 }
 
 function resize() {

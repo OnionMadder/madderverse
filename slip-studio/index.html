@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=182" />
+    <link rel="stylesheet" href="style.css?v=183" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -224,6 +224,7 @@
         </div>
         <button id="beginBtn" class="landing-btn" type="button">Begin</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
+        <button id="landingRecipes" class="landing-link" type="button">Glaze recipes</button>
         <button id="landingHowto" class="landing-link" type="button">How to play</button>
         <a id="landingAppLink" class="landing-link landing-app-link" href="https://play.google.com/store/apps/details?id=org.madderverse.slipstudio" target="_blank" rel="noopener">Get the Android app &#x2197;</a>
     </div>
@@ -380,6 +381,7 @@
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
             <span class="gallery-bar-right">
+                <button class="tool-btn" id="galleryRecipes" type="button" title="Glaze recipes you've discovered">Recipes</button>
                 <button class="tool-btn" id="galleryShelfBtn" type="button" title="Save all your pots as one shelf photo">Shelf photo</button>
                 <button class="tool-btn" id="galleryViewToggle" type="button">Grid</button>
                 <button class="tool-btn" id="galleryClose" type="button">Close</button>
@@ -389,13 +391,28 @@
         <p class="gallery-empty" id="galleryEmpty">No pots yet — shape one, fire it, and tap Save.</p>
     </div>
 
+    <!-- Glaze recipe journal: the curated dip-chemistry pairs, revealed as
+         you discover them at the kiln. A calm collectible, nothing gated. -->
+    <div class="gallery" id="recipeModal" role="dialog" aria-label="Glaze recipes" hidden>
+        <div class="gallery-bar">
+            <span class="gallery-title">Glaze recipes <span class="recipe-count" id="recipeCount"></span></span>
+            <span class="gallery-bar-right">
+                <button class="tool-btn" id="recipeClose" type="button">Close</button>
+            </span>
+        </div>
+        <p class="recipe-intro">Dip one glaze over another, then fire — some pairs react into a whole new colour. Find them all.</p>
+        <div class="recipe-grid" id="recipeGrid"></div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
     <footer class="footer" aria-label="Site info">
         <span>&copy; <span data-year>2026</span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
         <span class="sep" aria-hidden="true">&middot;</span>
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=182"></script>
+    <script type="module" src="main.js?v=183"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
