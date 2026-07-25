@@ -32,6 +32,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 const BG_COLOR    = 0x1b1815; // warm charcoal (matches CSS --bg)
 const WHEEL_COLOR = 0x2d2a26; // dark stone
 const SPIN_SPEED  = 0.3;      // radians / second — contemplative, not nervous
+const DISPLAY_SPIN = 0.16;    // slower, calmer turn for the immersive showcase
 
 // --- View (dolly-zoom toward the pot + manual spin) -------------
 const CAM_BASE    = new THREE.Vector3(0, 1.15, 4.1); // camera at zoom = 1
@@ -1202,6 +1203,7 @@ const state = {
     facetCount: 0,              // 0 = round; else N flat sides carved via applyFacets
     rimStyle: "cut",            // lip treatment: cut | rounded | flared | rolled | collared
     rimScallop: 0,              // 0 = straight lip; else N scallops (lip waves up/down)
+    displayMode: false,         // immersive showcase: chrome hidden, pot slow-rotates
     spin: SPIN_SPEED,           // current angular speed (eases to 0 while busy)
     decoTool: "brush",          // brush | splatter | stamp | overlay | motif | pattern | band
     decoColor: null,            // paint colour (hex), or null = painting off
@@ -1589,6 +1591,8 @@ function init() {
     document.getElementById("tabDecorate")?.addEventListener("click", () => setDecoTab("decorate"));
     document.getElementById("saveBtn")?.addEventListener("click", () => savePot());
     document.getElementById("photoBtn")?.addEventListener("click", () => openPhotoModal());
+    document.getElementById("displayBtn")?.addEventListener("click", () => enterDisplayMode());
+    bindDisplayLayer();
     document.getElementById("photoClose")?.addEventListener("click", closePhotoModal);
     document.getElementById("photoSave")?.addEventListener("click", finalizePhoto);
     document.querySelectorAll("#photoStyles .photo-chip").forEach((el) =>
@@ -1732,6 +1736,7 @@ function init() {
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
+            enterDisplayMode, exitDisplayMode,
             setPhotoStyle, setPhotoAspect,
             makeLidPartner, swapActivePiece, matchLidRim, capturePieceState, restorePieceState,
             loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb, stageThumb, keyOutThumbBg, ensureGalleryBgImg,
@@ -4712,6 +4717,8 @@ function updateToolbar() {
         saveBtn.setAttribute("title",       hasPartner ? "Save set" : "Save");
     }
     if (photoBtn) photoBtn.hidden = !firedAndCool;
+    const displayBtn = document.getElementById("displayBtn");
+    if (displayBtn) displayBtn.hidden = !firedAndCool;
     // Lid button (dual-purpose): visible while you're on the pot at
     // any pre-fired stage. Creates a lid partner the first time you
     // tap it; on subsequent taps (a lid already exists) it swaps you
@@ -5405,6 +5412,69 @@ function rotateBy(rad) { state.turntable.rotation.y += rad; }
 function onWheel(ev) {
     ev.preventDefault();
     zoomBy(ev.deltaY < 0 ? 1.1 : 1 / 1.1);
+}
+
+// --- Display mode: immersive showcase ---------------------------
+// A full-screen, chrome-free view of the finished piece that turns
+// slowly on its own with the music playing — a museum turntable. Its
+// own overlay layer owns the pointer (drag turns the pot, a tap leaves),
+// so none of the sculpt/paint handlers run while it's up.
+let displayDragging = false;
+let displayHintT = 0;
+function enterDisplayMode() {
+    if (state.displayMode) return;
+    state.displayMode = true;
+    document.body.classList.add("display-mode");
+    setZoom(1);                       // calm, centred framing
+    const layer = document.getElementById("displayLayer");
+    if (layer) { layer.hidden = false; layer.classList.remove("hint-hidden"); }
+    clearTimeout(displayHintT);
+    displayHintT = setTimeout(() => {
+        document.getElementById("displayLayer")?.classList.add("hint-hidden");
+    }, 3200);
+    haptic(10);
+}
+function exitDisplayMode() {
+    if (!state.displayMode) return;
+    state.displayMode = false;
+    displayDragging = false;
+    document.body.classList.remove("display-mode");
+    const layer = document.getElementById("displayLayer");
+    if (layer) layer.hidden = true;
+    clearTimeout(displayHintT);
+}
+function bindDisplayLayer() {
+    const layer = document.getElementById("displayLayer");
+    if (!layer) return;
+    let startX = 0, startY = 0, lastX = 0, moved = false, id = null;
+    layer.addEventListener("pointerdown", (ev) => {
+        id = ev.pointerId; startX = lastX = ev.clientX; startY = ev.clientY; moved = false;
+        displayDragging = true;
+        layer.setPointerCapture?.(ev.pointerId);
+        layer.classList.add("hint-hidden");   // first touch dismisses the hint
+        ev.preventDefault();
+    });
+    layer.addEventListener("pointermove", (ev) => {
+        if (!displayDragging || ev.pointerId !== id) return;
+        rotateBy((ev.clientX - lastX) * ROTATE_SENS);
+        lastX = ev.clientX;
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 8) moved = true;
+        ev.preventDefault();
+    });
+    const end = (ev) => {
+        if (ev.pointerId !== id) return;
+        displayDragging = false;
+        id = null;
+        if (!moved) exitDisplayMode();          // a tap (not a drag) leaves
+    };
+    layer.addEventListener("pointerup", end);
+    layer.addEventListener("pointercancel", end);
+    // The explicit ✕ leaves too; keep its press off the drag layer.
+    const exitBtn = document.getElementById("displayExit");
+    if (exitBtn) {
+        exitBtn.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+        exitBtn.addEventListener("click", (ev) => { ev.stopPropagation(); exitDisplayMode(); });
+    }
 }
 
 // Map a pointer event onto the axis plane → {y: height, r: radius}.
@@ -7580,7 +7650,9 @@ function renderGalleryTile(grid, members) {
         stageThumb(assemblyThumb, ASSEMBLY_FOOT_FRAC).then((u) => { img.src = u; });
         img.alt = (primary.title || "Saved set");
         img.loading = "lazy";
-        img.addEventListener("click", async () => { await loadPot(primary); closeGallery(); });
+        // Tap a saved piece → load it (lands fired) and drop straight into
+        // the immersive showcase; exit display leaves you on the loaded pot.
+        img.addEventListener("click", async () => { await loadPot(primary); closeGallery(); enterDisplayMode(); });
         half.appendChild(img);
         thumbWrap.appendChild(half);
     } else {
@@ -7592,7 +7664,7 @@ function renderGalleryTile(grid, members) {
             stageThumb(p.thumb).then((u) => { img.src = u; });
             img.alt = p.title || "Saved pot";
             img.loading = "lazy";
-            img.addEventListener("click", async () => { await loadPot(p); closeGallery(); });
+            img.addEventListener("click", async () => { await loadPot(p); closeGallery(); enterDisplayMode(); });
             half.appendChild(img);
             thumbWrap.appendChild(half);
         });
@@ -7733,7 +7805,11 @@ function tick() {
     // Altering is done off the wheel (you push a static wall), so the
     // wheel holds still whenever the Alter tool is armed on wet clay.
     const alterHold = state.alterMode && state.clayState === "wet";
-    const targetSpin = (busy || alterHold || state.clayState === "leather") ? 0 : SPIN_SPEED;
+    // Display mode turns the piece slowly on its own (pausing only while the
+    // viewer drags it), independent of the stage-based spin rules.
+    const targetSpin = state.displayMode
+        ? (displayDragging ? 0 : DISPLAY_SPIN)
+        : (busy || alterHold || state.clayState === "leather") ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
     // Wheel hum tracks the spin: as the auto-spin eases out while the
@@ -7742,7 +7818,7 @@ function tick() {
         const ratio = Math.max(0, state.spin / SPIN_SPEED);
         // Ease the hum in from silence after Begin (time constant ~0.3s)
         // so it doesn't pop to full volume the first frame on some devices.
-        const targetGain = wheelStarted ? 1 : 0;
+        const targetGain = (wheelStarted && !state.displayMode) ? 1 : 0;
         wheelGain += (targetGain - wheelGain) * (1 - Math.exp(-dt * 3));
         // Pitch dips to ~0.65x at full-stop and recovers to 1.0x at
         // full spin — the hum sounds heavier as the wheel slows down,
