@@ -1691,3 +1691,19 @@ body.reduce-motion .compost { transition: opacity 120ms ease; }
     100% { transform: scale(1); }
 }
 body.reduce-motion .garden.just-grew { animation: none; }
+
+/* ─── Breeding status line — "N pairs ready to cross tonight" + field note ── */
+.tray-breed {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--water) 14%, var(--cream));
+    border: 1px solid color-mix(in srgb, var(--water) 40%, var(--cream-shade));
+    border-radius: 999px;
+    padding: 5px 12px;
+    margin: 0 auto;
+    max-width: 100%;
+    line-height: 1.35;
+}
+.tray-breed[hidden] { display: none; }

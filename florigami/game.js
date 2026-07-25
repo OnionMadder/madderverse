@@ -28,7 +28,7 @@ const GAME_NAME = "Florigami";
 // renaming it would wipe every existing player's saved garden. Same approach as
 // Pootery keeping its "crayte-*" keys after that rename.
 const SAVE_KEY = "petalcraft-save";
-const SAVE_VERSION = 3;
+const SAVE_VERSION = 4;
 
 const GRID_W = 6;
 const GRID_H = 4;
@@ -521,6 +521,7 @@ const state = {
     unlockedSpecies: ["cosmos"],   // every other species unlocks via progress
     flowerdex: { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {}, lilies: {}, mums: {}, windflowers: {}, roses: {} },
     seenOrnaments: [],             // ornament ids already announced (persisted)
+    crosses: [],                   // capped log of observed colour crosses (persisted)
     settings: {
         sound: true,
         ambient: true,      // quiet garden ambience (wind, birds, crickets)
@@ -735,6 +736,10 @@ function rollDay() {
                     newBabies.push({
                         x: spot[0], y: spot[1],
                         tile: { species: t.species, genotype: breed(t.genotype, n.genotype), stage: 0, watered: false, wetLevel: 0, failedBreeds: 0 },
+                        // parent COLOURS (not genotypes) — for the legible cross readout
+                        // + field-notes. Genotype stays hidden (accidental discovery).
+                        parents: [phenotype(t.species, t.genotype), phenotype(n.species, n.genotype)],
+                        parentCoords: [[x, y], [nx, ny]],
                     });
                 }
                 t.failedBreeds = 0;
@@ -749,15 +754,20 @@ function rollDay() {
     // 3. Place babies (deferred so they don't participate in this day's roll).
     const discoveries = [];
     const babyCoords = [];
-    for (const { x, y, tile } of newBabies) {
+    const crosses = [];
+    for (const { x, y, tile, parents, parentCoords } of newBabies) {
         if (tileAt(x, y) !== null) continue;
         setTile(x, y, tile);
         babyCoords.push({ x, y });
         const color = phenotype(tile.species, tile.genotype);
-        if (!state.flowerdex[tile.species][color]) {
+        const isNew = !state.flowerdex[tile.species][color];
+        if (isNew) {
             state.flowerdex[tile.species][color] = { firstSeen: isoDate(), genotype: tile.genotype };
             discoveries.push({ species: tile.species, color, x, y, rare: isRare(tile.species, color) });
         }
+        const cross = { species: tile.species, a: parents[0], b: parents[1], child: color, x, y, parentCoords, isNew, day: state.clock.day };
+        crosses.push(cross);
+        recordCross(cross);
     }
 
     // 4. Dry-out for the new day, then roll weather (rain re-waters everything).
@@ -767,7 +777,30 @@ function rollDay() {
         for (const t of state.grid.tiles) { if (t) { t.watered = true; t.wetLevel = 1; } }
     }
 
-    return { babies: newBabies.length, discoveries, babyCoords };
+    return { babies: newBabies.length, discoveries, babyCoords, crosses };
+}
+
+// ─── Crosses history — the field notes that make breeding legible ─────
+// A capped log of "colour A × colour B → child" the player has actually
+// observed. Powers the rollover readout + the "you've seen X from this pairing"
+// hint. It records OUTCOMES, never genotypes — the accidental-discovery mystery
+// (two same-colour flowers can carry different genes) is preserved.
+const CROSS_LOG_CAP = 80;
+function recordCross(c) {
+    if (!Array.isArray(state.crosses)) state.crosses = [];
+    state.crosses.push({ species: c.species, a: c.a, b: c.b, child: c.child, day: c.day });
+    if (state.crosses.length > CROSS_LOG_CAP) state.crosses.shift();
+}
+
+/** Distinct child colours the player has observed from crossing colours a×b
+ *  (order-independent) of a species. */
+function crossOutcomesFor(species, a, b) {
+    const seen = new Set();
+    for (const c of (state.crosses || [])) {
+        if (c.species !== species) continue;
+        if ((c.a === a && c.b === b) || (c.a === b && c.b === a)) seen.add(c.child);
+    }
+    return [...seen];
 }
 
 /**
@@ -784,11 +817,12 @@ function advanceTimeTo(targetMinutes) {
     let rollovers = Math.max(0, newDayIdx - prevDayIdx);
     const capped = Math.min(rollovers, MAX_CATCHUP_DAYS);
 
-    const agg = { babies: 0, discoveries: [], babyCoords: [], days: rollovers };
+    const agg = { babies: 0, discoveries: [], babyCoords: [], crosses: [], days: rollovers };
     for (let i = 0; i < capped; i++) {
         const r = rollDay();
         agg.babies += r.babies;
         agg.discoveries.push(...r.discoveries);
+        agg.crosses.push(...r.crosses);
         // Only the LAST rollover's sprouts still exist as sprouts (earlier ones
         // grew), so keep just the final day's coords for the sparkle.
         agg.babyCoords = r.babyCoords;
@@ -923,6 +957,7 @@ function serialize() {
         seenOnboarding: state.seenOnboarding,
         goalIndex: state.goalIndex,
         seenOrnaments: state.seenOrnaments.slice(),
+        crosses: (state.crosses || []).slice(),
     };
 }
 
@@ -941,6 +976,10 @@ function migrateSave(data) {
     // defensively in deserialize (dex/inventory buckets, seenOrnaments default []),
     // so a v2 save falls through whole — no data touched.
     if (v < 3) { v = 3; }
+    // v3 → v4: cosmos colour-mixing genetics + `crosses` log. deserialize defaults
+    // crosses to []; old cosmos flowerdex colours (pink etc.) are harmless extra
+    // keys, and the tray/dex read the new SPECIES tables — nothing to migrate.
+    if (v < 4) { v = 4; }
     data.version = SAVE_VERSION;
     return data;
 }
@@ -974,6 +1013,7 @@ function deserialize(data) {
         for (const sp of UNLOCK_ORDER) if (!state.flowerdex[sp]) state.flowerdex[sp] = {};
     }
     if (Array.isArray(data.seenOrnaments)) state.seenOrnaments = data.seenOrnaments.slice();
+    state.crosses = Array.isArray(data.crosses) ? data.crosses.slice() : [];
     if (data.settings && typeof data.settings === "object") {
         state.settings.sound = data.settings.sound !== false;
         state.settings.ambient = data.settings.ambient !== false;
@@ -1233,6 +1273,7 @@ const clockTimeEl = document.getElementById("clock-time");
 const seedTrayEl = document.getElementById("seed-tray");
 const trayHintEl = document.getElementById("tray-hint");
 const goalEl = document.getElementById("tray-goal");
+const breedStatusEl = document.getElementById("breed-status");
 const rainEl = document.getElementById("rain");
 const toastEl = document.getElementById("toast");
 const bloombookEl = document.getElementById("bloombook");
@@ -1315,6 +1356,7 @@ function renderGrid(highlights, sprouts, rareHighlights) {
     }
     updateWetVisuals();
     layoutConnectors();
+    renderBreedStatus();
 }
 
 // ─── 9f2. FLOWER SPRITE SHEETS (progressive enhancement) ─────────
@@ -1902,6 +1944,35 @@ function armSeed(species, color) {
 function renderGoal() {
     if (!goalEl) return;
     goalEl.textContent = MICRO_GOALS[state.goalIndex % MICRO_GOALS.length];
+}
+
+function cap(s) { return s ? s[0].toUpperCase() + s.slice(1) : s; }
+function humanList(arr) {
+    if (arr.length <= 1) return arr[0] || "";
+    if (arr.length === 2) return `${arr[0]} & ${arr[1]}`;
+    return `${arr.slice(0, -1).join(", ")} & ${arr[arr.length - 1]}`;
+}
+
+// Breeding clarity: how many adjacent watered pairs will attempt to cross at the
+// next rollover, plus a field-note of what a colour-pairing has produced for the
+// player before (observed outcomes only — genotype stays hidden).
+function renderBreedStatus() {
+    if (!breedStatusEl) return;
+    const pairs = breedEligiblePairs();
+    if (!pairs.length) { breedStatusEl.hidden = true; breedStatusEl.textContent = ""; return; }
+    const infos = pairs.map(([i, j]) => {
+        const a = state.grid.tiles[i], b = state.grid.tiles[j];
+        return { species: a.species, ca: phenotype(a.species, a.genotype), cb: phenotype(b.species, b.genotype) };
+    });
+    const n = infos.length;
+    let msg = `🌙 ${n} pair${n > 1 ? "s" : ""} ready to cross tonight.`;
+    const hinted = infos.find(p => crossOutcomesFor(p.species, p.ca, p.cb).length);
+    if (hinted) {
+        const outs = crossOutcomesFor(hinted.species, hinted.ca, hinted.cb);
+        msg += `  ${cap(hinted.ca)} × ${hinted.cb} has made ${humanList(outs)} before.`;
+    }
+    breedStatusEl.hidden = false;
+    breedStatusEl.textContent = msg;
 }
 
 // ─── 10. BLOOMBOOK ───────────────────────────────────────────────
@@ -2528,17 +2599,24 @@ function applyRolloverResult(agg, live) {
     if (state.ui.bloombookOpen) renderBloombook();
 
     const newlyUnlocked = agg.newlyUnlocked || [];
+    const crosses = (agg.crosses || []).filter(c => !isRare(c.species, c.child)); // rares get their own moment
     if (newlyUnlocked.length) {
         const sp = SPECIES[newlyUnlocked[0]].name.toLowerCase();
         toast(`New seeds unlocked: ${sp}!`);
         sfx("unlock");
+    } else if (crosses.length) {
+        // Legible causality — name what crossed into what. Lead with a NEW
+        // discovery if there was one this rollover, else the first cross.
+        const c = crosses.find(x => x.isNew) || crosses[0];
+        const extra = crosses.length > 1 ? ` (+${crosses.length - 1} more)` : "";
+        const tag = c.isNew ? " — new in the Bloombook!" : "";
+        toast(`${cap(c.a)} × ${c.b} ${speciesShort(c.species)} → ${c.child}${tag}${extra}`, 4300);
+        if (live) sfx(c.isNew ? "discovery" : "plant");
     } else if (agg.discoveries.length > 0 && !rares.length) {
         const first = agg.discoveries[0];
         const extra = agg.discoveries.length > 1 ? ` (+${agg.discoveries.length - 1} more)` : "";
         toast(`New in the Bloombook: ${first.color} ${speciesShort(first.species)}.${extra}`);
         if (live) sfx("discovery");
-    } else if (agg.babies > 0 && live && !rares.length) {
-        toast(`${agg.babies} new sprout${agg.babies === 1 ? "" : "s"}.`);
     }
 
     // Garden growth celebration (after the discovery/unlock toasts above).
