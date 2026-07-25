@@ -72,7 +72,25 @@ const STRENGTH = 0.08; // soft lerp toward the finger; clay LAGS, not snaps
 // loop tool bites into leather-hard with more conviction.
 const SCULPT_RATE_MAX = 0.30;
 const TRIM_RATE_MAX   = 0.42;
-let lastSculptT = 0, lastTrimT = 0;
+let lastSculptT = 0, lastTrimT = 0, lastAlterT = 0;
+
+// --- Altering feel ----------------------------------------------
+// The Alter tool pushes/pulls the wall LOCALLY (one side), off the
+// spinning wheel, to dent / oval / bulge a pot. Angular spread of the
+// push, in columns (COLS around) — ~COLS*45/360, so a touch affects a
+// ~45° patch, not the whole ring. Height spread reuses the brush sigma.
+const ALTER_ANGLE_SIGMA = Math.max(4, Math.round(COLS * 45 / 360));
+const ALTER_STRENGTH    = 0.16;   // softer than throwing; clay yields locally
+const ALTER_RATE_MAX    = 0.34;   // world-units/sec cap on local wall movement
+const ALTER_MIN_R       = 0.03;   // a pinched side can go thinner than a thrown wall
+
+// Scalloped rim: the lip edge waves up/down N times around. Amplitude in
+// world units; the wave tapers in from SCALLOP_SPAN (fraction of TOP) below
+// the rim to full at the lip, so the body is untouched. (Declared here at
+// the top because writeProfileArrayToGeometry — which reads them — runs
+// during init(), before a mid-file const would be initialized: TDZ trap.)
+const SCALLOP_AMP  = 0.055;
+const SCALLOP_SPAN = 0.20;
 
 // Clay-feel modifiers layered on the rate cap.
 //   PULL_PENALTY: stretching the wall outward is harder than compressing
@@ -100,6 +118,32 @@ const BRUSHES = [
     { label: "Broad",  sigma: 0.160 },
 ];
 const DEFAULT_BRUSH = 1;
+
+// --- Direct-throwing gestures (feel overhaul) -------------------
+// Grab-anywhere: a wet touch grabs the wall if it lands anywhere inside
+// the pot's silhouette OR within this radial margin just outside it —
+// far more forgiving than GRAB_TOL (which demanded landing right on the
+// edge). A press clearly outside this band spins the view to inspect.
+const WET_GRAB_MARGIN = 0.30;
+// Pull-to-raise: once a wet stroke is read as a vertical "pull", the
+// finger's screen-vertical travel maps to heightScale. This gain spans
+// roughly the full MIN..MAX height range over ~65% of the canvas height
+// (responsive without being twitchy).
+const PULL_HEIGHT_GAIN = 1.5;
+// Raising also slims the wall a touch (clay conserves volume as it
+// stretches up), so a pull reads like drawing the clay up, not a stretch.
+// Applied per height-delta and symmetric, so lowering re-fattens.
+const PULL_SLIM = 0.14;
+// Grab-to-raise: which grab decides height vs. width is set by WHERE you
+// touch, not the drag direction (which was ambiguous on diagonal drags).
+// Grabbing the top lip (profile height >= this fraction of TOP) pulls the
+// pot taller/shorter; grabbing anywhere lower shapes the wall in/out.
+const RIM_GRAB_FRAC = 0.84;
+// At the lip, a drag splits into raise (up/down) vs. flare/collar (sideways).
+// Lock only once one axis clearly dominates so a diagonal never misfires;
+// force a pick after this much travel if it stays ambiguous.
+const RIM_LOCK_FRAC  = 0.03;   // fraction of min(canvas) travel before locking
+const RIM_AXIS_RATIO = 1.25;   // one axis must beat the other by this to lock
 
 // --- Physical limits of the wheel -------------------------------
 // The foot that rests on the wheel can never be wider than the wheel
@@ -1109,6 +1153,32 @@ const LID_STYLES = {
 };
 const LID_STYLE_IDS = ["flat", "domed", "tall", "pointed"];
 
+// --- Rim styles -------------------------------------------------
+// A rim style reshapes only the top RIM_ZONE_ROWS of the profile — the
+// LIP — leaving the body the user threw intact. Each style is a function
+// of the anchor radius rA (the radius at the base of the lip zone) and t
+// (0 at the anchor, 1 at the very rim); it returns the lip radius at t.
+// Every style returns rA at t=0 so the lip joins the body cleanly. "cut"
+// is null = leave the sculpted edge as-is (the old flat cut). The style
+// is re-derived from the current anchor after each throw, so the lip
+// tracks the body and switching styles never compounds.
+const RIM_ZONE_ROWS = 16;
+const _ss01 = (x) => THREE.MathUtils.smoothstep(x, 0, 1);
+const RIM_STYLES = {
+    cut: null,
+    // Outward bead peaking mid-lip, curling back in at the very edge so
+    // the rim reads rounded/finished instead of a paper-thin cut.
+    rounded: (rA, t) => rA + 0.045 * Math.sin(Math.PI * t) - 0.055 * _ss01((t - 0.80) / 0.20),
+    // Everted: the lip splays outward toward the rim.
+    flared: (rA, t) => rA + 0.16 * Math.pow(t, 1.5),
+    // Rolled-over lip: a fuller bead that curls hard inward at the top.
+    rolled: (rA, t) => rA + 0.08 * Math.sin(Math.PI * t) - 0.12 * _ss01((t - 0.62) / 0.38),
+    // Collared neck: the opening pulls in toward a narrower mouth.
+    collared: (rA, t) => rA - (rA * 0.44) * _ss01(t),
+};
+const RIM_STYLE_IDS = ["cut", "rounded", "flared", "rolled", "collared"];
+const RIM_STYLE_LABELS = { cut: "Cut", rounded: "Rounded", flared: "Flared", rolled: "Rolled", collared: "Collar" };
+
 // Lids are now generated parametrically from the source pot's rim
 // (see seedLidForRim) — no preset silhouette needed.
 const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "jar", "egg",
@@ -1128,6 +1198,10 @@ const state = {
     clayTarget: null,           // material params currently tweening toward
     glaze: null,                // chosen glaze id (once glazing), else null
     brushIndex: DEFAULT_BRUSH,  // index into BRUSHES
+    alterMode: false,           // wet Alter tool: off = round throwing, on = push one side
+    facetCount: 0,              // 0 = round; else N flat sides carved via applyFacets
+    rimStyle: "cut",            // lip treatment: cut | rounded | flared | rolled | collared
+    rimScallop: 0,              // 0 = straight lip; else N scallops (lip waves up/down)
     spin: SPIN_SPEED,           // current angular speed (eases to 0 while busy)
     decoTool: "brush",          // brush | splatter | stamp | overlay | motif | pattern | band
     decoColor: null,            // paint colour (hex), or null = painting off
@@ -1310,6 +1384,71 @@ const targetColor = new THREE.Color(); // scratch for the material tween
 const profile = new Float32Array(ROWS + 1);
 let profileDirty = false;
 
+// --- Altering (asymmetry) ---------------------------------------
+// `profile` stays the round, on-the-wheel baseline (all Phase-1 sculpt,
+// trim, lids read it). Altering adds a PER-VERTEX radial offset on top:
+// final radius at (row r, col c) = profile[r] + displace[r*(COLS+1)+c].
+// Editing `profile` moves every angle (round throwing); editing
+// `displace` locally dents/bulges ONE side (an oval, a pushed-in wall,
+// facets). displaceActive is false for a plain round pot, so those pots
+// keep the exact fast analytic-normal path and pay nothing for this.
+const DISP_W = COLS + 1;
+const displace = new Float32Array((ROWS + 1) * DISP_W);
+let displaceActive = false;
+const _radGrid = new Float32Array((ROWS + 1) * DISP_W); // geometry scratch
+function clearDisplace() {
+    displace.fill(0);
+    displaceActive = false;
+}
+// Keep the wrap seam watertight: column COLS duplicates column 0, so any
+// write to one must mirror to the other or a crack opens at the seam.
+function mirrorDisplaceSeam() {
+    for (let r = 0; r <= ROWS; r++) {
+        displace[r * DISP_W + COLS] = displace[r * DISP_W + 0];
+    }
+}
+// --- Persist the displacement field (disk / gallery entries) ----
+// The field is (ROWS+1)*(COLS+1) floats; too big for pretty JSON, so it
+// serializes as a base64 Int16 blob (offset*4096, ~0.00024 precision,
+// plenty). Only ALTERED pots carry it — a round pot stores null and the
+// loader treats a missing field as round (backward compatible with every
+// pot saved before altering existed).
+function encodeDisplaceField(field) {
+    if (!field) return null;
+    const q = new Int16Array(field.length);
+    for (let i = 0; i < field.length; i++) {
+        q[i] = Math.max(-32767, Math.min(32767, Math.round(field[i] * 4096)));
+    }
+    const bytes = new Uint8Array(q.buffer);
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+}
+function decodeDisplaceField(str) {
+    if (!str) return null;
+    try {
+        const bin = atob(str);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const q = new Int16Array(bytes.buffer);
+        const out = new Float32Array((ROWS + 1) * DISP_W);
+        const n = Math.min(q.length, out.length);
+        let any = false;
+        for (let i = 0; i < n; i++) { out[i] = q[i] / 4096; if (out[i] !== 0) any = true; }
+        return any ? out : null;
+    } catch (_) { return null; }
+}
+// Load a field (Float32Array or null) into the LIVE displace + active flag.
+function setDisplaceField(field) {
+    if (field && field.length) {
+        displace.set(field.subarray ? field.subarray(0, displace.length) : field);
+        mirrorDisplaceSeam();
+        displaceActive = true;
+    } else {
+        clearDisplace();
+    }
+}
+
 // Sculpt interaction scratch.
 const raycaster = new THREE.Raycaster();
 // Vertical plane through the spin axis, facing the camera. Pointer
@@ -1317,6 +1456,11 @@ const raycaster = new THREE.Raycaster();
 const axisPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 const hitPoint  = new THREE.Vector3();
 let sculpting = false;
+// Per-stroke throwing state (wet): grab-time screen point + height, and
+// the locked intent ("shape" = radial push/pull, "raise" = vertical pull
+// that grows/shrinks height). null between strokes / until the intent
+// locks after STROKE_LOCK_FRAC of travel.
+let wetStroke = null;
 // Handle reshape: set while dragging an ear at the handle phase; carries
 // the grab-time snapshot so each move computes an offset from there.
 let handleDrag = null;
@@ -1410,6 +1554,9 @@ function init() {
     document.querySelectorAll(".brush-btn").forEach((b, idx) =>
         b.addEventListener("click", () => setBrush(idx)));
     setBrush(DEFAULT_BRUSH);
+    document.getElementById("alterBtn")?.addEventListener("click", () => setAlterMode(!state.alterMode));
+    document.getElementById("facetBtn")?.addEventListener("click", cycleFacets);
+    document.getElementById("scallopBtn")?.addEventListener("click", cycleScallop);
     buildGlazePackTabs();
     buildGlazeBar();
     buildDecoBar();
@@ -1493,6 +1640,7 @@ function init() {
     buildShapePicker();
     buildBgPicker();
     buildLidStylePicker();
+    buildRimStylePicker();
     buildHandleStylePicker();
     buildHandleCountPicker();
     let savedBg = DEFAULT_BG, savedMusic = true, savedSfx = true;
@@ -1563,6 +1711,10 @@ function init() {
     if (location.search.includes("dev")) {
         window.__slip = {
             state, profile, radiusAt, sculptToward, trimToward, maxRadiusAt,
+            displace, displaceInfo: () => ({ active: displaceActive }),
+            setAlterMode, alterToward, applyFacets, clearDisplace, writeProfileToGeometry,
+            cycleScallop, cycleFacets,
+            setRimStyle, computeStyledProfile, RIM_STYLE_IDS,
             setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape, setLidStyle,
             startFiringMoment, endFiringMoment,
             bumpDab, resetBumpLayer,
@@ -3131,6 +3283,54 @@ function nudgeHeight(delta) {
     if (state.clayState !== "wet") return; // height locks at leather+
     setHeightScale(state.heightScale + delta);
 }
+// Toggle the wet-stage Alter tool. On = the wheel holds still and a drag
+// pushes one side of the wall (dent / oval / bulge). Off = round throwing.
+function setAlterMode(on) {
+    state.alterMode = !!on;
+    sculpting = false; wetStroke = null;    // end any in-progress stroke cleanly
+    const b = document.getElementById("alterBtn");
+    if (b) {
+        b.classList.toggle("is-active", state.alterMode);
+        b.setAttribute("aria-pressed", state.alterMode ? "true" : "false");
+    }
+}
+// Facets button: cycle round → 6 → 8 → 12 flat sides. Each step rewrites
+// the displacement field (so it replaces any previous facet); "round"
+// clears it. A freehand alter can follow; the next facet tap overwrites.
+const FACET_CYCLE = [0, 6, 8, 12];
+const FACET_DEPTH = 0.07;
+function cycleFacets() {
+    const i = FACET_CYCLE.indexOf(state.facetCount || 0);
+    const n = FACET_CYCLE[(i + 1) % FACET_CYCLE.length];
+    state.facetCount = n;
+    if (n === 0) clearDisplace(); else applyFacets(n, FACET_DEPTH);
+    if (state.pot) writeProfileToGeometry(state.pot.geometry);
+    updateFacetBtn();
+}
+function updateFacetBtn() {
+    const b = document.getElementById("facetBtn");
+    if (!b) return;
+    b.textContent = state.facetCount ? state.facetCount + " sides" : "Facets";
+    b.classList.toggle("is-active", !!state.facetCount);
+}
+// Scallop button: cycle straight lip → 6 → 8 → 12 waves. Parametric (just a
+// count), applied live in the geometry writer — no field baking, so it rides
+// on top of facets / freehand altering / rim styles.
+const SCALLOP_CYCLE = [0, 6, 8, 12];
+function cycleScallop() {
+    if (state.isLid) return;
+    const i = SCALLOP_CYCLE.indexOf(state.rimScallop || 0);
+    state.rimScallop = SCALLOP_CYCLE[(i + 1) % SCALLOP_CYCLE.length];
+    if (state.pot) writeProfileToGeometry(state.pot.geometry);
+    state.dirty = true;
+    updateScallopBtn();
+}
+function updateScallopBtn() {
+    const b = document.getElementById("scallopBtn");
+    if (!b) return;
+    b.textContent = state.rimScallop ? state.rimScallop + " scallops" : "Scallop";
+    b.classList.toggle("is-active", !!state.rimScallop);
+}
 
 const HANDLE_BULGE     = 0.22;   // outward arc — modest amphora ear, not a giant wing
 const HANDLE_GAP       = 0.055;  // min clearance of the tube's inner edge from the wall (finger gap)
@@ -3466,12 +3666,19 @@ function updateHandleStylePicker() {
 // at angle 0 and 2π (no lighting seam where the lathe wraps). Cheap
 // enough to call on every sculpting frame.
 function writeProfileToGeometry(geo) {
-    writeProfileArrayToGeometry(geo, profile);
+    // Apply the rim style at render time (pure profile stays untouched),
+    // then the local altering field. Round pots pass a null field so they
+    // keep the fast analytic-normal path.
+    const prof = computeStyledProfile(profile, state.rimStyle, state.isLid);
+    writeProfileArrayToGeometry(geo, prof, displaceActive ? displace : null,
+        state.isLid ? 0 : state.rimScallop);
 }
-function writeProfileArrayToGeometry(geo, prof) {
+function writeProfileArrayToGeometry(geo, prof, disp, scallopN) {
     const pos = geo.attributes.position.array;
     const nor = geo.attributes.normal.array;
     const dyStep = TOP / ROWS;
+    const dTheta = (Math.PI * 2) / COLS;
+    const W = COLS + 1;
     // Find the highest contiguous tail of zero-radius rings at the top
     // of the profile (lid silhouettes collapse to the axis above the
     // dome). All those rings will share the cap row's y so the
@@ -3483,13 +3690,30 @@ function writeProfileArrayToGeometry(geo, prof) {
         if (prof[r] < EPS) firstCollapse = r; else break;
     }
     const capY = firstCollapse <= ROWS ? firstCollapse * dyStep : ROWS * dyStep;
+    // Pass 1 (altered surfaces only): build the full per-vertex radius
+    // grid = base profile + local displacement, so the analytic normals
+    // below can finite-difference it in both height and angle.
+    if (disp) {
+        for (let r = 0; r <= ROWS; r++) {
+            const collapsed = r >= firstCollapse;
+            const base = prof[r] < EPS ? 0 : prof[r];
+            for (let c = 0; c <= COLS; c++) {
+                _radGrid[r * W + c] = collapsed ? 0 : Math.max(0, base + disp[r * W + c]);
+            }
+        }
+    }
+    // Scalloped-rim setup: wave the lip's Y up/down, tapering in over the
+    // top SCALLOP_SPAN of the pot so only the rim undulates.
+    const rimRow  = firstCollapse <= ROWS ? firstCollapse - 1 : ROWS;
+    const scStart = rimRow - SCALLOP_SPAN * ROWS;
     for (let r = 0; r <= ROWS; r++) {
         const y = (r < firstCollapse) ? r * dyStep : capY;
-        const rad = prof[r] < EPS ? 0 : prof[r];
+        const baseRad = prof[r] < EPS ? 0 : prof[r];
+        const waveW = scallopN ? THREE.MathUtils.smoothstep(r, scStart, rimRow) : 0;
 
         // 2D outward normal in the (radius, height) plane, from the
         // local profile slope. Central difference inside, one-sided
-        // at the ends.
+        // at the ends. Used on ROUND surfaces (disp == null).
         let dr, dy;
         if (r === 0)         { dr = prof[1] - prof[0];           dy = dyStep; }
         else if (r === ROWS) { dr = prof[ROWS] - prof[ROWS - 1]; dy = dyStep; }
@@ -3506,9 +3730,12 @@ function writeProfileArrayToGeometry(geo, prof) {
             const theta = (c / COLS) * Math.PI * 2;
             const cos = Math.cos(theta);
             const sin = Math.sin(theta);
-            const i = (r * (COLS + 1) + c) * 3;
+            const i = (r * W + c) * 3;
+            const rad = disp && !bottomCap && !topCap ? _radGrid[r * W + c] : baseRad;
             pos[i]     = rad * cos;
-            pos[i + 1] = y;
+            pos[i + 1] = (waveW && !bottomCap && !topCap)
+                ? y + SCALLOP_AMP * waveW * Math.cos(scallopN * theta)
+                : y;
             pos[i + 2] = rad * sin;
             if (bottomCap) {
                 nor[i] = 0; nor[i + 1] = -1; nor[i + 2] = 0;
@@ -3518,8 +3745,27 @@ function writeProfileArrayToGeometry(geo, prof) {
                 // pairs with the quarter-circle apex smoothing so the
                 // slope-derived normals on rows below blend cleanly up.
                 nor[i] = 0; nor[i + 1] = 1; nor[i + 2] = 0;
-            } else {
+            } else if (!disp) {
                 nor[i] = n2x * cos; nor[i + 1] = n2y; nor[i + 2] = n2x * sin;
+            } else {
+                // Altered surface r(theta, y): the exact outward normal is
+                // -(dP/dtheta x dP/dy) normalized. r_y / r_theta are finite
+                // differences of the radius grid (r_theta wraps at the seam).
+                const rY = (r === ROWS)
+                    ? (_radGrid[r * W + c] - _radGrid[(r - 1) * W + c]) / dyStep
+                    : (_radGrid[(r + 1) * W + c] - _radGrid[(r - 1) * W + c]) / (2 * dyStep);
+                const cL = c === 0    ? COLS - 1 : c - 1;
+                const cR = c === COLS ? 1        : c + 1;
+                const rT = (_radGrid[r * W + cR] - _radGrid[r * W + cL]) / (2 * dTheta);
+                const ax = rT * cos - rad * sin;
+                const az = rT * sin + rad * cos;
+                const bx = rY * cos, bz = rY * sin;
+                // outward = -(a x b), with a=(ax,0,az), b=(bx,1,bz)
+                let nx = az;
+                let ny = ax * bz - az * bx;
+                let nz = -ax;
+                const nl = Math.hypot(nx, ny, nz) || 1;
+                nor[i] = nx / nl; nor[i + 1] = ny / nl; nor[i + 2] = nz / nl;
             }
         }
     }
@@ -3699,6 +3945,102 @@ function sculptToward(y, targetR) {
         profile[r] = profile[r] + (avg - profile[r]) * SMOOTH_ALPHA;
     }
     clampProfile(); // the foot can't pull wider than the wheel
+    profileDirty = true;
+    state.dirty = true;
+}
+
+// --- Altering: local (per-angle) push/pull ----------------------
+// Move the wall toward `targetR` in a LOCAL patch around (u = angle
+// fraction 0..1, v = height fraction 0..1), writing into the per-vertex
+// `displace` field. Falls off as a 2-D Gaussian in height AND angle, so
+// one touch dents/bulges a single side — an oval, a pushed-in wall, a
+// facet — while the rest of the ring stays put. Rate-capped like
+// throwing so wet clay leads the finger. The round `profile` is never
+// touched, so switching back to plain shaping still spins clean rings.
+function alterToward(u, v, targetR) {
+    if (state.isLid) return;                 // lids stay round
+    targetR = THREE.MathUtils.clamp(targetR, ALTER_MIN_R, MAX_R);
+    const centerCol = ((u % 1) + 1) % 1 * COLS;
+    const centerRow = THREE.MathUtils.clamp(v, 0, 1) * ROWS;
+    const sigmaRows = (BRUSHES[state.brushIndex].sigma / TOP) * ROWS;
+    const sigmaCols = ALTER_ANGLE_SIGMA;
+    const reachR = Math.ceil(sigmaRows * 3);
+    const reachC = Math.ceil(sigmaCols * 3);
+    const loR = Math.max(1, Math.floor(centerRow - reachR));
+    const hiR = Math.min(ROWS, Math.ceil(centerRow + reachR));
+    const W = COLS + 1;
+    // Angular distance in columns, wrapped around the seam.
+    const colDist = (c) => { const d = Math.abs(c - centerCol); return Math.min(d, COLS - d); };
+    // Pass 1: strongest desired delta drives the rate-cap scale.
+    let maxAbs = 0;
+    for (let r = loR; r <= hiR; r++) {
+        const dR = (r - centerRow) / sigmaRows;
+        const wR = Math.exp(-0.5 * dR * dR);
+        if (wR < 0.02) continue;
+        const base = profile[r];
+        for (let c = 0; c <= COLS; c++) {
+            const dC = colDist(c) / sigmaCols;
+            if (dC > 3) continue;
+            const w = wR * Math.exp(-0.5 * dC * dC) * ALTER_STRENGTH;
+            const cur = base + displace[r * W + c];
+            const abs = Math.abs((targetR - cur) * w);
+            if (abs > maxAbs) maxAbs = abs;
+        }
+    }
+    const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
+    const dt = lastAlterT ? Math.min(0.05, Math.max(0.005, (now - lastAlterT) / 1000)) : 1 / 60;
+    lastAlterT = now;
+    const cap = ALTER_RATE_MAX * dt;
+    const scale = (maxAbs > cap && maxAbs > 0) ? cap / maxAbs : 1;
+    // Pass 2: apply, clamping the FINAL radius (profile + displace) to the
+    // wheel envelope so an altered wall can't punch through the axis or
+    // overhang the foot.
+    for (let r = loR; r <= hiR; r++) {
+        const dR = (r - centerRow) / sigmaRows;
+        const wR = Math.exp(-0.5 * dR * dR);
+        if (wR < 0.02) continue;
+        const y = (r / ROWS) * TOP;
+        const base = profile[r];
+        const maxR = maxRadiusAt(y);
+        for (let c = 0; c <= COLS; c++) {
+            const dC = colDist(c) / sigmaCols;
+            if (dC > 3) continue;
+            const w = wR * Math.exp(-0.5 * dC * dC) * ALTER_STRENGTH * scale;
+            const idx = r * W + c;
+            let finalR = base + displace[idx];
+            finalR += (targetR - finalR) * w;
+            finalR = THREE.MathUtils.clamp(finalR, ALTER_MIN_R, maxR);
+            displace[idx] = finalR - base;
+        }
+    }
+    mirrorDisplaceSeam();
+    displaceActive = true;
+    profileDirty = true;
+    state.dirty = true;
+}
+
+// One-tap facet: carve `n` regular flats/flutes around the pot by writing
+// a cos(nθ) ripple into the displacement field (depth in world units).
+// Positive depth flutes inward; the round profile is untouched, so you
+// can un-facet by clearing displacement.
+function applyFacets(n, depth) {
+    if (state.isLid) return;
+    const W = COLS + 1;
+    for (let r = 0; r <= ROWS; r++) {
+        const y = (r / ROWS) * TOP;
+        const maxR = maxRadiusAt(y);
+        const base = profile[r];
+        // taper the facet to nothing across the foot so the base stays flat
+        const ramp = THREE.MathUtils.smoothstep(y, 0, FOOT_TOP * 2.2);
+        for (let c = 0; c < COLS; c++) {
+            const theta = (c / COLS) * Math.PI * 2;
+            const off = -depth * ramp * (0.5 - 0.5 * Math.cos(n * theta)); // 0..-depth
+            const finalR = THREE.MathUtils.clamp(base + off, ALTER_MIN_R, maxR);
+            displace[r * W + c] = finalR - base;
+        }
+    }
+    mirrorDisplaceSeam();
+    displaceActive = true;
     profileDirty = true;
     state.dirty = true;
 }
@@ -4130,6 +4472,14 @@ function resetPot() {
     state.savedPot = null;
     state.savedLid = null;
     seedProfile();
+    clearDisplace();          // fresh pot is round
+    state.facetCount = 0;
+    updateFacetBtn();
+    state.rimScallop = 0;
+    updateScallopBtn();
+    state.rimStyle = "cut";
+    updateRimStylePicker();
+    setAlterMode(false);
     profileDirty = true;
     state.glaze = null;
     state.glazeGradient = null;
@@ -4325,8 +4675,23 @@ function updateToolbar() {
     // whatever brush size you set in wet — no UI here so the
     // decorate panel doesn't get crowded with controls.
     if (brushBar) brushBar.hidden = cs !== "wet";
+    // Altering is pot-only (lids stay round) — hide the shaping toggles,
+    // and the divider before them, on a lid.
+    const showShape = cs === "wet" && !state.isLid;
+    const alterBtn = document.getElementById("alterBtn");
+    const scallopBtn = document.getElementById("scallopBtn");
+    if (scallopBtn) scallopBtn.hidden = !showShape;
+    const facetBtn = document.getElementById("facetBtn");
+    const brushSep = document.querySelector("#brushBar .brush-sep");
+    if (alterBtn) alterBtn.hidden = !showShape;
+    if (facetBtn) facetBtn.hidden = !showShape;
+    if (brushSep) brushSep.style.display = showShape ? "" : "none";
+    if (!showShape && state.alterMode) setAlterMode(false);
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
+    // Rim styles: pots only, wet only (mutually exclusive with the lid picker).
+    const rimStylePicker = document.getElementById("rimStylePicker");
+    if (rimStylePicker) rimStylePicker.hidden = !(showShape);
     const handleControlsOn = state.handle.on && !state.isLid && cs === "leather";
     const handleStylePicker = document.getElementById("handleStylePicker");
     if (handleStylePicker) handleStylePicker.hidden = !handleControlsOn;
@@ -5057,6 +5422,70 @@ function pointerToProfile(ev) {
     return { y: hitPoint.y / state.heightScale, r: Math.abs(hitPoint.x) };
 }
 
+// Drive a wet (throwing) stroke. The first bit of travel locks the intent:
+// a mostly-vertical drag becomes a "raise" (pull the clay up / press it
+// down — the potter's pull), a mostly-horizontal drag becomes a "shape"
+// (radial push/pull of the wall, the original behaviour). Locking per
+// stroke keeps it predictable for small hands — sideways shaping never
+// drifts the height, and a deliberate up-drag always grows the pot.
+function handleWetStroke(ev) {
+    if (!wetStroke) return;
+    if (wetStroke.intent === "alter") {
+        const uv = pointerToUV(ev);
+        const p = pointerToProfile(ev);
+        if (uv && p) { alterToward(uv.x, uv.y, p.r); maybeSquelch(); }
+        return;
+    }
+    if (wetStroke.intent === "rim") {
+        const rect = state.canvas.getBoundingClientRect();
+        // Decide raise vs. flare from the first clearly-dominant drag axis.
+        if (!wetStroke.rimMode) {
+            const dx = ev.clientX - wetStroke.startX;
+            const dy = ev.clientY - wetStroke.startY;
+            const adx = Math.abs(dx), ady = Math.abs(dy);
+            const dist = Math.hypot(dx, dy);
+            const lockPx = RIM_LOCK_FRAC * Math.min(rect.width, rect.height);
+            if (dist < lockPx) return;                       // too small to tell
+            if (ady > adx * RIM_AXIS_RATIO)      wetStroke.rimMode = "raise";
+            else if (adx > ady * RIM_AXIS_RATIO) wetStroke.rimMode = "flare";
+            else if (dist > lockPx * 3)          wetStroke.rimMode = ady >= adx ? "raise" : "flare";
+            else return;                                     // ambiguous — wait for a clearer direction
+        }
+        if (wetStroke.rimMode === "raise") {
+            // Pull the lip up/down → taller/shorter.
+            const frac = -(ev.clientY - wetStroke.startY) / rect.height;
+            setHeightScale(wetStroke.startHeight + frac * PULL_HEIGHT_GAIN);
+            applyPullSlim();
+            maybeSquelch();
+        } else {
+            // Pull the lip sideways → flare out / collar in. Reuses the
+            // throwing sculpt, so the rim follows the finger with the same
+            // wet-clay feel and blends into the wall below via the brush.
+            const p = pointerToProfile(ev);
+            if (p) { sculptToward(p.y, p.r); maybeSquelch(); }
+        }
+        return;
+    }
+    // Body grab → shape the wall in/out.
+    const p = pointerToProfile(ev);
+    if (p) { sculptToward(p.y, p.r); maybeSquelch(); }
+}
+
+// While pulling height, slim the wall as it rises (and re-fatten as it
+// drops) so raising reads like drawing clay up, not scaling it. Maps the
+// whole wall from its grab-time snapshot, so the effect is exact and
+// fully reversible within the stroke; the wheel envelope still clamps it.
+function applyPullSlim() {
+    const sp = wetStroke && wetStroke.startProfile;
+    if (!sp) return;
+    const dH = state.heightScale - wetStroke.startHeight; // + = taller
+    const slim = Math.max(0.6, 1 - PULL_SLIM * dH);
+    for (let r = 0; r <= ROWS; r++) profile[r] = sp[r] * slim;
+    clampProfile();
+    profileDirty = true;
+    state.dirty = true;
+}
+
 // Screen point → NDC, shared by the object raycasts below.
 function pointerNDC(ev) {
     const rect = state.canvas.getBoundingClientRect();
@@ -5113,6 +5542,7 @@ function onPointerDown(ev) {
         // Two fingers → view gesture; abandon any in-progress stroke
         // (sculpt, paint, handle reshape, or dip) so pinch/spin takes over.
         sculpting = false;
+        wetStroke = null;
         handleDrag = null;
         if (dipping) { dipping = false; dipPreview = null; renderDips(); }
         // End any in-progress placement drag (the placement stays put).
@@ -5128,15 +5558,52 @@ function onPointerDown(ev) {
     }
 
     if (state.clayState === "wet") {
-        // Pure shaping: no handles here anymore (they're a Decorate-stage
-        // finishing step), so a touch on the pot always sculpts.
+        // Pure shaping (no handles here — those are a Decorate-stage step).
+        // Grab-anywhere: touching anywhere on/inside the clay column — or
+        // just outside its wall (WET_GRAB_MARGIN) — starts a throwing
+        // stroke. A press clearly outside the pot spins it to inspect.
+        // Alter tool: push one side of the wall in/out locally. Needs the
+        // true angle under the finger, so it raycasts the pot (pointerToUV);
+        // a miss spins the pot so you can turn the side you want to the front.
+        if (state.alterMode) {
+            const uv = pointerToUV(ev);
+            if (!uv) {
+                state.userRotating = true;
+                viewPrevX = ev.clientX;
+                ev.preventDefault();
+                return;
+            }
+            sculpting = true;
+            wetStroke = { intent: "alter" };
+            const pa = pointerToProfile(ev);
+            if (pa) { alterToward(uv.x, uv.y, pa.r); maybeSquelch(); }
+            ev.preventDefault();
+            return;
+        }
         const p = pointerToProfile(ev);
-        if (!p) return;
-        if (p.y < -0.05 || p.y > TOP + 0.15) return;
-        if (Math.abs(p.r - radiusAt(p.y)) > GRAB_TOL) return;
+        const onClay = p && p.y >= -0.05 && p.y <= TOP + 0.15
+            && p.r <= radiusAt(p.y) + WET_GRAB_MARGIN;
+        if (!onClay) {
+            state.userRotating = true;
+            viewPrevX = ev.clientX;
+            ev.preventDefault();
+            return;
+        }
+        // Grab LOCATION picks the family: the top lip is the "rim" family
+        // (pull up/down to raise, sideways to flare/collar — decided by the
+        // first clear drag axis); the body always shapes the wall in/out.
         sculpting = true;
-        sculptToward(p.y, p.r);
-        maybeSquelch();
+        const rimGrab = p.y >= TOP * RIM_GRAB_FRAC;
+        if (rimGrab) {
+            wetStroke = {
+                intent: "rim", rimMode: null,
+                startX: ev.clientX, startY: ev.clientY,
+                startHeight: state.heightScale,
+                startProfile: Float32Array.from(profile), // for slim-on-raise
+            };
+        } else {
+            wetStroke = { intent: "shape" };
+        }
         ev.preventDefault();
     } else if (state.clayState === "leather") {
         // Handle editing takes top priority: if an ear is grabbed, reshape
@@ -5303,11 +5770,11 @@ function onPointerMove(ev) {
         return;
     }
     if (sculpting) {
-        const p = pointerToProfile(ev);
-        if (p) {
-            if (state.clayState === "leather") trimToward(p.y, p.r);
-            else sculptToward(p.y, p.r);
-            maybeSquelch();
+        if (state.clayState === "leather") {
+            const p = pointerToProfile(ev);
+            if (p) { trimToward(p.y, p.r); maybeSquelch(); }
+        } else {
+            handleWetStroke(ev);   // shape (radial) or raise (vertical pull)
         }
         ev.preventDefault();
     } else if (state.painting) {
@@ -5342,6 +5809,7 @@ function onPointerUp(ev) {
     if (pointers.size < 2) pinchPrevDist = 0;
     if (pointers.size === 0) {
         sculpting = false;
+        wetStroke = null;
         handleDrag = null;
         // A wax stroke just ended: seal the glaze that's under the wax now,
         // so later dips can't reach under it (revealed when the wax lifts).
@@ -5366,6 +5834,7 @@ function onPointerUp(ev) {
         // otherwise let a single first sample exhaust the per-call cap.
         lastSculptT = 0;
         lastTrimT = 0;
+        lastAlterT = 0;
         state.painting = false;
         state.userRotating = false;
         lastPaintUV = null;
@@ -5861,6 +6330,10 @@ async function savePot() {
         id: Date.now().toString(36),
         ts: Date.now(),
         profile: Array.from(profile, (x) => +x.toFixed(4)),
+        displace: encodeDisplaceField(displaceActive ? displace : null),
+        facetCount: state.facetCount,
+        rimScallop: state.rimScallop,
+        rimStyle: state.rimStyle,
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
         finish: state.finish,
@@ -5907,6 +6380,10 @@ async function savePot() {
                 id: (Date.now() + 1).toString(36),
                 ts: Date.now() + 1,
                 profile: Array.from(profile, (x) => +x.toFixed(4)),
+                displace: encodeDisplaceField(displaceActive ? displace : null),
+                facetCount: state.facetCount,
+                rimScallop: state.rimScallop,
+                rimStyle: state.rimStyle,
                 glaze: state.glaze,
                 finish: state.finish,
                 dips: state.dips.map((d) => ({ ...d })),
@@ -5980,6 +6457,10 @@ function capturePieceState() {
     if (state.frozenDipCanvas) frozenCopy.getContext("2d").drawImage(state.frozenDipCanvas, 0, 0);
     return {
         profile: Float32Array.from(profile),
+        displace: displaceActive ? Float32Array.from(displace) : null, // local altering
+        facetCount: state.facetCount,
+        rimScallop: state.rimScallop,
+        rimStyle: state.rimStyle,
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
         finish: state.finish,
@@ -6003,6 +6484,13 @@ function capturePieceState() {
 function restorePieceState(saved) {
     resetDecoHistory(); // switching pieces replaces the deco surface
     for (let i = 0; i < saved.profile.length; i++) profile[i] = saved.profile[i];
+    setDisplaceField(saved.displace);        // restore local altering (or clear → round)
+    state.facetCount = saved.facetCount || 0;
+    updateFacetBtn();
+    state.rimScallop = saved.rimScallop || 0;
+    updateScallopBtn();
+    state.rimStyle = saved.rimStyle || "cut";
+    updateRimStylePicker();
     profileDirty = true;
     state.glaze = saved.glaze;
     state.glazeGradient = saved.glazeGradient || null;
@@ -6241,7 +6729,11 @@ function buildPartnerMesh() {
 // can tween the partner alongside the active piece during firing.
 function syncPartnerMesh(saved) {
     if (!state.partnerMesh) buildPartnerMesh();
-    writeProfileArrayToGeometry(state.partnerMesh.geometry, saved.profile);
+    writeProfileArrayToGeometry(
+        state.partnerMesh.geometry,
+        computeStyledProfile(saved.profile, saved.rimStyle, saved.isLid),
+        saved.displace || null,
+    );
     state.partnerDecoCtx.clearRect(0, 0, DECO_W, DECO_H);
     state.partnerDecoCtx.drawImage(saved.decoCanvas, 0, 0);
     state.partnerDecoTex.needsUpdate = true;
@@ -6476,6 +6968,65 @@ function updateLidStylePicker() {
     });
 }
 
+// --- Rim styles (lip shaping) -----------------------------------
+// Rim styles are a RENDER-TIME transform, never baked into `profile`.
+// `profile` stays the pure sculpted shape (what the user throws + what
+// sculpt/trim read); the lip zone is restyled only when writing geometry.
+// So "cut" is a true no-op that restores the sculpted edge exactly,
+// switching styles never compounds, and the transform is idempotent.
+const _styledProfile = new Float32Array(ROWS + 1);
+function computeStyledProfile(src, rimStyle, isLid) {
+    const f = (!isLid && rimStyle && RIM_STYLES[rimStyle]) ? RIM_STYLES[rimStyle] : null;
+    if (!f) return src;                 // cut / lid → the pure profile, untouched
+    const dst = _styledProfile;
+    dst.set(src);
+    const a = ROWS - RIM_ZONE_ROWS;
+    if (a < 1) return dst;
+    const rA = src[a];
+    for (let r = a + 1; r <= ROWS; r++) {
+        const t = (r - a) / RIM_ZONE_ROWS;
+        dst[r] = THREE.MathUtils.clamp(f(rA, t), ALTER_MIN_R, maxRadiusAt((r / ROWS) * TOP));
+    }
+    // Soften the anchor junction so the lip joins the body without a kink
+    // (in the scratch copy only — the pure profile is never touched).
+    for (let pass = 0; pass < 2; pass++) {
+        for (let r = a; r <= a + 3 && r < ROWS; r++) {
+            if (r >= 1) dst[r] = (dst[r - 1] + 2 * dst[r] + dst[r + 1]) / 4;
+        }
+    }
+    return dst;
+}
+function setRimStyle(style) {
+    if (!(style in RIM_STYLES) || state.isLid) return;
+    state.rimStyle = style;
+    profileDirty = true;
+    if (state.pot) writeProfileToGeometry(state.pot.geometry);
+    state.dirty = true;
+    updateRimStylePicker();
+}
+function buildRimStylePicker() {
+    const wrap = document.getElementById("rimStylePicker");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    RIM_STYLE_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "lid-style-btn";            // reuse the chip styling
+        b.dataset.rim = id;
+        b.textContent = RIM_STYLE_LABELS[id];
+        b.addEventListener("click", () => setRimStyle(id));
+        wrap.appendChild(b);
+    });
+    updateRimStylePicker();
+}
+function updateRimStylePicker() {
+    const wrap = document.getElementById("rimStylePicker");
+    if (!wrap) return;
+    wrap.querySelectorAll(".lid-style-btn").forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.rim === state.rimStyle);
+    });
+}
+
 // Toggle which piece is live for editing/viewing. The currently-live
 // piece is captured into the OTHER slot; the paused piece is restored
 // into the live state. Available whenever exactly one piece is paused.
@@ -6569,6 +7120,13 @@ async function loadPot(entry) {
     resetDecoHistory();  // a loaded pot starts with a clean undo history
 
     for (let i = 0; i < profile.length; i++) profile[i] = entry.profile?.[i] ?? 0;
+    setDisplaceField(decodeDisplaceField(entry.displace)); // altering (missing = round)
+    state.facetCount = entry.facetCount || 0;
+    updateFacetBtn();
+    state.rimScallop = entry.rimScallop || 0;
+    updateScallopBtn();
+    state.rimStyle = entry.rimStyle || "cut";
+    updateRimStylePicker();
     profileDirty = true;
     state.glaze = entry.glaze || null;
     state.glazeGradient = entry.glazeGradient || null;
@@ -6732,6 +7290,10 @@ async function loadAsCapturedState(entry) {
     }
     return {
         profile: Float32Array.from(entry.profile || []),
+        displace: decodeDisplaceField(entry.displace), // altered shape (or null = round)
+        facetCount: entry.facetCount || 0,
+        rimScallop: entry.rimScallop || 0,
+        rimStyle: entry.rimStyle || "cut",
         glaze: entry.glaze || null,
         glazeGradient: entry.glazeGradient || null,
         finish: entry.finish || DEFAULT_FINISH,
@@ -7160,7 +7722,10 @@ function tick() {
     // handles, dip and paint against. Turn it by dragging the wheel or
     // empty space (or two-finger). Wet throws on a live wheel; fired spins
     // to show off / photograph the finished piece.
-    const targetSpin = (busy || state.clayState === "leather") ? 0 : SPIN_SPEED;
+    // Altering is done off the wheel (you push a static wall), so the
+    // wheel holds still whenever the Alter tool is armed on wet clay.
+    const alterHold = state.alterMode && state.clayState === "wet";
+    const targetSpin = (busy || alterHold || state.clayState === "leather") ? 0 : SPIN_SPEED;
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
     // Wheel hum tracks the spin: as the auto-spin eases out while the
@@ -7363,7 +7928,7 @@ function updateShapeHint() {
 // (index.html #coach) shows the gesture; the hand image demonstrates it.
 // Dismissed on the first real gesture (onPointerDown) or on progressing.
 const COACH_CAPTIONS = {
-    wet:     "Drag the pot wall to shape it — in, out, up, down.",
+    wet:     "Drag the wall to shape it. Grab the rim: pull up to raise, sideways to flare.",
     leather: "Tap Dip, then drag down — glaze pours to your finger.",
     fired:   "Spin to admire. Save it, or take a photo.",
 };

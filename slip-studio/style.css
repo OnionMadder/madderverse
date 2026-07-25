@@ -947,6 +947,42 @@ html, body {
     border-color: var(--accent);
     background: rgba(201, 138, 100, 0.18);
 }
+/* Thin divider between the brush dots and the shaping toggles. */
+.brush-sep {
+    pointer-events: none;
+    width: 24px;
+    height: 1px;
+    margin: 2px auto;
+    background: var(--ink-faint);
+    opacity: 0.6;
+}
+/* Alter / Facets shaping toggles — labelled pills so they read as a
+   different kind of control from the round brush-size dots above. */
+.shape-btn {
+    pointer-events: auto;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-appearance: none;
+    appearance: none;
+    min-width: 46px;
+    height: 30px;
+    padding: 0 8px;
+    border-radius: 15px;
+    border: 1px solid var(--ink-faint);
+    background: var(--chip);
+    color: var(--ink-dim);
+    font: 600 12px/1 var(--ui, system-ui, sans-serif);
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+.shape-btn.is-active {
+    border-color: var(--accent);
+    background: rgba(201, 138, 100, 0.20);
+    color: var(--ink);
+}
+.shape-btn[hidden] { display: none; }
 .brush-dot {
     display: block;
     border-radius: 50%;

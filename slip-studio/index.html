@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=170" />
+    <link rel="stylesheet" href="style.css?v=179" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -218,10 +218,15 @@
     </div>
 
     <div class="lid-style-picker" id="lidStylePicker" role="group" aria-label="Lid style" hidden></div>
+    <div class="lid-style-picker" id="rimStylePicker" role="group" aria-label="Rim style" hidden></div>
     <div class="brush-bar" id="brushBar" role="group" aria-label="Brush size">
         <button class="brush-btn" type="button" aria-label="Fine brush" aria-pressed="false"><span class="brush-dot brush-dot-s"></span></button>
         <button class="brush-btn" type="button" aria-label="Medium brush" aria-pressed="false"><span class="brush-dot brush-dot-m"></span></button>
         <button class="brush-btn" type="button" aria-label="Broad brush" aria-pressed="false"><span class="brush-dot brush-dot-l"></span></button>
+        <span class="brush-sep" aria-hidden="true"></span>
+        <button id="alterBtn" class="shape-btn" type="button" aria-pressed="false" aria-label="Alter shape: push one side of the wall" title="Alter — push one side of the wall in or out">Alter</button>
+        <button id="facetBtn" class="shape-btn" type="button" aria-label="Facets: carve flat sides, tap to cycle" title="Facets — tap to cycle round / 6 / 8 / 12 flat sides">Facets</button>
+        <button id="scallopBtn" class="shape-btn" type="button" aria-label="Scallop: wave the rim up and down, tap to cycle" title="Scallop — tap to cycle straight / 6 / 8 / 12 wavy rim">Scallop</button>
     </div>
 
     <div class="deco-stack" id="decoStack" hidden>
@@ -376,7 +381,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=170"></script>
+    <script type="module" src="main.js?v=179"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
