@@ -60,23 +60,33 @@ const MINUTES_PER_DAY = 24 * 60;
 // Species definitions.
 // table maps a 3-char genotype ("012" = R:0 Y:1 W:2) → color.
 const SPECIES = {
+    // Cosmos — the starter species, redesigned 2026-07-25 as a COLOUR-MIXING
+    // model (replaces the AC:NH cosmos palette). The three genes are pigment
+    // presence: R (red), Y (yellow), B (blue). A pigment is "present" at
+    // strength ≥ 1. Colour = which pigments are present:
+    //   R=red · Y=yellow · B=blue · R+Y=orange · Y+B=green · R+B=purple
+    //   none=white (rare) · all three=black (rare)
+    // Seeds are the three PRIMARIES; crossing two primaries deterministically
+    // yields their mix (red×yellow→orange, etc.). White + black are the latent
+    // "expand later" rares (deep recessive / all-pigment crosses).
     cosmos: {
         name: "Cosmos",
         genes: 3,
-        seeds: { red: "200", yellow: "021", white: "001" },
+        seeds: { red: "200", yellow: "020", blue: "002" },
         table: {
-            "000": "white",  "001": "white",  "002": "white",
-            "010": "yellow", "011": "yellow", "012": "white",
-            "020": "yellow", "021": "yellow", "022": "yellow",
-            "100": "pink",   "101": "pink",   "102": "pink",
-            "110": "orange", "111": "orange", "112": "pink",
-            "120": "orange", "121": "orange", "122": "orange",
-            "200": "red",    "201": "red",    "202": "red",
-            "210": "orange", "211": "orange", "212": "red",
-            "220": "black",  "221": "black",  "222": "red",
+            "000": "white",  "001": "blue",   "002": "blue",
+            "010": "yellow", "011": "green",  "012": "green",
+            "020": "yellow", "021": "green",  "022": "green",
+            "100": "red",    "101": "purple", "102": "purple",
+            "110": "orange", "111": "black",  "112": "black",
+            "120": "orange", "121": "black",  "122": "black",
+            "200": "red",    "201": "purple", "202": "purple",
+            "210": "orange", "211": "black",  "212": "black",
+            "220": "orange", "221": "black",  "222": "black",
         },
-        dex: ["white", "yellow", "red", "pink", "orange", "black"],
-        rare: ["black"],
+        dex: ["red", "orange", "yellow", "green", "blue", "purple"],
+        rare: ["white", "black"],
+        sprites: { src: "assets/img/flowers/cosmos.png", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] },
     },
     tulips: {
         name: "Tulips",
@@ -257,12 +267,14 @@ const TOTAL_GATES = { hyacinths: 10, lilies: 14, mums: 18, windflowers: 23, rose
 // Flavor text for the Bloombook — written in Onion's voice.
 const FLAVOR = {
     cosmos: {
-        white:  "Where most gardens begin. Plain isn't nothing — it's the start of everything else here.",
-        yellow: "Cheerful and easy, and a little glad you showed up.",
-        red:    "Bold, warm, no apologies. Some days you just want the loud one.",
-        pink:   "You didn't plan this one. A lot of the best things turn up that way.",
-        orange: "Red and yellow meeting halfway — proof that mixing what you already have can make something new.",
-        black:  "Cross the right pair, wait, and one morning it's simply there. Deep as dusk. Hardly anyone gets it on the first try.",
+        red:    "One of the three you start with. Bold, warm, no apologies.",
+        yellow: "A starting primary — cheerful and easy, and a little glad you showed up.",
+        blue:   "The third primary. Cool and calm, and rarer to find loose in the wild than you'd think.",
+        orange: "Red and yellow, meeting halfway — proof that mixing what you already have makes something new.",
+        green:  "Yellow and blue, quietly agreeing. The colour the leaves lent to the bloom.",
+        purple: "Red and blue met in the middle, and got a little regal about it.",
+        white:  "No pigment at all — which turns out to be surprisingly hard to arrive at. The blank the whole rainbow forgets it came from.",
+        black:  "Every colour at once, folded down into the dark. The deepest cross there is; hardly anyone gets it on the first try.",
     },
     tulips: {
         white:  "Sturdy and quiet. An honest place to start.",
@@ -472,9 +484,9 @@ function phenotype(species, genotype) {
     return s.table[genotype];
 }
 
-/** Is `color` a hybrid (not one of the three seed colors) for this species? */
-function isHybridColor(color) {
-    return !SEED_COLORS.includes(color);
+/** Is `color` a hybrid (not one of a species' own seed colors)? */
+function isHybridColor(species, color) {
+    return !seedColorsFor(species).includes(color);
 }
 
 // ─── 3. STATE ────────────────────────────────────────────────────
@@ -497,7 +509,7 @@ const state = {
     // Seeds are unlimited; the useful part is which colors each species offers.
     // Windflowers seed orange (not yellow) — the one exception (see seedColorsFor).
     seedInventory: {
-        cosmos:      { red: Infinity, yellow: Infinity, white: Infinity },
+        cosmos:      { red: Infinity, yellow: Infinity, blue: Infinity },
         tulips:      { red: Infinity, yellow: Infinity, white: Infinity },
         pansies:     { red: Infinity, yellow: Infinity, white: Infinity },
         hyacinths:   { red: Infinity, yellow: Infinity, white: Infinity },
@@ -805,7 +817,7 @@ function unlockSpecies(species) {
 function checkUnlocks() {
     const newly = [];
     const cosmosColors = Object.keys(state.flowerdex.cosmos || {});
-    const cosmosHybrids = cosmosColors.filter(isHybridColor).length;
+    const cosmosHybrids = cosmosColors.filter(c => isHybridColor("cosmos", c)).length;
 
     if (!isUnlocked("tulips") && cosmosHybrids >= 1 && unlockSpecies("tulips")) newly.push("tulips");
     if (!isUnlocked("pansies") && cosmosColors.length >= 5 && unlockSpecies("pansies")) newly.push("pansies");
@@ -1246,6 +1258,14 @@ function renderGrid(highlights, sprouts, rareHighlights) {
 const SPRITE_COLS = ["seed", "sprout", "bud", "bloom", "night"];
 const spriteReady = {};   // species id -> true once its sheet <img> has loaded
 
+// Sheet rows = dex colours first, then any rare colours not already in the dex
+// (so rares like white/black cosmos get their own painted row, below the dex).
+// The compositor bakes rows in this exact order.
+function spriteColorsFor(species) {
+    const s = SPECIES[species];
+    return s.dex.concat((s.rare || []).filter(c => !s.dex.includes(c)));
+}
+
 /** Kick off loading for every species that has a sprite sheet configured. */
 function initSpriteSheets() {
     for (const sp of Object.keys(SPECIES)) {
@@ -1268,9 +1288,10 @@ function spriteFrameFor(species, color, stage, isNight) {
     const col = cols.indexOf(key);
     if (col < 0) return null;
     const shared = (key === "seed" || key === "sprout");  // seed/sprout live on row 0
-    const row = shared ? 0 : SPECIES[species].dex.indexOf(color);
+    const colors = spriteColorsFor(species);
+    const row = shared ? 0 : colors.indexOf(color);
     if (row < 0) return null;
-    return { src: cfg.src, col, row, cols: cols.length, rows: SPECIES[species].dex.length };
+    return { src: cfg.src, col, row, cols: cols.length, rows: colors.length };
 }
 
 /** Paint a sheet frame onto a responsive box using percentage background math. */
