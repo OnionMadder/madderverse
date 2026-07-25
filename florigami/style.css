@@ -1658,3 +1658,27 @@ body.dragging-flower .tile { cursor: grabbing; }
 .compost.hot .compost-label { color: var(--ink); }
 
 body.reduce-motion .compost { transition: opacity 120ms ease; }
+
+/* ─── Plantable tray: seeds + everything you've bred ──────────────── */
+/* As discoveries pile up the tray grows — cap it and let it scroll. */
+.tray-seeds {
+    max-height: 108px;
+    overflow-y: auto;
+    align-content: flex-start;
+    padding: 2px;
+    scrollbar-width: thin;
+}
+/* Colours you've BRED (vs the starting seeds) get a soft leaf-green cue. */
+.seed-chip.bred {
+    border-color: var(--grass-dark);
+    background: linear-gradient(180deg, var(--cream), color-mix(in srgb, var(--grass) 16%, var(--cream)));
+}
+.seed-chip.bred::after {
+    content: "✿";
+    font-size: 10px;
+    color: var(--grass-dark);
+    margin-left: -1px;
+    opacity: 0.8;
+}
+.seed-chip.bred.armed { background: var(--accent); }
+.seed-chip.bred.armed::after { color: rgba(255,255,255,0.85); }

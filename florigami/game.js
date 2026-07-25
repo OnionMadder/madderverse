@@ -623,21 +623,38 @@ function neighborCoords(x, y) {
     return out;
 }
 
-function plant(x, y, species, color) {
-    const inv = state.seedInventory[species];
-    if (!inv || inv[color] <= 0) return false;
-    if (tileAt(x, y) !== null) return false;
+/**
+ * The genotype planted for a (species, color): a seed's homozygous genotype, or
+ * for a DISCOVERED colour the exact genotype first found (stored in the dex).
+ * Lets players replant anything they've bred — the intentional-breeding puzzle.
+ */
+function plantGenotype(species, color) {
+    const seeds = SPECIES[species].seeds;
+    if (seeds[color]) return seeds[color];
+    const entry = (state.flowerdex[species] || {})[color];
+    return entry && entry.genotype;
+}
 
+function plant(x, y, species, color) {
+    if (tileAt(x, y) !== null) return false;
+    const g = plantGenotype(species, color);
+    if (!g) return false;
     setTile(x, y, {
         species,
-        genotype: SPECIES[species].seeds[color],
+        genotype: g,
         stage: 0,
         watered: false,
         wetLevel: 0,        // transient (not saved): drives the drying droplet
         failedBreeds: 0,
     });
-    if (inv[color] !== Infinity) inv[color] -= 1;
-    return true;
+    return true;   // seeds + bred colours are unlimited — cozy, no scarcity
+}
+
+/** Every colour a species can currently plant = every colour discovered so far
+ *  (seed colours are pre-known), in canonical dex-then-rare order. */
+function plantableColorsFor(species) {
+    const found = state.flowerdex[species] || {};
+    return spriteColorsFor(species).filter(c => found[c]);
 }
 
 function waterTile(x, y) {
@@ -1786,10 +1803,14 @@ function showNextCelebration() {
 function renderSeedTray() {
     seedTrayEl.innerHTML = "";
     for (const species of state.unlockedSpecies) {
-        for (const color of seedColorsFor(species)) {
+        const seedCols = seedColorsFor(species);
+        for (const color of plantableColorsFor(species)) {
             const chip = document.createElement("button");
             chip.type = "button";
             chip.className = "seed-chip";
+            // Colours you've BRED (not starting seeds) get a subtle marker so it
+            // reads as "you made this, and can replant it."
+            if (!seedCols.includes(color)) chip.classList.add("bred");
             const armed = state.ui.armedSeed
                 && state.ui.armedSeed.species === species
                 && state.ui.armedSeed.color === color;
@@ -1804,6 +1825,9 @@ function renderSeedTray() {
             label.textContent = `${color} ${speciesShort(species)}`;
             chip.appendChild(label);
 
+            chip.title = seedCols.includes(color)
+                ? `Plant a ${color} ${speciesShort(species)}`
+                : `Replant a ${color} ${speciesShort(species)} you've bred`;
             chip.addEventListener("click", () => { sfx("tap"); armSeed(species, color); });
             seedTrayEl.appendChild(chip);
         }
