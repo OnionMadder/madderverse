@@ -1510,3 +1510,74 @@ body.reduce-motion .celebrate.burst .celebrate-card { animation: none; }
             color-mix(in srgb, var(--fc, var(--f-red)) 80%, #fff 14%));
     box-shadow: inset 0 0 6px rgba(0,0,0,0.28);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   PHASE 6 (scaffolding) — sprite-sheet flowers + photo backdrops
+   All progressive: the game looks identical until real art is added.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Sprite-backed flower: the .fl-body becomes a single sheet frame.
+   Neutralizes the CSS-shape styling; inline bg (image/size/position) is set
+   by applySprite(). !important beats the [data-stage][data-species] rules. ── */
+.flower.sprited .fl-body {
+    width: 100% !important;
+    height: 100% !important;
+    background-color: transparent !important;
+    background-repeat: no-repeat !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    filter: drop-shadow(0 2px 2px rgba(74, 63, 46, 0.18));
+    /* image-rendering: pixelated;  ← uncomment if the flower art is pixel art */
+}
+.flower.sprited .fl-body::before,
+.flower.sprited .fl-body::after { content: none !important; display: none !important; }
+
+/* ── Photo backdrop: two cross-fading image layers behind the living sky ── */
+.scene-photo {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    border-radius: var(--radius);
+}
+.scene-photo[hidden] { display: none; }
+.scene-layer {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+}
+.scene-night {                 /* JS sets opacity 0 (day) … 1 (night) */
+    opacity: 0;
+    transition: opacity 900ms linear;
+}
+body.reduce-motion .scene-night { transition: none; }
+
+/* When a photo is active, the gradient sky steps aside; sun/moon/stars stay as
+   overlays unless the scene opts out (photo-keeps-sky toggled by JS). */
+.garden-wrap.has-photo .sky { background: transparent; }
+.garden-wrap.has-photo .ground { display: none; }
+.garden-wrap.has-photo:not(.photo-keeps-sky) .celestial,
+.garden-wrap.has-photo:not(.photo-keeps-sky) .stars,
+.garden-wrap.has-photo:not(.photo-keeps-sky) .clouds { display: none; }
+
+/* ── Seasonal hooks (opt-in). garden-wrap carries data-season = spring |
+   summer | autumn | winter (real-world). These are deliberately no-ops by
+   default — tune a gentle wash here once you've seen it against real art. ── */
+/* .garden-wrap[data-season="autumn"] .sky  { filter: saturate(1.05) hue-rotate(-6deg); } */
+/* .garden-wrap[data-season="winter"] .sky  { filter: saturate(0.9) brightness(1.02); } */
+
+/* ── Settings <select> (Scene picker) — matches the cozy control styling ── */
+.set-select {
+    border: 1px solid var(--cream-shade);
+    background: var(--cream-warm);
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink);
+    cursor: pointer;
+    flex: 0 0 auto;
+}

@@ -27,7 +27,7 @@
     <meta name="theme-color" content="#F7EFDD" />
     <meta name="apple-mobile-web-app-title" content="Madderverse" />
     <meta name="application-name" content="Madderverse" />
-    <link rel="stylesheet" href="style.css?v=7" />
+    <link rel="stylesheet" href="style.css?v=8" />
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -57,6 +57,12 @@
 
     <!-- ─── The garden grid ──────────────────────────────────────── -->
     <section class="garden-wrap">
+        <!-- Photo backdrop (empty until scene art is registered): day + night
+             image layers crossfade with the clock; hidden → living sky shows. -->
+        <div id="scene-photo" class="scene-photo" hidden aria-hidden="true">
+            <div id="scene-day" class="scene-layer scene-day"></div>
+            <div id="scene-night" class="scene-layer scene-night"></div>
+        </div>
         <!-- Living sky: continuous day→dusk→night gradient + sun/moon/stars -->
         <div class="sky" id="sky" aria-hidden="true">
             <div class="stars" id="stars"></div>
@@ -157,7 +163,7 @@
     document.getElementById("year").textContent = new Date().getFullYear();
 </script>
 
-<script src="game.js?v=7"></script>
+<script src="game.js?v=8"></script>
 
 </body>
 </html>

@@ -511,6 +511,7 @@ const state = {
         ambient: true,      // quiet garden ambience (wind, birds, crickets)
         speed: DEFAULT_SPEED,
         reducedMotion: false,
+        scene: "auto",      // "auto" (season) | "living-sky" | a BACKDROPS id
     },
     seenOnboarding: false,
     goalIndex: 0,
@@ -890,6 +891,7 @@ function deserialize(data) {
         state.settings.ambient = data.settings.ambient !== false;
         state.settings.speed = SPEED_PRESETS[data.settings.speed] ? data.settings.speed : DEFAULT_SPEED;
         state.settings.reducedMotion = !!data.settings.reducedMotion;
+        if (typeof data.settings.scene === "string") state.settings.scene = data.settings.scene;
     }
     state.seenOnboarding = !!data.seenOnboarding;
     state.goalIndex = data.goalIndex || 0;
@@ -1156,6 +1158,9 @@ const cloudsEl = document.getElementById("clouds");
 const sceneVeilEl = document.getElementById("scene-veil");
 const ambientFxEl = document.getElementById("ambient-fx");
 const connectorsEl = document.getElementById("connectors");
+const scenePhotoEl = document.getElementById("scene-photo");
+const sceneDayEl = document.getElementById("scene-day");
+const sceneNightEl = document.getElementById("scene-night");
 
 gardenEl.style.setProperty("--gw", state.grid.w);
 gardenEl.style.setProperty("--gh", state.grid.h);
@@ -1223,6 +1228,126 @@ function renderGrid(highlights, sprouts, rareHighlights) {
     layoutConnectors();
 }
 
+// ─── 9f2. FLOWER SPRITE SHEETS (progressive enhancement) ─────────
+// Flowers render as the CSS shapes below by DEFAULT. When a species gets a
+// real sprite sheet, add `sprites: { src, frame }` to its SPECIES entry and
+// drop the PNG in — makeFlowerEl then draws from the sheet instead, per-frame,
+// with the CSS shapes as an automatic fallback if the image is missing or slow.
+//
+// Sheet convention (see ASSETS.md): ONE sheet per species, a fixed grid —
+//   • columns = growth stages, in this order: seed, sprout, bud, bloom, night
+//   • rows    = the species' dex colors, in dex order (row 0 = first dex color)
+//   • seed + sprout are colour-agnostic and are read from ROW 0 only, so the
+//     artist draws them once (leave those cells blank in the other rows).
+// A `night` column is optional (closed/dimmed bloom shown after dark).
+const SPRITE_COLS = ["seed", "sprout", "bud", "bloom", "night"];
+const spriteReady = {};   // species id -> true once its sheet <img> has loaded
+
+/** Kick off loading for every species that has a sprite sheet configured. */
+function initSpriteSheets() {
+    for (const sp of Object.keys(SPECIES)) {
+        const cfg = SPECIES[sp].sprites;
+        if (!cfg || !cfg.src || spriteReady[sp]) continue;
+        const img = new Image();
+        img.onload = () => { spriteReady[sp] = true; rerenderGarden(); };
+        img.onerror = () => console.warn("[petalcraft] flower sheet failed to load (using CSS shapes):", cfg.src);
+        img.src = cfg.src;
+    }
+}
+
+/** The sheet frame for a (species, color, stage), or null → use CSS shapes. */
+function spriteFrameFor(species, color, stage, isNight) {
+    const cfg = SPECIES[species].sprites;
+    if (!cfg || !spriteReady[species]) return null;
+    const cols = cfg.stages || SPRITE_COLS;
+    let key = SPRITE_COLS[stage] || "bloom";              // 0..3 → seed/sprout/bud/bloom
+    if (stage === 3 && isNight && cols.includes("night")) key = "night";
+    const col = cols.indexOf(key);
+    if (col < 0) return null;
+    const shared = (key === "seed" || key === "sprout");  // seed/sprout live on row 0
+    const row = shared ? 0 : SPECIES[species].dex.indexOf(color);
+    if (row < 0) return null;
+    return { src: cfg.src, col, row, cols: cols.length, rows: SPECIES[species].dex.length };
+}
+
+/** Paint a sheet frame onto a responsive box using percentage background math. */
+function applySprite(el, f) {
+    el.style.backgroundImage = `url("${f.src}")`;
+    el.style.backgroundSize = `${f.cols * 100}% ${f.rows * 100}%`;
+    const px = f.cols > 1 ? (f.col / (f.cols - 1)) * 100 : 0;
+    const py = f.rows > 1 ? (f.row / (f.rows - 1)) * 100 : 0;
+    el.style.backgroundPosition = `${px}% ${py}%`;
+}
+
+/** Force a full grid repaint (used when a sheet finishes loading mid-game). */
+function rerenderGarden() {
+    for (const el of gardenEl.children) delete el.dataset.sig;
+    renderGrid();
+}
+
+// ─── 9f3. PHOTO BACKDROPS + SEASONS (progressive enhancement) ─────
+// The living CSS sky is the DEFAULT and the fallback. When real scene art
+// exists, register it in BACKDROPS and (optionally) map seasons to it. A photo
+// backdrop crossfades day→night by the clock; season is auto-picked from the
+// player's real-world date, overridable in Settings. See ASSETS.md for specs.
+//
+//   BACKDROPS[id] = { name, day: "assets/img/backdrops/x-day.jpg",
+//                     night: "…-night.jpg", celestial?: true }
+//   SEASON_SCENES  = { spring: id|null, summer, autumn, winter }
+const BACKDROPS = {};            // empty until scene art is dropped in
+const SEASON_SCENES = { spring: null, summer: null, autumn: null, winter: null };
+
+/** Real-world season (northern hemisphere) — drives the "auto" scene. */
+function currentSeason() {
+    const m = new Date().getMonth();     // 0=Jan … 11=Dec
+    if (m === 11 || m <= 1) return "winter";
+    if (m <= 4) return "spring";
+    if (m <= 7) return "summer";
+    return "autumn";
+}
+
+/** Which backdrop id is active right now, or null for the living CSS sky. */
+function activeBackdropId() {
+    const pref = state.settings.scene || "auto";
+    if (pref === "living-sky") return null;
+    if (pref !== "auto" && BACKDROPS[pref]) return pref;   // explicit override
+    const id = SEASON_SCENES[currentSeason()];             // auto → by season
+    return (id && BACKDROPS[id]) ? id : null;
+}
+
+/** Apply the active backdrop (preloads, then reveals; falls back on error). */
+function applyBackdrop() {
+    if (!scenePhotoEl || !gardenWrapEl) return;
+    gardenWrapEl.setAttribute("data-season", currentSeason());
+    const id = activeBackdropId();
+    if (!id) {                                             // living sky
+        gardenWrapEl.classList.remove("has-photo");
+        scenePhotoEl.hidden = true;
+        return;
+    }
+    const bd = BACKDROPS[id];
+    const img = new Image();
+    img.onload = () => {
+        sceneDayEl.style.backgroundImage = `url("${bd.day}")`;
+        sceneNightEl.style.backgroundImage = `url("${bd.night || bd.day}")`;
+        scenePhotoEl.hidden = false;
+        gardenWrapEl.classList.add("has-photo");
+        gardenWrapEl.classList.toggle("photo-keeps-sky", bd.celestial !== false);
+        updateBackdropTime();
+    };
+    img.onerror = () => {                                  // missing art → living sky
+        gardenWrapEl.classList.remove("has-photo");
+        scenePhotoEl.hidden = true;
+    };
+    img.src = bd.day;
+}
+
+/** Crossfade the day/night backdrop layers by time of day (0 day … 1 night). */
+function updateBackdropTime() {
+    if (!sceneNightEl || !scenePhotoEl || scenePhotoEl.hidden) return;
+    sceneNightEl.style.opacity = skyAt(dayFraction()).star.toFixed(2);
+}
+
 function makeFlowerEl(tile) {
     const wrap = document.createElement("div");
     wrap.className = "flower";
@@ -1234,6 +1359,17 @@ function makeFlowerEl(tile) {
     const body = document.createElement("div");
     body.className = "fl-body";
     wrap.appendChild(body);
+
+    // If a real sprite sheet is loaded for this species, draw the frame and skip
+    // the CSS shape entirely. Otherwise fall through to the CSS-drawn flower.
+    const frame = spriteFrameFor(tile.species, color, tile.stage, currentSegment() === "night");
+    if (frame) {
+        wrap.classList.add("sprited");
+        applySprite(body, frame);
+        const sn = GROWTH_STAGES[tile.stage];
+        wrap.setAttribute("aria-label", `${color} ${SPECIES[tile.species].name.toLowerCase()}, ${sn}`);
+        return wrap;
+    }
 
     // Bloom shapes differ by species: hyacinths = a stacked "spike" of florets,
     // tulips = a CSS cup (::before), cosmos + pansies = a 5-petal face.
@@ -1344,6 +1480,9 @@ function updateSky(force) {
     // Sun arc: rises ~0.25, sets ~0.80. Moon takes the opposite span.
     positionCelestial(sunEl, f, 0.25, 0.80);
     positionCelestial(moonEl, f, 0.80, 1.25);   // wraps past midnight
+
+    // A photo backdrop (if active) crossfades day→night on the same clock.
+    updateBackdropTime();
 }
 
 function positionCelestial(el, f, rise, set) {
@@ -1922,6 +2061,33 @@ function renderSettings() {
         state.settings.reducedMotion = v; applyMotionPref(); saveSoon(); renderClock();
     }));
 
+    // Scene picker — only shown once real backdrop art has been registered.
+    // Options: Auto (follows the real-world season), Living sky (the CSS default),
+    // and one entry per registered backdrop.
+    if (Object.keys(BACKDROPS).length) {
+        const row = document.createElement("div");
+        row.className = "set-row";
+        const lab = document.createElement("div");
+        lab.className = "set-label";
+        lab.innerHTML = "Scene<span class=\"set-sub\">garden backdrop</span>";
+        row.appendChild(lab);
+        const sel = document.createElement("select");
+        sel.className = "set-select";
+        const opts = [["auto", "Auto (season)"], ["living-sky", "Living sky"]]
+            .concat(Object.keys(BACKDROPS).map(id => [id, BACKDROPS[id].name || id]));
+        for (const [val, label] of opts) {
+            const o = document.createElement("option");
+            o.value = val; o.textContent = label;
+            if (state.settings.scene === val) o.selected = true;
+            sel.appendChild(o);
+        }
+        sel.addEventListener("change", () => {
+            state.settings.scene = sel.value; sfx("tap"); applyBackdrop(); saveSoon();
+        });
+        row.appendChild(sel);
+        settingsBodyEl.appendChild(row);
+    }
+
     // Back up / restore the garden (a plain JSON file — nothing leaves the device)
     const dataRow = document.createElement("div");
     dataRow.className = "set-row";
@@ -2270,6 +2436,8 @@ function init() {
     applyMotionPref();
     buildGrid();
     initClouds();
+    initSpriteSheets();   // no-op until a species has a sprite sheet configured
+    applyBackdrop();      // living CSS sky until a photo backdrop is registered
     renderClock();
     renderGrid();
     renderSeedTray();
@@ -2344,6 +2512,48 @@ window.__petalcraft = {
     unlockAll: () => { UNLOCK_ORDER.forEach(unlockSpecies); renderSeedTray(); renderOrnaments(); },
     isRare, totalDex, rareCount, speciesCompleteCount, refreshOrnaments,
     reset: () => { localStorage.removeItem(SAVE_KEY); location.reload(); },
+
+    // ── Asset-pipeline test rigs (dev only) — prove the sprite + backdrop
+    //    plumbing works before real art exists, using generated placeholders. ──
+
+    /** Generate a placeholder sheet for one species (or all) + wire it in. */
+    mockSprites: (species) => {
+        const list = species ? [species] : Object.keys(SPECIES);
+        for (const sp of list) {
+            const dex = SPECIES[sp].dex, F = 128;
+            const cv = document.createElement("canvas");
+            cv.width = SPRITE_COLS.length * F; cv.height = dex.length * F;
+            const g = cv.getContext("2d");
+            for (let r = 0; r < dex.length; r++) {
+                for (let c = 0; c < SPRITE_COLS.length; c++) {
+                    const cs = getComputedStyle(document.documentElement).getPropertyValue(`--f-${dex[r]}`).trim() || "#ccc";
+                    const cx = c * F + F / 2, cy = r * F + F / 2;
+                    const rad = [10, 22, 34, 52, 46][c];        // seed→night grows
+                    g.fillStyle = cs; g.beginPath(); g.arc(cx, cy, rad, 0, 7); g.fill();
+                    g.fillStyle = "rgba(0,0,0,.25)"; g.font = "18px sans-serif"; g.textAlign = "center";
+                    g.fillText(SPRITE_COLS[c][0].toUpperCase(), cx, r * F + 20);
+                }
+            }
+            SPECIES[sp].sprites = { src: cv.toDataURL(), frame: F };
+            spriteReady[sp] = true;
+        }
+        rerenderGarden();
+        return `mock sprites on: ${list.join(", ")}`;
+    },
+    /** Register a generated gradient backdrop + a season map, to test the layer. */
+    mockBackdrop: () => {
+        const grad = (a, b) => {
+            const cv = document.createElement("canvas"); cv.width = 8; cv.height = 256;
+            const g = cv.getContext("2d"); const lg = g.createLinearGradient(0, 0, 0, 256);
+            lg.addColorStop(0, a); lg.addColorStop(1, b); g.fillStyle = lg; g.fillRect(0, 0, 8, 256);
+            return cv.toDataURL();
+        };
+        BACKDROPS.testmeadow = { name: "Test meadow", day: grad("#bfe3ef", "#dfeecb"), night: grad("#20223e", "#3a3a5a") };
+        SEASON_SCENES.spring = SEASON_SCENES.summer = SEASON_SCENES.autumn = SEASON_SCENES.winter = "testmeadow";
+        state.settings.scene = "auto"; applyBackdrop();
+        return "mock backdrop registered (scene=auto)";
+    },
+    applyBackdrop, currentSeason,
 };
 
 init();
