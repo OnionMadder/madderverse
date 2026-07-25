@@ -864,6 +864,45 @@ function checkUnlocks() {
     return newly;
 }
 
+// ─── 6b. GARDEN EXPANSION ─────────────────────────────────────────
+// The plot grows as the Bloombook fills (DESIGN.md §4.5) — more room to lay out
+// deliberate crosses. Tiers key off totalDex(); existing flowers keep their
+// (x,y) as the plot extends right + down. Never shrinks.
+const EXPANSION_TIERS = [
+    { at: 0,  w: 6,  h: 4 },    // start — 24 tiles
+    { at: 12, w: 8,  h: 6 },    // 48 tiles
+    { at: 26, w: 10, h: 8 },    // 80 tiles
+    { at: 42, w: 12, h: 10 },   // 120 tiles — the post-game sandbox
+];
+
+function targetGridSize() {
+    const n = totalDex();
+    let best = EXPANSION_TIERS[0];
+    for (const t of EXPANSION_TIERS) if (n >= t.at) best = t;
+    return best;
+}
+
+/** Grow the grid to (nw, nh), preserving every flower's (x, y). No DOM rebuild
+ *  here — callers do buildGrid() + renderGrid() after. */
+function resizeGrid(nw, nh) {
+    const ow = state.grid.w, oh = state.grid.h, old = state.grid.tiles;
+    const tiles = new Array(nw * nh).fill(null);
+    for (let y = 0; y < oh; y++) {
+        for (let x = 0; x < ow; x++) tiles[y * nw + x] = old[y * ow + x];
+    }
+    state.grid.w = nw; state.grid.h = nh; state.grid.tiles = tiles;
+    gardenEl.style.setProperty("--gw", nw);
+    gardenEl.style.setProperty("--gh", nh);
+}
+
+/** Expand the plot if the player has earned a bigger tier. Returns the new
+ *  {w,h} when it grew, else null. */
+function checkExpansion() {
+    const t = targetGridSize();
+    if (t.w > state.grid.w || t.h > state.grid.h) { resizeGrid(t.w, t.h); return t; }
+    return null;
+}
+
 // ─── 7. PERSISTENCE ──────────────────────────────────────────────
 
 function serialize() {
@@ -2477,6 +2516,10 @@ function applyRolloverResult(agg, live) {
     const sprouts = new Set((agg.babyCoords || [])
         .map(b => `${b.x},${b.y}`)
         .filter(k => !hybridHi.has(k) && !rareHi.has(k)));
+    // Expand the plot first (if earned) so this frame paints the bigger grid;
+    // coords in the highlight sets stay valid (same x,y in a larger grid).
+    const expanded = checkExpansion();
+    if (expanded) buildGrid();
     rotateGoal();
     renderClock();
     renderGrid(hybridHi, sprouts, rareHi);
@@ -2496,6 +2539,15 @@ function applyRolloverResult(agg, live) {
         if (live) sfx("discovery");
     } else if (agg.babies > 0 && live && !rares.length) {
         toast(`${agg.babies} new sprout${agg.babies === 1 ? "" : "s"}.`);
+    }
+
+    // Garden growth celebration (after the discovery/unlock toasts above).
+    if (expanded && live) {
+        setTimeout(() => {
+            sfx("unlock");
+            toast(`Your garden grew — ${expanded.w}×${expanded.h} tiles now. More room to plant.`, 4200);
+            if (!motionOff()) { gardenEl.classList.remove("just-grew"); void gardenEl.offsetWidth; gardenEl.classList.add("just-grew"); }
+        }, newlyUnlocked.length || agg.discoveries.length ? 1300 : 200);
     }
 
     // Rare finds get their own moment — a grander jingle + a keepsake card —
@@ -2600,6 +2652,7 @@ function init() {
     if (titleEl) titleEl.textContent = GAME_NAME;
 
     applyMotionPref();
+    checkExpansion();     // a loaded save that already earned a bigger plot starts at it (silent)
     buildGrid();
     initGardenPointer();  // tap = water/plant · drag = move/pick a flower
     initClouds();

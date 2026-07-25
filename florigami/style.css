@@ -1682,3 +1682,12 @@ body.reduce-motion .compost { transition: opacity 120ms ease; }
 }
 .seed-chip.bred.armed { background: var(--accent); }
 .seed-chip.bred.armed::after { color: rgba(255,255,255,0.85); }
+
+/* ─── Garden expansion — a gentle "zoom out" pulse when the plot grows ── */
+.garden.just-grew { animation: garden-grew 900ms cubic-bezier(0.34, 1.3, 0.64, 1); }
+@keyframes garden-grew {
+    0%   { transform: scale(1.06); }
+    55%  { transform: scale(0.985); }
+    100% { transform: scale(1); }
+}
+body.reduce-motion .garden.just-grew { animation: none; }
