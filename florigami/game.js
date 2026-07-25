@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════════
-   Petalcraft — cozy flower-breeding game
+   Florigami — cozy flower-breeding game (renamed from "Petalcraft" 2026-07-25)
    Mendelian genetics per species. Genotype hidden ("accidental
    discovery"); the player sees colors only.
    No timers, no fail states, no ads, no accounts.
@@ -22,8 +22,11 @@
 // tab title, and any toast that names the game. The <title> tag and SEO meta
 // in index.html are separate (crawlers read the static HTML) and must be
 // updated there too on a rename — see the report for the exact spots.
-const GAME_NAME = "Petalcraft";
+const GAME_NAME = "Florigami";
 
+// Storage key stays "petalcraft-*" (the pre-rename name) as invisible plumbing —
+// renaming it would wipe every existing player's saved garden. Same approach as
+// Pootery keeping its "crayte-*" keys after that rename.
 const SAVE_KEY = "petalcraft-save";
 const SAVE_VERSION = 3;
 
@@ -2146,7 +2149,7 @@ saveImportInput.addEventListener("change", () => {
             toast("Garden restored.");
             location.reload();
         } else {
-            toast("That file didn't look like a Petalcraft save.");
+            toast("That file didn't look like a Florigami save.");
         }
     };
     reader.readAsText(file);
@@ -2159,7 +2162,7 @@ function downloadSave() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `petalcraft-garden-${isoDate()}.json`;
+        a.download = `florigami-garden-${isoDate()}.json`;
         document.body.appendChild(a);
         a.click();
         a.remove();

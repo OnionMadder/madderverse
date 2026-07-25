@@ -1,31 +1,33 @@
-# Petalcraft — Design & Technical Architecture Spec
+# Florigami — Design & Technical Architecture Spec
+
+> **Renamed 2026-07-25: "Petalcraft" → "Florigami"** (flower + origami, matching the torn-paper art direction). Folder + URL moved `petalcraft/` → `florigami/` with a redirect shim at the old path; the `petalcraft-*` localStorage keys were **kept** so saves survive. This doc was bulk-renamed — §1's collision analysis text is *historical* (it audited the original name "Petalcraft"); Florigami's own name-collision check was done at rename time (no game/app collision; the origami-sculpture exhibition "Florigami in the Garden" owns the term in the art space).
 
 *A cozy, web-based flower-breeding game for The Madderverse.*
-*Name confirmed: **Petalcraft**. URL: **madderverse.org/petalcraft/**. Draft: 2026-07-21. Author: design pass for Onion.*
+*Name confirmed: **Florigami** (was Petalcraft). URL: **madderverse.org/florigami/**. Draft: 2026-07-21. Author: design pass for Onion.*
 
-This is a design document only. **No code has been written and no `petalcraft/` folder has been created in the repo yet** — that happens in a follow-up session.
+This is a design document only. **No code has been written and no `florigami/` folder has been created in the repo yet** — that happens in a follow-up session.
 
-The game lives at **`madderverse.org/petalcraft/`**, following the Madderverse flat-shape convention: `petalcraft/index.html` + `petalcraft/game.js` + `petalcraft/style.css` + `petalcraft/assets/` at the repo root, matching `cookie-cache/`, `slip-studio/`, `friend-picker/`, `georges-jump/`, `bala-draws/`, and `all-munkis/`.
+The game lives at **`madderverse.org/florigami/`**, following the Madderverse flat-shape convention: `florigami/index.html` + `florigami/game.js` + `florigami/style.css` + `florigami/assets/` at the repo root, matching `cookie-cache/`, `slip-studio/`, `friend-picker/`, `georges-jump/`, `bala-draws/`, and `all-munkis/`.
 
 Design north stars: cozy, hand-curated, no timers or fail states, no ads / no IAP-for-play / no subscriptions (Madderverse Promise), genotype hidden by default (accidental discovery), plays fine in a browser tab and later ships as a paid Android app via Capacitor like Slip Studio.
 
 ---
 
-## 1. Name — **Petalcraft** (confirmed)
+## 1. Name — **Florigami** (confirmed)
 
-Onion picked **Petalcraft** on 2026-07-21. Everything downstream — folder, package id, keystore filename, listing copy, hub grid slot — keys off this name.
+Onion picked **Florigami** on 2026-07-21. Everything downstream — folder, package id, keystore filename, listing copy, hub grid slot — keys off this name.
 
-- **Folder / URL:** `petalcraft/` at the repo root, published at `madderverse.org/petalcraft/`.
-- **Package id (Phase 6 Capacitor):** `org.madderverse.petalcraft`.
-- **App display name:** `Petalcraft`.
-- **Full listing title (Phase 6, if we want a subtitle like *Pootery: Throw, Glaze, Fire*):** to be decided closer to the Play upload — the design doc leaves the plain `Petalcraft` in place.
+- **Folder / URL:** `florigami/` at the repo root, published at `madderverse.org/florigami/`.
+- **Package id (Phase 6 Capacitor):** `org.madderverse.florigami`.
+- **App display name:** `Florigami`.
+- **Full listing title (Phase 6, if we want a subtitle like *Pootery: Throw, Glaze, Fire*):** to be decided closer to the Play upload — the design doc leaves the plain `Florigami` in place.
 
 ### Collision check (2026-07-21)
 
-Search-space audit for `"Petalcraft"` on Google, Steam, itch.io:
+Search-space audit for `"Florigami"` on Google, Steam, itch.io:
 
-- **PetalCraft (Minecraft server)** — `petalcraftmc.com`. A friendly vanilla-plus survival multiplayer Minecraft server. Different product category (server, not a game), different platform (Java Minecraft, not web/Android), different audience (Minecraft players, not casual/cozy gamers). **Not a competitor for Play Store or hub discoverability, but occupies the top Google result for the bare word "petalcraft."** Practical impact: someone Googling our game may land on the server first for a while. Mitigation: consistent "Petalcraft — cozy flower breeding game" phrasing in meta descriptions, listing copy, and the hub tile so Google's title tag distinguishes us. Not a blocker.
-- **No indie game named "Petalcraft"** on Steam or itch.io (searched both).
+- **PetalCraft (Minecraft server)** — `petalcraftmc.com`. A friendly vanilla-plus survival multiplayer Minecraft server. Different product category (server, not a game), different platform (Java Minecraft, not web/Android), different audience (Minecraft players, not casual/cozy gamers). **Not a competitor for Play Store or hub discoverability, but occupies the top Google result for the bare word "petalcraft."** Practical impact: someone Googling our game may land on the server first for a while. Mitigation: consistent "Florigami — cozy flower breeding game" phrasing in meta descriptions, listing copy, and the hub tile so Google's title tag distinguishes us. Not a blocker.
+- **No indie game named "Florigami"** on Steam or itch.io (searched both).
 - **Petal by Petal** — a real cozy incremental flower-empire indie on Steam (Orquin Games, 90% Very Positive, released March 2026). Distinct name; adjacent genre. Worth being aware of as a comparable / marketing reference, not a legal or discoverability collision.
 - **Verdict:** **clear enough to proceed.** No indie collisions with meaningful audience; the Minecraft-server namespace overlap is a minor SEO nuisance we manage with copy, not a rename.
 
@@ -304,7 +306,7 @@ Rationale:
 ### 6.2 File structure
 
 ```
-petalcraft/
+florigami/
 ├── index.html                    # entry — links CSS, loads JS, sets meta
 ├── game.js                       # all game logic (single file)
 ├── style.css                     # all styles
@@ -424,9 +426,9 @@ Notes on the schema:
 
 Follow the Slip Studio and Cookie Cache pattern exactly:
 
-- Folder `petalcraft-app/` **outside git**, sibling to `petalcraft/`.
+- Folder `petalcraft-app/` **outside git**, sibling to `florigami/`.
 - Minimal deps: `@capacitor/core` + `@capacitor/android` only. **No RevenueCat**, no billing plugin — this is a paid app.
-- Package id `org.madderverse.petalcraft`.
+- Package id `org.madderverse.florigami`.
 - App display name = the branded short name (see §1 pick).
 - `www/index.html` is an app-stripped copy: no GoatCounter, no `Back to Madderverse` home button, no site footer. `game.js` and `style.css` are the same file, verbatim.
 - Immersive fullscreen in `MainActivity.java` (same as Slip Studio v22 rollout).
@@ -500,7 +502,7 @@ Hour estimates are **coder-hours by a familiar-with-the-codebase developer**, no
 - Immersive theme
 - App icon (1080×1080 source → mipmap set via `@capacitor/assets`)
 - `PLAY_STORE_LISTING.md` in the web game dir (full description + What's new + ASO notes + screenshot shot list, following the Slip Studio + Cookie Cache pattern)
-- Privacy page at `/petalcraft/privacy/` (nothing collected, localStorage-only)
+- Privacy page at `/florigami/privacy/` (nothing collected, localStorage-only)
 - First AAB, sideload verification
 - Onion uploads to Play Console → paid $0.99 → apply for Teacher Approved on the Kids + Family surface
 
@@ -633,4 +635,4 @@ Non-obvious calls this doc has made that deserve a sanity check before building:
 
 ---
 
-*End of design document. Name locked (Petalcraft). Next session: scaffold the `petalcraft/` directory and build the Phase-1 genetic engine.*
+*End of design document. Name locked (Florigami). Next session: scaffold the `florigami/` directory and build the Phase-1 genetic engine.*

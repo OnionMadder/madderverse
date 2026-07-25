@@ -1,4 +1,4 @@
-# Petalcraft — Torn-Paper Art: Gemini prompt kit
+# Florigami — Torn-Paper Art: Gemini prompt kit
 
 Goal: a **cut/torn construction-paper collage** look (Eric-Carle-ish), produced
 as a *reusable kit* of paper pieces, then assembled + patterned into flower

@@ -1,4 +1,4 @@
-# Petalcraft — Asset Drop-In Guide
+# Florigami — Asset Drop-In Guide
 
 Everything below is **already wired**. The game ships and plays with zero art
 (CSS-drawn flowers + the living CSS sky). When you have real art, drop the files
@@ -126,7 +126,7 @@ living sky even without photos — off by default so nothing surprises you.
 
 ## 3. After dropping assets in
 
-1. Put files under `petalcraft/assets/img/flowers/` and `…/backdrops/`.
+1. Put files under `florigami/assets/img/flowers/` and `…/backdrops/`.
 2. Add the `sprites:` lines and/or `BACKDROPS` / `SEASON_SCENES` entries in
    `game.js`.
 3. **Bump the cache-bust** in `index.html` (`game.js?v=N` + `style.css?v=N`) so
