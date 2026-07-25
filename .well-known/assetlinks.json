@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "org.madderverse.slipstudio",
+      "sha256_cert_fingerprints": [
+        "02:20:28:D7:CB:E2:F1:4B:9C:66:0D:94:29:81:3A:0F:F9:69:AD:19:12:79:C8:DB:37:2F:A0:11:31:25:B0:9B"
+      ]
+    }
+  }
+]
