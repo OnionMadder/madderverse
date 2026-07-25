@@ -84,7 +84,7 @@ body {
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    max-width: 480px;
+    max-width: 720px;
     width: 100%;
     margin: 0 auto;
     padding: 8px 12px 12px;
@@ -167,7 +167,7 @@ body {
     display: grid;
     grid-template-columns: repeat(var(--gw, 6), 1fr);
     gap: var(--tile-gap);
-    width: min(100%, 420px);
+    width: min(100%, 640px);
     aspect-ratio: var(--gw, 6) / var(--gh, 4);
     position: relative;
     z-index: 2;
@@ -1581,3 +1581,80 @@ body.reduce-motion .scene-night { transition: none; }
     cursor: pointer;
     flex: 0 0 auto;
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   Move / pick flowers — drag a grown flower to empty soil to MOVE it,
+   or onto the compost to PICK it. Tap still waters.
+   ══════════════════════════════════════════════════════════════════ */
+
+.tile { touch-action: none; }   /* let a press become a drag without page-scroll */
+
+/* Origin tile while its flower is lifted for dragging */
+.tile.lifted { opacity: 0.45; }
+.tile.lifted .flower { filter: grayscale(0.3) brightness(1.05); }
+
+/* Empty tiles you can drop onto */
+.tile.droppable {
+    outline: 2px dashed rgba(122, 149, 87, 0.55);
+    outline-offset: -3px;
+}
+.tile.drop-hover {
+    outline: 3px solid var(--grass-dark);
+    outline-offset: -3px;
+    background: linear-gradient(180deg, var(--grass), var(--grass-dark));
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.4);
+}
+
+/* The floating flower that follows the finger/cursor */
+.drag-ghost {
+    position: fixed;
+    left: 0; top: 0;
+    width: 84px; height: 84px;
+    transform: translate(-50%, -55%) scale(1.12) rotate(-4deg);
+    pointer-events: none;
+    z-index: 500;
+    filter: drop-shadow(0 8px 10px rgba(50,36,22,0.4));
+    display: grid;
+    place-items: center;
+}
+.drag-ghost .flower { width: 100%; height: 100%; }
+body.dragging-flower { cursor: grabbing; user-select: none; }
+body.dragging-flower .tile { cursor: grabbing; }
+
+/* Compost pile — only visible while dragging */
+.compost {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translate(-50%, 24px);
+    z-index: 480;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 12px 22px 10px;
+    background: var(--cream-warm);
+    border: 2px dashed var(--soil-dark);
+    border-radius: 18px;
+    box-shadow: 0 6px 20px rgba(74,63,46,0.28);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease, transform 180ms ease, background 150ms ease;
+}
+.compost.show { opacity: 1; transform: translate(-50%, 0); }
+.compost.hot {
+    background: var(--grass);
+    border-color: var(--grass-dark);
+    transform: translate(-50%, 0) scale(1.08);
+}
+.compost-icon { font-size: 30px; line-height: 1; }
+.compost-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.compost.hot .compost-label { color: var(--ink); }
+
+body.reduce-motion .compost { transition: opacity 120ms ease; }

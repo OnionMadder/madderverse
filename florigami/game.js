@@ -648,6 +648,23 @@ function waterTile(x, y) {
     return true;
 }
 
+/** Move a grown flower from one tile to an empty one (free rearranging, no cost). */
+function movePlant(fx, fy, tx, ty) {
+    const t = tileAt(fx, fy);
+    if (!t || tileAt(tx, ty) !== null) return false;
+    if (fx === tx && fy === ty) return false;
+    setTile(fx, fy, null);
+    setTile(tx, ty, t);
+    return true;
+}
+
+/** Pick (remove) a flower, freeing its tile. Cozy — no penalty, seeds are infinite. */
+function removePlant(x, y) {
+    if (tileAt(x, y) === null) return false;
+    setTile(x, y, null);
+    return true;
+}
+
 function waterAll() {
     let n = 0;
     for (const t of state.grid.tiles) {
@@ -1189,7 +1206,8 @@ function buildGrid() {
             el.dataset.x = x;
             el.dataset.y = y;
             el.setAttribute("role", "gridcell");
-            el.addEventListener("click", () => onTileClick(x, y));
+            // Tap + drag are handled by pointer events on the garden (see
+            // initGardenPointer) so a tap waters, a drag moves/picks the flower.
             gardenEl.appendChild(el);
         }
     }
@@ -2266,7 +2284,16 @@ function dismissCoach() {
 
 // ─── 13. INTERACTIONS ────────────────────────────────────────────
 
-function onTileClick(x, y) {
+// One-time nudge so players discover they can rearrange/pick flowers.
+function maybeMoveHint() {
+    try {
+        if (localStorage.getItem("florigami-move-hint")) return;
+        localStorage.setItem("florigami-move-hint", "1");
+    } catch (_) { /* private mode — just show it */ }
+    setTimeout(() => toast("Tip: once it grows, drag a flower to move it — or drop it on the compost to pick it.", 4800), 1600);
+}
+
+function onTileTap(x, y) {
     const t = tileAt(x, y);
 
     if (state.ui.armedSeed && t === null) {
@@ -2279,6 +2306,7 @@ function onTileClick(x, y) {
             renderGrid();
             saveSoon();
             dismissCoach();
+            maybeMoveHint();
         }
         return;
     }
@@ -2305,6 +2333,96 @@ function spawnDroplet(tileEl) {
     d.className = "droplet";
     tileEl.appendChild(d);
     setTimeout(() => d.remove(), 650);
+}
+
+// ─── DRAG: move a flower to empty soil, or to the compost to pick it ─────
+// A press that doesn't move is a TAP (waters, or plants an armed seed). A press
+// that moves picks the flower up: drop it on empty soil to MOVE it, or on the
+// compost pile to PICK (remove) it and free the tile. All free — cozy.
+const DRAG_THRESHOLD = 8;
+let gdrag = null, compostEl = null, dragGhostEl = null;
+
+function tileFromPoint(cx, cy) {
+    const el = document.elementFromPoint(cx, cy);
+    const tile = el && el.closest ? el.closest(".tile") : null;
+    if (!tile || !gardenEl.contains(tile)) return null;
+    return { x: +tile.dataset.x, y: +tile.dataset.y, el: tile };
+}
+
+function initGardenPointer() {
+    compostEl = document.getElementById("compost");
+    gardenEl.addEventListener("pointerdown", onGardenDown);
+    gardenEl.addEventListener("pointermove", onGardenMove);
+    gardenEl.addEventListener("pointerup", onGardenUp);
+    gardenEl.addEventListener("pointercancel", () => { if (gdrag && gdrag.moved) endDrag(); gdrag = null; });
+}
+
+function onGardenDown(e) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    const hit = tileFromPoint(e.clientX, e.clientY);
+    if (!hit) return;
+    gdrag = { fromX: hit.x, fromY: hit.y, tile: tileAt(hit.x, hit.y), sx: e.clientX, sy: e.clientY, moved: false };
+    try { gardenEl.setPointerCapture(e.pointerId); } catch (_) { /* ok */ }
+}
+
+function onGardenMove(e) {
+    if (!gdrag) return;
+    if (!gdrag.moved) {
+        if (Math.hypot(e.clientX - gdrag.sx, e.clientY - gdrag.sy) < DRAG_THRESHOLD) return;
+        if (!gdrag.tile) { gdrag = null; return; }   // dragging from empty soil → nothing
+        beginDrag(gdrag);
+    }
+    e.preventDefault();
+    if (dragGhostEl) { dragGhostEl.style.left = e.clientX + "px"; dragGhostEl.style.top = e.clientY + "px"; }
+    const t = tileFromPoint(e.clientX, e.clientY);
+    for (const el of gardenEl.children) el.classList.remove("drop-hover");
+    if (t && tileAt(t.x, t.y) === null) t.el.classList.add("drop-hover");
+    if (compostEl) compostEl.classList.toggle("hot", overCompost(e.clientX, e.clientY));
+}
+
+function onGardenUp(e) {
+    if (!gdrag) return;
+    const d = gdrag; gdrag = null;
+    if (!d.moved) { onTileTap(d.fromX, d.fromY); return; }
+    const onCompost = overCompost(e.clientX, e.clientY);
+    const target = tileFromPoint(e.clientX, e.clientY);
+    endDrag();
+    if (onCompost && removePlant(d.fromX, d.fromY)) {
+        sfx("plant"); toast("Picked — that tile's free again."); renderGrid(); saveSoon();
+    } else if (target && movePlant(d.fromX, d.fromY, target.x, target.y)) {
+        sfx("plant"); renderGrid(); saveSoon();
+    } else {
+        renderGrid();   // snap back
+    }
+}
+
+function overCompost(cx, cy) {
+    if (!compostEl || !compostEl.classList.contains("show")) return false;
+    const r = compostEl.getBoundingClientRect();
+    return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+}
+
+function beginDrag(d) {
+    d.moved = true;
+    document.body.classList.add("dragging-flower");
+    const originEl = gardenEl.children[d.fromY * state.grid.w + d.fromX];
+    if (originEl) originEl.classList.add("lifted");
+    dragGhostEl = document.createElement("div");
+    dragGhostEl.className = "drag-ghost";
+    dragGhostEl.appendChild(makeFlowerEl(d.tile));
+    document.body.appendChild(dragGhostEl);
+    for (let i = 0; i < gardenEl.children.length; i++) {
+        if (state.grid.tiles[i] === null) gardenEl.children[i].classList.add("droppable");
+    }
+    if (compostEl) compostEl.classList.add("show");
+    dismissCoach();
+}
+
+function endDrag() {
+    document.body.classList.remove("dragging-flower");
+    if (dragGhostEl) { dragGhostEl.remove(); dragGhostEl = null; }
+    if (compostEl) compostEl.classList.remove("show", "hot");
+    for (const el of gardenEl.children) el.classList.remove("lifted", "droppable", "drop-hover");
 }
 
 function onWaterAll() {
@@ -2459,6 +2577,7 @@ function init() {
 
     applyMotionPref();
     buildGrid();
+    initGardenPointer();  // tap = water/plant · drag = move/pick a flower
     initClouds();
     initSpriteSheets();   // no-op until a species has a sprite sheet configured
     applyBackdrop();      // living CSS sky until a photo backdrop is registered
