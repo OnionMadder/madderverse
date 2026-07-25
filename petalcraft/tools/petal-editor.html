@@ -71,10 +71,22 @@
       <label>Petal size <input type="range" id="ring-size" min="15" max="80" value="46"><span class="v" id="ring-size-v">.46</span></label>
       <label>Angle offset <input type="range" id="ring-angle" min="0" max="90" value="0"><span class="v" id="ring-angle-v">0°</span></label>
       <label>Point <select id="ring-tip"><option value="out">outward</option><option value="in">inward</option></select></label>
+      <label>Petal spin <input type="range" id="ring-spin" min="-180" max="180" value="0"><span class="v" id="ring-spin-v">0°</span></label>
       <label>Jitter <input type="range" id="ring-jitter" min="0" max="30" value="6"><span class="v" id="ring-jitter-v">6</span></label>
       <div class="row" style="margin-top:8px">
         <button class="leaf" id="add-ring">+ Add ring</button>
         <button id="clear-petals">Clear petals</button>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Orient all petals</h2>
+      <p class="muted" style="margin:0 0 8px">Spin every petal in place — fixes a whole ring pointing the wrong way at once.</p>
+      <div class="row">
+        <button id="orient-m90">⟲ −90°</button>
+        <button id="orient-m15">−15°</button>
+        <button id="orient-p15">+15°</button>
+        <button id="orient-p90">+90° ⟳</button>
       </div>
     </div>
 
@@ -190,10 +202,14 @@ function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,
 // ---- ring generator ----
 function addRing(){
   const shape=val("ring-shape"), n=+val("ring-count"), radius=+val("ring-radius")/100,
-        size=+val("ring-size")/100, off=+val("ring-angle"), tip=val("ring-tip"), jit=+val("ring-jitter");
+        size=+val("ring-size")/100, off=+val("ring-angle"), tip=val("ring-tip"),
+        spin=+val("ring-spin"), jit=+val("ring-jitter");
+  // Auto-align: a wide shape's long axis is horizontal, so add 90° so its LONG
+  // axis (not its short side) points outward by default. Spin fine-tunes from there.
+  const im=img[shape], axisAdjust=(im && im.width>im.height*1.05)?90:0;
   for(let i=0;i<n;i++){
     const A=-90 + i*(360/n) + off + (Math.random()*2-1)*jit;      // degrees
-    const rot=A + (tip==="out"?90:-90) + (Math.random()*2-1)*jit;
+    const rot=A + (tip==="out"?90:-90) + axisAdjust + spin + (Math.random()*2-1)*jit;
     const jr=radius*(1+(Math.random()*2-1)*jit*0.01);
     formation.petals.push({
       shape, cx:0.5+jr*Math.cos(A*Math.PI/180), cy:0.5+jr*Math.sin(A*Math.PI/180),
@@ -235,11 +251,16 @@ function val(id){return document.getElementById(id).value;}
 function setRange(id,v){const el=document.getElementById(id);el.value=v;el.dispatchEvent(new Event("input"));}
 function bindLabel(id,fmt){const el=document.getElementById(id),out=document.getElementById(id+"-v");if(out){const u=()=>out.textContent=fmt(el.value);el.addEventListener("input",u);u();}}
 bindLabel("ring-count",v=>v); bindLabel("ring-radius",v=>"."+(""+v).padStart(2,"0")); bindLabel("ring-size",v=>"."+v);
-bindLabel("ring-angle",v=>v+"°"); bindLabel("ring-jitter",v=>v);
+bindLabel("ring-angle",v=>v+"°"); bindLabel("ring-spin",v=>v+"°"); bindLabel("ring-jitter",v=>v);
 bindLabel("center-size",v=>"."+v); bindLabel("sel-rot",v=>v+"°"); bindLabel("sel-scale",v=>"."+v);
 
 document.getElementById("add-ring").onclick=addRing;
 document.getElementById("clear-petals").onclick=()=>{formation.petals=[];select(-1);draw();};
+function spinAll(d){formation.petals.forEach(p=>p.rot=((p.rot+d)%360+360)%360);draw();}
+document.getElementById("orient-m90").onclick=()=>spinAll(-90);
+document.getElementById("orient-m15").onclick=()=>spinAll(-15);
+document.getElementById("orient-p15").onclick=()=>spinAll(15);
+document.getElementById("orient-p90").onclick=()=>spinAll(90);
 document.getElementById("sel-rot").addEventListener("input",e=>{if(selected>=0){formation.petals[selected].rot=+e.target.value;draw();}});
 document.getElementById("sel-scale").addEventListener("input",e=>{if(selected>=0){formation.petals[selected].scale=+e.target.value/100;draw();}});
 document.getElementById("sel-flip").onclick=()=>{if(selected>=0){formation.petals[selected].flip=!formation.petals[selected].flip;draw();}};
