@@ -135,27 +135,121 @@ const SPECIES = {
         dex: ["white", "yellow", "red", "pink", "orange", "blue", "purple"],
         rare: ["blue", "purple"],
     },
+    // ─── Progression-unlocked species (Phase 5) ──────────────────────
+    // All four tables transcribed verbatim from Joey Parrish's GPLv3
+    // phenotypes.py (the same source the tables above were verified against;
+    // generated 2026-07-24, seed→phenotype sanity-checked). Lily/mum/windflower
+    // are 3-gene; roses are the 4-gene endgame (R,Y,W + S "shade") that alone
+    // can reach the blue rose.
+    lilies: {
+        name: "Lilies",
+        genes: 3,
+        seeds: { red: "201", yellow: "020", white: "002" },
+        table: {
+            "000": "white",  "001": "white",  "002": "white",
+            "010": "yellow", "011": "white",  "012": "white",
+            "020": "yellow", "021": "yellow", "022": "white",
+            "100": "red",    "101": "pink",   "102": "white",
+            "110": "orange", "111": "yellow", "112": "yellow",
+            "120": "orange", "121": "yellow", "122": "yellow",
+            "200": "black",  "201": "red",    "202": "pink",
+            "210": "black",  "211": "red",    "212": "pink",
+            "220": "orange", "221": "orange", "222": "white",
+        },
+        dex: ["white", "yellow", "red", "pink", "orange", "black"],
+        rare: ["black"],
+    },
+    mums: {
+        name: "Mums",
+        genes: 3,
+        seeds: { red: "200", yellow: "020", white: "001" },
+        table: {
+            "000": "white",  "001": "white",  "002": "purple",
+            "010": "yellow", "011": "yellow", "012": "white",
+            "020": "yellow", "021": "yellow", "022": "yellow",
+            "100": "pink",   "101": "pink",   "102": "pink",
+            "110": "yellow", "111": "red",    "112": "pink",
+            "120": "purple", "121": "purple", "122": "purple",
+            "200": "red",    "201": "red",    "202": "red",
+            "210": "purple", "211": "purple", "212": "red",
+            "220": "green",  "221": "green",  "222": "red",
+        },
+        dex: ["white", "yellow", "red", "pink", "purple", "green"],
+        rare: ["green", "purple"],
+    },
+    windflowers: {
+        name: "Windflowers",
+        genes: 3,
+        // Note: windflowers seed from white / ORANGE / red (no yellow seed) —
+        // this is why seed colors are read per-species, not from SEED_COLORS.
+        seeds: { red: "200", orange: "020", white: "001" },
+        table: {
+            "000": "white",  "001": "white",  "002": "blue",
+            "010": "orange", "011": "orange", "012": "blue",
+            "020": "orange", "021": "orange", "022": "orange",
+            "100": "red",    "101": "red",    "102": "blue",
+            "110": "pink",   "111": "pink",   "112": "pink",
+            "120": "orange", "121": "orange", "122": "orange",
+            "200": "red",    "201": "red",    "202": "purple",
+            "210": "red",    "211": "red",    "212": "purple",
+            "220": "pink",   "221": "pink",   "222": "purple",
+        },
+        dex: ["white", "red", "orange", "pink", "blue", "purple"],
+        rare: ["blue", "purple"],
+    },
+    roses: {
+        name: "Roses",
+        genes: 4,   // the only 4-gene species; the extra gene reaches blue + black
+        seeds: { red: "2001", yellow: "0200", white: "0010" },
+        table: {
+            "0000": "white",  "0001": "white",  "0002": "white",  "0010": "white",  "0011": "white",  "0012": "white",  "0020": "purple", "0021": "purple", "0022": "purple",
+            "0100": "yellow", "0101": "yellow", "0102": "yellow", "0110": "white",  "0111": "white",  "0112": "white",  "0120": "purple", "0121": "purple", "0122": "purple",
+            "0200": "yellow", "0201": "yellow", "0202": "yellow", "0210": "yellow", "0211": "yellow", "0212": "yellow", "0220": "white",  "0221": "white",  "0222": "white",
+            "1000": "red",    "1001": "pink",   "1002": "white",  "1010": "red",    "1011": "pink",   "1012": "white",  "1020": "red",    "1021": "pink",   "1022": "purple",
+            "1100": "orange", "1101": "yellow", "1102": "yellow", "1110": "red",    "1111": "pink",   "1112": "white",  "1120": "red",    "1121": "pink",   "1122": "purple",
+            "1200": "orange", "1201": "yellow", "1202": "yellow", "1210": "orange", "1211": "yellow", "1212": "yellow", "1220": "red",    "1221": "pink",   "1222": "white",
+            "2000": "black",  "2001": "red",    "2002": "pink",   "2010": "black",  "2011": "red",    "2012": "pink",   "2020": "black",  "2021": "red",    "2022": "pink",
+            "2100": "orange", "2101": "orange", "2102": "yellow", "2110": "red",    "2111": "red",    "2112": "white",  "2120": "black",  "2121": "red",    "2122": "purple",
+            "2200": "orange", "2201": "orange", "2202": "yellow", "2210": "orange", "2211": "orange", "2212": "yellow", "2220": "blue",   "2221": "red",    "2222": "white",
+        },
+        dex: ["white", "yellow", "red", "pink", "orange", "purple", "black", "blue"],
+        rare: ["blue", "black"],
+    },
 };
 
-// The three base colors every species is seeded with.
+// The three base colors MOST species are seeded with (cosmos/tulips/pansies/
+// hyacinths/lilies/mums/roses). Windflowers are the exception (orange, not
+// yellow) — always read a species' real seed colors via seedColorsFor().
 const SEED_COLORS = ["red", "yellow", "white"];
+
+/** The seed colors a given species actually ships (keys of its seeds table). */
+function seedColorsFor(species) {
+    return Object.keys(SPECIES[species].seeds);
+}
 
 // Unlock schedule (DESIGN.md §4.2). cosmos is free from day 1; the others
 // unlock from garden progress so the first ~15 min is one self-contained puzzle.
 // Order matters: it's how locked species queue up as "coming" tabs/hints.
-const UNLOCK_ORDER = ["cosmos", "tulips", "pansies", "hyacinths"];
+const UNLOCK_ORDER = ["cosmos", "tulips", "pansies", "hyacinths", "lilies", "mums", "windflowers", "roses"];
 
 // A short, non-spoiling hint shown on each locked species' Bloombook tab. Says
 // the species exists and roughly why it's coming, never the exact trigger —
 // discovery stays a surprise (Madderverse Promise: you just haven't found it yet).
 const LOCKED_HINT = {
-    tulips:    "Grow your first cosmos hybrid and these arrive.",
-    pansies:   "A few more cosmos in the Bloombook and these open up.",
-    hyacinths: "Keep filling the Bloombook — these bloom into reach with time.",
+    tulips:      "Grow your first cosmos hybrid and these arrive.",
+    pansies:     "A few more cosmos in the Bloombook and these open up.",
+    hyacinths:   "Keep filling the Bloombook — these bloom into reach with time.",
+    lilies:      "Your garden's growing. These are a little further down the path.",
+    mums:        "More discoveries, and these will find their way to you.",
+    windflowers: "Something breezier waits a few flowers on from here.",
+    roses:       "The last and finest. Fill enough of the Bloombook and they arrive.",
 };
 
-// How many total discovered flowers (across species) unlocks hyacinths.
-const HYACINTH_UNLOCK_DEX = 10;
+// Progression gates keyed off total discoveries across all species — a natural,
+// self-paced "you've been at this a while" curve (Madderverse Promise: nothing is
+// ever blocked, you just haven't found it yet). tulips + pansies keep their own
+// cosmos-specific gates below; the rest ladder up on total Bloombook breadth.
+const TOTAL_GATES = { hyacinths: 10, lilies: 14, mums: 18, windflowers: 23, roses: 28 };
 
 // Flavor text for the Bloombook — written in Onion's voice.
 const FLAVOR = {
@@ -192,6 +286,40 @@ const FLAVOR = {
         orange: "Sunset stacked into a single stem. Turned up when two warm colors met.",
         blue:   "The one people come to see. It rises out of the plainest white, which never stops feeling like a small trick you pulled off.",
         purple: "Deep as evening and just as unhurried. A few good crosses and patience made this.",
+    },
+    lilies: {
+        white:  "Tall, clean, and calm. A steady place to begin.",
+        yellow: "Sunlit and a little showy, the way lilies are allowed to be.",
+        red:    "Bold enough to lead a whole bed. Storybook stuff.",
+        pink:   "Gentler than the red, and secretly the favorite. Keep this one.",
+        orange: "A trumpet of warm colour — more accident than plan, kept anyway.",
+        black:  "Red pressed down to its very darkest. It looks like it knows how hard it was.",
+    },
+    mums: {
+        white:  "Small, tidy, endlessly patient. Almost everything here grows out of one.",
+        yellow: "Cheerful in the way of late-season flowers that don't know summer's over.",
+        red:    "Velvety and sure of itself. The loud one, when you want it.",
+        pink:   "Soft petals packed in tight. Looks like it took its time.",
+        purple: "Deep and quietly pleased with itself. The reward for a few good crosses.",
+        green:  "A mum the colour of new leaves. Rare, a little odd, and completely worth it.",
+    },
+    windflowers: {
+        white:  "Plain and open-faced. Nearly everything strange here starts this simple.",
+        red:    "A quick, bright bloom that leans toward whoever's watching.",
+        orange: "Warm as embers — and the colour these are usually seeded from.",
+        pink:   "Softer than it has any need to be. A small, good surprise.",
+        blue:   "Barely blue, but blue enough to stop you. And it comes from the plainest white, which is the whole trick.",
+        purple: "Dusky and deep, the end of a few patient crosses.",
+    },
+    roses: {
+        white:  "The plain one everything else gets measured against. Quietly refuses to apologize for it.",
+        yellow: "Bright and generous — the rose that shows up early and stays late.",
+        red:    "The rose people picture when they hear the word. Worth the fuss of growing one on purpose.",
+        pink:   "Soft, a little shy, and somehow always the one people reach for first.",
+        orange: "Warm as a low sun. Turned up where red and yellow finally agreed on something.",
+        purple: "Deep, and a bit regal about it. A few careful crosses got you here.",
+        black:  "Not truly black — just red gone as deep as red can go. Looks like it keeps secrets.",
+        blue:   "The one everyone swears can't be done. And yet — here it is. Nobody outside this garden will quite believe you.",
     },
 };
 
@@ -363,14 +491,20 @@ const state = {
         // tiles[y*w+x] = null | { species, genotype, stage, watered, failedBreeds }
         tiles: Array(GRID_W * GRID_H).fill(null),
     },
+    // Seeds are unlimited; the useful part is which colors each species offers.
+    // Windflowers seed orange (not yellow) — the one exception (see seedColorsFor).
     seedInventory: {
-        cosmos:    { red: Infinity, yellow: Infinity, white: Infinity },
-        tulips:    { red: Infinity, yellow: Infinity, white: Infinity },
-        pansies:   { red: Infinity, yellow: Infinity, white: Infinity },
-        hyacinths: { red: Infinity, yellow: Infinity, white: Infinity },
+        cosmos:      { red: Infinity, yellow: Infinity, white: Infinity },
+        tulips:      { red: Infinity, yellow: Infinity, white: Infinity },
+        pansies:     { red: Infinity, yellow: Infinity, white: Infinity },
+        hyacinths:   { red: Infinity, yellow: Infinity, white: Infinity },
+        lilies:      { red: Infinity, yellow: Infinity, white: Infinity },
+        mums:        { red: Infinity, yellow: Infinity, white: Infinity },
+        windflowers: { red: Infinity, orange: Infinity, white: Infinity },
+        roses:       { red: Infinity, yellow: Infinity, white: Infinity },
     },
-    unlockedSpecies: ["cosmos"],   // tulips, pansies, hyacinths unlock via progress
-    flowerdex: { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {} },
+    unlockedSpecies: ["cosmos"],   // every other species unlocks via progress
+    flowerdex: { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {}, lilies: {}, mums: {}, windflowers: {}, roses: {} },
     seenOrnaments: [],             // ornament ids already announced (persisted)
     settings: {
         sound: true,
@@ -640,9 +774,9 @@ function isoDate() { return new Date().toISOString().slice(0, 10); }
 
 // ─── 6. UNLOCKS ──────────────────────────────────────────────────
 
-/** Mark a species' three seed colors as "known" (no discovery fanfare). */
+/** Mark a species' own seed colors as "known" (no discovery fanfare). */
 function ensureSeedColorsKnown(species) {
-    for (const color of SEED_COLORS) {
+    for (const color of seedColorsFor(species)) {
         if (!state.flowerdex[species][color]) {
             state.flowerdex[species][color] = { firstSeen: isoDate(), genotype: SPECIES[species].seeds[color] };
         }
@@ -671,9 +805,12 @@ function checkUnlocks() {
 
     if (!isUnlocked("tulips") && cosmosHybrids >= 1 && unlockSpecies("tulips")) newly.push("tulips");
     if (!isUnlocked("pansies") && cosmosColors.length >= 5 && unlockSpecies("pansies")) newly.push("pansies");
-    // Hyacinths open once the Bloombook has some breadth to it — a natural
-    // "you've been at this a while" gate, reachable at the player's own pace.
-    if (!isUnlocked("hyacinths") && totalDex() >= HYACINTH_UNLOCK_DEX && unlockSpecies("hyacinths")) newly.push("hyacinths");
+    // The rest ladder up on total Bloombook breadth — hyacinths → lilies → mums
+    // → windflowers → roses — so the garden keeps opening at the player's pace.
+    const total = totalDex();
+    for (const sp of ["hyacinths", "lilies", "mums", "windflowers", "roses"]) {
+        if (!isUnlocked(sp) && total >= TOTAL_GATES[sp] && unlockSpecies(sp)) newly.push(sp);
+    }
     return newly;
 }
 
@@ -1468,7 +1605,7 @@ function showNextCelebration() {
 function renderSeedTray() {
     seedTrayEl.innerHTML = "";
     for (const species of state.unlockedSpecies) {
-        for (const color of SEED_COLORS) {
+        for (const color of seedColorsFor(species)) {
             const chip = document.createElement("button");
             chip.type = "button";
             chip.className = "seed-chip";
@@ -1495,7 +1632,10 @@ function renderSeedTray() {
 // Singular label for a species id (chips, dex names, toasts). Falls back to
 // trimming a trailing "s" so a newly-added species never silently reads as
 // "cosmos" (the old default hid the hyacinths mislabel).
-const SPECIES_SHORT = { cosmos: "cosmos", tulips: "tulip", pansies: "pansy", hyacinths: "hyacinth" };
+const SPECIES_SHORT = {
+    cosmos: "cosmos", tulips: "tulip", pansies: "pansy", hyacinths: "hyacinth",
+    lilies: "lily", mums: "mum", windflowers: "windflower", roses: "rose",
+};
 function speciesShort(species) {
     if (SPECIES_SHORT[species]) return SPECIES_SHORT[species];
     return species && species.endsWith("s") ? species.slice(0, -1) : (species || "flower");
@@ -2201,7 +2341,7 @@ window.__petalcraft = {
     state, breed, phenotype, SPECIES, SPEED_PRESETS,
     advanceDay: onAdvanceDay,
     setSpeed: (k) => { if (SPEED_PRESETS[k]) { state.settings.speed = k; saveSoon(); } },
-    unlockAll: () => { ["tulips", "pansies", "hyacinths"].forEach(unlockSpecies); renderSeedTray(); renderOrnaments(); },
+    unlockAll: () => { UNLOCK_ORDER.forEach(unlockSpecies); renderSeedTray(); renderOrnaments(); },
     isRare, totalDex, rareCount, speciesCompleteCount, refreshOrnaments,
     reset: () => { localStorage.removeItem(SAVE_KEY); location.reload(); },
 };
