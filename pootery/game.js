@@ -2390,6 +2390,18 @@
         return CLAY_TYPES[0];
     }
 
+    /* Push a clay's colours onto a DOM element as CSS custom
+       properties so the picker discs + lump balls build their clay
+       surface entirely in CSS (see .clay-disc / .lump-ball) — no more
+       baked PNG texture tiles. `unfired` runs dark→light→dark, so
+       [3] is the highlight and [1] the shadow. */
+    function setClaySurfaceVars(el, mat) {
+        const u = mat.unfired || [];
+        el.style.setProperty("--lump-color", mat.swatch);
+        el.style.setProperty("--clay-hi", u[3] || mat.swatch);
+        el.style.setProperty("--clay-lo", u[1] || mat.swatch);
+    }
+
     /* ============================================================
        CLAY TEXTURES — generated procedurally (no PNGs to ship)
        ============================================================
@@ -3004,6 +3016,7 @@
         KERNEL_SIGMA: 2.4,   /* gaussian spread (in sample-index units) */
         KERNEL_CUT:   0.06,  /* below this weight, skip the slice */
         EASE:         0.14,  /* per-16.67-ms ease factor */
+        PULL_EASE:    0.62,  /* outward pulls ease slower — clay has weight */
 
         /* Wheel.
            Real pottery: the wheel slows when you press on it -- the
@@ -3045,8 +3058,103 @@
            "new pot" entry points (title START, fresh-slate); every
            other path (re-shape, remix) leaves it false so existing
            clay is immediately shapeable. */
-        needsLump: false
+        needsLump: false,
+
+        /* --- Starter shape + lip-drag height (ported from Slip Studio) ---
+           shapeId  : which starter silhouette a fresh lump throws into
+                      (see POT_SHAPES). "cylinder" = the classic straight
+                      wall, so old behavior is the default.
+           heightScale: vertical stretch factor. Geometry (incl. height)
+                      lives in clay[].y, so this is a live-editing convenience
+                      re-derived from the loaded rim height, never persisted
+                      on its own. */
+        shapeId:    "cylinder",
+        heightScale: 1,
+
+        /* Rim-pull stroke state (grab the lip → raise/lower height).
+           Null unless the current drag started on the top lip. */
+        rimStroke: null
     };
+
+    /* ---- Starter shapes: control profiles thrown from a fresh lump ----
+       Each `controls` is a list of [t, radius] points, t = 0 at the
+       base (on the wheel) up to t = 1 at the rim, radius in logical px.
+       seedShape() resamples these into SHAPE.clay's N radius samples;
+       buildPotPath's midpoint smoothing rounds the corners. Base radii
+       stay under the wheel cap (WHEEL_RX) so pots keep a foot. */
+    const POT_SHAPES = [
+        { id: "cylinder", label: "TUBE",
+          controls: [[0, 72], [1, 72]] },
+        { id: "vase", label: "VASE",
+          controls: [[0, 46], [0.15, 60], [0.42, 94], [0.68, 62], [0.86, 42], [1, 52]] },
+        { id: "bowl", label: "BOWL",
+          controls: [[0, 40], [0.3, 80], [0.62, 112], [1, 130]] },
+        { id: "cup", label: "CUP",
+          controls: [[0, 50], [0.5, 62], [1, 68]] },
+        { id: "bottle", label: "BOTTLE",
+          controls: [[0, 60], [0.24, 90], [0.44, 82], [0.6, 34], [0.82, 26], [1, 31]] },
+        { id: "jar", label: "JAR",
+          controls: [[0, 54], [0.3, 94], [0.55, 102], [0.78, 78], [1, 72]] },
+        { id: "egg", label: "EGG",
+          controls: [[0, 34], [0.34, 96], [0.6, 92], [0.85, 50], [1, 40]] },
+        { id: "planter", label: "POT",
+          controls: [[0, 58], [0.5, 92], [1, 122]] }
+    ];
+
+    /* Sample a control-point profile at parameter t (0..1). Linear
+       between points; buildPotPath smooths the result visually. */
+    function sampleShapeProfile(controls, t) {
+        if (t <= controls[0][0]) return controls[0][1];
+        const last = controls.length - 1;
+        if (t >= controls[last][0]) return controls[last][1];
+        for (let i = 0; i < last; i++) {
+            const a = controls[i], b = controls[i + 1];
+            if (t >= a[0] && t <= b[0]) {
+                const f = (t - a[0]) / (b[0] - a[0] || 1);
+                return a[1] + (b[1] - a[1]) * f;
+            }
+        }
+        return controls[last][1];
+    }
+
+    /* Rim-pull tuning (grab the lip → raise/lower the pot height). */
+    const RIM_GRAB_FRAC  = 0.90;   /* t at/above this = a lip grab (top ~10%) */
+    const RIM_LOCK_PX    = 7;      /* travel before the drag axis locks */
+    const HEIGHT_MIN     = 0.55;
+    const HEIGHT_MAX     = 1.05;
+
+    /* Lay out the fixed y for each clay sample from the current
+       heightScale (radii preserved). Called by resetClay/seedShape
+       and whenever a rim-pull changes the pot's height. */
+    function layoutClayY() {
+        const clay = SHAPE.clay;
+        if (!clay) return;
+        const N = clay.length;
+        const span = (SHAPE.baseY - SHAPE.topY) * SHAPE.heightScale;
+        for (let i = 0; i < N; i++) {
+            const t = i / (N - 1);
+            clay[i].y = SHAPE.baseY - t * span;
+        }
+    }
+
+    /* Re-throw the current clay into a named starter shape (keeps the
+       current heightScale + clay material). */
+    function seedShape(shapeId) {
+        const shape = POT_SHAPES.find(function (s) { return s.id === shapeId; }) ||
+                      POT_SHAPES[0];
+        SHAPE.shapeId = shape.id;
+        if (!SHAPE.clay) resetClay();
+        const clay = SHAPE.clay;
+        const N = clay.length;
+        for (let i = 0; i < N; i++) {
+            const t = i / (N - 1);
+            let r = sampleShapeProfile(shape.controls, t);
+            /* Keep the base under the wheel cap so it sits on a foot. */
+            if (i <= 4) r = Math.min(r, WHEEL_RX + (SHAPE.MAX_R - WHEEL_RX) * (i / 4));
+            clay[i].radius = Math.max(SHAPE.MIN_R, Math.min(SHAPE.MAX_R, r));
+        }
+        layoutClayY();
+    }
 
     /* ----- 5A. Init (lazy on first onEnter) ----- */
 
@@ -3063,6 +3171,7 @@
         attachShapePointer();
         wireShapeButtons();
         buildClayPicker();
+        buildShapePicker();
         buildLumpTray();
 
         /* DPR can change on display swap. Re-size when the canvas
@@ -3093,10 +3202,7 @@
 
             const disc = document.createElement("span");
             disc.className = "clay-disc";
-            disc.style.setProperty("--lump-color", mat.swatch);
-            const discTex = clayTextureUrl(mat.id);
-            disc.style.setProperty("--lump-texture",
-                discTex ? ("url('" + discTex + "')") : "none");
+            setClaySurfaceVars(disc, mat);
             btn.appendChild(disc);
 
             const name = document.createElement("span");
@@ -3107,6 +3213,65 @@
             if (mat.id === SHAPE.clayTypeId) btn.classList.add("active");
             btn.addEventListener("click", function () { setClay(mat.id); });
             pick.appendChild(btn);
+        });
+    }
+
+    /* ----- Starter-shape picker ----- */
+    function buildShapePicker() {
+        const pick = document.getElementById("shapePicker");
+        if (!pick) return;
+        Array.from(pick.querySelectorAll(".shape-chip")).forEach(function (b) {
+            b.remove();
+        });
+        POT_SHAPES.forEach(function (shape) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "chip shape-chip";
+            btn.dataset.shape = shape.id;
+            btn.textContent = shape.label;
+            btn.setAttribute("aria-label", shape.label + " shape");
+            if (shape.id === SHAPE.shapeId) btn.classList.add("active");
+            btn.addEventListener("click", function () { setStarterShape(shape.id); });
+            pick.appendChild(btn);
+        });
+    }
+
+    /* Re-throw the clay into a starter silhouette. Blocked while the
+       wheel is empty (drop a lump first) or the form is locked. */
+    function setStarterShape(shapeId) {
+        if (SHAPE.needsLump || SHAPE.clayLocked) return;
+        SHAPE.shapeId = shapeId;
+        seedShape(shapeId);
+        SHAPE.rimStroke = null;
+        document.querySelectorAll(".shape-chip[data-shape]").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.shape === shapeId);
+        });
+        squelch();
+        haptic(8);
+    }
+
+    /* Adopt a loaded/remixed entry's shape state into live SHAPE:
+       starter-shape label + heightScale re-derived from the loaded rim
+       height so a subsequent rim-pull continues from the right place.
+       Call AFTER SHAPE.clay is set. */
+    function adoptEntryShape(entry) {
+        SHAPE.shapeId = entry.shapeId || "cylinder";
+        const clay = SHAPE.clay;
+        if (clay && clay.length) {
+            const span = SHAPE.baseY - SHAPE.topY;
+            const rimY = clay[clay.length - 1].y;
+            SHAPE.heightScale = Math.max(HEIGHT_MIN, Math.min(HEIGHT_MAX,
+                (SHAPE.baseY - rimY) / span));
+        }
+        SHAPE.rimStroke = null;
+        refreshShapePickers();
+    }
+
+    /* Sync the shape picker's active chip to the live SHAPE state (used
+       after loading / remixing a pot re-derives its starter shape). */
+    function refreshShapePickers() {
+        document.querySelectorAll(".shape-chip[data-shape]").forEach(function (b) {
+            b.classList.toggle("active", b.dataset.shape === SHAPE.shapeId);
         });
     }
 
@@ -3162,10 +3327,7 @@
 
             const ball = document.createElement("span");
             ball.className = "lump-ball";
-            ball.style.setProperty("--lump-color", mat.swatch);
-            const lumpTex = clayTextureUrl(mat.id);
-            ball.style.setProperty("--lump-texture",
-                lumpTex ? ("url('" + lumpTex + "')") : "none");
+            setClaySurfaceVars(ball, mat);
             lump.appendChild(ball);
 
             const name = document.createElement("span");
@@ -3248,10 +3410,7 @@
             moved = false;
             ghost = document.createElement("div");
             ghost.className = "clay-lump-ghost";
-            ghost.style.setProperty("--lump-color", mat.swatch);
-            const ghostTex = clayTextureUrl(mat.id);
-            ghost.style.setProperty("--lump-texture",
-                ghostTex ? ("url('" + ghostTex + "')") : "none");
+            setClaySurfaceVars(ghost, mat);
             ghost.style.transform =
                 "translate(" + e.clientX + "px," + e.clientY +
                 "px) translate(-50%,-50%) scale(1.12)";
@@ -3300,6 +3459,7 @@
 
     function resetClay() {
         const arr = new Array(SHAPE.N);
+        SHAPE.heightScale = 1;
         const span = SHAPE.baseY - SHAPE.topY;
         for (let i = 0; i < SHAPE.N; i++) {
             const t = i / (SHAPE.N - 1);
@@ -3311,7 +3471,13 @@
         }
         SHAPE.clay = arr;
         SHAPE.clayLocked = false;
+        SHAPE.rimStroke = null;
         SHAPE.particles.length = 0;
+        /* Throw into the currently-selected starter silhouette
+           (cylinder = the classic straight wall). */
+        if (SHAPE.shapeId && SHAPE.shapeId !== "cylinder") {
+            seedShape(SHAPE.shapeId);
+        }
     }
 
     /* ----- 5B. Pointer input ----- */
@@ -3337,6 +3503,23 @@
             SHAPE.pointerLastY = p.y;
             SHAPE.pointerActive = true;
             SHAPE.wetSince = performance.now();  /* refresh drying-ring timer */
+            /* Rim-pull: a grab on the top lip becomes a dedicated
+               stroke — drag up/down to raise/lower the pot, or
+               sideways to flare/collar the mouth. Axis locks after a
+               few px of travel so the intent is unambiguous. */
+            const clay = SHAPE.clay;
+            const span = (SHAPE.baseY - SHAPE.topY) * SHAPE.heightScale;
+            const grabT = (SHAPE.baseY - p.y) / span;
+            const nearMouth = Math.abs(p.x - SHAPE.centerX) <
+                              clay[clay.length - 1].radius + 46;
+            if (grabT >= RIM_GRAB_FRAC && grabT <= 1.14 && nearMouth) {
+                SHAPE.rimStroke = {
+                    startX: p.x, startY: p.y,
+                    axis: null, startHeight: SHAPE.heightScale
+                };
+            } else {
+                SHAPE.rimStroke = null;
+            }
             wetLoopStart();   /* sustained wet hum under the squelches */
             haptic(5);        /* light tap — "you grabbed the clay" */
         });
@@ -3350,6 +3533,7 @@
             if (!SHAPE.pointerActive) return;
             SHAPE.pointerActive = false;
             SHAPE.pointer = null;
+            SHAPE.rimStroke = null;
             try { c.releasePointerCapture(e.pointerId); } catch (_) {}
             wetLoopStop();
         }
@@ -3370,7 +3554,10 @@
         });
 
         if (reset) reset.addEventListener("click", function () {
+            /* Clean slate: re-throw the selected starter shape at full
+               height so RESET visibly clears everything the kid did. */
             resetClay();
+            refreshShapePickers();
             flashButton(reset);
         });
 
@@ -3399,8 +3586,10 @@
         const N = clay.length;
 
         /* Map pointer y to a sample-index domain. Outside the pot's
-           vertical zone? Don't deform. */
-        const span = SHAPE.baseY - SHAPE.topY;
+           vertical zone? Don't deform. Scale by heightScale so the
+           finger still maps to the right samples after a rim-pull has
+           stretched or squashed the pot's height. */
+        const span = (SHAPE.baseY - SHAPE.topY) * SHAPE.heightScale;
         const t = (SHAPE.baseY - p.y) / span;
         if (t < -0.05 || t > 1.05) return false;
         const centerIdx = Math.max(0, Math.min(N - 1, t * (N - 1)));
@@ -3431,17 +3620,71 @@
             if (w < SHAPE.KERNEL_CUT) continue;
             /* desired pulls slice toward targetR weighted by kernel,
                then we ease toward that desired over the frame. */
-            const desired = clay[i].radius + (targetR - clay[i].radius) * w;
-            const next = clay[i].radius + (desired - clay[i].radius) * ease;
+            const cur = clay[i].radius;
+            const desired = cur + (targetR - cur) * w;
+            /* Clay feel (ported from Slip Studio): pulling the wall
+               OUTWARD is weightier than pushing in (you're fighting
+               the clay's cohesion), and the wall gets stubborn as it
+               thins toward MIN_R so a hard pinch doesn't snap it to
+               nothing in one frame. */
+            let e = ease;
+            if (desired > cur) e *= SHAPE.PULL_EASE;
+            const thin = (cur - minR) / 26;
+            if (desired < cur && thin < 1) e *= 0.4 + 0.6 * Math.max(0, thin);
+            const next = cur + (desired - cur) * e;
             let hiR = maxR;
             if (!EGG.infiniteClay && i <= RAMP) {
                 hiR = Math.min(maxR, WHEEL_RX + (maxR - WHEEL_RX) * (i / RAMP));
             }
             const clamped = Math.max(minR, Math.min(hiR, next));
-            if (Math.abs(clamped - clay[i].radius) > 0.04) didShape = true;
+            if (Math.abs(clamped - cur) > 0.04) didShape = true;
             clay[i].radius = clamped;
         }
+        /* Light wheel-polish smoothing: a spinning wheel evens out
+           sharp local bumps into a fair curve. One weak neighbour
+           blur pass, skipped at the base/rim ends so the foot and lip
+           stay crisp. */
+        if (didShape) {
+            for (let i = 1; i < N - 1; i++) {
+                clay[i].radius += (0.5 * (clay[i - 1].radius + clay[i + 1].radius) -
+                                   clay[i].radius) * 0.08;
+            }
+        }
         return didShape;
+    }
+
+    /* Rim-pull: the current drag grabbed the very lip. It ONLY claims
+       the stroke for a clearly VERTICAL drag — dragging the lip up/down
+       raises/lowers the whole pot (heightScale). A sideways drag is
+       ordinary wall shaping (which already flares/collars the mouth),
+       so we hand it straight back to applyShaping instead of fighting
+       it — this is what keeps shaping the upper wall from feeling
+       broken. Returns whether the clay changed. */
+    function applyRimPull(p, dt) {
+        const rs = SHAPE.rimStroke;
+        if (!rs) return false;
+        const dx = p.x - rs.startX;
+        const dy = p.y - rs.startY;
+        if (!rs.axis) {
+            if (Math.hypot(dx, dy) < RIM_LOCK_PX) return false;
+            /* Claim it for RAISE only if the drag is decisively vertical;
+               otherwise it's a normal wall/mouth shaping drag. */
+            if (Math.abs(dy) > Math.abs(dx) * 1.3) {
+                rs.axis = "raise";
+            } else {
+                SHAPE.rimStroke = null;
+                return applyShaping(p, dt);
+            }
+        }
+        /* RAISE: drag up (dy negative) = taller, down = shorter. Map
+           screen travel to a height-scale delta, clamped to the canvas. */
+        const span = SHAPE.baseY - SHAPE.topY;
+        const target = rs.startHeight + (-dy / span);
+        const next = Math.max(HEIGHT_MIN, Math.min(HEIGHT_MAX, target));
+        if (Math.abs(next - SHAPE.heightScale) < 0.001) return false;
+        SHAPE.heightScale = next;
+        layoutClayY();
+        return true;
     }
 
     /* ----- 5E. Clay-shaving particles ----- */
@@ -3672,6 +3915,13 @@
                 }, opts.surfaceTexturePackId);
             }
 
+            /* Dip glaze — coats the clay/skin BEFORE the light catches
+               so the sheen sits on top for a glossy glazed look, and
+               UNDER the kid's brush/stamps so they can still draw on a
+               dipped pot. Arrays come from D (live) or the saved entry
+               (thumbnails); absent = no-op. */
+            if (opts.dips && opts.dips.length) compositeDips(ctx, opts.dips);
+
             /* Light catches — sheen + rim painted on TOP of the
                surface texture so the 3D-lit feel survives even
                when a pack skin is wrapped over the bare clay.
@@ -3680,6 +3930,10 @@
             if (typeof paintLightCatches === "function") {
                 paintLightCatches(ctx);
             }
+
+            /* Frieze bands — applied decoration, painted crisp on top
+               of the sheen. */
+            if (opts.bands && opts.bands.length) compositeBands(ctx, opts.bands);
         }
 
         /* Paint layer (decorate mode) — clipped to the pot silhouette
@@ -4038,7 +4292,9 @@
     function buildPotPath(ctx) {
         /* Right side bottom -> top with midpoint-quadratic smoothing,
            lineTo across the rim, left side top -> bottom smoothed,
-           lineTo across the base. */
+           lineTo across the base. Traces the RENDER profile (clay +
+           active rim style) so the lip treatment is part of the
+           silhouette / clip everywhere. */
         const cx = SHAPE.centerX;
         const clay = SHAPE.clay;
         const N = clay.length;
@@ -4121,16 +4377,11 @@
         ctx.fillStyle = grad;
         ctx.fill();
 
-        /* Surface texture — tilable PNG per clay type, layered on
-           top of the gradient via soft-light so the global shading
-           still reads. No-op until the matching texture image
-           finishes decoding. */
-        paintClayTexture(ctx, mat, {
-            x: cx - maxR - 4,
-            y: clay[N - 1].y - 4,
-            w: (maxR + 4) * 2,
-            h: SHAPE.baseY - clay[N - 1].y + 14
-        });
+        /* (Procedural clay grain removed — the clay body is now a clean
+           side-lit base gradient. The grain used to be a soft-light PNG
+           tile over the gradient; it read as muddy under the new dip
+           glazes and the picker swatches now carry the clay-surface look
+           in CSS instead.) */
 
         /* Foot ring — now that the base is capped to the wheel, give the
            pot a turned foot: the body tucks in just above the base to a
@@ -4483,7 +4734,9 @@
 
         /* Shaping */
         if (SHAPE.pointerActive && SHAPE.pointer && !SHAPE.clayLocked) {
-            const didShape = applyShaping(SHAPE.pointer, dt);
+            const didShape = SHAPE.rimStroke
+                ? applyRimPull(SHAPE.pointer, dt)
+                : applyShaping(SHAPE.pointer, dt);
             if (didShape) {
                 emitParticles(SHAPE.pointer);
                 /* Throttled squelch — fires once every 90-160ms
@@ -5865,6 +6118,24 @@
            snap to the cursor center. */
         movingSticker: null,
 
+        /* --- Dip glaze + band decoration (ported from Slip Studio) ---
+           dips : ordered list of glaze coats, each covering from the
+                  RIM down to a coverage line. Overlapping dips react
+                  into an emergent third colour (see reactGlaze). Entry
+                  shapes: { color, cover, drips, seed } freehand, or
+                  { preset } for a one-tap gradient. Rendered UNDER the
+                  brush/stamp decoration so kids can still draw on a
+                  glazed pot.
+           bands: ordered list of frieze stripes, each { id, cy, h }
+                  (cy = centre height fraction, h = thickness fraction).
+                  Rendered as a horizontally-repeating band. */
+        dips: [],
+        bands: [],
+        dipDrag: null,        /* in-progress freehand dip during a drag */
+        movingBand: null,     /* { band, grabFrac } while dragging a band */
+        dripAmount: 1,        /* 0=off, 1=few, 2=lots — new dips inherit this */
+        bandFriezeId: null,   /* frieze chosen for the next band placement */
+
         dpr: 1,
 
         activePackId: "core",
@@ -5960,6 +6231,17 @@
                         rot: s.rot || 0, flipH: !!s.flipH,
                         color: s.color || null
                     };
+                }),
+                /* Dip coats + bands travel with undo so NUKE/UNDID
+                   restore the full decorate state. */
+                dips: (D.dips || []).map(function (d) {
+                    return d.preset ? { preset: d.preset }
+                        : { color: d.color, cover: d.cover,
+                            drips: d.drips || 0, seed: d.seed || 1,
+                            rgb: d.rgb ? d.rgb.slice() : null };
+                }),
+                bands: (D.bands || []).map(function (b) {
+                    return { id: b.id, cy: b.cy, h: b.h };
                 })
             };
         } catch (e) {
@@ -5994,6 +6276,19 @@
                     color: s.color || null
                 };
             });
+            /* Restore dip coats + bands from the snapshot (absent on
+               pre-dip snapshots → cleared, which is correct). */
+            D.dips = (snapshot.dips || []).map(function (d) {
+                return d.preset ? { preset: d.preset }
+                    : { color: d.color, cover: d.cover,
+                        drips: d.drips || 0, seed: d.seed || 1,
+                        rgb: d.rgb ? d.rgb.slice() : dipHexToRgb(d.color) };
+            });
+            D.bands = (snapshot.bands || []).map(function (b) {
+                return { id: b.id, cy: b.cy, h: b.h };
+            });
+            D.dipDrag = null;
+            D.movingBand = null;
             if (typeof renderStickerLayer === "function") renderStickerLayer();
             if (onDone) onDone();
         };
@@ -6092,6 +6387,292 @@
         D.glaze = pack.glazes[0];
         D.pattern = pack.patterns[0];
         buildToolUI();
+    }
+
+    /* ============================================================
+       DIP GLAZE + BAND DECORATION  (ported from Slip Studio)
+       ------------------------------------------------------------
+       Dips coat the pot from the RIM downward to a coverage line;
+       overlapping dips blend into an emergent third colour; drips
+       hang below the line. Bands are frieze stripes wrapped around
+       the pot. Everything renders straight onto the scene ctx,
+       clipped to the pot silhouette — no extra offscreen canvas.
+       ============================================================ */
+
+    function dipHexToRgb(hex) {
+        if (typeof hex !== "string") return [200, 120, 80];
+        /* Support hsl() (rgb-cycle glaze) by sampling via a scratch. */
+        if (hex[0] !== "#") {
+            _dipParseCtx = _dipParseCtx ||
+                document.createElement("canvas").getContext("2d");
+            _dipParseCtx.fillStyle = hex;
+            hex = _dipParseCtx.fillStyle;   /* normalized to #rrggbb */
+        }
+        const n = parseInt(hex.slice(1), 16);
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    }
+    let _dipParseCtx = null;
+
+    /* Emergent glaze chemistry: two overlapping coats fire into a
+       muddier/mixed third colour (geometric mean per channel, with a
+       faint saturation lift so the result never goes flat grey). */
+    function reactGlaze(a, b) {
+        const mix = [
+            Math.round(Math.sqrt(a[0] * b[0])),
+            Math.round(Math.sqrt(a[1] * b[1])),
+            Math.round(Math.sqrt(a[2] * b[2]))
+        ];
+        const avg = (mix[0] + mix[1] + mix[2]) / 3;
+        for (let i = 0; i < 3; i++) {
+            mix[i] = Math.max(0, Math.min(255, Math.round(mix[i] + (mix[i] - avg) * 0.18)));
+        }
+        return mix;
+    }
+
+    /* One-tap full-height gradient dips. Stops are rim -> foot. */
+    const DIP_PRESETS = {
+        rainbow: ["#ff3b3b", "#ff9e2c", "#ffe14d", "#3fd067", "#3aa0ff", "#8a5cff"],
+        sunset:  ["#ffd36b", "#ff9a4d", "#ff5e7e", "#8a4f8f"],
+        ocean:   ["#bff7ff", "#4fc8e0", "#2b7bd0", "#123a86"],
+        ember:   ["#ffe8a3", "#ff9b3d", "#e0431f", "#611015"]
+    };
+    const DIP_PRESET_ORDER = [
+        { id: "rainbow", label: "RAINBOW" },
+        { id: "sunset",  label: "SUNSET" },
+        { id: "ocean",   label: "OCEAN" },
+        { id: "ember",   label: "EMBER" }
+    ];
+
+    /* Band friezes (reused from Slip Studio, covered by the studio's
+       rawpixel license). File ids resolved via bandSrc(). */
+    const BAND_FRIESES = [
+        "element-download--1783299972",
+        "element-download--1783300000",
+        "element-download--1783300035",
+        "element-download--1783300065",
+        "element-download--1783300399",
+        "element-download--1783300461"
+    ];
+    const BAND_IMAGES = {};   /* id -> HTMLImageElement (async) */
+    function bandSrc(id) { return "assets/bands/" + id + ".png"; }
+    function loadBandImages() {
+        BAND_FRIESES.forEach(function (id) {
+            if (BAND_IMAGES[id]) return;
+            const img = new Image();
+            img.src = bandSrc(id);
+            BAND_IMAGES[id] = img;
+        });
+    }
+    /* Preload frieze art at module init so gallery thumbnails render
+       bands even if the gallery is opened before the decorate stage. */
+    loadBandImages();
+
+    /* Pot vertical geometry in logical px, honouring the active rim
+       style + height. rimY = top lip, footY = base on the wheel. */
+    function potGeom() {
+        const clay = SHAPE.clay;
+        const N = clay.length;
+        const rimY = clay[N - 1].y;
+        const footY = clay[0].y;
+        return { clay: clay, N: N, rimY: rimY, footY: footY,
+                 span: Math.max(1, footY - rimY) };
+    }
+
+    /* Deterministic drip tendrils hanging below a dip's line. */
+    function makeDrips(seed, amount) {
+        if (!amount) return [];
+        const rand = mulberry32(seed || 1);
+        const count = amount === 2 ? (6 + Math.floor(rand() * 4))
+                                   : (2 + Math.floor(rand() * 2));
+        const drips = [];
+        for (let i = 0; i < count; i++) {
+            drips.push({
+                x:   0.08 + rand() * 0.84,        /* fraction across width */
+                len: 0.10 + rand() * 0.30,        /* fraction of pot span  */
+                w:   4 + rand() * 6,
+                bead: 0.6 + rand() * 0.9
+            });
+        }
+        return drips;
+    }
+
+    /* Alpha of a dip's coat at row y: solid above the line, a short
+       feather just below it, nothing lower. */
+    function dipCoverageAlpha(lineY, y) {
+        const FEATHER = 11;
+        if (y <= lineY) return 1;
+        if (y <= lineY + FEATHER) return 1 - (y - lineY) / FEATHER;
+        return 0;
+    }
+
+    /* Paint a dip list onto ctx (already in logical 400x600 space),
+       clipped to the pot silhouette. Handles presets, per-row
+       chemistry for overlapping freehand coats, and drips. */
+    function compositeDips(ctx, dips) {
+        if (!dips || !dips.length) return;
+        const g = potGeom();
+        ctx.save();
+        buildPotPath(ctx);
+        ctx.clip();
+
+        /* Preset gradients render first as a base coat. */
+        for (let i = 0; i < dips.length; i++) {
+            const d = dips[i];
+            if (!d.preset) continue;
+            const stops = DIP_PRESETS[d.preset];
+            if (!stops) continue;
+            const grad = ctx.createLinearGradient(0, g.rimY, 0, g.footY);
+            for (let s = 0; s < stops.length; s++) {
+                grad.addColorStop(s / (stops.length - 1), stops[s]);
+            }
+            ctx.globalAlpha = 0.9;
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, g.rimY, SHAPE.W, g.footY - g.rimY + 2);
+            ctx.globalAlpha = 1;
+        }
+
+        /* Freehand coats: precompute each line + rgb. */
+        const coats = [];
+        for (let i = 0; i < dips.length; i++) {
+            const d = dips[i];
+            if (d.preset) continue;
+            coats.push({
+                lineY: g.rimY + Math.max(0, Math.min(1, d.cover)) * g.span,
+                rgb:   d.rgb || dipHexToRgb(d.color),
+                drips: d.drips || 0,
+                seed:  d.seed || 1
+            });
+        }
+        if (coats.length) {
+            for (let y = Math.floor(g.rimY); y <= g.footY; y++) {
+                let rgb = null, aMax = 0;
+                for (let c = 0; c < coats.length; c++) {
+                    const a = dipCoverageAlpha(coats[c].lineY, y);
+                    if (a <= 0) continue;
+                    rgb = rgb ? reactGlaze(rgb, coats[c].rgb) : coats[c].rgb.slice();
+                    if (a > aMax) aMax = a;
+                }
+                if (rgb && aMax > 0) {
+                    ctx.fillStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," +
+                                    rgb[2] + "," + (0.86 * aMax).toFixed(3) + ")";
+                    ctx.fillRect(0, y, SHAPE.W, 1);
+                }
+            }
+            /* Drips on top, in each coat's colour. */
+            for (let c = 0; c < coats.length; c++) {
+                if (!coats[c].drips) continue;
+                const rgb = coats[c].rgb;
+                ctx.fillStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," +
+                                rgb[2] + ",0.86)";
+                const drips = makeDrips(coats[c].seed, coats[c].drips);
+                for (let k = 0; k < drips.length; k++) {
+                    const dr = drips[k];
+                    const x = dr.x * SHAPE.W;
+                    const y0 = coats[c].lineY;
+                    const y1 = Math.min(g.footY, y0 + dr.len * g.span);
+                    ctx.beginPath();
+                    ctx.moveTo(x - dr.w / 2, y0);
+                    ctx.lineTo(x + dr.w / 2, y0);
+                    ctx.lineTo(x + dr.w / 2, y1);
+                    ctx.arc(x, y1, dr.w / 2, 0, Math.PI);
+                    ctx.lineTo(x - dr.w / 2, y0);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(x, y1, dr.w * 0.5 * dr.bead, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+        ctx.restore();
+    }
+
+    /* Paint frieze bands onto ctx, clipped to the pot silhouette.
+       Each band repeats horizontally across the pot width. */
+    function compositeBands(ctx, bands) {
+        if (!bands || !bands.length) return;
+        const g = potGeom();
+        ctx.save();
+        buildPotPath(ctx);
+        ctx.clip();
+        for (let i = 0; i < bands.length; i++) {
+            const b = bands[i];
+            const img = BAND_IMAGES[b.id];
+            if (!img || !img.complete || !img.naturalWidth) continue;
+            const h = Math.max(8, b.h * g.span);
+            const cy = g.rimY + b.cy * g.span;
+            const top = cy - h / 2;
+            /* Tile width keeps the frieze's aspect ratio. */
+            const tileW = h * (img.naturalWidth / img.naturalHeight);
+            const reps = Math.ceil(SHAPE.W / tileW) + 1;
+            for (let r = 0; r < reps; r++) {
+                ctx.drawImage(img, r * tileW, top, tileW, h);
+            }
+        }
+        ctx.restore();
+    }
+
+    /* --- Dip + band interaction (pointer-driven) --- */
+
+    /* Pointer y -> coverage fraction (0 at rim, 1 at foot). */
+    function coverFracFromY(y) {
+        const g = potGeom();
+        return Math.max(0, Math.min(1, (y - g.rimY) / g.span));
+    }
+
+    /* Begin a freehand dip on drag: adds a live coat whose lower edge
+       tracks the finger. Colour = current glaze; drips = current pref. */
+    function dipDragStart(p) {
+        const coat = {
+            color: (D.glaze === "@rgb-cycle") ? currentPaintColor() : D.glaze,
+            cover: coverFracFromY(p.y),
+            drips: D.dripAmount,
+            seed:  Math.floor(Math.random() * 1e9) || 1
+        };
+        coat.rgb = dipHexToRgb(coat.color);
+        D.dips.push(coat);
+        D.dipDrag = coat;
+    }
+    function dipDragTo(p) {
+        if (D.dipDrag) D.dipDrag.cover = coverFracFromY(p.y);
+    }
+    /* A tap places a coat reaching from the rim down to the tap. */
+    function placeDipTap(p) {
+        dipDragStart(p);
+        D.dipDrag = null;
+    }
+    /* One-tap gradient pour — replaces any existing preset, keeps
+       freehand coats layered on top. */
+    function placePresetDip(presetId) {
+        if (!DIP_PRESETS[presetId]) return;
+        pushUndoSnapshot();
+        D.dips = D.dips.filter(function (d) { return !d.preset; });
+        D.dips.unshift({ preset: presetId });
+        haptic(8);
+    }
+
+    /* Band hit-test (topmost first) + move. */
+    function hitTestBand(p) {
+        const g = potGeom();
+        for (let i = D.bands.length - 1; i >= 0; i--) {
+            const b = D.bands[i];
+            const cy = g.rimY + b.cy * g.span;
+            const half = (b.h * g.span) / 2 + 6;
+            if (p.y >= cy - half && p.y <= cy + half) {
+                return { band: b, index: i };
+            }
+        }
+        return null;
+    }
+    function moveBandTo(p) {
+        if (!D.movingBand) return;
+        D.movingBand.band.cy = Math.max(0.06, Math.min(0.94, coverFracFromY(p.y)));
+    }
+    function placeBandTap(p) {
+        const id = D.bandFriezeId || BAND_FRIESES[0];
+        D.bandFriezeId = id;
+        loadBandImages();
+        D.bands.push({ id: id, cy: Math.max(0.1, Math.min(0.9, coverFracFromY(p.y))), h: 0.15 });
+        haptic(8);
     }
 
     /* ----- 6C. Init / sizing ----- */
@@ -6700,6 +7281,11 @@
         D.paintCtx.restore();
         /* CLEAR also wipes the sticker layer + records. */
         D.stickers = [];
+        /* ...and the dip glaze coats + frieze bands. */
+        D.dips = [];
+        D.bands = [];
+        D.dipDrag = null;
+        D.movingBand = null;
         if (typeof renderStickerLayer === "function") renderStickerLayer();
         /* Clearing wipes any prior custom-sticker pixels too — flag
            starts fresh until a new sticker lands. */
@@ -6866,6 +7452,19 @@
                 }
                 return;
             }
+
+            /* BAND: a press on an existing band grabs it to slide up/down;
+               otherwise the tap on pointerup places a new band. */
+            if (D.tool === "band") {
+                const hit = hitTestBand(p);
+                if (hit) {
+                    pushUndoSnapshot();
+                    D.movingBand = hit;
+                    D.canvas.style.cursor = "grabbing";
+                    D.gestureCommitted = true;
+                }
+                return;
+            }
         };
 
         /* Commit the deferred paint START (brush / spray / splatter /
@@ -6874,7 +7473,11 @@
         const commitPaintStart = function () {
             if (D.gestureCommitted) return;
             pushUndoSnapshot();
-            paintDot(D.pendingPos, true);   /* true = stroke start -> taper the head */
+            if (D.tool === "dip") {
+                dipDragStart(D.pendingPos);   /* begin a live glaze coat */
+            } else {
+                paintDot(D.pendingPos, true); /* true = stroke start -> taper the head */
+            }
             D.gestureCommitted = true;
             D.strokedThisGesture = true;
         };
@@ -6984,6 +7587,14 @@
                     D.movingSticker = null;
                     if (D.tool === "move") D.canvas.style.cursor = "grab";
                 }
+                /* Drop a half-drawn dip coat / band grab so a pinch
+                   leaves nothing behind. */
+                if (D.dipDrag) {
+                    const idx = D.dips.indexOf(D.dipDrag);
+                    if (idx !== -1) D.dips.splice(idx, 1);
+                    D.dipDrag = null;
+                }
+                D.movingBand = null;
                 beginGesture();
             }
         });
@@ -7017,6 +7628,23 @@
             /* Stamps are tap-only: dragging never paints a trail of
                stamps. The actual placement happens on tap-up. */
             if (D.tool === "stamp") {
+                D.lastPaintPos = p;
+                D.pointer = p;
+                return;
+            }
+            /* BAND drag — slide a grabbed band up/down; a drag that
+               didn't grab a band does nothing (placement is on tap). */
+            if (D.tool === "band") {
+                if (D.movingBand) moveBandTo(p);
+                D.lastPaintPos = p;
+                D.pointer = p;
+                return;
+            }
+            /* DIP drag — the first move commits a live glaze coat, then
+               the finger sets its lower edge. */
+            if (D.tool === "dip") {
+                if (!D.gestureCommitted) commitPaintStart();
+                dipDragTo(p);
                 D.lastPaintPos = p;
                 D.pointer = p;
                 return;
@@ -7055,6 +7683,12 @@
                         } else {
                             paintDot(D.pendingPos);
                         }
+                    } else if (D.tool === "dip") {
+                        pushUndoSnapshot();
+                        placeDipTap(D.pendingPos);
+                    } else if (D.tool === "band") {
+                        pushUndoSnapshot();
+                        placeBandTap(D.pendingPos);
                     } else if (D.tool !== "move") {
                         /* SCOOT (move) only acts on a drag — a clean tap
                            with nothing grabbed places/erases nothing. */
@@ -7076,6 +7710,12 @@
                 if (D.movingSticker) {
                     D.movingSticker = null;
                     if (D.tool === "move") D.canvas.style.cursor = "grab";
+                }
+                /* Finalize any dip coat / band drag from this gesture. */
+                D.dipDrag = null;
+                if (D.movingBand) {
+                    D.movingBand = null;
+                    if (D.tool === "band") D.canvas.style.cursor = "pointer";
                 }
                 D.gestureStart = null;
                 D.gestureCommitted = false;
@@ -7651,6 +8291,8 @@
             b.classList.toggle("active", b.dataset.tool === D.tool);
         });
         buildTexturePalette();
+        buildDipControls();
+        buildFriezePalette();
 
         /* Size slider (matches the ROT slider pattern so all
            tool-row inputs share one control vocabulary). */
@@ -7671,6 +8313,79 @@
         /* Reflect the active tool's contextual rows on mount + on
            every pack swap (buildToolUI re-runs then). */
         syncToolContext();
+    }
+
+    /* Build the DIP tool's DRIPS toggle + POURS (gradient presets).
+       Wired once; re-run is cheap + keeps the active chips in sync. */
+    function buildDipControls() {
+        const drip = document.getElementById("dripPicker");
+        if (drip) {
+            drip.innerHTML = "";
+            [{ v: 0, label: "OFF" }, { v: 1, label: "FEW" }, { v: 2, label: "LOTS" }]
+                .forEach(function (o) {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "chip";
+                    btn.textContent = o.label;
+                    if (o.v === D.dripAmount) btn.classList.add("active");
+                    btn.addEventListener("click", function () {
+                        D.dripAmount = o.v;
+                        drip.querySelectorAll(".chip").forEach(function (c) {
+                            c.classList.remove("active");
+                        });
+                        btn.classList.add("active");
+                    });
+                    drip.appendChild(btn);
+                });
+        }
+        const pour = document.getElementById("pourPicker");
+        if (pour) {
+            pour.innerHTML = "";
+            DIP_PRESET_ORDER.forEach(function (o) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "chip";
+                btn.textContent = o.label;
+                /* Colour the chip with its own gradient so kids can
+                   see what they're picking. */
+                const stops = DIP_PRESETS[o.id];
+                btn.style.background = "linear-gradient(90deg," + stops.join(",") + ")";
+                btn.style.color = "#012";
+                btn.addEventListener("click", function () {
+                    if (D.tool !== "dip") setTool("dip");
+                    placePresetDip(o.id);
+                });
+                pour.appendChild(btn);
+            });
+        }
+    }
+
+    /* Build the BAND tool's frieze picker. */
+    function buildFriezePalette() {
+        const fp = document.getElementById("friezePalette");
+        if (!fp) return;
+        loadBandImages();
+        fp.innerHTML = "";
+        BAND_FRIESES.forEach(function (id) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "frieze-swatch";
+            btn.dataset.frieze = id;
+            btn.setAttribute("aria-label", "Frieze band");
+            const img = document.createElement("img");
+            img.src = bandSrc(id);
+            img.alt = "";
+            btn.appendChild(img);
+            if (id === D.bandFriezeId) btn.classList.add("active");
+            btn.addEventListener("click", function () {
+                D.bandFriezeId = id;
+                fp.querySelectorAll(".frieze-swatch").forEach(function (s) {
+                    s.classList.toggle("active", s.dataset.frieze === id);
+                });
+                if (D.tool !== "band") setTool("band");
+            });
+            fp.appendChild(btn);
+        });
     }
 
     /* Progressive disclosure: show only the contextual rows the
@@ -7833,6 +8548,8 @@
            currentScreen to pin the highlight strip to a static
            offset instead of animating it. */
         renderPotScene(D.ctx, {
+            dips:          D.dips,
+            bands:         D.bands,
             paintCanvas:   D.paintCanvas,
             stickerCanvas: D.stickerCanvas,
             particles:     false
@@ -8131,6 +8848,10 @@
                 return { y: c.y, radius: c.radius };
             }),
             clayTypeId: SHAPE.clayTypeId,
+            /* Starter shape (metadata only — the geometry, including
+               height, is fully baked into clay[]). Backward compatible:
+               absent → "cylinder". */
+            shapeId: SHAPE.shapeId || "cylinder",
             paintDataUrl: (D.paintCanvas)
                 ? D.paintCanvas.toDataURL("image/png")
                 : null,
@@ -8168,6 +8889,18 @@
                     flipH: !!s.flipH,
                     color: s.color || null
                 };
+            }),
+            /* Dip glaze coats + frieze bands (ported from Slip Studio).
+               Deep-copied so later edits don't mutate the saved entry.
+               Absent on legacy pots → render as bare (backward safe). */
+            dips: (D.dips || []).map(function (d) {
+                return d.preset
+                    ? { preset: d.preset }
+                    : { color: d.color, cover: d.cover,
+                        drips: d.drips || 0, seed: d.seed || 1 };
+            }),
+            bands: (D.bands || []).map(function (b) {
+                return { id: b.id, cy: b.cy, h: b.h };
             })
         };
         /* Carry forward the user's name on a re-save. */
@@ -8741,6 +9474,8 @@
             ctx.save();
             ctx.translate(0, KILN.potOffsetY);
             renderPotScene(ctx, {
+                dips:          D.dips,
+                bands:         D.bands,
                 paintCanvas:   D.paintCanvas,
                 stickerCanvas: D.stickerCanvas,
                 particles:     false,
@@ -9117,6 +9852,9 @@
                     h: SHAPE.baseY - clay[N - 1].y + 14
                 }, entry.surfaceTexturePackId);
             }
+            /* Dip glaze coat — under the sheen (glossy) + under the
+               kid's paint, matching the live renderPotScene order. */
+            if (entry.dips && entry.dips.length) compositeDips(ctx, entry.dips);
             /* Light catches on TOP of the surface texture so saved
                pots with skins still read as 3D-lit. Same layering
                as live renderPotScene: lighting then paint then
@@ -9124,6 +9862,8 @@
             if (typeof paintLightCatches === "function") {
                 paintLightCatches(ctx);
             }
+            /* Frieze bands on top of the sheen. */
+            if (entry.bands && entry.bands.length) compositeBands(ctx, entry.bands);
             if (entry._paintImg) {
                 ctx.save();
                 buildPotPath(ctx);
@@ -11044,6 +11784,9 @@
             /* Match the source's clay type so the remix starts
                with the same material vibe. */
             if (entry.clayTypeId) SHAPE.clayTypeId = entry.clayTypeId;
+            /* Adopt the source's rim finish + starter-shape label and
+               re-derive its height so continued shaping matches. */
+            adoptEntryShape(entry);
             /* Re-render so the wheel reflects the new shape. */
             if (typeof renderShape === "function") renderShape();
             refreshShapeMode();
@@ -13994,7 +14737,21 @@
             get running()          { return SHAPE.running; },
             get wheelPhase()       { return SHAPE.wheelPhase; },
             get EASE()             { return SHAPE.EASE; },
-            get WHEEL_SLOW_FACTOR() { return SHAPE.WHEEL_SLOW_FACTOR; }
+            get WHEEL_SLOW_FACTOR() { return SHAPE.WHEEL_SLOW_FACTOR; },
+            get shapeId()          { return SHAPE.shapeId; },
+            get heightScale()      { return SHAPE.heightScale; }
+        },
+        /* Live read-outs for the dip glaze + band decoration port. */
+        _dec: {
+            get tool()  { return D.tool; },
+            get dips()  { return D.dips.slice(); },
+            get bands() { return D.bands.slice(); },
+            get dripAmount()  { return D.dripAmount; },
+            get bandFriezeId() { return D.bandFriezeId; },
+            bandImgReady: function (id) {
+                const im = BAND_IMAGES[id];
+                return !!(im && im.complete && im.naturalWidth);
+            }
         }
     };
 

@@ -54,7 +54,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=64" />
+    <link rel="stylesheet" href="style.css?v=70" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -554,6 +554,12 @@
                 <!-- swatches injected by buildClayPicker() -->
             </div>
 
+            <!-- Starter shape: re-throws a fresh lump into a vase,
+                 bowl, bottle, etc. Chips injected by buildShapePicker(). -->
+            <div class="chip-picker" id="shapePicker" role="tablist" aria-label="Starter shape">
+                <span class="row-label">SHAPE</span>
+            </div>
+
             <p class="shape-hint" id="shapeHint">
                 TAP to boss the clay. PINCH = skinnier. PUSH = THICCER.
             </p>
@@ -690,6 +696,8 @@
                 <button class="tool-btn" data-tool="spray"    type="button">SPRTZ</button>
                 <button class="tool-btn" data-tool="splatter" type="button">SPLAT</button>
                 <button class="tool-btn" data-tool="stamp"    type="button">POOF</button>
+                <button class="tool-btn" data-tool="dip"      type="button">DIP</button>
+                <button class="tool-btn" data-tool="band"     type="button">BAND</button>
                 <button class="tool-btn" data-tool="eraser"   id="decBaleet"  type="button">OOPS</button>
                 <button class="tool-btn" data-tool="move"     id="decMove"    type="button">SCOOT</button>
             </div>
@@ -755,9 +763,32 @@
                  on each sticker), so GOO stays available for THWACK.
                  Hidden for BALEET/SCOOT. -->
             <div class="tool-row palette-row glaze-row ctx-block"
-                 data-ctx="brush spray splatter stamp">
+                 data-ctx="brush spray splatter stamp dip">
                 <span class="row-label">GOO</span>
                 <div class="palette glaze-palette" id="glazePalette" role="listbox" aria-label="Glaze colors"></div>
+            </div>
+
+            <!-- DRIPS — dip tool only. How much glaze runs down below
+                 the dip line. -->
+            <div class="tool-row drip-row ctx-block" data-ctx="dip">
+                <span class="row-label">DRIPS</span>
+                <div class="chip-picker inline-chips" id="dripPicker"
+                     role="tablist" aria-label="Drip amount"></div>
+            </div>
+
+            <!-- POURS — dip tool only. One-tap gradient glaze pours. -->
+            <div class="tool-row pour-row ctx-block" data-ctx="dip">
+                <span class="row-label">POURS</span>
+                <div class="chip-picker inline-chips" id="pourPicker"
+                     role="tablist" aria-label="Gradient pours"></div>
+            </div>
+
+            <!-- FRIEZE — band tool only. Tap a frieze, then tap the pot
+                 to wrap a band; drag it up/down to move. -->
+            <div class="tool-row palette-row frieze-row ctx-block" data-ctx="band">
+                <span class="row-label">FRIEZE</span>
+                <div class="palette frieze-palette" id="friezePalette"
+                     role="listbox" aria-label="Frieze bands"></div>
             </div>
 
         </div>
@@ -1505,7 +1536,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=64"></script>
+<script src="game.js?v=70"></script>
 
 </body>
 </html>
