@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Petalcraft — Petal Formation Editor</title>
+<style>
+  :root{--paper:#F7EFDD;--paper2:#FBF3E2;--edge:#E7D9BC;--ink:#463A28;--ink2:#7A6A4E;--accent:#C7654E;--leaf:#7A9557;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink);}
+  header{padding:12px 18px;border-bottom:1px solid var(--edge);display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  header h1{font-family:Georgia,serif;font-size:18px;margin:0}
+  header .hint{color:var(--ink2);font-size:12.5px}
+  .app{display:flex;gap:18px;padding:18px;align-items:flex-start;flex-wrap:wrap}
+  .stage{background:var(--paper2);border:1px solid var(--edge);border-radius:14px;padding:12px;box-shadow:0 6px 20px rgba(70,58,40,.08)}
+  canvas{display:block;border-radius:10px;touch-action:none;cursor:crosshair}
+  .stage-bar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .panel{width:320px;max-width:100%;display:flex;flex-direction:column;gap:14px}
+  .box{background:var(--paper2);border:1px solid var(--edge);border-radius:12px;padding:12px 14px}
+  .box h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin:0 0 10px}
+  label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:13px;margin:7px 0}
+  label span.v{color:var(--ink2);font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+  input[type=range]{flex:1}
+  select,button,input[type=color]{font-family:inherit;font-size:13px;border:1px solid var(--edge);background:var(--paper);color:var(--ink);border-radius:8px;padding:6px 10px;cursor:pointer}
+  button.primary{background:var(--accent);color:#fff;border-color:transparent;font-weight:700}
+  button.leaf{background:var(--leaf);color:#fff;border-color:transparent;font-weight:700}
+  button:active{transform:scale(.97)}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .row>*{flex:1}
+  .muted{color:var(--ink2);font-size:12px;line-height:1.5}
+  .sel-none{opacity:.45;pointer-events:none}
+  textarea{width:100%;height:120px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;border:1px solid var(--edge);border-radius:8px;padding:8px;background:var(--paper);color:var(--ink)}
+  .pill{display:inline-block;background:var(--paper);border:1px solid var(--edge);border-radius:999px;padding:2px 9px;font-size:12px}
+  .swatches{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .swatches button{width:24px;height:24px;border-radius:50%;padding:0;border:2px solid rgba(0,0,0,.12)}
+</style>
+</head>
+<body>
+<header>
+  <h1>🌸 Petal Formation Editor</h1>
+  <span class="hint">Build a flower once → the compositor stamps it in every color, pattern &amp; growth stage. Click a petal to select · drag to move.</span>
+</header>
+
+<div class="app">
+  <div class="stage">
+    <canvas id="cv" width="520" height="520"></canvas>
+    <div class="stage-bar">
+      <label style="flex:0 0 auto;gap:6px"><input type="checkbox" id="bg-soil" checked> soil bg</label>
+      <label style="flex:0 0 auto;gap:6px"><input type="checkbox" id="show-shadow" checked> shadows</label>
+      <label style="flex:0 0 auto;gap:6px"><input type="checkbox" id="show-index"> numbers</label>
+      <span class="pill" id="count-pill">0 petals</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="box">
+      <h2>Preview color / pattern</h2>
+      <label>Flower color <input type="color" id="tone" value="#C94E4E"></label>
+      <div class="swatches" id="tone-swatches"></div>
+      <label>Pattern
+        <select id="pattern"><option value="">(none — flat)</option></select>
+      </label>
+      <p class="muted">Preview only. Final art gets full watercolor shading + your real colors.</p>
+    </div>
+
+    <div class="box">
+      <h2>Add a ring of petals</h2>
+      <label>Shape <select id="ring-shape"></select></label>
+      <label>Count <input type="range" id="ring-count" min="3" max="16" value="8"><span class="v" id="ring-count-v">8</span></label>
+      <label>Radius <input type="range" id="ring-radius" min="0" max="45" value="22"><span class="v" id="ring-radius-v">.22</span></label>
+      <label>Petal size <input type="range" id="ring-size" min="15" max="80" value="46"><span class="v" id="ring-size-v">.46</span></label>
+      <label>Angle offset <input type="range" id="ring-angle" min="0" max="90" value="0"><span class="v" id="ring-angle-v">0°</span></label>
+      <label>Point <select id="ring-tip"><option value="out">outward</option><option value="in">inward</option></select></label>
+      <label>Jitter <input type="range" id="ring-jitter" min="0" max="30" value="6"><span class="v" id="ring-jitter-v">6</span></label>
+      <div class="row" style="margin-top:8px">
+        <button class="leaf" id="add-ring">+ Add ring</button>
+        <button id="clear-petals">Clear petals</button>
+      </div>
+    </div>
+
+    <div class="box" id="sel-box">
+      <h2>Selected petal <span class="pill" id="sel-id">none</span></h2>
+      <label>Rotate <input type="range" id="sel-rot" min="0" max="359" value="0"><span class="v" id="sel-rot-v">0°</span></label>
+      <label>Scale <input type="range" id="sel-scale" min="12" max="90" value="46"><span class="v" id="sel-scale-v">.46</span></label>
+      <div class="row">
+        <button id="sel-flip">Flip</button>
+        <button id="sel-dupe">Duplicate</button>
+        <button id="sel-front">To front</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="sel-del" style="color:var(--accent)">Delete petal</button>
+      </div>
+    </div>
+
+    <div class="box">
+      <h2>Center</h2>
+      <label>Shape <select id="center-shape"></select></label>
+      <label>Size <input type="range" id="center-size" min="0" max="55" value="28"><span class="v" id="center-size-v">.28</span></label>
+    </div>
+
+    <div class="box">
+      <h2>Formation</h2>
+      <label>Name <input type="text" id="fname" value="cosmos" style="flex:1;border:1px solid var(--edge);border-radius:8px;padding:6px 8px;background:var(--paper);color:var(--ink)"></label>
+      <div class="row" style="margin-top:6px">
+        <button class="primary" id="export">⬇ Export JSON</button>
+        <button id="import-btn">⬆ Import</button>
+        <input type="file" id="import" accept="application/json,.json" style="display:none">
+      </div>
+      <p class="muted" style="margin:8px 0 4px">Live JSON (what the compositor reads):</p>
+      <textarea id="json" readonly></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHAPES = ["circle","oval","kite","seed","leaf","stem","triangle","rhombus","pentagon"];
+const PATTERNS = ["image-from-rawpixel-id-6110062-png.png","image-from-rawpixel-id-6110064-png.png","image-from-rawpixel-id-6110068-png.png","image-from-rawpixel-id-6110071-png.png","image-from-rawpixel-id-6110074-png.png","image-from-rawpixel-id-6110081-png.png","image-from-rawpixel-id-6110084-png.png","image-from-rawpixel-id-6116797-png.png","image-from-rawpixel-id-6116802-png.png","image-from-rawpixel-id-7435345-png.png"];
+const SIZE = 520;                       // canvas + reference space
+const img = {}, pat = {};               // loaded HTMLImageElements
+const tintCache = {};                   // shape+color -> canvas
+
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let formation = { name:"cosmos", petals:[], center:{shape:"circle", scale:0.28} };
+let selected = -1;
+
+// ---- loading ----
+function loadImg(src){ return new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src=src; }); }
+async function loadAll(){
+  await Promise.all(SHAPES.map(async s=> img[s]=await loadImg(`../shapes/${s}.png`)));
+  await Promise.all(PATTERNS.map(async p=> pat[p]=await loadImg(`../patterns/${p}`)));
+}
+
+// ---- helpers ----
+function hexToRgb(h){h=h.replace("#","");return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)];}
+function tinted(shape,color,patName){
+  const key=shape+"|"+color+"|"+(patName||"");
+  if(tintCache[key]) return tintCache[key];
+  const im=img[shape]; if(!im) return null;
+  const c=document.createElement("canvas"); c.width=im.width; c.height=im.height; const g=c.getContext("2d");
+  g.drawImage(im,0,0);
+  if(patName && pat[patName]){                         // clip pattern into shape
+    g.globalCompositeOperation="source-atop";
+    const p=pat[patName], s=Math.max(c.width/p.width,c.height/p.height)*1.6;
+    const pw=p.width*s, ph=p.height*s;
+    g.globalAlpha=0.9; g.drawImage(p,(c.width-pw)/2,(c.height-ph)/2,pw,ph); g.globalAlpha=1;
+  }
+  g.globalCompositeOperation="multiply";               // tone toward color, keep texture
+  g.fillStyle=color; g.globalAlpha=patName?0.55:0.8; g.fillRect(0,0,c.width,c.height); g.globalAlpha=1;
+  // soft pigment-pool edge (radial dark) for a hint of depth
+  const rad=g.createRadialGradient(c.width/2,c.height/2,c.width*0.12,c.width/2,c.height/2,c.width*0.62);
+  rad.addColorStop(0,"rgba(0,0,0,0)"); rad.addColorStop(1,"rgba(40,26,16,0.28)");
+  g.fillStyle=rad; g.fillRect(0,0,c.width,c.height);
+  g.globalCompositeOperation="destination-in"; g.drawImage(im,0,0); // restore alpha
+  tintCache[key]=c; return c;
+}
+function petalColor(){ return document.getElementById("tone").value; }
+function patName(){ return document.getElementById("pattern").value; }
+
+// ---- render ----
+function draw(){
+  ctx.clearRect(0,0,SIZE,SIZE);
+  if(document.getElementById("bg-soil").checked){ ctx.fillStyle="#B6906A"; roundRect(ctx,0,0,SIZE,SIZE,26); ctx.fill(); }
+  const showShadow=document.getElementById("show-shadow").checked;
+  const showIdx=document.getElementById("show-index").checked;
+  const col=petalColor(), pn=patName();
+  formation.petals.forEach((pt,i)=>{
+    const tc=tinted(pt.shape,col,pn); if(!tc) return;
+    const w=pt.scale*SIZE, h=w*tc.height/tc.width;
+    ctx.save();
+    ctx.translate(pt.cx*SIZE, pt.cy*SIZE);
+    ctx.rotate((pt.rot+(pt.flip?180:0))*Math.PI/180);
+    if(showShadow){ ctx.shadowColor="rgba(50,36,22,.42)"; ctx.shadowBlur=14; ctx.shadowOffsetY=7; }
+    ctx.drawImage(tc,-w/2,-h/2,w,h);
+    ctx.restore();
+    if(i===selected){ ctx.save(); ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.setLineDash([5,4]);
+      ctx.beginPath(); ctx.arc(pt.cx*SIZE,pt.cy*SIZE,w*0.5,0,7); ctx.stroke(); ctx.restore(); }
+    if(showIdx){ ctx.fillStyle="#fff"; ctx.font="bold 13px system-ui"; ctx.textAlign="center";
+      ctx.fillText(i, pt.cx*SIZE, pt.cy*SIZE+4); }
+  });
+  // center
+  const cc=tinted(formation.center.shape, "#E7A24C", null);
+  if(cc){ const w=formation.center.scale*SIZE, h=w*cc.height/cc.width;
+    ctx.save(); if(showShadow){ctx.shadowColor="rgba(50,36,22,.4)";ctx.shadowBlur=8;ctx.shadowOffsetY=3;}
+    ctx.drawImage(cc, SIZE/2-w/2, SIZE/2-h/2, w, h); ctx.restore(); }
+  document.getElementById("count-pill").textContent=formation.petals.length+" petals";
+  updateJSON();
+}
+function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+
+// ---- ring generator ----
+function addRing(){
+  const shape=val("ring-shape"), n=+val("ring-count"), radius=+val("ring-radius")/100,
+        size=+val("ring-size")/100, off=+val("ring-angle"), tip=val("ring-tip"), jit=+val("ring-jitter");
+  for(let i=0;i<n;i++){
+    const A=-90 + i*(360/n) + off + (Math.random()*2-1)*jit;      // degrees
+    const rot=A + (tip==="out"?90:-90) + (Math.random()*2-1)*jit;
+    const jr=radius*(1+(Math.random()*2-1)*jit*0.01);
+    formation.petals.push({
+      shape, cx:0.5+jr*Math.cos(A*Math.PI/180), cy:0.5+jr*Math.sin(A*Math.PI/180),
+      rot:((rot%360)+360)%360, scale:size*(1+(Math.random()*2-1)*jit*0.01), flip:false
+    });
+  }
+  select(-1); draw();
+}
+
+// ---- selection / interaction ----
+function pickPetal(mx,my){
+  for(let i=formation.petals.length-1;i>=0;i--){ const p=formation.petals[i];
+    const dx=mx-p.cx*SIZE, dy=my-p.cy*SIZE; if(Math.hypot(dx,dy) < p.scale*SIZE*0.5) return i; }
+  return -1;
+}
+let drag=null;
+cv.addEventListener("pointerdown",e=>{
+  const r=cv.getBoundingClientRect(), mx=(e.clientX-r.left)*SIZE/r.width, my=(e.clientY-r.top)*SIZE/r.height;
+  const i=pickPetal(mx,my); select(i);
+  if(i>=0){ const p=formation.petals[i]; drag={i,ox:mx-p.cx*SIZE,oy:my-p.cy*SIZE}; cv.setPointerCapture(e.pointerId); }
+});
+cv.addEventListener("pointermove",e=>{
+  if(!drag) return; const r=cv.getBoundingClientRect(), mx=(e.clientX-r.left)*SIZE/r.width, my=(e.clientY-r.top)*SIZE/r.height;
+  const p=formation.petals[drag.i]; p.cx=(mx-drag.ox)/SIZE; p.cy=(my-drag.oy)/SIZE; draw();
+});
+cv.addEventListener("pointerup",()=>drag=null);
+
+function select(i){
+  selected=i; const box=document.getElementById("sel-box");
+  if(i<0){ box.classList.add("sel-none"); document.getElementById("sel-id").textContent="none"; draw(); return; }
+  box.classList.remove("sel-none"); const p=formation.petals[i];
+  document.getElementById("sel-id").textContent="#"+i;
+  setRange("sel-rot",Math.round(p.rot)); setRange("sel-scale",Math.round(p.scale*100));
+  draw();
+}
+
+// ---- wire controls ----
+function val(id){return document.getElementById(id).value;}
+function setRange(id,v){const el=document.getElementById(id);el.value=v;el.dispatchEvent(new Event("input"));}
+function bindLabel(id,fmt){const el=document.getElementById(id),out=document.getElementById(id+"-v");if(out){const u=()=>out.textContent=fmt(el.value);el.addEventListener("input",u);u();}}
+bindLabel("ring-count",v=>v); bindLabel("ring-radius",v=>"."+(""+v).padStart(2,"0")); bindLabel("ring-size",v=>"."+v);
+bindLabel("ring-angle",v=>v+"°"); bindLabel("ring-jitter",v=>v);
+bindLabel("center-size",v=>"."+v); bindLabel("sel-rot",v=>v+"°"); bindLabel("sel-scale",v=>"."+v);
+
+document.getElementById("add-ring").onclick=addRing;
+document.getElementById("clear-petals").onclick=()=>{formation.petals=[];select(-1);draw();};
+document.getElementById("sel-rot").addEventListener("input",e=>{if(selected>=0){formation.petals[selected].rot=+e.target.value;draw();}});
+document.getElementById("sel-scale").addEventListener("input",e=>{if(selected>=0){formation.petals[selected].scale=+e.target.value/100;draw();}});
+document.getElementById("sel-flip").onclick=()=>{if(selected>=0){formation.petals[selected].flip=!formation.petals[selected].flip;draw();}};
+document.getElementById("sel-dupe").onclick=()=>{if(selected>=0){const p={...formation.petals[selected]};p.cx+=0.03;p.cy+=0.03;formation.petals.push(p);select(formation.petals.length-1);}};
+document.getElementById("sel-front").onclick=()=>{if(selected>=0){const p=formation.petals.splice(selected,1)[0];formation.petals.push(p);select(formation.petals.length-1);}};
+document.getElementById("sel-del").onclick=()=>{if(selected>=0){formation.petals.splice(selected,1);select(-1);}};
+document.getElementById("center-shape").addEventListener("change",e=>{formation.center.shape=e.target.value;draw();});
+document.getElementById("center-size").addEventListener("input",e=>{formation.center.scale=+e.target.value/100;draw();});
+["tone","pattern","bg-soil","show-shadow","show-index"].forEach(id=>document.getElementById(id).addEventListener("input",draw));
+document.getElementById("fname").addEventListener("input",e=>{formation.name=e.target.value;updateJSON();});
+
+// swatches (the game's phenotype palette)
+const PAL=["#C94E4E","#E89AB2","#E9925A","#F1D65C","#9B7BC0","#7C96CF","#9FB86A","#46424C","#F3EEE0"];
+const sw=document.getElementById("tone-swatches");
+PAL.forEach(c=>{const b=document.createElement("button");b.style.background=c;b.title=c;b.onclick=()=>{document.getElementById("tone").value=c;draw();};sw.appendChild(b);});
+
+// export / import
+function formationOut(){return {name:formation.name,version:1,petals:formation.petals.map(p=>({shape:p.shape,cx:+p.cx.toFixed(4),cy:+p.cy.toFixed(4),rot:+p.rot.toFixed(1),scale:+p.scale.toFixed(4),flip:!!p.flip})),center:{shape:formation.center.shape,scale:+formation.center.scale.toFixed(4)}};}
+function updateJSON(){document.getElementById("json").value=JSON.stringify(formationOut());}
+document.getElementById("export").onclick=()=>{
+  const blob=new Blob([JSON.stringify(formationOut(),null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(formation.name||"formation")+".formation.json";a.click();
+};
+document.getElementById("import-btn").onclick=()=>document.getElementById("import").click();
+document.getElementById("import").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);formation={name:d.name||"flower",petals:d.petals||[],center:d.center||{shape:"circle",scale:0.28}};document.getElementById("fname").value=formation.name;document.getElementById("center-shape").value=formation.center.shape;setRange("center-size",Math.round(formation.center.scale*100));select(-1);}catch(err){alert("Not a valid formation file.");}};rd.readAsText(f);});
+
+// populate shape dropdowns
+function fillShapes(){["ring-shape","center-shape"].forEach(id=>{const s=document.getElementById(id);SHAPES.forEach(sh=>{const o=document.createElement("option");o.value=sh;o.textContent=sh;s.appendChild(o);});});document.getElementById("ring-shape").value="seed";document.getElementById("center-shape").value="circle";}
+function fillPatterns(){const s=document.getElementById("pattern");PATTERNS.forEach((p,i)=>{const o=document.createElement("option");o.value=p;o.textContent="pattern "+(i+1);s.appendChild(o);});}
+
+// go
+(async function(){
+  fillShapes(); fillPatterns();
+  await loadAll();
+  if(!img.seed){ document.querySelector("header .hint").textContent="⚠ Couldn't load shapes from ../shapes/ — serve this from the petalcraft folder (localhost), not file://."; }
+  addRing();                 // start with one default ring so it's not empty
+  select(-1);
+})();
+</script>
+</body>
+</html>
