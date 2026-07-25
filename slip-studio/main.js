@@ -3670,7 +3670,9 @@ function writeProfileToGeometry(geo) {
     // then the local altering field. Round pots pass a null field so they
     // keep the fast analytic-normal path.
     const prof = computeStyledProfile(profile, state.rimStyle, state.isLid);
-    writeProfileArrayToGeometry(geo, prof, displaceActive ? displace : null,
+    // Lids stay round: never apply the altering field or scallop to a lid,
+    // even if the pot's field is still live in memory when we draw it.
+    writeProfileArrayToGeometry(geo, prof, (displaceActive && !state.isLid) ? displace : null,
         state.isLid ? 0 : state.rimScallop);
 }
 function writeProfileArrayToGeometry(geo, prof, disp, scallopN) {
@@ -6916,6 +6918,12 @@ function makeLidPartner() {
     const rimR = profile[ROWS];
     state.savedPot = capturePieceState();
     state.isLid = true;
+    // A fresh lid is round: drop the pot's altering / facets / scallop from
+    // the live state (they live on in savedPot and come back on swap).
+    clearDisplace();
+    state.facetCount = 0; updateFacetBtn();
+    state.rimScallop = 0; updateScallopBtn();
+    if (state.alterMode) setAlterMode(false);
     seedLidForRim(rimR, state.lidStyle);
     profileDirty = true;
     state.glaze = null;
