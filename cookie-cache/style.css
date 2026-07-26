@@ -1387,6 +1387,96 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
+   PAUSE BUTTON (top-right) + PAUSE OVERLAY — only during a live round
+   ═══════════════════════════════════════════════════════════════════ */
+.btn-pause {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 12px);
+    right: calc(env(safe-area-inset-right, 0px) + 10px);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,255,204,0.55);
+    background: rgba(5,5,5,0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--accent-cyan);
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+    line-height: 1;
+    cursor: pointer;
+    z-index: 100;
+    display: none;               /* shown only while a round is in progress */
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: 0 0 12px rgba(0,255,204,0.2);
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.08s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+body.in-game .btn-pause { display: flex; }
+.btn-pause:active { transform: scale(0.92); }
+
+.pause-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 140;               /* above the stage/countdown, below the rotate prompt */
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(3, 6, 8, 0.82);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+             env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+.pause-overlay.open { display: flex; animation: pause-fade 0.16s ease-out; }
+@keyframes pause-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.pause-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(10px, 2.4vh, 18px);
+    text-align: center;
+    pointer-events: none;        /* only the controls inside take taps; the rest resumes */
+}
+.pause-card > * { pointer-events: auto; }
+
+.pause-title {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-weight: 900;
+    font-size: clamp(2rem, 9vw, 3.4rem);
+    letter-spacing: 6px;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 20px rgba(0,255,204,0.6);
+}
+.pause-quit {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: clamp(0.72rem, 2.2vw, 0.85rem);
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.7);
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 6px;
+    padding: 8px 18px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.08s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.pause-quit:active { transform: scale(0.95); color: #fff; }
+@media (hover: hover) {
+    .pause-quit:hover { color: #fff; border-color: rgba(255,255,255,0.6); }
+}
+.pause-hint {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: clamp(0.68rem, 2vw, 0.82rem);
+    color: rgba(255,255,255,0.5);
+    margin: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
    FOOTER (subtle)
    ═══════════════════════════════════════════════════════════════════ */
 footer {

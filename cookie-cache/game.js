@@ -260,6 +260,10 @@ const els = {
     btnReplay:   document.getElementById('btn-replay'),
     btnMute:     document.getElementById('btn-mute'),
     btnReturn:   document.getElementById('btn-return'),
+    btnPause:    document.getElementById('btn-pause'),
+    pauseOverlay:document.getElementById('pause-overlay'),
+    btnResume:   document.getElementById('btn-resume'),
+    btnQuit:     document.getElementById('btn-quit'),
     menuMascot:  document.getElementById('menu-mascot'),
     loreModal:   document.getElementById('lore-modal'),
     loreBackdrop:document.getElementById('lore-backdrop'),
@@ -461,6 +465,23 @@ function stopLevelMusic() {
     } catch (_) {}
 }
 
+// Pause the level music in place (keeps currentTime) for a game pause; resume
+// picks it back up mid-track. Separate from stopLevelMusic, which rewinds.
+function pauseLevelMusic() {
+    if (!SFX_LEVEL_MUSIC) return;
+    try { SFX_LEVEL_MUSIC.pause(); } catch (_) {}
+}
+
+// Resume the level music from where a pause left it (no rewind), the partner
+// to pauseLevelMusic. Respects mute; volume stays whatever it was.
+function resumeLevelMusic() {
+    if (audio.muted || !SFX_LEVEL_MUSIC) return;
+    try {
+        SFX_LEVEL_MUSIC.volume = audio.levelMusicVol;
+        SFX_LEVEL_MUSIC.play().catch(() => {});
+    } catch (_) {}
+}
+
 // Ramp the level music down over `ms` then stop it — a soft landing for the
 // round-end transition instead of a hard cut. Volume is restored afterwards so
 // the next round starts at full.
@@ -527,6 +548,8 @@ function toggleMute() {
 
 const state = {
     running:      false,
+    paused:       false,
+    pauseAt:      0,     // performance.now() when the round was paused
     cookies:      [],
     score:        0,
     pile:         0,
@@ -608,6 +631,8 @@ function unlockOrientation() {
 function abortRound() {
     if (!state.running) return;
     state.running = false;
+    state.paused  = false;
+    hidePauseOverlay();
     if (state.rafId) cancelAnimationFrame(state.rafId);
     state.rafId = null;
     state.cookies.forEach(c => c.el && c.el.remove());
@@ -621,6 +646,64 @@ function abortRound() {
     unlockOrientation();
     exitGameFullscreen();
     showScreen('menu');
+}
+
+// ── Pause ──────────────────────────────────────────────────────────
+// Freezes a live round: stops the loop + spawn/clock, holds the cookies in
+// place, pauses music, and shows the overlay. Kid-friendly — a child who gets
+// interrupted (or whose phone locks) doesn't lose the round. Only meaningful
+// while actually playing: no-op during the countdown, the feast, or the menu.
+function showPauseOverlay() {
+    if (!els.pauseOverlay) return;
+    els.pauseOverlay.classList.add('open');
+    els.pauseOverlay.setAttribute('aria-hidden', 'false');
+}
+
+function hidePauseOverlay() {
+    if (!els.pauseOverlay) return;
+    els.pauseOverlay.classList.remove('open');
+    els.pauseOverlay.setAttribute('aria-hidden', 'true');
+}
+
+function pauseGame() {
+    if (!state.running || state.paused) return;
+    state.paused  = true;
+    state.pauseAt = performance.now();
+    if (state.rafId) cancelAnimationFrame(state.rafId);
+    state.rafId = null;
+    stopGlitches();
+    pauseLevelMusic();
+    clearBlade();                 // drop any half-drawn swipe
+    els.stage.classList.remove('time-low');   // stop the final-5s red pulse while frozen
+    showPauseOverlay();
+}
+
+function resumeGame() {
+    if (!state.running || !state.paused) return;
+    state.paused = false;
+    hidePauseOverlay();
+    // Shift the Frenzy deadline forward by however long we were paused so a
+    // paused Frenzy doesn't silently expire (it's the one absolute-time clock;
+    // spawnInMs / timeLeftMs are dt-driven and were frozen with the loop).
+    if (state.frenzy && state.pauseAt) {
+        state.frenzyUntil += performance.now() - state.pauseAt;
+    }
+    state.pauseAt = 0;
+    resumeLevelMusic();
+    state.lastTs = 0;             // reset dt so the first resumed frame isn't a huge step
+    state.rafId  = requestAnimationFrame(loop);
+    scheduleNextGlitch();
+}
+
+function togglePause() {
+    if (!state.running) return;
+    if (state.paused) resumeGame(); else pauseGame();
+}
+
+// Quit from the pause overlay straight back to the menu.
+function quitToMenu() {
+    if (!state.running) return;
+    abortRound();
 }
 
 const rand   = (min, max) => min + Math.random() * (max - min);
@@ -976,7 +1059,7 @@ function sliceSegment(ax, ay, bx, by) {
 }
 
 function onBladeDown(e) {
-    if (!state.running) return;
+    if (!state.running || state.paused) return;
     const p = stageLocalPoint(e);
     state.blade.active = true;
     state.blade.pointerId = e.pointerId;
@@ -1682,6 +1765,9 @@ function loop(ts) {
 
 function resetState() {
     state.running     = false;
+    state.paused      = false;
+    state.pauseAt     = 0;
+    hidePauseOverlay();
     state.score       = 0;
     state.pile        = 0;
     state.timeLeftMs  = CFG.duration * 1000;
@@ -2130,6 +2216,18 @@ function init() {
     els.btnReplay.addEventListener('click', startRound);
     if (els.btnMute) els.btnMute.addEventListener('click', toggleMute);
 
+    // Pause controls: the top-right button toggles, Resume/Quit live on the
+    // overlay, and tapping the dimmed backdrop (anything that isn't a control)
+    // resumes — the friendliest possible "get back in" for a young player.
+    if (els.btnPause)  els.btnPause.addEventListener('click', togglePause);
+    if (els.btnResume) els.btnResume.addEventListener('click', resumeGame);
+    if (els.btnQuit)   els.btnQuit.addEventListener('click', quitToMenu);
+    if (els.pauseOverlay) {
+        els.pauseOverlay.addEventListener('click', (e) => {
+            if (e.target === els.pauseOverlay) resumeGame();   // backdrop tap only
+        });
+    }
+
     if (els.menuMascot)   els.menuMascot.addEventListener('click', loreOpen);
     if (els.loreClose)    els.loreClose.addEventListener('click', loreCloseModal);
     if (els.loreBackdrop) els.loreBackdrop.addEventListener('click', loreCloseModal);
@@ -2155,10 +2253,21 @@ function init() {
     // only open from the menu (where state.running is false), so the two
     // handlers never both fire on the same Esc keypress.
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && state.running && !state.loreOpen) {
+        if (state.loreOpen) return;   // the lore modal owns keys while it's open
+        if (e.key === 'Escape' && state.running) {
             e.preventDefault();
             abortRound();
+        } else if ((e.key === 'p' || e.key === 'P' || e.key === ' ') && state.running) {
+            e.preventDefault();
+            togglePause();
         }
+    });
+
+    // Auto-pause when the tab is hidden mid-round (phone locks, app switched
+    // away, another tab). We don't auto-resume — the player taps back in — so
+    // they never return to a round that ran on without them.
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && state.running && !state.paused) pauseGame();
     });
 
     // If the user exits fullscreen mid-play (Esc, F11, browser UI),
