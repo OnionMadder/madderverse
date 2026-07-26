@@ -90,7 +90,7 @@ function mixSpecies(name, extra) {
 // All 8 AC-named species share the genetics above; they differ only by
 // silhouette (art) and their signature rare pattern (baked into the sheets).
 const SPECIES = {
-    cosmos:      mixSpecies("Cosmos", { sprites: { src: "assets/img/flowers/cosmos.png", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] } }),
+    cosmos:      mixSpecies("Cosmos", { sprites: { src: "assets/img/flowers/cosmos.png?a=2", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] } }),
     tulips:      mixSpecies("Tulips"),
     pansies:     mixSpecies("Pansies"),
     hyacinths:   mixSpecies("Hyacinths"),

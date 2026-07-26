@@ -88,8 +88,13 @@ def stamp(cv, tex, cx, cy, w, rot=0, shadow_op=90, sb=None):
 
 def bloom_cell(colorHex, isRare):
     cv = Image.new('RGBA', (F, F), (0, 0, 0, 0))
-    petTex = petal_tex('circle', PATTERN if isRare else None, colorHex)
+    pf = PATTERN if isRare else None
+    texcache = {}
+    def tex(shape):
+        if shape not in texcache: texcache[shape] = petal_tex(shape, pf, colorHex)
+        return texcache[shape]
     for p in form['petals']:
+        petTex = tex(p.get('shape', 'circle'))   # honor each petal's shape
         w = max(2, int(p['scale']*F)); h = max(2, int(w*petTex.height/petTex.width))
         im = petTex.resize((w, h), Image.LANCZOS)
         im = im.rotate(-(p['rot']+(180 if p.get('flip') else 0)), expand=True, resample=Image.BICUBIC)
@@ -98,7 +103,7 @@ def bloom_cell(colorHex, isRare):
         cv.alpha_composite(sh, (x+off[0], y+off[1])); cv.alpha_composite(im, (x, y))
     c = form.get('center')
     if c:
-        stamp(cv, solid_tex('circle', CENTER, 0.16), F/2, F/2, int(c['scale']*F), shadow_op=55)
+        stamp(cv, solid_tex(c.get('shape', 'circle'), CENTER, 0.16), F/2, F/2, int(c['scale']*F), shadow_op=55)
     return cv
 
 def bud_cell(colorHex, isRare):

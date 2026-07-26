@@ -1,0 +1,106 @@
+{
+  "name": "cosmos",
+  "version": 1,
+  "petals": [
+    {
+      "shape": "pentagon",
+      "cx": 0.5326,
+      "cy": 0.2906,
+      "rot": 186,
+      "scale": 0.3454,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.7108,
+      "cy": 0.408,
+      "rot": 243.3,
+      "scale": 0.3529,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.6728,
+      "cy": 0.6327,
+      "rot": 310.8,
+      "scale": 0.3437,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.4586,
+      "cy": 0.7124,
+      "rot": 10.3,
+      "scale": 0.3292,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.2946,
+      "cy": 0.5948,
+      "rot": 62,
+      "scale": 0.3319,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.3335,
+      "cy": 0.3534,
+      "rot": 126.8,
+      "scale": 0.3423,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.6942,
+      "cy": 0.3772,
+      "rot": 240.7,
+      "scale": 0.354,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.6855,
+      "cy": 0.6275,
+      "rot": 304,
+      "scale": 0.342,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.4994,
+      "cy": 0.7226,
+      "rot": 359.8,
+      "scale": 0.3406,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.3075,
+      "cy": 0.6263,
+      "rot": 56.9,
+      "scale": 0.3247,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.3073,
+      "cy": 0.3843,
+      "rot": 116.1,
+      "scale": 0.3397,
+      "flip": false
+    },
+    {
+      "shape": "pentagon",
+      "cx": 0.4973,
+      "cy": 0.283,
+      "rot": 181.3,
+      "scale": 0.3538,
+      "flip": false
+    }
+  ],
+  "center": {
+    "shape": "circle",
+    "scale": 0.23
+  }
+}
