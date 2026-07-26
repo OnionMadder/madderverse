@@ -1,0 +1,90 @@
+{
+  "name": "daisy",
+  "version": 1,
+  "petals": [
+    {
+      "shape": "stem",
+      "cx": 0.6726,
+      "cy": 0.288,
+      "rot": 219.4,
+      "scale": 0.2324,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.7602,
+      "cy": 0.437,
+      "rot": 257.8,
+      "scale": 0.2245,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.7519,
+      "cy": 0.5877,
+      "rot": 289.2,
+      "scale": 0.2283,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.6382,
+      "cy": 0.7291,
+      "rot": 330,
+      "scale": 0.2281,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.479,
+      "cy": 0.7751,
+      "rot": 5.9,
+      "scale": 0.2285,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.3405,
+      "cy": 0.7087,
+      "rot": 34.5,
+      "scale": 0.2276,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.2378,
+      "cy": 0.5581,
+      "rot": 76.6,
+      "scale": 0.2305,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.2419,
+      "cy": 0.4088,
+      "rot": 112.2,
+      "scale": 0.2323,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.3514,
+      "cy": 0.2703,
+      "rot": 146.9,
+      "scale": 0.2245,
+      "flip": false
+    },
+    {
+      "shape": "stem",
+      "cx": 0.5136,
+      "cy": 0.2346,
+      "rot": 184.5,
+      "scale": 0.2348,
+      "flip": false
+    }
+  ],
+  "center": {
+    "shape": "circle",
+    "scale": 0.41
+  }
+}

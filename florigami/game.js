@@ -28,7 +28,11 @@ const GAME_NAME = "Florigami";
 // renaming it would wipe every existing player's saved garden. Same approach as
 // Pootery keeping its "crayte-*" keys after that rename.
 const SAVE_KEY = "petalcraft-save";
-const SAVE_VERSION = 4;
+const SAVE_VERSION = 5;
+
+// Species renamed 2026-07-25 (roster rework). Old saves are carried forward by
+// remapping these ids on load so unlocked progress + dex + crosses survive.
+const RENAMED_SPECIES = { tulips: "daisies", hyacinths: "sunflowers" };
 
 const GRID_W = 6;
 const GRID_H = 4;
@@ -91,9 +95,9 @@ function mixSpecies(name, extra) {
 // silhouette (art) and their signature rare pattern (baked into the sheets).
 const SPECIES = {
     cosmos:      mixSpecies("Cosmos", { sprites: { src: "assets/img/flowers/cosmos.png?a=2", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] } }),
-    tulips:      mixSpecies("Tulips"),
-    pansies:     mixSpecies("Pansies"),
-    hyacinths:   mixSpecies("Hyacinths"),
+    daisies:      mixSpecies("Daisies", { sprites: { src: "assets/img/flowers/daisy.png?a=1", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] } }),
+    pansies:     mixSpecies("Pansies", { sprites: { src: "assets/img/flowers/pansy.png?a=1", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] } }),
+    sunflowers:   mixSpecies("Sunflowers"),
     lilies:      mixSpecies("Lilies"),
     mums:        mixSpecies("Mums"),
     windflowers: mixSpecies("Windflowers"),
@@ -112,15 +116,15 @@ function seedColorsFor(species) {
 // Unlock schedule (DESIGN.md §4.2). cosmos is free from day 1; the others
 // unlock from garden progress so the first ~15 min is one self-contained puzzle.
 // Order matters: it's how locked species queue up as "coming" tabs/hints.
-const UNLOCK_ORDER = ["cosmos", "tulips", "pansies", "hyacinths", "lilies", "mums", "windflowers", "roses"];
+const UNLOCK_ORDER = ["cosmos", "daisies", "pansies", "sunflowers", "lilies", "mums", "windflowers", "roses"];
 
 // A short, non-spoiling hint shown on each locked species' Bloombook tab. Says
 // the species exists and roughly why it's coming, never the exact trigger —
 // discovery stays a surprise (Madderverse Promise: you just haven't found it yet).
 const LOCKED_HINT = {
-    tulips:      "Grow your first cosmos hybrid and these arrive.",
+    daisies:      "Grow your first cosmos hybrid and these arrive.",
     pansies:     "A few more cosmos in the Bloombook and these open up.",
-    hyacinths:   "Keep filling the Bloombook — these bloom into reach with time.",
+    sunflowers:   "Keep filling the Bloombook — these bloom into reach with time.",
     lilies:      "Your garden's growing. These are a little further down the path.",
     mums:        "More discoveries, and these will find their way to you.",
     windflowers: "Something breezier waits a few flowers on from here.",
@@ -129,9 +133,9 @@ const LOCKED_HINT = {
 
 // Progression gates keyed off total discoveries across all species — a natural,
 // self-paced "you've been at this a while" curve (Madderverse Promise: nothing is
-// ever blocked, you just haven't found it yet). tulips + pansies keep their own
+// ever blocked, you just haven't found it yet). daisies + pansies keep their own
 // cosmos-specific gates below; the rest ladder up on total Bloombook breadth.
-const TOTAL_GATES = { hyacinths: 10, lilies: 14, mums: 18, windflowers: 23, roses: 28 };
+const TOTAL_GATES = { sunflowers: 10, lilies: 14, mums: 18, windflowers: 23, roses: 28 };
 
 // Flavor text for the Bloombook — written in Onion's voice.
 // Shared, colour-mixing-themed flavour for the unified palette. Every species
@@ -324,16 +328,16 @@ const state = {
     // (red/yellow/blue) — the unified colour-mixing model.
     seedInventory: {
         cosmos:      { red: Infinity, yellow: Infinity, blue: Infinity },
-        tulips:      { red: Infinity, yellow: Infinity, blue: Infinity },
+        daisies:      { red: Infinity, yellow: Infinity, blue: Infinity },
         pansies:     { red: Infinity, yellow: Infinity, blue: Infinity },
-        hyacinths:   { red: Infinity, yellow: Infinity, blue: Infinity },
+        sunflowers:   { red: Infinity, yellow: Infinity, blue: Infinity },
         lilies:      { red: Infinity, yellow: Infinity, blue: Infinity },
         mums:        { red: Infinity, yellow: Infinity, blue: Infinity },
         windflowers: { red: Infinity, yellow: Infinity, blue: Infinity },
         roses:       { red: Infinity, yellow: Infinity, blue: Infinity },
     },
     unlockedSpecies: ["cosmos"],   // every other species unlocks via progress
-    flowerdex: { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {}, lilies: {}, mums: {}, windflowers: {}, roses: {} },
+    flowerdex: { cosmos: {}, daisies: {}, pansies: {}, sunflowers: {}, lilies: {}, mums: {}, windflowers: {}, roses: {} },
     seenOrnaments: [],             // ornament ids already announced (persisted)
     crosses: [],                   // capped log of observed colour crosses (persisted)
     settings: {
@@ -692,7 +696,7 @@ function unlockSpecies(species) {
 
 /**
  * Re-evaluate progression gates (DESIGN.md §4.2):
- *  - tulips  unlock at the first cosmos HYBRID (any non-seed color).
+ *  - daisies  unlock at the first cosmos HYBRID (any non-seed color).
  *  - pansies unlock once 5 cosmos slots are filled.
  * Returns an array of newly-unlocked species names (for UI fanfare).
  */
@@ -701,12 +705,12 @@ function checkUnlocks() {
     const cosmosColors = Object.keys(state.flowerdex.cosmos || {});
     const cosmosHybrids = cosmosColors.filter(c => isHybridColor("cosmos", c)).length;
 
-    if (!isUnlocked("tulips") && cosmosHybrids >= 1 && unlockSpecies("tulips")) newly.push("tulips");
+    if (!isUnlocked("daisies") && cosmosHybrids >= 1 && unlockSpecies("daisies")) newly.push("daisies");
     if (!isUnlocked("pansies") && cosmosColors.length >= 5 && unlockSpecies("pansies")) newly.push("pansies");
-    // The rest ladder up on total Bloombook breadth — hyacinths → lilies → mums
+    // The rest ladder up on total Bloombook breadth — sunflowers → lilies → mums
     // → windflowers → roses — so the garden keeps opening at the player's pace.
     const total = totalDex();
-    for (const sp of ["hyacinths", "lilies", "mums", "windflowers", "roses"]) {
+    for (const sp of ["sunflowers", "lilies", "mums", "windflowers", "roses"]) {
         if (!isUnlocked(sp) && total >= TOTAL_GATES[sp] && unlockSpecies(sp)) newly.push(sp);
     }
     return newly;
@@ -786,7 +790,7 @@ function migrateSave(data) {
     // v1 → v2: pansies bucket + clock.lastRealMs were added; deserialize already
     // backfills both defensively, so nothing destructive is needed here.
     if (v < 2) { v = 2; }
-    // v2 → v3: hyacinths species + seenOrnaments were added. Both are backfilled
+    // v2 → v3: sunflowers species + seenOrnaments were added. Both are backfilled
     // defensively in deserialize (dex/inventory buckets, seenOrnaments default []),
     // so a v2 save falls through whole — no data touched.
     if (v < 3) { v = 3; }
@@ -794,6 +798,9 @@ function migrateSave(data) {
     // crosses to []; old cosmos flowerdex colours (pink etc.) are harmless extra
     // keys, and the tray/dex read the new SPECIES tables — nothing to migrate.
     if (v < 4) { v = 4; }
+    // v4 → v5: species roster rework (tulips→daisies, hyacinths→sunflowers).
+    // deserialize remaps those ids in unlocked/dex/crosses, so nothing to do here.
+    if (v < 5) { v = 5; }
     data.version = SAVE_VERSION;
     return data;
 }
@@ -816,14 +823,24 @@ function deserialize(data) {
             failedBreeds: t.fb || 0,
         });
     }
+    // Carry renamed species forward (tulips→daisies, hyacinths→sunflowers) BEFORE
+    // the known-species filter, so a player's unlocked/dex/crosses survive the rename.
+    if (Array.isArray(data.unlocked)) data.unlocked = data.unlocked.map(s => RENAMED_SPECIES[s] || s);
+    if (data.dex && typeof data.dex === "object") {
+        for (const [o, n] of Object.entries(RENAMED_SPECIES)) {
+            if (data.dex[o]) { data.dex[n] = Object.assign({}, data.dex[n], data.dex[o]); delete data.dex[o]; }
+        }
+    }
+    if (Array.isArray(data.crosses)) data.crosses.forEach(c => { if (c && RENAMED_SPECIES[c.species]) c.species = RENAMED_SPECIES[c.species]; });
+
     if (Array.isArray(data.unlocked)) {
         // Keep only species we still ship (guards against a renamed/removed id).
         state.unlockedSpecies = data.unlocked.filter(s => SPECIES[s]);
         if (!state.unlockedSpecies.length) state.unlockedSpecies = ["cosmos"];
     }
     if (data.dex && typeof data.dex === "object") {
-        // Ensure every species bucket exists (older saves predate pansies/hyacinths).
-        state.flowerdex = { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {}, ...data.dex };
+        // Ensure every species bucket exists (older saves predate pansies/sunflowers).
+        state.flowerdex = { cosmos: {}, daisies: {}, pansies: {}, sunflowers: {}, ...data.dex };
         for (const sp of UNLOCK_ORDER) if (!state.flowerdex[sp]) state.flowerdex[sp] = {};
     }
     if (Array.isArray(data.seenOrnaments)) state.seenOrnaments = data.seenOrnaments.slice();
@@ -1325,16 +1342,9 @@ function makeFlowerEl(tile) {
         return wrap;
     }
 
-    // Bloom shapes differ by species: hyacinths = a stacked "spike" of florets,
-    // tulips = a CSS cup (::before), cosmos + pansies = a 5-petal face.
-    if (tile.stage === 3 && tile.species === "hyacinths") {
-        for (let i = 0; i < 6; i++) {
-            const fl = document.createElement("div");
-            fl.className = "floret";
-            fl.style.setProperty("--i", i);
-            body.appendChild(fl);
-        }
-    } else if (tile.stage === 3 && tile.species !== "tulips") {
+    // CSS fallback (used until a species has a baked sprite sheet): a generic
+    // 5-petal paper face for every species. Real silhouette comes from the sheet.
+    if (tile.stage === 3) {
         for (let i = 0; i < 5; i++) {
             const petal = document.createElement("div");
             petal.className = "petal";
@@ -1731,9 +1741,9 @@ function renderSeedTray() {
 
 // Singular label for a species id (chips, dex names, toasts). Falls back to
 // trimming a trailing "s" so a newly-added species never silently reads as
-// "cosmos" (the old default hid the hyacinths mislabel).
+// "cosmos" (the old default hid the sunflowers mislabel).
 const SPECIES_SHORT = {
-    cosmos: "cosmos", tulips: "tulip", pansies: "pansy", hyacinths: "hyacinth",
+    cosmos: "cosmos", daisies: "daisy", pansies: "pansy", sunflowers: "sunflower",
     lilies: "lily", mums: "mum", windflowers: "windflower", roses: "rose",
 };
 function speciesShort(species) {

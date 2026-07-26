@@ -1,0 +1,50 @@
+{
+  "name": "pansy",
+  "version": 1,
+  "petals": [
+    {
+      "shape": "circle",
+      "cx": 0.5914,
+      "cy": 0.2453,
+      "rot": 202.7,
+      "scale": 0.5053,
+      "flip": false
+    },
+    {
+      "shape": "circle",
+      "cx": 0.7728,
+      "cy": 0.5077,
+      "rot": 273.6,
+      "scale": 0.4954,
+      "flip": false
+    },
+    {
+      "shape": "circle",
+      "cx": 0.5758,
+      "cy": 0.7533,
+      "rot": 340.9,
+      "scale": 0.5002,
+      "flip": false
+    },
+    {
+      "shape": "circle",
+      "cx": 0.2863,
+      "cy": 0.6692,
+      "rot": 50.4,
+      "scale": 0.5106,
+      "flip": false
+    },
+    {
+      "shape": "circle",
+      "cx": 0.2749,
+      "cy": 0.3537,
+      "rot": 120.9,
+      "scale": 0.5165,
+      "flip": false
+    }
+  ],
+  "center": {
+    "shape": "circle",
+    "scale": 0.12
+  }
+}
