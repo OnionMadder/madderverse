@@ -1096,6 +1096,18 @@ const SHAPES = {
             [0.43, 1.40],
         ],
     },
+    // Teapot: a squat, round body that narrows to a modest lidded mouth,
+    // and auto-fits a single handle + a pouring spout at the Decorate stage.
+    teapot: {
+        label: "Teapot",
+        handle: true,
+        spout: true,
+        controls: [
+            [0.00, 0.00], [0.34, 0.00], [0.42, 0.06], [0.58, 0.24],
+            [0.68, 0.46], [0.69, 0.64], [0.62, 0.82], [0.50, 0.96],
+            [0.42, 1.06], [0.44, 1.12], [0.42, 1.16],
+        ],
+    },
 };
 
 // Lid silhouettes — keyed by style. Each entry generates control
@@ -1205,7 +1217,7 @@ const RIM_STYLE_LABELS = { cut: "Cut", rounded: "Rounded", flared: "Flared", rol
 // Lids are now generated parametrically from the source pot's rim
 // (see seedLidForRim) — no preset silhouette needed.
 const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "jar", "egg",
-    "planter", "goblet", "budvase", "mug"]; // picker order; lid is set-only
+    "planter", "goblet", "budvase", "mug", "teapot"]; // picker order; lid is set-only
 const DEFAULT_SHAPE = "vase";
 
 const state = {
@@ -1310,6 +1322,11 @@ const state = {
         // just the mirror hidden. A style pref, kept across on/off toggles.
         count: 2,
     },
+    // Teapot spout — a tapering curved tube on the opposite side from the
+    // handle, built like the ear (its own mesh + material, glazes/decorates
+    // via the same shader). A single global on-flag reflecting the POT (lids
+    // never carry a spout), hidden when the active piece is a lid.
+    spout: { mesh: null, material: null, on: false },
     pendingSetId: null,                   // carried across save → reset for lid pairs
     // Has the user done anything that isn't reflected in the gallery?
     // Set true on any sculpt / decorate / glaze / advance / lid-create;
@@ -1762,6 +1779,7 @@ function init() {
             setFinish, resistAt, resistStroke, clearResist, setShowWax, freezeDipUnderWax, setMotifFullColor,
             setHandleOn, setHandleThickness, setHandleCount,
             rebuildHandleGeometry, buildHandleCurve, handleAttachYs,
+            setSpoutOn, ensureSpoutMesh, rebuildSpoutGeometry, buildSpoutGeometry,
             setZoom, zoomBy, rotateBy,
             savePot, openPhotoModal, closePhotoModal, finalizePhoto,
             enterDisplayMode, exitDisplayMode,
@@ -3623,6 +3641,133 @@ function updateHandleVisibility() {
     if (state.handle.mesh)       state.handle.mesh.visible       = visible;
     // The mirror ear is the SECOND handle — hidden for a single-handle pot.
     if (state.handle.mirrorMesh) state.handle.mirrorMesh.visible = visible && state.handle.count !== 1;
+    updateSpoutVisibility(); // the spout rides the same show/hide rules
+}
+
+// --- Teapot spout ------------------------------------------------
+// A tapering curved tube that pours: attaches low on the belly, arcs OUT
+// and UP so the lip sits near the rim (so tea doesn't dribble). Built like
+// the handle (frame-sweep with a per-station radius) but single-ended and
+// narrowing to the tip, placed on the FAR side from the handle. Reuses the
+// handle's glaze+deco material approach so it finishes to match the body.
+const SPOUT_TUBE_R  = 0.085;   // base tube radius (thick where it meets the wall)
+const SPOUT_TIP_R   = 0.045;   // narrow pouring lip
+const SPOUT_ROOT_FLARE = 1.1;  // extra swell where it joins the body
+const SPOUT_REACH   = 0.42;    // how far the lip reaches out past the wall
+function spoutAttachY() {
+    return Math.max(FOOT_TOP + FOOT_BLEND + 0.06, TOP * 0.34); // low on the belly, clear of the foot
+}
+// Highest y where the profile still has real radius — the rim the lip aims for.
+function spoutRimY() {
+    const EPS = 0.02;
+    for (let r = ROWS; r >= 0; r--) if (profile[r] > EPS) return (r / ROWS) * TOP;
+    return TOP;
+}
+function buildSpoutCurve() {
+    const yBase = spoutAttachY();
+    const rBase = radiusAt(yBase);
+    const yTip = Math.min(TOP - 0.06, spoutRimY());   // lip about level with the rim
+    const inset = SPOUT_TUBE_R * 2.0;                 // bury the base cap in the wall
+    const reach = SPOUT_REACH;
+    const pts = [
+        new THREE.Vector3(rBase - inset, yBase, 0),                                  // buried base
+        new THREE.Vector3(rBase + reach * 0.42, yBase + (yTip - yBase) * 0.35, 0),   // knee: out + up
+        new THREE.Vector3(rBase + reach * 0.82, yBase + (yTip - yBase) * 0.72, 0),
+        new THREE.Vector3(rBase + reach, yTip, 0),                                   // pouring lip
+    ];
+    return new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
+}
+// Extra thickness only at the root (t≈0), easing off — a pulled-clay fillet.
+function spoutRootBlend(t) {
+    const edge = 0.22;
+    return t < edge ? smoothstep(1 - t / edge) : 0;
+}
+function buildSpoutGeometry() {
+    const curve = buildSpoutCurve();
+    const TUBULAR = 56, RADIAL = 18;
+    const frames = curve.computeFrenetFrames(TUBULAR, false);
+    const pos = [], idx = [];
+    const P = new THREE.Vector3();
+    for (let i = 0; i <= TUBULAR; i++) {
+        const t = i / TUBULAR;
+        curve.getPointAt(t, P);
+        const N = frames.normals[i], B = frames.binormals[i];
+        const rTaper = SPOUT_TUBE_R + (SPOUT_TIP_R - SPOUT_TUBE_R) * t; // wide base → narrow lip
+        const r = rTaper * (1 + SPOUT_ROOT_FLARE * spoutRootBlend(t));
+        for (let j = 0; j <= RADIAL; j++) {
+            const v = (j / RADIAL) * Math.PI * 2;
+            const sn = Math.sin(v), cs = -Math.cos(v);
+            pos.push(
+                P.x + r * (cs * N.x + sn * B.x),
+                P.y + r * (cs * N.y + sn * B.y),
+                P.z + r * (cs * N.z + sn * B.z),
+            );
+        }
+    }
+    for (let i = 1; i <= TUBULAR; i++) {
+        for (let j = 1; j <= RADIAL; j++) {
+            const a = (RADIAL + 1) * (i - 1) + (j - 1);
+            const b = (RADIAL + 1) * i + (j - 1);
+            const c = (RADIAL + 1) * i + j;
+            const d = (RADIAL + 1) * (i - 1) + j;
+            idx.push(a, b, d, b, c, d);
+        }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setIndex(idx);
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.computeVertexNormals();
+    return geo;
+}
+function ensureSpoutMesh() {
+    if (state.spout.mesh) return state.spout.mesh;
+    const initial = currentLook();
+    const mat = new THREE.MeshPhysicalMaterial({
+        color: initial.color, roughness: initial.roughness,
+        clearcoat: initial.clearcoat, clearcoatRoughness: initial.clearcoatRoughness,
+        envMapIntensity: initial.envMapIntensity,
+        metalness: initial.metalness != null ? initial.metalness : 0,
+        iridescence: 0.001, iridescenceIOR: 1.3, side: THREE.DoubleSide,
+    });
+    state.spout.material = mat;
+    mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uDipMap = { value: state.dipTex };
+        shader.uniforms.decoMap = { value: state.decoTex };
+        shader.vertexShader = shader.vertexShader
+            .replace("#include <common>", "varying float vSpoutV;\nvarying float vSpoutU;\n#include <common>")
+            .replace("#include <begin_vertex>", `#include <begin_vertex>\n vSpoutV = position.y / ${TOP.toFixed(4)};\n vSpoutU = atan( position.z, position.x ) * 0.15915494 + 0.5;`);
+        shader.fragmentShader = shader.fragmentShader
+            .replace("#include <common>", "uniform sampler2D uDipMap;\nuniform sampler2D decoMap;\nvarying float vSpoutV;\nvarying float vSpoutU;\n#include <common>")
+            .replace("#include <map_fragment>",
+                `#include <map_fragment>
+                 float _sv = clamp( vSpoutV, 0.0, 1.0 );
+                 vec4 _sdip = texture2D( uDipMap, vec2( 0.5, _sv ) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _sdip.rgb, vec3( 2.2 ) ), _sdip.a );
+                 vec4 _sdeco = texture2D( decoMap, vec2( vSpoutU, _sv ) );
+                 diffuseColor.rgb = mix( diffuseColor.rgb, pow( _sdeco.rgb, vec3( 2.2 ) ), _sdeco.a );`);
+    };
+    mat.customProgramCacheKey = () => "spout-deco-dip-v1";
+    const mesh = new THREE.Mesh(buildSpoutGeometry(), mat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.rotation.y = Math.PI;   // opposite the (single) handle
+    state.potGroup.add(mesh);
+    state.spout.mesh = mesh;
+    return mesh;
+}
+function rebuildSpoutGeometry() {
+    if (!state.spout.mesh) return;
+    const old = state.spout.mesh.geometry;
+    state.spout.mesh.geometry = buildSpoutGeometry();
+    if (old) old.dispose();
+}
+function updateSpoutVisibility() {
+    if (state.spout.mesh) state.spout.mesh.visible = state.spout.on && !state.isLid;
+}
+function setSpoutOn(on) {
+    state.spout.on = !!on;
+    if (state.spout.on) { ensureSpoutMesh(); rebuildSpoutGeometry(); }
+    updateSpoutVisibility();
+    state.dirty = true;
 }
 
 // Tube-radius preset swap. New geometry uses the new thickness; the
@@ -3816,6 +3961,9 @@ function writeProfileArrayToGeometry(geo, prof, disp, scallopN) {
     // handle update on the live one.
     if (geo === state.pot?.geometry && state.handle.on && !state.isLid) {
         rebuildHandleGeometry();
+    }
+    if (geo === state.pot?.geometry && state.spout.on && !state.isLid) {
+        rebuildSpoutGeometry();
     }
 }
 
@@ -4151,6 +4299,10 @@ function advanceStage() {
                 setHandleCount(1);
                 setHandleOn(true);
             }
+            // Teapot preset: fit the pouring spout on the far side too.
+            if (SHAPES[state.shape] && SHAPES[state.shape].spout && !state.isLid && !state.spout.on) {
+                setSpoutOn(true);
+            }
             state.dirty = true;
             scheduleCoach("leather"); // first time at Decorate → teach the dip
             break;
@@ -4167,9 +4319,10 @@ function advanceStage() {
             // pot carries a handle, swap the pot in first — then it fires as
             // the active piece (bottom of the assembly) with its handle
             // showing, and the lid rides along as the partner on top.
-            if (state.isLid && state.savedPot && state.handle.on) {
+            if (state.isLid && state.savedPot && (state.handle.on || state.spout.on)) {
                 swapActivePiece();
                 if (state.handle.on) rebuildHandleGeometry();
+                if (state.spout.on) rebuildSpoutGeometry();
                 updateHandleVisibility();
             }
             setPhase("fired");
@@ -4535,6 +4688,8 @@ function resetPot() {
     state.handle.bottomOffset = 0;
     state.handle.thickness = DEFAULT_HANDLE_THICKNESS;
     state.handle.count = 2;
+    state.spout.on = false;
+    updateSpoutVisibility();
     updateHandleVisibility();
     updateHandleStylePicker();
     updateHandleCountPicker();
@@ -4658,6 +4813,17 @@ function tickMaterial(dt) {
         hm.metalness          += ((t.metalness != null ? t.metalness : 0) - hm.metalness) * k;
         hm.iridescence        += ((t.iridescence != null ? t.iridescence : 0) - hm.iridescence) * k;
         if (t.iridescenceIOR != null) hm.iridescenceIOR += (t.iridescenceIOR - hm.iridescenceIOR) * k;
+    }
+    if (state.spout.material && state.spout.on) {
+        const sm = state.spout.material;
+        sm.color.lerp(targetColor, k);
+        sm.roughness          += (t.roughness          - sm.roughness)          * k;
+        sm.clearcoat          += (t.clearcoat          - sm.clearcoat)          * k;
+        sm.clearcoatRoughness += (t.clearcoatRoughness - sm.clearcoatRoughness) * k;
+        sm.envMapIntensity    += (t.envMapIntensity    - sm.envMapIntensity)    * k;
+        sm.metalness          += ((t.metalness != null ? t.metalness : 0) - sm.metalness) * k;
+        sm.iridescence        += ((t.iridescence != null ? t.iridescence : 0) - sm.iridescence) * k;
+        if (t.iridescenceIOR != null) sm.iridescenceIOR += (t.iridescenceIOR - sm.iridescenceIOR) * k;
     }
 }
 
@@ -6454,6 +6620,7 @@ async function savePot() {
         title: defaultPotTitle(), // pre-named; user can rename in the gallery
         isLid: state.isLid,
         handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
+        spout: !state.isLid && state.spout.on,   // teapot spout (pot only)
         handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset    : 0,
         handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset      : 0,
         handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset   : 0,
@@ -6503,6 +6670,7 @@ async function savePot() {
                 title: defaultPotTitle(),
                 isLid: state.isLid,
                 handle: !state.isLid && state.handle.on,
+                spout: !state.isLid && state.spout.on,
                 handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
                 handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset    : 0,
                 handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset : 0,
@@ -7317,7 +7485,9 @@ async function loadPot(entry) {
         ensureHandleMesh();
         rebuildHandleGeometry();
     }
-    updateHandleVisibility();
+    state.spout.on = !state.isLid && !!entry.spout;
+    if (state.spout.on) { ensureSpoutMesh(); rebuildSpoutGeometry(); }
+    updateHandleVisibility(); // also refreshes spout visibility
     updateHandleStylePicker();
     updateHandleCountPicker();
 
