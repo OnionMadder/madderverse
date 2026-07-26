@@ -314,6 +314,9 @@ body {
         height: clamp(76px, 20dvh, 140px);
     }
     #screen-feast .feast-stats { font-size: clamp(0.78rem, 2.4vw, 1rem); line-height: 1.25; }
+    #screen-feast .end-fact { margin-top: clamp(6px, 1.4vh, 12px); padding: clamp(6px, 1.2vh, 10px) 12px; }
+    #screen-feast .end-fact-label { font-size: clamp(0.54rem, 1.7vw, 0.68rem); margin-bottom: 3px; }
+    #screen-feast .end-fact-text { font-size: clamp(0.74rem, 2vw, 0.9rem); line-height: 1.3; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -536,30 +539,10 @@ body {
     100% { opacity: 0; transform: translateX(-4px); }
 }
 
-/* ── Tub Butter sitting in the corner ─────────────────────────── */
-.tub-butter {
-    /* Hidden during the catch phase — cookies get the whole stage now, and
-       Tub reappears to eat the pile at the feast (#feast-tub). */
-    display: none;
-    position: absolute;
-    bottom: 8px;
-    left: 8px;
-    width: clamp(80px, 22vw, 130px);
-    height: clamp(80px, 22vw, 130px);
-    background-image: url('assets/img/eater.png');
-    background-repeat: no-repeat;
-    background-size: 300% 200%;
-    background-position: 100% 0%; /* frame-one (idle) */
-    filter: drop-shadow(0 0 12px rgba(0,255,204,0.35)) drop-shadow(0 6px 10px rgba(0,0,0,0.55));
-    pointer-events: none;
-    z-index: 12;
-    animation: tub-breathe 2.4s ease-in-out infinite;
-    transform-origin: bottom center;
-}
-.tub-butter.chomp {
-    background-position: 50% 0%; /* frame-four (mouth open) */
-    animation: tub-chomp 0.32s ease-out;
-}
+/* ── Tub Butter feast animations ──────────────────────────────────
+   The in-play corner Tub + pile-thumbnail zone were removed so cookies
+   get the whole stage; these keyframes live on because the feast Tub
+   (#feast-tub) still breathes and chomps through the end-game pile. */
 @keyframes tub-breathe {
     0%,100% { transform: scaleY(1)    translateY(0);    }
     50%     { transform: scaleY(1.05) translateY(-3px); }
@@ -589,34 +572,6 @@ body {
     0%   { transform: translate(0, 0) rotate(0) scale(1); opacity: 1; }
     18%  { opacity: 1; }
     100% { transform: translate(var(--split-x), var(--split-y)) rotate(var(--split-rot)) scale(0.85); opacity: 0; }
-}
-
-/* ── Pile zone next to Tub Butter ─────────────────────────────── */
-.pile-zone {
-    /* Hidden during the catch phase (see .tub-butter). The PILE count still
-       ticks in the HUD; the stacked thumbnails just aren't shown in play. */
-    display: none;
-    position: absolute;
-    bottom: 14px;
-    left: clamp(80px, 22vw, 130px);
-    width: clamp(60px, 18vw, 110px);
-    height: clamp(40px, 14vw, 70px);
-    pointer-events: none;
-    z-index: 11;
-}
-.pile-cookie {
-    position: absolute;
-    width: clamp(28px, 9vw, 44px);
-    height: clamp(28px, 9vw, 44px);
-    background-repeat: no-repeat;
-    filter: drop-shadow(0 0 6px rgba(0,255,204,0.35)) drop-shadow(0 3px 4px rgba(0,0,0,0.5));
-    transform-origin: center bottom;
-    animation: pile-plop 0.32s ease-out;
-}
-@keyframes pile-plop {
-    0%   { transform: translateY(-22px) scale(0.6) rotate(-12deg); opacity: 0; }
-    60%  { transform: translateY(4px)   scale(1.12) rotate(6deg);  opacity: 1; }
-    100% { transform: translateY(0)     scale(1)    rotate(0);     opacity: 1; }
 }
 
 /* ── Flying cookies & veggies ────────────────────────────────── */
@@ -1299,6 +1254,38 @@ body {
 }
 .end-best[hidden] { display: none; }
 .end-best span { font-weight: 700; }
+
+/* "DID YOU KNOW?" cookie fact — the game's teaching, surfaced at the reward.
+   A quiet framed note under the stats; distinct from the playful rank line. */
+.end-fact {
+    margin-top: 14px;
+    max-width: 34em;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 10px 14px;
+    border: 1px solid rgba(0,255,204,0.35);
+    border-radius: 10px;
+    background: rgba(0,255,204,0.06);
+    text-align: center;
+}
+.end-fact[hidden] { display: none; }
+.end-fact-label {
+    display: block;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: clamp(0.6rem, 1.9vw, 0.72rem);
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 8px rgba(0,255,204,0.4);
+    margin-bottom: 5px;
+}
+.end-fact-text {
+    display: block;
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: clamp(0.82rem, 2.3vw, 0.98rem);
+    line-height: 1.4;
+    color: rgba(255,255,255,0.92);
+}
 
 /* "NEW HIGH SCORE!" banner — pops in above the feast title on a new best. */
 .new-best-banner {

@@ -220,6 +220,35 @@ const LORE_PAGES = [
     },
 ];
 
+// ── Cookie facts (feast screen) ────────────────────────────────────
+// The booklet teaches "what's a data cookie" before the round; these bring
+// one true, kid-sized fact back at the feast so the lesson lands at the moment
+// of reward instead of only living in a manual nobody re-opens. All accurate,
+// all plain-language — this is the learning the game is built around, not a
+// retention hook. One is shown at random per feast, never the same twice in a
+// row (see pickCookieFact).
+const COOKIE_FACTS = [
+    "A 'login cookie' is how a website remembers it's you — so you don't have to sign in every single time.",
+    "A cookie is just a tiny note a website leaves on your device. It can't run or do anything on its own.",
+    "Paused a video and came back later? A cookie remembered right where you stopped.",
+    "Dark mode still on when you return to a site? Thank a little cookie for that.",
+    "You can clear out cookies any time — grown-ups call it 'clearing the cache,' just like Tub tidying his!",
+    "Some cookies try to follow you from site to site to watch what you like. Those are the sneaky 'tracker' kind.",
+    "A high score saved on your device — like the one you just set — works a lot like a cookie.",
+    "A website can only read its OWN cookies, never the ones a different website left behind.",
+    "Data cookies have nothing to do with baking. A programmer just thought the name sounded fun.",
+];
+
+// Remember the last fact so a replay always shows a different one.
+let _lastFactIdx = -1;
+function pickCookieFact() {
+    if (COOKIE_FACTS.length <= 1) return COOKIE_FACTS[0] || '';
+    let i;
+    do { i = randI(0, COOKIE_FACTS.length - 1); } while (i === _lastFactIdx);
+    _lastFactIdx = i;
+    return COOKIE_FACTS[i];
+}
+
 const SCREENS = {
     menu:  document.getElementById('screen-menu'),
     game:  document.getElementById('screen-game'),
@@ -240,8 +269,6 @@ const els = {
     loreNext:    document.getElementById('lore-next'),
     lorePageNum: document.getElementById('lore-page-num'),
     stage:       document.getElementById('game-stage'),
-    tub:         document.getElementById('tub-butter'),
-    pileZone:    document.getElementById('pile-zone'),
     countdown:   document.getElementById('countdown'),
     hudScore:    document.getElementById('hud-score'),
     hudTime:     document.getElementById('hud-time'),
@@ -256,6 +283,8 @@ const els = {
     endRank:     document.getElementById('end-rank'),
     endBest:     document.getElementById('end-best'),
     endBestVal:  document.getElementById('end-best-val'),
+    endFact:     document.getElementById('end-fact'),
+    endFactText: document.getElementById('end-fact-text'),
     newBestBanner: document.getElementById('new-best-banner'),
     menuBest:    document.getElementById('menu-best'),
     menuBestVal: document.getElementById('menu-best-val'),
@@ -507,7 +536,6 @@ const state = {
     lastTs:       0,
     stageW:       0,
     stageH:       0,
-    chompResetTo: 0,
     glitchTimer:  0,
     best:         0,
     mode:         'classic',
@@ -1407,14 +1435,6 @@ function spawnVegSplatter(cx, cy) {
     }
 }
 
-function cookiePunch(c) {
-    c.el.style.transition = 'transform 0.09s ease-out';
-    c.el.style.transform = `rotate(${c.rot}deg) scale(1.7)`;
-    setTimeout(() => {
-        c.el.style.transition = '';
-    }, 100);
-}
-
 function spawnTapRing(cx, cy, outer) {
     const ring = document.createElement('div');
     ring.className = outer ? 'tap-ring outer' : 'tap-ring';
@@ -1550,68 +1570,11 @@ function spawnConfetti(cx, cy, count) {
     }
 }
 
-function flashTubChomp() {
-    els.tub.classList.add('chomp');
-    state.chompResetTo = performance.now() + 280;
-}
-
-function flyToTub(c, targetX, targetY) {
-    c.alive = false;
-    const startX = c.x, startY = c.y;
-    const startTime = performance.now();
-    const DURATION = 280;
-
-    const tick = (now) => {
-        const t = Math.min((now - startTime) / DURATION, 1);
-        const ease = t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3) / 2;
-        const x = lerp(startX, targetX, ease);
-        const y = lerp(startY, targetY, ease) - Math.sin(Math.PI * ease) * 30;
-        const scale = lerp(1, 0.18, ease);
-        c.el.style.left = (x - c.w / 2) + 'px';
-        c.el.style.top  = (y - c.h / 2) + 'px';
-        c.el.style.transform = `scale(${scale}) rotate(${c.rot + ease * 360}deg)`;
-        c.el.style.opacity = ease > 0.85 ? lerp(1, 0, (ease - 0.85) / 0.15) : 1;
-        if (t < 1) requestAnimationFrame(tick);
-        else c.el.remove();
-    };
-    requestAnimationFrame(tick);
-}
-
-function addPileThumb(sprite) {
-    const MAX_THUMBS = 10;
-    const existing = els.pileZone.children;
-    if (existing.length >= MAX_THUMBS) {
-        existing[0].remove();
-    }
-    const el = document.createElement('div');
-    el.className = 'pile-cookie';
-    const zoneR = els.pileZone.getBoundingClientRect();
-    const thumbW = Math.min(Math.max(zoneR.width * 0.45, 28), 44);
-    // 4:3 to match the whole-cookie cells (1080×810); the eaten look is a
-    // CSS bite, not a taller eaten sprite.
-    const thumbH = Math.round(thumbW * 0.75);
-    applySprite(el, sprite.sheet, sprite.frame, thumbW, thumbH);
-    applyBite(el);
-    el.style.width = thumbW + 'px';
-    el.style.height = thumbH + 'px';
-    const x = rand(0, Math.max(0, zoneR.width  - thumbW));
-    const y = rand(0, Math.max(0, zoneR.height - thumbH));
-    el.style.left = x + 'px';
-    el.style.bottom = y + 'px';
-    el.style.transform = `rotate(${rand(-25, 25)}deg)`;
-    els.pileZone.appendChild(el);
-}
-
 function loop(ts) {
     if (!state.running) return;
     if (!state.lastTs) state.lastTs = ts;
-    const dt = Math.min((ts - state.lastTs) / 1000, 0.05); 
+    const dt = Math.min((ts - state.lastTs) / 1000, 0.05);
     state.lastTs = ts;
-
-    if (state.chompResetTo && ts >= state.chompResetTo) {
-        els.tub.classList.remove('chomp');
-        state.chompResetTo = 0;
-    }
 
     const W = state.stageW, H = state.stageH;
     for (const c of state.cookies) {
@@ -1647,9 +1610,9 @@ function loop(ts) {
             c.el.remove();
         }
     }
-    // Only keep cookies still in physics. Popped cookies are handed off to
-    // flyToTub which holds its own reference; leaving them in this array would
-    // make it grow unbounded over a round.
+    // Only keep cookies still in physics. Sliced cookies are handed off to
+    // sliceSplitCookie (its halves clean themselves up); leaving them in this
+    // array would make it grow unbounded over a round.
     state.cookies = state.cookies.filter(c => c.alive);
 
     drawBlade();
@@ -1697,7 +1660,6 @@ function resetState() {
     state.timeLeftMs  = CFG.duration * 1000;
     state.spawnInMs   = TUNE.spawnStart * (1 + rand(-TUNE.spawnJitter, TUNE.spawnJitter));
     state.lastTs      = 0;
-    state.chompResetTo = 0;
     state.streakHits  = 0;
     state.lastHitAt   = 0;
 
@@ -1708,9 +1670,7 @@ function resetState() {
     els.stage.querySelectorAll('.round-end, .mode-flash, .swipe-hint').forEach(el => el.remove());  // clear last round's overlays
     els.stage.classList.remove('time-low', 'frenzy-active', 'stage-shake', 'stage-shake-big');
     setCodeRainSpeed(1);
-    els.pileZone.innerHTML = '';
     els.feastPile.innerHTML = '';
-    els.tub.classList.remove('chomp');
 
     els.hudScore.textContent = '0';
     els.hudTime.textContent  = String(CFG.duration);
@@ -1891,6 +1851,12 @@ function playTickSfx() {
 function showFeast() {
     els.endScore.textContent = String(state.score);
     els.endRank.textContent  = rankFor(state.score);
+
+    // A true, kid-sized cookie fact — the game's teaching, landed at the reward.
+    if (els.endFact && els.endFactText) {
+        els.endFactText.textContent = pickCookieFact();
+        els.endFact.hidden = false;
+    }
 
     // Personal best: a new high only counts if the player actually scored.
     // Beating it updates the saved value, reveals the menu badge next time,

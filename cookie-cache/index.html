@@ -108,8 +108,6 @@
 
     <div class="game-frame">
         <div id="game-stage" class="game-stage">
-            <div id="tub-butter" class="tub-butter"></div>
-            <div id="pile-zone" class="pile-zone"></div>
             <div id="countdown" class="countdown"></div>
         </div>
     </div>
@@ -143,6 +141,11 @@
             <div>Score: <span id="end-score">0</span></div>
             <div id="end-rank" class="end-rank">&nbsp;</div>
             <div id="end-best" class="end-best" hidden>Best: <span id="end-best-val">0</span></div>
+        </div>
+
+        <div id="end-fact" class="end-fact" aria-live="polite" hidden>
+            <span class="end-fact-label">DID YOU KNOW?</span>
+            <span class="end-fact-text" id="end-fact-text"></span>
         </div>
 
         <button class="btn btn-xl btn-yellow" id="btn-replay" type="button">
