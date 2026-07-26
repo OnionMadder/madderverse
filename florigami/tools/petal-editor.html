@@ -69,7 +69,8 @@
       <label>Count <input type="range" id="ring-count" min="3" max="16" value="8"><span class="v" id="ring-count-v">8</span></label>
       <label>Radius <input type="range" id="ring-radius" min="0" max="45" value="22"><span class="v" id="ring-radius-v">.22</span></label>
       <label>Petal size <input type="range" id="ring-size" min="15" max="80" value="46"><span class="v" id="ring-size-v">.46</span></label>
-      <label>Angle offset <input type="range" id="ring-angle" min="0" max="90" value="0"><span class="v" id="ring-angle-v">0°</span></label>
+      <label>Angle offset <input type="range" id="ring-angle" min="0" max="359" value="0"><span class="v" id="ring-angle-v">0°</span></label>
+      <label>Spread <input type="range" id="ring-spread" min="40" max="360" value="360"><span class="v" id="ring-spread-v">360°</span></label>
       <label>Point <select id="ring-tip"><option value="out">outward</option><option value="in">inward</option></select></label>
       <label>Petal spin <input type="range" id="ring-spin" min="-180" max="180" value="0"><span class="v" id="ring-spin-v">0°</span></label>
       <label>Jitter <input type="range" id="ring-jitter" min="0" max="30" value="6"><span class="v" id="ring-jitter-v">6</span></label>
@@ -97,11 +98,25 @@
       <div class="row">
         <button id="sel-flip">Flip</button>
         <button id="sel-dupe">Duplicate</button>
-        <button id="sel-front">To front</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="sel-back">⤓ To back</button>
+        <button id="sel-front">⤒ To front</button>
       </div>
       <div class="row" style="margin-top:8px">
         <button id="sel-del" style="color:var(--accent)">Delete petal</button>
       </div>
+      <p class="muted" style="margin:8px 0 0">Drag the petal to move · drag the <b>◈ handle</b> to rotate · arrow keys nudge · <b>[</b> <b>]</b> rotate.</p>
+    </div>
+
+    <div class="box">
+      <h2>Symmetry (bilateral)</h2>
+      <label style="justify-content:flex-start;gap:8px"><input type="checkbox" id="mirror-axis"> show mirror axis</label>
+      <div class="row" style="margin-top:6px">
+        <button id="mirror-all">Mirror all ⇄</button>
+        <button id="mirror-sel">Mirror selected</button>
+      </div>
+      <p class="muted" style="margin:8px 0 0">Build one half (+ center on the axis), then <b>Mirror all</b> to make a bilateral flower — pansy, orchid, iris.</p>
     </div>
 
     <div class="box">
@@ -172,6 +187,7 @@ function patName(){ return document.getElementById("pattern").value; }
 function draw(){
   ctx.clearRect(0,0,SIZE,SIZE);
   if(document.getElementById("bg-soil").checked){ ctx.fillStyle="#B6906A"; roundRect(ctx,0,0,SIZE,SIZE,26); ctx.fill(); }
+  if(document.getElementById("mirror-axis").checked){ ctx.save(); ctx.strokeStyle="rgba(199,101,78,.55)"; ctx.lineWidth=1.5; ctx.setLineDash([6,5]); ctx.beginPath(); ctx.moveTo(SIZE/2,0); ctx.lineTo(SIZE/2,SIZE); ctx.stroke(); ctx.restore(); }
   const showShadow=document.getElementById("show-shadow").checked;
   const showIdx=document.getElementById("show-index").checked;
   const col=petalColor(), pn=patName();
@@ -194,6 +210,13 @@ function draw(){
   if(cc){ const w=formation.center.scale*SIZE, h=w*cc.height/cc.width;
     ctx.save(); if(showShadow){ctx.shadowColor="rgba(50,36,22,.4)";ctx.shadowBlur=8;ctx.shadowOffsetY=3;}
     ctx.drawImage(cc, SIZE/2-w/2, SIZE/2-h/2, w, h); ctx.restore(); }
+  // rotate handle for the selected petal
+  const hnd=selHandle();
+  if(hnd){ const p=formation.petals[selected]; ctx.save();
+    ctx.strokeStyle="rgba(255,255,255,.85)"; ctx.lineWidth=1.5; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(p.cx*SIZE,p.cy*SIZE); ctx.lineTo(hnd.x,hnd.y); ctx.stroke();
+    ctx.fillStyle="#C7654E"; ctx.beginPath(); ctx.arc(hnd.x,hnd.y,7,0,7); ctx.fill();
+    ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke(); ctx.restore(); }
   document.getElementById("count-pill").textContent=formation.petals.length+" petals";
   updateJSON();
 }
@@ -203,12 +226,17 @@ function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,
 function addRing(){
   const shape=val("ring-shape"), n=+val("ring-count"), radius=+val("ring-radius")/100,
         size=+val("ring-size")/100, off=+val("ring-angle"), tip=val("ring-tip"),
-        spin=+val("ring-spin"), jit=+val("ring-jitter");
+        spin=+val("ring-spin"), jit=+val("ring-jitter"), spread=+val("ring-spread");
   // Auto-align: a wide shape's long axis is horizontal, so add 90° so its LONG
   // axis (not its short side) points outward by default. Spin fine-tunes from there.
   const im=img[shape], axisAdjust=(im && im.width>im.height*1.05)?90:0;
+  const full = spread>=360;
   for(let i=0;i<n;i++){
-    const A=-90 + i*(360/n) + off + (Math.random()*2-1)*jit;      // degrees
+    // Full ring: evenly around 360°. Arc/fan: n petals fanned across `spread`,
+    // centred on the angle offset (top = -90°).
+    const A = (full ? (-90 + i*(360/n) + off)
+                    : (-90 + off - spread/2 + (n>1 ? i*(spread/(n-1)) : 0)))
+              + (Math.random()*2-1)*jit;
     const rot=A + (tip==="out"?90:-90) + axisAdjust + spin + (Math.random()*2-1)*jit;
     const jr=radius*(1+(Math.random()*2-1)*jit*0.01);
     formation.petals.push({
@@ -222,20 +250,39 @@ function addRing(){
 // ---- selection / interaction ----
 function pickPetal(mx,my){
   for(let i=formation.petals.length-1;i>=0;i--){ const p=formation.petals[i];
-    const dx=mx-p.cx*SIZE, dy=my-p.cy*SIZE; if(Math.hypot(dx,dy) < p.scale*SIZE*0.5) return i; }
+    const dx=mx-p.cx*SIZE, dy=my-p.cy*SIZE; if(Math.hypot(dx,dy) < Math.max(14, p.scale*SIZE*0.5)) return i; }
   return -1;
 }
+// Rotate-handle position for the selected petal (a dot in the direction it points).
+function selHandle(){
+  if(selected<0) return null;
+  const p=formation.petals[selected]; const w=p.scale*SIZE;
+  const a=(p.rot+(p.flip?180:0))*Math.PI/180;             // petal's facing (up = -y before rot)
+  const dist=Math.max(34, w*0.62);
+  return { x:p.cx*SIZE + Math.sin(a)*dist, y:p.cy*SIZE - Math.cos(a)*dist };
+}
+function toXY(e){ const r=cv.getBoundingClientRect(); return [ (e.clientX-r.left)*SIZE/r.width, (e.clientY-r.top)*SIZE/r.height ]; }
 let drag=null;
 cv.addEventListener("pointerdown",e=>{
-  const r=cv.getBoundingClientRect(), mx=(e.clientX-r.left)*SIZE/r.width, my=(e.clientY-r.top)*SIZE/r.height;
+  const [mx,my]=toXY(e);
+  const h=selHandle();
+  if(h && Math.hypot(mx-h.x,my-h.y)<16){ drag={mode:"rotate"}; cv.setPointerCapture(e.pointerId); return; }
   const i=pickPetal(mx,my); select(i);
-  if(i>=0){ const p=formation.petals[i]; drag={i,ox:mx-p.cx*SIZE,oy:my-p.cy*SIZE}; cv.setPointerCapture(e.pointerId); }
+  if(i>=0){ const p=formation.petals[i]; drag={mode:"move",i,ox:mx-p.cx*SIZE,oy:my-p.cy*SIZE}; cv.setPointerCapture(e.pointerId); }
 });
 cv.addEventListener("pointermove",e=>{
-  if(!drag) return; const r=cv.getBoundingClientRect(), mx=(e.clientX-r.left)*SIZE/r.width, my=(e.clientY-r.top)*SIZE/r.height;
-  const p=formation.petals[drag.i]; p.cx=(mx-drag.ox)/SIZE; p.cy=(my-drag.oy)/SIZE; draw();
+  if(!drag) return; const [mx,my]=toXY(e);
+  if(drag.mode==="rotate"){
+    const p=formation.petals[selected]; if(!p) return;
+    const dx=mx-p.cx*SIZE, dy=my-p.cy*SIZE;
+    let rot=Math.atan2(dx,-dy)*180/Math.PI - (p.flip?180:0);   // point petal at the pointer
+    p.rot=((rot%360)+360)%360; setRange("sel-rot",Math.round(p.rot)); draw();
+  } else {
+    const p=formation.petals[drag.i]; p.cx=(mx-drag.ox)/SIZE; p.cy=(my-drag.oy)/SIZE; draw();
+  }
 });
 cv.addEventListener("pointerup",()=>drag=null);
+cv.addEventListener("pointercancel",()=>drag=null);
 
 function select(i){
   selected=i; const box=document.getElementById("sel-box");
@@ -252,6 +299,7 @@ function setRange(id,v){const el=document.getElementById(id);el.value=v;el.dispa
 function bindLabel(id,fmt){const el=document.getElementById(id),out=document.getElementById(id+"-v");if(out){const u=()=>out.textContent=fmt(el.value);el.addEventListener("input",u);u();}}
 bindLabel("ring-count",v=>v); bindLabel("ring-radius",v=>"."+(""+v).padStart(2,"0")); bindLabel("ring-size",v=>"."+v);
 bindLabel("ring-angle",v=>v+"°"); bindLabel("ring-spin",v=>v+"°"); bindLabel("ring-jitter",v=>v);
+bindLabel("ring-spread",v=>v+"°");
 bindLabel("center-size",v=>"."+v); bindLabel("sel-rot",v=>v+"°"); bindLabel("sel-scale",v=>"."+v);
 
 document.getElementById("add-ring").onclick=addRing;
@@ -266,7 +314,29 @@ document.getElementById("sel-scale").addEventListener("input",e=>{if(selected>=0
 document.getElementById("sel-flip").onclick=()=>{if(selected>=0){formation.petals[selected].flip=!formation.petals[selected].flip;draw();}};
 document.getElementById("sel-dupe").onclick=()=>{if(selected>=0){const p={...formation.petals[selected]};p.cx+=0.03;p.cy+=0.03;formation.petals.push(p);select(formation.petals.length-1);}};
 document.getElementById("sel-front").onclick=()=>{if(selected>=0){const p=formation.petals.splice(selected,1)[0];formation.petals.push(p);select(formation.petals.length-1);}};
+document.getElementById("sel-back").onclick=()=>{if(selected>=0){const p=formation.petals.splice(selected,1)[0];formation.petals.unshift(p);select(0);}};
 document.getElementById("sel-del").onclick=()=>{if(selected>=0){formation.petals.splice(selected,1);select(-1);}};
+
+// ---- symmetry (bilateral mirror across the vertical axis) ----
+function mirrorPetal(p){ return { shape:p.shape, cx:1-p.cx, cy:p.cy, rot:((360-p.rot)%360+360)%360, scale:p.scale, flip:p.flip }; }
+document.getElementById("mirror-all").onclick=()=>{ const cur=formation.petals.slice(); for(const p of cur) formation.petals.push(mirrorPetal(p)); select(-1); draw(); };
+document.getElementById("mirror-sel").onclick=()=>{ if(selected>=0){ formation.petals.push(mirrorPetal(formation.petals[selected])); select(formation.petals.length-1); } };
+document.getElementById("mirror-axis").addEventListener("input",draw);
+
+// ---- keyboard: arrow nudge + [ ] rotate on the selected petal ----
+window.addEventListener("keydown",e=>{
+  if(selected<0) return;
+  const tag=(document.activeElement&&document.activeElement.tagName)||"";
+  if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT") return;
+  const p=formation.petals[selected]; const step=e.shiftKey?0.02:0.006;
+  let used=true;
+  if(e.key==="ArrowLeft") p.cx-=step; else if(e.key==="ArrowRight") p.cx+=step;
+  else if(e.key==="ArrowUp") p.cy-=step; else if(e.key==="ArrowDown") p.cy+=step;
+  else if(e.key==="[") { p.rot=((p.rot-3)%360+360)%360; setRange("sel-rot",Math.round(p.rot)); }
+  else if(e.key==="]") { p.rot=((p.rot+3)%360+360)%360; setRange("sel-rot",Math.round(p.rot)); }
+  else used=false;
+  if(used){ e.preventDefault(); draw(); }
+});
 document.getElementById("center-shape").addEventListener("change",e=>{formation.center.shape=e.target.value;draw();});
 document.getElementById("center-size").addEventListener("input",e=>{formation.center.scale=+e.target.value/100;draw();});
 ["tone","pattern","bg-soil","show-shadow","show-index"].forEach(id=>document.getElementById(id).addEventListener("input",draw));
