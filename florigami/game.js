@@ -118,26 +118,26 @@ function seedColorsFor(species) {
 // Order matters: it's how locked species queue up as "coming" tabs/hints.
 const UNLOCK_ORDER = ["cosmos", "daisies", "pansies", "sunflowers", "lilies", "mums", "windflowers", "roses"];
 
-// A short, non-spoiling hint shown on each locked species' Bloombook tab. Says
+// A short, non-spoiling hint shown on each locked species' Floridex tab. Says
 // the species exists and roughly why it's coming, never the exact trigger —
 // discovery stays a surprise (Madderverse Promise: you just haven't found it yet).
 const LOCKED_HINT = {
     daisies:      "Grow your first cosmos hybrid and these arrive.",
-    pansies:     "A few more cosmos in the Bloombook and these open up.",
-    sunflowers:   "Keep filling the Bloombook — these bloom into reach with time.",
+    pansies:     "A few more cosmos in the Floridex and these open up.",
+    sunflowers:   "Keep filling the Floridex — these bloom into reach with time.",
     lilies:      "Your garden's growing. These are a little further down the path.",
     mums:        "More discoveries, and these will find their way to you.",
     windflowers: "Something breezier waits a few flowers on from here.",
-    roses:       "The last and finest. Fill enough of the Bloombook and they arrive.",
+    roses:       "The last and finest. Fill enough of the Floridex and they arrive.",
 };
 
 // Progression gates keyed off total discoveries across all species — a natural,
 // self-paced "you've been at this a while" curve (Madderverse Promise: nothing is
 // ever blocked, you just haven't found it yet). daisies + pansies keep their own
-// cosmos-specific gates below; the rest ladder up on total Bloombook breadth.
+// cosmos-specific gates below; the rest ladder up on total Floridex breadth.
 const TOTAL_GATES = { sunflowers: 10, lilies: 14, mums: 18, windflowers: 23, roses: 28 };
 
-// Flavor text for the Bloombook — written in Onion's voice.
+// Flavor text for the Floridex — written in Onion's voice.
 // Shared, colour-mixing-themed flavour for the unified palette. Every species
 // breeds identically, so the base colours share flavour; per-species overrides
 // (e.g. for the signature rares) can be added to FLAVOR later. Read via flavorFor().
@@ -158,7 +158,7 @@ function flavorFor(species, color) {
 
 // ─── Garden ornaments ─────────────────────────────────────────────
 // Cozy, gameplay-neutral keepsakes that appear in the garden scene as you
-// fill the Bloombook. Pure decoration — no stats, no timers, nothing to lose.
+// fill the Floridex. Pure decoration — no stats, no timers, nothing to lose.
 // Each unlocks from progress the player makes anyway (DESIGN.md §4.7 reward loop),
 // so nobody has to grind FOR an ornament — they just turn up. `at` returns true
 // once earned; `svg` is drawn inline (zero art assets). `pos` places it on the
@@ -260,7 +260,7 @@ const MICRO_GOALS = [
     "Plant a few of the same flower side by side.",
     "Cross a red and a yellow — see what turns up.",
     "Water everything, then let a day pass.",
-    "Fill one more slot in the Bloombook.",
+    "Fill one more slot in the Floridex.",
     "Some flowers carry secrets. Breed the same color twice.",
 ];
 
@@ -337,7 +337,7 @@ const state = {
         roses:       { red: Infinity, yellow: Infinity, blue: Infinity },
     },
     unlockedSpecies: ["cosmos"],   // every other species unlocks via progress
-    flowerdex: { cosmos: {}, daisies: {}, pansies: {}, sunflowers: {}, lilies: {}, mums: {}, windflowers: {}, roses: {} },
+    floridex: { cosmos: {}, daisies: {}, pansies: {}, sunflowers: {}, lilies: {}, mums: {}, windflowers: {}, roses: {} },
     seenOrnaments: [],             // ornament ids already announced (persisted)
     crosses: [],                   // capped log of observed colour crosses (persisted)
     settings: {
@@ -351,9 +351,9 @@ const state = {
     goalIndex: 0,
     ui: {
         armedSeed: null,
-        bloombookOpen: false,
-        bloombookTab: "cosmos",     // a species id, or "__rares" for the trophy shelf
-        bloombookFilter: "all",     // "all" | "found" | "rare"
+        floridexOpen: false,
+        floridexTab: "cosmos",     // a species id, or "__rares" for the trophy shelf
+        floridexFilter: "all",     // "all" | "found" | "rare"
     },
     lastSaveAt: 0,
 };
@@ -368,7 +368,7 @@ function inGameMinutesPerRealMs() {
 }
 
 function dexCount(species) {
-    return Object.keys(state.flowerdex[species] || {}).length;
+    return Object.keys(state.floridex[species] || {}).length;
 }
 
 /** Is `color` a signature "rare" flower for this species? */
@@ -381,7 +381,7 @@ function isRare(species, color) {
 function totalDex() {
     let n = 0;
     for (const sp of UNLOCK_ORDER) {
-        const found = state.flowerdex[sp] || {};
+        const found = state.floridex[sp] || {};
         n += SPECIES[sp].dex.filter(c => found[c]).length;
     }
     return n;
@@ -391,7 +391,7 @@ function totalDex() {
 function rareCount() {
     let n = 0;
     for (const sp of UNLOCK_ORDER) {
-        const found = state.flowerdex[sp] || {};
+        const found = state.floridex[sp] || {};
         for (const c of (SPECIES[sp].rare || [])) if (found[c]) n++;
     }
     return n;
@@ -399,7 +399,7 @@ function rareCount() {
 
 /** Is every color in this species' dex discovered? */
 function isSpeciesComplete(species) {
-    const found = state.flowerdex[species] || {};
+    const found = state.floridex[species] || {};
     return SPECIES[species].dex.every(c => found[c]);
 }
 
@@ -450,7 +450,7 @@ function neighborCoords(x, y) {
 function plantGenotype(species, color) {
     const seeds = SPECIES[species].seeds;
     if (seeds[color]) return seeds[color];
-    const entry = (state.flowerdex[species] || {})[color];
+    const entry = (state.floridex[species] || {})[color];
     return entry && entry.genotype;
 }
 
@@ -472,7 +472,7 @@ function plant(x, y, species, color) {
 /** Every colour a species can currently plant = every colour discovered so far
  *  (seed colours are pre-known), in canonical dex-then-rare order. */
 function plantableColorsFor(species) {
-    const found = state.flowerdex[species] || {};
+    const found = state.floridex[species] || {};
     return spriteColorsFor(species).filter(c => found[c]);
 }
 
@@ -578,9 +578,9 @@ function rollDay() {
         setTile(x, y, tile);
         babyCoords.push({ x, y });
         const color = phenotype(tile.species, tile.genotype);
-        const isNew = !state.flowerdex[tile.species][color];
+        const isNew = !state.floridex[tile.species][color];
         if (isNew) {
-            state.flowerdex[tile.species][color] = { firstSeen: isoDate(), genotype: tile.genotype };
+            state.floridex[tile.species][color] = { firstSeen: isoDate(), genotype: tile.genotype };
             discoveries.push({ species: tile.species, color, x, y, rare: isRare(tile.species, color) });
         }
         const cross = { species: tile.species, a: parents[0], b: parents[1], child: color, x, y, parentCoords, isNew, day: state.clock.day };
@@ -679,8 +679,8 @@ function isoDate() { return new Date().toISOString().slice(0, 10); }
 /** Mark a species' own seed colors as "known" (no discovery fanfare). */
 function ensureSeedColorsKnown(species) {
     for (const color of seedColorsFor(species)) {
-        if (!state.flowerdex[species][color]) {
-            state.flowerdex[species][color] = { firstSeen: isoDate(), genotype: SPECIES[species].seeds[color] };
+        if (!state.floridex[species][color]) {
+            state.floridex[species][color] = { firstSeen: isoDate(), genotype: SPECIES[species].seeds[color] };
         }
     }
 }
@@ -702,12 +702,12 @@ function unlockSpecies(species) {
  */
 function checkUnlocks() {
     const newly = [];
-    const cosmosColors = Object.keys(state.flowerdex.cosmos || {});
+    const cosmosColors = Object.keys(state.floridex.cosmos || {});
     const cosmosHybrids = cosmosColors.filter(c => isHybridColor("cosmos", c)).length;
 
     if (!isUnlocked("daisies") && cosmosHybrids >= 1 && unlockSpecies("daisies")) newly.push("daisies");
     if (!isUnlocked("pansies") && cosmosColors.length >= 5 && unlockSpecies("pansies")) newly.push("pansies");
-    // The rest ladder up on total Bloombook breadth — sunflowers → lilies → mums
+    // The rest ladder up on total Floridex breadth — sunflowers → lilies → mums
     // → windflowers → roses — so the garden keeps opening at the player's pace.
     const total = totalDex();
     for (const sp of ["sunflowers", "lilies", "mums", "windflowers", "roses"]) {
@@ -717,7 +717,7 @@ function checkUnlocks() {
 }
 
 // ─── 6b. GARDEN EXPANSION ─────────────────────────────────────────
-// The plot grows as the Bloombook fills (DESIGN.md §4.5) — more room to lay out
+// The plot grows as the Floridex fills (DESIGN.md §4.5) — more room to lay out
 // deliberate crosses. Tiers key off totalDex(); existing flowers keep their
 // (x,y) as the plot extends right + down. Never shrinks.
 const EXPANSION_TIERS = [
@@ -770,7 +770,7 @@ function serialize() {
             }),
         },
         unlocked: state.unlockedSpecies.slice(),
-        dex: state.flowerdex,
+        dex: state.floridex,
         settings: { ...state.settings },
         seenOnboarding: state.seenOnboarding,
         goalIndex: state.goalIndex,
@@ -795,7 +795,7 @@ function migrateSave(data) {
     // so a v2 save falls through whole — no data touched.
     if (v < 3) { v = 3; }
     // v3 → v4: cosmos colour-mixing genetics + `crosses` log. deserialize defaults
-    // crosses to []; old cosmos flowerdex colours (pink etc.) are harmless extra
+    // crosses to []; old cosmos floridex colours (pink etc.) are harmless extra
     // keys, and the tray/dex read the new SPECIES tables — nothing to migrate.
     if (v < 4) { v = 4; }
     // v4 → v5: species roster rework (tulips→daisies, hyacinths→sunflowers).
@@ -840,8 +840,8 @@ function deserialize(data) {
     }
     if (data.dex && typeof data.dex === "object") {
         // Ensure every species bucket exists (older saves predate pansies/sunflowers).
-        state.flowerdex = { cosmos: {}, daisies: {}, pansies: {}, sunflowers: {}, ...data.dex };
-        for (const sp of UNLOCK_ORDER) if (!state.flowerdex[sp]) state.flowerdex[sp] = {};
+        state.floridex = { cosmos: {}, daisies: {}, pansies: {}, sunflowers: {}, ...data.dex };
+        for (const sp of UNLOCK_ORDER) if (!state.floridex[sp]) state.floridex[sp] = {};
     }
     if (Array.isArray(data.seenOrnaments)) state.seenOrnaments = data.seenOrnaments.slice();
     state.crosses = Array.isArray(data.crosses) ? data.crosses.slice() : [];
@@ -1107,9 +1107,9 @@ const goalEl = document.getElementById("tray-goal");
 const breedStatusEl = document.getElementById("breed-status");
 const rainEl = document.getElementById("rain");
 const toastEl = document.getElementById("toast");
-const bloombookEl = document.getElementById("bloombook");
-const bloombookTabsEl = document.getElementById("bloombook-tabs");
-const bloombookBodyEl = document.getElementById("bloombook-body");
+const floridexEl = document.getElementById("floridex");
+const floridexTabsEl = document.getElementById("floridex-tabs");
+const floridexBodyEl = document.getElementById("floridex-body");
 const skyEl = document.getElementById("sky");
 const sunEl = document.getElementById("sun");
 const moonEl = document.getElementById("moon");
@@ -1691,7 +1691,7 @@ function showNextCelebration() {
     const disc = celebrateQueue.shift();
     if (!disc) { celebrateEl.hidden = true; celebrateEl.setAttribute("aria-hidden", "true"); return; }
 
-    const entry = (state.flowerdex[disc.species] || {})[disc.color] || { genotype: disc.genotype, firstSeen: isoDate() };
+    const entry = (state.floridex[disc.species] || {})[disc.color] || { genotype: disc.genotype, firstSeen: isoDate() };
     const thumb = celebrateEl.querySelector(".celebrate-thumb");
     const name = celebrateEl.querySelector(".celebrate-name");
     const flavor = celebrateEl.querySelector(".celebrate-flavor");
@@ -1807,44 +1807,44 @@ function renderBreedStatus() {
     breedStatusEl.textContent = msg;
 }
 
-// ─── 10. BLOOMBOOK ───────────────────────────────────────────────
+// ─── 10. FLORIDEX ────────────────────────────────────────────────
 
 const RARES_TAB = "__rares";
 
-function renderBloombook() {
-    bloombookTabsEl.innerHTML = "";
+function renderFloridex() {
+    floridexTabsEl.innerHTML = "";
 
     // Trophy shelf tab first — the place your signature finds live.
-    bloombookTabsEl.appendChild(makeTab(RARES_TAB, "★ Rares",
-        state.ui.bloombookTab === RARES_TAB, false));
+    floridexTabsEl.appendChild(makeTab(RARES_TAB, "★ Rares",
+        state.ui.floridexTab === RARES_TAB, false));
 
     // Unlocked species, in discovery order.
     for (const species of UNLOCK_ORDER) {
         if (!isUnlocked(species)) continue;
-        bloombookTabsEl.appendChild(makeTab(species, SPECIES[species].name,
-            species === state.ui.bloombookTab, false));
+        floridexTabsEl.appendChild(makeTab(species, SPECIES[species].name,
+            species === state.ui.floridexTab, false));
     }
     // Locked species show a muted "coming" tab — they reveal that MORE exists,
     // with a soft hint, but never how to unlock it (no spoiler).
     for (const species of UNLOCK_ORDER) {
         if (isUnlocked(species)) continue;
-        bloombookTabsEl.appendChild(makeTab(species, "🔒 ？", false, true));
+        floridexTabsEl.appendChild(makeTab(species, "🔒 ？", false, true));
     }
 
     // Guard: the active tab must be the rares shelf or an unlocked species.
-    if (state.ui.bloombookTab !== RARES_TAB && !isUnlocked(state.ui.bloombookTab)) {
-        state.ui.bloombookTab = state.unlockedSpecies[0];
+    if (state.ui.floridexTab !== RARES_TAB && !isUnlocked(state.ui.floridexTab)) {
+        state.ui.floridexTab = state.unlockedSpecies[0];
     }
 
-    bloombookBodyEl.innerHTML = "";
-    if (state.ui.bloombookTab === RARES_TAB) renderRaresShelf();
-    else renderSpeciesPage(state.ui.bloombookTab);
+    floridexBodyEl.innerHTML = "";
+    if (state.ui.floridexTab === RARES_TAB) renderRaresShelf();
+    else renderSpeciesPage(state.ui.floridexTab);
 }
 
 function makeTab(id, label, active, locked) {
     const tab = document.createElement("button");
     tab.type = "button";
-    tab.className = "bloombook-tab" + (active ? " active" : "") + (locked ? " locked" : "");
+    tab.className = "floridex-tab" + (active ? " active" : "") + (locked ? " locked" : "");
     tab.textContent = label;
     if (locked) {
         tab.setAttribute("aria-label", "Locked species");
@@ -1853,7 +1853,7 @@ function makeTab(id, label, active, locked) {
             toast(LOCKED_HINT[id] || "Keep going — more will bloom into reach.");
         });
     } else {
-        tab.addEventListener("click", () => { sfx("tap"); state.ui.bloombookTab = id; renderBloombook(); });
+        tab.addEventListener("click", () => { sfx("tap"); state.ui.floridexTab = id; renderFloridex(); });
     }
     return tab;
 }
@@ -1861,7 +1861,7 @@ function makeTab(id, label, active, locked) {
 // ── Species page: filter bar + a scrollable list of flavor cards ──
 function renderSpeciesPage(species) {
     const spec = SPECIES[species];
-    const found = state.flowerdex[species] || {};
+    const found = state.floridex[species] || {};
     const seen = spec.dex.filter(c => found[c]).length;
 
     // Progress note.
@@ -1871,7 +1871,7 @@ function renderSpeciesPage(species) {
     note.textContent = complete
         ? `All ${spec.dex.length} discovered — this page is complete. ✿`
         : `${seen} / ${spec.dex.length} discovered.`;
-    bloombookBodyEl.appendChild(note);
+    floridexBodyEl.appendChild(note);
 
     // Filter chips.
     const filters = document.createElement("div");
@@ -1879,17 +1879,17 @@ function renderSpeciesPage(species) {
     for (const [key, lbl] of [["all", "All"], ["found", "Found"], ["rare", "★ Rare"]]) {
         const chip = document.createElement("button");
         chip.type = "button";
-        chip.className = "dex-filter" + (state.ui.bloombookFilter === key ? " active" : "");
+        chip.className = "dex-filter" + (state.ui.floridexFilter === key ? " active" : "");
         chip.textContent = lbl;
-        chip.addEventListener("click", () => { sfx("tap"); state.ui.bloombookFilter = key; renderBloombook(); });
+        chip.addEventListener("click", () => { sfx("tap"); state.ui.floridexFilter = key; renderFloridex(); });
         filters.appendChild(chip);
     }
-    bloombookBodyEl.appendChild(filters);
+    floridexBodyEl.appendChild(filters);
 
     // Card list.
     const list = document.createElement("div");
     list.className = "dex-list";
-    const filter = state.ui.bloombookFilter;
+    const filter = state.ui.floridexFilter;
     let shown = 0;
     for (const color of spec.dex) {
         const filled = !!found[color];
@@ -1907,7 +1907,7 @@ function renderSpeciesPage(species) {
             : "Nothing discovered on this page yet. Cross a few and check back.";
         list.appendChild(empty);
     }
-    bloombookBodyEl.appendChild(list);
+    floridexBodyEl.appendChild(list);
 }
 
 function makeDexCard(species, color, filled, rare, entry) {
@@ -1969,7 +1969,7 @@ function renderRaresShelf() {
     for (const species of UNLOCK_ORDER) {
         if (!isUnlocked(species)) continue;
         for (const color of (SPECIES[species].rare || [])) {
-            rares.push({ species, color, entry: (state.flowerdex[species] || {})[color] });
+            rares.push({ species, color, entry: (state.floridex[species] || {})[color] });
         }
     }
     const foundN = rares.filter(r => r.entry).length;
@@ -1979,12 +1979,12 @@ function renderRaresShelf() {
     note.textContent = rares.length === 0
         ? "The rarest flowers will be displayed here once you've unlocked more of the garden."
         : `You've found ${foundN} of ${rares.length} signature flowers.`;
-    bloombookBodyEl.appendChild(note);
+    floridexBodyEl.appendChild(note);
 
     const intro = document.createElement("p");
     intro.className = "dex-shelf-intro";
     intro.textContent = "The hardest crosses in the garden. Each one earns a spot on the shelf.";
-    bloombookBodyEl.appendChild(intro);
+    floridexBodyEl.appendChild(intro);
 
     const shelf = document.createElement("div");
     shelf.className = "dex-shelf";
@@ -2011,19 +2011,19 @@ function renderRaresShelf() {
         item.appendChild(cap);
         shelf.appendChild(item);
     }
-    bloombookBodyEl.appendChild(shelf);
+    floridexBodyEl.appendChild(shelf);
 }
 
-function openBloombook() {
-    state.ui.bloombookOpen = true;
-    bloombookEl.hidden = false;
-    bloombookEl.setAttribute("aria-hidden", "false");
-    renderBloombook();
+function openFloridex() {
+    state.ui.floridexOpen = true;
+    floridexEl.hidden = false;
+    floridexEl.setAttribute("aria-hidden", "false");
+    renderFloridex();
 }
-function closeBloombook() {
-    state.ui.bloombookOpen = false;
-    bloombookEl.hidden = true;
-    bloombookEl.setAttribute("aria-hidden", "true");
+function closeFloridex() {
+    state.ui.floridexOpen = false;
+    floridexEl.hidden = true;
+    floridexEl.setAttribute("aria-hidden", "true");
 }
 
 // ─── 11. SETTINGS ────────────────────────────────────────────────
@@ -2221,7 +2221,7 @@ const COACH_STEPS = [
     "Welcome. This is your garden — a grid of soil.",
     "Pick a seed from the tray at the bottom, then tap a soil tile to plant it.",
     "Tap a flower to water it (or use “Water all”). Watered flowers that bloom next to each other can cross.",
-    "Days pass on their own — flowers grow and cross while you watch, or while you're away. New colors go in the Bloombook 📖.",
+    "Days pass on their own — flowers grow and cross while you watch, or while you're away. New colors go in the Floridex 📖.",
 ];
 let coachStep = 0;
 
@@ -2428,7 +2428,7 @@ function applyRolloverResult(agg, live) {
     renderGrid(hybridHi, sprouts, rareHi);
     renderSeedTray();
     refreshOrnaments(live);
-    if (state.ui.bloombookOpen) renderBloombook();
+    if (state.ui.floridexOpen) renderFloridex();
 
     const newlyUnlocked = agg.newlyUnlocked || [];
     const crosses = (agg.crosses || []).filter(c => !isRare(c.species, c.child)); // rares get their own moment
@@ -2441,13 +2441,13 @@ function applyRolloverResult(agg, live) {
         // discovery if there was one this rollover, else the first cross.
         const c = crosses.find(x => x.isNew) || crosses[0];
         const extra = crosses.length > 1 ? ` (+${crosses.length - 1} more)` : "";
-        const tag = c.isNew ? " — new in the Bloombook!" : "";
+        const tag = c.isNew ? " — new in the Floridex!" : "";
         toast(`${cap(c.a)} × ${c.b} ${speciesShort(c.species)} → ${c.child}${tag}${extra}`, 4300);
         if (live) sfx(c.isNew ? "discovery" : "plant");
     } else if (agg.discoveries.length > 0 && !rares.length) {
         const first = agg.discoveries[0];
         const extra = agg.discoveries.length > 1 ? ` (+${agg.discoveries.length - 1} more)` : "";
-        toast(`New in the Bloombook: ${first.color} ${speciesShort(first.species)}.${extra}`);
+        toast(`New in the Floridex: ${first.color} ${speciesShort(first.species)}.${extra}`);
         if (live) sfx("discovery");
     }
 
@@ -2540,7 +2540,7 @@ function init() {
     const loaded = loadFromStorage();
 
     // Backfill known seed colors for whatever's already unlocked (covers new
-    // games AND v1 saves that predate the pre-seeded Bloombook).
+    // games AND v1 saves that predate the pre-seeded Floridex).
     for (const sp of state.unlockedSpecies) ensureSeedColorsKnown(sp);
 
     // Offline catch-up: advance the clock by however much real time elapsed
@@ -2585,9 +2585,9 @@ function init() {
     document.getElementById("btn-water-all").addEventListener("click", onWaterAll);
     const advBtn = document.getElementById("btn-advance-day");
     if (advBtn) advBtn.addEventListener("click", onAdvanceDay);
-    document.getElementById("btn-bloombook").addEventListener("click", () => { sfx("tap"); openBloombook(); });
-    document.getElementById("btn-close-bloombook").addEventListener("click", () => { sfx("tap"); closeBloombook(); });
-    bloombookEl.addEventListener("click", (e) => { if (e.target === bloombookEl) closeBloombook(); });
+    document.getElementById("btn-floridex").addEventListener("click", () => { sfx("tap"); openFloridex(); });
+    document.getElementById("btn-close-floridex").addEventListener("click", () => { sfx("tap"); closeFloridex(); });
+    floridexEl.addEventListener("click", (e) => { if (e.target === floridexEl) closeFloridex(); });
 
     const settingsBtn = document.getElementById("btn-settings");
     if (settingsBtn) settingsBtn.addEventListener("click", () => { sfx("tap"); openSettings(); });
@@ -2619,7 +2619,7 @@ function init() {
         applyRolloverResult(catchUp, /*live*/ false);
         const bits = [];
         if (catchUp.babies) bits.push(`${catchUp.babies} new sprout${catchUp.babies === 1 ? "" : "s"}`);
-        if (catchUp.discoveries.length) bits.push(`${catchUp.discoveries.length} new in the Bloombook`);
+        if (catchUp.discoveries.length) bits.push(`${catchUp.discoveries.length} new in the Floridex`);
         const awayRares = catchUp.discoveries.filter(d => d.rare).length;
         if (awayRares) bits.push(`${awayRares} rare${awayRares === 1 ? "" : "s"} ✨`);
         if (bits.length) setTimeout(() => toast(`While you were away: ${bits.join(", ")}.`, awayRares ? 5200 : 3400), 400);

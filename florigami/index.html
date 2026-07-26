@@ -8,16 +8,16 @@
     <meta property="og:url" content="https://madderverse.org/florigami/" />
     <meta name="twitter:url" content="https://madderverse.org/florigami/" />
     <meta name="title" content="Florigami - Madderverse" />
-    <meta name="description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Bloombook. Ad-free, no accounts, plays offline." />
+    <meta name="description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Floridex. Ad-free, no accounts, plays offline." />
     <meta name="keywords" content="Florigami, flower breeding game, cozy game, Mendelian genetics puzzle, Madderverse, Onion Madder, Mad Sundar LLC, free kids games, ad-free games" />
     <meta name="author" content="Onion Madder" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Florigami - Madderverse" />
-    <meta property="og:description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Bloombook." />
+    <meta property="og:description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Floridex." />
     <meta property="og:image" content="https://madderverse.org/assets/img/logo.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Florigami - Madderverse" />
-    <meta name="twitter:description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Bloombook." />
+    <meta name="twitter:description" content="A cozy flower-breeding puzzle. Cross colors, discover hybrids, fill the Floridex." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
@@ -27,7 +27,7 @@
     <meta name="theme-color" content="#F7EFDD" />
     <meta name="apple-mobile-web-app-title" content="Madderverse" />
     <meta name="application-name" content="Madderverse" />
-    <link rel="stylesheet" href="style.css?v=19" />
+    <link rel="stylesheet" href="style.css?v=20" />
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
@@ -49,7 +49,7 @@
             <button id="btn-settings" class="topbar-btn" type="button" aria-label="Settings">
                 <span aria-hidden="true">⚙</span>
             </button>
-            <button id="btn-bloombook" class="topbar-btn" type="button" aria-label="Open Bloombook">
+            <button id="btn-floridex" class="topbar-btn" type="button" aria-label="Open Floridex">
                 <span aria-hidden="true">📖</span>
             </button>
         </div>
@@ -104,15 +104,15 @@
 
 </main>
 
-<!-- ─── Bloombook overlay ────────────────────────────────────── -->
-<div id="bloombook" class="modal" hidden aria-hidden="true" role="dialog" aria-labelledby="bloombook-title">
+<!-- ─── Floridex overlay ────────────────────────────────────── -->
+<div id="floridex" class="modal" hidden aria-hidden="true" role="dialog" aria-labelledby="floridex-title">
     <div class="modal-card">
         <header class="modal-head">
-            <h2 id="bloombook-title">The Bloombook</h2>
-            <button id="btn-close-bloombook" class="modal-close" type="button" aria-label="Close Bloombook">✕</button>
+            <h2 id="floridex-title">The Floridex</h2>
+            <button id="btn-close-floridex" class="modal-close" type="button" aria-label="Close Floridex">✕</button>
         </header>
-        <div class="bloombook-tabs" id="bloombook-tabs" role="tablist"></div>
-        <div class="bloombook-body" id="bloombook-body"></div>
+        <div class="floridex-tabs" id="floridex-tabs" role="tablist"></div>
+        <div class="floridex-body" id="floridex-body"></div>
     </div>
 </div>
 
@@ -170,7 +170,7 @@
     document.getElementById("year").textContent = new Date().getFullYear();
 </script>
 
-<script src="game.js?v=19"></script>
+<script src="game.js?v=20"></script>
 
 </body>
 </html>

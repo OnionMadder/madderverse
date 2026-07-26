@@ -124,7 +124,7 @@ If a candidate pair rolls a breed, an offspring flower spawns in a **random empt
 
 Key: `petalcraft-save`. Value: JSON.
 
-Additional keys: `petalcraft-settings`, `petalcraft-seen-onboarding`, `petalcraft-flowerdex`. Split so that resetting the garden doesn't wipe the flowerdex (that's a v3+ feature though — v1 keeps them together).
+Additional keys: `petalcraft-settings`, `petalcraft-seen-onboarding`, `petalcraft-Floridex`. Split so that resetting the garden doesn't wipe the Floridex (that's a v3+ feature though — v1 keeps them together).
 
 **Save cadence.** Debounced 500ms after any state change (planting, watering, rearrangement, EoD rollover). Not on every tick.
 
@@ -146,9 +146,9 @@ Why these three:
 
 1. **Lilies** — unlocks after collecting all 8 tulip colors. 3-gene; introduces a more dramatic silhouette.
 2. **Mums** — unlocks after collecting all 8 pansy colors. 3-gene; introduces green as a rare color.
-3. **Hyacinths** — unlocks after Bloombook is 25% complete. 3-gene; distinctive "spike" shape.
-4. **Windflowers** — unlocks after Bloombook is 40% complete. 3-gene; unusual color palette (introduces distinct pink/blue).
-5. **Roses** — the endgame species, 4-gene, unlocks after Bloombook is 60% complete. Roses can produce the ultimate rare: **blue rose**. This mirrors AC's endgame — blue roses take real work to breed and their arrival is a game-shaping moment.
+3. **Hyacinths** — unlocks after Floridex is 25% complete. 3-gene; distinctive "spike" shape.
+4. **Windflowers** — unlocks after Floridex is 40% complete. 3-gene; unusual color palette (introduces distinct pink/blue).
+5. **Roses** — the endgame species, 4-gene, unlocks after Floridex is 60% complete. Roses can produce the ultimate rare: **blue rose**. This mirrors AC's endgame — blue roses take real work to breed and their arrival is a game-shaping moment.
 
 **Invented species vs. real:** All species names are real-world public-domain flowers. We do **not** invent species for v1 — the AC species set is intentional, well-studied, and gives us 8 hand-curated species without a lot of work justifying them. See §10.
 
@@ -165,7 +165,7 @@ Day 1 the player gets:
 - **3 yellow cosmos seeds** (`[0, 2, 0]`)
 - **3 white cosmos seeds** (`[0, 0, 1]`)
 - A **6×4** starter garden plot (expands via progression, §4.3)
-- A **Bloombook** — the collectible catalog — with cosmos entries blank except for the three seed colors already unlocked (so the player can *see* what they've found and what's left).
+- A **Floridex** — the collectible catalog — with cosmos entries blank except for the three seed colors already unlocked (so the player can *see* what they've found and what's left).
 
 Rationale: starting with only cosmos gives the player a single self-contained puzzle for the first ~15 minutes. Tulip and pansy seeds are unlocked shortly after (§4.2).
 
@@ -173,15 +173,15 @@ Rationale: starting with only cosmos gives the player a single self-contained pu
 
 - **Cosmos** available from day 1.
 - **Tulips** unlock when player discovers their first cosmos hybrid (i.e. any color that isn't red/yellow/white). A "New seed shipment" chime plays; three tulip seed packets appear.
-- **Pansies** unlock when player fills out 5 cosmos slots in the Bloombook.
+- **Pansies** unlock when player fills out 5 cosmos slots in the Floridex.
 - **Lilies, mums, hyacinths, windflowers** as described in §3.
-- **Roses** last, gated behind ~60% flowerdex.
+- **Roses** last, gated behind ~60% Floridex.
 
 Everything scales to the player's own pace. There are no daily quests, streaks, energy meters, or timed events.
 
-### 4.3 Bloombook — the flowerdex
+### 4.3 Floridex — the flower catalog
 
-The Bloombook is a per-species page catalog. Each species page has a grid of color slots (e.g. cosmos = 6 colors, tulips = 8, roses = 8 including blue and black). Each slot shows either:
+The Floridex is a per-species page catalog. Each species page has a grid of color slots (e.g. cosmos = 6 colors, tulips = 8, roses = 8 including blue and black). Each slot shows either:
 
 - A **silhouette** if not yet discovered ("something goes here").
 - The **flower sprite** + the date discovered + a one-line flavor text if discovered.
@@ -194,11 +194,11 @@ The Bloombook is a per-species page catalog. Each species page has a grid of col
 
 Flavor text is written by Onion; the design doc puts a placeholder line under each entry in `data/flavor.js`.
 
-**No completion-required-for-play** — the game continues to work indefinitely with any percentage of the flowerdex filled.
+**No completion-required-for-play** — the game continues to work indefinitely with any percentage of the Floridex filled.
 
 ### 4.4 Target flowers (goals)
 
-A tiny, non-nagging targets system: **the Bloombook itself is the target list**. There's no separate quest UI. Every empty slot is implicitly a target.
+A tiny, non-nagging targets system: **the Floridex itself is the target list**. There's no separate quest UI. Every empty slot is implicitly a target.
 
 **Optional micro-goals** shown on the main screen (v1 has just one at a time, rotating):
 - "Try crossing two colors you haven't yet."
@@ -209,9 +209,9 @@ These are hints, not requirements. Ignoring them does nothing.
 
 ### 4.5 Garden expansion
 
-Player unlocks additional plot tiles as the Bloombook fills:
+Player unlocks additional plot tiles as the Floridex fills:
 - Start: `6×4` (24 tiles)
-- 25% flowerdex: `8×6` (48 tiles)
+- 25% Floridex: `8×6` (48 tiles)
 - 50%: `10×8` (80 tiles)
 - 100%: `12×10` (120 tiles) — the sandbox size for post-game.
 
@@ -227,7 +227,7 @@ Expansion is instant on unlock (small celebratory chime, camera zooms out).
 
 ### 4.7 End-game
 
-After 100% flowerdex, the game becomes a pure sandbox. Additional post-game niceties for later phases (not v1):
+After 100% Floridex, the game becomes a pure sandbox. Additional post-game niceties for later phases (not v1):
 - **Custom garden decorations** (paths, benches, garden gnomes as static sprites).
 - **Seasonal palette shifts** (spring/summer/fall/winter tinting).
 - **Photo mode** (export a PNG of the current garden — pattern-matches Slip Studio's photo export).
@@ -256,7 +256,7 @@ Small SFX set, lazy-loaded like Slip Studio's:
 - **Ambient night** — crickets + occasional owl, loops ~90s.
 - **Watering** — a `plip` (single droplet) on tap.
 - **Rain** — soft loop when rainy day.
-- **Discovery jingle** — a 2-3 second warm chord + rising arpeggio when a new flower goes into the Bloombook. This is the game's most important sound; it's the payoff for hours of accidental discovery. Get this right; everything else can be placeholder.
+- **Discovery jingle** — a 2-3 second warm chord + rising arpeggio when a new flower goes into the Floridex. This is the game's most important sound; it's the payoff for hours of accidental discovery. Get this right; everything else can be placeholder.
 - **UI tap** — soft wooden thock.
 - **Seed plant** — muffled tap + tiny leaf rustle.
 
@@ -267,7 +267,7 @@ Small SFX set, lazy-loaded like Slip Studio's:
 Dry, warm, minimal. Kid-friendly but not talking down to kids. Slight self-awareness OK. Reference points: Cookie Cache's "Slice to Slice" hint copy; the tone of the Madderverse hub tagline.
 
 Bad: "Wow!! You did it!!! Amazing job!!!! ⭐⭐⭐"
-Good: "New in the Bloombook: pink cosmos."
+Good: "New in the Floridex: pink cosmos."
 
 Bad: "Uh oh! Your flowers are getting thirsty!"
 Good: (no such message — nagging is not cozy)
@@ -282,7 +282,7 @@ Good: (no such system exists)
 - **No scoring.** No high-score list, no XP bar, no rank.
 - **No FOMO.** No limited-time events, no daily login rewards, no streak counters.
 - **No forced choice regret.** Actions are undoable in the important moments — placing a flower is free; rearranging is free.
-- **The only "progress" is the flowerdex,** and progress is entirely under the player's control.
+- **The only "progress" is the Floridex,** and progress is entirely under the player's control.
 - **Discovery > efficiency.** Even a "wasteful" breeding pair might produce a hybrid you didn't have. Nothing is wrong to plant.
 
 ---
@@ -323,7 +323,7 @@ florigami/
 │   └── favi/                     # per-game favicons (or link the shared set)
 ├── data/                         # (optional) split if game.js is getting long
 │   ├── genes.js                  # phenotype lookup tables per species
-│   └── flavor.js                 # Bloombook flavor text per hybrid
+│   └── flavor.js                 # Floridex flavor text per hybrid
 ├── privacy/
 │   └── index.html                # per-app privacy page for Play listing
 └── PLAY_STORE_LISTING.md         # written closer to Phase 6
@@ -348,7 +348,7 @@ const state = {
   },
   seedInventory: { cosmos: { red: Infinity, yellow: Infinity, white: Infinity }, tulips: {...} },
   unlockedSpecies: ['cosmos'],
-  flowerdex: {
+  Floridex: {
     cosmos: { red: { firstSeen: '2026-07-21' }, /* ... other slots unfilled */ },
     tulips: {},
     // ...
@@ -467,8 +467,8 @@ Hour estimates are **coder-hours by a familiar-with-the-codebase developer**, no
 
 ### Phase 3 — progression + collectibles (**~9 h**)
 
-- Bloombook UI (species pages, silhouette-vs-discovered slots)
-- Discovery jingle + Bloombook slot fill animation
+- Floridex UI (species pages, silhouette-vs-discovered slots)
+- Discovery jingle + Floridex slot fill animation
 - Unlock schedule wired: tulips-after-cosmos-hybrid, pansies-after-5-cosmos-slots, etc.
 - Third starter species (pansies) added, tables loaded
 - Garden expansion tiers (`6×4` → `8×6` etc.)
@@ -483,7 +483,7 @@ Hour estimates are **coder-hours by a familiar-with-the-codebase developer**, no
 - Full sound pass
 - `prefers-reduced-motion` gating
 - Accessibility: keyboard support for the grid, `aria-label`s on flowers
-- Discovery flash + gentle vibration on Bloombook fill
+- Discovery flash + gentle vibration on Floridex fill
 
 ### Phase 5 — remaining species (**~8 h**)
 
@@ -491,7 +491,7 @@ Hour estimates are **coder-hours by a familiar-with-the-codebase developer**, no
 - Rose engine — 4-gene extension, black + blue rose in phenotype tables
 - Additional sprite art (5 more species × 4 stages × ~8 colors ≈ 160 sprites) — this is Onion or paid art, not code
 - Unlock gates wired for each
-- Bloombook flavor text pass (48 hybrid entries × 2-3 sentences each)
+- Floridex flavor text pass (48 hybrid entries × 2-3 sentences each)
 
 ### Phase 6 — Android paid app (**~6 h, plus Onion's Play-Console-side work**)
 
@@ -534,7 +534,7 @@ Sprite dimensions: 64×64 at 1× (for phone-portrait), export at 128×128 for re
 
 ### 8.2 UI art
 
-- Bloombook page background (parchment texture)
+- Floridex page background (parchment texture)
 - Seed packet illustration (single reusable template, palette-swapped)
 - Button set (water-all, plant, settings) — 3–5 icons
 - Backdrop/sky elements for day/night/rain tinting
@@ -551,7 +551,7 @@ Total audio budget: ~5 MB compressed after MP3-32k or Opus.
 
 ### 8.4 Fonts
 
-- **Fraunces** (headings + Bloombook titles) — free, matches Slip Studio's warm serif
+- **Fraunces** (headings + Floridex titles) — free, matches Slip Studio's warm serif
 - **Nunito** (body + UI) — free, warm geometric sans
 
 Either use Google Fonts (fast, but sends a request to Google) or self-host `.woff2` files under `assets/fonts/` (~150 KB total, works offline, better for the Play app). Recommend self-hosting for Phase 6.
@@ -566,7 +566,7 @@ Either use Google Fonts (fast, but sends a request to Google) or self-host `.wof
 | SFX | None | Full set |
 | Music | None | 1 loop |
 | Icons | Emoji / text | Real UI icons |
-| Bloombook page | Grid of divs | Illustrated page |
+| Floridex page | Grid of divs | Illustrated page |
 
 ---
 
@@ -576,7 +576,7 @@ Stated so they don't creep in mid-build:
 
 - **No gene visibility UI.** Accidental discovery is the whole design. No Punnett-square display, no "genotype: `[1, 0, 2]`" text, no color-percentage predictions. Player learns patterns by observation only. (Debug console shows genotypes for the developer; production strips this.)
 - **No ads.**
-- **No IAP-for-play.** No paid seed packs, no paid Bloombook slots, no paid land expansions. Once someone pays $0.99, the game is theirs. Web build is free forever, positioned as the trial.
+- **No IAP-for-play.** No paid seed packs, no paid Floridex slots, no paid land expansions. Once someone pays $0.99, the game is theirs. Web build is free forever, positioned as the trial.
 - **No subscriptions.**
 - **No multiplayer, no leaderboards, no friend-visits.** Nothing that requires a server. Pure single-player.
 - **No login / account system.**
@@ -605,7 +605,7 @@ Stated so they don't creep in mid-build:
 - No AC:NH art assets, sprites, sound, or music.
 - No character names (no Isabelle, no K.K. Slider, no NPCs referencing AC's cast).
 - No AC-specific location or lore terminology (no "Nook" anything, no "bells," no "island").
-- No AC-specific branded hybrid *nomenclature* if any exists (all hybrid slots in the Bloombook are named plainly, e.g. "orange cosmos," not any invented AC name).
+- No AC-specific branded hybrid *nomenclature* if any exists (all hybrid slots in the Floridex are named plainly, e.g. "orange cosmos," not any invented AC name).
 - No use of AC's specific UI language ("Nook Miles," "the DIY workbench," etc.).
 
 **References cited in code comments** (in `data/genes.js`):
