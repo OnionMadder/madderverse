@@ -1707,3 +1707,22 @@ body.reduce-motion .garden.just-grew { animation: none; }
     line-height: 1.35;
 }
 .tray-breed[hidden] { display: none; }
+
+/* ─── Transparent plots over a photo backdrop ────────────────────────
+   When the garden scene is the backdrop, the soil tiles step aside so the
+   scene shows through. Empty tiles keep a soft luminous outline (planting
+   spots stay findable); planted tiles go fully clear so the flower sits
+   right in the scene. (Living-sky mode keeps the normal soil bed.) */
+.garden-wrap.has-photo .tile {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.22),
+                inset 0 0 12px rgba(60, 45, 30, 0.06);
+    border-radius: 13px;
+}
+.garden-wrap.has-photo .tile:has(.flower) { box-shadow: none; }        /* planted: flower only */
+.garden-wrap.has-photo .tile.watered {
+    background: rgba(126, 176, 196, 0.14);
+    box-shadow: inset 0 0 0 1.5px rgba(126, 176, 196, 0.55);
+}
+.garden-wrap.has-photo .tile:not(.watered)::before { display: none; }  /* no dew over the scene */
