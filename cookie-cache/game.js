@@ -639,6 +639,7 @@ function abortRound() {
     state.cookies = [];
     clearBlade();
     endFrenzy();
+    endSlowmo();
     stopStartSfx();
     stopLevelMusic();
     stopGlitches();
@@ -682,11 +683,13 @@ function resumeGame() {
     if (!state.running || !state.paused) return;
     state.paused = false;
     hidePauseOverlay();
-    // Shift the Frenzy deadline forward by however long we were paused so a
-    // paused Frenzy doesn't silently expire (it's the one absolute-time clock;
+    // Shift the Frenzy / slow-mo deadlines forward by however long we were
+    // paused so they don't silently expire (they're the absolute-time clocks;
     // spawnInMs / timeLeftMs are dt-driven and were frozen with the loop).
-    if (state.frenzy && state.pauseAt) {
-        state.frenzyUntil += performance.now() - state.pauseAt;
+    if (state.pauseAt) {
+        const held = performance.now() - state.pauseAt;
+        if (state.frenzy) state.frenzyUntil += held;
+        if (state.slowmo) state.slowmoUntil += held;
     }
     state.pauseAt = 0;
     resumeLevelMusic();
@@ -825,10 +828,17 @@ const WAVE_CHANCE      = 0.28;
 // short cookie storm: rapid spawns, no bombs, double points.
 const GOLDEN_CHANCE   = 0.05;  // odds a plain cookie is golden
 const FRENZY_CHANCE   = 0.03;  // odds a plain cookie is a frenzy trigger
+const SLOWMO_CHANCE   = 0.04;  // odds a plain cookie is a slow-mo "buffering" trigger
 const GOLDEN_MULT     = 5;     // golden cookie scores this × a normal catch
 const FRENZY_MULT     = 2;     // every catch scores ×this while Frenzy is on
 const FRENZY_MS       = 5000;  // how long a Frenzy lasts
 const FRENZY_SPAWN_MS = 200;   // spawn interval during a Frenzy (fast!)
+// SLOW-MO ("BUFFERING…"): slicing a slow-mo cookie briefly eases every cookie's
+// motion so they're easy to catch — a calm, helpful reward (no dark pattern),
+// on-theme with a laggy cache. The round CLOCK keeps ticking at normal speed;
+// only the cookies slow, so it's a breather, not a way to farm points.
+const SLOWMO_MS       = 3200;  // how long the slow-mo window lasts
+const SLOWMO_FACTOR   = 0.45;  // cookie motion runs at this fraction of normal
 
 // Launch one cookie (or veggie) UP from just below the bottom edge, tossed
 // like a Fruit-Ninja fruit: a strong upward velocity + gentle horizontal
@@ -842,8 +852,9 @@ function launchCookie(startXFrac) {
     let special = null;
     if (!isVeggie && !state.frenzy) {
         const r = Math.random();
-        if (TUNE.allowFrenzy && r < FRENZY_CHANCE)   special = 'frenzy';
-        else if (r < FRENZY_CHANCE + GOLDEN_CHANCE)  special = 'golden';
+        if (TUNE.allowFrenzy && r < FRENZY_CHANCE)                      special = 'frenzy';
+        else if (r < FRENZY_CHANCE + GOLDEN_CHANCE)                     special = 'golden';
+        else if (r < FRENZY_CHANCE + GOLDEN_CHANCE + SLOWMO_CHANCE)     special = 'slowmo';
     }
     // Element aspect tracks the sheet cell (cookies 4:3, veggies 1:1) so the
     // scaled sprite fills the box with no neighbour-cell bleed.
@@ -869,6 +880,7 @@ function launchCookie(startXFrac) {
     el.className = isVeggie ? 'flying-veggie' : 'flying-cookie';
     if (special === 'golden')      el.classList.add('golden');
     else if (special === 'frenzy') el.classList.add('frenzy-cookie');
+    else if (special === 'slowmo') el.classList.add('slowmo-cookie');
     el.style.left = '0px';
     el.style.top  = '0px';
     el.style.width  = cookieW + 'px';
@@ -971,11 +983,75 @@ function endFrenzy(natural) {
     state.frenzy = false;
     state.frenzyUntil = 0;
     els.stage.classList.remove('frenzy-active');
-    setCodeRainSpeed(1);   // back to the calm background drift
+    // Frenzy owns the code-rain speed; hand it back to slow-mo if that's still
+    // running, otherwise to the calm default.
+    setCodeRainSpeed(state.slowmo ? 1.9 : 1);
     if (wasOn && natural && state.running) {
         spawnStageFlash(state.stageW / 2, state.stageH / 2, 'rgba(255,170,0,0.4)');
         flashMilestoneBanner('PHEW!');
     }
+}
+
+// ── Slow-mo ("BUFFERING…") ─────────────────────────────────────────
+// Slicing a slow-mo cookie eases every cookie's motion (SLOWMO_FACTOR) for a
+// short window — a calm, catch-up-friendly breather. The round clock is
+// untouched (see the loop), so it can't be farmed for points. Slicing another
+// slow-mo cookie extends it. Auto-ends after SLOWMO_MS (checked in the loop).
+state.slowmo = false;
+state.slowmoUntil = 0;
+
+function startSlowmo() {
+    const now = performance.now();
+    const wasOn = state.slowmo;
+    state.slowmo = true;
+    state.slowmoUntil = now + SLOWMO_MS;          // slicing another extends it
+    if (!wasOn) {
+        els.stage.classList.add('slowmo-active');
+        flashMilestoneBanner('BUFFERING…');
+        playSlowmoSfx();
+        // Don't fight an active Frenzy for the code-rain speed — Frenzy's
+        // fast rain wins while it's on; slow the rain only when it isn't.
+        if (!state.frenzy) setCodeRainSpeed(1.9);
+    }
+}
+
+// natural=true when the timer ran out mid-play (brief "resume" flash);
+// false/omitted for teardown on reset/end/abort.
+function endSlowmo(natural) {
+    const wasOn = state.slowmo;
+    state.slowmo = false;
+    state.slowmoUntil = 0;
+    els.stage.classList.remove('slowmo-active');
+    if (!state.frenzy) setCodeRainSpeed(1);   // Frenzy, if on, keeps its fast rain
+    if (wasOn && natural && state.running) {
+        flashMilestoneBanner('RESUMED!');
+    }
+}
+
+// Slow-mo cue: a downward pitch bend — the "everything slows" sound. Reuses
+// the shared tone AudioContext.
+function playSlowmoSfx() {
+    if (audio.muted) return;
+    try {
+        const Ctor = window.AudioContext || window.webkitAudioContext;
+        if (!Ctor) return;
+        if (!_streakBreakCtx) _streakBreakCtx = new Ctor();
+        const ctx = _streakBreakCtx;
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        const now = ctx.currentTime;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(760, now);
+        o.frequency.exponentialRampToValueAtTime(180, now + 0.5);   // wind down
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.2, now + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+        o.connect(g);
+        g.connect(ctx.destination);
+        o.start(now);
+        o.stop(now + 0.58);
+    } catch (_) {}
 }
 
 let bladeCanvas = null, bladeCtx = null;
@@ -1332,10 +1408,12 @@ function catchCookie(c) {
 
     // Golden always pops big + gold; combo tiers pop big with the tier label;
     // otherwise ~18% of catches get a fun random label for flavor.
+    const isSlowmo  = c.special === 'slowmo';
     const flavorBig = Math.random() < 0.18;
-    const big = isGolden || tier.mult > 1 || flavorBig;
+    const big = isGolden || isSlowmo || tier.mult > 1 || flavorBig;
     let popText;
     if (isGolden)           popText = `GOLDEN! +${earned}`;
+    else if (isSlowmo)      popText = `BUFFERING… +${earned}`;
     else if (tier.mult > 1) popText = `${tier.label} +${earned}`;
     else if (flavorBig)     popText = `${choice(SCORE_LABELS)} +${earned}`;
     else                    popText = `+${earned}`;
@@ -1369,6 +1447,8 @@ function catchCookie(c) {
         shakeStage(false);
     } else if (c.special === 'frenzy') {
         startFrenzy();
+    } else if (isSlowmo) {
+        startSlowmo();
     }
 
     // Slice the cookie in two — the halves tumble apart and fade. The pile
@@ -1686,12 +1766,17 @@ function loop(ts) {
     const dt = Math.min((ts - state.lastTs) / 1000, 0.05);
     state.lastTs = ts;
 
+    // Global slow-mo eases EVERY cookie's motion during a "buffering" window;
+    // the round clock below is deliberately left at full speed.
+    const timeScale = state.slowmo ? SLOWMO_FACTOR : 1;
+
     const W = state.stageW, H = state.stageH;
     for (const c of state.cookies) {
         if (!c.alive) continue;
         // Per-cookie time scaling: same parabolic arc, compressed in time.
-        // Streak-driven speedup is baked in at spawn via c.timeMult.
-        const cdt = dt * (c.timeMult || 1);
+        // Streak-driven speedup is baked in at spawn via c.timeMult; slow-mo
+        // scales the whole field.
+        const cdt = dt * (c.timeMult || 1) * timeScale;
         c.vy += CFG.gravity * cdt;
         c.x  += c.vx * cdt;
         c.y  += c.vy * cdt;
@@ -1727,8 +1812,9 @@ function loop(ts) {
 
     drawBlade();
 
-    // Frenzy auto-ends after its window (with a wind-down flash).
+    // Frenzy / slow-mo auto-end after their windows (with a wind-down flash).
     if (state.frenzy && performance.now() > state.frenzyUntil) endFrenzy(true);
+    if (state.slowmo && performance.now() > state.slowmoUntil) endSlowmo(true);
 
     state.spawnInMs -= dt * 1000;
     if (state.spawnInMs <= 0) {
@@ -1781,8 +1867,9 @@ function resetState() {
     clearBlade();
     clearParticles();
     endFrenzy();
+    endSlowmo();
     els.stage.querySelectorAll('.round-end, .mode-flash, .swipe-hint').forEach(el => el.remove());  // clear last round's overlays
-    els.stage.classList.remove('time-low', 'frenzy-active', 'stage-shake', 'stage-shake-big');
+    els.stage.classList.remove('time-low', 'frenzy-active', 'slowmo-active', 'stage-shake', 'stage-shake-big');
     setCodeRainSpeed(1);
     els.feastPile.innerHTML = '';
 
@@ -1875,6 +1962,7 @@ function endRound() {
     state.rafId = null;
     clearBlade();
     endFrenzy();
+    endSlowmo();
     stopStartSfx();
     fadeOutLevelMusic(ROUND_END_MS);   // soft landing instead of a hard cut
     stopGlitches();
