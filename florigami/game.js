@@ -1265,8 +1265,16 @@ function rerenderGarden() {
 //   BACKDROPS[id] = { name, day: "assets/img/backdrops/x-day.jpg",
 //                     night: "…-night.jpg", celestial?: true }
 //   SEASON_SCENES  = { spring: id|null, summer, autumn, winter }
-const BACKDROPS = {};            // empty until scene art is dropped in
-const SEASON_SCENES = { spring: null, summer: null, autumn: null, winter: null };
+const BACKDROPS = {
+    garden: {
+        name: "Paper garden",
+        day: "assets/img/backdrops/garden-day.jpg?a=1",
+        night: "assets/img/backdrops/garden-night.jpg?a=1",
+        celestial: false,   // the scene is its own world — hide the CSS sun/moon/stars
+    },
+};
+// One scene for now, shown year-round; swap in seasonal variants later.
+const SEASON_SCENES = { spring: "garden", summer: "garden", autumn: "garden", winter: "garden" };
 
 /** Real-world season (northern hemisphere) — drives the "auto" scene. */
 function currentSeason() {
