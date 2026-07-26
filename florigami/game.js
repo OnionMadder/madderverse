@@ -719,12 +719,13 @@ function checkUnlocks() {
 // ─── 6b. GARDEN EXPANSION ─────────────────────────────────────────
 // The plot grows as the Floridex fills (DESIGN.md §4.5) — more room to lay out
 // deliberate crosses. Tiers key off totalDex(); existing flowers keep their
-// (x,y) as the plot extends right + down. Never shrinks.
+// (x,y) as the plot extends RIGHT (horizontal growth only — height stays 4 so
+// the plot reads as a wide band that fits the landscape garden scene). Never shrinks.
 const EXPANSION_TIERS = [
     { at: 0,  w: 6,  h: 4 },    // start — 24 tiles
-    { at: 12, w: 8,  h: 6 },    // 48 tiles
-    { at: 26, w: 10, h: 8 },    // 80 tiles
-    { at: 42, w: 12, h: 10 },   // 120 tiles — the post-game sandbox
+    { at: 12, w: 8,  h: 4 },    // 32 tiles
+    { at: 26, w: 10, h: 4 },    // 40 tiles
+    { at: 42, w: 12, h: 4 },    // 48 tiles — the post-game sandbox
 ];
 
 function targetGridSize() {
