@@ -724,8 +724,8 @@ function checkUnlocks() {
 const EXPANSION_TIERS = [
     { at: 0,  w: 6,  h: 4 },    // start — 24 tiles
     { at: 12, w: 8,  h: 4 },    // 32 tiles
-    { at: 26, w: 10, h: 4 },    // 40 tiles
-    { at: 42, w: 12, h: 4 },    // 48 tiles — the post-game sandbox
+    { at: 26, w: 9,  h: 4 },    // 36 tiles
+    { at: 42, w: 10, h: 4 },    // 40 tiles — the widest (post-game sandbox)
 ];
 
 function targetGridSize() {
