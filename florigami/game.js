@@ -57,183 +57,52 @@ const DEFAULT_SPEED = "relaxed";
 const MAX_CATCHUP_DAYS = 40;
 const MINUTES_PER_DAY = 24 * 60;
 
-// Species definitions.
-// table maps a 3-char genotype ("012" = R:0 Y:1 W:2) → color.
+// ─── Unified colour-mixing genetics (finalized 2026-07-25) ───────────────
+// EVERY species breeds the same way (the model prototyped on cosmos). The 3
+// genes are pigment presence: R (red), Y (yellow), B (blue); a pigment shows at
+// strength >= 1. Colour = which pigments are present:
+//   R=red . Y=yellow . B=blue . R+Y=orange . Y+B=green . R+B=purple
+//   none = white (rare) . all three = black (rare)
+// Seeds are the 3 PRIMARIES; crossing two primaries deterministically yields
+// their mix (red x yellow -> orange ...). White + black are the two UNIVERSAL
+// rares (deep-recessive / all-pigment crosses) and the only PATTERNED tier:
+// every base colour is plain watercolour, each species' rares wear that
+// species' signature pattern. Species differ by silhouette + rare pattern only.
+const MIX_SEEDS = { red: "200", yellow: "020", blue: "002" };
+const MIX_TABLE = {
+    "000": "white",  "001": "blue",   "002": "blue",
+    "010": "yellow", "011": "green",  "012": "green",
+    "020": "yellow", "021": "green",  "022": "green",
+    "100": "red",    "101": "purple", "102": "purple",
+    "110": "orange", "111": "black",  "112": "black",
+    "120": "orange", "121": "black",  "122": "black",
+    "200": "red",    "201": "purple", "202": "purple",
+    "210": "orange", "211": "black",  "212": "black",
+    "220": "orange", "221": "black",  "222": "black",
+};
+const MIX_DEX = ["red", "orange", "yellow", "green", "blue", "purple"];
+const MIX_RARE = ["white", "black"];
+
+function mixSpecies(name, extra) {
+    return Object.assign({ name, genes: 3, seeds: MIX_SEEDS, table: MIX_TABLE, dex: MIX_DEX, rare: MIX_RARE }, extra || {});
+}
+
+// All 8 AC-named species share the genetics above; they differ only by
+// silhouette (art) and their signature rare pattern (baked into the sheets).
 const SPECIES = {
-    // Cosmos — the starter species, redesigned 2026-07-25 as a COLOUR-MIXING
-    // model (replaces the AC:NH cosmos palette). The three genes are pigment
-    // presence: R (red), Y (yellow), B (blue). A pigment is "present" at
-    // strength ≥ 1. Colour = which pigments are present:
-    //   R=red · Y=yellow · B=blue · R+Y=orange · Y+B=green · R+B=purple
-    //   none=white (rare) · all three=black (rare)
-    // Seeds are the three PRIMARIES; crossing two primaries deterministically
-    // yields their mix (red×yellow→orange, etc.). White + black are the latent
-    // "expand later" rares (deep recessive / all-pigment crosses).
-    cosmos: {
-        name: "Cosmos",
-        genes: 3,
-        seeds: { red: "200", yellow: "020", blue: "002" },
-        table: {
-            "000": "white",  "001": "blue",   "002": "blue",
-            "010": "yellow", "011": "green",  "012": "green",
-            "020": "yellow", "021": "green",  "022": "green",
-            "100": "red",    "101": "purple", "102": "purple",
-            "110": "orange", "111": "black",  "112": "black",
-            "120": "orange", "121": "black",  "122": "black",
-            "200": "red",    "201": "purple", "202": "purple",
-            "210": "orange", "211": "black",  "212": "black",
-            "220": "orange", "221": "black",  "222": "black",
-        },
-        dex: ["red", "orange", "yellow", "green", "blue", "purple"],
-        rare: ["white", "black"],
-        sprites: { src: "assets/img/flowers/cosmos.png", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] },
-    },
-    tulips: {
-        name: "Tulips",
-        genes: 3,
-        seeds: { red: "201", yellow: "020", white: "001" },
-        table: {
-            "000": "white",  "001": "white",  "002": "white",
-            "010": "yellow", "011": "yellow", "012": "white",
-            "020": "yellow", "021": "yellow", "022": "yellow",
-            "100": "pink",   "101": "pink",   "102": "white",
-            "110": "orange", "111": "yellow", "112": "yellow",
-            "120": "orange", "121": "yellow", "122": "yellow",
-            "200": "black",  "201": "red",    "202": "red",
-            "210": "black",  "211": "red",    "212": "red",
-            "220": "purple", "221": "purple", "222": "purple",
-        },
-        dex: ["white", "yellow", "red", "pink", "orange", "purple", "black"],
-        rare: ["purple", "black"],
-    },
-    pansies: {
-        name: "Pansies",
-        genes: 3,
-        seeds: { red: "200", yellow: "020", white: "001" },
-        table: {
-            "000": "white",  "001": "white",  "002": "blue",
-            "010": "yellow", "011": "yellow", "012": "blue",
-            "020": "yellow", "021": "yellow", "022": "yellow",
-            "100": "red",    "101": "red",    "102": "blue",
-            "110": "orange", "111": "orange", "112": "orange",
-            "120": "yellow", "121": "yellow", "122": "yellow",
-            "200": "red",    "201": "red",    "202": "purple",
-            "210": "red",    "211": "red",    "212": "purple",
-            "220": "orange", "221": "orange", "222": "purple",
-        },
-        dex: ["white", "yellow", "red", "orange", "blue", "purple"],
-        rare: ["blue", "purple"],
-    },
-    // Hyacinths — the first progression-unlocked species. 3-gene, distinctive
-    // "spike" silhouette (a stacked cluster of florets). Phenotype table cross-
-    // verified 2026-07-24 against Joey Parrish's GPLv3 phenotypes.py source
-    // (hyacinth = expand3('wwu','yyw','yyy','rpw','oyy','oyy','rrr','urr','lll'),
-    // decoded w/y/r/p/o=blue(u)/purple(l)) — same lineage as the tables above.
-    // Seeds: red 201, yellow 020, white 001 — each resolves to its own color below.
-    hyacinths: {
-        name: "Hyacinths",
-        genes: 3,
-        seeds: { red: "201", yellow: "020", white: "001" },
-        table: {
-            "000": "white",  "001": "white",  "002": "blue",
-            "010": "yellow", "011": "yellow", "012": "white",
-            "020": "yellow", "021": "yellow", "022": "yellow",
-            "100": "red",    "101": "pink",   "102": "white",
-            "110": "orange", "111": "yellow", "112": "yellow",
-            "120": "orange", "121": "yellow", "122": "yellow",
-            "200": "red",    "201": "red",    "202": "red",
-            "210": "blue",   "211": "red",    "212": "red",
-            "220": "purple", "221": "purple", "222": "purple",
-        },
-        dex: ["white", "yellow", "red", "pink", "orange", "blue", "purple"],
-        rare: ["blue", "purple"],
-    },
-    // ─── Progression-unlocked species (Phase 5) ──────────────────────
-    // All four tables transcribed verbatim from Joey Parrish's GPLv3
-    // phenotypes.py (the same source the tables above were verified against;
-    // generated 2026-07-24, seed→phenotype sanity-checked). Lily/mum/windflower
-    // are 3-gene; roses are the 4-gene endgame (R,Y,W + S "shade") that alone
-    // can reach the blue rose.
-    lilies: {
-        name: "Lilies",
-        genes: 3,
-        seeds: { red: "201", yellow: "020", white: "002" },
-        table: {
-            "000": "white",  "001": "white",  "002": "white",
-            "010": "yellow", "011": "white",  "012": "white",
-            "020": "yellow", "021": "yellow", "022": "white",
-            "100": "red",    "101": "pink",   "102": "white",
-            "110": "orange", "111": "yellow", "112": "yellow",
-            "120": "orange", "121": "yellow", "122": "yellow",
-            "200": "black",  "201": "red",    "202": "pink",
-            "210": "black",  "211": "red",    "212": "pink",
-            "220": "orange", "221": "orange", "222": "white",
-        },
-        dex: ["white", "yellow", "red", "pink", "orange", "black"],
-        rare: ["black"],
-    },
-    mums: {
-        name: "Mums",
-        genes: 3,
-        seeds: { red: "200", yellow: "020", white: "001" },
-        table: {
-            "000": "white",  "001": "white",  "002": "purple",
-            "010": "yellow", "011": "yellow", "012": "white",
-            "020": "yellow", "021": "yellow", "022": "yellow",
-            "100": "pink",   "101": "pink",   "102": "pink",
-            "110": "yellow", "111": "red",    "112": "pink",
-            "120": "purple", "121": "purple", "122": "purple",
-            "200": "red",    "201": "red",    "202": "red",
-            "210": "purple", "211": "purple", "212": "red",
-            "220": "green",  "221": "green",  "222": "red",
-        },
-        dex: ["white", "yellow", "red", "pink", "purple", "green"],
-        rare: ["green", "purple"],
-    },
-    windflowers: {
-        name: "Windflowers",
-        genes: 3,
-        // Note: windflowers seed from white / ORANGE / red (no yellow seed) —
-        // this is why seed colors are read per-species, not from SEED_COLORS.
-        seeds: { red: "200", orange: "020", white: "001" },
-        table: {
-            "000": "white",  "001": "white",  "002": "blue",
-            "010": "orange", "011": "orange", "012": "blue",
-            "020": "orange", "021": "orange", "022": "orange",
-            "100": "red",    "101": "red",    "102": "blue",
-            "110": "pink",   "111": "pink",   "112": "pink",
-            "120": "orange", "121": "orange", "122": "orange",
-            "200": "red",    "201": "red",    "202": "purple",
-            "210": "red",    "211": "red",    "212": "purple",
-            "220": "pink",   "221": "pink",   "222": "purple",
-        },
-        dex: ["white", "red", "orange", "pink", "blue", "purple"],
-        rare: ["blue", "purple"],
-    },
-    roses: {
-        name: "Roses",
-        genes: 4,   // the only 4-gene species; the extra gene reaches blue + black
-        seeds: { red: "2001", yellow: "0200", white: "0010" },
-        table: {
-            "0000": "white",  "0001": "white",  "0002": "white",  "0010": "white",  "0011": "white",  "0012": "white",  "0020": "purple", "0021": "purple", "0022": "purple",
-            "0100": "yellow", "0101": "yellow", "0102": "yellow", "0110": "white",  "0111": "white",  "0112": "white",  "0120": "purple", "0121": "purple", "0122": "purple",
-            "0200": "yellow", "0201": "yellow", "0202": "yellow", "0210": "yellow", "0211": "yellow", "0212": "yellow", "0220": "white",  "0221": "white",  "0222": "white",
-            "1000": "red",    "1001": "pink",   "1002": "white",  "1010": "red",    "1011": "pink",   "1012": "white",  "1020": "red",    "1021": "pink",   "1022": "purple",
-            "1100": "orange", "1101": "yellow", "1102": "yellow", "1110": "red",    "1111": "pink",   "1112": "white",  "1120": "red",    "1121": "pink",   "1122": "purple",
-            "1200": "orange", "1201": "yellow", "1202": "yellow", "1210": "orange", "1211": "yellow", "1212": "yellow", "1220": "red",    "1221": "pink",   "1222": "white",
-            "2000": "black",  "2001": "red",    "2002": "pink",   "2010": "black",  "2011": "red",    "2012": "pink",   "2020": "black",  "2021": "red",    "2022": "pink",
-            "2100": "orange", "2101": "orange", "2102": "yellow", "2110": "red",    "2111": "red",    "2112": "white",  "2120": "black",  "2121": "red",    "2122": "purple",
-            "2200": "orange", "2201": "orange", "2202": "yellow", "2210": "orange", "2211": "orange", "2212": "yellow", "2220": "blue",   "2221": "red",    "2222": "white",
-        },
-        dex: ["white", "yellow", "red", "pink", "orange", "purple", "black", "blue"],
-        rare: ["blue", "black"],
-    },
+    cosmos:      mixSpecies("Cosmos", { sprites: { src: "assets/img/flowers/cosmos.png", frame: 256, stages: ["seed", "sprout", "bud", "bloom"] } }),
+    tulips:      mixSpecies("Tulips"),
+    pansies:     mixSpecies("Pansies"),
+    hyacinths:   mixSpecies("Hyacinths"),
+    lilies:      mixSpecies("Lilies"),
+    mums:        mixSpecies("Mums"),
+    windflowers: mixSpecies("Windflowers"),
+    roses:       mixSpecies("Roses"),
 };
 
-// The three base colors MOST species are seeded with (cosmos/tulips/pansies/
-// hyacinths/lilies/mums/roses). Windflowers are the exception (orange, not
-// yellow) — always read a species' real seed colors via seedColorsFor().
-const SEED_COLORS = ["red", "yellow", "white"];
+// The three primary seed colours every species now ships (unified model).
+// Prefer seedColorsFor(species) at call sites; this stays as the shared default.
+const SEED_COLORS = ["red", "yellow", "blue"];
 
 /** The seed colors a given species actually ships (keys of its seeds table). */
 function seedColorsFor(species) {
@@ -265,78 +134,23 @@ const LOCKED_HINT = {
 const TOTAL_GATES = { hyacinths: 10, lilies: 14, mums: 18, windflowers: 23, roses: 28 };
 
 // Flavor text for the Bloombook — written in Onion's voice.
-const FLAVOR = {
-    cosmos: {
-        red:    "One of the three you start with. Bold, warm, no apologies.",
-        yellow: "A starting primary — cheerful and easy, and a little glad you showed up.",
-        blue:   "The third primary. Cool and calm, and rarer to find loose in the wild than you'd think.",
-        orange: "Red and yellow, meeting halfway — proof that mixing what you already have makes something new.",
-        green:  "Yellow and blue, quietly agreeing. The colour the leaves lent to the bloom.",
-        purple: "Red and blue met in the middle, and got a little regal about it.",
-        white:  "No pigment at all — which turns out to be surprisingly hard to arrive at. The blank the whole rainbow forgets it came from.",
-        black:  "Every colour at once, folded down into the dark. The deepest cross there is; hardly anyone gets it on the first try.",
-    },
-    tulips: {
-        white:  "Sturdy and quiet. An honest place to start.",
-        yellow: "Sunny and reliable, like the ones by somebody's front step.",
-        red:    "Storybook red. Worth the patience it takes to grow one on purpose.",
-        pink:   "Softer and rarer than it looks. Keep this one.",
-        orange: "More accident than plan, kept because it turned out kind of perfect.",
-        purple: "Two strong colors and a little luck. You found your way here.",
-        black:  "The deepest plum there is. It looks like it knows how hard it was to grow.",
-    },
-    pansies: {
-        white:  "Small, plain, steady. Nearly everything else here grows out of flowers like this.",
-        yellow: "Bright without making a fuss. Easy to love.",
-        red:    "Velvety, and a little dramatic — in the best way.",
-        orange: "Somewhere between a sunrise and a snack. It'll grow on you.",
-        blue:   "Not quite blue, but close enough to make you look twice. And it comes from the plainest white — which is sort of the whole point.",
-        purple: "Deep and quietly proud. The reward for a few good crosses.",
-    },
-    hyacinths: {
-        white:  "Tidy little bells, stacked neat as a stairway. A calm place to start.",
-        yellow: "Butter-bright and faintly sweet. The kind of smell you notice before you see it.",
-        red:    "A warm spire that leans toward the sun. Steady work got you here.",
-        pink:   "Softer than the red, and it seems to know it. A quiet favorite.",
-        orange: "Sunset stacked into a single stem. Turned up when two warm colors met.",
-        blue:   "The one people come to see. It rises out of the plainest white, which never stops feeling like a small trick you pulled off.",
-        purple: "Deep as evening and just as unhurried. A few good crosses and patience made this.",
-    },
-    lilies: {
-        white:  "Tall, clean, and calm. A steady place to begin.",
-        yellow: "Sunlit and a little showy, the way lilies are allowed to be.",
-        red:    "Bold enough to lead a whole bed. Storybook stuff.",
-        pink:   "Gentler than the red, and secretly the favorite. Keep this one.",
-        orange: "A trumpet of warm colour — more accident than plan, kept anyway.",
-        black:  "Red pressed down to its very darkest. It looks like it knows how hard it was.",
-    },
-    mums: {
-        white:  "Small, tidy, endlessly patient. Almost everything here grows out of one.",
-        yellow: "Cheerful in the way of late-season flowers that don't know summer's over.",
-        red:    "Velvety and sure of itself. The loud one, when you want it.",
-        pink:   "Soft petals packed in tight. Looks like it took its time.",
-        purple: "Deep and quietly pleased with itself. The reward for a few good crosses.",
-        green:  "A mum the colour of new leaves. Rare, a little odd, and completely worth it.",
-    },
-    windflowers: {
-        white:  "Plain and open-faced. Nearly everything strange here starts this simple.",
-        red:    "A quick, bright bloom that leans toward whoever's watching.",
-        orange: "Warm as embers — and the colour these are usually seeded from.",
-        pink:   "Softer than it has any need to be. A small, good surprise.",
-        blue:   "Barely blue, but blue enough to stop you. And it comes from the plainest white, which is the whole trick.",
-        purple: "Dusky and deep, the end of a few patient crosses.",
-    },
-    roses: {
-        white:  "The plain one everything else gets measured against. Quietly refuses to apologize for it.",
-        yellow: "Bright and generous — the rose that shows up early and stays late.",
-        red:    "The rose people picture when they hear the word. Worth the fuss of growing one on purpose.",
-        pink:   "Soft, a little shy, and somehow always the one people reach for first.",
-        orange: "Warm as a low sun. Turned up where red and yellow finally agreed on something.",
-        purple: "Deep, and a bit regal about it. A few careful crosses got you here.",
-        black:  "Not truly black — just red gone as deep as red can go. Looks like it keeps secrets.",
-        blue:   "The one everyone swears can't be done. And yet — here it is. Nobody outside this garden will quite believe you.",
-    },
+// Shared, colour-mixing-themed flavour for the unified palette. Every species
+// breeds identically, so the base colours share flavour; per-species overrides
+// (e.g. for the signature rares) can be added to FLAVOR later. Read via flavorFor().
+const SHARED_FLAVOR = {
+    red:    "One of the three primaries you start with. Bold, warm, no apologies.",
+    yellow: "A starting primary — cheerful and easy, and a little glad you showed up.",
+    blue:   "The third primary. Cool and calm, and steadier than it lets on.",
+    orange: "Red and yellow, meeting halfway — proof that mixing what you have makes something new.",
+    green:  "Yellow and blue, quietly agreeing. The colour the leaves lent to the bloom.",
+    purple: "Red and blue met in the middle, and got a little regal about it.",
+    white:  "No pigment at all — surprisingly hard to arrive at. The blank the whole rainbow forgets it came from.",
+    black:  "Every colour at once, folded down into the dark. The deepest cross there is.",
 };
+const FLAVOR = {};   // per-species overrides (none yet — all species use SHARED_FLAVOR)
+function flavorFor(species, color) {
+    return (FLAVOR[species] && FLAVOR[species][color]) || SHARED_FLAVOR[color] || "";
+}
 
 // ─── Garden ornaments ─────────────────────────────────────────────
 // Cozy, gameplay-neutral keepsakes that appear in the garden scene as you
@@ -506,17 +320,17 @@ const state = {
         // tiles[y*w+x] = null | { species, genotype, stage, watered, failedBreeds }
         tiles: Array(GRID_W * GRID_H).fill(null),
     },
-    // Seeds are unlimited; the useful part is which colors each species offers.
-    // Windflowers seed orange (not yellow) — the one exception (see seedColorsFor).
+    // Seeds are unlimited; every species now ships the same 3 primaries
+    // (red/yellow/blue) — the unified colour-mixing model.
     seedInventory: {
         cosmos:      { red: Infinity, yellow: Infinity, blue: Infinity },
-        tulips:      { red: Infinity, yellow: Infinity, white: Infinity },
-        pansies:     { red: Infinity, yellow: Infinity, white: Infinity },
-        hyacinths:   { red: Infinity, yellow: Infinity, white: Infinity },
-        lilies:      { red: Infinity, yellow: Infinity, white: Infinity },
-        mums:        { red: Infinity, yellow: Infinity, white: Infinity },
-        windflowers: { red: Infinity, orange: Infinity, white: Infinity },
-        roses:       { red: Infinity, yellow: Infinity, white: Infinity },
+        tulips:      { red: Infinity, yellow: Infinity, blue: Infinity },
+        pansies:     { red: Infinity, yellow: Infinity, blue: Infinity },
+        hyacinths:   { red: Infinity, yellow: Infinity, blue: Infinity },
+        lilies:      { red: Infinity, yellow: Infinity, blue: Infinity },
+        mums:        { red: Infinity, yellow: Infinity, blue: Infinity },
+        windflowers: { red: Infinity, yellow: Infinity, blue: Infinity },
+        roses:       { red: Infinity, yellow: Infinity, blue: Infinity },
     },
     unlockedSpecies: ["cosmos"],   // every other species unlocks via progress
     flowerdex: { cosmos: {}, tulips: {}, pansies: {}, hyacinths: {}, lilies: {}, mums: {}, windflowers: {}, roses: {} },
@@ -1867,7 +1681,7 @@ function showNextCelebration() {
     thumb.innerHTML = "";
     if (entry.genotype) thumb.appendChild(makeFlowerEl({ species: disc.species, genotype: entry.genotype, stage: 3 }));
     name.textContent = `${disc.color} ${speciesShort(disc.species)}`;
-    flavor.textContent = FLAVOR[disc.species][disc.color] || "";
+    flavor.textContent = flavorFor(disc.species, disc.color);
     sub.textContent = celebrateQueue.length > 0
         ? `A rare find — and there's another waiting.`
         : `A rare find. One of the hardest crosses in the garden.`;
@@ -2110,7 +1924,7 @@ function makeDexCard(species, color, filled, rare, entry) {
 
         const flavor = document.createElement("p");
         flavor.className = "dex-card-flavor";
-        flavor.textContent = FLAVOR[species][color] || "";
+        flavor.textContent = flavorFor(species, color);
         text.appendChild(flavor);
 
         const date = document.createElement("div");

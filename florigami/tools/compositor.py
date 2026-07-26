@@ -56,9 +56,14 @@ def wshade(a, floor=0.46, band=0.15, form_=52):
     return ImageChops.multiply(edge, g).convert('RGB')
 
 def petal_tex(shape, pf, tone, tw=0.44):
+    # pf=None -> PLAIN watercolour petal (base colours). pf set -> PATTERNED
+    # petal (rares only). Same tone + pigment-pool shading either way.
     shp = load(shape); a = shp.split()[3]
-    it = ImageChops.multiply(shp.convert('RGB'), coverpat(pf, shp.size))
-    it = ImageChops.multiply(it, Image.new('RGB', shp.size, lt(tone, tw)))
+    it = shp.convert('RGB')
+    if pf is not None:
+        it = ImageChops.multiply(it, coverpat(pf, shp.size))
+    plainTw = tw if pf is not None else 0.22   # plain petals hold more of the pure hue
+    it = ImageChops.multiply(it, Image.new('RGB', shp.size, lt(tone, plainTw)))
     it = ImageChops.multiply(it, wshade(a)); r = it.convert('RGBA'); r.putalpha(a); return r
 
 def solid_tex(shape, hexc, tw=0.10):
@@ -81,9 +86,9 @@ def stamp(cv, tex, cx, cy, w, rot=0, shadow_op=90, sb=None):
         cv.alpha_composite(sh, (x+off[0], y+off[1]))
     cv.alpha_composite(im, (x, y))
 
-def bloom_cell(colorHex):
+def bloom_cell(colorHex, isRare):
     cv = Image.new('RGBA', (F, F), (0, 0, 0, 0))
-    petTex = petal_tex('circle', PATTERN, colorHex)
+    petTex = petal_tex('circle', PATTERN if isRare else None, colorHex)
     for p in form['petals']:
         w = max(2, int(p['scale']*F)); h = max(2, int(w*petTex.height/petTex.width))
         im = petTex.resize((w, h), Image.LANCZOS)
@@ -96,11 +101,11 @@ def bloom_cell(colorHex):
         stamp(cv, solid_tex('circle', CENTER, 0.16), F/2, F/2, int(c['scale']*F), shadow_op=55)
     return cv
 
-def bud_cell(colorHex):
+def bud_cell(colorHex, isRare):
     cv = Image.new('RGBA', (F, F), (0, 0, 0, 0))
     stamp(cv, solid_tex('stem', GREEN), F*0.5, F*0.72, int(F*0.10), shadow_op=50)      # stem
     stamp(cv, solid_tex('leaf', GREEN), F*0.40, F*0.60, int(F*0.26), rot=40, shadow_op=45)  # sepal leaf
-    stamp(cv, petal_tex('seed', PATTERN, colorHex), F*0.5, F*0.40, int(F*0.34), shadow_op=70)  # closed bud
+    stamp(cv, petal_tex('seed', PATTERN if isRare else None, colorHex), F*0.5, F*0.40, int(F*0.34), shadow_op=70)  # closed bud
     return cv
 
 def sprout_cell():
@@ -115,17 +120,19 @@ def seed_cell():
     stamp(cv, solid_tex('seed', BROWN, 0.0), F*0.5, F*0.6, int(F*0.24), shadow_op=60)
     return cv
 
+RARE = {"white", "black"}   # the only PATTERNED colours; all others plain
 sheet = Image.new('RGBA', (len(STAGES)*F, len(COLORS)*F), (0, 0, 0, 0))
 for row, (name, hexc) in enumerate(COLORS):
+    isRare = name in RARE
     for col, stage in enumerate(STAGES):
         if stage == "seed":
             cell = seed_cell() if row == 0 else None
         elif stage == "sprout":
             cell = sprout_cell() if row == 0 else None
         elif stage == "bud":
-            cell = bud_cell(hexc)
+            cell = bud_cell(hexc, isRare)
         else:
-            cell = bloom_cell(hexc)
+            cell = bloom_cell(hexc, isRare)
         if cell is not None:
             sheet.alpha_composite(cell, (col*F, row*F))
 
