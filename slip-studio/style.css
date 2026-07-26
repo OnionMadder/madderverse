@@ -2296,3 +2296,85 @@ body.display-mode #coach { display: none !important; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 .toast[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .toast { transition: opacity 0.4s ease; } }
+
+/* ---------- Collections (gallery filter + assign) ---------- */
+.gallery-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin: 0 2px 12px;
+    align-items: center;
+}
+.gallery-filter[hidden] { display: none; }
+.filter-chip {
+    -webkit-appearance: none;
+    appearance: none;
+    padding: 5px 13px;
+    border-radius: 999px;
+    border: 1px solid var(--g-card-border, rgba(255, 255, 255, 0.14));
+    background: var(--g-card, rgba(255, 255, 255, 0.05));
+    color: var(--ink-dim);
+    font-size: 13px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.filter-chip.is-active {
+    background: var(--pill-active-bg, rgba(201, 138, 100, 0.9));
+    color: var(--pill-active-ink, #1b1512);
+    border-color: transparent;
+}
+.filter-new { border-style: dashed; }
+.filter-edit { padding: 5px 10px; }
+
+/* Assign button on each gallery card (top-left, mirrors the delete ×). */
+.gallery-file {
+    position: absolute;
+    top: 7px;
+    left: 7px;
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(20, 17, 14, 0.42);
+    color: rgba(255, 255, 255, 0.72);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.gallery-file.is-filed {
+    color: var(--pill-active-ink, #1b1512);
+    background: var(--pill-active-bg, rgba(201, 138, 100, 0.9));
+    border-color: transparent;
+}
+
+/* Collection chooser list (inside the confirm-modal card). */
+.collection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 4px 0 14px;
+    max-height: 46vh;
+    overflow-y: auto;
+}
+.collection-option {
+    -webkit-appearance: none;
+    appearance: none;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--g-card-border, rgba(255, 255, 255, 0.14));
+    background: var(--g-card, rgba(255, 255, 255, 0.05));
+    color: var(--g-title, #efe7db);
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.collection-option.is-current { border-color: var(--pill-active-bg, rgba(201, 138, 100, 0.9)); }
+.collection-new { border-style: dashed; color: var(--ink-dim); }
+.collection-remove { color: #d98a86; }

@@ -1770,6 +1770,7 @@ function init() {
             loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb, stageThumb, keyOutThumbBg, ensureGalleryBgImg,
             dbAll, dbDelete, dismissLanding,
             openRecipes, closeRecipes, checkRecipeDiscoveries, loadDiscoveredRecipes, showToast,
+            loadCollections, createCollection, assignToCollection, setGalleryFilter, getGalleryFilter, chooseCollection,
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
             // the picker. installedPacks() returns a Set of category names.
@@ -7417,22 +7418,196 @@ async function loadAsCapturedState(entry) {
     };
 }
 
+// --- Collections (named shelves) --------------------------------
+// Group saved pieces into named shelves. Collection metadata (id + name)
+// lives in localStorage; each pot carries its collectionId in IndexedDB,
+// so the assignment travels with the piece. "Unfiled" = a pot with no
+// collectionId, or one pointing at a since-deleted shelf.
+const COLLECTIONS_KEY = "slip-collections";
+const GALLERY_FILTER_KEY = "slip-gallery-filter";
+function loadCollections() {
+    try {
+        const a = JSON.parse(localStorage.getItem(COLLECTIONS_KEY) || "[]");
+        return Array.isArray(a) ? a.filter((c) => c && c.id && c.name) : [];
+    } catch (_) { return []; }
+}
+function saveCollections(list) {
+    try { localStorage.setItem(COLLECTIONS_KEY, JSON.stringify(list)); } catch (_) {}
+}
+function collectionName(id) {
+    const c = loadCollections().find((x) => x.id === id);
+    return c ? c.name : null;
+}
+function makeCollectionId() {
+    return "c" + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+}
+function createCollection(name) {
+    name = (name || "").trim().slice(0, 40);
+    if (!name) return null;
+    const list = loadCollections();
+    const c = { id: makeCollectionId(), name };
+    list.push(c);
+    saveCollections(list);
+    return c;
+}
+function getGalleryFilter() {
+    try { return localStorage.getItem(GALLERY_FILTER_KEY) || "all"; } catch (_) { return "all"; }
+}
+function setGalleryFilter(f) {
+    try { localStorage.setItem(GALLERY_FILTER_KEY, f); } catch (_) {}
+    openGallery();
+}
+function potMatchesFilter(p, filter, validIds) {
+    if (filter === "all") return true;
+    const cid = p.collectionId;
+    if (filter === "unfiled") return !cid || !validIds.has(cid);
+    return cid === filter;
+}
+async function assignToCollection(members, collectionId) {
+    for (const m of members) {
+        m.collectionId = collectionId || null;
+        try { await dbPut(m); } catch (_) {}
+    }
+    openGallery();
+}
+// Chooser: pick an existing shelf, make a new one, or remove.
+function chooseCollection(members) {
+    const modal = document.getElementById("collectionModal");
+    const list = document.getElementById("collectionList");
+    const cancel = document.getElementById("collectionCancel");
+    if (!modal || !list) return;
+    const close = () => {
+        modal.classList.remove("is-open");
+        setTimeout(() => { modal.hidden = true; }, 200);
+        modal.removeEventListener("click", onBackdrop);
+        cancel?.removeEventListener("click", close);
+    };
+    const onBackdrop = (e) => { if (e.target === modal) close(); };
+    list.innerHTML = "";
+    const curId = members[0] ? members[0].collectionId : null;
+    loadCollections().forEach((c) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "collection-option" + (c.id === curId ? " is-current" : "");
+        b.textContent = c.name;
+        b.addEventListener("click", () => { close(); assignToCollection(members, c.id); });
+        list.appendChild(b);
+    });
+    if (curId && collectionName(curId)) {
+        const rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "collection-option collection-remove";
+        rm.textContent = "Remove from collection";
+        rm.addEventListener("click", () => { close(); assignToCollection(members, null); });
+        list.appendChild(rm);
+    }
+    const nw = document.createElement("button");
+    nw.type = "button";
+    nw.className = "collection-option collection-new";
+    nw.textContent = "+ New collection…";
+    nw.addEventListener("click", () => {
+        const name = window.prompt("Name this collection", "");
+        if (name == null) return;
+        const c = createCollection(name);
+        if (c) { close(); assignToCollection(members, c.id); }
+    });
+    list.appendChild(nw);
+    cancel?.addEventListener("click", close);
+    modal.addEventListener("click", onBackdrop);
+    modal.hidden = false;
+    requestAnimationFrame(() => modal.classList.add("is-open"));
+}
+// The filter chips above the grid: All / each shelf / Unfiled / + New,
+// plus a rename-delete pencil when a real shelf is selected.
+function renderGalleryFilter() {
+    const bar = document.getElementById("galleryFilter");
+    if (!bar) return;
+    const cols = loadCollections();
+    const active = getGalleryFilter();
+    bar.innerHTML = "";
+    const chip = (id, label) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "filter-chip" + (active === id ? " is-active" : "");
+        b.textContent = label;
+        b.addEventListener("click", () => setGalleryFilter(id));
+        bar.appendChild(b);
+    };
+    chip("all", "All");
+    cols.forEach((c) => chip(c.id, c.name));
+    chip("unfiled", "Unfiled");
+    const nw = document.createElement("button");
+    nw.type = "button";
+    nw.className = "filter-chip filter-new";
+    nw.textContent = "+ New";
+    nw.addEventListener("click", () => {
+        const name = window.prompt("Name this collection", "");
+        if (name == null) return;
+        const c = createCollection(name);
+        if (c) setGalleryFilter(c.id);
+    });
+    bar.appendChild(nw);
+    const activeCol = cols.find((c) => c.id === active);
+    if (activeCol) {
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.className = "filter-chip filter-edit";
+        edit.textContent = "✎"; // ✎
+        edit.title = "Rename or delete this collection";
+        edit.addEventListener("click", () => editCollection(activeCol));
+        bar.appendChild(edit);
+    }
+    // Hide the whole bar until there's at least one collection to show.
+    bar.hidden = cols.length === 0 && active === "all";
+}
+async function editCollection(col) {
+    const next = window.prompt("Rename collection (clear the text to delete it)", col.name);
+    if (next == null) return;
+    const list = loadCollections();
+    const idx = list.findIndex((c) => c.id === col.id);
+    if (idx < 0) return;
+    if (!next.trim()) {
+        list.splice(idx, 1);            // pots keep a dangling id → shown as Unfiled
+        saveCollections(list);
+        setGalleryFilter("all");
+    } else {
+        list[idx].name = next.trim().slice(0, 40);
+        saveCollections(list);
+        openGallery();
+    }
+}
+
+let galleryRenderSeq = 0;
 async function openGallery() {
     const grid = document.getElementById("galleryGrid");
     const empty = document.getElementById("galleryEmpty");
     if (!grid) return;
+    const myGen = ++galleryRenderSeq;  // guard against overlapping re-renders
     grid.innerHTML = "";
     grid.classList.toggle("shelf",   state.galleryView === "shelf");
     grid.classList.toggle("compact", state.galleryView !== "shelf");
     await ensureGalleryBgImg(); // load the Studio backdrop once for all cards
+    if (myGen !== galleryRenderSeq) return; // a newer render superseded us
+    grid.innerHTML = "";                     // clear again in case a stale append landed
     let pots = [];
     try { pots = await dbAll(); } catch (_) {}
     pots.sort((a, b) => b.ts - a.ts);
-    if (empty) empty.hidden = pots.length > 0;
+    // Filter by the active collection (set-mates share a collectionId, so a
+    // set stays whole through the filter). renderGalleryFilter builds the bar.
+    const validIds = new Set(loadCollections().map((c) => c.id));
+    const filter = getGalleryFilter();
+    const filtered = pots.filter((p) => potMatchesFilter(p, filter, validIds));
+    renderGalleryFilter();
+    if (empty) {
+        empty.hidden = filtered.length > 0;
+        empty.textContent = pots.length && !filtered.length
+            ? "No pots on this shelf yet."
+            : "No pots yet — shape one, fire it, and tap Save.";
+    }
 
     // Group set-mates together; each setId yields a single paired tile.
     const seen = new Set();
-    pots.forEach((p) => {
+    filtered.forEach((p) => {
         if (p.setId) {
             if (seen.has(p.setId)) return;
             seen.add(p.setId);
@@ -7755,6 +7930,20 @@ function renderGalleryTile(grid, members) {
         openGallery();
     });
     item.appendChild(del);
+
+    // Assign-to-collection button (folder), top-left. Highlights when the
+    // piece is already filed on a shelf; tap opens the chooser.
+    const fileBtn = document.createElement("button");
+    fileBtn.className = "gallery-file";
+    fileBtn.type = "button";
+    const filedName = primary.collectionId ? collectionName(primary.collectionId) : null;
+    if (filedName) fileBtn.classList.add("is-filed");
+    fileBtn.setAttribute("aria-label", filedName ? `In collection: ${filedName}` : "Add to collection");
+    fileBtn.title = filedName ? `In: ${filedName}` : "Add to collection";
+    fileBtn.innerHTML = '<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 6.5 L8 6.5 L9.4 8 L17.2 8 L17.2 15 L2.8 15 Z"/></svg>';
+    fileBtn.addEventListener("click", (e) => { e.stopPropagation(); chooseCollection(members); });
+    item.appendChild(fileBtn);
+
     grid.appendChild(item);
 }
 

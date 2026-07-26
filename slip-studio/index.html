@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=183" />
+    <link rel="stylesheet" href="style.css?v=184" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -377,6 +377,17 @@
         </div>
     </div>
 
+    <!-- Collection chooser: assign a pot (or set) to a named shelf. -->
+    <div id="collectionModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="Add to collection" hidden>
+        <div class="confirm-modal-card">
+            <p class="confirm-modal-message">Add to collection</p>
+            <div class="collection-list" id="collectionList"></div>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn" id="collectionCancel" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="gallery" id="gallery" role="dialog" aria-label="Your pots" hidden>
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
@@ -387,6 +398,7 @@
                 <button class="tool-btn" id="galleryClose" type="button">Close</button>
             </span>
         </div>
+        <div class="gallery-filter" id="galleryFilter" role="group" aria-label="Collections"></div>
         <div class="gallery-grid" id="galleryGrid"></div>
         <p class="gallery-empty" id="galleryEmpty">No pots yet — shape one, fire it, and tap Save.</p>
     </div>
@@ -412,7 +424,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=183"></script>
+    <script type="module" src="main.js?v=184"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
