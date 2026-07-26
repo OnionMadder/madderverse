@@ -1413,14 +1413,12 @@ function spawnZapRing(cx, cy) {
 }
 
 function spawnVegSplatter(cx, cy) {
-    const N = 22;
+    const N = burstCount(22);
     for (let k = 0; k < N; k++) {
-        const s = document.createElement('div');
-        s.className = 'crumb';
         const angle = rand(-Math.PI, Math.PI);
         const dist  = rand(35, 110);
         const size  = rand(7, 14);
-        s.style.cssText = `
+        spawnParticle('crumb', `
             left: ${cx - size/2}px;
             top:  ${cy - size/2}px;
             width: ${size}px;
@@ -1429,9 +1427,7 @@ function spawnVegSplatter(cx, cy) {
             --crumb-rot: ${rand(-360, 360)}deg;
             --crumb-color: ${choice(VEG_SPLATTER_COLORS)};
             animation-delay: ${k * 9}ms;
-        `;
-        els.stage.appendChild(s);
-        s.addEventListener('animationend', () => s.remove(), { once: true });
+        `);
     }
 }
 
@@ -1479,23 +1475,66 @@ function spawnStageFlash(cx, cy, color) {
     setTimeout(release, 700);
 }
 
+// ── Particle governor ─────────────────────────────────────────────
+// Each catch fires several bursts (chunks, crumbs, sparks, confetti) — ~50
+// short-lived DOM nodes. A multi-slice combo or a Frenzy can ask for 150-200
+// in a single frame, which drops frames on low-end phones. We cap the number
+// of concurrent burst particles: a normal single slice still spawns in full,
+// but heavy moments degrade gracefully (fewer particles) instead of stuttering.
+// Under the OS "reduce motion" setting every burst is thinned further — this is
+// the JS side of the reduce-motion promise the file's top comment makes.
+const PARTICLE_CAP = 150;
+let _particleCount = 0;
+
+// Scale a burst's requested particle count for current conditions.
+function burstCount(base) {
+    return reduceMotion() ? Math.max(1, Math.ceil(base * 0.4)) : base;
+}
+
+// Create one governed burst particle on the stage. Returns the element, or
+// null when we're at the concurrency cap (the caller simply ends up spawning
+// fewer). The node frees its slot and removes itself on animationend, with a
+// safety-net timeout in case animationend never fires (backgrounded tab,
+// interrupted animation). 1600ms exceeds every burst's stagger + duration.
+function spawnParticle(className, cssText) {
+    if (_particleCount >= PARTICLE_CAP) return null;
+    const el = document.createElement('div');
+    el.className = className;
+    el.style.cssText = cssText;
+    els.stage.appendChild(el);
+    _particleCount++;
+    let freed = false;
+    const done = () => {
+        if (freed) return;
+        freed = true;
+        _particleCount = Math.max(0, _particleCount - 1);
+        el.remove();
+    };
+    el.addEventListener('animationend', done, { once: true });
+    setTimeout(done, 1600);
+    return el;
+}
+
+// Clear every in-flight burst particle and zero the counter — called on round
+// reset so a fresh round never inherits the previous one's node backlog.
+function clearParticles() {
+    els.stage.querySelectorAll('.chunk, .crumb, .spark, .confetti').forEach(el => el.remove());
+    _particleCount = 0;
+}
+
 function spawnChunks(cx, cy) {
-    const N = 9;
+    const N = burstCount(9);
     for (let k = 0; k < N; k++) {
-        const ch = document.createElement('div');
-        ch.className = 'chunk';
         const angle = (k / N) * Math.PI * 2 + rand(-0.4, 0.4);
         const dist  = rand(55, 120);
-        ch.style.cssText = `
+        spawnParticle('chunk', `
             left: ${cx - 8}px;
             top:  ${cy - 8}px;
             --chunk-end: translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist - 30}px);
             --chunk-rot: ${rand(-360, 360)}deg;
             --chunk-color: ${choice(CRUMB_COLORS)};
             animation-delay: ${k * 12}ms;
-        `;
-        els.stage.appendChild(ch);
-        ch.addEventListener('animationend', () => ch.remove(), { once: true });
+        `);
     }
 }
 
@@ -1509,14 +1548,12 @@ function spawnTapFlash(cx, cy) {
 }
 
 function spawnCrumbs(cx, cy) {
-    const N = 18;
+    const N = burstCount(18);
     for (let k = 0; k < N; k++) {
-        const crumb = document.createElement('div');
-        crumb.className = 'crumb';
         const angle = rand(-Math.PI, Math.PI);
         const dist  = rand(28, 100);
         const size  = rand(5, 12);
-        crumb.style.cssText = `
+        spawnParticle('crumb', `
             left: ${cx - size/2}px;
             top:  ${cy - size/2}px;
             width: ${size}px;
@@ -1525,48 +1562,38 @@ function spawnCrumbs(cx, cy) {
             --crumb-rot: ${rand(-220, 220)}deg;
             --crumb-color: ${choice(CRUMB_COLORS)};
             animation-delay: ${k * 12}ms;
-        `;
-        els.stage.appendChild(crumb);
-        crumb.addEventListener('animationend', () => crumb.remove(), { once: true });
+        `);
     }
 }
 
 function spawnSparks(cx, cy) {
-    const N = 10;
+    const N = burstCount(10);
     for (let k = 0; k < N; k++) {
-        const s = document.createElement('div');
-        s.className = 'spark';
         const angle = (k / N) * Math.PI * 2 + rand(-0.3, 0.3);
         const dist  = rand(40, 80);
-        s.style.cssText = `
+        spawnParticle('spark', `
             left: ${cx - 5}px;
             top:  ${cy - 5}px;
             --spark-end: translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px);
             --spark-color: ${choice(SPARK_COLORS)};
             animation-delay: ${k * 8}ms;
-        `;
-        els.stage.appendChild(s);
-        s.addEventListener('animationend', () => s.remove(), { once: true });
+        `);
     }
 }
 
 function spawnConfetti(cx, cy, count) {
-    const N = count != null ? count : 12;
+    const N = burstCount(count != null ? count : 12);
     for (let k = 0; k < N; k++) {
-        const c = document.createElement('div');
-        c.className = 'confetti';
         const angle = rand(-Math.PI, 0) - 0.15;
         const dist  = rand(60, 110);
-        c.style.cssText = `
+        spawnParticle('confetti', `
             left: ${cx - 3}px;
             top:  ${cy - 5}px;
             --confetti-end: translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist + 50}px);
             --confetti-rot: ${rand(-540, 540)}deg;
             --confetti-color: ${choice(CONFETTI_COLORS)};
             animation-delay: ${k * 14}ms;
-        `;
-        els.stage.appendChild(c);
-        c.addEventListener('animationend', () => c.remove(), { once: true });
+        `);
     }
 }
 
@@ -1666,6 +1693,7 @@ function resetState() {
     state.cookies.forEach(c => c.el && c.el.remove());
     state.cookies = [];
     clearBlade();
+    clearParticles();
     endFrenzy();
     els.stage.querySelectorAll('.round-end, .mode-flash, .swipe-hint').forEach(el => el.remove());  // clear last round's overlays
     els.stage.classList.remove('time-low', 'frenzy-active', 'stage-shake', 'stage-shake-big');
