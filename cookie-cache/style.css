@@ -219,14 +219,16 @@ body {
 .menu-best span { font-weight: 900; }
 
 /* ── Difficulty toggle (menu) ─────────────────────────────────────── */
-.mode-toggle {
+.mode-toggle,
+.len-toggle {
     display: flex;
-    flex-wrap: wrap;      /* three modes wrap instead of overflowing a narrow screen */
+    flex-wrap: wrap;      /* options wrap instead of overflowing a narrow screen */
     gap: 10px;
     justify-content: center;
     margin: 2px 0;
 }
-.mode-btn {
+.mode-btn,
+.len-btn {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -246,23 +248,43 @@ body {
     transition: transform 0.08s ease, border-color 0.15s ease,
                 color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
-.mode-btn .mode-sub {
+/* The length toggle is the secondary choice — a touch smaller/narrower so the
+   difficulty modes stay the visual anchor. */
+.len-btn {
+    min-width: clamp(72px, 22vw, 92px);
+    padding: 6px 10px;
+    font-size: clamp(0.75rem, 2.1vw, 0.9rem);
+}
+.mode-btn .mode-sub,
+.len-btn .len-sub {
     font-size: 0.62em;
     font-weight: 600;
     letter-spacing: 0.5px;
     text-transform: uppercase;
     opacity: 0.75;
 }
-.mode-btn:active { transform: scale(0.95); }
-.mode-btn.is-active {
+.mode-btn:active,
+.len-btn:active { transform: scale(0.95); }
+.mode-btn.is-active,
+.len-btn.is-active {
     color: #050505;
     background: var(--accent-cyan);
     border-color: var(--accent-cyan);
     box-shadow: 0 0 18px rgba(0,255,204,0.55);
 }
-.mode-btn:focus-visible {
+.mode-btn:focus-visible,
+.len-btn:focus-visible {
     outline: 2px solid var(--accent-cyan);
     outline-offset: 3px;
+}
+.menu-toggle-label {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: clamp(0.56rem, 1.7vw, 0.7rem);
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: rgba(0,255,204,0.6);
+    margin: 4px 0 -2px;
 }
 
 /* ── Short-viewport menu (phone landscape) ───────────────────────────
@@ -300,6 +322,8 @@ body {
     .menu-hint { font-size: clamp(0.62rem, 1.7vw, 0.78rem); margin-top: 0; }
     .btn-xl { font-size: clamp(1.1rem, 4vw, 1.5rem); padding: 10px 34px; }
     .mode-btn { padding: 6px 12px; }
+    .len-btn  { padding: 4px 10px; }
+    .menu-toggle-label { margin: 2px 0 -3px; }
 
     /* Feast screen: shrink the title + stage (and Tub inside it, which is
        vw-sized and would otherwise overflow the shorter stage) so the score,

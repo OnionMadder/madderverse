@@ -293,6 +293,7 @@ const els = {
     menuBest:    document.getElementById('menu-best'),
     menuBestVal: document.getElementById('menu-best-val'),
     modeBtns:    Array.from(document.querySelectorAll('.mode-btn')),
+    lenBtns:     Array.from(document.querySelectorAll('.len-btn')),
 };
 
 // ── Personal best (localStorage) ──────────────────────────────────
@@ -351,6 +352,42 @@ function renderModeToggle() {
     if (!els.modeBtns) return;
     els.modeBtns.forEach(btn => {
         const on = btn.dataset.mode === state.mode;
+        btn.classList.toggle('is-active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+}
+
+// ── Round length (localStorage) ───────────────────────────────────
+// How many seconds a round lasts. 30 (quick) is the original arcade length
+// and the default; 60/90 are for older kids who want a longer sitting. Persists
+// like the mode. The level music loops (see playLevelMusic) so longer rounds
+// stay scored; the difficulty ramp is time-normalised to CFG.duration, so a
+// 90s round just eases in more gradually.
+const LEN_KEY = 'cookie-cache-length';
+const VALID_LENS = [30, 60, 90];
+const DEFAULT_LEN = 30;
+
+function loadLen() {
+    try {
+        const v = parseInt(localStorage.getItem(LEN_KEY), 10);
+        return VALID_LENS.includes(v) ? v : DEFAULT_LEN;
+    } catch (_) { return DEFAULT_LEN; }
+}
+
+function saveLen(v) {
+    try { localStorage.setItem(LEN_KEY, String(v)); } catch (_) {}
+}
+
+function setLen(v) {
+    state.roundLen = VALID_LENS.includes(v) ? v : DEFAULT_LEN;
+    saveLen(state.roundLen);
+    renderLenToggle();
+}
+
+function renderLenToggle() {
+    if (!els.lenBtns) return;
+    els.lenBtns.forEach(btn => {
+        const on = parseInt(btn.dataset.len, 10) === state.roundLen;
         btn.classList.toggle('is-active', on);
         btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
@@ -451,6 +488,7 @@ function playBurpSfx() {
 function playLevelMusic() {
     if (audio.muted || !SFX_LEVEL_MUSIC) return;
     try {
+        SFX_LEVEL_MUSIC.loop = true;   // loop so 60/90s rounds keep their soundtrack
         SFX_LEVEL_MUSIC.currentTime = 0;
         SFX_LEVEL_MUSIC.volume = audio.levelMusicVol;
         SFX_LEVEL_MUSIC.play().catch(() => {});
@@ -562,6 +600,7 @@ const state = {
     glitchTimer:  0,
     best:         0,
     mode:         'classic',
+    roundLen:     DEFAULT_LEN,
 };
 
 function showScreen(name) {
@@ -1881,6 +1920,7 @@ function resetState() {
 
 function startRound() {
     applyMode(state.mode);
+    CFG.duration = state.roundLen;   // the menu's round-length choice drives the clock + ramp
     playStartSfx();
     document.body.classList.add('in-game');
     // Chain orientation lock off the fullscreen promise — browsers only
@@ -2299,6 +2339,11 @@ function init() {
     renderModeToggle();
     els.modeBtns.forEach(btn => {
         btn.addEventListener('click', () => setMode(btn.dataset.mode));
+    });
+    state.roundLen = loadLen();
+    renderLenToggle();
+    els.lenBtns.forEach(btn => {
+        btn.addEventListener('click', () => setLen(parseInt(btn.dataset.len, 10)));
     });
     els.btnStart.addEventListener('click',  startRound);
     els.btnReplay.addEventListener('click', startRound);

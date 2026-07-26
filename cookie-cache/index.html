@@ -61,6 +61,7 @@
                 aria-haspopup="dialog"></button>
         <p class="menu-mascot-hint" aria-hidden="true">▸ TAP TUB FOR THE STORY ◂</p>
 
+        <p class="menu-toggle-label">Difficulty</p>
         <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Difficulty">
             <button type="button" class="mode-btn" data-mode="cozy" aria-pressed="false">
                 COZY<span class="mode-sub">easy &amp; slow</span>
@@ -70,6 +71,19 @@
             </button>
             <button type="button" class="mode-btn" data-mode="zen" aria-pressed="false">
                 ZEN<span class="mode-sub">calm, no bombs</span>
+            </button>
+        </div>
+
+        <p class="menu-toggle-label">Round length</p>
+        <div class="len-toggle" id="len-toggle" role="group" aria-label="Round length">
+            <button type="button" class="len-btn is-active" data-len="30" aria-pressed="true">
+                30s<span class="len-sub">quick</span>
+            </button>
+            <button type="button" class="len-btn" data-len="60" aria-pressed="false">
+                60s<span class="len-sub">standard</span>
+            </button>
+            <button type="button" class="len-btn" data-len="90" aria-pressed="false">
+                90s<span class="len-sub">marathon</span>
             </button>
         </div>
 
