@@ -157,8 +157,9 @@ let selected = -1;
 // ---- loading ----
 function loadImg(src){ return new Promise(r=>{ const i=new Image(); i.onload=()=>r(i); i.onerror=()=>r(null); i.src=src; }); }
 async function loadAll(){
-  await Promise.all(SHAPES.map(async s=> img[s]=await loadImg(`../shapes/${s}.png`)));
-  await Promise.all(PATTERNS.map(async p=> pat[p]=await loadImg(`../patterns/${p}`)));
+  const cb = "?t=" + Date.now();   // always fetch fresh art (you're actively adding shapes)
+  await Promise.all(SHAPES.map(async s=> img[s]=await loadImg(`../shapes/${s}.png`+cb)));
+  await Promise.all(PATTERNS.map(async p=> pat[p]=await loadImg(`../patterns/${p}`+cb)));
 }
 
 // ---- helpers ----
