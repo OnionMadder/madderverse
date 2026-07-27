@@ -127,6 +127,8 @@
       <h2>Center</h2>
       <label>Shape <select id="center-shape"></select></label>
       <label>Size <input type="range" id="center-size" min="0" max="55" value="28"><span class="v" id="center-size-v">.28</span></label>
+      <label style="justify-content:flex-start;gap:8px"><input type="checkbox" id="center-behind"> center behind petals</label>
+      <p class="muted" style="margin:6px 0 0">On = petals rest on top of the center (use it as a stem — hyacinth, foxglove).</p>
     </div>
 
     <div class="box">
@@ -151,7 +153,7 @@ const img = {}, pat = {};               // loaded HTMLImageElements
 const tintCache = {};                   // shape+color -> canvas
 
 const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
-let formation = { name:"cosmos", petals:[], center:{shape:"circle", scale:0.28} };
+let formation = { name:"cosmos", petals:[], center:{shape:"circle", scale:0.28, behind:false} };
 let selected = -1;
 
 // ---- loading ----
@@ -196,6 +198,8 @@ function draw(){
   const showShadow=document.getElementById("show-shadow").checked;
   const showIdx=document.getElementById("show-index").checked;
   const col=petalColor(), pn=patName();
+  const behind = !!(formation.center && formation.center.behind);
+  if(behind) drawCenter(showShadow);        // stem/center rests BEHIND the petals (hyacinth)
   formation.petals.forEach((pt,i)=>{
     const tc=tinted(pt.shape,col,pn); if(!tc) return;
     const w=pt.scale*SIZE, h=w*tc.height/tc.width;
@@ -210,11 +214,7 @@ function draw(){
     if(showIdx){ ctx.fillStyle="#fff"; ctx.font="bold 13px system-ui"; ctx.textAlign="center";
       ctx.fillText(i, pt.cx*SIZE, pt.cy*SIZE+4); }
   });
-  // center
-  const cc=tinted(formation.center.shape, "#E7A24C", null);
-  if(cc){ const w=formation.center.scale*SIZE, h=w*cc.height/cc.width;
-    ctx.save(); if(showShadow){ctx.shadowColor="rgba(50,36,22,.4)";ctx.shadowBlur=8;ctx.shadowOffsetY=3;}
-    ctx.drawImage(cc, SIZE/2-w/2, SIZE/2-h/2, w, h); ctx.restore(); }
+  if(!behind) drawCenter(showShadow);       // default: center on top of the petals
   // rotate handle for the selected petal
   const hnd=selHandle();
   if(hnd){ const p=formation.petals[selected]; ctx.save();
@@ -224,6 +224,12 @@ function draw(){
     ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke(); ctx.restore(); }
   document.getElementById("count-pill").textContent=formation.petals.length+" petals";
   updateJSON();
+}
+function drawCenter(showShadow){
+  const cc=tinted(formation.center.shape, "#E7A24C", null); if(!cc) return;
+  const w=formation.center.scale*SIZE, h=w*cc.height/cc.width;
+  ctx.save(); if(showShadow){ctx.shadowColor="rgba(50,36,22,.4)";ctx.shadowBlur=8;ctx.shadowOffsetY=3;}
+  ctx.drawImage(cc, SIZE/2-w/2, SIZE/2-h/2, w, h); ctx.restore();
 }
 function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
 
@@ -344,6 +350,7 @@ window.addEventListener("keydown",e=>{
 });
 document.getElementById("center-shape").addEventListener("change",e=>{formation.center.shape=e.target.value;draw();});
 document.getElementById("center-size").addEventListener("input",e=>{formation.center.scale=+e.target.value/100;draw();});
+document.getElementById("center-behind").addEventListener("change",e=>{formation.center.behind=e.target.checked;draw();});
 ["tone","pattern","bg-soil","show-shadow","show-index"].forEach(id=>document.getElementById(id).addEventListener("input",draw));
 document.getElementById("fname").addEventListener("input",e=>{formation.name=e.target.value;updateJSON();});
 
@@ -353,14 +360,14 @@ const sw=document.getElementById("tone-swatches");
 PAL.forEach(c=>{const b=document.createElement("button");b.style.background=c;b.title=c;b.onclick=()=>{document.getElementById("tone").value=c;draw();};sw.appendChild(b);});
 
 // export / import
-function formationOut(){return {name:formation.name,version:1,petals:formation.petals.map(p=>({shape:p.shape,cx:+p.cx.toFixed(4),cy:+p.cy.toFixed(4),rot:+p.rot.toFixed(1),scale:+p.scale.toFixed(4),flip:!!p.flip})),center:{shape:formation.center.shape,scale:+formation.center.scale.toFixed(4)}};}
+function formationOut(){return {name:formation.name,version:1,petals:formation.petals.map(p=>({shape:p.shape,cx:+p.cx.toFixed(4),cy:+p.cy.toFixed(4),rot:+p.rot.toFixed(1),scale:+p.scale.toFixed(4),flip:!!p.flip})),center:{shape:formation.center.shape,scale:+formation.center.scale.toFixed(4),behind:!!formation.center.behind}};}
 function updateJSON(){document.getElementById("json").value=JSON.stringify(formationOut());}
 document.getElementById("export").onclick=()=>{
   const blob=new Blob([JSON.stringify(formationOut(),null,2)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=(formation.name||"formation")+".formation.json";a.click();
 };
 document.getElementById("import-btn").onclick=()=>document.getElementById("import").click();
-document.getElementById("import").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);formation={name:d.name||"flower",petals:d.petals||[],center:d.center||{shape:"circle",scale:0.28}};document.getElementById("fname").value=formation.name;document.getElementById("center-shape").value=formation.center.shape;setRange("center-size",Math.round(formation.center.scale*100));select(-1);}catch(err){alert("Not a valid formation file.");}};rd.readAsText(f);});
+document.getElementById("import").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);formation={name:d.name||"flower",petals:d.petals||[],center:d.center||{shape:"circle",scale:0.28}};document.getElementById("fname").value=formation.name;document.getElementById("center-shape").value=formation.center.shape;setRange("center-size",Math.round(formation.center.scale*100));document.getElementById("center-behind").checked=!!formation.center.behind;select(-1);}catch(err){alert("Not a valid formation file.");}};rd.readAsText(f);});
 
 // populate shape dropdowns
 function fillShapes(){["ring-shape","center-shape"].forEach(id=>{const s=document.getElementById(id);SHAPES.forEach(sh=>{const o=document.createElement("option");o.value=sh;o.textContent=sh;s.appendChild(o);});});document.getElementById("ring-shape").value="seed";document.getElementById("center-shape").value="circle";}

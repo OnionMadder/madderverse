@@ -93,6 +93,11 @@ def bloom_cell(colorHex, isRare):
     def tex(shape):
         if shape not in texcache: texcache[shape] = petal_tex(shape, pf, colorHex)
         return texcache[shape]
+    c = form.get('center')
+    def draw_center():
+        if c: stamp(cv, solid_tex(c.get('shape', 'circle'), CENTER, 0.16), F/2, F/2, int(c['scale']*F), shadow_op=55)
+    behind = bool(c and c.get('behind'))
+    if behind: draw_center()                 # stem/center rests BEHIND the petals (hyacinth)
     for p in form['petals']:
         petTex = tex(p.get('shape', 'circle'))   # honor each petal's shape
         w = max(2, int(p['scale']*F)); h = max(2, int(w*petTex.height/petTex.width))
@@ -101,9 +106,7 @@ def bloom_cell(colorHex, isRare):
         x, y = int(p['cx']*F-im.width/2), int(p['cy']*F-im.height/2)
         sh, off = shadow(im, (0, int(F*0.012)), int(F*0.02), 90)
         cv.alpha_composite(sh, (x+off[0], y+off[1])); cv.alpha_composite(im, (x, y))
-    c = form.get('center')
-    if c:
-        stamp(cv, solid_tex(c.get('shape', 'circle'), CENTER, 0.16), F/2, F/2, int(c['scale']*F), shadow_op=55)
+    if not behind: draw_center()             # default: center on top
     return cv
 
 def bud_cell(colorHex, isRare):
