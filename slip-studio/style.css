@@ -266,7 +266,32 @@ html, body {
     height: 100%;
     display: block;
     touch-action: none;          /* no scroll/zoom gestures on the canvas */
+    /* Desktop trialers on madderverse.org got a plain arrow over the whole
+       studio, with nothing saying the pot could be dragged at all. Touch
+       devices ignore cursors, so this costs mobile nothing. */
+    cursor: grab;
 }
+#scene:active { cursor: grabbing; }
+/* With a mark-making tool armed, a press paints instead of turning the
+   pot — say so. JS sets .tool-armed on <body> (syncSceneCursor). */
+body.tool-armed #scene,
+body.tool-armed #scene:active { cursor: crosshair; }
+
+/* Carve aim ring — a hairline circle centred on the cursor showing where
+   the needle will bite. Outline only, so it never hides the surface it's
+   aiming at. */
+.carve-dot {
+    position: fixed;
+    z-index: 6;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;       /* centre on the pointer */
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);  /* readable on pale glaze too */
+    pointer-events: none;
+}
+.carve-dot[hidden] { display: none; }
 
 /* ---------- Soft loading state ---------- */
 .loader {
@@ -2126,6 +2151,34 @@ html, body {
     text-align: center;
     padding: 0 2rem;
 }
+/* Now a flex column (icons above the message) — so [hidden] needs restating,
+   or the display here would override it and the empty state would show
+   on a full shelf. */
+.gallery-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+.gallery-empty[hidden] { display: none; }
+.empty-steps {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0.75;
+}
+.empty-steps[hidden] { display: none; }
+.empty-step {
+    width: 26px;
+    height: 26px;
+    color: rgba(243, 237, 230, 0.5);
+}
+.empty-arrow {
+    color: rgba(243, 237, 230, 0.3);
+    font-size: 0.9rem;
+    font-style: normal;
+}
+/* Keep last: must outrank the display:flex above when the grid has tiles. */
 .gallery-grid:not(:empty) + .gallery-empty { display: none; }
 
 /* ---------- Quiet footer ---------- */

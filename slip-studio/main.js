@@ -4681,6 +4681,7 @@ function setDipMode(on) {
     }
     updateDipBar();
     updateGlazeBar();
+    syncSceneCursor();
 }
 function setDipColor(hex, fxId) {
     state.dipColor = hex;
@@ -4983,6 +4984,7 @@ function updateToolbar() {
     if (facetBtn) facetBtn.hidden = !showShape;
     if (brushSep) brushSep.style.display = showShape ? "" : "none";
     markShapeToolsOffered(showShape);
+    syncSceneCursor();   // stage changes re-decide grab vs crosshair
     if (!showShape && state.alterMode) setAlterMode(false);
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
@@ -5235,6 +5237,20 @@ function updateVariantRow() {
     });
 }
 
+// Desktop-only affordance: the canvas reads as grab/grabbing (you can turn
+// the pot) until something is armed that makes a press mark the pot
+// instead — then it's a crosshair. Touch devices have no cursor, so this
+// is invisible there; it's for trialers on the web build.
+function syncSceneCursor() {
+    const panelGlaze = document.getElementById("panelGlaze");
+    const leather = state.clayState === "leather";
+    // Decorate tab open = a mark-making tool is always armed (brush by
+    // default). Glaze tab only marks when Dip is armed.
+    const decorating = leather && panelGlaze && panelGlaze.hidden;
+    const pouring    = leather && panelGlaze && !panelGlaze.hidden && !!state.dipMode;
+    document.body.classList.toggle("tool-armed", !!(decorating || pouring));
+}
+
 function setDecoTool(name) {
     state.decoTool = name;
     const fam = familyForTool(name);
@@ -5242,6 +5258,7 @@ function setDecoTool(name) {
     updateDecoFamilies();
     updateVariantRow();
     updateDecoSub();
+    syncSceneCursor();
 }
 
 // Switch the tray between the Glaze and Decorate panels.
@@ -5255,6 +5272,7 @@ function setDecoTab(name) {
     if (pD) pD.hidden = glaze;
     if (tG) { tG.classList.toggle("is-active", glaze); tG.setAttribute("aria-selected", glaze ? "true" : "false"); }
     if (tD) { tD.classList.toggle("is-active", !glaze); tD.setAttribute("aria-selected", !glaze ? "true" : "false"); }
+    syncSceneCursor();
 }
 
 // Pick which stamp shape to place.
@@ -5677,6 +5695,7 @@ function bindSculpt(canvas) {
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
+    canvas.addEventListener("pointerleave", hideCarveDot);
     canvas.addEventListener("wheel", onWheel, { passive: false });
 }
 
@@ -6082,8 +6101,36 @@ function onPointerDown(ev) {
     }
 }
 
+// Sgraffito is permanent — there's no eraser, only Undo — so aiming the
+// needle blind is the one place in Decorate where a slip really costs you.
+// A faint ring under the cursor shows where the mark will bite BEFORE you
+// commit. Mouse only: touch has no hover, and a dot under a fingertip
+// would be invisible anyway. Costs one raycast per mousemove, and only
+// while Carve is actually armed.
+function updateCarveDot(ev) {
+    const dot = document.getElementById("carveDot");
+    if (!dot) return;
+    const panelGlaze = document.getElementById("panelGlaze");
+    const armed = ev && ev.pointerType === "mouse"
+        && state.decoTool === "carve"
+        && state.clayState === "leather"
+        && panelGlaze && panelGlaze.hidden      // Decorate tab showing
+        && !state.painting;                     // mid-stroke: the mark speaks for itself
+    if (!armed) { hideCarveDot(); return; }
+    const uv = pointerToUV(ev);
+    if (!uv) { hideCarveDot(); return; }        // off the pot — nothing to bite
+    dot.style.left = ev.clientX + "px";
+    dot.style.top  = ev.clientY + "px";
+    dot.hidden = false;
+}
+function hideCarveDot() {
+    const dot = document.getElementById("carveDot");
+    if (dot && !dot.hidden) dot.hidden = true;
+}
+
 function onPointerMove(ev) {
     if (pointers.has(ev.pointerId)) pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    updateCarveDot(ev);
 
     if (pointers.size >= 2) {
         // Pinch → zoom, centroid drift → manual spin.
@@ -7982,9 +8029,19 @@ async function openGallery() {
     renderGalleryFilter();
     if (empty) {
         empty.hidden = filtered.length > 0;
-        empty.textContent = pots.length && !filtered.length
-            ? "No pots on this shelf yet."
-            : "No pots yet — shape one, fire it, and tap Save.";
+        // Write the message into its span, not the container — the container
+        // also holds the shape → fire → save icons, which textContent would wipe.
+        const emptyText = document.getElementById("galleryEmptyText");
+        const onEmptyShelf = pots.length && !filtered.length;
+        if (emptyText) {
+            emptyText.textContent = onEmptyShelf
+                ? "No pots on this shelf yet."
+                : "No pots yet — shape one, fire it, and tap Save.";
+        }
+        // The steps illustrate making a FIRST pot; on a shelf that's merely
+        // unfilled the user already knows how, so they'd just be noise.
+        const steps = empty.querySelector(".empty-steps");
+        if (steps) steps.hidden = !!onEmptyShelf;
     }
 
     // Group set-mates together; each setId yields a single paired tile.

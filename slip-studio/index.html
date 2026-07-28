@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=192" />
+    <link rel="stylesheet" href="style.css?v=193" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -87,6 +87,10 @@
         </symbol>
         <symbol id="icon-check" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 10.5 L8.5 15 L16 5.5"/>
+        </symbol>
+        <!-- Kiln flame — used by the empty-gallery "shape → fire → save" hint. -->
+        <symbol id="icon-kiln" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 3 C10 6 13.5 7 13.5 11 A3.5 3.5 0 0 1 6.5 11 C6.5 8.5 8 8 8.5 6.5 C9.4 7.6 10 8.6 10 3 Z"/>
         </symbol>
         <symbol id="icon-taller" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 17 L16 17"/>
@@ -193,6 +197,11 @@
         </div>
         <p class="coach-cap" id="coachCap"></p>
     </div>
+
+    <!-- Carve aim ring: follows the mouse while the Carve tool is armed, so
+         you can see where the needle will bite before committing a
+         permanent sgraffito mark. Positioned from main.js updateCarveDot. -->
+    <div id="carveDot" class="carve-dot" aria-hidden="true" hidden></div>
 
     <a class="home" href="../" aria-label="Back to Madderverse" title="Back to Madderverse">&#x2302;</a>
     <button class="title-btn" id="titleBtn" type="button" aria-label="Back to title" title="Title screen">&#x21A9;</button>
@@ -412,7 +421,20 @@
         </div>
         <div class="gallery-filter" id="galleryFilter" role="group" aria-label="Collections"></div>
         <div class="gallery-grid" id="galleryGrid"></div>
-        <p class="gallery-empty" id="galleryEmpty">No pots yet — shape one, fire it, and tap Save.</p>
+        <!-- Empty shelf: show the three-step arc visually, not just in prose,
+             so someone browsing before they've made anything can see what the
+             studio actually asks of them. The message lives in its own span —
+             openGallery() writes textContent, which would wipe the icons. -->
+        <div class="gallery-empty" id="galleryEmpty">
+            <div class="empty-steps" aria-hidden="true">
+                <svg class="empty-step"><use href="#icon-pot"/></svg>
+                <span class="empty-arrow">→</span>
+                <svg class="empty-step"><use href="#icon-kiln"/></svg>
+                <span class="empty-arrow">→</span>
+                <svg class="empty-step"><use href="#icon-save"/></svg>
+            </div>
+            <span id="galleryEmptyText">No pots yet — shape one, fire it, and tap Save.</span>
+        </div>
     </div>
 
     <!-- Glaze recipe journal: the curated dip-chemistry pairs, revealed as
@@ -436,7 +458,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=192"></script>
+    <script type="module" src="main.js?v=193"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
