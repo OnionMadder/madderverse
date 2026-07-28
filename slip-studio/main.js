@@ -34,6 +34,35 @@ const WHEEL_COLOR = 0x2d2a26; // dark stone
 const SPIN_SPEED  = 0.3;      // radians / second — contemplative, not nervous
 const DISPLAY_SPIN = 0.16;    // slower, calmer turn for the immersive showcase
 
+// --- Reduced motion ---------------------------------------------
+// style.css already tones down the CSS animations, but the biggest movers
+// here are driven from JS — sustained rotation and the 4.5s kiln
+// cinematic — and a stylesheet can't reach those. Worse, tick() writes an
+// INLINE opacity onto .kiln-vignette, which outranks the stylesheet's
+// reduced-motion `opacity: 0` and put the whole glow sequence back on
+// screen for exactly the people who asked for less of it.
+//
+// Live query rather than a boot-time snapshot: the OS toggle can flip
+// while the studio is open, and the next frame should honour it.
+const reduceMotionQuery = (typeof matchMedia === "function")
+    ? matchMedia("(prefers-reduced-motion: reduce)")
+    : null;
+let reduceMotion = !!(reduceMotionQuery && reduceMotionQuery.matches);
+if (reduceMotionQuery) {
+    const onReduceChange = (e) => { reduceMotion = e.matches; };
+    // Safari <14 only has the deprecated listener form.
+    if (reduceMotionQuery.addEventListener) reduceMotionQuery.addEventListener("change", onReduceChange);
+    else if (reduceMotionQuery.addListener) reduceMotionQuery.addListener(onReduceChange);
+}
+// The wheel still turns while you throw — it's the core metaphor, and a
+// dead wheel would read as broken — but at a fraction of the speed. The
+// purely decorative spins (admiring a fired piece, Display mode) stop
+// altogether; drag still turns them by hand.
+const REDUCED_SPIN_SCALE = 0.4;
+// Same beats, less dwell: the kiln phases are normalised against this, so
+// shortening it compresses the sequence without changing its shape.
+const REDUCED_FIRING_DURATION = 1.6;
+
 // --- View (dolly-zoom toward the pot + manual spin) -------------
 const CAM_BASE    = new THREE.Vector3(0, 1.15, 4.1); // camera at zoom = 1
 const CAM_TARGET  = new THREE.Vector3(0, 0.66, 0);
@@ -1593,6 +1622,7 @@ function init() {
 
     resize();
     window.addEventListener("resize", resize, { passive: true });
+    document.addEventListener("keydown", onDialogEscape);
     bindSculpt(canvas);
 
     const advanceBtn = document.getElementById("advanceBtn");
@@ -1820,6 +1850,12 @@ function init() {
             setRimStyle, computeStyledProfile, RIM_STYLE_IDS,
             setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape, setLidStyle,
             startFiringMoment, endFiringMoment,
+            // Reduced motion can't be emulated from a page script, so expose
+            // the flag: read it to check the OS setting was picked up, set it
+            // to exercise the reduced paths without changing the OS.
+            getReduceMotion: () => reduceMotion,
+            setReduceMotion: (on) => { reduceMotion = !!on; },
+            spinTargetFor, firingDuration: () => (reduceMotion ? REDUCED_FIRING_DURATION : FIRING_DURATION),
             bumpDab, resetBumpLayer,
             playSfx, stopSfx,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
@@ -6620,11 +6656,15 @@ async function openPhotoModal() {
     photoBgCache = await loadBackdropImage();
     syncPhotoChips();
     renderPhotoPreview();
-    document.getElementById("photoModal").hidden = false;
+    const m = document.getElementById("photoModal");
+    m.hidden = false;
+    trapFocus(m);
 }
 
 function closePhotoModal() {
-    document.getElementById("photoModal").hidden = true;
+    const m = document.getElementById("photoModal");
+    m.hidden = true;
+    releaseFocus(m);
     photoPotCache = null;
     photoBgCache = null;
 }
@@ -7819,6 +7859,7 @@ function chooseCollection(members) {
     const close = () => {
         modal.classList.remove("is-open");
         setTimeout(() => { modal.hidden = true; }, 200);
+        releaseFocus(modal);   // hands focus back to the gallery beneath
         modal.removeEventListener("click", onBackdrop);
         cancel?.removeEventListener("click", close);
     };
@@ -7856,6 +7897,7 @@ function chooseCollection(members) {
     modal.addEventListener("click", onBackdrop);
     modal.hidden = false;
     requestAnimationFrame(() => modal.classList.add("is-open"));
+    trapFocus(modal);
 }
 // The filter chips above the grid: All / each shelf / Unfiled / + New,
 // plus a rename-delete pencil when a real shelf is selected.
@@ -7958,7 +8000,9 @@ async function openGallery() {
         }
     });
     syncGalleryViewToggle();
-    document.getElementById("gallery").hidden = false;
+    const g = document.getElementById("gallery");
+    g.hidden = false;
+    trapFocus(g);
 }
 
 // --- Kiln-shelf photo -------------------------------------------
@@ -8337,7 +8381,7 @@ function syncGalleryViewToggle() {
 }
 function closeGallery() {
     const g = document.getElementById("gallery");
-    if (g) g.hidden = true;
+    if (g) { g.hidden = true; releaseFocus(g); }
 }
 
 // --- Glaze recipes (discovery journal) --------------------------
@@ -8420,11 +8464,11 @@ function renderRecipeGrid() {
 function openRecipes() {
     renderRecipeGrid();
     const m = document.getElementById("recipeModal");
-    if (m) m.hidden = false;
+    if (m) { m.hidden = false; trapFocus(m); }
 }
 function closeRecipes() {
     const m = document.getElementById("recipeModal");
-    if (m) m.hidden = true;
+    if (m) { m.hidden = true; releaseFocus(m); }
 }
 
 // Minimal transient toast (recipe discoveries + future gentle notices).
@@ -8452,27 +8496,37 @@ function resize() {
     state.camera.updateProjectionMatrix();
 }
 
-function tick() {
-    const dt = state.clock.getDelta();
-    // The auto-spin eases to a stop while you work (throwing/trimming/
-    // painting), while you manually spin, and whenever zoomed in —
-    // then drifts back up once you're idle at the default framing.
+// How fast the wheel *wants* to turn this frame. Split out of tick() so the
+// rule is stateable in one place (and checkable without a render loop).
+//
+// The auto-spin eases to a stop while you work (throwing/trimming/painting),
+// while you manually spin, and whenever zoomed in — then drifts back up once
+// you're idle at the default framing. The Decorate stage stands still: a
+// static pot to attach/reshape handles, dip and paint against. Wet throws on
+// a live wheel; fired spins to show off / photograph the finished piece.
+// Display mode turns slowly on its own, independent of the stage rules.
+function spinTargetFor() {
     const zoomed = state.zoom > 1.02;
     // A handle reshape drag holds the wheel still so the ear doesn't move
     // under your finger; otherwise the pot spins for viewing/decorating.
     const busy = sculpting || state.painting || state.userRotating || zoomed || state.firing || dipping || !!handleDrag;
-    // The Decorate stage stands still — a static pot to attach/reshape
-    // handles, dip and paint against. Turn it by dragging the wheel or
-    // empty space (or two-finger). Wet throws on a live wheel; fired spins
-    // to show off / photograph the finished piece.
     // Altering is done off the wheel (you push a static wall), so the
     // wheel holds still whenever the Alter tool is armed on wet clay.
     const alterHold = state.alterMode && state.clayState === "wet";
-    // Display mode turns the piece slowly on its own (pausing only while the
-    // viewer drags it), independent of the stage-based spin rules.
-    const targetSpin = state.displayMode
-        ? (displayDragging ? 0 : DISPLAY_SPIN)
-        : (busy || alterHold || state.clayState === "leather") ? 0 : SPIN_SPEED;
+    // Under reduced motion the decorative spins stop outright (fired and
+    // Display are "admire it turning" states, not working ones); the wet
+    // wheel keeps turning, just slower — see REDUCED_SPIN_SCALE.
+    const idleSpin = reduceMotion
+        ? (state.clayState === "wet" ? SPIN_SPEED * REDUCED_SPIN_SCALE : 0)
+        : SPIN_SPEED;
+    const displaySpin = reduceMotion ? 0 : DISPLAY_SPIN;
+    if (state.displayMode) return displayDragging ? 0 : displaySpin;
+    return (busy || alterHold || state.clayState === "leather") ? 0 : idleSpin;
+}
+
+function tick() {
+    const dt = state.clock.getDelta();
+    const targetSpin = spinTargetFor();
     state.spin += (targetSpin - state.spin) * (1 - Math.exp(-dt * 4));
     state.turntable.rotation.y += state.spin * dt;
     // Wheel hum tracks the spin: as the auto-spin eases out while the
@@ -8500,10 +8554,11 @@ function tick() {
     if (state.firing) {
         const now = (typeof performance !== "undefined" ? performance.now() : Date.now());
         const elapsed = (now - state.firingStart) / 1000;
-        if (elapsed >= FIRING_DURATION) {
+        const firingLen = reduceMotion ? REDUCED_FIRING_DURATION : FIRING_DURATION;
+        if (elapsed >= firingLen) {
             endFiringMoment();
         } else {
-            const phaseT = elapsed / FIRING_DURATION;
+            const phaseT = elapsed / firingLen;
             // Phase fractions of the total: close 11%, fire 44%, cool 11%, open 33%.
             const closeEnd = 0.11, fireEnd = 0.55, coolEnd = 0.66;
             let edge = 0, glow = 0, bd = 1, ducked = 1;
@@ -8532,7 +8587,12 @@ function tick() {
                 bd = 0.12 + 0.88 * t;    // studio brightens back
                 ducked = FIRING_MUSIC_DUCK + (1 - FIRING_MUSIC_DUCK) * t;
             }
-            const vignette = document.getElementById("kilnVignette");
+            // Leave the vignette alone under reduced motion: writing an
+            // inline opacity here would override the stylesheet's
+            // `opacity: 0` and restore the glow pulse we're suppressing.
+            // The clay still visibly turns from raw to fired, which is the
+            // part that carries the meaning.
+            const vignette = reduceMotion ? null : document.getElementById("kilnVignette");
             if (vignette) {
                 vignette.style.opacity = "1";
                 const edgeEl = vignette.querySelector(".kiln-edge");
@@ -8774,6 +8834,78 @@ function haptic(ms) {
     if (navigator.vibrate) { try { navigator.vibrate(ms); } catch (_) {} }
 }
 
+// --- Modal focus management -------------------------------------
+// Every overlay here is a role="dialog" that covers the studio, but Tab
+// used to walk straight out of it into the toolbar behind — so a keyboard
+// or screen-reader user could "type" into a pot they can't see, and on
+// close the focus ring was left wherever it had wandered. These keep the
+// ring inside the open dialog and hand it back to whatever opened it.
+//
+// A stack, not a single slot: the gallery can raise the collection or
+// confirm dialog on top of itself, and closing the inner one has to
+// return the trap to the outer one rather than dropping it entirely.
+const FOCUSABLE_SEL = [
+    "a[href]", "button:not([disabled])", "input:not([disabled])",
+    "select:not([disabled])", "textarea:not([disabled])",
+    '[tabindex]:not([tabindex="-1"])',
+].join(",");
+const focusTrapStack = [];
+
+// getClientRects() rather than offsetParent: these dialogs are
+// position:fixed, for which offsetParent is always null — that check
+// would have filtered out every control in the dialog.
+function visibleFocusable(root) {
+    return Array.from(root.querySelectorAll(FOCUSABLE_SEL))
+        .filter((el) => !el.hidden && el.getClientRects().length > 0);
+}
+function onTrapKey(e) {
+    if (e.key !== "Tab") return;
+    const top = focusTrapStack[focusTrapStack.length - 1];
+    if (!top) return;
+    const items = visibleFocusable(top.root);
+    if (!items.length) { e.preventDefault(); return; }
+    const first = items[0], last = items[items.length - 1];
+    const active = document.activeElement;
+    const outside = !top.root.contains(active);
+    if (e.shiftKey && (active === first || outside)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && (active === last || outside)) { e.preventDefault(); first.focus(); }
+}
+function trapFocus(root, initial) {
+    if (!root || focusTrapStack.some((t) => t.root === root)) return;
+    focusTrapStack.push({ root, prev: document.activeElement });
+    // Capture phase so the dialog wins the Tab before anything below it.
+    if (focusTrapStack.length === 1) document.addEventListener("keydown", onTrapKey, true);
+    const target = initial || visibleFocusable(root)[0];
+    if (target) { try { target.focus(); } catch (_) {} }
+}
+// Escape closes the topmost dialog. showConfirm and chooseCollection carry
+// their own Esc handling (they have to resolve a promise / tear down
+// listeners); this covers the four that had no keyboard exit at all —
+// which matters more now that Tab can no longer wander out of them.
+function onDialogEscape(e) {
+    if (e.key !== "Escape") return;
+    const photo   = document.getElementById("photoModal");
+    const recipes = document.getElementById("recipeModal");
+    const gallery = document.getElementById("gallery");
+    // Innermost first: photo and recipes can both open over the gallery.
+    if (photo && !photo.hidden)        { closePhotoModal(); return; }
+    if (recipes && !recipes.hidden)    { closeRecipes();    return; }
+    if (gallery && !gallery.hidden)    { closeGallery();    return; }
+}
+
+function releaseFocus(root) {
+    const i = focusTrapStack.findIndex((t) => t.root === root);
+    if (i === -1) return;
+    const [entry] = focusTrapStack.splice(i, 1);
+    if (!focusTrapStack.length) document.removeEventListener("keydown", onTrapKey, true);
+    const prev = entry.prev;
+    // Only restore if the opener is still on the page and still focusable —
+    // a gallery tile can be deleted while its own dialog is open.
+    if (prev && document.contains(prev) && typeof prev.focus === "function") {
+        try { prev.focus(); } catch (_) {}
+    }
+}
+
 // Generic confirm dialog — a centered card over a dimmed backdrop,
 // styled to match the calm palette (instead of native confirm()'s
 // system harshness). Returns a promise; Esc / backdrop tap = cancel,
@@ -8793,6 +8925,7 @@ function showConfirm(message, opts) {
         const close = (result) => {
             modal.classList.remove("is-open");
             setTimeout(() => { modal.hidden = true; }, 200);
+            releaseFocus(modal);
             ok.removeEventListener("click", onOk);
             cancel.removeEventListener("click", onCancel);
             modal.removeEventListener("click", onBackdrop);
@@ -8812,7 +8945,7 @@ function showConfirm(message, opts) {
         document.addEventListener("keydown", onKey);
         modal.hidden = false;
         requestAnimationFrame(() => modal.classList.add("is-open"));
-        cancel.focus(); // safer default for keyboard
+        trapFocus(modal, cancel); // cancel is the safer keyboard default
     });
 }
 
