@@ -1413,6 +1413,11 @@ let motifLastUV = null;
 // studio on a fresh install; suppressed forever once the user interacts.
 const FIRST_RUN_KEY = "slip-seen-first-run";
 let firstRunTimer = null;
+// Declared up here, NOT beside its helpers further down: init() runs at
+// line ~1527 and reaches updateToolbar → markShapeToolsOffered, so a
+// `const` further down the file would be in its temporal dead zone and
+// throw on load. (Same trap as dipPreview — see CLAUDE.md.)
+const SHAPE_TOOLS_KEY = "slip-seen-shape-tools";
 
 // Wheel-hum ramp: the hum fades in from silence after Begin rather than
 // popping to full volume the first frame (see tick()).
@@ -1595,9 +1600,10 @@ function init() {
     document.querySelectorAll(".brush-btn").forEach((b, idx) =>
         b.addEventListener("click", () => setBrush(idx)));
     setBrush(DEFAULT_BRUSH);
-    document.getElementById("alterBtn")?.addEventListener("click", () => setAlterMode(!state.alterMode));
-    document.getElementById("facetBtn")?.addEventListener("click", cycleFacets);
-    document.getElementById("scallopBtn")?.addEventListener("click", cycleScallop);
+    // Any tap on a shaping pill counts as "found" — retire the pulse for good.
+    document.getElementById("alterBtn")?.addEventListener("click", () => { markShapeToolsSeen(); setAlterMode(!state.alterMode); });
+    document.getElementById("facetBtn")?.addEventListener("click", () => { markShapeToolsSeen(); cycleFacets(); });
+    document.getElementById("scallopBtn")?.addEventListener("click", () => { markShapeToolsSeen(); cycleScallop(); });
     buildGlazePackTabs();
     buildGlazeBar();
     buildDecoBar();
@@ -4891,6 +4897,7 @@ function updateToolbar() {
     if (alterBtn) alterBtn.hidden = !showShape;
     if (facetBtn) facetBtn.hidden = !showShape;
     if (brushSep) brushSep.style.display = showShape ? "" : "none";
+    markShapeToolsOffered(showShape);
     if (!showShape && state.alterMode) setAlterMode(false);
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
@@ -8444,6 +8451,31 @@ function showLanding() {
     updateShapeHint();
 }
 
+// --- New-tool attention pulse -----------------------------------
+// The wet caption names Alter / Facets / Scallop, but a caption alone
+// doesn't move a thumb toward three pills it has never noticed. Breathe
+// them once, the first time they're on screen, and stop for good the
+// moment any of them is tapped. Deliberately NOT a badge or a modal —
+// the studio stays calm. (The pulse itself is disabled under
+// prefers-reduced-motion in style.css; the flag still clears.)
+function shapeToolsSeen() {
+    try { return localStorage.getItem(SHAPE_TOOLS_KEY) === "1"; }
+    catch (_) { return true; } // storage blocked → never nag
+}
+function markShapeToolsSeen() {
+    if (shapeToolsSeen()) return;
+    try { localStorage.setItem(SHAPE_TOOLS_KEY, "1"); } catch (_) {}
+    document.querySelectorAll(".shape-btn.is-new")
+        .forEach((b) => b.classList.remove("is-new"));
+}
+// Called from updateToolbar once the shaping pills are actually visible.
+function markShapeToolsOffered(visible) {
+    const on = visible && !shapeToolsSeen();
+    ["alterBtn", "facetBtn", "scallopBtn"].forEach((id) => {
+        document.getElementById(id)?.classList.toggle("is-new", on);
+    });
+}
+
 // --- First-launch control hints ---------------------------------
 function hasSeenFirstRun() {
     try { return localStorage.getItem(FIRST_RUN_KEY) === "1"; }
@@ -8505,9 +8537,12 @@ function updateShapeHint() {
 // (index.html #coach) shows the gesture; the hand image demonstrates it.
 // Dismissed on the first real gesture (onPointerDown) or on progressing.
 const COACH_CAPTIONS = {
-    wet:     "Drag the wall to shape it. Grab the rim: pull up to raise, sideways to flare.",
+    // Kept to the same rendered height as the pre-v186 caption (5 lines /
+    // ~98px at 375px wide) — the up/sideways detail it drops is already
+    // shown by the SVG gesture lines, and the room buys the tool mention.
+    wet:     "Drag the wall to shape it. Grab the rim to raise or flare. Try Alter, Facets and Scallop too.",
     leather: "Tap Dip, then drag down — glaze pours to your finger.",
-    fired:   "Spin to admire. Save it, or take a photo.",
+    fired:   "Spin to admire. Tap the eye to fill the screen, then save it or take a photo.",
 };
 const coachKey = (stage) => "slip-coach-" + stage;
 let coachStage = null;   // the stage currently being coached (or null)
@@ -8563,6 +8598,8 @@ function replayCoaching() {
     Object.keys(COACH_CAPTIONS).forEach((s) => {
         try { localStorage.removeItem(coachKey(s)); } catch (_) {}
     });
+    // "How to play" re-offers the shaping pills too, not just the hands.
+    try { localStorage.removeItem(SHAPE_TOOLS_KEY); } catch (_) {}
     hideCoach(false);
     const landing = document.getElementById("landing");
     const inStudio = !(landing && !landing.hidden && !landing.classList.contains("is-gone"));

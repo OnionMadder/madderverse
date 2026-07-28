@@ -983,6 +983,20 @@ html, body {
     color: var(--ink);
 }
 .shape-btn[hidden] { display: none; }
+/* First-sight breathe on the shaping pills (main.js markShapeToolsOffered).
+   Slow and low-contrast on purpose — an invitation, not a notification
+   badge. Retires permanently the first time one is tapped. */
+.shape-btn.is-new {
+    animation: shape-breathe 3.2s ease-in-out 3;
+}
+@keyframes shape-breathe {
+    0%, 100% { border-color: var(--ink-faint); box-shadow: none; }
+    50%      { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(201, 138, 100, 0.14); }
+}
+@media (prefers-reduced-motion: reduce) {
+    /* Hold the "found me" state rather than pulsing — same signal, no motion. */
+    .shape-btn.is-new { animation: none; border-color: var(--accent); }
+}
 .brush-dot {
     display: block;
     border-radius: 50%;
