@@ -1418,19 +1418,6 @@ let firstRunTimer = null;
 // `const` further down the file would be in its temporal dead zone and
 // throw on load. (Same trap as dipPreview — see CLAUDE.md.)
 const SHAPE_TOOLS_KEY = "slip-seen-shape-tools";
-// Draft-recovery constants live up here for the same reason: init() calls
-// startDraftHeartbeat(), so declaring these beside their helpers (down by
-// the IndexedDB code) put them in the TDZ and aborted init silently —
-// which also killed the ?dev handle and left SFX uninitialised.
-const DRAFT_ID = "current";
-const DRAFT_INTERVAL_MS = 8000;
-let draftTimer = null;
-let draftWriting = false;
-// Likewise the IndexedDB names. These used to sit beside openDB() further
-// down, which was safe only because openDB was reached exclusively from
-// user actions (opening the gallery) — long after evaluation. Draft
-// recovery calls it from init(), so they have to be initialised by then.
-const DB_NAME = "slip-studio", DB_STORE = "pots", DB_DRAFT = "draft";
 
 // Wheel-hum ramp: the hum fades in from silence after Begin rather than
 // popping to full volume the first frame (see tick()).
@@ -1542,8 +1529,10 @@ function handleTubeRadius() {
     return HANDLE_THICKNESSES[state.handle.thickness] || HANDLE_THICKNESSES[DEFAULT_HANDLE_THICKNESS];
 }
 
-init();
-
+// init() is invoked at the BOTTOM of this file — see the boot block there.
+// Don't call it from here: doing so puts every top-level const/let declared
+// below this point back into its temporal dead zone for the whole startup
+// path, which is a silent, hard-to-trace class of breakage.
 function init() {
     const canvas = document.getElementById("scene");
     state.canvas = canvas;
@@ -6182,6 +6171,8 @@ function onPointerUp(ev) {
 }
 
 // --- Persistence + gallery (local, IndexedDB) -------------------
+const DB_NAME = "slip-studio", DB_STORE = "pots", DB_DRAFT = "draft";
+
 // v2 adds the in-progress draft store. The upgrade is additive and guarded,
 // so a v1 database (every existing player) keeps its pots untouched.
 function openDB() {
@@ -6234,6 +6225,11 @@ async function dbDelete(id) {
 // The draft holds ONE piece. While a set is in progress (a partner is
 // paused in memory) drafting is skipped — that flow is seconds from its
 // save, and a half-restored set would be worse than none.
+const DRAFT_ID = "current";
+const DRAFT_INTERVAL_MS = 8000;
+let draftTimer = null;
+let draftWriting = false;
+
 async function draftWrite() {
     // Don't fight the GPU/CPU mid-gesture or during the kiln animation,
     // and never draft a set (see above) or a finished, saved piece.
@@ -9300,4 +9296,27 @@ function updateSfxToggle() {
     btn.classList.toggle("is-on", state.sfxOn);
     btn.setAttribute("aria-pressed", state.sfxOn ? "true" : "false");
     btn.textContent = state.sfxOn ? "♫ SFX on" : "♫ SFX off";
+}
+
+// --- Boot -------------------------------------------------------
+// The LAST statement in this file, deliberately.
+//
+// init() reaches most of the module, and a top-level `const`/`let` declared
+// BELOW the call site is still in its temporal dead zone when init runs.
+// Touching one throws, init aborts half-built, and because a module-
+// evaluation error surfaces poorly it reads as some unrelated feature
+// quietly not working — we lost real time to exactly that three times in
+// one sitting (the ?dev handle and SFX init vanishing were symptoms, not
+// the cause). Booting from the bottom means every binding in the file is
+// initialised before init touches anything, so a helper is safe to call
+// from startup no matter where its constants happen to live.
+//
+// If you move this call back up, you re-arm that trap for everything
+// declared after it. Don't.
+try {
+    init();
+} catch (err) {
+    // Never fail silently — a half-built studio is worse than a loud error.
+    console.error("[Slip Studio] init() failed:", err);
+    throw err;
 }
