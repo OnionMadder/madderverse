@@ -286,6 +286,30 @@ html, body {
     pointer-events: none;
 }
 
+/* GL context lost. Sits above the (now blank) canvas but below the loader.
+   Calm copy over the normal background — a black screen with no
+   explanation is what earns a one-star review, not the hiccup itself. */
+.context-lost {
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    text-align: center;
+    background: var(--bg);
+    color: var(--ink);
+    font: 400 17px/1.5 var(--display, Georgia, serif);
+}
+.context-lost[hidden] { display: none; }
+.context-lost-sub {
+    color: var(--ink-dim);
+    font: 400 14px/1.5 var(--ui, system-ui, sans-serif);
+}
+
 .loader-ring {
     width: 34px;
     height: 34px;
@@ -363,6 +387,17 @@ html, body {
 }
 .landing-btn:hover { background: #d89a74; }
 .landing-btn:active { transform: scale(0.97); }
+/* Draft recovery. Outlined rather than filled so Begin stays the primary
+   action — this is an offer, not a demand. */
+.landing-btn-resume {
+    background: none;
+    color: var(--ink);
+    border: 1px solid var(--accent);
+    padding: 11px 30px;
+    font-size: 0.88rem;
+}
+.landing-btn-resume:hover { background: rgba(201, 138, 100, 0.14); }
+.landing-btn-resume[hidden] { display: none; }
 .landing-link {
     -webkit-appearance: none;
     appearance: none;

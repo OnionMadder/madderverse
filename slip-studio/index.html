@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=186" />
+    <link rel="stylesheet" href="style.css?v=188" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -212,6 +212,14 @@
         <span class="loader-label">Slip Studio</span>
     </div>
 
+    <!-- Shown only while the GL context is lost (memory pressure on older
+         tablets). Reassurance, not an error dialog: the pot is intact and
+         the scene comes back on its own when the browser restores us. -->
+    <div id="contextLost" class="context-lost" role="status" aria-live="polite" hidden>
+        <p>Catching our breath&hellip;</p>
+        <p class="context-lost-sub">Your pot is safe. The studio will be right back.</p>
+    </div>
+
     <div id="landing" class="landing" hidden>
         <h1 class="landing-title">Slip Studio</h1>
         <p class="landing-tag">a calm place to shape clay</p>
@@ -223,6 +231,10 @@
             <button class="music-toggle" id="sfxToggle"   type="button" aria-pressed="true">&#9835; SFX on</button>
         </div>
         <button id="beginBtn" class="landing-btn" type="button">Begin</button>
+        <!-- Only shown when an unsaved pot survived the last session
+             (main.js offerDraft). Sits under Begin, not over it: a fresh
+             start stays the default, recovery is the offer. -->
+        <button id="resumeBtn" class="landing-btn landing-btn-resume" type="button" hidden>Continue your pot</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
         <button id="landingRecipes" class="landing-link" type="button">Glaze recipes</button>
         <button id="landingHowto" class="landing-link" type="button">How to play</button>
@@ -424,7 +436,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=186"></script>
+    <script type="module" src="main.js?v=188"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

@@ -1418,6 +1418,19 @@ let firstRunTimer = null;
 // `const` further down the file would be in its temporal dead zone and
 // throw on load. (Same trap as dipPreview — see CLAUDE.md.)
 const SHAPE_TOOLS_KEY = "slip-seen-shape-tools";
+// Draft-recovery constants live up here for the same reason: init() calls
+// startDraftHeartbeat(), so declaring these beside their helpers (down by
+// the IndexedDB code) put them in the TDZ and aborted init silently —
+// which also killed the ?dev handle and left SFX uninitialised.
+const DRAFT_ID = "current";
+const DRAFT_INTERVAL_MS = 8000;
+let draftTimer = null;
+let draftWriting = false;
+// Likewise the IndexedDB names. These used to sit beside openDB() further
+// down, which was safe only because openDB was reached exclusively from
+// user actions (opening the gallery) — long after evaluation. Draft
+// recovery calls it from init(), so they have to be initialised by then.
+const DB_NAME = "slip-studio", DB_STORE = "pots", DB_DRAFT = "draft";
 
 // Wheel-hum ramp: the hum fades in from silence after Begin rather than
 // popping to full volume the first frame (see tick()).
@@ -1681,6 +1694,48 @@ function init() {
     setDecoSize(DEFAULT_DECO_SIZE);
     setPhase(INITIAL_STATE); // sets the tween target + toolbar
 
+    // --- WebGL context loss ---------------------------------------
+    // Android tablets (which is where a Teacher Approved app actually
+    // lands) drop the GL context under memory pressure — backgrounding
+    // the app, a camera launch, another heavy tab. Without a handler
+    // the canvas goes permanently black and the pot is gone: the worst
+    // possible outcome for a paid piece of work.
+    //
+    // The default browser behaviour is to NOT restore, so preventDefault
+    // is what buys us a restore event at all. Three.js re-uploads its own
+    // geometry/textures on the next render, but our hand-rolled canvas
+    // textures (deco, bump, sgraffito, dip) are ours to re-flag.
+    canvas.addEventListener("webglcontextlost", (e) => {
+        e.preventDefault();
+        state.contextLost = true;
+        // Reassure FIRST. Everything below can throw (audio may not even be
+        // initialised yet); the user must not be left staring at a black
+        // canvas because a teardown call failed.
+        const note = document.getElementById("contextLost");
+        if (note) note.hidden = false;
+        try { renderer.setAnimationLoop(null); } catch (_) {}  // stop drawing into a dead context
+        try { stopSfx("wheel"); } catch (_) {}
+    }, false);
+    canvas.addEventListener("webglcontextrestored", () => {
+        state.contextLost = false;
+        // Mark every canvas-backed texture dirty so they re-upload.
+        [state.decoTex, state.bumpTex, state.sgraffitoTex, state.dipTex,
+         state.resistTex, state.partnerDecoTex, state.partnerBumpTex,
+         state.partnerSgraffitoTex, state.partnerDipTex,
+         state.partnerResistTex].forEach((t) => {
+            if (t) t.needsUpdate = true;
+        });
+        // Materials must recompile: their onBeforeCompile hooks (dip /
+        // deco / resist) are what make the pot look like anything.
+        if (state.clayMaterial)   state.clayMaterial.needsUpdate = true;
+        if (state.handleMaterial) state.handleMaterial.needsUpdate = true;
+        if (state.partnerMaterial) state.partnerMaterial.needsUpdate = true;
+        const note = document.getElementById("contextLost");
+        if (note) note.hidden = true;
+        state.clock.getDelta();            // swallow the long stalled dt
+        renderer.setAnimationLoop(tick);
+    }, false);
+
     // First frame, then reveal the scene and start the loop.
     renderer.render(scene, camera);
     hideLoader();
@@ -1741,6 +1796,10 @@ function init() {
     const landing = document.getElementById("landing");
     if (landing) landing.hidden = false;
     document.getElementById("beginBtn")?.addEventListener("click", dismissLanding);
+    // Draft recovery: offer the unsaved pot from a killed session, then
+    // start the heartbeat that keeps this one recoverable in turn.
+    offerDraft();
+    startDraftHeartbeat();
     document.getElementById("landingGallery")?.addEventListener("click", () => {
         dismissLanding();
         openGallery();
@@ -4703,6 +4762,7 @@ function resetPot() {
     setHeightScale(1.0);
     setPhase(INITIAL_STATE);
     state.dirty = false;
+    draftClear(); // starting over — the old draft is no longer the user's work
     updateGlazeBar();
 }
 
@@ -6122,12 +6182,16 @@ function onPointerUp(ev) {
 }
 
 // --- Persistence + gallery (local, IndexedDB) -------------------
-const DB_NAME = "slip-studio", DB_STORE = "pots";
-
+// v2 adds the in-progress draft store. The upgrade is additive and guarded,
+// so a v1 database (every existing player) keeps its pots untouched.
 function openDB() {
     return new Promise((res, rej) => {
-        const r = indexedDB.open(DB_NAME, 1);
-        r.onupgradeneeded = () => r.result.createObjectStore(DB_STORE, { keyPath: "id" });
+        const r = indexedDB.open(DB_NAME, 2);
+        r.onupgradeneeded = () => {
+            const db = r.result;
+            if (!db.objectStoreNames.contains(DB_STORE)) db.createObjectStore(DB_STORE, { keyPath: "id" });
+            if (!db.objectStoreNames.contains(DB_DRAFT)) db.createObjectStore(DB_DRAFT, { keyPath: "id" });
+        };
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
     });
@@ -6157,6 +6221,95 @@ async function dbDelete(id) {
         tx.objectStore(DB_STORE).delete(id);
         tx.oncomplete = () => res();
         tx.onerror = () => rej(tx.error);
+    });
+}
+
+// --- In-progress draft ------------------------------------------
+// A phone call, a low-memory kill or a closed tab used to lose an
+// unsaved pot outright. A single draft record (id "current") is
+// rewritten on a slow heartbeat while there's unsaved work, and offered
+// back on the next launch. IndexedDB, NOT sessionStorage: sessionStorage
+// dies with the process, which is precisely the case we're recovering.
+//
+// The draft holds ONE piece. While a set is in progress (a partner is
+// paused in memory) drafting is skipped — that flow is seconds from its
+// save, and a half-restored set would be worse than none.
+async function draftWrite() {
+    // Don't fight the GPU/CPU mid-gesture or during the kiln animation,
+    // and never draft a set (see above) or a finished, saved piece.
+    if (draftWriting || !state.dirty || state.firing || state.contextLost) return;
+    if (state.savedPot || state.savedLid) return;
+    if (sculpting || state.painting || dipping || handleDrag) return;
+    draftWriting = true;
+    try {
+        const draft = { ...corePieceFields(), id: DRAFT_ID, ts: Date.now(), stage: state.clayState };
+        const db = await openDB();
+        await new Promise((res, rej) => {
+            const tx = db.transaction(DB_DRAFT, "readwrite");
+            tx.objectStore(DB_DRAFT).put(draft);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
+    } catch (_) {
+        // Quota or a blocked upgrade — recovery is a bonus, never a blocker.
+    } finally {
+        draftWriting = false;
+    }
+}
+async function draftRead() {
+    try {
+        const db = await openDB();
+        return await new Promise((res, rej) => {
+            const tx = db.transaction(DB_DRAFT, "readonly");
+            const rq = tx.objectStore(DB_DRAFT).get(DRAFT_ID);
+            rq.onsuccess = () => res(rq.result || null);
+            rq.onerror = () => rej(rq.error);
+        });
+    } catch (_) { return null; }
+}
+async function draftClear() {
+    try {
+        const db = await openDB();
+        await new Promise((res, rej) => {
+            const tx = db.transaction(DB_DRAFT, "readwrite");
+            tx.objectStore(DB_DRAFT).delete(DRAFT_ID);
+            tx.oncomplete = () => res();
+            tx.onerror = () => rej(tx.error);
+        });
+    } catch (_) {}
+}
+// Surface the Continue button if a draft survived, and wire it to restore
+// that piece at the stage it was left on. Declining (tapping Begin) leaves
+// the draft alone — it's only dropped once the user actually starts a new
+// pot, so a stray tap on Begin can't destroy yesterday's work.
+async function offerDraft() {
+    const btn = document.getElementById("resumeBtn");
+    if (!btn) return;
+    const draft = await draftRead();
+    if (!draft) return;
+    btn.hidden = false;
+    btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+            await loadPot(draft, { phase: draft.stage || "wet" });
+            // It's unsaved work again, exactly as it was.
+            state.dirty = true;
+            dismissLanding();
+        } catch (_) {
+            btn.hidden = true; // unreadable draft — don't strand the user on it
+        } finally {
+            btn.disabled = false;
+        }
+    }, { once: true });
+}
+
+function startDraftHeartbeat() {
+    if (draftTimer) return;
+    draftTimer = setInterval(draftWrite, DRAFT_INTERVAL_MS);
+    // Backgrounding is the most likely moment to be killed — take the
+    // snapshot on the way out rather than waiting for the next tick.
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") draftWrite();
     });
 }
 
@@ -6579,6 +6732,40 @@ function defaultPotTitle() {
     return `${base} in ${look}`;
 }
 
+// Everything that describes ONE piece — geometry, glaze, decoration
+// layers, handle/spout. Shared by the gallery save and the in-progress
+// draft so the two can never drift apart; the caller adds whatever else
+// its own record needs (id/ts/thumb/title for a save, stage for a draft).
+function corePieceFields() {
+    return {
+        profile: Array.from(profile, (x) => +x.toFixed(4)),
+        displace: encodeDisplaceField(displaceActive ? displace : null),
+        facetCount: state.facetCount,
+        rimScallop: state.rimScallop,
+        rimStyle: state.rimStyle,
+        glaze: state.glaze,
+        glazeGradient: state.glazeGradient,
+        finish: state.finish,
+        dips: state.dips.map((d) => ({ ...d })),
+        deco: state.decoCanvas.toDataURL("image/png"),        // composite (thumbnails, partner, legacy)
+        paintDeco: state.paintCanvas.toDataURL("image/png"),  // baked freehand layer (editable reload)
+        placements: serializePlacements(),                    // movable motifs + bands
+        bump: state.bumpCanvas.toDataURL("image/png"),
+        sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
+        resist: state.resistCanvas.toDataURL("image/png"),
+        frozenDip: state.frozenDipCanvas ? state.frozenDipCanvas.toDataURL("image/png") : null,
+        isLid: state.isLid,
+        handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
+        spout: !state.isLid && state.spout.on,   // teapot spout (pot only)
+        handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset    : 0,
+        handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset      : 0,
+        handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset   : 0,
+        handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
+        handleCount:  !state.isLid && state.handle.on ? state.handle.count : 2,
+        heightScale:  state.heightScale,
+    };
+}
+
 async function savePot() {
     // A saved pot shows its FINISHED look: peel any wax off first so the
     // gallery thumb + photo reveal the protected colour, not a milky coat.
@@ -6604,36 +6791,12 @@ async function savePot() {
     // entries share this thumb so the gallery shows the set together.
     const assemblyThumb = partner ? captureAssemblyThumb() : null;
     const entry = {
+        ...corePieceFields(),
         id: Date.now().toString(36),
         ts: Date.now(),
-        profile: Array.from(profile, (x) => +x.toFixed(4)),
-        displace: encodeDisplaceField(displaceActive ? displace : null),
-        facetCount: state.facetCount,
-        rimScallop: state.rimScallop,
-        rimStyle: state.rimStyle,
-        glaze: state.glaze,
-        glazeGradient: state.glazeGradient,
-        finish: state.finish,
-        dips: state.dips.map((d) => ({ ...d })),
-        deco: state.decoCanvas.toDataURL("image/png"),        // composite (thumbnails, partner, legacy)
-        paintDeco: state.paintCanvas.toDataURL("image/png"),  // baked freehand layer (editable reload)
-        placements: serializePlacements(),                    // movable motifs + bands
-        bump: state.bumpCanvas.toDataURL("image/png"),
-        sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
-        resist: state.resistCanvas.toDataURL("image/png"),
-        frozenDip: state.frozenDipCanvas ? state.frozenDipCanvas.toDataURL("image/png") : null,
         thumb: captureThumb(),
         setId,
         title: defaultPotTitle(), // pre-named; user can rename in the gallery
-        isLid: state.isLid,
-        handle: !state.isLid && state.handle.on, // lids never carry a handle in v1
-        spout: !state.isLid && state.spout.on,   // teapot spout (pot only)
-        handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset    : 0,
-        handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset      : 0,
-        handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset   : 0,
-        handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
-        handleCount:  !state.isLid && state.handle.on ? state.handle.count : 2,
-        heightScale:  state.heightScale,
         assemblyThumb,
     };
     try {
@@ -6641,6 +6804,7 @@ async function savePot() {
         flashSaved();
         state.pendingSetId = null;
         state.dirty = false; // the gallery now reflects everything in view
+        draftClear();        // the work is in the gallery — nothing to recover
 
         if (partner) {
             // Swap in the partner, save it under the same set id, then
@@ -7385,7 +7549,10 @@ function pulseSaveFlash() {
 }
 
 // Restore a saved pot into the scene as a finished (fired) piece.
-async function loadPot(entry) {
+// opts.phase — where to land. Gallery loads land on "fired" (the piece is
+// finished); a restored draft lands back on the stage it was left at.
+async function loadPot(entry, opts) {
+    const landPhase = (opts && opts.phase) || "fired";
     setShowWax(false); // a loaded pot shows its finished (wax-cleared) look
     // For a handled SET, always load the POT (the handle-bearer) as the
     // active piece — the handle binds to the active mesh, and the lid can't
@@ -7512,12 +7679,12 @@ async function loadPot(entry) {
         } catch (_) { /* gallery read failed — fall back to solo view */ }
     }
 
-    setPhase("fired");
+    setPhase(landPhase);
     updateGlazeBar();
     // Force an immediate frame so the piece shows right away.
     writeProfileToGeometry(state.pot.geometry);
     profileDirty = false;
-    tickMaterial(10); // snap material to the fired look
+    tickMaterial(10); // snap material to the landed stage's look
     state.renderer.render(state.scene, state.camera);
 }
 
