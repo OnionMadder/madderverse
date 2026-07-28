@@ -3122,6 +3122,15 @@
     const RIM_LOCK_PX    = 7;      /* travel before the drag axis locks */
     const HEIGHT_MIN     = 0.55;
     const HEIGHT_MAX     = 1.05;
+    /* A fresh lump throws SHORT, so "grab the lip and pull up" has
+       somewhere to go. It used to start at 1.0 against a 1.05 ceiling,
+       which meant an 80px up-drag bought 5% and then clamped — half the
+       gesture was dead while down-drags got the full range. The ceiling
+       can't rise instead: topY (95) is the design headroom, and a wide
+       bowl's lip ellipse already reaches ~34px above the rim, so past
+       ~1.05 the mouth clips off the top of the canvas. Starting lower
+       also matches how throwing actually goes — you pull the wall up. */
+    const FRESH_HEIGHT   = 0.84;
 
     /* Lay out the fixed y for each clay sample from the current
        heightScale (radii preserved). Called by resetClay/seedShape
@@ -3459,8 +3468,8 @@
 
     function resetClay() {
         const arr = new Array(SHAPE.N);
-        SHAPE.heightScale = 1;
-        const span = SHAPE.baseY - SHAPE.topY;
+        SHAPE.heightScale = FRESH_HEIGHT;
+        const span = (SHAPE.baseY - SHAPE.topY) * SHAPE.heightScale;
         for (let i = 0; i < SHAPE.N; i++) {
             const t = i / (SHAPE.N - 1);
             arr[i] = {
@@ -4322,12 +4331,9 @@
         const clay = SHAPE.clay;
         const N = clay.length;
 
-        /* Compute current max radius (for gradient stops). */
-        let maxR = 0;
-        for (let i = 0; i < N; i++) {
-            if (clay[i].radius > maxR) maxR = clay[i].radius;
-        }
-        if (maxR < 1) maxR = 1;
+        /* (max radius no longer needed here — the body is a flat albedo
+           and all modelling comes from the form pass in
+           paintLightCatches(), which works per row off its own radius.) */
 
         /* (Overhead contact shadow removed — the symmetric dark ellipse
            directly under the pot read as high-noon lighting, fighting
@@ -4350,31 +4356,17 @@
                value family as the shadow mid instead of dropping
                into pure dark like a close-range falloff would */
         const mat = currentClay();
-        buildPotPath(ctx);
-        const grad = ctx.createLinearGradient(cx - maxR, 0, cx + maxR, 0);
         const stops = mat.unfired;
-        if (_galleryLighting) {
-            /* GALLERY: explicit side key. The bright peak is pulled
-               hard to the LEFT (0.22) and the right side rolls down
-               to the dark mid, so the form reads unmistakably "lit
-               from one side" on its display plinth — no ambiguous
-               near-symmetric studio fill. */
-            grad.addColorStop(0.00, stops[2]);
-            grad.addColorStop(0.22, stops[3]);
-            grad.addColorStop(0.52, stops[2]);
-            grad.addColorStop(0.80, stops[1]);
-            grad.addColorStop(1.00, stops[1]);
-        } else {
-            /* Working screens: gently asymmetric mid-distance studio
-               light (peak ~0.40), softer than the gallery key. */
-            grad.addColorStop(0.00, stops[1]);
-            grad.addColorStop(0.18, stops[2]);
-            grad.addColorStop(0.40, stops[3]);
-            grad.addColorStop(0.62, stops[2]);
-            grad.addColorStop(0.85, stops[1]);
-            grad.addColorStop(1.00, stops[1]);
-        }
-        ctx.fillStyle = grad;
+        buildPotPath(ctx);
+        /* FLAT albedo. Every bit of modelling now comes from the
+           cylindrical form pass in paintLightCatches(), which multiplies
+           this base by ramp(s) / stops[3] — so bare clay lands on exactly
+           the authored stops 1..3 value range it always had, while the
+           same lighting also wraps whatever gets laid on top (pack skin,
+           dip glaze). The old horizontal gradient ran across ±maxR and so
+           handed every row the slice of light meant for the pot's WIDEST
+           point; that is why necks, shoulders and tapers read flat. */
+        ctx.fillStyle = stops[3];
         ctx.fill();
 
         /* (Procedural clay grain removed — the clay body is now a clean
@@ -4496,93 +4488,327 @@
        distance studio light used on shape / decorate / kiln. */
     let _galleryLighting = false;
 
-    function paintLightCatches(ctx) {
-        const mat = currentClay();
-        const cx = SHAPE.centerX;
-        const clay = SHAPE.clay;
-        const N = clay.length;
-        if (!N) return;
-        let maxR = 0;
-        for (let i = 0; i < N; i++) if (clay[i].radius > maxR) maxR = clay[i].radius;
+    /* ---- Cylindrical form lighting ----
+       A pot is a surface of revolution, so for a side-on view the
+       surface normal at horizontal offset x on a row of radius r is
+       exactly (x/r, -dr/dy, sqrt(1 - (x/r)^2)), normalised. Every term
+       is derivable from SHAPE.clay, which means real per-row modelling
+       without a 3D engine and without touching the data model.
 
-        const topY = clay[N - 1].y - 4;
-        const colH = SHAPE.baseY - clay[N - 1].y + 14;
-        const hlColor = mat.highlight;
-        const hlEdge  = hlColor.replace(/[\d.]+\)\s*$/, "0)");
-        const tint = function (a) {
-            return hlColor.replace(/[\d.]+\)\s*$/, a.toFixed(3) + ")");
+       The old light catches were global horizontal gradients sized to
+       the pot's WIDEST point, so a bottle neck at r=26 got the middle
+       slice of a gradient built for r=90 and lost its roundness. Worse,
+       the position of the highlight drifted with a row's width instead
+       of its shape: on BOTTLE it sat at 14% across the neck and 39%
+       across the belly, for no physical reason.
+
+       Output is two layers so it can light whatever is underneath —
+       bare clay, a pack skin, a dip glaze — with one consistent model:
+         mul  multiply layer, ramp(s) / stops[3]. Against the flat
+              stops[3] albedo drawPot() lays down, bare clay resolves to
+              the clay's own authored stops 1..3 ramp, so the palette is
+              unchanged; anything painted over the clay simply takes the
+              same falloff.
+         spec additive specular + fresnel rim, in the clay's highlight
+              colour, replacing the old sheen/rim rectangles.
+       Bands, brush strokes and stickers composite AFTER this pass, so
+       they stay crisp decals rather than being dimmed on the shadow
+       side.                                                          */
+    const FORM_U = 257;            /* samples across a row: u = x / r */
+    const FORM_S = 129;            /* profile-slope buckets           */
+    const FORM_SLOPE_MAX = 3;
+    /* Darkest clay stop the shadow side is allowed to reach. 1 = the
+       value range the old horizontal gradient had; 0 = deeper, more
+       sculptural shadows. See the ramp note in formMaps(). */
+    const FORM_RAMP_FLOOR = 0;
+
+    /* Key light per mode, in canvas space (y grows DOWN, +z toward the
+       viewer). Working screens keep the calm mid-distance studio key;
+       the gallery gets a harder side key + a strong key-side rim so a
+       finished pot still reads as lit on a plinth.
+
+       spec / rimL / rimR are absolute peak strengths, deliberately
+       matching the alphas the old sheen + rim rectangles used (work
+       0.18 sheen + 0.06 right rim; gallery 0.26 sheen + 0.30 left key
+       rim + 0.14 right fill rim) so the highlight reads at the same
+       intensity it always did. They are NOT scaled by the clay's
+       highlight alpha — mat.highlight contributes its COLOUR only,
+       exactly as tint() did, or porcelain and void would blow out. */
+    const FORM_LIGHTS = {
+        work:    { dir: [-0.50, -0.46, 0.73], spec: 0.18, rimR: 0.06, rimL: 0.00 },
+        gallery: { dir: [-0.74, -0.34, 0.58], spec: 0.26, rimR: 0.14, rimL: 0.30 }
+    };
+
+    function formHexRGB(h) {
+        return [parseInt(h.slice(1, 3), 16),
+                parseInt(h.slice(3, 5), 16),
+                parseInt(h.slice(5, 7), 16)];
+    }
+    function formHlParts(s) {
+        const m = s.match(/rgba?\(([^)]+)\)/)[1].split(",").map(Number);
+        return { r: m[0], g: m[1], b: m[2], a: m[3] === undefined ? 1 : m[3] };
+    }
+
+    /* (clay id + mode) -> {mul, spec} byte tables. Built once, so the
+       per-frame pass is a plain array copy with no trigonometry. */
+    const FORM_MAPS = {};
+    function formMaps(mat, gallery) {
+        const key = mat.id + (gallery ? "|g" : "");
+        if (FORM_MAPS[key]) return FORM_MAPS[key];
+        const stops = mat.unfired;
+        /* Ramp floor. The old horizontal gradient only ever reached
+           stops[1] at its darkest, so floor 1 reproduces its exact value
+           range. Floor 0 lets the shadow side fall all the way to the
+           clay's darkest stop — same highlights, deeper shadow, a more
+           sculptural read. One constant, easy to put back. */
+        const ramp = FORM_RAMP_FLOOR === 0
+            ? [formHexRGB(stops[0]), formHexRGB(stops[1]),
+               formHexRGB(stops[2]), formHexRGB(stops[3])]
+            : [formHexRGB(stops[1]), formHexRGB(stops[2]),
+               formHexRGB(stops[3])];
+        const segs = ramp.length - 1;
+        const peak = ramp[segs];
+        const hl  = formHlParts(mat.highlight);
+        const cfg = gallery ? FORM_LIGHTS.gallery : FORM_LIGHTS.work;
+        const ll = Math.hypot(cfg.dir[0], cfg.dir[1], cfg.dir[2]);
+        const Lx = cfg.dir[0] / ll, Ly = cfg.dir[1] / ll, Lz = cfg.dir[2] / ll;
+        /* half-vector against an orthographic view direction (0,0,1) */
+        const hvx = Lx, hvy = Ly, hvz = Lz + 1;
+        const hvl = Math.hypot(hvx, hvy, hvz);
+        const hx = hvx / hvl, hy = hvy / hvl, hz = hvz / hvl;
+
+        const mul  = new Uint8ClampedArray(FORM_U * FORM_S * 4);
+        const spec = new Uint8ClampedArray(FORM_U * FORM_S * 4);
+        for (let sy = 0; sy < FORM_S; sy++) {
+            const slope = -FORM_SLOPE_MAX +
+                          (2 * FORM_SLOPE_MAX) * (sy / (FORM_S - 1));
+            /* |(u, -slope, nz)| is sqrt(1 + slope^2) exactly, since
+               u^2 + nz^2 == 1. */
+            const inv = 1 / Math.sqrt(1 + slope * slope);
+            for (let ux = 0; ux < FORM_U; ux++) {
+                const u  = -1 + 2 * (ux / (FORM_U - 1));
+                const nz = Math.sqrt(Math.max(0, 1 - u * u));
+                const nx = u * inv, ny = -slope * inv, nzz = nz * inv;
+                const dot = nx * Lx + ny * Ly + nzz * Lz;
+                /* A little wrap past the terminator — clay is soft and
+                   shouldn't snap to graphic black on the shadow side. */
+                const wrap = Math.max(0, (dot + 0.35) / 1.35);
+                let s = 0.16 + 0.62 * Math.max(0, dot) + 0.26 * wrap;
+                if (s < 0) s = 0; else if (s > 1) s = 1;
+
+                const f = s * segs;
+                let i0 = f | 0;
+                if (i0 > segs - 1) i0 = segs - 1;
+                const t = f - i0;
+                const a = ramp[i0], b = ramp[i0 + 1];
+                const o = (sy * FORM_U + ux) * 4;
+                for (let c = 0; c < 3; c++) {
+                    const lit = a[c] + (b[c] - a[c]) * t;
+                    mul[o + c] = peak[c] ? 255 * lit / peak[c] : 0;
+                }
+                mul[o + 3] = 255;
+
+                const sp = Math.pow(Math.max(0, nx * hx + ny * hy + nzz * hz),
+                                    34) * cfg.spec;
+                const fr = Math.pow(1 - nz, 5) *
+                           (u > 0 ? cfg.rimR : cfg.rimL);
+                const k = Math.min(1, sp + fr);
+                spec[o]     = hl.r * k;
+                spec[o + 1] = hl.g * k;
+                spec[o + 2] = hl.b * k;
+                spec[o + 3] = 255;
+            }
+        }
+        FORM_MAPS[key] = { mul: mul, spec: spec };
+        return FORM_MAPS[key];
+    }
+
+    /* r(y) for every pixel row, sampled off the SAME quadratic chain
+       buildPotPath draws — a linear walk of the clay samples would put
+       the shading's u = ±1 edge slightly inside the silhouette and leave
+       a bright seam down both sides. */
+    let _formR = null;
+    function formRadiusTable() {
+        const clay = SHAPE.clay, N = clay.length, cx = SHAPE.centerX;
+        if (!_formR) _formR = new Float32Array(SHAPE.H);
+        const R = _formR;
+        R.fill(-1);
+        const put = function (x, y) {
+            const yi = Math.round(y);
+            if (yi < 0 || yi >= SHAPE.H) return;
+            const r = x - cx;
+            if (r > R[yi]) R[yi] = r;
         };
+        let px = cx + clay[0].radius, py = clay[0].y;
+        put(px, py);
+        for (let i = 1; i < N - 1; i++) {
+            const c1x = cx + clay[i].radius, c1y = clay[i].y;
+            const e1x = cx + (clay[i].radius + clay[i + 1].radius) * 0.5;
+            const e1y = (clay[i].y + clay[i + 1].y) * 0.5;
+            for (let s = 1; s <= 20; s++) {
+                const t = s / 20, mt = 1 - t;
+                put(mt * mt * px + 2 * mt * t * c1x + t * t * e1x,
+                    mt * mt * py + 2 * mt * t * c1y + t * t * e1y);
+            }
+            px = e1x; py = e1y;
+        }
+        const rx = cx + clay[N - 1].radius, ry = clay[N - 1].y;
+        for (let s = 1; s <= 8; s++) {
+            const t = s / 8;
+            put(px + (rx - px) * t, py + (ry - py) * t);
+        }
+        /* interpolate the rows the curve stepped over */
+        let last = -1;
+        for (let y = 0; y < SHAPE.H; y++) {
+            if (R[y] >= 0) {
+                if (last >= 0 && y - last > 1) {
+                    for (let k = last + 1; k < y; k++) {
+                        R[k] = R[last] + (R[y] - R[last]) *
+                               ((k - last) / (y - last));
+                    }
+                }
+                last = y;
+            }
+        }
+        return R;
+    }
+
+    /* dr/dy per row, smoothed.
+       R is built by rasterising a curve and linearly filling the rows
+       the curve stepped over, so it's piecewise-linear: its raw
+       derivative is a staircase, and feeding that straight into the
+       slope buckets banded the lower wall of flared shapes (adjacent
+       rows differing by 105/255 where the smooth stretch differed by
+       43). A wide central difference plus two box-blur passes turns it
+       back into the smooth gradient the real profile has. */
+    let _formSlope = null, _formSlopeTmp = null;
+    function formSlopeTable(R, rimY, footY) {
+        if (!_formSlope) {
+            _formSlope    = new Float32Array(SHAPE.H);
+            _formSlopeTmp = new Float32Array(SHAPE.H);
+        }
+        const S = _formSlope, T = _formSlopeTmp;
+        const D = 4;
+        for (let y = rimY; y <= footY; y++) {
+            const a = R[Math.max(rimY, y - D)];
+            const b = R[Math.min(footY, y + D)];
+            const span = Math.min(footY, y + D) - Math.max(rimY, y - D);
+            S[y] = span > 0 ? (b - a) / span : 0;
+        }
+        for (let pass = 0; pass < 2; pass++) {
+            for (let y = rimY; y <= footY; y++) {
+                let sum = 0, n = 0;
+                for (let k = -2; k <= 2; k++) {
+                    const yy = y + k;
+                    if (yy < rimY || yy > footY) continue;
+                    sum += S[yy]; n++;
+                }
+                T[y] = sum / n;
+            }
+            S.set(T.subarray(rimY, footY + 1), rimY);
+        }
+        return S;
+    }
+
+    /* Scratch canvases, reused every frame. Built in logical 400x600
+       space and drawn with drawImage (which honours the target's
+       transform) so gallery thumbnails scale correctly — putImageData
+       would ignore the transform and blow out the thumbnail. */
+    let _formMulCv = null, _formMulCtx = null, _formMulImg = null;
+    let _formSpecCv = null, _formSpecCtx = null, _formSpecImg = null;
+    function formBuffers() {
+        if (_formMulCv) return;
+        _formMulCv = document.createElement("canvas");
+        _formMulCv.width = SHAPE.W; _formMulCv.height = SHAPE.H;
+        _formMulCtx = _formMulCv.getContext("2d");
+        _formMulImg = _formMulCtx.createImageData(SHAPE.W, SHAPE.H);
+        _formSpecCv = document.createElement("canvas");
+        _formSpecCv.width = SHAPE.W; _formSpecCv.height = SHAPE.H;
+        _formSpecCtx = _formSpecCv.getContext("2d");
+        _formSpecImg = _formSpecCtx.createImageData(SHAPE.W, SHAPE.H);
+    }
+
+    function paintLightCatches(ctx) {
+        const clay = SHAPE.clay;
+        if (!clay || !clay.length) return;
+        const mat  = currentClay();
+        const maps = formMaps(mat, _galleryLighting);
+        const R    = formRadiusTable();
+        formBuffers();
+
+        const mulD = _formMulImg.data, specD = _formSpecImg.data;
+        mulD.fill(0); specD.fill(0);   /* alpha 0 outside the pot: multiply
+                                          and lighter both leave the
+                                          destination untouched there */
+
+        const cx = SHAPE.centerX, W = SHAPE.W, N = clay.length;
+        const rimY  = Math.max(0, Math.round(clay[N - 1].y));
+        const footY = Math.min(SHAPE.H - 1, Math.round(clay[0].y));
+        const US = (FORM_U - 1) * 0.5;
+        const SL = formSlopeTable(R, rimY, footY);
+
+        for (let y = rimY; y <= footY; y++) {
+            const r = R[y];
+            if (!(r > 0.5)) continue;
+            let slope = SL[y];
+            if (slope >  FORM_SLOPE_MAX) slope =  FORM_SLOPE_MAX;
+            if (slope < -FORM_SLOPE_MAX) slope = -FORM_SLOPE_MAX;
+            const row = (((slope + FORM_SLOPE_MAX) / (2 * FORM_SLOPE_MAX) *
+                          (FORM_S - 1) + 0.5) | 0) * FORM_U * 4;
+            const invR = 1 / r;
+            const x0 = Math.max(0, Math.ceil(cx - r));
+            const x1 = Math.min(W - 1, Math.floor(cx + r));
+            let o = (y * W + x0) * 4;
+            for (let x = x0; x <= x1; x++, o += 4) {
+                let ux = (((x - cx) * invR + 1) * US + 0.5) | 0;
+                if (ux < 0) ux = 0;
+                else if (ux > FORM_U - 1) ux = FORM_U - 1;
+                const s = row + ux * 4;
+                mulD[o]      = maps.mul[s];
+                mulD[o + 1]  = maps.mul[s + 1];
+                mulD[o + 2]  = maps.mul[s + 2];
+                mulD[o + 3]  = 255;
+                specD[o]     = maps.spec[s];
+                specD[o + 1] = maps.spec[s + 1];
+                specD[o + 2] = maps.spec[s + 2];
+                specD[o + 3] = 255;
+            }
+        }
+        _formMulCtx.putImageData(_formMulImg, 0, 0);
+        _formSpecCtx.putImageData(_formSpecImg, 0, 0);
 
         ctx.save();
         buildPotPath(ctx);
         ctx.clip();
+        ctx.globalCompositeOperation = "multiply";
+        ctx.drawImage(_formMulCv, 0, 0, SHAPE.W, SHAPE.H);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.drawImage(_formSpecCv, 0, 0, SHAPE.W, SHAPE.H);
+        ctx.globalCompositeOperation = "source-over";
 
+        /* Gallery keeps its overhead spotlight — brightest at the
+           shoulder, falling off downward, so a saved pot still reads as
+           lit from the display case's lamp above. It's a purely vertical
+           term, so unlike the old horizontal sheen it was never part of
+           the flat-shading problem and carries over unchanged. */
         if (_galleryLighting) {
-            /* ---- DISPLAY-CASE light ---- */
-            /* Key sheen — pushed further left + a touch hotter so
-               the form reads sculpted from the side. */
-            const sheenX = cx - maxR * 0.34;
-            const sheenW = maxR * 0.52;
-            const sheen  = ctx.createLinearGradient(
-                sheenX - sheenW, 0, sheenX + sheenW, 0);
-            sheen.addColorStop(0.00, hlEdge);
-            sheen.addColorStop(0.50, tint(0.26));
-            sheen.addColorStop(1.00, hlEdge);
-            ctx.fillStyle = sheen;
-            ctx.fillRect(sheenX - sheenW, topY, sheenW * 2, colH);
-
-            /* Bright key-side rim — traces the LEFT silhouette
-               edge, the classic product-shot separator. */
-            const rimL = ctx.createLinearGradient(
-                cx - maxR - 4, 0, cx - maxR + 26, 0);
-            rimL.addColorStop(0.00, tint(0.30));
-            rimL.addColorStop(1.00, hlEdge);
-            ctx.fillStyle = rimL;
-            ctx.fillRect(cx - maxR - 4, topY, 30, colH);
-
-            /* Soft fill rim — far RIGHT edge, dimmer, so the
-               shadow side doesn't vanish into the backdrop. */
-            const rimR = ctx.createLinearGradient(
-                cx + maxR - 22, 0, cx + maxR + 4, 0);
-            rimR.addColorStop(0.00, hlEdge);
-            rimR.addColorStop(1.00, tint(0.14));
-            ctx.fillStyle = rimR;
-            ctx.fillRect(cx + maxR - 22, topY, 26, colH);
-
-            /* Top spotlight — agrees with the CSS niche's overhead
-               glow: brightest at the pot's shoulder, falling off
-               downward so each pot reads as lit from the display
-               case's spotlight above. */
-            const spotH = colH * 0.66;
+            const hl2 = currentClay().highlight;
+            const tint2 = function (a) {
+                return hl2.replace(/[\d.]+\)\s*$/, a.toFixed(3) + ")");
+            };
+            let wide = 0;
+            for (let i = 0; i < N; i++) {
+                if (clay[i].radius > wide) wide = clay[i].radius;
+            }
+            const topY = clay[N - 1].y - 4;
+            const spotH = (SHAPE.baseY - clay[N - 1].y + 14) * 0.66;
             const spot = ctx.createLinearGradient(0, topY, 0, topY + spotH);
-            spot.addColorStop(0.00, tint(0.24));
-            spot.addColorStop(0.55, tint(0.07));
-            spot.addColorStop(1.00, hlEdge);
+            spot.addColorStop(0.00, tint2(0.24));
+            spot.addColorStop(0.55, tint2(0.07));
+            spot.addColorStop(1.00, hl2.replace(/[\d.]+\)\s*$/, "0)"));
             ctx.fillStyle = spot;
-            ctx.fillRect(cx - maxR, topY, maxR * 2, spotH);
-        } else {
-            /* ---- Normal mid-distance studio light ---- */
-            /* Specular sheen */
-            const sheenX = cx - maxR * 0.20;
-            const sheenW = maxR * 0.55;
-            const sheen  = ctx.createLinearGradient(
-                sheenX - sheenW, 0, sheenX + sheenW, 0);
-            sheen.addColorStop(0.00, hlEdge);
-            sheen.addColorStop(0.50, tint(0.18));
-            sheen.addColorStop(1.00, hlEdge);
-            ctx.fillStyle = sheen;
-            ctx.fillRect(sheenX - sheenW, topY, sheenW * 2, colH);
-
-            /* Rim light */
-            const rimRight = cx + maxR * 0.95;
-            const rim = ctx.createLinearGradient(
-                rimRight - 30, 0, rimRight + 4, 0);
-            rim.addColorStop(0.00, hlEdge);
-            rim.addColorStop(1.00, tint(0.06));
-            ctx.fillStyle = rim;
-            ctx.fillRect(rimRight - 30, topY, 34, colH);
+            ctx.fillRect(cx - wide, topY, wide * 2, spotH);
         }
-
         ctx.restore();
     }
 
@@ -6478,6 +6704,24 @@
                  span: Math.max(1, footY - rimY) };
     }
 
+    /* Pot radius at a logical y, interpolated between clay samples.
+       clay[0] is the base (largest y), clay[N-1] the rim (smallest). */
+    function radiusAtY(y) {
+        const clay = SHAPE.clay;
+        if (!clay) return 0;
+        const N = clay.length;
+        if (y >= clay[0].y)     return clay[0].radius;
+        if (y <= clay[N - 1].y) return clay[N - 1].radius;
+        for (let i = 0; i < N - 1; i++) {
+            const a = clay[i], b = clay[i + 1];   /* a.y > b.y */
+            if (y <= a.y && y >= b.y) {
+                const f = (a.y - y) / ((a.y - b.y) || 1);
+                return a.radius + (b.radius - a.radius) * f;
+            }
+        }
+        return clay[N - 1].radius;
+    }
+
     /* Deterministic drip tendrils hanging below a dip's line. */
     function makeDrips(seed, amount) {
         if (!amount) return [];
@@ -6565,9 +6809,17 @@
                 ctx.fillStyle = "rgba(" + rgb[0] + "," + rgb[1] + "," +
                                 rgb[2] + ",0.86)";
                 const drips = makeDrips(coats[c].seed, coats[c].drips);
+                /* Spread drips across the POT's width at the dip line, not
+                   across the whole 400px canvas. Spreading over SHAPE.W put
+                   most runs outside the silhouette, where the clip threw
+                   them away — with FEW's 2-3 drips that regularly left a
+                   dip with no visible drips at all. 0.82 keeps the bead off
+                   the very edge, where a run would read as the outline
+                   rather than as glaze on the face. */
+                const rLine = Math.max(1, radiusAtY(coats[c].lineY) * 0.82);
                 for (let k = 0; k < drips.length; k++) {
                     const dr = drips[k];
-                    const x = dr.x * SHAPE.W;
+                    const x = SHAPE.centerX + (dr.x * 2 - 1) * rLine;
                     const y0 = coats[c].lineY;
                     const y1 = Math.min(g.footY, y0 + dr.len * g.span);
                     ctx.beginPath();

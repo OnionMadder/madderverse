@@ -1058,11 +1058,18 @@ a:focus-visible {
     box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.45);
     width: 100%;
     max-width: 420px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: var(--teal-low) transparent;
-    -webkit-overflow-scrolling: touch;
+    /* WRAP, don't scroll. These rows carry the starter shapes, the drip
+       amounts and the gradient pours — a chip that scrolls off the right
+       edge is one a kid never finds, because touch scrollbars stay
+       invisible until you're already scrolling. At 1280px the shape row
+       was 681px of chips in a 358px box, hiding BOTTLE/JAR/EGG/POT, and
+       the pour row hid EMBER outright. Wrapping shows every option at
+       every width. overflow must be visible on BOTH axes or the wrapped
+       rows get clipped — a non-visible overflow-x forces overflow-y to
+       compute to auto. */
+    flex-wrap: wrap;
+    row-gap: 6px;
+    overflow: visible;
 }
 
 .chip-picker::-webkit-scrollbar       { height: 6px; }
