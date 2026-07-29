@@ -1566,7 +1566,10 @@ body.tool-armed #scene:active { cursor: crosshair; }
 .glaze-pack-tabs, .dip-pack-tabs {
     display: flex;
     justify-content: center;
-    gap: 4px;
+    /* Row gap 8px (column stays 4): these wrap to two rows, and at a 4px row
+       gap the rows sit only 24px apart — no room to give a 20px tab a hit
+       area without it stealing from the row above. Same fix as .bg-tabs. */
+    gap: 8px 4px;
     margin-bottom: 2px;
     flex-wrap: wrap;
     pointer-events: auto;
@@ -2594,3 +2597,76 @@ body.display-mode #coach { display: none !important; }
 .collection-option.is-current { border-color: var(--pill-active-bg, rgba(201, 138, 100, 0.9)); }
 .collection-new { border-style: dashed; color: var(--ink-dim); }
 .collection-remove { color: #d98a86; }
+
+/* ---- Decorate tray touch targets --------------------------------
+   Same technique as the landing (see .landing-link::before): grow the
+   TOUCHABLE area with a pseudo-element so nothing moves and the tray keeps
+   fitting over the pot. Two of these were below the 24px WCAG 2.5.8
+   minimum outright — the glaze and dip pack tabs at 20px.
+
+   Every height here is capped to the measured pitch of its row, NOT pushed
+   to a flat 44. When a hit box exceeds the pitch, the element later in DOM
+   order silently swallows the overlap and taps fire the wrong control —
+   that shipped once already on .bg-tab in v202. Horizontal expansion is
+   mostly skipped: gaps in this tray are only 4-8px.
+
+   .deco-tool / .deco-act (42px and 38px) are already fine and left alone. */
+.deco-swatch,
+.deco-variant,
+.deco-tab,
+.deco-size,
+.glaze-btn,
+.dip-chip,
+.glaze-pack-tab,
+.dip-pack-tab { position: relative; }
+
+.deco-swatch::before,
+.deco-variant::before,
+.deco-tab::before,
+.deco-size::before,
+.glaze-btn::before,
+.dip-chip::before,
+.glaze-pack-tab::before,
+.dip-pack-tab::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    /* Invisible hit area only — never paints. */
+}
+/* Colour swatches sit in a single row with 6px between them: take the gap
+   horizontally, and grow vertically into the padding around the row. */
+.deco-swatch::before { width: calc(100% + 6px); height: 36px; }
+/* Single rows with 6px gaps. */
+.deco-variant::before { width: calc(100% + 6px); height: 36px; }
+.deco-tab::before     { width: calc(100% + 6px); height: 38px; }
+.deco-size::before    { width: calc(100% + 6px); height: 40px; }
+.glaze-btn::before    { width: calc(100% + 6px); height: 40px; }
+.dip-chip::before     { width: calc(100% + 8px); height: 34px; }
+/* Pack tabs wrap to two rows pitched 28px apart (8px row gap above), so
+   28px is the ceiling — anything more steals from the row above. */
+.glaze-pack-tab::before,
+.dip-pack-tab::before { width: calc(100% + 4px); height: 28px; }
+
+/* ---- "There's more this way" -------------------------------------
+   Tray rows that scroll horizontally get a soft fade on whichever edge
+   still has content past it. Without this, a 375px phone showed 3 of the 7
+   motif packs with nothing hinting the rest existed — the content is the
+   product here, so hiding it behind an invisible swipe is expensive.
+   Classes are set from main.js syncScrollHints(); the mask is only applied
+   on the edge that can actually still travel, so it disappears at the end
+   of a scroll rather than implying there's forever more. */
+.has-more-right {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
+            mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent 100%);
+}
+.has-more-left {
+    -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 26px), transparent 100%);
+            mask-image: linear-gradient(to left, #000 calc(100% - 26px), transparent 100%);
+}
+.has-more-left.has-more-right {
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
+}

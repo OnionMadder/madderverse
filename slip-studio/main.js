@@ -1684,6 +1684,14 @@ function init() {
     resize();
     window.addEventListener("resize", resize, { passive: true });
     document.addEventListener("keydown", onDialogEscape);
+    // 'scroll' doesn't bubble but it does capture, so one listener covers
+    // every tray row without wiring each one as it's rebuilt.
+    document.addEventListener("scroll", (ev) => {
+        const t = ev.target;
+        if (t && t.matches && t.matches(SCROLL_HINT_SEL)) syncScrollHints();
+    }, true);
+    window.addEventListener("resize", syncScrollHints, { passive: true });
+    watchTrayForScrollHints();
     bindSculpt(canvas);
 
     const advanceBtn = document.getElementById("advanceBtn");
@@ -1918,6 +1926,7 @@ function init() {
             getReduceMotion: () => reduceMotion,
             setReduceMotion: (on) => { reduceMotion = !!on; },
             spinTargetFor, firingDuration: () => (reduceMotion ? REDUCED_FIRING_DURATION : FIRING_DURATION),
+            syncScrollHints, scheduleScrollHints,
             pushShapeHistory, undoShape, resetShapeHistory,
             shapeHistoryDepth: () => shapeHistory.length,
             bumpDab, resetBumpLayer,
@@ -5312,6 +5321,53 @@ function updateVariantRow() {
     });
 }
 
+// --- Scroll affordance in the decorate tray ---------------------
+// Several tray rows scroll horizontally once their content is wider than
+// the screen. On a 375px phone that hid 4 of the 7 motif packs and the
+// "Full colour" toggle behind a swipe with nothing on screen suggesting
+// they existed — a real problem when the selling point is how much is in
+// the box. Mark which direction each row can still travel so CSS can fade
+// that edge (see .has-more-left / .has-more-right).
+const SCROLL_HINT_SEL = "#motifPackTabs, #decoOptions, #decoSub, .glaze-pack-tabs, .dip-pack-tabs";
+// Callers rebuild these rows and then ask for a re-measure in the same
+// tick, at which point the row can still read as zero-overflow (the tabs
+// and thumbs aren't laid out yet). Measuring again on the next task picks
+// up the settled width. Deliberately setTimeout and not rAF: rAF is paused
+// when the page is hidden, which would leave the fade stale on a tab the
+// user comes back to (and makes this untestable in the preview pane).
+let scrollHintTimer = 0;
+function scheduleScrollHints() {
+    clearTimeout(scrollHintTimer);
+    scrollHintTimer = setTimeout(() => {
+        syncScrollHints();
+        // Thumbnails can still be decoding when a row is first built, which
+        // changes its width after the fact. One trailing pass settles it
+        // without polling.
+        setTimeout(syncScrollHints, 220);
+    }, 0);
+}
+// Watching the tray for rebuilds beats calling this from each build site:
+// the rows are populated by several functions and not always within the
+// tick that triggered them, so call-site timing was unreliable — the fade
+// simply never appeared. childList only, NOT attributes: syncScrollHints
+// toggles classes inside this subtree and would otherwise retrigger itself.
+function watchTrayForScrollHints() {
+    const stack = document.getElementById("decoStack");
+    if (!stack || typeof MutationObserver !== "function") return;
+    new MutationObserver(scheduleScrollHints)
+        .observe(stack, { childList: true, subtree: true });
+}
+function syncScrollHints() {
+    document.querySelectorAll(SCROLL_HINT_SEL).forEach((el) => {
+        const more = el.scrollWidth - el.clientWidth;
+        const at = el.scrollLeft;
+        // 2px slack: sub-pixel layout leaves a ~1px residue that would
+        // otherwise leave the fade showing at the very end of a scroll.
+        el.classList.toggle("has-more-right", more > 2 && at < more - 2);
+        el.classList.toggle("has-more-left",  more > 2 && at > 2);
+    });
+}
+
 // Desktop-only affordance: the canvas reads as grab/grabbing (you can turn
 // the pot) until something is armed that makes a press mark the pot
 // instead — then it's a crosshair. Touch devices have no cursor, so this
@@ -5348,6 +5404,7 @@ function setDecoTab(name) {
     if (tG) { tG.classList.toggle("is-active", glaze); tG.setAttribute("aria-selected", glaze ? "true" : "false"); }
     if (tD) { tD.classList.toggle("is-active", !glaze); tD.setAttribute("aria-selected", !glaze ? "true" : "false"); }
     syncSceneCursor();
+    scheduleScrollHints();   // the freshly-shown panel's rows may overflow
 }
 
 // Pick which stamp shape to place.
@@ -5502,6 +5559,8 @@ function updateDecoSub() {
         sub.hidden = true;
         sub.innerHTML = "";
     }
+    // Rows were just rebuilt — re-measure what can still scroll.
+    scheduleScrollHints();
 }
 
 // Pick a brush size (S/M/L).
