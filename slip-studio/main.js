@@ -4452,6 +4452,10 @@ function advanceStage() {
     switch (state.clayState) {
         case "wet":
             setPhase("leather"); // firms to leather-hard, ready to decorate
+            // The form is committed here, so the throwing history is spent:
+            // at leather the same ring records trims only. This also keeps
+            // undo from restoring a wet heightScale after height has locked.
+            resetShapeHistory();
             // Tandem shaping: if the user made a partner at wet, advance
             // it alongside so both pieces ride the clay arc together
             // instead of having to be dried independently. We only
@@ -5152,10 +5156,18 @@ function updateToolbar() {
         shorterBtn.hidden = !canHeight;
         shorterBtn.disabled = state.heightScale <= MIN_HEIGHT_SCALE + 1e-3;
     }
-    // Shaping undo rides with the wet stage — same window in which the
-    // history is being recorded. Its disabled state tracks the ring depth.
+    // Geometry undo shows wherever geometry can still change: throwing at
+    // wet, trimming the foot at leather. It's deliberately separate from the
+    // deco tray's own Undo — so leather carries two Undo buttons for now,
+    // which is the known cost of covering trim until the tray layout pass
+    // decides who owns it. Labels differ so they're tellable apart.
     const shapeUndoBtn = document.getElementById("shapeUndo");
-    if (shapeUndoBtn) shapeUndoBtn.hidden = cs !== "wet";
+    if (shapeUndoBtn) {
+        shapeUndoBtn.hidden = !(cs === "wet" || cs === "leather");
+        const what = cs === "leather" ? "trim" : "shaping";
+        shapeUndoBtn.setAttribute("aria-label", "Undo last " + what);
+        shapeUndoBtn.setAttribute("title", "Undo the last " + what);
+    }
     updateShapeUndoBtn();
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
@@ -6197,6 +6209,7 @@ function onPointerDown(ev) {
                     && Math.abs(p.r - radiusAt(p.y)) <= GRAB_TOL;
         if (inFoot) {
             sculpting = true;
+            pushShapeHistory();   // one undo step per trim drag
             trimToward(p.y, p.r);
             maybeSquelch();
             ev.preventDefault();
