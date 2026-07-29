@@ -370,7 +370,16 @@ body.tool-armed #scene:active { cursor: crosshair; }
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* `safe center` centres when there's room but falls back to flex-start
+       when the content is taller than the screen. Plain `center` overflows
+       equally off BOTH ends, and the part above the top edge can't be
+       scrolled to at all — on a 360x640 phone that put "How to play" and the
+       app link out of reach entirely. Browsers that don't know `safe` ignore
+       the second declaration and keep the first. */
     justify-content: center;
+    justify-content: safe center;
+    overflow-y: auto;                /* last-resort scroll on very short screens */
+    -webkit-overflow-scrolling: touch;
     gap: 12px;
     padding: 24px;
     /* Translucent scrim so the chosen backdrop previews behind the title. */
@@ -848,6 +857,46 @@ body.tool-armed #scene:active { cursor: crosshair; }
     transition: color 0.2s ease, border-color 0.2s ease;
 }
 .music-toggle.is-on { color: var(--ink); border-color: var(--ink-dim); }
+
+/* Short screens — landing fit.
+   The landing stacks title + tagline + 11 starter shapes + backdrop picker +
+   sound toggles + Begin + four links, running ~726px tall. That fits an
+   812px iPhone with 13px to spare and overflows nearly everything else
+   (375x667 was cut 59px, 360x640 cut 73px, with the top clipped too and no
+   way to scroll). `safe center` + overflow-y on .landing stop anything being
+   unreachable; this tightens the vertical rhythm so ordinary phones don't
+   have to scroll a title screen at all.
+   The 820px threshold is measured, not guessed: the roomy layout needs
+   ~810px of height, so every phone-sized viewport takes the compact one and
+   only tablets/desktop keep the original. An earlier 730px cut-off let a
+   412x732 Pixel fall through to the roomy layout and overflow by 77px.
+   MUST stay after .shape-swatch / .bg-picker / .music-toggle: these are
+   single-class selectors matching their base rules' specificity, so they
+   only win by coming later in the file. */
+@media (max-height: 820px) {
+    .landing { gap: 8px; padding: 14px; }
+    .landing-title { font-size: 2.1rem; }
+    .landing-tag { margin: 0 0 16px; }
+    /* The 320px cap forces 11 swatches into 4 rows (187px) when the screen
+       has 347px to give. Letting it use the full width packs the same
+       swatches into fewer rows — by far the biggest saving on this screen. */
+    .shape-picker { gap: 8px; margin-bottom: 6px; max-width: none; width: 100%; }
+    /* 46px keeps SIX swatches on a row down to a 360px screen (6x48 + 5x8 =
+       328 <= 332 available), which is what holds the 11 shapes to two rows.
+       At 50px a 360px phone drops to five per row and the extra row alone
+       overflowed the screen. */
+    .shape-swatch { width: 46px; height: 53px; }
+    .bg-picker { margin-bottom: 2px; }
+    .landing-app-link { margin-top: 8px; }
+}
+/* Shorter again (landscape phones, tablets in split view): drop the tagline
+   and tighten further — reaching Begin matters more than the mood line. */
+@media (max-height: 620px) {
+    .landing-tag { display: none; }
+    .landing-title { font-size: 1.8rem; }
+    .shape-swatch { width: 46px; height: 52px; }
+    .bg-picker { display: none; }   /* backdrop is changeable in-studio too */
+}
 
 /* Back-to-title button (top-left, beside home) */
 .title-btn {
