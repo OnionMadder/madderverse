@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=193" />
+    <link rel="stylesheet" href="style.css?v=196" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -337,6 +337,12 @@
             <button id="shorterBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Push pot shorter" title="Push pot shorter">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-shorter"/></svg>
             </button>
+            <!-- Undo the last shaping action. Wet stage only — Decorate has
+                 its own undo in the deco tray, and the two histories are
+                 deliberately separate (different surfaces, different stages). -->
+            <button id="shapeUndo" class="tool-btn tool-btn-icon" type="button" hidden disabled aria-label="Undo last shaping" title="Undo the last shaping">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-undo"/></svg>
+            </button>
             <button id="swapBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Switch to pot" title="Switch to pot">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-pot"/></svg>
             </button>
@@ -458,7 +464,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=193"></script>
+    <script type="module" src="main.js?v=196"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

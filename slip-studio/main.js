@@ -1475,6 +1475,67 @@ function clearDisplace() {
     displace.fill(0);
     displaceActive = false;
 }
+// --- Sculpt history (wet-stage undo) ----------------------------
+// Decorate has had bounded undo since v128; the wet stage had none, so a
+// mis-pull on a nearly-finished form was unrecoverable — in the stage that
+// asks for the most commitment. This snapshots the GEOMETRY subset only
+// (the wet stage doesn't touch glaze or decoration), which is the same set
+// capturePieceState persists, so it's known to round-trip.
+//
+// Cost: a round pot is ~640 bytes a snapshot (profile alone). `displace`
+// is ~81 KB, so it's stored only when altering is actually live — most
+// pots never pay it, and a full 10-deep ring of altered states is <1 MB.
+const SHAPE_HISTORY_MAX = 10;
+let shapeHistory = [];
+function snapShapeState() {
+    return {
+        profile: Float32Array.from(profile),
+        displace: displaceActive ? Float32Array.from(displace) : null,
+        facetCount: state.facetCount,
+        rimScallop: state.rimScallop,
+        rimStyle: state.rimStyle,
+        heightScale: state.heightScale,
+        lidMaxY: state.lidMaxY,
+    };
+}
+// Call BEFORE a mutation, once per user action — at the START of a drag,
+// not per move, so one stroke is one undo step (same rule as the deco
+// history). Discrete taps (facets, scallop, rim style, height nudges)
+// each push their own.
+function pushShapeHistory() {
+    shapeHistory.push(snapShapeState());
+    if (shapeHistory.length > SHAPE_HISTORY_MAX) shapeHistory.shift();
+    updateShapeUndoBtn();
+}
+function undoShape() {
+    const snap = shapeHistory.pop();
+    if (!snap) return;
+    for (let i = 0; i < snap.profile.length; i++) profile[i] = snap.profile[i];
+    setDisplaceField(snap.displace);   // null → clears back to round
+    state.facetCount = snap.facetCount || 0;
+    state.rimScallop = snap.rimScallop || 0;
+    state.rimStyle = snap.rimStyle || "cut";
+    state.lidMaxY = snap.lidMaxY;
+    // Height lives on the group transform, not the profile, so it has to be
+    // pushed back through the setter to move the mesh and the partner lid.
+    if (Math.abs((snap.heightScale ?? 1) - state.heightScale) > 1e-4) {
+        setHeightScale(snap.heightScale ?? 1);
+    }
+    profileDirty = true;               // tick() rewrites the geometry
+    if (state.pot) writeProfileToGeometry(state.pot.geometry);
+    updateFacetBtn();
+    updateScallopBtn();
+    updateRimStylePicker();
+    state.dirty = true;
+    updateShapeUndoBtn();
+    haptic(10);
+}
+function resetShapeHistory() { shapeHistory = []; updateShapeUndoBtn(); }
+function updateShapeUndoBtn() {
+    const b = document.getElementById("shapeUndo");
+    if (b) b.disabled = shapeHistory.length === 0;
+}
+
 // Keep the wrap seam watertight: column COLS duplicates column 0, so any
 // write to one must mirror to the other or a crack opens at the seam.
 function mirrorDisplaceSeam() {
@@ -1699,6 +1760,7 @@ function init() {
     });
     document.getElementById("tallerBtn")?.addEventListener("click", () => nudgeHeight(+HEIGHT_STEP));
     document.getElementById("shorterBtn")?.addEventListener("click", () => nudgeHeight(-HEIGHT_STEP));
+    document.getElementById("shapeUndo")?.addEventListener("click", undoShape);
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
     document.getElementById("galleryRecipes")?.addEventListener("click", openRecipes);
@@ -1856,6 +1918,8 @@ function init() {
             getReduceMotion: () => reduceMotion,
             setReduceMotion: (on) => { reduceMotion = !!on; },
             spinTargetFor, firingDuration: () => (reduceMotion ? REDUCED_FIRING_DURATION : FIRING_DURATION),
+            pushShapeHistory, undoShape, resetShapeHistory,
+            shapeHistoryDepth: () => shapeHistory.length,
             bumpDab, resetBumpLayer,
             playSfx, stopSfx,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
@@ -3424,6 +3488,9 @@ function setHeightScale(scale) {
 }
 function nudgeHeight(delta) {
     if (state.clayState !== "wet") return; // height locks at leather+
+    // Push only from the BUTTON path: setHeightScale is also called every
+    // frame of a rim-pull drag, which already snapshotted at stroke start.
+    pushShapeHistory();
     setHeightScale(state.heightScale + delta);
 }
 // Toggle the wet-stage Alter tool. On = the wheel holds still and a drag
@@ -3443,6 +3510,7 @@ function setAlterMode(on) {
 const FACET_CYCLE = [0, 6, 8, 12];
 const FACET_DEPTH = 0.07;
 function cycleFacets() {
+    pushShapeHistory();
     const i = FACET_CYCLE.indexOf(state.facetCount || 0);
     const n = FACET_CYCLE[(i + 1) % FACET_CYCLE.length];
     state.facetCount = n;
@@ -3462,6 +3530,7 @@ function updateFacetBtn() {
 const SCALLOP_CYCLE = [0, 6, 8, 12];
 function cycleScallop() {
     if (state.isLid) return;
+    pushShapeHistory();
     const i = SCALLOP_CYCLE.indexOf(state.rimScallop || 0);
     state.rimScallop = SCALLOP_CYCLE[(i + 1) % SCALLOP_CYCLE.length];
     if (state.pot) writeProfileToGeometry(state.pot.geometry);
@@ -4771,6 +4840,7 @@ function resetPot() {
     renderDips();
     clearDeco();
     resetDecoHistory(); // fresh pot → no undo carryover
+    resetShapeHistory();
     resetBumpLayer();
     // Clear the handle on reset — a fresh pot starts handle-less.
     state.handle.on = false;
@@ -5073,6 +5143,11 @@ function updateToolbar() {
         shorterBtn.hidden = !canHeight;
         shorterBtn.disabled = state.heightScale <= MIN_HEIGHT_SCALE + 1e-3;
     }
+    // Shaping undo rides with the wet stage — same window in which the
+    // history is being recorded. Its disabled state tracks the ring depth.
+    const shapeUndoBtn = document.getElementById("shapeUndo");
+    if (shapeUndoBtn) shapeUndoBtn.hidden = cs !== "wet";
+    updateShapeUndoBtn();
     if (cs === "leather") updateDecoSub();   // contextual sub-palette
 }
 
@@ -5955,6 +6030,7 @@ function onPointerDown(ev) {
                 return;
             }
             sculpting = true;
+            pushShapeHistory();   // one undo step per stroke, not per move
             wetStroke = { intent: "alter" };
             const pa = pointerToProfile(ev);
             if (pa) { alterToward(uv.x, uv.y, pa.r); maybeSquelch(); }
@@ -5974,6 +6050,7 @@ function onPointerDown(ev) {
         // (pull up/down to raise, sideways to flare/collar — decided by the
         // first clear drag axis); the body always shapes the wall in/out.
         sculpting = true;
+        pushShapeHistory();   // one undo step per stroke, not per move
         const rimGrab = p.y >= TOP * RIM_GRAB_FRAC;
         if (rimGrab) {
             wetStroke = {
@@ -7009,6 +7086,7 @@ function capturePieceState() {
 // against the fully-restored state.
 function restorePieceState(saved) {
     resetDecoHistory(); // switching pieces replaces the deco surface
+    resetShapeHistory();   // ...and the geometry it was built on
     for (let i = 0; i < saved.profile.length; i++) profile[i] = saved.profile[i];
     setDisplaceField(saved.displace);        // restore local altering (or clear → round)
     state.facetCount = saved.facetCount || 0;
@@ -7442,6 +7520,11 @@ function makeLidPartner() {
     const rimR = profile[ROWS];
     state.savedPot = capturePieceState();
     state.isLid = true;
+    // The shaping history belongs to the POT that was just parked. Carrying
+    // it onto a brand-new lid would let one Undo tap stamp the pot's whole
+    // profile onto the lid — swapActivePiece resets via restorePieceState,
+    // but this path builds the lid from scratch and never goes through it.
+    resetShapeHistory();
     // A fresh lid is round: drop the pot's altering / facets / scallop from
     // the live state (they live on in savedPot and come back on swap).
     clearDisplace();
@@ -7464,8 +7547,12 @@ function makeLidPartner() {
 // (or the lid's own current rim if no source — fallback for testing).
 function setLidStyle(style) {
     if (!LID_STYLES[style]) return;
+    // Re-tapping the style that's already active isn't an edit — don't spend
+    // an undo slot on a reseed that produces the identical silhouette.
+    const reseeds = state.isLid && state.clayState === "wet" && style !== state.lidStyle;
     state.lidStyle = style;
-    if (state.isLid && state.clayState === "wet") {
+    if (reseeds) {
+        pushShapeHistory();   // reseeding replaces the lid silhouette — undoable
         const rimR = (state.savedPot && state.savedPot.profile) ? state.savedPot.profile[ROWS] : profile[ROWS];
         seedLidForRim(rimR, style);
         profileDirty = true;
@@ -7530,6 +7617,8 @@ function computeStyledProfile(src, rimStyle, isLid) {
 }
 function setRimStyle(style) {
     if (!(style in RIM_STYLES) || state.isLid) return;
+    if (style === state.rimStyle) return;   // re-tapping the active style isn't an edit
+    pushShapeHistory();
     state.rimStyle = style;
     profileDirty = true;
     if (state.pot) writeProfileToGeometry(state.pot.geometry);
@@ -7581,6 +7670,7 @@ function matchLidRim() {
     const oldBase = profile[1];
     if (newRim <= MIN_R || oldBase <= MIN_R) return;
     if (Math.abs(newRim - oldBase) < 1e-4) return;
+    pushShapeHistory();   // refitting rescales the whole lid — undoable
     const ratio = newRim / oldBase;
     for (let r = 0; r <= ROWS; r++) profile[r] *= ratio;
     clampProfile();
@@ -7653,6 +7743,7 @@ async function loadPot(entry, opts) {
     state.savedLid = null;
     state.dirty = false; // loaded piece reflects the gallery snapshot
     resetDecoHistory();  // a loaded pot starts with a clean undo history
+    resetShapeHistory();
 
     for (let i = 0; i < profile.length; i++) profile[i] = entry.profile?.[i] ?? 0;
     setDisplaceField(decodeDisplaceField(entry.displace)); // altering (missing = round)

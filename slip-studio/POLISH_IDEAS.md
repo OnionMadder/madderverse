@@ -1,8 +1,8 @@
 # Slip Studio — polish ideas & nice-to-haves
 
-**Rewritten 2026-07-28 against web v193.** The previous version of this file was written 2026-07-02 at v2.2 and went badly stale: by the time it was next read, most of its headline recommendations had already shipped, and one of its remaining items (trim SFX) was wrong. It was being treated as a backlog when it had become a historical document.
+**Rewritten 2026-07-28 against web v196.** The previous version of this file was written 2026-07-02 at v2.2 and went badly stale: by the time it was next read, most of its headline recommendations had already shipped, and one of its remaining items (trim SFX) was wrong. It was being treated as a backlog when it had become a historical document.
 
-This rewrite is scoped to **minor polish and nice-to-haves** — no new mechanics, no new stages, no monetization changes, no rework of the "meditative / no upsells" positioning. Every claim below was checked against the v193 source, not against the old doc.
+This rewrite is scoped to **minor polish and nice-to-haves** — no new mechanics, no new stages, no monetization changes, no rework of the "meditative / no upsells" positioning. Every claim below was checked against the v196 source, not against the old doc.
 
 **Read §0 before adding anything here.**
 
@@ -41,6 +41,9 @@ The 2026-07-02 doc's three "best wins" and nearly all of its small-effort list a
 - Named collections / shelves (v184) — covers most of what "gallery filter" was asking for.
 - Empty shelf illustrates shape → fire → save (v193).
 
+**Shaping**
+- **Wet-stage sculpting undo (v196)** — bounded 10-deep ring of the geometry subset (`profile`, `displace`, facets, scallop, rim style, height, `lidMaxY`), one step per drag, plus every discrete tap. `#shapeUndo` in the wet toolbar. Deliberately a *separate* history from Decorate's: different surfaces, different stages.
+
 **Robustness & a11y**
 - WebGL context-loss recovery (v187) — the old doc filed this as a "larger, later" item.
 - Draft autosave + "Continue this one?" on relaunch (v188), IndexedDB rather than the proposed sessionStorage.
@@ -53,13 +56,13 @@ The 2026-07-02 doc's three "best wins" and nearly all of its small-effort list a
 
 ---
 
-## 2. Still open — verified against v193
+## 2. Still open — verified against v196
 
 Ranked by return-per-effort. **S** = <1 h, **M** = 1–3 h, **L** = 3–8 h.
 
 ### Worth doing next
 
-- **Sculpting undo** [L] — Decorate has bounded undo (`decoHistory`, cap 10); the **wet stage has none** (no `sculptHistory` in the source). A mis-pull on a nearly-finished form is currently unrecoverable, and sculpting is the stage where the app asks for the most commitment. This is the largest remaining gap between "toy" and "tool". Needs a bounded snapshot ring of `profile` + `displace` + `facetCount`/`rimScallop`/`rimStyle` — all already serializable, since save/load round-trips them.
+- **Trim undo at leather** [S] — the one sliver the v196 sculpting undo deliberately left out. `trimToward` mutates `profile` at the leather stage, and Decorate's undo doesn't cover geometry, so a bad trim is still unrecoverable. The machinery already exists — it needs a `pushShapeHistory()` at the trim branch of `onPointerDown` and a decision about which Undo button owns it (the deco tray already has one at that stage; two Undo buttons on one screen would be worse than the gap).
 - **Signed-and-dated foot stamp** [M] — Not present (no `footStamp`/`signature`). A small "SS · YY.MM" impressed into the foot ring, visible from beneath or in the museum-plinth photo style. Pure analogue-craft flourish; fits the "you made a thing" ethos and costs nothing at runtime.
 - **Museum-plinth title caption** [M] — `PHOTO_STYLES` ships the plinth style, but there's no title option (no `photoTitle`/`withTitle`). An opt-in "with title" toggle drawing the pot's name in Fraunces small-caps would make the export read as a gallery card. One extra tap, nothing forced.
 
@@ -103,7 +106,7 @@ Carried forward deliberately. These encode product positioning; don't reopen wit
 
 ## 5. Content generosity — current inventory
 
-The value-for-money lane is content abundance, never engagement mechanics (see the `project_slip_value_pass` memory). Counted from the v193 source:
+The value-for-money lane is content abundance, never engagement mechanics (see the `project_slip_value_pass` memory). Counted from the v196 source:
 
 | | count |
 |---|---|
@@ -128,9 +131,9 @@ Not verified against Play Console — these are from `PLAY_STORE_LISTING.md` and
 - **Feature graphic must be exactly 1024×500.** `slip-feature.png` is 1488×720 and Play rejects it — crop/resize or recompose.
 - **Screenshot recapture.** The drafted shot list predates the sculpting overhaul, Display mode, collections and the teapot. Current screenshots undersell the build.
 - **Promo video.** 30 s landscape shot list is drafted; unshot.
-- **Release notes for the next upload.** Play is on vc13 / web v136; the staged vc16 AAB is web v180 and now trails live by v181–v193.
+- **Release notes for the next upload.** Play is on vc13 / web v136; the staged vc16 AAB is web v180 and now trails live by v181–v196.
 - **Do not raise the price** back to $2.99 until reviews accumulate.
 
 ---
 
-*Verified against `main.js` / `style.css` / `index.html` at web v193, 2026-07-28. §6 is unverified and reflects `PLAY_STORE_LISTING.md`.*
+*Verified against `main.js` / `style.css` / `index.html` at web v196, 2026-07-28. §6 is unverified and reflects `PLAY_STORE_LISTING.md`.*
