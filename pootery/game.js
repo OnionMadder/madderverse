@@ -7227,10 +7227,19 @@
     async function purchasePack(packId) {
         const P = rcPlugin();
         if (!P || !_rcReady) {
-            alert(
-                "Purchases will be available when the app launches " +
-                "on Google Play. (Billing is not active in this build.)"
-            );
+            /* Two different situations, and they used to share one line
+               that said purchases arrive "when the app launches on Google
+               Play" — stale ever since it did launch, and simply wrong for
+               the web build, where the free version is the point.
+                 no Capacitor -> this IS the web build; packs are bought in
+                                 the Android app, so say that.
+                 Capacitor but RC not ready -> the store didn't answer
+                                 (usually offline); it's worth retrying. */
+            alert(window.Capacitor
+                ? "Couldn't reach the Play Store just now. Check your " +
+                  "connection and try again."
+                : "Pack purchases happen in the Pootery app on Google Play. " +
+                  "Everything else here is free to play — no account needed.");
             return;
         }
         const entId = PACK_ENTITLEMENTS[packId];
