@@ -858,6 +858,53 @@ body.tool-armed #scene:active { cursor: crosshair; }
 }
 .music-toggle.is-on { color: var(--ink); border-color: var(--ink-dim); }
 
+/* ---- Landing touch targets -------------------------------------
+   Several of these controls are deliberately small: the title screen is
+   meant to be calm, and it has to fit a 640px-tall phone. So instead of
+   inflating them (which would undo the fit tuned above), grow the
+   TOUCHABLE area with a pseudo-element — it doesn't participate in layout,
+   so it costs zero height.
+
+   Every expansion is capped to the slack actually measured between
+   neighbours. Overlapping hit boxes are worse than small ones: in an
+   overlap the later element in DOM order silently takes the tap, so a
+   press aimed at one control fires another. `::before` throughout because
+   `.bg-swatch.is-video::after` and `.bg-tab.is-pack-locked::after` are
+   already spoken for. */
+.landing-link,
+.bg-tab,
+.bg-swatch,
+.music-toggle { position: relative; }
+
+.landing-link::before,
+.bg-tab::before,
+.bg-swatch::before,
+.music-toggle::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    /* No background — this is an invisible hit area only. */
+}
+/* Links stack at a 37px pitch (29px control + 8px gap): filling exactly
+   the pitch makes the hit zones tile edge-to-edge with no overlap. */
+.landing-link::before { left: 0; right: 0; height: 37px; }
+/* Category tabs are 22px in rows pitched 28px apart, with only 2px between
+   them horizontally — so this grows vertically only. 34px clears the 24px
+   WCAG 2.5.8 minimum that 22px was failing. */
+.bg-tab::before { left: 0; right: 0; height: 34px; }
+/* Swatches have 6-7px between them and 34px of clear space above, so a
+   little room in both directions. */
+.bg-swatch::before { left: -3px; right: -3px; height: 44px; }
+/* Sound toggles have 8px between them; above sits the backdrop row, so the
+   vertical growth stays modest. */
+.music-toggle::before { left: -4px; right: -4px; height: 40px; }
+
+/* Roomy screens have ~100px of headroom and a 41px link pitch — take it. */
+@media (min-height: 821px) {
+    .landing-link::before { height: 41px; }
+}
+
 /* Short screens — landing fit.
    The landing stacks title + tagline + 11 starter shapes + backdrop picker +
    sound toggles + Begin + four links, running ~726px tall. That fits an
