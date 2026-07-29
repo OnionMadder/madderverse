@@ -2670,3 +2670,25 @@ body.display-mode #coach { display: none !important; }
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
             mask-image: linear-gradient(to right, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
 }
+
+/* ---- Gallery card touch targets ---------------------------------
+   NOTE: the ::before hit-area trick used on the landing and the deco tray
+   does NOT work inside these cards, and it's worth recording why. The card
+   (.gallery-item) and .pot-title itself both set overflow:hidden — for
+   rounded corners and for title ellipsis — so a pseudo-element can't reach
+   outside its own box, and sibling overlays inside the card paint above it.
+   Measured: a requested 42px area came back as 27px. So these grow for
+   real instead.
+
+   Delete and Add-to-collection are position:absolute overlays in opposite
+   corners (275px apart on a 375px phone), so resizing them costs no layout
+   and there's no neighbour to steal from. */
+.gallery-del,
+.gallery-file {
+    width: 34px;
+    height: 34px;
+}
+/* Rename was 19px tall — under the 24px WCAG 2.5.8 minimum. It's in the
+   normal flow, so this is real padding: ~31px total, which the shelf card's
+   meta column has room for. Keeps overflow/ellipsis behaviour intact. */
+.pot-title { padding: 6px 0; }
