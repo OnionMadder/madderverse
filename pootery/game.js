@@ -3163,7 +3163,23 @@
         { id: "egg", label: "EGG",
           controls: [[0, 34], [0.34, 96], [0.6, 92], [0.85, 50], [1, 40]] },
         { id: "planter", label: "POT",
-          controls: [[0, 58], [0.5, 92], [1, 122]] }
+          controls: [[0, 58], [0.5, 92], [1, 122]] },
+        /* Bonus silhouettes. Every shape spans the full height (the
+           profile is sampled 0..1 across it and heightScale is a
+           separate control), so these earn their place by CURVE, not
+           by size — each does something none of the first eight does.
+           AMPHORA: narrowest foot of the set under the widest belly.
+           TULIP:   S-curve — pinches to a waist, then flares open.
+           GOURD:   two separate bulges, the only double-belly form.
+           GOBLET:  narrow lower third carrying a wide upper cup.    */
+        { id: "amphora", label: "AMPHORA",
+          controls: [[0, 26], [0.15, 56], [0.4, 100], [0.62, 72], [0.8, 36], [1, 40]] },
+        { id: "tulip", label: "TULIP",
+          controls: [[0, 40], [0.2, 70], [0.45, 58], [0.72, 88], [1, 116]] },
+        { id: "gourd", label: "GOURD",
+          controls: [[0, 44], [0.18, 88], [0.36, 62], [0.6, 104], [0.82, 54], [1, 58]] },
+        { id: "goblet", label: "GOBLET",
+          controls: [[0, 58], [0.18, 40], [0.34, 34], [0.55, 72], [0.78, 96], [1, 104]] }
     ];
 
     /* Sample a control-point profile at parameter t (0..1). Linear
