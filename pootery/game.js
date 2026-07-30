@@ -6105,6 +6105,8 @@
         },
         {
             id: "plushie", label: "PLUSH",
+            /* BLUSH — the soft pink only makes sense on a plush pack */
+            clays: ["blush"],
             packType: "builder",   /* parts build a teddy bear */
             buildSubject: "bear",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
@@ -6231,6 +6233,8 @@
            ============================================================ */
         {
             id: "dinosaur", label: "DINOSAUR",
+            /* OCHRE — fossil bone and amber */
+            clays: ["ochre"],
             packType: "builder",   /* parts build a dinosaur */
             buildSubject: "dino",
             sheet: "dinosaur",
@@ -6286,6 +6290,8 @@
         },
         {
             id: "music", label: "MUSIC",
+            /* BASALT — vinyl black */
+            clays: ["basalt"],
             packType: "crafter",
             sheet: "music",
             surfaceTextures: ["music", "music-neon", "music-vinyl"],
@@ -6318,6 +6324,8 @@
            ============================================================ */
         {
             id: "chickens", label: "CHICKENS",
+            /* MOSS — farmyard green */
+            clays: ["moss"],
             packType: "special",
             sheet: "chickens",
             surfaceTextures: ["chickens", "chickens-clay", "chickens-skin"],
@@ -6352,6 +6360,8 @@
         },
         {
             id: "aliens", label: "ALIENS",
+            /* GALAXY — deep cosmic blue */
+            clays: ["galaxy"],
             packType: "special",
             sheet: "aliens",
             surfaceTextures: ["aliens", "aliens-mars", "aliens-venus"],
@@ -6386,6 +6396,8 @@
         },
         {
             id: "moons", label: "MOONS",
+            /* SLATE — lunar grey */
+            clays: ["slate"],
             packType: "special",
             sheet: "literally-moons",   /* sheet file is hyphenated */
             surfaceTextures: ["literally-moons", "literally-moons-sponge", "literally-moons-stars"],
@@ -7838,6 +7850,33 @@
         return null;
     }
 
+    /* OOPS over a sticker deletes it.
+       The eraser only ever cut holes in the PAINT canvas, so rubbing it
+       across a stamped sticker did precisely nothing — measured 0 pixels
+       changed while the same stroke over brushwork changed 515. To a kid
+       that reads as a broken button, and stickers are already
+       first-class objects everywhere else (SCOOT picks them up and drags
+       them), so the eraser has to treat them as objects too rather than
+       as pixels it can't reach.
+
+       Uses the eraser's own radius plus the sticker's, so a sticker goes
+       when the brush actually touches it — not only when its centre is
+       caught. Returns whether anything went, so the caller can re-render
+       and fire feedback only when it did. */
+    function eraseStickersAt(p, radius) {
+        if (!D.stickers || !D.stickers.length) return false;
+        const before = D.stickers.length;
+        D.stickers = D.stickers.filter(function (s) {
+            const dx = p.x - s.x;
+            const dy = p.y - s.y;
+            const reach = (s.r || 14) + radius;
+            return (dx * dx + dy * dy) > reach * reach;
+        });
+        if (D.stickers.length === before) return false;
+        if (typeof renderStickerLayer === "function") renderStickerLayer();
+        return true;
+    }
+
     function clearPaint() {
         if (!D.paintCtx) return;
         D.paintCtx.save();
@@ -8446,6 +8485,8 @@
             ctx.beginPath();
             ctx.arc(p.x, p.y, effectiveBrushSize(), 0, Math.PI * 2);
             ctx.fill();
+            /* ...and take out any sticker under the dab. */
+            eraseStickersAt(p, effectiveBrushSize());
         } else {
             /* brush: (re)start this stroke's taper + spacing bookkeeping.
                A TAP lays a full soft dab of glaze; a stroke START
@@ -8499,6 +8540,16 @@
             ctx.lineTo(p.x, p.y);
             ctx.stroke();
             ctx.restore();
+            /* Sweep stickers along the segment, not just at its end —
+               a fast drag can step right over a sticker between two
+               samples and would otherwise skip it. */
+            const r = effectiveBrushSize();
+            const dx = p.x - last.x, dy = p.y - last.y;
+            const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / Math.max(4, r)));
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                eraseStickersAt({ x: last.x + dx * t, y: last.y + dy * t }, r);
+            }
             return;
         }
 
