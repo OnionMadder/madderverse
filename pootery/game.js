@@ -383,7 +383,14 @@
             const hasStickers = Array.isArray(entry.stickers) &&
                                 entry.stickers.length > 0;
             const hasSurface  = !!entry.surfaceTexturePackId;
-            if (!hasStickers && !hasSurface) {
+            /* Dips + the full-body wrap were missing from BOTH share
+               tiers, so a pot shared to EVERYONE (or entered in a
+               battle) arrived with its glaze stripped off — the local
+               MINE tab renders from localStorage and kept them, which
+               is why this only ever showed up on other people's pots. */
+            const hasDips    = Array.isArray(entry.dips) && entry.dips.length > 0;
+            const hasOverlay = !!entry.overlay;
+            if (!hasStickers && !hasSurface && !hasDips && !hasOverlay) {
                 /* Nothing to add — keep the existing image. */
                 return resolve(entry.paintDataUrl || null);
             }
@@ -404,6 +411,33 @@
                     ctx.fillStyle = pat;
                     ctx.fillRect(0, 0, w, h);
                     ctx.restore();
+                }
+            }
+
+            /* ---- Layers 1b/1c: dip glaze, then the wrap ----
+               Both read potGeom()/buildPotPath, which resolve against
+               the LIVE SHAPE.clay — wrong when an older gallery pot is
+               being shared, so borrow the entry's own profile for the
+               duration. Restored immediately: these two draw
+               synchronously, and the sticker pass below works in
+               absolute coordinates and doesn't need it.
+
+               Baked flat, this sits ABOVE the lighting when the remote
+               pot renders (the paint layer draws after the light pass),
+               so a shared dip reads a little flatter than the same pot
+               locally. That's the price of working with no schema
+               change; the recipe columns below restore full fidelity
+               once the migration has run. */
+            if (hasDips || hasOverlay) {
+                const savedClay = SHAPE.clay;
+                if (Array.isArray(entry.clay) && entry.clay.length) {
+                    SHAPE.clay = entry.clay;
+                }
+                try {
+                    if (hasDips) compositeDips(ctx, entry.dips);
+                    if (hasOverlay) compositeOverlay(ctx, entry.overlay);
+                } finally {
+                    SHAPE.clay = savedClay;
                 }
             }
 
@@ -499,7 +533,14 @@
             paint_data_url:          entry.paintDataUrl || null,
             surface_texture_pack_id: entry.surfaceTexturePackId || null,
             stickers: (entry.stickers && entry.stickers.length)
-                ? entry.stickers : null
+                ? entry.stickers : null,
+            /* Glaze recipe. Needs SUPABASE_POTS_V12.sql; without it
+               the insert 400s and the caller falls back to the baked
+               tier, which now carries the dip flattened into the
+               image — so the glaze shows either way, and only the
+               lighting fidelity differs. */
+            dips: (entry.dips && entry.dips.length) ? entry.dips : null,
+            overlay: entry.overlay || null
         });
 
         return rawPostPot(url, recipe).then(function (row) {
@@ -1199,7 +1240,14 @@
             paint_data_url:          entry.paintDataUrl || null,
             surface_texture_pack_id: entry.surfaceTexturePackId || null,
             stickers: (entry.stickers && entry.stickers.length)
-                ? entry.stickers : null
+                ? entry.stickers : null,
+            /* Glaze recipe. Needs SUPABASE_POTS_V12.sql; without it
+               the insert 400s and the caller falls back to the baked
+               tier, which now carries the dip flattened into the
+               image — so the glaze shows either way, and only the
+               lighting fidelity differs. */
+            dips: (entry.dips && entry.dips.length) ? entry.dips : null,
+            overlay: entry.overlay || null
         });
 
         return rawPostPot(url, recipe).then(function (row) {
@@ -10801,6 +10849,12 @@
             fired:        !!row.fired,
             overfired:    !!row.overfired,
             exploded:     !!row.exploded,
+            /* Present only once SUPABASE_POTS_V12.sql has run. Absent
+               on older rows and on anything stored via the baked tier,
+               where the glaze already lives inside paint_data_url —
+               so defaulting to empty is correct, never a double-draw. */
+            dips:         Array.isArray(row.dips) ? row.dips : [],
+            overlay:      row.overlay || null,
             name:         row.name || "",
             author:       row.author || "anonymous",
             userId:       row.user_id || null,
