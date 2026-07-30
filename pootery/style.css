@@ -6026,8 +6026,17 @@ html.is-native .madder-home {
 }
 
 .clay-lump-prompt {
-    align-self: center;
-    flex: 0 0 auto;
+    /* Own row, ALWAYS. Sharing the lumps' row made the layout depend on
+       how long the caption happened to be: "PLOP A LUMP →" is 144px and
+       "SWAP CLAY →" is 121px, and with three lumps the row needed
+       exactly the 360px available — so the pre-plop caption tipped
+       STONE onto a second line and the whole rail jumped the moment you
+       dropped a lump. On its own row the lumps get the full width (three
+       use 202px of 360), so the tray looks identical before and after,
+       and it still holds a fourth and fifth clay once packs grant them
+       without re-introducing the jump. */
+    flex: 0 0 100%;
+    text-align: center;
     font-family: var(--font-mono);
     font-size: 10px;
     letter-spacing: 1.4px;
