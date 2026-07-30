@@ -2380,6 +2380,71 @@
             firedTint: "rgba(90, 60, 200, 0.30)",
             outline:   "#02030a",
             highlight: "rgba(185, 205, 255, 0.55)"
+        },
+        /* ============================================================
+           BONUS CLAY BODIES. Free, ungated, appended so the original
+           five keep their positions in the tray.
+
+           `bonus: true` keeps them OUT of the MATERIAL MASTER
+           achievement's requirement — that counts base clays
+           dynamically, so without this flag adding four bodies would
+           quietly turn "fire a pot with every base clay (5)" into a
+           nine-clay grind still labelled 5. Adding content must never
+           inflate a completion requirement.
+
+           These fill the gaps in the existing palette rather than
+           crowding it: EARTH is red, STONE a warm grey, and nothing
+           was gold, blue-grey, pink or green. Worth having now that
+           the form pass shades by local radius — a clay body finally
+           reads as its own material instead of the same gradient in a
+           different hue.                                            */
+        {
+            id: "ochre",
+            label: "OCHRE",
+            flavor: "Golden earth. Fancy without trying.",
+            unfired: ["#2e1e05", "#5c3d0d", "#a87b1e", "#c69a2e",
+                      "#7d5714", "#2e1e05"],
+            swatch: "#a87b1e",
+            firedTint: "rgba(200, 150, 40, 0.22)",
+            outline:   "#1d1203",
+            highlight: "rgba(255, 240, 190, 0.36)",
+            bonus: true
+        },
+        {
+            id: "slate",
+            label: "SLATE",
+            flavor: "Cool blue-grey. Very architect.",
+            unfired: ["#12181c", "#2c3a44", "#56707e", "#647f8d",
+                      "#3a4c58", "#12181c"],
+            swatch: "#56707e",
+            firedTint: "rgba(90, 120, 140, 0.20)",
+            outline:   "#0c1114",
+            highlight: "rgba(225, 240, 255, 0.38)",
+            bonus: true
+        },
+        {
+            id: "blush",
+            label: "BLUSH",
+            flavor: "Soft pink clay. Yes, really.",
+            unfired: ["#33141a", "#6b2f3a", "#c07f88", "#d4959c",
+                      "#8d4a55", "#33141a"],
+            swatch: "#c07f88",
+            firedTint: "rgba(215, 130, 145, 0.20)",
+            outline:   "#240d12",
+            highlight: "rgba(255, 230, 235, 0.40)",
+            bonus: true
+        },
+        {
+            id: "moss",
+            label: "MOSS",
+            flavor: "Green clay. Smells like a forest.",
+            unfired: ["#131c10", "#2c3f26", "#5b7a4c", "#6b8c59",
+                      "#3d5434", "#131c10"],
+            swatch: "#5b7a4c",
+            firedTint: "rgba(110, 150, 80, 0.20)",
+            outline:   "#0d140b",
+            highlight: "rgba(235, 250, 215, 0.34)",
+            bonus: true
         }
     ];
 
@@ -14385,9 +14450,14 @@
             icon: "◆",
             check: function (s) {
                 /* Don't count VOID toward the requirement — it's
-                   the reward, not the prerequisite. */
+                   the reward, not the prerequisite. Bonus bodies
+                   (OCHRE/SLATE/BLUSH/MOSS) are excluded too: this
+                   count is dynamic, so without the flag every clay
+                   added later would silently raise the bar while the
+                   description still promised five. New content should
+                   never make an existing achievement harder. */
                 const baseCount = CLAY_TYPES.filter(function (c) {
-                    return !c.unlockedBy;
+                    return !c.unlockedBy && !c.bonus;
                 }).length;
                 return s.clayTypes.size >= baseCount;
             }
