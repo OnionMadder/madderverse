@@ -130,10 +130,12 @@ Still no ads. Still no IAP. Still no internet needed.
 
 (Future "What's new" blocks should stay short — one screen of text, not a changelog.)
 
-## What's new  (v2.5.0 / vc14 — THIS RELEASE, paste into Play Console "What's new")
+## What's new  (v2.5.0 / vc14 — DRAFTED BUT NEVER SHIPPED, for history)
 
-Bundles everything from web v137 → v168 (vc13 was web v136). Kept under Play's
-500-char release-notes limit.
+⚠ vc14 was built but never uploaded, and vc15/vc16 followed the same way. The
+Play track is still on **vc13 (web v136)**, so the live release notes never
+mentioned any of this. It's superseded by the v2.7.0 block below, which covers
+the whole span in one go — don't paste this one.
 
 ```
 Slip Studio v2.5 — glaze chemistry, wax resist, and a gallery for your pots.
@@ -147,6 +149,32 @@ Slip Studio v2.5 — glaze chemistry, wax resist, and a gallery for your pots.
 
 Still ad-free. No purchases. No internet needed.
 ```
+
+## What's new  (v2.7.0 / vc17 — THIS RELEASE, paste into Play Console "What's new")
+
+Covers web **v137 → v214** in one upload — everything since the live vc13 (web
+v136), including the three builds that were staged but never shipped. 490 chars,
+inside Play's 500-char limit.
+
+```
+Slip Studio v2.7 — a deeper wheel, and undo at last.
+
+• Shape it off-round: dent one side, carve facets, wave the rim.
+• Undo for shaping and trimming — take a bad pull back.
+• Display mode: fill the screen with a finished pot.
+• Glaze recipes: overlapping dips react into new colors.
+• Name your own shelves in the gallery.
+• New teapot with a spout, wax resist, lustre finishes, 49 glazes.
+• Your pot survives if the app closes mid-throw.
+
+Still ad-free. No purchases. No internet needed.
+```
+
+Deliberately left out of the notes (real work, but not what sells an update):
+the accessibility pass (reduced motion honoured in JS, focus traps, keyboard
+exits), the touch-target sweep across every screen, WebGL context-loss
+recovery, and the landing-screen fit on short phones. Worth a line in the
+Data-safety/accessibility notes if Play ever asks, not in the changelog.
 
 ## Store event — "Major update" (Play Console → Promotional content → Add event)
 
