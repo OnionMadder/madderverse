@@ -1795,6 +1795,17 @@ a:focus-visible {
         0 0 10px rgba(255, 46, 136, 0.6);
 }
 
+/* Gradient POUR swatches. Same footprint as a glaze swatch so the two
+   rows line up, but a rounded square instead of a circle: circle = one
+   colour, rounded square = a gradient that runs down the whole pot. */
+.pour-swatch {
+    /* Radius only — the 30px footprint is inherited from .swatch on
+       purpose. Sizing these 32px made the bottom row overhang the
+       picker by 3px, because the container's padding is sized off the
+       glaze swatch's height. */
+    border-radius: 7px;
+}
+
 /* Floating name chip above each glaze swatch on hover/focus.
    Built from the data-name attribute set by buildToolUI; reads
    "CHERRY RED" / "SCANLINE GRAY" / etc. Pure CSS so it works

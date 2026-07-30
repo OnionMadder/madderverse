@@ -6656,17 +6656,54 @@
     }
 
     /* One-tap full-height gradient dips. Stops are rim -> foot. */
+    /* One-tap gradient pours. Stops run rim -> foot. These are pure
+       colour data — no art, no download weight — and deliberately NOT
+       pack-gated: every pour is free for everyone, which is where the
+       generosity in this game should live. A pour recolours the whole
+       pot, so each one is a genuinely different finished piece.
+       Saves store only the preset id and placePresetDip() ignores an id
+       it doesn't know, so adding to this table is backward-compatible
+       and removing from it can never corrupt an old pot. */
     const DIP_PRESETS = {
-        rainbow: ["#ff3b3b", "#ff9e2c", "#ffe14d", "#3fd067", "#3aa0ff", "#8a5cff"],
-        sunset:  ["#ffd36b", "#ff9a4d", "#ff5e7e", "#8a4f8f"],
-        ocean:   ["#bff7ff", "#4fc8e0", "#2b7bd0", "#123a86"],
-        ember:   ["#ffe8a3", "#ff9b3d", "#e0431f", "#611015"]
+        /* the original four — kept first so existing muscle memory holds */
+        rainbow:  ["#ff3b3b", "#ff9e2c", "#ffe14d", "#3fd067", "#3aa0ff", "#8a5cff"],
+        sunset:   ["#ffd36b", "#ff9a4d", "#ff5e7e", "#8a4f8f"],
+        ocean:    ["#bff7ff", "#4fc8e0", "#2b7bd0", "#123a86"],
+        ember:    ["#ffe8a3", "#ff9b3d", "#e0431f", "#611015"],
+        /* warm */
+        terra:    ["#f4d9a8", "#dda15e", "#bc6c25", "#6b3410"],
+        honey:    ["#fff6d6", "#ffd98a", "#e8a33d", "#8a5216"],
+        lava:     ["#2b0a06", "#7a1c0c", "#e0431f", "#ffd24a"],
+        /* pink + purple */
+        bubble:   ["#fff0f7", "#ffb3d9", "#ff5ea8", "#c11e6e"],
+        orchid:   ["#ffe3f5", "#ff9ad5", "#c060c8", "#5c2a7a"],
+        plum:     ["#f6e0ef", "#c98ac0", "#8a3a76", "#3a1030"],
+        /* green */
+        meadow:   ["#eaf7a8", "#9fd45c", "#4a9b46", "#1e5a2e"],
+        mint:     ["#f2fff9", "#b8f0d8", "#6dc9a8", "#2b7a63"],
+        forest:   ["#dff0c8", "#8fbf6a", "#3f7a3a", "#14351c"],
+        /* cool */
+        frost:    ["#ffffff", "#dff4ff", "#a8d8f0", "#6fa8c8"],
+        storm:    ["#dfe9f2", "#9fb3c8", "#5a7a99", "#22303f"],
+        midnight: ["#cfe0ff", "#5a7fd6", "#26356e", "#080c1e"]
     };
     const DIP_PRESET_ORDER = [
-        { id: "rainbow", label: "RAINBOW" },
-        { id: "sunset",  label: "SUNSET" },
-        { id: "ocean",   label: "OCEAN" },
-        { id: "ember",   label: "EMBER" }
+        { id: "rainbow",  label: "RAINBOW" },
+        { id: "sunset",   label: "SUNSET" },
+        { id: "ocean",    label: "OCEAN" },
+        { id: "ember",    label: "EMBER" },
+        { id: "terra",    label: "TERRA" },
+        { id: "honey",    label: "HONEY" },
+        { id: "lava",     label: "LAVA" },
+        { id: "bubble",   label: "BUBBLE" },
+        { id: "orchid",   label: "ORCHID" },
+        { id: "plum",     label: "PLUM" },
+        { id: "meadow",   label: "MEADOW" },
+        { id: "mint",     label: "MINT" },
+        { id: "forest",   label: "FOREST" },
+        { id: "frost",    label: "FROST" },
+        { id: "storm",    label: "STORM" },
+        { id: "midnight", label: "MIDNIGHT" }
     ];
 
     /* Band friezes (reused from Slip Studio, covered by the studio's
@@ -8605,16 +8642,29 @@
             DIP_PRESET_ORDER.forEach(function (o) {
                 const btn = document.createElement("button");
                 btn.type = "button";
-                btn.className = "chip";
-                btn.textContent = o.label;
-                /* Colour the chip with its own gradient so kids can
-                   see what they're picking. */
+                /* Swatches, not text chips. As text these took 7 rows and
+                   211px of a 269px-wide tray once there were 16 of them —
+                   the picker crowded out the pot it was meant to decorate.
+                   Reusing .swatch borrows the glaze palette's sizing AND
+                   its data-name hover label, so the name is still there
+                   without spending a row on it. Rounded square vs the
+                   glazes' circle reads as "gradient pour" vs "one
+                   colour" at a glance. */
+                btn.className = "swatch pour-swatch";
+                btn.dataset.name = o.label;
+                btn.setAttribute("aria-label", o.label + " pour");
+                /* Vertical gradient: a pour runs rim -> foot, so the
+                   swatch previews how it actually lands on the pot. */
                 const stops = DIP_PRESETS[o.id];
-                btn.style.background = "linear-gradient(90deg," + stops.join(",") + ")";
-                btn.style.color = "#012";
+                btn.style.background =
+                    "linear-gradient(180deg," + stops.join(",") + ")";
                 btn.addEventListener("click", function () {
                     if (D.tool !== "dip") setTool("dip");
                     placePresetDip(o.id);
+                    pour.querySelectorAll(".pour-swatch").forEach(function (s) {
+                        s.classList.remove("active");
+                    });
+                    btn.classList.add("active");
                 });
                 pour.appendChild(btn);
             });
