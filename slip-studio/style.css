@@ -2692,3 +2692,18 @@ body.display-mode #coach { display: none !important; }
    normal flow, so this is real padding: ~31px total, which the shelf card's
    meta column has room for. Keeps overflow/ellipsis behaviour intact. */
 .pot-title { padding: 6px 0; }
+
+/* Photo-modal style/aspect chips: 34px in rows pitched 42px apart with 8px
+   between them, so there's slack in both directions to claim. Capped to the
+   pitch as everywhere else — see the deco-tray block for why overshoot is
+   worse than a small target. */
+.photo-chip { position: relative; }
+.photo-chip::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100% + 8px);
+    height: 42px;
+}

@@ -9104,6 +9104,10 @@ function trapFocus(root, initial) {
 // which matters more now that Tab can no longer wander out of them.
 function onDialogEscape(e) {
     if (e.key !== "Escape") return;
+    // Display mode sits above everything and hides all chrome, so it gets
+    // first refusal. Its only other exits are the ✕ and a tap on the pot —
+    // fine with a thumb, a dead end for anyone on a keyboard.
+    if (state.displayMode) { exitDisplayMode(); return; }
     const photo   = document.getElementById("photoModal");
     const recipes = document.getElementById("recipeModal");
     const gallery = document.getElementById("gallery");
