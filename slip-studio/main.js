@@ -1013,13 +1013,13 @@ async function uninstallPack(category) {
     setInstalledPacks(installed);
     for (const bg of packBgs(category)) bgUrlCache.delete(bg.id);
 }
-// Multiple ambient tracks — initMusic picks one per session so it
-// doesn't get repetitive across launches. Missing files fail silently
-// (the Audio element errors and the rest of the app keeps working).
+// Ambient track list. Only the tracks actually shipped belong here:
+// initMusic() picks one at random per session, so a phantom entry meant
+// 2-in-3 launches loaded a 404 before silently falling back to track 0.
+// If more tracks land later, add them here — the picker already handles
+// N > 1 by randomising.
 const MUSIC_TRACKS = [
     { src: "assets/audio/New Plan - Out To The World.mp3", label: "Out to the World" },
-    { src: "assets/audio/ambient-2.mp3",                   label: "Track 2" },
-    { src: "assets/audio/ambient-3.mp3",                   label: "Track 3" },
 ];
 
 // --- Sound effects ----------------------------------------------
@@ -1902,12 +1902,14 @@ function init() {
         dismissLanding();
         replayCoaching();
     });
-    // The Get-the-app link is for the web build only — hide it inside
-    // the Capacitor Android wrap (Capacitor injects window.Capacitor).
-    if (window.Capacitor) {
-        const appLink = document.getElementById("landingAppLink");
-        if (appLink) appLink.hidden = true;
-    }
+    // Web-only chrome — hidden inside the Capacitor Android wrap (Capacitor
+    // injects window.Capacitor). Setting a body class instead of hiding each
+    // element by hand lets CSS decide what belongs to the web build; the JS
+    // just flips one flag. Covers: the ⌂ "Back to Madderverse" home button
+    // (would try to navigate out of the WebView on tap), the site footer
+    // (© + Madderverse link that has no meaning in the app), and the
+    // Get-the-app link (you're already in the app).
+    if (window.Capacitor) document.body.classList.add("capacitor-app");
 
     // Dev handle (inert unless the URL carries ?dev) — used to drive
     // and inspect the sculpt during testing across the build.

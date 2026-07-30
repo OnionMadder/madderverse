@@ -13,11 +13,15 @@
    load, then upgrades when the woff2 arrives. If the files aren't
    present yet, the stack falls back to system UI sans / serif so
    nothing breaks. */
-@font-face { font-family: "Inter";    font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/inter-400.woff2") format("woff2"); }
-@font-face { font-family: "Inter";    font-style: normal; font-weight: 500; font-display: swap; src: url("vendor/fonts/inter-500.woff2") format("woff2"); }
-@font-face { font-family: "Inter";    font-style: normal; font-weight: 600; font-display: swap; src: url("vendor/fonts/inter-600.woff2") format("woff2"); }
-@font-face { font-family: "Fraunces"; font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/fraunces-400.woff2") format("woff2"); }
-@font-face { font-family: "Fraunces"; font-style: normal; font-weight: 600; font-display: swap; src: url("vendor/fonts/fraunces-600.woff2") format("woff2"); }
+/* Inter + Fraunces are variable fonts on Google Fonts v20+ / v38+ — one
+   Latin .woff2 per family covers every axis instance, so five @font-face
+   declarations point at two files. The declared weight range spans the
+   values we actually use (400 body / 500 medium / 600 semibold for Inter;
+   400 body / 600 titles for Fraunces) so the browser picks the right axis
+   sample instead of synthesizing bold. Latin only — the app ships in
+   English. */
+@font-face { font-family: "Inter";    font-style: normal; font-weight: 400 600; font-display: swap; src: url("vendor/fonts/inter-latin.woff2") format("woff2-variations"), url("vendor/fonts/inter-latin.woff2") format("woff2"); }
+@font-face { font-family: "Fraunces"; font-style: normal; font-weight: 400 600; font-display: swap; src: url("vendor/fonts/fraunces-latin.woff2") format("woff2-variations"), url("vendor/fonts/fraunces-latin.woff2") format("woff2"); }
 
 :root {
     --bg:        #1b1815;   /* warm near-black charcoal (matches scene bg) */
@@ -2707,3 +2711,12 @@ body.display-mode #coach { display: none !important; }
     width: calc(100% + 8px);
     height: 42px;
 }
+
+/* ---- Capacitor wrap: hide the web-only chrome --------------------
+   Set from main.js: body.capacitor-app when window.Capacitor is present.
+   These elements exist in one HTML file for both surfaces; the CSS decides
+   which one is web-only. Kept in a single block so it's obvious what the
+   Play build strips vs what the site shows. */
+body.capacitor-app .home,
+body.capacitor-app .footer,
+body.capacitor-app .landing-app-link { display: none; }
