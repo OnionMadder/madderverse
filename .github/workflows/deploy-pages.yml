@@ -12,7 +12,29 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  # Deliberately TRUE, which is the opposite of GitHub's Pages starter
+  # workflow. Their default (false) exists to let a production deploy
+  # finish undisturbed — but it also means anything at the head of this
+  # group blocks every later run indefinitely.
+  #
+  # That is not hypothetical: on 2026-07-30 a run sat in `waiting` on a
+  # github-pages deployment that nobody could approve (the API reported
+  # reviewers: [] and current_user_can_approve: false) and held the group
+  # for 12.5 hours. Every push behind it queued and was then cancelled by
+  # the next push, so the live site stayed 5 versions behind while five
+  # separate runs came and went. Re-dispatching could not help — a fresh
+  # run just queued behind the same wedged head. It only cleared by
+  # manually cancelling that run.
+  #
+  # The trade is safe here because this deploy is idempotent: it uploads
+  # the whole repo root (path: '.'), so any single successful run
+  # publishes the complete current state of main. Losing an in-flight
+  # deploy to a newer one costs nothing, because the newer one ships
+  # everything the cancelled one would have. Worst case the site serves
+  # the previous version for another minute.
+  #
+  # If you set this back to false, you are re-arming the 12-hour jam.
+  cancel-in-progress: true
 
 jobs:
   deploy:
