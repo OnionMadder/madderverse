@@ -6105,8 +6105,6 @@
         },
         {
             id: "plushie", label: "PLUSH",
-            /* BLUSH — the soft pink only makes sense on a plush pack */
-            clays: ["blush"],
             packType: "builder",   /* parts build a teddy bear */
             buildSubject: "bear",
             sheet: "plush",   /* sheet file is named "plush", pack id is "plushie" */
@@ -6853,15 +6851,30 @@
         bubble:   "plushie",   /* NB: the pack's id is "plushie", not "plush" */
         orchid:   "modded",
         honey:    "breakfast",
-        /* $0.99 */
+        /* $0.99 — one each, so the two packs at the same price carry
+           the same weight. LAVA used to sit here as DINOSAUR's second
+           pour, which left MUSIC looking short at an identical price;
+           it couldn't simply move across, because that flips the gap
+           rather than closing it. Twelve pours don't divide evenly into
+           this tier structure (1 each to three points packs, 2 each to
+           three megas, 2 each here would need thirteen), so the extra
+           had to leave the tier altogether. */
         terra:    "dinosaur",
-        lava:     "dinosaur",
         midnight: "music",
-        /* $1.99 megas */
+        /* $1.99 megas — LAVA lands on MOONS, which is a better home for
+           it than it looks: Io is a volcanic moon. The megas already
+           vary in size (11/8/11 stickers), so a third pour here doesn't
+           break a pattern the way an uneven $0.99 tier did. */
         meadow:   "chickens",
         forest:   "chickens",
         mint:     "aliens",
         plum:     "aliens",
+        /* ALIENS carries the spare 12th pour. Its sticker sheet has
+           three fewer frames than the other two megas (8 vs 11) — an
+           art limit, not a design choice — so the extra pour narrows a
+           gap it can't close on its own. Revisit when the sticker art
+           is redrawn. */
+        lava:     "aliens",
         frost:    "moons",
         storm:    "moons"
     };
