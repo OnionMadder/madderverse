@@ -2368,7 +2368,8 @@
             swatch: "#1c1a17",
             firedTint: "rgba(40, 35, 30, 0.34)",
             outline:   "#000000",
-            highlight: "rgba(140, 120, 105, 0.48)"
+            highlight: "rgba(140, 120, 105, 0.48)",
+            packPending: true
         },
         {
             id: "galaxy",
@@ -2379,25 +2380,27 @@
             swatch: "#1e2880",
             firedTint: "rgba(90, 60, 200, 0.30)",
             outline:   "#02030a",
-            highlight: "rgba(185, 205, 255, 0.55)"
+            highlight: "rgba(185, 205, 255, 0.55)",
+            packPending: true
         },
         /* ============================================================
-           BONUS CLAY BODIES. Free, ungated, appended so the original
-           five keep their positions in the tray.
+           CLAY BODIES HELD BACK FOR PACK ASSIGNMENT.
 
-           `bonus: true` keeps them OUT of the MATERIAL MASTER
-           achievement's requirement — that counts base clays
-           dynamically, so without this flag adding four bodies would
-           quietly turn "fire a pot with every base clay (5)" into a
-           nine-clay grind still labelled 5. Adding content must never
-           inflate a completion requirement.
+           `packPending: true` keeps a body out of BOTH clay pickers
+           and out of the MATERIAL MASTER count, but it stays in
+           CLAY_TYPES — which is the whole point. currentClay() resolves
+           a saved pot's clayTypeId against this array, so a pot already
+           fired in BASALT or GALAXY still renders correctly in the
+           gallery even though nobody can pick those today. Deleting the
+           entries instead would break every one of those saved pots.
 
-           These fill the gaps in the existing palette rather than
-           crowding it: EARTH is red, STONE a warm grey, and nothing
-           was gold, blue-grey, pink or green. Worth having now that
-           the form pass shades by local radius — a clay body finally
-           reads as its own material instead of the same gradient in a
-           different hue.                                            */
+           Clear the flag (and add the body to its pack) once the pack
+           contents are defined.
+
+           These fill the gaps in the palette rather than crowding it:
+           EARTH is red, STONE a warm grey, and nothing was gold,
+           blue-grey, pink or green. They read as genuinely different
+           materials now that the form pass shades by local radius.   */
         {
             id: "ochre",
             label: "OCHRE",
@@ -2408,7 +2411,7 @@
             firedTint: "rgba(200, 150, 40, 0.22)",
             outline:   "#1d1203",
             highlight: "rgba(255, 240, 190, 0.36)",
-            bonus: true
+            packPending: true
         },
         {
             id: "slate",
@@ -2420,7 +2423,7 @@
             firedTint: "rgba(90, 120, 140, 0.20)",
             outline:   "#0c1114",
             highlight: "rgba(225, 240, 255, 0.38)",
-            bonus: true
+            packPending: true
         },
         {
             id: "blush",
@@ -2432,7 +2435,7 @@
             firedTint: "rgba(215, 130, 145, 0.20)",
             outline:   "#240d12",
             highlight: "rgba(255, 230, 235, 0.40)",
-            bonus: true
+            packPending: true
         },
         {
             id: "moss",
@@ -2444,7 +2447,7 @@
             firedTint: "rgba(110, 150, 80, 0.20)",
             outline:   "#0d140b",
             highlight: "rgba(235, 250, 215, 0.34)",
-            bonus: true
+            packPending: true
         }
     ];
 
@@ -3127,13 +3130,13 @@
 
         /* --- Starter shape + lip-drag height (ported from Slip Studio) ---
            shapeId  : which starter silhouette a fresh lump throws into
-                      (see POT_SHAPES). "cylinder" = the classic straight
+                      (see POT_SHAPES). Defaults to "vase" — POT_SHAPES[0].
                       wall, so old behavior is the default.
            heightScale: vertical stretch factor. Geometry (incl. height)
                       lives in clay[].y, so this is a live-editing convenience
                       re-derived from the loaded rim height, never persisted
                       on its own. */
-        shapeId:    "cylinder",
+        shapeId:    "vase",
         heightScale: 1,
 
         /* Rim-pull stroke state (grab the lip → raise/lower height).
@@ -3148,12 +3151,16 @@
        buildPotPath's midpoint smoothing rounds the corners. Base radii
        stay under the wheel cap (WHEEL_RX) so pots keep a foot. */
     const POT_SHAPES = [
-        { id: "cylinder", label: "TUBE",
-          controls: [[0, 72], [1, 72]] },
+        /* VASE is first on purpose: POT_SHAPES[0] is the fallback for an
+           unknown shape id, so the list's head IS the default. TUBE and
+           BOWL were removed here — a straight tube is what the clay
+           already looks like before you shape it, so it read as "no
+           shape chosen" rather than a choice, and BOWL overlapped POT.
+           Their ids can still appear in OLD saved pots; that's safe,
+           because a loaded pot restores its silhouette from the saved
+           profile array, not by re-deriving it from shapeId. */
         { id: "vase", label: "VASE",
           controls: [[0, 46], [0.15, 60], [0.42, 94], [0.68, 62], [0.86, 42], [1, 52]] },
-        { id: "bowl", label: "BOWL",
-          controls: [[0, 40], [0.3, 80], [0.62, 112], [1, 130]] },
         { id: "cup", label: "CUP",
           controls: [[0, 50], [0.5, 62], [1, 68]] },
         { id: "bottle", label: "BOTTLE",
@@ -3345,7 +3352,7 @@
        height so a subsequent rim-pull continues from the right place.
        Call AFTER SHAPE.clay is set. */
     function adoptEntryShape(entry) {
-        SHAPE.shapeId = entry.shapeId || "cylinder";
+        SHAPE.shapeId = entry.shapeId || "vase";
         const clay = SHAPE.clay;
         if (clay && clay.length) {
             const span = SHAPE.baseY - SHAPE.topY;
@@ -3563,11 +3570,14 @@
         SHAPE.clayLocked = false;
         SHAPE.rimStroke = null;
         SHAPE.particles.length = 0;
-        /* Throw into the currently-selected starter silhouette
-           (cylinder = the classic straight wall). */
-        if (SHAPE.shapeId && SHAPE.shapeId !== "cylinder") {
-            seedShape(SHAPE.shapeId);
-        }
+        /* Throw into the currently-selected starter silhouette. This
+           used to be skipped for "cylinder", because a raw INIT_R wall
+           already IS a cylinder — but with TUBE removed, skipping would
+           leave RESET showing the one silhouette that's no longer a
+           choice. Always seed; seedShape falls back to POT_SHAPES[0]
+           (VASE) for an id that no longer exists, which is what a pot
+           loaded from an old TUBE/BOWL save will hit. */
+        seedShape(SHAPE.shapeId);
     }
 
     /* ----- 5B. Pointer input ----- */
@@ -3655,6 +3665,21 @@
             SHAPE.clayLocked = true;
             flashButton(finish);
             if (SCREENS["decorate"]) {
+                /* Shaping ALWAYS hands off bare clay. Decoration used to
+                   survive a trip back to the wheel, which meant returning
+                   to decorate showed the last pot's dips and paint over a
+                   shape they were never drawn for — decoration lives in
+                   the silhouette's screen space, so once the profile
+                   moves the old marks no longer fit it.
+
+                   Deliberately hooked to THIS transition rather than
+                   decorate's onEnter: stepping back from the kiln, or
+                   opening a saved pot, must keep its decoration. Only
+                   shape -> decorate starts clean. A remix is safe too —
+                   doRemix clones the shape onto the wheel and nothing
+                   else, so there's no decoration here to lose. */
+                clearPaint();
+                clearUndoStack();   /* or undo would reach into the last pot */
                 showScreen("decorate");
             } else {
                 flashStub(finish, "KILN HEATING...");
@@ -8983,10 +9008,12 @@
         const fire  = document.getElementById("decFire");
 
         if (back) back.addEventListener("click", function () {
-            /* Re-shape escape hatch: unlock clay; paint persists so
-               the decoration deforms with any re-shaping (the paint
-               composite is clipped to the new silhouette). Undo
-               stack is decorate-scope; clear it on the way out. */
+            /* Re-shape escape hatch: unlock the clay and go back to the
+               wheel. The decoration is NOT carried forward — going
+               shape -> decorate again clears it (see the DECORATE IT
+               handler), because marks drawn against the old silhouette
+               don't fit a reshaped one. Undo stack is decorate-scope, so
+               it goes on the way out. */
             clearUndoStack();
             SHAPE.clayLocked = false;
             showScreen("shape");
@@ -9349,8 +9376,8 @@
             clayTypeId: SHAPE.clayTypeId,
             /* Starter shape (metadata only — the geometry, including
                height, is fully baked into clay[]). Backward compatible:
-               absent → "cylinder". */
-            shapeId: SHAPE.shapeId || "cylinder",
+               absent → "vase". */
+            shapeId: SHAPE.shapeId || "vase",
             paintDataUrl: (D.paintCanvas)
                 ? D.paintCanvas.toDataURL("image/png")
                 : null,
@@ -14620,20 +14647,20 @@
         {
             id: "material_master",
             title: "MATERIAL MASTER",
-            desc: "Fire a pot with every base clay (5).",
+            /* A GETTER, not a fixed string: the bar scales with the
+               clays you own, so buying a pack that carries a body has to
+               re-read the count. desc is pulled fresh on every grid
+               render, so this stays honest. It was hardcoded "(5)" while
+               the check counted dynamically — exactly how a target stops
+               matching its label. Excludes VOID (the reward, not the
+               prerequisite). */
+            get desc() {
+                return "Fire a pot with every clay you own (" +
+                       availableClays().length + ").";
+            },
             icon: "◆",
             check: function (s) {
-                /* Don't count VOID toward the requirement — it's
-                   the reward, not the prerequisite. Bonus bodies
-                   (OCHRE/SLATE/BLUSH/MOSS) are excluded too: this
-                   count is dynamic, so without the flag every clay
-                   added later would silently raise the bar while the
-                   description still promised five. New content should
-                   never make an existing achievement harder. */
-                const baseCount = CLAY_TYPES.filter(function (c) {
-                    return !c.unlockedBy && !c.bonus;
-                }).length;
-                return s.clayTypes.size >= baseCount;
+                return s.clayTypes.size >= availableClays().length;
             }
         },
         {
@@ -14768,10 +14795,45 @@
            isClayUnlocked() — no list mutation needed here. */
     }
 
+    /* The pack that grants a clay body, via its `clays: [...]` list.
+       Null for the always-free bodies (and for any still awaiting an
+       assignment). */
+    function packForClay(clayId) {
+        for (let i = 0; i < GLAZE_PACKS.length; i++) {
+            const p = GLAZE_PACKS[i];
+            if (Array.isArray(p.clays) && p.clays.indexOf(clayId) !== -1) {
+                return p;
+            }
+        }
+        return null;
+    }
+
     function isClayUnlocked(c) {
+        /* A pack-held body appears the moment its pack is owned. Until
+           it's assigned to one, packForClay returns null and the body
+           stays hidden — but it REMAINS in CLAY_TYPES, so pots already
+           fired in it still render in the gallery. */
+        if (c.packPending) {
+            const pack = packForClay(c.id);
+            return !!pack && isPackUsable(pack);
+        }
         if (!c.unlockedBy) return true;
         ensureAchievements();
         return ACH_STATE.unlocked.has(c.unlockedBy);
+    }
+
+    /* Clay bodies the player can actually pick right now: the free ones
+       plus any granted by a pack they own. This is what MATERIAL MASTER
+       counts, so buying a pack that carries a clay raises the bar to
+       include it instead of leaving the achievement already-complete. */
+    function availableClays() {
+        return CLAY_TYPES.filter(function (c) {
+            /* VOID is the reward for finishing, never part of the bar. */
+            if (c.unlockedBy) return false;
+            if (!c.packPending) return true;
+            const pack = packForClay(c.id);
+            return !!pack && isPackUsable(pack);
+        });
     }
 
     /* Main entry point — called from anywhere an achievement
