@@ -6787,6 +6787,86 @@
         { id: "midnight", label: "MIDNIGHT" }
     ];
 
+    /* Which pack each pour belongs to. A pour NOT listed here is free
+       for everyone — that's deliberately the original four
+       (rainbow/sunset/ocean/ember), so nobody loses a pour they already
+       had; every gated pour is one that never shipped to the Play build.
+
+       Kept as one table rather than a field on each pack so the entire
+       free/paid boundary is readable in a single place and can be
+       retuned without touching twelve pack definitions.
+
+       Themed to their pack: DINOSAUR gets the fossil-earth and volcanic
+       pours, MUSIC the stage-night one, MOONS the lunar pair, and the
+       three points packs each earn one so playing still pays. */
+    const POUR_PACKS = {
+        /* points packs — earned, not bought */
+        bubble:   "plushie",   /* NB: the pack's id is "plushie", not "plush" */
+        orchid:   "modded",
+        honey:    "breakfast",
+        /* $0.99 */
+        terra:    "dinosaur",
+        lava:     "dinosaur",
+        midnight: "music",
+        /* $1.99 megas */
+        meadow:   "chickens",
+        forest:   "chickens",
+        mint:     "aliens",
+        plum:     "aliens",
+        frost:    "moons",
+        storm:    "moons"
+    };
+
+    /* The pack a pour belongs to, or null when it's free for everyone. */
+    function pourPackFor(pourId) {
+        const packId = POUR_PACKS[pourId];
+        if (!packId) return null;
+        return GLAZE_PACKS.find(function (p) { return p.id === packId; }) || null;
+    }
+
+    /* A POUR_PACKS entry naming a pack that doesn't exist fails OPEN —
+       pourPackFor returns null and the pour silently becomes free. That
+       already happened once: the PLUSH pack's id is "plushie", so
+       BUBBLE shipped unlocked and nothing complained. Shout at load
+       time instead of giving paid content away quietly. */
+    (function verifyPourPacks() {
+        const bad = Object.keys(POUR_PACKS).filter(function (pourId) {
+            return !GLAZE_PACKS.some(function (p) {
+                return p.id === POUR_PACKS[pourId];
+            });
+        });
+        if (bad.length) {
+            console.error("[CRAYte] POUR_PACKS names unknown pack(s) — these " +
+                          "pours are unintentionally FREE:",
+                          bad.map(function (id) {
+                              return id + " -> " + POUR_PACKS[id];
+                          }).join(", "));
+        }
+        const unknownPour = Object.keys(POUR_PACKS).filter(function (id) {
+            return !DIP_PRESETS[id];
+        });
+        if (unknownPour.length) {
+            console.error("[CRAYte] POUR_PACKS references pours that don't " +
+                          "exist:", unknownPour.join(", "));
+        }
+    }());
+
+    /* A pour is usable if it's free, or its pack is unlocked. Reuses
+       isPackUsable so pours obey exactly the same ownership rules as
+       that pack's glazes — no parallel entitlement logic to drift. */
+    function isPourUnlocked(pourId) {
+        const pack = pourPackFor(pourId);
+        return !pack || isPackUsable(pack);
+    }
+
+    /* Every pour a pack carries — used by the shop card/modal so the
+       price reads against everything you actually get. */
+    function poursForPack(packId) {
+        return Object.keys(POUR_PACKS).filter(function (id) {
+            return POUR_PACKS[id] === packId;
+        });
+    }
+
     /* Band friezes (reused from Slip Studio, covered by the studio's
        rawpixel license). File ids resolved via bandSrc(). */
     const BAND_FRIESES = [
@@ -8733,13 +8813,40 @@
                    colour" at a glance. */
                 btn.className = "swatch pour-swatch";
                 btn.dataset.name = o.label;
-                btn.setAttribute("aria-label", o.label + " pour");
                 /* Vertical gradient: a pour runs rim -> foot, so the
                    swatch previews how it actually lands on the pot. */
                 const stops = DIP_PRESETS[o.id];
                 btn.style.background =
                     "linear-gradient(180deg," + stops.join(",") + ")";
+
+                const lockPack = pourPackFor(o.id);
+                const locked   = !isPourUnlocked(o.id);
+                if (locked) {
+                    /* Show it, don't hide it. A locked pour still previews
+                       its gradient so the kid can see what they'd get —
+                       a hidden pour sells nothing, and a greyed-out one
+                       sells almost as little. */
+                    btn.classList.add("is-locked");
+                    btn.setAttribute("aria-label",
+                        o.label + " pour — locked, in the " +
+                        lockPack.label + " pack");
+                    const pip = document.createElement("span");
+                    pip.className = "pour-lock";
+                    pip.textContent = "🔒";
+                    pip.setAttribute("aria-hidden", "true");
+                    btn.appendChild(pip);
+                } else {
+                    btn.setAttribute("aria-label", o.label + " pour");
+                }
+
                 btn.addEventListener("click", function () {
+                    if (locked) {
+                        /* Straight to the pack that carries it. Doing
+                           nothing here was the whole reason a locked
+                           control feels broken rather than tempting. */
+                        handleShopCardClick(lockPack.id);
+                        return;
+                    }
                     if (D.tool !== "dip") setTool("dip");
                     placePresetDip(o.id);
                     pour.querySelectorAll(".pour-swatch").forEach(function (s) {
@@ -13399,6 +13506,19 @@
         const card = document.createElement("div");
         card.className = "shop-card";
         card.dataset.pack = p.id;
+        /* These are the store's only controls, but they were plain divs:
+           not focusable, not announced as buttons, and unreachable
+           without a pointer. Play's pre-launch accessibility scan flags
+           exactly this. Kept as a <div> with an explicit button role
+           rather than swapped to <button>, because the card's grid
+           layout and nested previews rely on the current box. */
+        card.setAttribute("role", "button");
+        card.setAttribute("tabindex", "0");
+        card.addEventListener("keydown", function (e) {
+            if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+            e.preventDefault();       /* Space would scroll the shop */
+            handleShopCardClick(p.id);
+        });
         const owned    = isPackOwned(p);
         const released = isPackReleased(p);
         const free     = !p.priceCents && p.unlock !== "points";
@@ -13726,14 +13846,52 @@
             card.appendChild(textures);
         }
 
+        /* Pours strip ------------------------------------------ */
+        /* Pours are the newest thing a pack carries, so without this the
+           price read against glazes/stamps/textures alone and the pack
+           looked like less than it is. Each swatch shows the real
+           gradient, top-to-bottom, exactly as it lands on the pot. */
+        const packPours = poursForPack(p.id);
+        if (packPours.length) {
+            const pourTitle = document.createElement("h3");
+            pourTitle.className = "pack-modal-section";
+            pourTitle.textContent = "POURS";
+            card.appendChild(pourTitle);
+
+            const pours = document.createElement("div");
+            pours.className = "pack-modal-pours";
+            packPours.forEach(function (pid) {
+                const entry = DIP_PRESET_ORDER.find(function (o) {
+                    return o.id === pid;
+                });
+                const tile = document.createElement("div");
+                tile.className = "pack-modal-pour";
+                tile.style.background = "linear-gradient(180deg," +
+                    DIP_PRESETS[pid].join(",") + ")";
+                tile.title = entry ? entry.label : pid;
+                pours.appendChild(tile);
+            });
+            card.appendChild(pours);
+        }
+
         /* Action button --------------------------------------- */
         const action = document.createElement("button");
         action.className = "pack-modal-action";
         action.type = "button";
         action.textContent = shopCtaText(p);
-        action.addEventListener("click", function () {
-            performPackAction(p);
-        });
+        /* "234 ✦ TO GO" is a status readout, not an offer — it used to
+           be a live button that silently did nothing when tapped.
+           Disable it so it can't be pressed and screen readers announce
+           it as unavailable. Every other CTA stays live, including an
+           AFFORDABLE points pack. */
+        if (isPackSparkLocked(p) && !isPackAffordable(p)) {
+            action.disabled = true;
+            action.setAttribute("aria-disabled", "true");
+        } else {
+            action.addEventListener("click", function () {
+                performPackAction(p);
+            });
+        }
         card.appendChild(action);
 
         document.body.appendChild(overlay);

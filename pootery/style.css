@@ -1806,6 +1806,31 @@ a:focus-visible {
     border-radius: 7px;
 }
 
+/* A locked pour keeps its gradient at full strength — you can't want
+   what you can't see — and is marked by the padlock rather than by
+   being greyed out. Only the border goes muted, which is enough to
+   read as "not yours yet" without hiding the goods. */
+.pour-swatch.is-locked {
+    border-color: rgba(255, 255, 255, 0.30);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.pour-swatch .pour-lock {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+    /* Dark scrim so the padlock stays legible on a pale gradient
+       (FROST is nearly white at the top). */
+    background: rgba(4, 12, 16, 0.42);
+    border-radius: inherit;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
 /* Floating name chip above each glaze swatch on hover/focus.
    Built from the data-name attribute set by buildToolUI; reads
    "CHERRY RED" / "SCANLINE GRAY" / etc. Pure CSS so it works
@@ -3704,6 +3729,20 @@ a:focus-visible {
     background-color: rgba(0, 0, 0, 0.35);
     background-size: cover;
     background-position: center;
+    border: 1px solid rgba(0, 255, 204, 0.12);
+    border-radius: var(--radius-sm);
+}
+
+/* Pours strip — same grid as the textures above it, but the tiles are
+   taller than they are wide so a vertical gradient reads as a POUR
+   running down a pot rather than as a square colour chip. */
+.pack-modal-pours {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+    gap: 8px;
+}
+.pack-modal-pour {
+    aspect-ratio: 2 / 3;
     border: 1px solid rgba(0, 255, 204, 0.12);
     border-radius: var(--radius-sm);
 }
