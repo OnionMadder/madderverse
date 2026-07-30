@@ -54,7 +54,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=86" />
+    <link rel="stylesheet" href="style.css?v=88" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -697,7 +697,7 @@
                 <button class="tool-btn" data-tool="splatter" type="button">SPLAT</button>
                 <button class="tool-btn" data-tool="stamp"    type="button">POOF</button>
                 <button class="tool-btn" data-tool="dip"      type="button">DIP</button>
-                <button class="tool-btn" data-tool="band"     type="button">BAND</button>
+                <button class="tool-btn" data-tool="overlay"  type="button">WRAP</button>
                 <button class="tool-btn" data-tool="eraser"   id="decBaleet"  type="button">OOPS</button>
                 <button class="tool-btn" data-tool="move"     id="decMove"    type="button">SCOOT</button>
             </div>
@@ -783,12 +783,13 @@
                      role="tablist" aria-label="Gradient pours"></div>
             </div>
 
-            <!-- FRIEZE — band tool only. Tap a frieze, then tap the pot
-                 to wrap a band; drag it up/down to move. -->
-            <div class="tool-row palette-row frieze-row ctx-block" data-ctx="band">
-                <span class="row-label">FRIEZE</span>
-                <div class="palette frieze-palette" id="friezePalette"
-                     role="listbox" aria-label="Frieze bands"></div>
+            <!-- WRAP — overlay tool only. One full-body pattern per
+                 pack; tap a swatch to wrap the whole pot, tap it again
+                 to take it off. Replaced the old FRIEZE band picker. -->
+            <div class="tool-row palette-row overlay-row ctx-block" data-ctx="overlay">
+                <span class="row-label">WRAP</span>
+                <div class="palette overlay-palette" id="overlayPalette"
+                     role="listbox" aria-label="Full-body wraps"></div>
             </div>
 
         </div>
@@ -1536,7 +1537,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=86"></script>
+<script src="game.js?v=88"></script>
 
 </body>
 </html>

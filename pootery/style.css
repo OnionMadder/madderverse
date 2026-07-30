@@ -1831,6 +1831,16 @@ a:focus-visible {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
+/* WRAP swatches — a square window onto the pack's full-body pattern.
+   Square rather than the glazes' circle or the pours' rounded rect, so
+   the three swatch families stay tellable apart at a glance. The
+   background-image is set inline per pack by buildOverlayPalette. */
+.overlay-swatch {
+    border-radius: 4px;
+    background-size: 150%;      /* zoom in so the motif reads at 30px */
+    background-position: center;
+}
+
 /* Floating name chip above each glaze swatch on hover/focus.
    Built from the data-name attribute set by buildToolUI; reads
    "CHERRY RED" / "SCANLINE GRAY" / etc. Pure CSS so it works

@@ -4037,6 +4037,10 @@
                (thumbnails); absent = no-op. */
             if (opts.dips && opts.dips.length) compositeDips(ctx, opts.dips);
 
+            /* Full-body wrap — over the glaze, UNDER the form pass, so
+               the lighting shapes it round the pot. */
+            if (opts.overlay) compositeOverlay(ctx, opts.overlay);
+
             /* Light catches — sheen + rim painted on TOP of the
                surface texture so the 3D-lit feel survives even
                when a pack skin is wrapped over the bare clay.
@@ -6458,15 +6462,21 @@
                   { preset } for a one-tap gradient. Rendered UNDER the
                   brush/stamp decoration so kids can still draw on a
                   glazed pot.
-           bands: ordered list of frieze stripes, each { id, cy, h }
-                  (cy = centre height fraction, h = thickness fraction).
-                  Rendered as a horizontally-repeating band. */
+           bands: LEGACY. The BAND tool was replaced by full-body wraps,
+                  but pots saved before that still carry their frieze
+                  stripes, so the render path stays and old pots keep
+                  looking like themselves. Nothing writes to this now.
+           overlay: id of the pack whose full-body wrap is applied, or
+                  null. One wrap per pack; it's a single value rather
+                  than a list because a second wrap would simply hide
+                  the first. */
         dips: [],
         bands: [],
+        overlay: null,
         dipDrag: null,        /* in-progress freehand dip during a drag */
-        movingBand: null,     /* { band, grabFrac } while dragging a band */
+        movingBand: null,     /* legacy, unused since the WRAP switch */
         dripAmount: 1,        /* 0=off, 1=few, 2=lots — new dips inherit this */
-        bandFriezeId: null,   /* frieze chosen for the next band placement */
+        bandFriezeId: null,   /* legacy, unused since the WRAP switch */
 
         dpr: 1,
 
@@ -6574,7 +6584,8 @@
                 }),
                 bands: (D.bands || []).map(function (b) {
                     return { id: b.id, cy: b.cy, h: b.h };
-                })
+                }),
+                overlay: D.overlay || null
             };
         } catch (e) {
             console.warn("[CRAYte] snapshot failed", e);
@@ -6616,6 +6627,7 @@
                         drips: d.drips || 0, seed: d.seed || 1,
                         rgb: d.rgb ? d.rgb.slice() : dipHexToRgb(d.color) };
             });
+            D.overlay = snapshot.overlay || null;
             D.bands = (snapshot.bands || []).map(function (b) {
                 return { id: b.id, cy: b.cy, h: b.h };
             });
@@ -6912,6 +6924,75 @@
             BAND_IMAGES[id] = img;
         });
     }
+    /* ============================================================
+       FULL-BODY WRAPS (one per pack)
+       ============================================================
+       Replaced the BAND tool. A wrap is a seamless pattern tiled over
+       the WHOLE pot and clipped to the silhouette — the pack's single
+       signature textile.
+
+       File per pack id under assets/overlays/. Extensions differ
+       because the source art does: two arrived with transparency and
+       stay PNG, the rest are opaque and re-encode far smaller as JPEG.
+       OVERLAY_EXT records which is which so the loader doesn't have to
+       probe for a 404.                                              */
+    const OVERLAY_EXT = {
+        core: "jpg", candy: "jpg", gamer: "jpg", space: "jpg",
+        plushie: "jpg", modded: "png", breakfast: "png",
+        dinosaur: "jpg", music: "jpg", chickens: "jpg",
+        aliens: "jpg", moons: "jpg"
+    };
+    const OVERLAY_IMAGES = {};
+    function overlaySrc(packId) {
+        return "assets/overlays/" + packId + "." +
+               (OVERLAY_EXT[packId] || "jpg");
+    }
+    function loadOverlayImages() {
+        Object.keys(OVERLAY_EXT).forEach(function (packId) {
+            if (OVERLAY_IMAGES[packId]) return;
+            const img = new Image();
+            img.src = overlaySrc(packId);
+            OVERLAY_IMAGES[packId] = img;
+        });
+    }
+    loadOverlayImages();
+
+    /* Tile size as a fraction of the pot's width. The source art is
+       square and seamless, so tiling keeps the motif undistorted —
+       stretching one square across a tall pot would smear it. */
+    const OVERLAY_TILE_FRAC = 0.62;
+
+    /* Paint a pack's wrap over the pot, clipped to the silhouette.
+       Deliberately called BEFORE the form pass: ten of the twelve wraps
+       are opaque, so compositing them after the lighting (where the old
+       bands sat) would paint over the cylindrical shading and flatten
+       the pot into a sticker. Underneath it, the form pass lights the
+       pattern and it reads as wrapped around the form. */
+    function compositeOverlay(ctx, overlayId) {
+        if (!overlayId) return;
+        const img = OVERLAY_IMAGES[overlayId];
+        if (!img || !img.complete || !img.naturalWidth) return;
+        const g = potGeom();
+        const clay = g.clay;
+        let maxR = 0;
+        for (let i = 0; i < g.N; i++) {
+            if (clay[i].radius > maxR) maxR = clay[i].radius;
+        }
+        if (maxR < 1) return;
+        const tile = Math.max(24, maxR * 2 * OVERLAY_TILE_FRAC);
+        ctx.save();
+        buildPotPath(ctx);
+        ctx.clip();
+        const x0 = SHAPE.centerX - maxR;
+        const x1 = SHAPE.centerX + maxR;
+        for (let y = g.rimY - tile; y < g.footY + tile; y += tile) {
+            for (let x = x0 - tile; x < x1 + tile; x += tile) {
+                ctx.drawImage(img, x, y, tile, tile);
+            }
+        }
+        ctx.restore();
+    }
+
     /* Preload frieze art at module init so gallery thumbnails render
        bands even if the gallery is opened before the decorate stage. */
     loadBandImages();
@@ -7765,9 +7846,11 @@
         D.paintCtx.restore();
         /* CLEAR also wipes the sticker layer + records. */
         D.stickers = [];
-        /* ...and the dip glaze coats + frieze bands. */
+        /* ...and the dip glaze coats, the legacy frieze bands, and
+           the full-body wrap. */
         D.dips = [];
         D.bands = [];
+        D.overlay = null;
         D.dipDrag = null;
         D.movingBand = null;
         if (typeof renderStickerLayer === "function") renderStickerLayer();
@@ -7937,18 +8020,11 @@
                 return;
             }
 
-            /* BAND: a press on an existing band grabs it to slide up/down;
-               otherwise the tap on pointerup places a new band. */
-            if (D.tool === "band") {
-                const hit = hitTestBand(p);
-                if (hit) {
-                    pushUndoSnapshot();
-                    D.movingBand = hit;
-                    D.canvas.style.cursor = "grabbing";
-                    D.gestureCommitted = true;
-                }
-                return;
-            }
+            /* WRAP is applied entirely from its picker, so a press on
+               the pot does nothing. Swallow it here — without this the
+               tap falls through to the paint branch on pointerup and
+               the kid draws a brush dot with the WRAP tool selected. */
+            if (D.tool === "overlay") return;
         };
 
         /* Commit the deferred paint START (brush / spray / splatter /
@@ -8116,14 +8192,8 @@
                 D.pointer = p;
                 return;
             }
-            /* BAND drag — slide a grabbed band up/down; a drag that
-               didn't grab a band does nothing (placement is on tap). */
-            if (D.tool === "band") {
-                if (D.movingBand) moveBandTo(p);
-                D.lastPaintPos = p;
-                D.pointer = p;
-                return;
-            }
+            /* WRAP: nothing to drag on the pot. */
+            if (D.tool === "overlay") { D.pointer = p; return; }
             /* DIP drag — the first move commits a live glaze coat, then
                the finger sets its lower edge. */
             if (D.tool === "dip") {
@@ -8170,10 +8240,7 @@
                     } else if (D.tool === "dip") {
                         pushUndoSnapshot();
                         placeDipTap(D.pendingPos);
-                    } else if (D.tool === "band") {
-                        pushUndoSnapshot();
-                        placeBandTap(D.pendingPos);
-                    } else if (D.tool !== "move") {
+                    } else if (D.tool !== "move" && D.tool !== "overlay") {
                         /* SCOOT (move) only acts on a drag — a clean tap
                            with nothing grabbed places/erases nothing. */
                         pushUndoSnapshot();
@@ -8197,10 +8264,7 @@
                 }
                 /* Finalize any dip coat / band drag from this gesture. */
                 D.dipDrag = null;
-                if (D.movingBand) {
-                    D.movingBand = null;
-                    if (D.tool === "band") D.canvas.style.cursor = "pointer";
-                }
+                D.movingBand = null;
                 D.gestureStart = null;
                 D.gestureCommitted = false;
                 D.multiTouched = false;
@@ -8776,7 +8840,7 @@
         });
         buildTexturePalette();
         buildDipControls();
-        buildFriezePalette();
+        buildOverlayPalette();
 
         /* Size slider (matches the ROT slider pattern so all
            tool-row inputs share one control vocabulary). */
@@ -8885,28 +8949,49 @@
     }
 
     /* Build the BAND tool's frieze picker. */
-    function buildFriezePalette() {
-        const fp = document.getElementById("friezePalette");
+    /* Build the WRAP picker: one swatch per pack, showing that pack's
+       full-body pattern. A pack you don't own shows its wrap behind a
+       padlock and routes to the shop, exactly like a locked pour —
+       same rule, same affordance, so "locked" looks consistent
+       wherever a kid meets it. */
+    function buildOverlayPalette() {
+        const fp = document.getElementById("overlayPalette");
         if (!fp) return;
-        loadBandImages();
+        loadOverlayImages();
         fp.innerHTML = "";
-        BAND_FRIESES.forEach(function (id) {
+        GLAZE_PACKS.forEach(function (pack) {
+            if (!OVERLAY_EXT[pack.id]) return;      /* pack has no wrap art */
+            const locked = !isPackUsable(pack);
             const btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "frieze-swatch";
-            btn.dataset.frieze = id;
-            btn.setAttribute("aria-label", "Frieze band");
-            const img = document.createElement("img");
-            img.src = bandSrc(id);
-            img.alt = "";
-            btn.appendChild(img);
-            if (id === D.bandFriezeId) btn.classList.add("active");
+            btn.className = "swatch overlay-swatch";
+            btn.dataset.overlay = pack.id;
+            btn.dataset.name = pack.label;
+            btn.style.backgroundImage = 'url("' + overlaySrc(pack.id) + '")';
+            btn.setAttribute("aria-label", locked
+                ? pack.label + " wrap — locked, in the " + pack.label + " pack"
+                : pack.label + " wrap");
+            if (locked) {
+                btn.classList.add("is-locked");
+                const pip = document.createElement("span");
+                pip.className = "pour-lock";      /* same padlock treatment */
+                pip.textContent = "🔒";
+                pip.setAttribute("aria-hidden", "true");
+                btn.appendChild(pip);
+            }
+            if (D.overlay === pack.id) btn.classList.add("active");
             btn.addEventListener("click", function () {
-                D.bandFriezeId = id;
-                fp.querySelectorAll(".frieze-swatch").forEach(function (s) {
-                    s.classList.toggle("active", s.dataset.frieze === id);
+                if (locked) { handleShopCardClick(pack.id); return; }
+                pushUndoSnapshot();
+                /* Tapping the active wrap takes it off — one wrap at a
+                   time, so the swatch is a toggle rather than a
+                   one-way door with no visible way back. */
+                D.overlay = (D.overlay === pack.id) ? null : pack.id;
+                fp.querySelectorAll(".overlay-swatch").forEach(function (s) {
+                    s.classList.toggle("active",
+                        s.dataset.overlay === D.overlay);
                 });
-                if (D.tool !== "band") setTool("band");
+                haptic(8);
             });
             fp.appendChild(btn);
         });
@@ -9076,6 +9161,7 @@
         renderPotScene(D.ctx, {
             dips:          D.dips,
             bands:         D.bands,
+            overlay:       D.overlay,
             paintCanvas:   D.paintCanvas,
             stickerCanvas: D.stickerCanvas,
             particles:     false
@@ -9427,7 +9513,9 @@
             }),
             bands: (D.bands || []).map(function (b) {
                 return { id: b.id, cy: b.cy, h: b.h };
-            })
+            }),
+            /* Full-body wrap: just the pack id whose pattern is on. */
+            overlay: D.overlay || null
         };
         /* Carry forward the user's name on a re-save. */
         if (prev && prev.name) entry.name = prev.name;
@@ -10002,6 +10090,7 @@
             renderPotScene(ctx, {
                 dips:          D.dips,
                 bands:         D.bands,
+                overlay:       D.overlay,
                 paintCanvas:   D.paintCanvas,
                 stickerCanvas: D.stickerCanvas,
                 particles:     false,
@@ -10381,6 +10470,9 @@
             /* Dip glaze coat — under the sheen (glossy) + under the
                kid's paint, matching the live renderPotScene order. */
             if (entry.dips && entry.dips.length) compositeDips(ctx, entry.dips);
+            /* Wrap sits over the glaze and UNDER the light catches, so a
+               saved pot is lit exactly like the live one. */
+            if (entry.overlay) compositeOverlay(ctx, entry.overlay);
             /* Light catches on TOP of the surface texture so saved
                pots with skins still read as 3D-lit. Same layering
                as live renderPotScene: lighting then paint then
@@ -15365,8 +15457,13 @@
             get bands() { return D.bands.slice(); },
             get dripAmount()  { return D.dripAmount; },
             get bandFriezeId() { return D.bandFriezeId; },
+            get overlay() { return D.overlay; },
             bandImgReady: function (id) {
                 const im = BAND_IMAGES[id];
+                return !!(im && im.complete && im.naturalWidth);
+            },
+            overlayImgReady: function (packId) {
+                const im = OVERLAY_IMAGES[packId];
                 return !!(im && im.complete && im.naturalWidth);
             }
         }
