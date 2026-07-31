@@ -4553,6 +4553,30 @@ function startFiringMoment() {
     }
 }
 
+// Abandon a kiln sequence in progress — the user walked away from it
+// (New pot, or loading something from the gallery) rather than letting
+// it finish. Deliberately NOT endFiringMoment: that one *completes* the
+// firing (marks the partner pieces fired, reveals glaze-chemistry
+// recipes), and none of that should happen to a piece nobody fired.
+// Just put the frame, the music and the kiln roar back.
+function cancelFiringMoment() {
+    if (!state.firing) return;
+    state.firing = false;
+    const v = document.getElementById("kilnVignette");
+    if (v) {
+        v.style.opacity = "0";
+        const edge = v.querySelector(".kiln-edge");
+        const glow = v.querySelector(".kiln-inner-glow");
+        if (edge) edge.style.opacity = "0";
+        if (glow) glow.style.opacity = "0";
+    }
+    const bd = document.getElementById("backdrop");
+    if (bd) bd.style.opacity = "1";
+    if (music && state._musicSavedVol != null) music.volume = state._musicSavedVol;
+    state._musicSavedVol = null;
+    stopSfx("kiln");
+}
+
 function endFiringMoment() {
     state.firing = false;
     const v = document.getElementById("kilnVignette");
@@ -4844,6 +4868,10 @@ function stepBack() {
 
 // Start a fresh wet pot.
 function resetPot() {
+    // Leaving mid-kiln: without this the sequence keeps running against the
+    // fresh pot — vignette up, backdrop dark, wheel held still by the busy
+    // flag — and then "completes" a firing on clay that was never fired.
+    cancelFiringMoment();
     state.isLid = false; // back to regular pot rules — wheel constrains the foot
     setShowWax(true);    // fresh pot: wax is visible again when applied
     state.lidMaxY = null;
@@ -5922,10 +5950,12 @@ function onWheel(ev) {
 // so none of the sculpt/paint handlers run while it's up.
 let displayDragging = false;
 let displayHintT = 0;
+let displayPrevZoom = null;       // framing to hand back when Display closes
 function enterDisplayMode() {
     if (state.displayMode) return;
     state.displayMode = true;
     document.body.classList.add("display-mode");
+    displayPrevZoom = state.zoom;     // give it back on the way out
     setZoom(1);                       // calm, centred framing
     const layer = document.getElementById("displayLayer");
     if (layer) { layer.hidden = false; layer.classList.remove("hint-hidden"); }
@@ -5943,6 +5973,9 @@ function exitDisplayMode() {
     const layer = document.getElementById("displayLayer");
     if (layer) layer.hidden = true;
     clearTimeout(displayHintT);
+    // Restore the framing Display borrowed. Peeking at a piece shouldn't
+    // silently throw away the close-up you'd set up before it.
+    if (displayPrevZoom != null) { setZoom(displayPrevZoom); displayPrevZoom = null; }
 }
 function bindDisplayLayer() {
     const layer = document.getElementById("displayLayer");
@@ -5951,7 +5984,10 @@ function bindDisplayLayer() {
     layer.addEventListener("pointerdown", (ev) => {
         id = ev.pointerId; startX = lastX = ev.clientX; startY = ev.clientY; moved = false;
         displayDragging = true;
-        layer.setPointerCapture?.(ev.pointerId);
+        // Capture can be refused; don't let it abort the handler and strand
+        // displayDragging true — a stuck drag flag freezes the showcase
+        // turntable, which is the one thing Display mode exists to do.
+        try { layer.setPointerCapture?.(ev.pointerId); } catch (_) {}
         layer.classList.add("hint-hidden");   // first touch dismisses the hint
         ev.preventDefault();
     });
@@ -5970,6 +6006,12 @@ function bindDisplayLayer() {
     };
     layer.addEventListener("pointerup", end);
     layer.addEventListener("pointercancel", end);
+    layer.addEventListener("lostpointercapture", end);
+    // Same safety net as the studio canvas: if the release happens somewhere
+    // this layer never hears about, the turntable would stop for good.
+    const sweep = (ev) => { if (id != null && ev.pointerId === id) end(ev); };
+    window.addEventListener("pointerup", sweep);
+    window.addEventListener("pointercancel", sweep);
     // The explicit ✕ leaves too; keep its press off the drag layer.
     const exitBtn = document.getElementById("displayExit");
     if (exitBtn) {
@@ -7848,6 +7890,10 @@ function pulseSaveFlash() {
 // opts.phase — where to land. Gallery loads land on "fired" (the piece is
 // finished); a restored draft lands back on the stage it was left at.
 async function loadPot(entry, opts) {
+    // Same as resetPot: the gallery is reachable mid-kiln, and a sequence
+    // left running would drag its vignette and its stopped wheel onto the
+    // pot we're about to load.
+    cancelFiringMoment();
     const landPhase = (opts && opts.phase) || "fired";
     setShowWax(false); // a loaded pot shows its finished (wax-cleared) look
     // For a handled SET, always load the POT (the handle-bearer) as the
@@ -9625,6 +9671,7 @@ function initMusic() {
 // --- SFX manager -----------------------------------------------
 const sfxCache = {};       // id -> { audio, def } (lazy-instantiated)
 const sfxFailed = new Set(); // ids whose file errored — don't retry
+const sfxLive = {};        // id -> most recent one-shot clone still sounding
 
 function loadSfx(id) {
     if (sfxCache[id]) return sfxCache[id];
@@ -9662,10 +9709,26 @@ function playSfx(id, opts) {
     clone.loop = false;
     clone.volume = Math.max(0, Math.min(1, vol));
     if (s.def.pitchVar) clone.playbackRate = 1 + (Math.random() - 0.5) * s.def.pitchVar;
+    // Remember the most recent clone so stopSfx can catch a long one-shot
+    // still in flight. Only the latest matters: the short overlapping
+    // sounds (squelch) are never stopped, and the long one (kiln) can't
+    // overlap itself.
+    sfxLive[id] = clone;
+    clone.addEventListener("ended", () => {
+        if (sfxLive[id] === clone) sfxLive[id] = null;
+    }, { once: true });
     clone.play().catch(() => {});
 }
 
 function stopSfx(id) {
+    // One-shots play on a detached clone, so pausing the cached element
+    // does nothing to a sound already sounding. The kiln roar runs the
+    // full 4.5 s — long enough to outlive the screen that started it.
+    const live = sfxLive[id];
+    if (live) {
+        try { live.pause(); live.currentTime = 0; } catch (_) {}
+        sfxLive[id] = null;
+    }
     const s = sfxCache[id];
     if (!s) return;
     s.audio.pause();
