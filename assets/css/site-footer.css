@@ -126,8 +126,8 @@
     top:  max(12px, env(safe-area-inset-top,  0px));
     left: max(12px, env(safe-area-inset-left, 0px));
     z-index: 60;
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -164,7 +164,7 @@
 }
 
 @media (max-width: 380px) {
-    .madder-home { width: 36px; height: 36px; font-size: 20px; }
+    .madder-home { width: 40px; height: 40px; font-size: 20px; }
 }
 
 

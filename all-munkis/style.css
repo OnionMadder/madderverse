@@ -849,8 +849,8 @@ body.madballz-mode .moon-fall {
     .title-block { flex: 1 1 auto; }
     .header-inner { gap: 10px; align-items: center; }
     .header-buttons { gap: 6px; }
-    .btn { font-size: 13px; padding: 8px 12px; letter-spacing: 0.08em; min-height: 40px; }
-    .icon-btn { width: 40px; height: 40px; font-size: 18px; }
+    .btn { font-size: 13px; padding: 8px 12px; letter-spacing: 0.08em; min-height: 44px; }
+    .icon-btn { width: 44px; height: 44px; font-size: 18px; }
     .subtitle { font-size: 10px; letter-spacing: 0.14em; }
 
     main { padding: 14px 10px calc(var(--tray-h, 240px) + 10px); gap: 14px; }
@@ -1610,7 +1610,10 @@ body.moon-invert {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
+    /* Padding sized so the pill hits Material's 44dp minimum tap target
+       even with the 12px text — 13px vertical padding + ~15px line-height
+       + 2px border ≈ 44px total. */
+    padding: 13px 14px;
     border-radius: 999px;
     background: rgba(15, 23, 42, 0.78);
     border: 1px solid rgba(167, 139, 250, 0.5);

@@ -1941,9 +1941,14 @@
             slot.classList.toggle('slot-bad', HORROR_TRIGGER_MODS.has(id));
             slot.dataset.char = id;
             slot.title = ch.label;
+            // Label ONLY for Madballz — the rainbow crew (+ Ice/Moon) is
+            // identified by color, so a redundant name plate under the
+            // sprite just adds noise. Madballz aren't color-coded the same
+            // way and their names (BRAINY, ZOMBI, CHAD…) carry info.
+            const showLabel = ch.sheet === 'mb';
             slot.innerHTML = `
                 <div class="slot-icon">${characterArt(id, index)}</div>
-                <div class="slot-label">${ch.label}</div>
+                ${showLabel ? `<div class="slot-label">${ch.label}</div>` : ''}
             `;
         } else {
             slot.classList.remove('active');
@@ -1951,9 +1956,9 @@
             slot.classList.add('empty');
             delete slot.dataset.char;
             slot.removeAttribute('title');
+            // Empty slot: the '+' placeholder is enough — no 'EMPTY' text.
             slot.innerHTML = `
                 <div class="slot-icon slot-empty"><span class="empty-plus">+</span></div>
-                <div class="slot-label">EMPTY</div>
             `;
         }
     }

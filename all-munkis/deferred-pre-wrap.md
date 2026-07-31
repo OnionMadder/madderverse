@@ -34,16 +34,30 @@ web site stable while All Munkis gets Capacitor-wrapped for Google Play.
 
 ## Deferred polish (not blocking ship)
 
-- **P2-6** Some tap targets are 40px tall on phones (header buttons) or
-  smaller (`madder-home` 36×36, `eggCounter` 30 high). Material wants 48dp.
-  Worth a polish pass but won't get rejected.
-- **P2-7** A few labels are very small + alpha-blended (`.slot-label` is
-  `rgba(45,212,191,0.32)` at 8px). Slot labels are arguably redundant once
-  a Munki is on stage — the *color* is the name. Could drop them entirely.
-- **P2-8** `<meta name="description">` still says "Sprunki-style music
-  game" — could update to reflect the rainbow narrative for link previews.
-- **P3-9 / P3-10 / P3-11 / P3-12 / P3-13** Various dead HTML
-  (`.bank-switcher`, `#madballzBtn`, stale lore comment, stale `<meta>`
-  title, footer "About" link). Not user-visible mid-play; cosmetic cleanup.
-
-These can be picked up after the Play submission lands.
+- **P2-6 ✅ DONE (2026-07-30)** — `.icon-btn` + `.btn` mobile min-heights
+  bumped to 44px; `.madder-home` bumped site-wide (40→44 desktop, 36→40
+  small); `#eggCounter` padding grown to hit 44px min. Shared file
+  `assets/css/site-footer.css` was edited (ripples to every game).
+- **P2-7 ✅ DONE (2026-07-30)** — `.slot-label` now only renders for
+  Madballz (`sheet === 'mb'`). Rainbow crew + Ice/Moon: color IS the
+  name, no label. Empty slot: the `+` placeholder is enough, "EMPTY"
+  text removed. `renderSlot` in `game.js` gates on `ch.sheet === 'mb'`.
+- **P2-8 ✅ DONE (2026-07-30)** — meta description + og:description +
+  twitter:description rewritten to the rainbow narrative. `<meta
+  name="title">` + og:title + twitter:title simplified to
+  "All Munkis — Madderverse". Keywords intentionally kept (sprunki
+  is still a real search term).
+- **P3-9 / P3-10 — NOT DEAD.** The deferred audit was wrong. Both are
+  actively wired: `.bank-switcher` is toggled by
+  `updateBankSwitcherVisibility` (hidden until a second bank unlocks
+  via the seventh-wheel swap); `#madballzBtn` is the "MEET THE
+  MADBALLZ" button revealed by `revealMadballzButton()` and wired to
+  `enterMadballzMode`. Do not delete.
+- **P3-11 ✅ DONE (2026-07-30)** — Stale lore comment in `index.html`
+  rewritten. Old comment claimed 7 crew colors + BLACK Watchers + 4
+  WHITE evils (Ice/Moon/Void/Static/Madballz); the real lore is 6
+  rainbow crew + 2 evils (Ice + Moon) + the cursed Flying Creeps.
+- **P3-12 ✅ DONE (2026-07-30)** — covered by P2-8 (meta title
+  updated in the same pass).
+- **P3-13 — NOT DEAD.** `about.html` exists at repo root and every
+  game's footer links to it. The link works.
