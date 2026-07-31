@@ -6988,7 +6988,10 @@ function kebabCase(s) {
 }
 function photoFilename() {
     const shape = state.isLid ? "lid" : (state.shape || "pot");
-    const glazeName = (state.glaze && GLAZES[state.glaze]) ? GLAZES[state.glaze].name : "bare-clay";
+    // Same naming the gallery and defaultPotTitle use, so a DIPPED pot is
+    // named for its dip (ocean, rainbow, …). Reading state.glaze alone
+    // called every dipped pot "bare-clay" — glaze is null while dipping.
+    const glazeName = glazeNameFor({ glaze: state.glaze, dips: state.dips });
     const d = new Date();
     const p2 = (n) => String(n).padStart(2, "0");
     const date = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
@@ -7015,7 +7018,13 @@ async function shareOrDownloadBlob(blob, filename, title) {
                 return true;
             }
         }
-    } catch (_) { /* user cancelled or share blocked — fall through to download */ }
+    } catch (err) {
+        // Backing out of the share sheet is the user saying "never mind" —
+        // not "put it somewhere else instead". We used to treat a cancel the
+        // same as a blocked share and drop a PNG into Downloads anyway, then
+        // report it saved. Only a genuine failure falls through.
+        if (err && err.name === "AbortError") return false;
+    }
     if (!blob) return false;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -7033,8 +7042,10 @@ async function finalizePhoto() {
     const out = document.createElement("canvas");
     composeStyledPhoto(photoPotCache, photoBgCache, state.photoStyle, state.photoAspect, out);
     const blob = await new Promise((res) => out.toBlob(res, "image/png"));
-    await shareOrDownloadBlob(blob, photoFilename(), "Slip Studio pot");
-    flashPhotoSave();
+    // Only claim it saved if it actually did — a cancelled share saves nothing.
+    if (await shareOrDownloadBlob(blob, photoFilename(), "Slip Studio pot")) {
+        flashPhotoSave();
+    }
 }
 
 function flashPhotoSave() {
@@ -7143,35 +7154,20 @@ async function savePot() {
             profileDirty = false;
             // Force material to settle into the fired look before thumb.
             tickMaterial(10);
+            // Built from corePieceFields() like the active entry — restorePieceState
+            // above has already made the partner the live piece, so this reads its
+            // state. This USED to be a hand-copied field list, which had silently
+            // drifted: it was missing heightScale and glazeGradient, so a partner
+            // reloaded at the default height and lost its gradient second colour.
+            // Both are read back on load (see loadPot + syncPartnerMesh), so the
+            // only bug was on the write side. Keep it spread, not copied.
             const partnerEntry = {
+                ...corePieceFields(),
                 id: (Date.now() + 1).toString(36),
                 ts: Date.now() + 1,
-                profile: Array.from(profile, (x) => +x.toFixed(4)),
-                displace: encodeDisplaceField(displaceActive ? displace : null),
-                facetCount: state.facetCount,
-                rimScallop: state.rimScallop,
-                rimStyle: state.rimStyle,
-                glaze: state.glaze,
-                finish: state.finish,
-                dips: state.dips.map((d) => ({ ...d })),
-                deco: state.decoCanvas.toDataURL("image/png"),
-                paintDeco: state.paintCanvas.toDataURL("image/png"),
-                placements: serializePlacements(),
-                bump: state.bumpCanvas.toDataURL("image/png"),
-                sgraffito: state.sgraffitoCanvas.toDataURL("image/png"),
-                resist: state.resistCanvas.toDataURL("image/png"),
-                frozenDip: state.frozenDipCanvas ? state.frozenDipCanvas.toDataURL("image/png") : null,
                 thumb: captureThumb(),
                 setId,
                 title: defaultPotTitle(),
-                isLid: state.isLid,
-                handle: !state.isLid && state.handle.on,
-                spout: !state.isLid && state.spout.on,
-                handleBulge:  !state.isLid && state.handle.on ? state.handle.bulgeOffset  : 0,
-                handleTop:    !state.isLid && state.handle.on ? state.handle.topOffset    : 0,
-                handleBottom: !state.isLid && state.handle.on ? state.handle.bottomOffset : 0,
-                handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
-                handleCount:  !state.isLid && state.handle.on ? state.handle.count : 2,
                 assemblyThumb, // same shared shot
             };
             await dbPut(partnerEntry);
@@ -8451,8 +8447,13 @@ async function exportShelfPhoto() {
     const items = tiles.map((t, i) => ({ img: imgs[i], title: t.title || "" })).filter((x) => x.img);
     const cv = renderShelfCanvas(items);
     const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
-    await shareOrDownloadBlob(blob, "slip-studio-shelf.png", "My Slip Studio pottery shelf");
-    if (btn) { btn.disabled = false; const t = "Shelf photo"; btn.textContent = "Saved ✓"; setTimeout(() => (btn.textContent = t), 1400); }
+    const saved = await shareOrDownloadBlob(blob, "slip-studio-shelf.png", "My Slip Studio pottery shelf");
+    if (btn) {
+        btn.disabled = false;
+        const t = "Shelf photo";
+        if (saved) { btn.textContent = "Saved ✓"; setTimeout(() => (btn.textContent = t), 1400); }
+        else { btn.textContent = t; }   // cancelled share — nothing was written
+    }
 }
 
 // Composite the loaded thumbnail items into the warm shelf image.
