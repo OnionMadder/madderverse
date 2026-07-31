@@ -500,12 +500,6 @@
         return n;
     }
 
-    // Which evil rides the 7th-wheel slot in the bank. Pre-Moon-unlock this
-    // is always 'ice'. Post-unlock the kid can drag-swap (see the altar
-    // logic in renderMunkiAltar). Persisted across sessions.
-    let seventhWheel = 'ice';
-    function altWheel() { return seventhWheel === 'ice' ? 'moon' : 'ice'; }
-
     function ensureAudio() {
         if (!audioCtx) {
             const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -2187,9 +2181,6 @@
         if (iceNowOn && !iceWasOn) playIceFreezeSound();
         // Easter egg: stage now matches the rainbow R-O-Y-G-B-P order?
         checkRainbowEgg();
-        // Jealousy: if the rainbow is now complete, deepen the sulk on the
-        // 7th-wheel chip; otherwise drop back to the idle sulk.
-        checkSulkState();
         // New achievement family: solid colours, palindromic / repeating
         // patterns, band-fill milestones, first encounter with Ice or Moon.
         if (charId) checkColdSnap(charId);
@@ -2375,18 +2366,6 @@
                 document.querySelectorAll('.stage-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
                 clearTrayGhost();
             });
-            // Tap-to-swap badge (only on the 7th-wheel chip post-unlock).
-            // Its own click swaps Ice<->Moon; stopPropagation keeps it from
-            // bubbling into the chip's drag / jealousy-tap logic.
-            const swapBtn = chip.querySelector('.chip-swap');
-            if (swapBtn) {
-                swapBtn.addEventListener('click', ev => {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    ensureAudio();
-                    swapSeventhWheel();
-                });
-            }
         });
     }
 
@@ -3119,7 +3098,7 @@
     //   madballzUnlocked — dormant feature flag, still persisted for safety
     //   achievements     — { id: { unlocked_at, points_awarded } } map
     //   moonUnlocked     — bool, set when total achievement points ≥ threshold
-    //   seventhWheel     — 'ice' | 'moon', which evil sits in the bank
+    //                      (also gates whether Moon appears in the bank at all)
     //   bandCount        — lifetime count of 6/6 stage fills (drives the
     //                      3/10/20 Bands achievements)
     //   activeBankIndex  — legacy from the multi-bank era; still clamped
@@ -3162,9 +3141,9 @@
                     }
                 });
             }
-            if (obj.seventhWheel === 'moon' || obj.seventhWheel === 'ice') {
-                seventhWheel = obj.seventhWheel;
-            }
+            // Legacy field `seventhWheel` (obj.seventhWheel) was the swap
+            // selector before Ice + Moon became coexisting tray citizens
+            // (2026-07-30). Ignored on load; unknown-to-us field on save.
             const idx = (obj.activeBankIndex | 0);
             if (idx >= 0 && idx < BANKS.length && BANKS[idx].unlocked) {
                 activeBankIndex = idx;
@@ -3187,30 +3166,23 @@
                 achievements: achievementsObj,
                 moonUnlocked,
                 bandCount,
-                seventhWheel,
                 activeBankIndex,
                 unlockedBanks: BANKS.map(b => b.unlocked)
             }));
         } catch (e) { /* ignore */ }
     }
 
-    // Under the original swap design ONE of Ice/Moon sat in the bank at
-    // a time (the seventhWheel; the altar chip let the kid swap between
-    // them). That was retired 2026-07-30 in favour of the "coexist"
-    // design: both evils are permanent tray citizens once Moon unlocks,
-    // which lets the anti-hero Void (triggered by BOTH on stage) actually
-    // become reachable. Pre-unlock: only `seventhWheel` (defaults to
-    // 'ice'), so brand-new players see the same first-run bank as before.
-    // Post-unlock: both. Idempotent; call after moon unlock, on init,
-    // after loadProgress.
+    // Ice + Moon coexist in the bank as of 2026-07-30 (retired the old
+    // seventhWheel swap altar / tap-to-swap badge design). Ice is always
+    // present; Moon appears once moonUnlocked flips via the achievement
+    // path. Idempotent; call after moon unlock, on init, after
+    // loadProgress. Keeps the old function name for stability across
+    // any lingering internal callers.
     function syncBankWithSeventhWheel() {
         const bank = BANKS[0].munkis;
         const cleaned = bank.filter(id => id !== 'ice' && id !== 'moon');
-        cleaned.push(seventhWheel);
-        if (moonUnlocked) {
-            const other = seventhWheel === 'ice' ? 'moon' : 'ice';
-            if (!cleaned.includes(other)) cleaned.push(other);
-        }
+        cleaned.push('ice');
+        if (moonUnlocked) cleaned.push('moon');
         BANKS[0].munkis = cleaned;
     }
 
@@ -3566,12 +3538,6 @@
         document.addEventListener('trayChipTap', e => {
             const charId = e.detail && e.detail.charId;
             if (!charId) return;
-            // Jealousy flavor: a tap on the lonely 7th-wheel chip pops a
-            // speech bubble. Doesn't conflict with chipSpam — both fire.
-            if (charId === seventhWheel) {
-                const chipEl = document.querySelector(`#tray .tray-chip[data-char="${charId}"]`);
-                maybeSpeakJealousy(charId, chipEl);
-            }
             const now = performance.now();
             const arr = spamTaps.get(charId) || [];
             arr.push(now);
@@ -3702,180 +3668,6 @@
             if (!el) return;
             grantAchievement('touchOutsider');
         });
-    }
-
-    // ---------- JEALOUSY FLAVOR ----------
-    // The 7th-wheel evil is the lonely one — the rainbow has 6 slots and 6
-    // colors, so one of Ice/Moon always sits out. checkSulkState() runs after
-    // every stage change and bumps the bank's 7th chip + the altar chip to
-    // .sulk-deep when the rainbow is fully on stage ("they really did it
-    // without me"). showSpeechBubble() / JEALOUS_QUOTES surface a tiny tap-
-    // triggered thought bubble per kid-friendly emotional storytelling.
-    function isRainbowComplete() {
-        for (let i = 0; i < RAINBOW_ORDER.length; i++) {
-            if (slots[i] !== RAINBOW_ORDER[i]) return false;
-        }
-        return true;
-    }
-
-    function checkSulkState() {
-        const deep = isRainbowComplete();
-        document.querySelectorAll('.tray-chip.sulk, .altar-chip.sulk').forEach(el => {
-            el.classList.toggle('sulk-deep', deep);
-        });
-    }
-
-    // Terse, cold, FNAF-quiet. The "left out" loneliness is still here
-    // but it reads as a threat now, not sad-but-cute. No emoji, lower-
-    // case kept only for an unsettling flat affect.
-    const JEALOUS_QUOTES = {
-        ice: [
-            "you never pick me.",
-            "you'll be cold too. soon.",
-            "i don't forget the warm ones.",
-            "i was a color once.",
-            "stay. it's freezing out here."
-        ],
-        moon: [
-            "i see you. always.",
-            "you'll make room for me.",
-            "i'm closer than you think.",
-            "don't look away.",
-            "you should have picked me."
-        ]
-    };
-
-    let bubbleCooldown = false;
-    function showSpeechBubble(chipEl, text) {
-        if (!chipEl || bubbleCooldown) return;
-        bubbleCooldown = true;
-        setTimeout(() => { bubbleCooldown = false; }, 450);
-        // Remove any prior bubble first so rapid taps don't stack.
-        document.querySelectorAll('.speech-bubble').forEach(b => b.remove());
-        const bubble = document.createElement('div');
-        bubble.className = 'speech-bubble';
-        bubble.textContent = text;
-        document.body.appendChild(bubble);
-        // Anchor above the chip. Uses fixed positioning so it doesn't shift
-        // when the page scrolls during the auto-dismiss.
-        const r = chipEl.getBoundingClientRect();
-        bubble.style.left = `${r.left + r.width / 2}px`;
-        bubble.style.top  = `${r.top - 8}px`;
-        requestAnimationFrame(() => bubble.classList.add('shown'));
-        setTimeout(() => {
-            bubble.classList.remove('shown');
-            setTimeout(() => bubble.remove(), 360);
-        }, 2400);
-    }
-
-    function maybeSpeakJealousy(charId, chipEl) {
-        const lines = JEALOUS_QUOTES[charId];
-        if (!lines) return;
-        const text = lines[Math.floor(Math.random() * lines.length)];
-        showSpeechBubble(chipEl, text);
-    }
-
-    // ---------- MUNKI ALTAR (Ice ↔ Moon swap, post-unlock) ----------
-    // After Moon unlocks, the alt-evil sits in a small "altar" chip next to
-    // the tray. The kid drags it onto the active 7th-wheel chip in the bank
-    // to swap which evil rides that slot. Drop anywhere else snaps back.
-    // The bank itself stays at 7 chips, preserving the rainbow-with-one-evil
-    // visual the redesign asked for.
-    // RETIRED. The Ice<->Moon swap is now a tap-to-swap badge on the
-    // 7th-wheel bank chip (see the .chip-swap branch in renderTray and
-    // its click handler in attachTrayHandlers). The old #munkiAltar
-    // element is kept in the DOM but always hidden+empty so the bank is
-    // a single 7-chip row with no dangling extra chip. attachAltarHandlers()
-    // below is dead code, intentionally left in place (zero-risk, unused).
-    function renderMunkiAltar() {
-        const altar = document.getElementById('munkiAltar');
-        if (altar) { altar.hidden = true; altar.innerHTML = ''; }
-    }
-
-    function attachAltarHandlers() {
-        const chip = document.querySelector('.altar-chip');
-        if (!chip) return;
-        chip.addEventListener('pointerdown', e => {
-            if (e.button !== undefined && e.button !== 0) return;
-            e.preventDefault();
-            ensureAudio();
-            try { chip.setPointerCapture(e.pointerId); } catch (_) {}
-            chip.classList.add('grabbing');
-            trayDragState.set(e.pointerId, {
-                chip,
-                charId: chip.dataset.char,
-                startX: e.clientX, startY: e.clientY,
-                dragging: false,
-                isAltar: true
-            });
-        });
-        chip.addEventListener('pointermove', e => {
-            const state = trayDragState.get(e.pointerId);
-            if (!state) return;
-            const dx = e.clientX - state.startX;
-            const dy = e.clientY - state.startY;
-            if (!state.dragging && (dx * dx + dy * dy) > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
-                state.dragging = true;
-                startTrayGhost(state.chip, e.clientX, e.clientY);
-                // Highlight the active 7th-wheel chip in the bank as the
-                // only valid drop target for an altar drag.
-                const active = document.querySelector(`.tray-chip[data-char="${seventhWheel}"]`);
-                if (active) active.classList.add('swap-target');
-            }
-            if (state.dragging) {
-                moveTrayGhost(e.clientX, e.clientY);
-            }
-        });
-        chip.addEventListener('pointerup', e => {
-            const state = trayDragState.get(e.pointerId);
-            if (!state) return;
-            trayDragState.delete(e.pointerId);
-            try {
-                if (state.chip.hasPointerCapture(e.pointerId)) {
-                    state.chip.releasePointerCapture(e.pointerId);
-                }
-            } catch (_) {}
-            state.chip.classList.remove('grabbing');
-            document.querySelectorAll('.tray-chip.swap-target').forEach(c => c.classList.remove('swap-target'));
-            if (state.dragging) {
-                // Drop on the active 7th-wheel chip → swap.
-                const els = document.elementsFromPoint(e.clientX, e.clientY);
-                const dropTarget = els.find(el => el.classList && el.classList.contains('tray-chip') && el.dataset.char === seventhWheel);
-                if (dropTarget) {
-                    swapSeventhWheel();
-                }
-                clearTrayGhost();
-            } else {
-                // No-drag tap on the altar chip — the alternate evil is also
-                // the lonely one (the rainbow doesn't pick either of them).
-                maybeSpeakJealousy(state.charId, state.chip);
-            }
-        });
-        chip.addEventListener('pointercancel', e => {
-            const state = trayDragState.get(e.pointerId);
-            if (!state) return;
-            trayDragState.delete(e.pointerId);
-            state.chip.classList.remove('grabbing');
-            document.querySelectorAll('.tray-chip.swap-target').forEach(c => c.classList.remove('swap-target'));
-            clearTrayGhost();
-        });
-    }
-
-    function swapSeventhWheel() {
-        const incoming = altWheel();
-        // If the outgoing evil is on the stage, clear it (its chip won't
-        // exist after the swap, so leaving the stage occupant orphaned
-        // would be a confusing state).
-        for (let i = 0; i < NUM_SLOTS; i++) {
-            if (slots[i] === seventhWheel) setSlot(i, null);
-        }
-        seventhWheel = incoming;
-        syncBankWithSeventhWheel();
-        saveProgress();
-        renderTray();
-        attachTrayHandlers();
-        renderMunkiAltar();
-        playDropSound();
     }
 
     // ---------- HEADER BUTTONS ----------
@@ -4870,8 +4662,9 @@
 
     function init() {
         loadProgress();
-        // Make sure the 7th slot reflects the persisted seventhWheel (ice
-        // by default, moon if the kid swapped) before the first renderTray.
+        // Bank membership depends on moonUnlocked (Ice always in; Moon in
+        // once unlocked). Call BEFORE renderTray so the first render has
+        // the right chip roster.
         syncBankWithSeventhWheel();
         buildStage();
         buildHorrorOverlay();
@@ -4888,8 +4681,6 @@
         watchVisibility();
         startCreepSystem();
         updateTrayHint();
-        // If Moon is unlocked, surface the altar chip so the kid can swap.
-        renderMunkiAltar();
         // If the kid found any eggs on a prior visit, restore the counter
         // chip with the saved count (no animation — it's not "new").
         if (achievements.size > 0 || moonUnlocked) {

@@ -999,7 +999,7 @@ body.dual-band-mode .moon-fall {
 }
 
 .tray-chip {
-    position: relative;          /* containing block for the .chip-swap badge */
+    position: relative;
     flex: 0 0 auto;
     width: 92px;
     height: 116px;
@@ -1727,123 +1727,6 @@ body.moon-invert {
 @keyframes moon-invert-flash {
     0%, 100% { filter: invert(0); }
     50%      { filter: invert(1) hue-rotate(180deg); }
-}
-
-/* ====== JEALOUSY FLAVOR ======
-   The 7th-wheel chip (in the bank) and the altar chip both wear the .sulk
-   class. Idle: a slow sigh-droop. .sulk-deep (rainbow on stage is complete):
-   the lonely chip dims and droops further as if to say "they finished
-   without me". Speech bubbles pop on tap with kid-friendly jealous lines. */
-.tray-chip.sulk {
-    animation: sulk-sigh 5s ease-in-out infinite;
-}
-@keyframes sulk-sigh {
-    0%, 100% { transform: translateY(0)   rotate(0); }
-    50%      { transform: translateY(2px) rotate(-1.2deg); }
-}
-.tray-chip.sulk.sulk-deep {
-    animation: sulk-sigh-deep 4.2s ease-in-out infinite;
-    filter: saturate(0.7) brightness(0.85);
-}
-@keyframes sulk-sigh-deep {
-    0%, 100% { transform: translateY(0)   rotate(0); }
-    50%      { transform: translateY(5px) rotate(-2.4deg); }
-}
-/* Don't sulk while the kid is actively grabbing — looks broken otherwise. */
-.tray-chip.sulk.grabbing { animation: none; }
-
-/* Speech bubble — small floating chat tooltip above the chip. */
-.speech-bubble {
-    position: fixed;
-    z-index: 60;
-    transform: translate(-50%, -100%) scale(0.85);
-    background: rgba(15, 23, 42, 0.95);
-    color: #fef9c3;
-    font-family: 'Fredoka', sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    padding: 7px 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(253, 230, 138, 0.4);
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
-    pointer-events: none;
-    white-space: nowrap;
-    max-width: 90vw;
-    text-overflow: ellipsis;
-    opacity: 0;
-    transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.speech-bubble.shown {
-    opacity: 1;
-    transform: translate(-50%, -100%) scale(1);
-}
-.speech-bubble::after {
-    content: '';
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 6px solid transparent;
-    border-top-color: rgba(15, 23, 42, 0.95);
-    border-bottom: 0;
-}
-
-/* ====== MUNKI ALTAR — RETIRED ======
-   The Ice <-> Moon swap is now a tap-to-swap badge on the 7th-wheel
-   bank chip (.chip-swap, below). The old #munkiAltar element is kept
-   in the DOM but always hidden, so the bank is a single clean 7-chip
-   row with no dangling extra chip. (.swap-target / .altar-* rules
-   further down are now dead CSS, left in place — zero risk.) */
-.munki-altar { display: none !important; }
-
-/* Tap-to-swap badge on the 7th-wheel chip — added by renderTray only
-   after Moon unlocks. Compact modern pill in a cold FNAF purple, not a
-   childish emoji. Tapping it swaps which evil rides the bank slot. */
-.chip-swap {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 7px;
-    font-family: 'Fredoka', sans-serif;
-    font-size: 8px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    color: #ddd6fe;
-    background: rgba(76, 29, 149, 0.5);
-    border: 1px solid rgba(167, 139, 250, 0.65);
-    border-radius: 999px;
-    cursor: pointer;
-    z-index: 6;
-    line-height: 1;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    box-shadow: 0 0 10px rgba(167, 139, 250, 0.4);
-    touch-action: manipulation;
-    transition: background 0.15s, border-color 0.15s, transform 0.1s;
-}
-.chip-swap:hover  { background: rgba(109, 40, 217, 0.72); border-color: #c4b5fd; }
-.chip-swap:active { transform: scale(0.92); }
-.chip-swap-arrow  { font-size: 11px; font-weight: 400; }
-/* Small phone chips: drop the word, the arrow alone reads. */
-@media (max-width: 480px) {
-    .chip-swap     { padding: 3px 5px; top: 3px; right: 3px; gap: 0; }
-    .chip-swap-txt { display: none; }
-}
-
-/* Highlight the bank chip that's a valid swap drop target during an
-   altar drag — mirrors the .drop-target glow on stage slots. */
-.tray-chip.swap-target {
-    border-color: #c4b5fd;
-    box-shadow: 0 0 22px rgba(167, 139, 250, 0.7);
-    animation: swap-target-pulse 0.9s ease-in-out infinite;
-}
-@keyframes swap-target-pulse {
-    0%, 100% { transform: scale(1); }
-    50%      { transform: scale(1.06); }
 }
 
 /* ====== EASTER-EGG COUNTER + MOON REVEAL ======
