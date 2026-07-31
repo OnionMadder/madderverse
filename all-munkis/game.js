@@ -370,6 +370,9 @@
         rowClock[1].started = false;
         setBandOn(0, false);
         setBandOn(1, false);
+        // Named combos are Standard-mode only; re-evaluate so a matched
+        // combo hides on entry and re-shows on exit if still valid.
+        checkNamedCombo();
     }
 
     // ---------- ACHIEVEMENTS ----------
@@ -1418,6 +1421,72 @@
     // is dropped onto a slot, the jumpscare fires automatically AND counts
     // toward unlocking the Madballz screen (see MADBALLZ_UNLOCK_THRESHOLD).
     const HORROR_TRIGGER_MODS = new Set(['ice', 'moon']);
+
+    // ---------- NAMED COMBOS ----------
+    // Detects arrangements worth calling out with a subtitle. Purely
+    // display — no scoring, no persistence, no sound. When the current
+    // slots match multiple entries, the highest-priority one wins;
+    // when nothing matches, the last subtitle fades out. A combo
+    // holds visible while its condition remains true and re-shows only
+    // when it becomes true again (so rearranging inside the same combo
+    // doesn't blink the label).
+    const CREW = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+    const WARM = ['red', 'orange', 'yellow'];
+    const COOL = ['green', 'blue', 'purple'];
+    function crewCount(set) {
+        let n = 0;
+        for (const c of CREW) if (set.has(c)) n++;
+        return n;
+    }
+    const NAMED_COMBOS = [
+        { name: 'FULL RAINBOW',   priority: 100, className: 'combo-rainbow',
+          detect: s => CREW.every(c => s.has(c)) && !s.has('ice') && !s.has('moon') },
+        { name: 'CURSED CHOIR',   priority:  90, className: 'combo-cursed',
+          detect: s => s.has('ice') && s.has('moon') && crewCount(s) >= 3 },
+        { name: 'THE COUP',       priority:  85, className: 'combo-coup',
+          detect: s => s.has('ice') && s.has('moon') && crewCount(s) === 0 },
+        { name: 'HALF LIGHT',     priority:  70, className: 'combo-ice',
+          detect: s => s.has('ice') && !s.has('moon') && crewCount(s) >= 3 },
+        { name: 'HAUNTED',        priority:  70, className: 'combo-moon',
+          detect: s => s.has('moon') && !s.has('ice') && crewCount(s) >= 3 },
+        { name: 'WARM SIDE',      priority:  50, className: 'combo-warm',
+          detect: s => WARM.every(c => s.has(c)) && !COOL.some(c => s.has(c))
+                    && !s.has('ice') && !s.has('moon') },
+        { name: 'COOL SIDE',      priority:  50, className: 'combo-cool',
+          detect: s => COOL.every(c => s.has(c)) && !WARM.some(c => s.has(c))
+                    && !s.has('ice') && !s.has('moon') }
+    ];
+    let comboLastName = null;
+    function checkNamedCombo() {
+        // Dual Band / Madballz have their own stage semantics — the combo
+        // catalogue was built for the Standard bank's crew + Ice/Moon. Skip
+        // outside that mode to avoid mislabeling a Madballz set as "COOP".
+        if (isMadballzMode || isDualBandMode) { showCombo(null); return; }
+        const set = new Set(slots.filter(Boolean));
+        let match = null;
+        for (const c of NAMED_COMBOS) {
+            if (c.detect(set) && (!match || c.priority > match.priority)) match = c;
+        }
+        showCombo(match);
+    }
+    function showCombo(combo) {
+        const el = document.getElementById('combo-subtitle');
+        if (!el) return;
+        const name = combo && combo.name;
+        if (name === comboLastName) return;
+        comboLastName = name;
+        // Wipe prior per-combo class before applying the new one so old
+        // palette accents don't leak between labels.
+        el.className = 'combo-subtitle';
+        if (name) {
+            el.textContent = name;
+            if (combo.className) el.classList.add(combo.className);
+            el.classList.add('is-shown');
+        } else {
+            el.classList.remove('is-shown');
+        }
+    }
+
     function bodyArt(c) {
         return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`
             + `<ellipse cx="22" cy="48" rx="9" ry="14" fill="${c.bodyColor}" stroke="${c.bodyShade}" stroke-width="3" transform="rotate(-15 22 48)"/>`
@@ -2062,6 +2131,10 @@
         // for the stage-scaled "perception lies" chaos (Chunk 4).
         document.body.classList.toggle('moon-present', moonOnStage());
         syncMoonFall();
+        // Named-combo subtitle (FULL RAINBOW / CURSED CHOIR / etc). Cheap
+        // enough to run on every slot change; showCombo() debounces same-
+        // combo repeats so re-arranging inside the same combo is silent.
+        checkNamedCombo();
     }
 
     function isIceOnStage() {
@@ -3105,6 +3178,7 @@
         renderTray();
         attachTrayHandlers();
         updateTrayHint();
+        checkNamedCombo();
     }
 
     function exitMadballzMode() {
@@ -3120,6 +3194,7 @@
         renderTray();
         attachTrayHandlers();
         updateTrayHint();
+        checkNamedCombo();
     }
 
     function updateTrayHint() {
@@ -3776,6 +3851,10 @@
                 }
                 updateIceFreeze();
                 if (cleared) playClearSound();
+                // CLEAR bypasses setSlot (writes slots[i] direct), so the
+                // named-combo detector needs an explicit poke or the
+                // subtitle keeps showing the last matched combo forever.
+                checkNamedCombo();
             });
         }
 

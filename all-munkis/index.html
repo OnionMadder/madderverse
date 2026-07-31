@@ -58,6 +58,12 @@
         </div>
     </main>
 
+    <!-- Named-combo subtitle. Fades in over the top of the stage whenever
+         the current arrangement matches an entry in NAMED_COMBOS (game.js).
+         Populated by showCombo(); text + per-combo class both set by JS.
+         Purely display — no scoring, no persistence, no sound. -->
+    <div id="combo-subtitle" class="combo-subtitle" aria-live="polite"></div>
+
     <!-- Dual Band Mode footswitches. Hidden until DUAL BAND mode is on.
          Each is a big stomp-style on/off for that row's WHOLE band
          (its own Bala's Theme + its own Munki voices, on its own loop
