@@ -2086,32 +2086,18 @@
             el.title = ch.label;
             // Mark the antagonists so the chip can pulse / glow distinctly.
             if (HORROR_TRIGGER_MODS.has(id)) el.classList.add('chip-bad');
-            // The 7th-wheel evil (the one not on stage in any rainbow run)
-            // wears a sad face by default and gets a .sulk class for the
-            // CSS droop/sigh animation. checkSulkState() may later upgrade
-            // it to .sulk-deep when the rainbow on stage is complete.
-            const isSulker = !isMadballzMode && id === seventhWheel;
-            const expr = isSulker ? 3 : undefined;
-            if (isSulker) el.classList.add('sulk');
-            // Post-Moon-unlock the 7th-wheel chip carries a tap-to-swap
-            // badge (Ice <-> Moon). Replaces the old drag-an-altar-chip
-            // mechanic so the bank stays a single 7-chip row with no
-            // dangling extra chip. ⇄ is a typographic arrow, not emoji.
-            const swapBadge = (isSulker && moonUnlocked)
-                ? `<button class="chip-swap" type="button"
-                          aria-label="Swap to ${CHARACTERS[altWheel()].label} Munki"
-                          title="Tap to swap Ice / Moon">`
-                  + `<span class="chip-swap-arrow" aria-hidden="true">⇄</span>`
-                  + `<span class="chip-swap-txt">SWAP</span></button>`
-                : '';
+            // Sulk / seventhWheel / chip-swap machinery retired 2026-07-30
+            // when Ice + Moon became coexisting tray citizens (see
+            // syncBankWithSeventhWheel + unlockMoon). Neither evil is
+            // "the lonely 7th wheel" any more, so neither gets the sad
+            // face + droop animation + tap-to-swap badge that used to
+            // render here.
             el.innerHTML = `
-                <div class="chip-icon">${characterArt(id, undefined, expr)}</div>
+                <div class="chip-icon">${characterArt(id, undefined, undefined)}</div>
                 <div class="chip-label">${ch.label}</div>
-                ${swapBadge}
             `;
             tray.appendChild(el);
         });
-        checkSulkState();
     }
 
     function renderSlot(index) {
@@ -3208,13 +3194,23 @@
         } catch (e) { /* ignore */ }
     }
 
-    // Keeps BANKS[0]'s 7th chip in sync with the current seventhWheel value.
-    // Idempotent — call after any swap, on init, after loadProgress.
+    // Under the original swap design ONE of Ice/Moon sat in the bank at
+    // a time (the seventhWheel; the altar chip let the kid swap between
+    // them). That was retired 2026-07-30 in favour of the "coexist"
+    // design: both evils are permanent tray citizens once Moon unlocks,
+    // which lets the anti-hero Void (triggered by BOTH on stage) actually
+    // become reachable. Pre-unlock: only `seventhWheel` (defaults to
+    // 'ice'), so brand-new players see the same first-run bank as before.
+    // Post-unlock: both. Idempotent; call after moon unlock, on init,
+    // after loadProgress.
     function syncBankWithSeventhWheel() {
         const bank = BANKS[0].munkis;
-        // Strip both evils, then append the current 7th wheel.
         const cleaned = bank.filter(id => id !== 'ice' && id !== 'moon');
         cleaned.push(seventhWheel);
+        if (moonUnlocked) {
+            const other = seventhWheel === 'ice' ? 'moon' : 'ice';
+            if (!cleaned.includes(other)) cleaned.push(other);
+        }
         BANKS[0].munkis = cleaned;
     }
 
@@ -3494,14 +3490,13 @@
     function unlockMoon() {
         moonUnlocked = true;
         saveProgress();
-        // Show the swap altar — the kid can now drag Moon's alternate chip
-        // onto Ice in the bank (or vice-versa) to swap which evil rides
-        // the 7th-wheel slot. Bank itself stays at 7 chips. seventhWheel
-        // defaults to 'ice' so the existing bank layout is unchanged on
-        // first unlock; the kid earns Moon's presence by swapping.
-        renderMunkiAltar();
-        // Re-render the bank so the 7th-wheel chip gets its tap-to-swap
-        // badge the instant Moon unlocks (no reload needed).
+        // "Coexist" design (2026-07-30): syncBankWithSeventhWheel now
+        // appends BOTH Ice + Moon post-unlock. Re-sync the bank + re-
+        // render the tray so Moon's chip appears immediately alongside
+        // Ice. The old altar/swap machinery is retired — renderMunkiAltar
+        // is a no-op now (see its body), left in place so any stale
+        // caller stays safe.
+        syncBankWithSeventhWheel();
         renderTray();
         attachTrayHandlers();
         bumpEggCounter(); // flip "5/5" → "FOUND"
