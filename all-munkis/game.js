@@ -2215,6 +2215,10 @@
         // for the stage-scaled "perception lies" chaos (Chunk 4).
         document.body.classList.toggle('moon-present', moonOnStage());
         syncMoonFall();
+        // Void: anti-hero counter-presence, appears ONLY when BOTH Ice
+        // AND Moon are on stage. Purely visual; CSS gates the full-body
+        // central sprite behind body.void-present.
+        document.body.classList.toggle('void-present', isIceOnStage() && moonOnStage());
         // Named-combo subtitle (FULL RAINBOW / CURSED CHOIR / etc). Cheap
         // enough to run on every slot change; showCombo() debounces same-
         // combo repeats so re-arranging inside the same combo is silent.

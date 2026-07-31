@@ -139,24 +139,31 @@ body > * { position: relative; z-index: 1; }
     transform: scale(0.55);
 }
 
-body.react-mode-active .horror-munki {
+/* Each corner Munki gates INDEPENDENTLY on whichever trigger is on
+   stage (moon-present for Moon, ice-on-stage for Ice), AND on
+   react-mode-active so they only fully arrive when horror actually
+   engages. Splitting them meant only one shows if only its trigger is
+   present — the coupled behavior (both appeared together whenever
+   react-mode-active was on, regardless of who's on stage) was wrong. */
+body.react-mode-active.moon-present .horror-munki--moon,
+body.react-mode-active.ice-on-stage .horror-munki--ice {
     opacity: 0.96;
-    /* Final pose: sharp focus + a dim blood-red glow — Moon's signature
-       "they're definitely here now". Ice's glow is overridden below to
-       cyan since Ice's horror palette is cold blue, not blood. */
-    filter: blur(0) drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
-                    drop-shadow(0 0 40px rgba(255, 40, 40, 0.28));
     /* ENTRY transition (slow creep-in). Overrides the base 1.5s exit
-       so the corner Munkis rise gradually over 12s while react-mode-active
-       is being ADDED, then snap back to the base rule (fast exit) when it's
-       REMOVED. */
+       so the corner Munkis rise gradually over 12s while their trigger
+       is present + horror is on, then snap back to the base rule (fast
+       exit) when either condition drops. */
     transition:
         opacity   12s ease-in,
         transform 12s ease-out,
         filter    12s ease-in;
 }
-body.react-mode-active .horror-munki--moon { transform: scale(1); }
-body.react-mode-active .horror-munki--ice {
+body.react-mode-active.moon-present .horror-munki--moon {
+    transform: scale(1);
+    /* Blood-red glow — Moon's signature "they're definitely here now". */
+    filter: blur(0) drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
+                    drop-shadow(0 0 40px rgba(255, 40, 40, 0.28));
+}
+body.react-mode-active.ice-on-stage .horror-munki--ice {
     transform: scale(1);
     /* Cyan glow for Ice — matches the ice-wall, frost overlay, snow,
        and the cyan jumpscare flash. Same shape as the red shadow above
@@ -172,8 +179,8 @@ body.react-mode-active .horror-munki--ice {
     0%, 100% { transform: translate(0, 0) scale(1); }
     50%      { transform: translate(0, -0.6%) scale(1.015); }
 }
-body.react-mode-active .horror-munki--moon { animation: horror-munki-breathe 5.2s ease-in-out 12s infinite; }
-body.react-mode-active .horror-munki--ice  { animation: horror-munki-breathe 5.6s ease-in-out 12s infinite; }
+body.react-mode-active.moon-present .horror-munki--moon { animation: horror-munki-breathe 5.2s ease-in-out 12s infinite; }
+body.react-mode-active.ice-on-stage .horror-munki--ice  { animation: horror-munki-breathe 5.6s ease-in-out 12s infinite; }
 
 /* Reduced-motion: no slow creep, no breathing — a short opacity fade so
    the kid is still aware something's happening without the motion. */
@@ -181,6 +188,82 @@ body.react-mode-active .horror-munki--ice  { animation: horror-munki-breathe 5.6
     .horror-munki { transition: opacity 1.2s ease-in; transform: none !important; filter: none; }
     .horror-munki--moon, .horror-munki--ice { animation: none !important; }
     body.react-mode-active .horror-munki { opacity: 0.7; }
+}
+
+/* ====== VOID MUNKI — anti-hero counter-presence ======
+   Full-body pose anchored bottom-center. Appears ONLY when BOTH Ice AND
+   Moon are on stage (body.void-present toggled by setSlot). Warm gold/
+   amber aura against Ice's cyan / Moon's red — reads as "the calm figure
+   who arrives when things get bad." Semi-transparent (0.78 target) so
+   the crew Munkis on stage remain readable in front. Z 5 sits above the
+   stage crew (z 1) but below the horror overlays (ice-wall/vignette z 8,
+   moon-fall z 9) so the horror still surrounds him. Same asymmetric
+   transition as .horror-munki: slow creep-in when arriving, fast fade
+   when leaving. */
+.void-munki {
+    position: fixed;
+    bottom: 0 !important;
+    left: 50%;
+    height: min(82vh, 78vw);
+    width: auto;
+    aspect-ratio: 1080 / 1229;
+    pointer-events: none;
+    z-index: 5;
+    /* Base = EXIT state (fast fade out). Opacity 0, held at slight down-
+       scale so the arrival transition has somewhere to grow from. */
+    opacity: 0;
+    transform: translateX(-50%) scale(0.78);
+    transform-origin: 50% 100%;   /* grow from feet-anchor, feet stay put */
+    filter: blur(6px)
+            drop-shadow(0 8px 24px rgba(180, 130, 40, 0.35));
+    transition:
+        opacity   1.5s ease-out,
+        transform 1.5s ease-out,
+        filter    1.5s ease-out;
+}
+body.void-present .void-munki {
+    /* ENTRY state — slow creep-in over the same 12 s as the corner
+       horror-Munkis so all three atmospheric presences ramp together
+       when Ice + Moon land. Warm gold/amber aura layered around him. */
+    opacity: 0.78;
+    transform: translateX(-50%) scale(1);
+    filter: blur(0)
+            drop-shadow(0 10px 28px rgba(180, 120, 30, 0.55))
+            drop-shadow(0 0 48px rgba(250, 200, 100, 0.4));
+    transition:
+        opacity   12s ease-in,
+        transform 12s ease-out,
+        filter    12s ease-in;
+}
+/* Slow "grounded breathing" while present — subtler than the corner
+   Munkis' breathe animation (Void is calm, not menacing). Kicks in
+   after the 12 s creep-in. */
+@keyframes void-breathe {
+    0%, 100% { transform: translateX(-50%) scale(1); }
+    50%      { transform: translateX(-50%) scale(1.007); }
+}
+body.void-present .void-munki {
+    animation: void-breathe 6.4s ease-in-out 12s infinite;
+}
+
+/* Void is Standard-mode territory. Suppress in Madballz + Dual Band +
+   Round Robin so his central figure doesn't intrude on alternate
+   composition surfaces. */
+body.madballz-mode .void-munki,
+body.dual-band-mode .void-munki,
+body.round-robin-mode .void-munki {
+    display: none !important;
+}
+
+/* Reduced-motion: opacity-only fade, no scale / breathing. */
+@media (prefers-reduced-motion: reduce) {
+    .void-munki {
+        transition: opacity 1.2s ease-in;
+        transform: translateX(-50%) !important;
+        filter: none;
+        animation: none !important;
+    }
+    body.void-present .void-munki { opacity: 0.6; }
 }
 
 /* ====== NAMED-COMBO SUBTITLE ======
