@@ -6624,9 +6624,22 @@ async function offerDraft() {
     }, { once: true });
 }
 
+// corePieceFields() encodes six canvases to PNG, and toDataURL blocks the
+// main thread — measured ~30 ms on desktop for the 2048x1024 layers, and
+// phones encode a good deal slower. Fired straight off the interval that
+// lands as a periodic hitch in a scene that's always turning. Wait for an
+// idle gap instead; the timeout guarantees it still runs under sustained
+// load. Deliberately NOT used for the visibilitychange path below, where
+// we're about to be killed and correctness beats smoothness.
+function draftWriteWhenIdle() {
+    const ric = window.requestIdleCallback;
+    if (typeof ric === "function") ric(() => draftWrite(), { timeout: 2000 });
+    else setTimeout(draftWrite, 0);
+}
+
 function startDraftHeartbeat() {
     if (draftTimer) return;
-    draftTimer = setInterval(draftWrite, DRAFT_INTERVAL_MS);
+    draftTimer = setInterval(draftWriteWhenIdle, DRAFT_INTERVAL_MS);
     // Backgrounding is the most likely moment to be killed — take the
     // snapshot on the way out rather than waiting for the next tick.
     document.addEventListener("visibilitychange", () => {
