@@ -410,14 +410,33 @@ body.dual-band-mode .stage::before {
     border-color: #2dd4bf;
     box-shadow: 0 0 16px rgba(45, 212, 191, 0.5);
 }
+/* Footswitches float ABOVE the fixed tray (which sits at bottom:0 with
+   z-index:10). Without an explicit fixed positioning here they render
+   in normal flow between <main> and .tray-wrap — and get covered by the
+   tray, making them untappable (bug seen 2026-07-31). Position them
+   just above the tray and lift the z-index above it. --tray-h is set
+   by watchTrayHeight() in game.js, so the bottom offset auto-tracks
+   the tray's actual height at any viewport. */
 .band-footswitches {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--tray-h, 240px) + 8px);
     display: flex;
     justify-content: center;
     gap: 22px;
     padding: 10px 12px 4px;
     flex-wrap: wrap;
+    z-index: 11;
+    pointer-events: none;   /* the wrapper is pass-through so gaps don't block */
 }
+.band-footswitches .band-foot { pointer-events: auto; }
 .band-footswitches[hidden] { display: none; }
+/* Dual Band mode adds a small extra bottom pad on main so the stage
+   doesn't overlap the fixed footswitch strip above the tray. */
+body.dual-band-mode main {
+    padding-bottom: calc(var(--tray-h, 240px) + 110px);
+}
 .band-foot {
     -webkit-appearance: none; appearance: none;
     display: flex;
@@ -675,7 +694,22 @@ body.madballz-mode #ice-freeze-warp::before,
 body.madballz-mode #moon-warp,
 body.madballz-mode .horror-munki,
 body.madballz-mode .snow-fall,
-body.madballz-mode .moon-fall {
+body.madballz-mode .moon-fall,
+/* Dual Band Mode also suppresses the horror overlays — the layering
+   performance is a music-composition surface, not a scare surface.
+   Same rule set as body.madballz-mode above; the JS-side bypasses
+   (setIceMuffle + setReactDrone + triggerJumpScare + moonRules) live
+   in game.js as `|| isDualBandMode` mirrors of the Madballz gates. */
+body.dual-band-mode #horror-overlay .bg-dim,
+body.dual-band-mode #horror-overlay .red-vignette,
+body.dual-band-mode #horror-overlay .eyes-container,
+body.dual-band-mode #horror-overlay .ice-wall,
+body.dual-band-mode #ice-freeze-warp,
+body.dual-band-mode #ice-freeze-warp::before,
+body.dual-band-mode #moon-warp,
+body.dual-band-mode .horror-munki,
+body.dual-band-mode .snow-fall,
+body.dual-band-mode .moon-fall {
     display: none !important;
 }
 

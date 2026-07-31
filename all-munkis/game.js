@@ -15,13 +15,20 @@
     // sprites, audio profiles, and the mode toggle are all preserved, but the
     // reveal button never appears. Flip to true to bring the bonus screen back.
     const MADBALLZ_ENABLED = true;
-    // Dual Band Mode: code is preserved (see "DUAL BAND MODE (v1.1)" section
-    // below + ensureDualBandAudio / setDualBandMode / scheduler branches),
-    // but gated off for the v1.1 Play release — the audio independence and
-    // footswitch UX weren't finished to a shippable bar. Re-enable + finish
-    // for v1.2. Flag flip is all that's needed to bring it back; the rest
-    // of the wiring is intact.
-    const DUAL_BAND_ENABLED = false;
+    // Dual Band Mode: enabled 2026-07-31 after finishing the audio-independence
+    // + UX gaps that had kept it flag-off for the v1.1 Play release:
+    //   1. Per-band DynamicsCompressor before merge (ensureDualBandAudio) so
+    //      each band's peaks don't sidechain the other — matches the
+    //      two-tab reference that had one compressor per tab.
+    //   2. Loop-clock anchor jitter (setBandOn) so a same-instant double-tap
+    //      doesn't phase-lock both bands to the same 16th-note grid.
+    //   3. Horror pipeline gated off in dual-band mode (CSS + JS bypasses in
+    //      setReactDrone/setIceMuffle/triggerJumpScare/moonRules) so Ice/Moon
+    //      drops don't hijack a composition surface.
+    //   4. Footswitches lifted to position:fixed above the fixed tray (were
+    //      buried behind it in normal flow, making them un-tappable).
+    // Flip to false to disable the mode without removing any wiring.
+    const DUAL_BAND_ENABLED = true;
     const STORAGE_KEY = 'all-munkis-progress-v1';
 
     // ---------- FLYING CREEP CONFIG (all tunable, all in one place) ----
@@ -211,7 +218,8 @@
     // (the locked design's required convergence). v1.0 single-row path is
     // never touched — scheduleStep just early-returns its audio in mode.
     let dualReady = false;
-    let rowGain = [null, null];   // per-row bus -> masterGain (footswitch gates)
+    let rowGain = [null, null];   // per-row bus -> rowCompressor -> masterGain
+    let rowCompressor = [null, null]; // per-row DynamicsCompressor (see below)
     let rowTone = [null, null];   // per-row {pad,bell,hat} (own Bala's Theme)
     let rowClock = [
         { step: 0, bar: 0, next: 0, started: false },
@@ -225,8 +233,26 @@
         for (let r = 0; r < 2; r++) {
             const rg = audioCtx.createGain();
             rg.gain.value = 0;            // silent until the footswitch lifts it
-            rg.connect(masterGain);       // converge at the one master/compressor
+            // Per-band DynamicsCompressor BEFORE the merge. The
+            // "two-tab magic" this mode reproduces relied on each tab
+            // owning its OWN compressor — the OS mixer summed them
+            // uncompressed against each other, so peaks stayed
+            // independent. Sharing a single master compressor here
+            // meant Band B's kick sidechained Band A's pad and
+            // vice versa; per-band compressors restore the
+            // independence. Settings clone the current master
+            // (line ~423) so each band sounds like the single-band
+            // path. Master downstream still runs but with far less
+            // work — it effectively becomes a soft peak limiter.
+            const rc = audioCtx.createDynamicsCompressor();
+            rc.threshold.value = -14;
+            rc.knee.value      = 10;
+            rc.ratio.value     = 6;
+            rc.attack.value    = 0.003;
+            rc.release.value   = 0.25;
+            rg.connect(rc).connect(masterGain);
             rowGain[r] = rg;
+            rowCompressor[r] = rc;
             // This row's OWN Bala's Theme: its own Tone ambient instances
             // through its own reverb/delay bus -> this row's gain. Wrapped
             // so a Tone failure can never break the raw-WebAudio path.
@@ -315,11 +341,16 @@
             g.setValueAtTime(g.value, t);
             g.linearRampToValueAtTime(on ? 1 : 0, t + 0.06);
         }
-        // First time a band is switched ON, anchor its loop clock to NOW.
+        // First time a band is switched ON, anchor its loop clock to NOW,
+        // with 0-50 ms of random jitter added to the base 80 ms offset.
         // The gap between the two anchors = whenever the player stamped
         // each footswitch = the performed offset (the two-tab magic).
+        // The jitter simulates the natural setTimeout drift that two
+        // separate browser tabs would produce, so even a same-instant
+        // double-tap doesn't phase-lock the two bands to a single grid.
         if (on && audioCtx && !rowClock[i].started) {
-            rowClock[i] = { step: 0, bar: 0, next: audioCtx.currentTime + 0.08, started: true };
+            const jitter = Math.random() * 0.05;
+            rowClock[i] = { step: 0, bar: 0, next: audioCtx.currentTime + 0.08 + jitter, started: true };
         }
     }
     function setDualBandMode(on) {
@@ -530,7 +561,7 @@
         // Madballz mode mutes the horror sub-bass drone — creeps + per-
         // Munki reacts still escalate the dread state, but the screen-wide
         // horror audio (and the matching overlays, gated in CSS) goes away.
-        if (isMadballzMode) level = 0;
+        if (isMadballzMode || isDualBandMode) level = 0;
         if (level === droneLevel) return;
         droneLevel = level;
         if (!toneReady || !toneDroneGain) return;
@@ -2319,6 +2350,11 @@
     // red, and the active Munkis glitch out. Returns to normal after 1.5s.
     // Debounced so spamming the button doesn't stack scares.
     function triggerJumpScare() {
+        // Dual Band Mode is a composition surface — scares would blow up
+        // the layering performance, so bypass entirely (mirrors the
+        // Madballz-mode design where Ice/Moon aren't even in the tray;
+        // Dual Band DOES ship them, so we need an active bypass).
+        if (isDualBandMode) return;
         if (isJumpScareActive) return;
         isJumpScareActive = true;
         addDread(DREAD.JUMPSCARE_SPIKE);   // instant meter spike
@@ -2434,6 +2470,11 @@
 
     function moonRules() {
         if (!slots.includes('moon')) return;
+        // Dual Band Mode: clicks are the composition instrument (footswitch
+        // taps, Munki drags). Chaos hijacking those taps would be actively
+        // hostile. Bypass to keep the mode clean, same rationale as the
+        // triggerJumpScare early-return above.
+        if (isDualBandMode) return;
         if (moonChaosCooldown) return;
         if (isJumpScareActive) return; // don't pile on during scares
         moonChaosCooldown = true;
@@ -2838,11 +2879,11 @@
         // Madballz mode keeps clean audio — no cold lowpass muffle even if
         // dread is climbing (creeps/per-Munki reacts still fire; only the
         // ice/moon horror audio layer is gated off).
-        const target = isMadballzMode             ? 14000
-                     : (!ice || stage === 'calm') ? 14000
-                     : stage === 'unease'         ? 7000
-                     : stage === 'dread'          ? 2500
-                     :                               700;  // terror
+        const target = (isMadballzMode || isDualBandMode) ? 14000
+                     : (!ice || stage === 'calm')         ? 14000
+                     : stage === 'unease'                 ? 7000
+                     : stage === 'dread'                  ? 2500
+                     :                                       700;  // terror
         if (target === iceMuffleLevel) return;
         iceMuffleLevel = target;
         const now = audioCtx.currentTime;
