@@ -110,10 +110,17 @@ body > * { position: relative; z-index: 1; }
     z-index: 40;          /* over the stage, under modals/jumpscare/tray */
     opacity: 0;
     filter: blur(8px) drop-shadow(0 12px 32px rgba(0, 0, 0, 0.7));
+    /* BASE = EXIT transition (fast). When react-mode-active is REMOVED,
+       CSS reverts to this rule, and the 1.5s duration fades the corner
+       Munkis out cleanly. Entry uses the 12s creep-in override below.
+       Follows the same asymmetric pattern as .bg-dim / .red-vignette /
+       .ice-wall — those had it right; .horror-munki was the only overlay
+       stuck at symmetric 12s, causing "jitter and sticks around" on
+       fade-out. Fixed 2026-07-31. */
     transition:
-        opacity   12s ease-in,
-        transform 12s ease-out,
-        filter    12s ease-in;
+        opacity   1.5s ease-out,
+        transform 1.5s ease-out,
+        filter    1.5s ease-out;
 }
 /* transform-origin is the sprite's OWN bottom-side corner so the 0.55→1
    scale-up grows OUT of the screen corner and the anchored corner never
@@ -139,6 +146,14 @@ body.react-mode-active .horror-munki {
        cyan since Ice's horror palette is cold blue, not blood. */
     filter: blur(0) drop-shadow(0 12px 32px rgba(180, 0, 0, 0.55))
                     drop-shadow(0 0 40px rgba(255, 40, 40, 0.28));
+    /* ENTRY transition (slow creep-in). Overrides the base 1.5s exit
+       so the corner Munkis rise gradually over 12s while react-mode-active
+       is being ADDED, then snap back to the base rule (fast exit) when it's
+       REMOVED. */
+    transition:
+        opacity   12s ease-in,
+        transform 12s ease-out,
+        filter    12s ease-in;
 }
 body.react-mode-active .horror-munki--moon { transform: scale(1); }
 body.react-mode-active .horror-munki--ice {
