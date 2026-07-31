@@ -232,12 +232,12 @@ Add a Google account as a **License tester** in Play Console (`Setup` → `Licen
 **Model:** a **paid app** (one-time price). Google Play handles the purchase at the store, so there is **NO in-app billing code, NO RevenueCat, NO product catalog** — the opposite of Pootery. Don't add billing.
 
 **Capacitor wrap:** `slip-studio-app/` — a SIBLING of the web app `slip-studio/`, **outside git** (untracked, like `pootery-app/`). Minimal deps: `@capacitor/core` + `@capacitor/android` only.
-- **Package id:** `org.madderverse.slipstudio` · **App name:** "Slip Studio"
+- **Package id:** `org.madderverse.slipstudio` · **App name** (under-icon launcher): "Slip Studio" · **Play listing title** (what users see in search + on the store page): "Slip Studio Shape Clay"
 - **Web source of truth** is the git repo's `slip-studio/`. Edits there do NOT reach the AAB until synced (see rebuild steps).
 - **Three.js is vendored locally** at `slip-studio/vendor/` (import map points there, NOT esm.sh) so the app runs offline. Re-vendor if bumping the Three version.
 - **Immersive fullscreen:** `MainActivity.java` hides the status + navigation bars (the bottom button row) via `WindowInsetsControllerCompat`, swipe-to-reveal. Keep this — it's a product requirement.
 
-**Release keystore** (safe to keep here): `slip-studio-app/android/app/slip-studio-release.keystore` · store/key password `slipstudio_2026_release` · alias `slipstudio` · PKCS12, 10000 days · DN `CN=Slip Studio, OU=Mad Sundar LLC, O=Mad Sundar LLC, L=Minneapolis, ST=Minnesota, C=US`.
+**Release keystore** (safe to keep here): `slip-studio-app/android/app/slip-studio-release.keystore` · store/key password `slipstudio_2026_release` · alias `slipstudio` · PKCS12, 10000 days · DN `CN=Slip Studio, OU=Mad Sundar LLC, O=Mad Sundar LLC, L=Minneapolis, ST=Minnesota, C=US`. **⚠ The `L=`/`ST=` fields are keystore-DN artefacts, NOT Onion's location** — she isn't in Minnesota. Never use these values as her location anywhere (docs, pitches, screenshots, social copy). Same applies to the Pootery keystore DN above.
 
 **Rebuild the signed AAB after a web change:**
 1. Edit web source in `slip-studio/`, commit, push.
