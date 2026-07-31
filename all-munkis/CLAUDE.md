@@ -631,10 +631,15 @@ portrait art, retune `EYE_PAIRS_PORTRAIT` to the new composition.
 > The v1.1 plate is an **empty concert-stage shot with overhead spotlights
 > casting volumetric blue beams down onto a polished concrete floor** — dark
 > and moody so the colorful Munkis pop against it. No baked-in HUD,
-> characters, or UI. **Current MD5 `8c324a0fdc3aa2e53dec389e9a5a7363`** (file
-> ~4 MB). Portrait companion `stage-portrait.jpg` MD5
-> `59c8b8221482294308cc4298c528344a` — note `.jpg` extension, the v1.0 `.png`
-> was deleted.
+> characters, or UI. **Current MD5 `a5243fda91747236761ac71d0ad0ed17`**
+> (2560×1707 progressive q82 JPEG, ~249 KB — downscaled from the original
+> 6720×4480 4-MB source on 2026-07-31 as part of the backdrop-optimization
+> pass; the pre-optimization MD5 was `8c324a0fdc3aa2e53dec389e9a5a7363`).
+> Portrait companion `stage-portrait.jpg` MD5
+> `b914e8e6a2ca3afab2a6a64f418530bb` (1080×2340 progressive q82 JPEG,
+> ~166 KB — re-encoded 2026-07-31, pre-opt was
+> `59c8b8221482294308cc4298c528344a`) — note `.jpg` extension, the v1.0
+> `.png` was deleted.
 >
 > Historical bad variants that have overwritten this file before — **never
 > ship these:**
