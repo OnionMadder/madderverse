@@ -1933,6 +1933,17 @@ function init() {
             shapeHistoryDepth: () => shapeHistory.length,
             bumpDab, resetBumpLayer,
             playSfx, stopSfx,
+            // The SFX elements live in a JS cache, not the DOM, so "is the
+            // wheel hum actually audible right now?" is otherwise unaskable
+            // from a page script. It's the one sound that can play when it
+            // shouldn't (the title screen is meant to be silent).
+            humInfo: () => ({
+                started: wheelStarted,
+                gain: +wheelGain.toFixed(3),
+                paused: sfxCache.wheel ? sfxCache.wheel.audio.paused : null,
+                volume: sfxCache.wheel ? +sfxCache.wheel.audio.volume.toFixed(3) : null,
+            }),
+            pointerCount: () => pointers.size,
             setDecoColor, setDecoTool, setDecoSize, paintAt, clearDeco,
             setAdjustMode, addBand, startMotifPlacement, startPlacementMove,
             movePlacementTo, endPlacementDrag, placementAt, loadStarterMotif,
@@ -4871,6 +4882,11 @@ function resetPot() {
     updateHandleCountPicker();
     // Reset the per-piece vertical stretch — fresh pot, default height.
     setHeightScale(1.0);
+    // Back to the default framing. Zoom is session-only camera state, but it
+    // also gates the auto-spin (any zoom holds the wheel still so you can
+    // work close in). Carried into a new pot it reads as a broken wheel that
+    // never starts, with no obvious way back — so a fresh pot re-frames.
+    setZoom(1);
     setPhase(INITIAL_STATE);
     state.dirty = false;
     draftClear(); // starting over — the old draft is no longer the user's work
@@ -5843,8 +5859,36 @@ function bindSculpt(canvas) {
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
+    // Capture is released automatically on up/cancel, but it can also be
+    // yanked away (element detached, browser gesture takeover). Treat that
+    // as a release so the pointer never stays in the map.
+    canvas.addEventListener("lostpointercapture", onPointerUp);
     canvas.addEventListener("pointerleave", hideCarveDot);
     canvas.addEventListener("wheel", onWheel, { passive: false });
+    // Safety net for a pointer that goes up somewhere we'll never hear
+    // about — capture refused, or the finger lifted outside the window.
+    // A leaked pointer is not a cosmetic bug: it keeps state.userRotating
+    // pinned true (the wheel stops for the rest of the session) AND makes
+    // pointers.size read 2, so the next one-finger drag is treated as a
+    // pinch. Only act on pointers we're actually tracking.
+    const sweep = (ev) => { if (pointers.has(ev.pointerId)) onPointerUp(ev); };
+    window.addEventListener("pointerup", sweep);
+    window.addEventListener("pointercancel", sweep);
+    // Backgrounding the tab drops pointer events on the floor; come back
+    // to a clean slate rather than a half-held gesture.
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") releaseAllPointers();
+    });
+    window.addEventListener("blur", releaseAllPointers);
+}
+
+// Drop every tracked pointer and clear the gesture flags they gate.
+// Reuses onPointerUp's own teardown so an in-progress dip/placement/wax
+// stroke still commits the way a normal release would.
+function releaseAllPointers() {
+    if (!pointers.size) return;
+    const ids = [...pointers.keys()];
+    ids.forEach((id) => onPointerUp({ pointerId: id }));
 }
 
 // --- View control -----------------------------------------------
@@ -6066,6 +6110,11 @@ function onPointerDown(ev) {
     dismissFirstRunHint();
     dismissCoach();
     pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    // Retarget every later event for this pointer to the canvas, so a drag
+    // that wanders off it (over the toolbar, the deco tray, past the window
+    // edge) still delivers its pointerup here. Without this, releasing
+    // off-canvas leaks the pointer — see the safety net in bindSculpt.
+    try { ev.currentTarget?.setPointerCapture?.(ev.pointerId); } catch (_) {}
 
     if (pointers.size >= 2) {
         // Two fingers → view gesture; abandon any in-progress stroke
@@ -8888,6 +8937,12 @@ function dismissLanding() {
 function showLanding() {
     const l = document.getElementById("landing");
     if (l) { l.hidden = false; l.classList.remove("is-gone"); }
+    // The title screen is silent. The pot still turns behind it, so without
+    // this the wheel hum — armed on the first Begin and never disarmed —
+    // keeps running over the landing every time you come back for a new pot.
+    wheelStarted = false;
+    wheelGain = 0;
+    stopSfx("wheel");
     // Clear any pending / visible first-run hint without marking it seen —
     // the user hasn't touched the clay yet, so it can re-offer next Begin.
     if (firstRunTimer) { clearTimeout(firstRunTimer); firstRunTimer = null; }
