@@ -3,9 +3,16 @@
     'use strict';
 
     // ---------- CONFIG ----------
-    const TEMPO = 100;                       // BPM
+    // TEMPO / SECONDS_PER_STEP are MUTABLE — Tier-1 music expansion adds a
+    // tempo cycler pill. All downstream sites read the current values
+    // fresh (scheduler, BAR_LEN calcs) so a mid-loop tempo change lands on
+    // the next scheduled step. STEPS_PER_BAR stays const — every Munki's
+    // play() hardcodes literal step indices (see the "Things that bite"
+    // section in the game-level CLAUDE.md).
+    let TEMPO = 100;                         // BPM (mutable — see setTempo)
+    let SECONDS_PER_STEP = 60 / TEMPO / 4;   // 0.15s at 100 BPM
+    const TEMPO_PRESETS = [80, 100, 120, 140];
     const STEPS_PER_BAR = 16;                // sixteenth notes
-    const SECONDS_PER_STEP = 60 / TEMPO / 4; // 0.15s
     const LOOKAHEAD_MS = 25;
     const SCHEDULE_AHEAD = 0.1;
     const NUM_SLOTS = 6;
@@ -167,6 +174,26 @@
     let isPlaying = false;
     let isMuted = false;
     let isBaseSongOn = true;                 // background "level music" theme
+    // ---------- MUSIC EXPANSION (Tier 1) — 2026-07-31 ----------
+    // Four global params the player controls via top-cluster pills. Each
+    // persists in the save (see loadProgress / saveProgress). Combined
+    // with the 8-character roster and 4-bar loop, they multiply the
+    // sonic surface far beyond the fixed-Cmaj-100-BPM baseline: 3 song
+    // moods × 4 tempos × 4 keys × 2 grooves = 96 distinct beds without
+    // adding a single character.
+    let songVariationIndex = 0;              // 0 = SUNNY, 1 = MINOR, 2 = AMBIENT
+    let keyShiftSemitones  = 0;              // 0, 2, 5, 8 = C, D, F, A♭
+    let isSwingOn          = false;          // straight vs shuffled 8ths
+    const KEY_PRESETS = [
+        { name: 'C',  shift: 0 },
+        { name: 'D',  shift: 2 },
+        { name: 'F',  shift: 5 },
+        { name: 'A♭', shift: 8 }
+    ];
+    // Global pitch-shift node — a ConstantSourceNode driving detune on
+    // every oscillator via a monkey-patch in ensureAudio. Musical
+    // transposition without editing any per-Munki play() function.
+    let pitchShiftSource = null;
     let isBassOn     = false;                // optional booming bass overlay (Madballz Theme) — off by default; user toggles via BASS button
     let isJumpScareActive = false;           // debounce + visual gate for BOO
     let currentStep = 0;
@@ -318,21 +345,21 @@
     // we only pass this row's bus as `out` and this row's clock as `when`.
     function dualRowStep(r, step, bar, when) {
         if (!rowGain[r]) return;
+        const w = swungWhen(when, step);
         if (isBaseSongOn) {
-            // Mirror the single-band swap: Madballz mode → MADBALLZ_SONG,
-            // standard → BASE_SONG. (Note: Dual Band itself is currently
-            // flag-gated off via DUAL_BAND_ENABLED, but keep this path in
-            // step with scheduleStep for when it's re-enabled in v1.2.)
-            const song = isMadballzMode ? MADBALLZ_SONG : BASE_SONG;
-            song.play(audioCtx, rowGain[r], when, step, bar);
-            if (!isMadballzMode) playRowTone(r, step, bar, when);
+            // Mirror the single-band routing: MADBALLZ_SONG in madballz
+            // mode, current variation otherwise. Both bands share the
+            // same MOOD pill so they harmonize.
+            const song = currentSong();
+            song.play(audioCtx, rowGain[r], w, step, bar);
+            if (!isMadballzMode) playRowTone(r, step, bar, w);
         }
         const lo = r * 3;
         for (let i = lo; i < lo + 3; i++) {
             const id = slots[i];
             if (!id) continue;
             const ch = CHARACTERS[id];
-            if (ch && ch.play) ch.play(audioCtx, rowGain[r], when, step);
+            if (ch && ch.play) ch.play(audioCtx, rowGain[r], w, step);
         }
     }
     function setBandOn(i, on) {
@@ -532,6 +559,25 @@
             comp.release.value = 0.25;
             // Chain: masterGain -> 14 kHz LP -> compressor -> destination.
             masterGain.connect(masterLP).connect(comp).connect(audioCtx.destination);
+
+            // Global pitch shifter (Tier-1 music expansion): a
+            // ConstantSourceNode outputting `keyShiftSemitones * 100`
+            // cents, wired into every oscillator's `.detune` AudioParam
+            // via a createOscillator monkey-patch. AudioParam sums its
+            // intrinsic value with all connected inputs, so per-voice
+            // detune (e.g. Tone's chorus / vibrato) still stacks on top.
+            // Set BEFORE buildToneLayer so Tone's oscillators get the
+            // patch too.
+            pitchShiftSource = audioCtx.createConstantSource();
+            pitchShiftSource.offset.value = keyShiftSemitones * 100;
+            pitchShiftSource.start();
+            const origCreateOsc = audioCtx.createOscillator.bind(audioCtx);
+            audioCtx.createOscillator = function() {
+                const osc = origCreateOsc();
+                try { pitchShiftSource.connect(osc.detune); } catch (_) {}
+                return osc;
+            };
+
             buildToneLayer(); // no-op if Tone.js isn't loaded
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -676,27 +722,115 @@
         schedTimer = setTimeout(schedule, LOOKAHEAD_MS);
     }
 
+    // Swing shifts off-beat 8ths (steps 2/6/10/14) forward by ~20% of a
+    // step, turning the straight grid into a shuffled lope. Applied to
+    // audio `when` only — the scheduler's constant advance rate is
+    // unchanged, so no note-density drift builds up over a bar.
+    function swungWhen(when, step) {
+        if (!isSwingOn) return when;
+        if (step === 2 || step === 6 || step === 10 || step === 14) {
+            return when + SECONDS_PER_STEP * 0.4;   // ~30ms at 100 BPM
+        }
+        return when;
+    }
+    // Which song plays right now. Madballz mode wins outright (its own
+    // brooding theme). Standard mode picks from SONG_VARIATIONS by the
+    // MOOD pill's index.
+    function currentSong() {
+        if (isMadballzMode) return MADBALLZ_SONG;
+        return SONG_VARIATIONS[songVariationIndex].song;
+    }
+    function currentTone() {
+        if (isMadballzMode) return null;
+        return SONG_VARIATIONS[songVariationIndex].tone;
+    }
+
+    // ---------- MUSIC EXPANSION SETTERS ----------
+    function setTempo(bpm) {
+        TEMPO = bpm;
+        SECONDS_PER_STEP = 60 / TEMPO / 4;
+        // The scheduler picks up SECONDS_PER_STEP on its next advance —
+        // already-scheduled notes fire at the old timing, the next step
+        // uses the new one. No pop.
+    }
+    function cycleTempo() {
+        const i = TEMPO_PRESETS.indexOf(TEMPO);
+        const next = TEMPO_PRESETS[(i + 1) % TEMPO_PRESETS.length];
+        setTempo(next);
+        updateTempoBtn();
+        saveProgress();
+    }
+    function setSwing(on) {
+        isSwingOn = !!on;
+        updateSwingBtn();
+        saveProgress();
+    }
+    function setKeyShift(semitones) {
+        keyShiftSemitones = semitones;
+        if (pitchShiftSource) {
+            const now = audioCtx.currentTime;
+            pitchShiftSource.offset.cancelScheduledValues(now);
+            pitchShiftSource.offset.setValueAtTime(pitchShiftSource.offset.value, now);
+            // 60ms glide keeps a mid-loop key change from clicking; short
+            // enough that the shift feels immediate to the player.
+            pitchShiftSource.offset.linearRampToValueAtTime(semitones * 100, now + 0.06);
+        }
+    }
+    function cycleKey() {
+        const i = KEY_PRESETS.findIndex(k => k.shift === keyShiftSemitones);
+        const next = KEY_PRESETS[(i + 1) % KEY_PRESETS.length];
+        setKeyShift(next.shift);
+        updateKeyBtn();
+        saveProgress();
+    }
+    function cycleSongVariation() {
+        songVariationIndex = (songVariationIndex + 1) % SONG_VARIATIONS.length;
+        updateMoodBtn();
+        saveProgress();
+    }
+    // Label / aria-pressed updaters — safe to call before their button
+    // element exists (early-return; init runs them once buttons are in DOM).
+    function updateTempoBtn() {
+        const el = document.getElementById('tempoBtn');
+        if (el) el.textContent = TEMPO + ' BPM';
+    }
+    function updateSwingBtn() {
+        const el = document.getElementById('swingBtn');
+        if (!el) return;
+        el.textContent = 'SWING ' + (isSwingOn ? 'ON' : 'OFF');
+        el.classList.toggle('off', !isSwingOn);
+        el.setAttribute('aria-pressed', String(isSwingOn));
+    }
+    function updateKeyBtn() {
+        const el = document.getElementById('keyBtn');
+        if (!el) return;
+        const preset = KEY_PRESETS.find(k => k.shift === keyShiftSemitones) || KEY_PRESETS[0];
+        el.textContent = 'KEY ' + preset.name;
+    }
+    function updateMoodBtn() {
+        const el = document.getElementById('moodBtn');
+        if (!el) return;
+        el.textContent = SONG_VARIATIONS[songVariationIndex].name;
+    }
+
     function scheduleStep(step, bar, when) {
-        // Single-row v1.0 audio path (byte-unchanged). In Dual Band Mode
-        // the audio is produced by dualRowStep() per band instead; we
-        // still run the quarter-note visual/react tick below.
+        // Single-row v1.0 audio path. In Dual Band Mode the audio is
+        // produced by dualRowStep() per band instead; we still run the
+        // quarter-note visual/react tick below.
         if (!isDualBandMode) {
+            const w = swungWhen(when, step);
             if (isBaseSongOn) {
-                // Auto-swap by mode: Madballz Mode plays its brooding minor
-                // theme; everything else plays Bala's Theme. SONG button
-                // still toggles whichever theme is currently active.
-                const song = isMadballzMode ? MADBALLZ_SONG : BASE_SONG;
-                song.play(audioCtx, masterGain, when, step, bar);
-                // TONE_LAYER ambient is Cmaj-only — skip in Madballz mode
-                // so the Tone pad doesn't clash with the minor progression.
-                if (!isMadballzMode) TONE_LAYER.play(step, bar, when);
+                const song = currentSong();
+                song.play(audioCtx, masterGain, w, step, bar);
+                const tone = currentTone();
+                if (tone) tone.play(step, bar, w);
             }
             // User-placed mods
             for (let i = 0; i < NUM_SLOTS; i++) {
                 const id = slots[i];
                 if (!id) continue;
                 const ch = CHARACTERS[id];
-                if (ch && ch.play) ch.play(audioCtx, masterGain, when, step);
+                if (ch && ch.play) ch.play(audioCtx, masterGain, w, step);
             }
         }
         if (step % 4 === 0) {
@@ -929,6 +1063,67 @@
             }
         }
     };
+
+    // ---------- SONG VARIATIONS (Tier-1 music expansion, 2026-07-31) ----------
+    // Alternate progressions the MOOD pill cycles through. Each is a
+    // {song, tone} pair — song = raw-WebAudio synth (bass/triad/melody),
+    // tone = Tone.js ambient pad. Shape-identical to BASE_SONG /
+    // TONE_LAYER; each shares its play() with the original by reference
+    // so a change to the base playback code lands on every variation for
+    // free.
+    //
+    // Adding a new variation = one new SONG/TONE data object + one entry
+    // in SONG_VARIATIONS below. No per-Munki edits — Munki voices are
+    // Cmaj-tuned and the global KEY pill's ConstantSourceNode-based
+    // pitch shift preserves their harmony with whatever bed is playing.
+    const MINOR_SONG = {
+        chordsByBar: [
+            // Am → Dm → G → C (aeolian loop, resolves back to A minor).
+            // Same shape as BASE_SONG; reuses its play() unmodified.
+            { bass: 55.00, triad: [220.00, 261.63, 329.63], melody: { 0: 440.00, 4: 523.25, 8: 659.25, 12: 523.25 } },
+            { bass: 73.42, triad: [293.66, 349.23, 440.00], melody: { 0: 587.33, 4: 698.46, 8: 587.33, 12: 440.00 } },
+            { bass: 49.00, triad: [196.00, 246.94, 293.66], melody: { 0: 493.88, 4: 587.33, 8: 493.88, 12: 392.00 } },
+            { bass: 65.41, triad: [261.63, 329.63, 392.00], melody: { 0: 523.25, 4: 659.25, 8: 523.25, 12: 440.00 } }
+        ],
+        play: BASE_SONG.play   // `this.chordsByBar` picks these bars
+    };
+    const MINOR_TONE = {
+        chordsByBar: [
+            ['A3', 'C4', 'E4'],   // Am
+            ['D3', 'F3', 'A3'],   // Dm
+            ['G3', 'B3', 'D4'],   // G
+            ['C4', 'E4', 'G4']    // C
+        ],
+        play: TONE_LAYER.play
+    };
+    // AMBIENT holds two Maj7 chords across the 4-bar loop (Cmaj7 for two
+    // bars, Fmaj7 for two) with the melody hook removed by leaving an
+    // empty `melody: {}` per bar — the shared BASE_SONG.play() renders
+    // just the bass + pad triad, which reads as an atmospheric drone.
+    const AMBIENT_SONG = {
+        chordsByBar: [
+            { bass: 32.70, triad: [130.81, 164.81, 196.00, 246.94], melody: {} },  // Cmaj7
+            { bass: 32.70, triad: [130.81, 164.81, 196.00, 246.94], melody: {} },  // Cmaj7 held
+            { bass: 43.65, triad: [130.81, 174.61, 220.00, 261.63], melody: {} },  // Fmaj7
+            { bass: 43.65, triad: [130.81, 174.61, 220.00, 261.63], melody: {} }   // Fmaj7 held
+        ],
+        play: BASE_SONG.play
+    };
+    const AMBIENT_TONE = {
+        chordsByBar: [
+            ['C4', 'E4', 'G4', 'B4'],   // Cmaj7
+            ['C4', 'E4', 'G4', 'B4'],   // Cmaj7
+            ['C4', 'F4', 'A4', 'C5'],   // Fmaj7 (voiced over C bass)
+            ['C4', 'F4', 'A4', 'C5']    // Fmaj7
+        ],
+        play: TONE_LAYER.play
+    };
+    const SONG_VARIATIONS = [
+        { name: 'SUNNY',   song: BASE_SONG,    tone: TONE_LAYER },
+        { name: 'MINOR',   song: MINOR_SONG,   tone: MINOR_TONE },
+        { name: 'AMBIENT', song: AMBIENT_SONG, tone: AMBIENT_TONE }
+    ];
+
     // 8-Munki roster (post-redesign):
     //   6 rainbow Munkis named for their color (red/orange/yellow/green/blue/purple)
     //   Ice Munki (white sprite Z, freeze power) — default 7th in bank
@@ -3144,6 +3339,17 @@
             // Legacy field `seventhWheel` (obj.seventhWheel) was the swap
             // selector before Ice + Moon became coexisting tray citizens
             // (2026-07-30). Ignored on load; unknown-to-us field on save.
+            // Music-expansion params (Tier 1, 2026-07-31). All optional
+            // — missing fields fall through to defaults.
+            if (TEMPO_PRESETS.includes(obj.tempo | 0)) setTempo(obj.tempo | 0);
+            if (KEY_PRESETS.some(k => k.shift === (obj.keyShift | 0))) {
+                keyShiftSemitones = obj.keyShift | 0;
+            }
+            if (typeof obj.songVariation === 'number'
+                && obj.songVariation >= 0 && obj.songVariation < SONG_VARIATIONS.length) {
+                songVariationIndex = obj.songVariation;
+            }
+            if (typeof obj.swingOn === 'boolean') isSwingOn = obj.swingOn;
             const idx = (obj.activeBankIndex | 0);
             if (idx >= 0 && idx < BANKS.length && BANKS[idx].unlocked) {
                 activeBankIndex = idx;
@@ -3167,7 +3373,12 @@
                 moonUnlocked,
                 bandCount,
                 activeBankIndex,
-                unlockedBanks: BANKS.map(b => b.unlocked)
+                unlockedBanks: BANKS.map(b => b.unlocked),
+                // Music-expansion params (Tier 1)
+                tempo: TEMPO,
+                keyShift: keyShiftSemitones,
+                songVariation: songVariationIndex,
+                swingOn: isSwingOn
             }));
         } catch (e) { /* ignore */ }
     }
@@ -3759,6 +3970,20 @@
                 bassBtn.setAttribute('aria-pressed', String(isBassOn));
             });
         }
+
+        // ---- Music expansion pills (Tier 1): MOOD / TEMPO / KEY / SWING ----
+        // Cycle-on-click, no dropdowns. Each pill's label reflects its
+        // current value; update*Btn() functions push state → label after
+        // every change (also called once from init() to seed labels from
+        // the loaded save).
+        const moodBtn = document.getElementById('moodBtn');
+        if (moodBtn) moodBtn.addEventListener('click', () => { ensureAudio(); cycleSongVariation(); });
+        const tempoBtn = document.getElementById('tempoBtn');
+        if (tempoBtn) tempoBtn.addEventListener('click', () => { ensureAudio(); cycleTempo(); });
+        const keyBtn = document.getElementById('keyBtn');
+        if (keyBtn) keyBtn.addEventListener('click', () => { ensureAudio(); cycleKey(); });
+        const swingBtn = document.getElementById('swingBtn');
+        if (swingBtn) swingBtn.addEventListener('click', () => { ensureAudio(); setSwing(!isSwingOn); });
 
         // ---- Dual Band Mode (v1.1, chunk A: mode + footswitch UI) ----
         const dualBandBtn = document.getElementById('dualBandBtn');
@@ -4681,6 +4906,11 @@
         watchVisibility();
         startCreepSystem();
         updateTrayHint();
+        // Seed music-expansion pill labels from loaded save state.
+        updateMoodBtn();
+        updateTempoBtn();
+        updateKeyBtn();
+        updateSwingBtn();
         // If the kid found any eggs on a prior visit, restore the counter
         // chip with the saved count (no animation — it's not "new").
         if (achievements.size > 0 || moonUnlocked) {

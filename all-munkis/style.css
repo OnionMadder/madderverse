@@ -494,6 +494,40 @@ body.madballz-mode .btn-bass { display: inline-block; }
     text-shadow: none;
 }
 
+/* ====== TIER-1 MUSIC EXPANSION PILLS (2026-07-31) ======
+   MOOD / TEMPO / KEY / SWING sit in the .madder-controls cluster and
+   cycle values on tap. Each has its own accent hue so the cluster stays
+   scannable at a glance:
+     MOOD  = warm rose  (song mood: SUNNY / MINOR / AMBIENT)
+     TEMPO = cyan       (80 / 100 / 120 / 140 BPM)
+     KEY   = violet     (C / D / F / A♭)
+     SWING = lime       (OFF / ON)
+   Suppressed in Madballz mode to keep that surface self-contained
+   (Madballz has its own theme + BASS overlay). */
+.btn-mood, .btn-tempo, .btn-key, .btn-swing {
+    font-size: 13px;
+    padding: 8px 14px;
+    letter-spacing: 0.08em;
+    min-width: 78px;
+}
+.btn-mood  { border: 2px solid #f472b6; color: #f472b6; text-shadow: 0 0 6px rgba(244, 114, 182, 0.5); }
+.btn-mood:hover, .btn-mood:active   { background: rgba(244, 114, 182, 0.15); color: #fff; }
+.btn-tempo { border: 2px solid #22d3ee; color: #22d3ee; text-shadow: 0 0 6px rgba(34, 211, 238, 0.55); }
+.btn-tempo:hover, .btn-tempo:active { background: rgba(34, 211, 238, 0.15); color: #fff; }
+.btn-key   { border: 2px solid #a78bfa; color: #a78bfa; text-shadow: 0 0 6px rgba(167, 139, 250, 0.5); }
+.btn-key:hover, .btn-key:active     { background: rgba(167, 139, 250, 0.15); color: #fff; }
+.btn-swing { border: 2px solid #a3e635; color: #a3e635; text-shadow: 0 0 6px rgba(163, 230, 53, 0.5); }
+.btn-swing:hover, .btn-swing:active { background: rgba(163, 230, 53, 0.15); color: #fff; }
+.btn-swing.off {
+    border-color: rgba(163, 230, 53, 0.45);
+    color: rgba(163, 230, 53, 0.65);
+    text-shadow: none;
+}
+body.madballz-mode .btn-mood,
+body.madballz-mode .btn-tempo,
+body.madballz-mode .btn-key,
+body.madballz-mode .btn-swing { display: none; }
+
 /* BOO! — big ominous red button that triggers the jumpscare. */
 .btn-boo {
     border: 2px solid #ef4444;
