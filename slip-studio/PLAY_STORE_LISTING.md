@@ -178,12 +178,17 @@ Data-safety/accessibility notes if Play ever asks, not in the changelog.
 
 ## Store event — "Major update" (Play Console → Promotional content → Add event)
 
-For the promotional event card on the store. Voice stays calm/confident.
+⚠ **Stale block below is for vc14, never shipped.** The vc14 event was
+never created. Use the **vc20 block underneath instead** — it covers the
+whole v137 → v216 span in one go, which matches what the vc20 upload
+actually delivers.
+
+### DRAFTED — vc14 event (historical, don't create)
 
 - **Event type:** Major update
 - **Name (≤ ~30 chars):** `Glaze, wax & a gallery`
 - **Short description:** `New glaze chemistry, wax resist, and a gallery to display your pots.`
-- **Full description:**
+- **Full description (vc14, historical):**
 ```
 The biggest Slip Studio update yet. Layer dip glazes and watch the overlaps
 react into new colors. Brush on wax, glaze over it, then peel the wax back to
@@ -193,10 +198,60 @@ with a handle — decorate with 40 glazes and themed color packs, then stage you
 whole collection in a gallery: a studio podium, a forest pedestal, or a sunlit
 shelf. Still ad-free, still no purchases, still works with no internet.
 ```
-- **Timing:** start it when the vc14 release goes live (Major-update events run best
-  in the first days after publish); a ~2-week window is typical.
-- **Graphic:** reuse a bright fired-pot screenshot (the gallery/showcase shot reads well
-  as the event image). Play wants an event image ~1200×628-ish; a promo video is optional.
+
+### THIS RELEASE — vc20 event (paste into Play Console)
+
+Voice stays calm and confident — no urgency, no FOMO, no "limited time".
+Covers the same span as the release notes (web v137 → v216), just written
+for a returning owner rather than a new buyer. The vc20 additions on top
+of vc14's drafted story are the biggest ones: the whole sculpting overhaul,
+Display mode, undo, glaze recipes, and named collections.
+
+- **Event type:** Major update
+- **Event name** (internal, 80 chars, cannot be changed):
+  `v2.7.0 major update — sculpting depth, Display, undo`
+- **Countries:** All countries where the app is sold
+- **Duration:** 10–14 days starting the day vc20 goes live (Major-update
+  events get their best surface placement in the first week after publish)
+- **Languages:** English (matches the app)
+- **Notify existing users:** yes — this update is the story to tell them
+- **Short description** (~50 chars):
+  `A deeper wheel, Display mode, and undo at last.`
+- **Full description:**
+```
+Slip Studio v2.7 is the biggest update yet — a whole new depth to the
+wheel, an immersive way to admire your pots, and the safety net every
+creative app should have.
+
+Shape the wall off-round: push one side in, carve flat facets, wave the
+rim. Pull a real handle. Throw a teapot with a pouring spout.
+
+When you finish a piece, tap the eye to fill the screen — Display mode
+turns your pot slowly on its backdrop like a piece on a plinth.
+
+Layer dip glazes and watch the overlaps react into new colors. Discover
+the glaze recipes at your own pace. Brush on wax, glaze over it, then
+peel the wax back to reveal the color it protected.
+
+Name your own shelves in the gallery. 49 glazes across four packs. Three
+finishes — glossy, matte, or pearl lustre.
+
+And when a pull goes wrong — undo. For the first time.
+
+Still ad-free, still no purchases, still no accounts, still works with
+no internet.
+```
+- **Event image (1200×628):** neither of the fresh 1080×1920 screenshots
+  is native to this aspect, so **compose one from the shot fleet at
+  `Desktop/slip-shots/`**. Best candidates:
+  - `alter.png` — the off-round wall, most visually distinctive "new"
+    story since altering is the flagship shaping feature
+  - `display.png` — the pot alone on its backdrop, atmospheric
+  - `gallery.png` — six diverse pots on a shelf, sells the collection depth
+  My pick: **alter.png cropped to 1200×628** with a bit of dark space on
+  either side — it reads as "the app can do things it couldn't before"
+  at thumbnail scale, which is what a Major-update card needs.
+- **Promo video:** optional. Skip for launch; add later if we cut one.
 
 ---
 
