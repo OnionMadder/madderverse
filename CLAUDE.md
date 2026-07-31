@@ -458,3 +458,48 @@ Lives at `florigami/` (flat shape: `index.html` + `game.js` + `style.css`, plus 
 - **Species (unlock chain, total-discovery gates):** cosmos (free) → tulips (first cosmos hybrid) → pansies (5 cosmos dex slots) → hyacinths (10 total) → lilies (14) → mums (18) → windflowers (23) → roses (28, the endgame). All 8 share the unified genetics above (see `mixSpecies`); they differ only by art/silhouette + signature rare pattern.
 - **Phase 3 systems (2026-07-24):** rare-tier collectibles (bigger sparkle + jingle + keepsake card + a `★ Rares` trophy shelf), a card-list Floridex with All/Found/Rare filters + inline flavor + locked-species tabs, and progression-unlocked **garden ornaments** (cozy scene decorations, no gameplay effect). Display name is variablized as `GAME_NAME` in `game.js` (drives topbar + `document.title` + toasts).
 - Dev handle: `window.__petalcraft` (kept on the old name as invisible plumbing; state, `advanceDay`, `unlockAll`, `reset`, `mockSprites`, `mockBackdrop`, rarity helpers). Phase 6 (Android paid app via Capacitor, pkg `org.madderverse.florigami`) is not built yet — see `DESIGN.md §7`.
+
+---
+
+## All Munkis — Android **free app** build & publish (Onion Madder dev account)
+
+**Two projects on disk, do not mingle:**
+- `all-munkis-app/` — **current** build project, on the **Onion Madder** dev account. Package id `com.onionmadder.munkis`, signed by `all-munkis-om-release.keystore` (`CN=All Munkis, O=Onion Madder, C=US`, no L/ST — no location leakage). PKCS12, alias `allmunkis`, both passwords `allmunkis_2026_release`, 10000 days, SHA-256 `EC:11:F3:58:7D:FB:3F:80:26:93:83:C4:C5:FC:52:D3:C6:BF:66:01:A2:38:AC:11:3F:3E:67:BE:6D:C2:83:A8`.
+- `all-munkis-app.archive-madsundar/` — **frozen** Mad Sundar LLC project. Package id `org.madderverse.munkis`, signed by `all-munkis-release.keystore` (`O=Mad Sundar LLC`, has the Minneapolis/MN decoy). vc11 is live on Play under this signing chain; vc12 was built but not promoted (default Capacitor icon); vc13 built 2026-05-29 with the correct Munki icon, staged AAB preserved in the archive. **Do not build here anymore; do not cross-sign.**
+
+Both projects are **OUTSIDE git** (untracked, sibling to `pootery-app/`, `slip-studio-app/`, `cookie-cache-app/`).
+
+**Why split?** Onion moved this listing off the Mad Sundar LLC dev account onto a personal "Onion Madder" account. Play doesn't let two accounts share a package id, so the new listing gets a fresh pkg id + fresh keystore + fresh Play App Signing enrolment on first upload — it appears as a brand-new app in the Play store even though the game content is the same.
+
+**In-app branding stays "Madderverse."** Only the Play Console "Developer" line and the underlying pkg id change. Launcher name (`app_name = "All Munkis"`), in-game copy, canonical URL, all unchanged.
+
+**Version lineage split:**
+- Mad Sundar chain (archived): vc11 live / vc12 (bad icon) built / vc13 built + staged / STOP.
+- Onion Madder chain (current): **vc1 / 1.1.1** — first upload; game state = v1.1 + the 2026-07-27 rebrand + the 2026-07-30 polish sweep.
+
+**Free, no IAP.** Do not add RevenueCat or billing (ad-free/kid-friendly).
+
+**Rebuild recipe** (JDK 21, mirrors Slip Studio's `-P` signing pattern):
+```bash
+APP="/c/Users/kelly/OneDrive/Desktop/website backups/madderverse/all-munkis-app"
+SRC="/c/Users/kelly/OneDrive/Desktop/website backups/madderverse/all-munkis"
+cd "$APP"
+rm -rf www/*
+cp "$SRC/index.html" "$SRC/game.js" "$SRC/style.css" www/
+cp -r "$SRC/assets" "$SRC/legal" www/
+sed -i '/goatcounter/d' www/index.html
+# (append the app-only .madder-home + .site-footer-slim { display:none } CSS to www/style.css)
+# bump versionCode + versionName in android/app/build.gradle
+npx cap copy android && npx cap sync android
+cd android
+JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot" ./gradlew bundleRelease \
+  -PMUNKIS_STORE_FILE=all-munkis-om-release.keystore \
+  -PMUNKIS_STORE_PASSWORD=allmunkis_2026_release \
+  -PMUNKIS_KEY_ALIAS=allmunkis \
+  -PMUNKIS_KEY_PASSWORD=allmunkis_2026_release --console=plain
+```
+Output: `all-munkis-app/android/app/build/outputs/bundle/release/app-release.aab`. Full flow in `all-munkis-app/BUILD_RECIPE.md`.
+
+**Privacy strip is mandatory** for every rebuild — Play Data Safety declares "no data collected," so GoatCounter MUST NOT ship in the app copy, and `.madder-home` + `.site-footer-slim` must be hidden (they link to `../` on madderverse.org and 404 in a WebView).
+
+**Current staged AAB (uploaded? or pending Onion):** `Desktop/all-munkis-v1.1.1-vc1-onionmadder.aab` (28.15 MB, built 2026-07-30, signed with the Onion Madder keystore). First-upload paperwork on Onion's side: create the app in Play Console under the Onion Madder account, enrol Play App Signing on first upload, back up the returned upload certificate PEM, adapt store listing from `all-munkis/PLAY_STORE_LISTING.md` (Mad Sundar draft), Data Safety = no data collected, privacy URL `https://madderverse.org/all-munkis/legal/privacy.html`.
