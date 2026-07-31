@@ -210,6 +210,21 @@
     // layering. Single-row default + v1.0 audio path are untouched.
     let isDualBandMode = false;
     let bandOn = [false, false]; // Row A, Row B — both start OFF on entry
+
+    // ---------- ROUND ROBIN MODE ----------
+    // Third playback mode. Munkis enter one at a time (one per bar) in
+    // rainbow order, hold the full-chorus for a few bars, clear, repeat.
+    // Uses the existing audio engine — voices layer cumulatively via
+    // scheduleStep's per-slot play() loop, no engine changes. Sequencer
+    // hook is a single call in scheduleStep at step === 0 of each bar.
+    // Mutually exclusive with Dual Band + Madballz (entering RR turns
+    // those off; entering either of them turns RR off).
+    let isRoundRobinMode = false;
+    let rrCycleBar = 0;                   // advances +1 per bar while RR is on
+    const RR_PLAN       = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+    const RR_ENTRY_BARS = 6;              // one Munki per bar for 6 bars
+    const RR_HOLD_BARS  = 4;              // stay full for 4 bars
+    const RR_TOTAL_BARS = RR_ENTRY_BARS + RR_HOLD_BARS; // 10 bars per cycle
     // ---- Chunk B audio (built lazily on first dual-band entry) ----
     // Pattern ported from the Tonehouse prototype: each band is the SAME
     // untouched engine code (BASE_SONG + per-Munki play()) scheduled into
@@ -354,6 +369,8 @@
         }
     }
     function setDualBandMode(on) {
+        // Mutually exclusive with Round Robin.
+        if (on && isRoundRobinMode) setRoundRobinMode(false);
         isDualBandMode = on;
         document.body.classList.toggle('dual-band-mode', on);
         const btn = document.getElementById('dualBandBtn');
@@ -373,6 +390,66 @@
         // Named combos are Standard-mode only; re-evaluate so a matched
         // combo hides on entry and re-shows on exit if still valid.
         checkNamedCombo();
+    }
+
+    // Round Robin toggle. Restarts the cycle on every ON transition so
+    // the player always sees the show start from an empty stage. Turning
+    // OFF leaves the current stage as-is (whatever the sequencer had
+    // laid down) so the player can pick up composing manually.
+    function setRoundRobinMode(on) {
+        if (on) {
+            // Mutually exclusive with the other alternate modes. Bounce
+            // Dual Band off explicitly; Madballz gets exited so the tray
+            // and body class both reset before RR takes over.
+            if (isDualBandMode) setDualBandMode(false);
+            if (isMadballzMode) exitMadballzMode();
+        }
+        isRoundRobinMode = on;
+        document.body.classList.toggle('round-robin-mode', on);
+        const btn = document.getElementById('roundRobinBtn');
+        if (btn) {
+            btn.setAttribute('aria-pressed', String(on));
+            btn.classList.toggle('on', on);
+        }
+        if (on) {
+            ensureAudio();
+            // Start from a clean stage + reset cycle counter so bar 0
+            // clears (already empty) then places red at slot 0.
+            for (let i = 0; i < NUM_SLOTS; i++) {
+                if (slots[i]) { slots[i] = null; renderSlot(i); }
+            }
+            updateIceFreeze();
+            rrCycleBar = 0;
+            // Poke the sequencer once immediately so the first Munki lands
+            // now rather than waiting up to ~2.4 s for the next bar tick.
+            rrTick();
+        }
+        // Combo detector needs to know the mode changed (RR shouldn't
+        // suppress combos — FULL RAINBOW firing mid-buildup is a feature).
+        checkNamedCombo();
+    }
+
+    // Called once per bar (at step === 0) while Round Robin is on.
+    // Phase 0..5 = ENTRY: place RR_PLAN[phase] into slot [phase].
+    // Phase 6..9 = HOLD: full chorus stays visible.
+    // Wrapping to phase 0 clears the stage before the next entry begins.
+    function rrTick() {
+        if (!isRoundRobinMode) return;
+        const phase = rrCycleBar % RR_TOTAL_BARS;
+        if (phase === 0) {
+            // New cycle — clear whatever's on stage first.
+            for (let i = 0; i < NUM_SLOTS; i++) {
+                if (slots[i]) { slots[i] = null; renderSlot(i); }
+            }
+            updateIceFreeze();
+        }
+        if (phase < RR_ENTRY_BARS && phase < NUM_SLOTS) {
+            // Place the next planned Munki. Route through setSlot so
+            // per-Munki state (placedAt shock face, dread, combo check)
+            // fires exactly like a manual drop.
+            setSlot(phase, RR_PLAN[phase]);
+        }
+        rrCycleBar++;
     }
 
     // ---------- ACHIEVEMENTS ----------
@@ -631,6 +708,13 @@
         if (step % 4 === 0) {
             const delayMs = Math.max(0, (when - audioCtx.currentTime) * 1000);
             setTimeout(() => { pulseActiveIcons(); tickReactState(); }, delayMs);
+        }
+        // Round Robin sequencer — fires once per bar (start-of-bar).
+        // Placed here (audio-thread schedule) so the entries land in
+        // time with the loop, not on wall-clock drift.
+        if (isRoundRobinMode && step === 0) {
+            const delayMs = Math.max(0, (when - audioCtx.currentTime) * 1000);
+            setTimeout(rrTick, delayMs);
         }
     }
 
@@ -3166,6 +3250,9 @@
     // canvas, and the tray + hint + body class swap to the darker palette.
     function enterMadballzMode() {
         ensureAudio();
+        // Mutually exclusive with Round Robin — kill it before switching
+        // to the Madballz roster.
+        if (isRoundRobinMode) setRoundRobinMode(false);
         isMadballzMode = true;
         document.body.classList.add('madballz-mode');
         const meet = document.getElementById('madballzBtn');
@@ -3899,6 +3986,14 @@
         const footB = document.getElementById('bandFootB');
         if (footA) footA.addEventListener('click', () => { ensureAudio(); setBandOn(0, !bandOn[0]); });
         if (footB) footB.addEventListener('click', () => { ensureAudio(); setBandOn(1, !bandOn[1]); });
+
+        const roundRobinBtn = document.getElementById('roundRobinBtn');
+        if (roundRobinBtn) {
+            roundRobinBtn.addEventListener('click', () => {
+                ensureAudio();
+                setRoundRobinMode(!isRoundRobinMode);
+            });
+        }
 
         // (Manual BOO! button removed — childish. triggerJumpScare still
         // auto-fires on an Ice/Moon stage drop as the FNAF scare.)

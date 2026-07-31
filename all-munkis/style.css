@@ -521,6 +521,30 @@ body.dual-band-mode .stage::before {
     border-color: #2dd4bf;
     box-shadow: 0 0 16px rgba(45, 212, 191, 0.5);
 }
+/* ROUND ROBIN toggle — violet neon (distinct from DUAL BAND teal and
+   BASS orange). Same base pattern as .btn-dualband. */
+.btn-roundrobin {
+    border: 2px solid #a78bfa;
+    color: #a78bfa;
+    text-shadow: 0 0 6px rgba(167, 139, 250, 0.55);
+}
+.btn-roundrobin:hover, .btn-roundrobin:active {
+    background: rgba(167, 139, 250, 0.15);
+    color: #fff;
+}
+.btn-roundrobin.on {
+    background: rgba(167, 139, 250, 0.22);
+    border-color: #a78bfa;
+    box-shadow: 0 0 16px rgba(167, 139, 250, 0.55);
+}
+/* Round Robin: soft ambient glow on the whole stage so the mode reads
+   as "auto-playing" without disabling any of the game's visuals. */
+body.round-robin-mode .stage {
+    box-shadow: 0 0 24px rgba(167, 139, 250, 0.35),
+                inset 0 0 40px rgba(167, 139, 250, 0.12);
+    border-radius: 8px;
+    transition: box-shadow 0.6s ease;
+}
 /* Footswitches float ABOVE the fixed tray (which sits at bottom:0 with
    z-index:10). Without an explicit fixed positioning here they render
    in normal flow between <main> and .tray-wrap — and get covered by the
