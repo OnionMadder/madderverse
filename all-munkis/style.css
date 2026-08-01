@@ -504,7 +504,7 @@ body.madballz-mode .btn-bass { display: inline-block; }
      SWING = lime       (OFF / ON)
    Suppressed in Madballz mode to keep that surface self-contained
    (Madballz has its own theme + BASS overlay). */
-.btn-mood, .btn-tempo, .btn-key, .btn-swing, .btn-space, .btn-filter {
+.btn-mood, .btn-tempo, .btn-key, .btn-swing, .btn-space, .btn-filter, .btn-hambone {
     font-size: 13px;
     padding: 8px 14px;
     letter-spacing: 0.08em;
@@ -534,12 +534,58 @@ body.madballz-mode .btn-bass { display: inline-block; }
 .btn-filter { border: 2px solid #fbbf24; color: #fbbf24; text-shadow: 0 0 6px rgba(251, 191, 36, 0.55); }
 .btn-filter:hover, .btn-filter:active { background: rgba(251, 191, 36, 0.15); color: #fff; }
 
+/* HAMBONE = call-and-response magenta cue (same family as MOOD but
+   brighter to signal it's a MODE, not a sound-shape param). */
+.btn-hambone { border: 2px solid #ec4899; color: #ec4899; text-shadow: 0 0 6px rgba(236, 72, 153, 0.5); }
+.btn-hambone:hover, .btn-hambone:active { background: rgba(236, 72, 153, 0.15); color: #fff; }
+.btn-hambone.off {
+    border-color: rgba(236, 72, 153, 0.45);
+    color: rgba(236, 72, 153, 0.65);
+    text-shadow: none;
+}
+.btn-hambone[aria-pressed="true"] {
+    background: rgba(236, 72, 153, 0.20);
+    box-shadow: 0 0 14px rgba(236, 72, 153, 0.45);
+}
+
 body.madballz-mode .btn-mood,
 body.madballz-mode .btn-tempo,
 body.madballz-mode .btn-key,
 body.madballz-mode .btn-swing,
 body.madballz-mode .btn-space,
-body.madballz-mode .btn-filter { display: none; }
+body.madballz-mode .btn-filter,
+body.madballz-mode .btn-hambone { display: none; }
+
+/* ====== HAMBONING MODE VISUAL ROLES (Tier 3) ======
+   Position-based split: even-index slots (nth-child odd = 1st/3rd/5th
+   in DOM order) render as LEAD; odd-index slots (nth-child even) render
+   as ANSWER. Warm yellow footlight on Lead, cool violet on Answer —
+   the geometry itself communicates the polyrhythm at a glance. Answer
+   slots also sway subtly side-to-side, standing in visible off-beat
+   contrast to the still Lead voices. */
+body.hambone-mode .stage-slot.active:nth-child(odd)::before {
+    background: radial-gradient(ellipse at 50% 100%,
+        rgba(251, 191, 36, 0.55),
+        transparent 70%);
+}
+body.hambone-mode .stage-slot.active:nth-child(even)::before {
+    background: radial-gradient(ellipse at 50% 100%,
+        rgba(167, 139, 250, 0.55),
+        transparent 70%);
+}
+body.hambone-mode .stage-slot.active:nth-child(even) .char-art {
+    animation: hambone-sway 1.2s ease-in-out infinite;
+    transform-origin: 50% 90%;
+}
+@keyframes hambone-sway {
+    0%, 100% { transform: rotate(-2deg); }
+    50%      { transform: rotate(2deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+    body.hambone-mode .stage-slot.active:nth-child(even) .char-art {
+        animation: none;
+    }
+}
 
 /* BOO! — big ominous red button that triggers the jumpscare. */
 .btn-boo {

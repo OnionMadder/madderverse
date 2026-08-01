@@ -174,6 +174,17 @@
     let isPlaying = false;
     let isMuted = false;
     let isBaseSongOn = true;                 // background "level music" theme
+    // Hamboning Mode (Tier 3, 2026-07-31): the stage becomes a call-and-
+    // response surface. Even-index slots (0/2/4) are LEAD voices (fire
+    // on their normal steps = beats 1 + 3 downbeats). Odd-index slots
+    // (1/3/5) are ANSWER voices (their audio `when` is shifted forward
+    // by a quarter note so they land on beats 2 + 4). Position-based
+    // role means no new gesture — the geometry itself communicates the
+    // polyrhythm. Mutually exclusive with Dual Band (both are "split
+    // composition" modes; a single active mode keeps the mental model
+    // clean).
+    let isHamboneMode = false;
+    function isAnswerSlot(idx) { return isHamboneMode && (idx % 2 === 1); }
     // ---------- MUSIC EXPANSION (Tier 1) — 2026-07-31 ----------
     // Four global params the player controls via top-cluster pills. Each
     // persists in the save (see loadProgress / saveProgress). Combined
@@ -438,6 +449,8 @@
         rowClock[1].started = false;
         setBandOn(0, false);
         setBandOn(1, false);
+        // Mutual exclusion — see setHamboneMode for the mirrored guard.
+        if (isDualBandMode && isHamboneMode) setHamboneMode(false);
         // Named combos are Standard-mode only; re-evaluate so a matched
         // combo hides on entry and re-shows on exit if still valid.
         checkNamedCombo();
@@ -922,6 +935,42 @@
         if (!el) return;
         el.textContent = FILTER_PRESETS[filterIndex].name;
     }
+    function setHamboneMode(on) {
+        isHamboneMode = !!on;
+        // Mutual exclusion with Dual Band — both are "split composition"
+        // modes and running them together is more confusing than useful.
+        if (isHamboneMode && isDualBandMode) setDualBandMode(false);
+        document.body.classList.toggle('hambone-mode', isHamboneMode);
+        updateHamboneBtn();
+        saveProgress();
+    }
+    function updateHamboneBtn() {
+        const el = document.getElementById('hamboneBtn');
+        if (!el) return;
+        el.classList.toggle('off', !isHamboneMode);
+        el.setAttribute('aria-pressed', String(isHamboneMode));
+        el.textContent = 'HAMBONE ' + (isHamboneMode ? 'ON' : 'OFF');
+    }
+    // Handclap — filtered noise burst, subtle enough to layer under the
+    // Munki voices without stealing focus. Fires on Answer beats
+    // (steps 4 + 12) in Hamboning Mode when there's at least one Answer
+    // slot occupied — the "clap-back" mechanical of a call-and-response.
+    function playHandclap(ctx, out, when) {
+        const n = noiseSource(ctx, 0.09);
+        const f = ctx.createBiquadFilter();
+        f.type = 'bandpass';
+        f.frequency.value = 1400;
+        f.Q.value = 1.8;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.11, when);
+        g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+        n.connect(f).connect(g).connect(out);
+        n.start(when); n.stop(when + 0.1);
+    }
+    function anyAnswerActive() {
+        for (let i = 1; i < NUM_SLOTS; i += 2) if (slots[i]) return true;
+        return false;
+    }
 
     function scheduleStep(step, bar, when) {
         // Single-row v1.0 audio path. In Dual Band Mode the audio is
@@ -935,12 +984,25 @@
                 const tone = currentTone();
                 if (tone) tone.play(step, bar, w);
             }
-            // User-placed mods
+            // User-placed mods. In Hamboning Mode, ANSWER voices (odd
+            // slot indices) get their `when` shifted forward by a
+            // quarter note (4 sixteenth-steps) so they land on beats
+            // 2 + 4 instead of 1 + 3. Same play() function, same step
+            // filter — just delayed audio.
             for (let i = 0; i < NUM_SLOTS; i++) {
                 const id = slots[i];
                 if (!id) continue;
                 const ch = CHARACTERS[id];
-                if (ch && ch.play) ch.play(audioCtx, masterGain, w, step, i);
+                if (!ch || !ch.play) continue;
+                const shift = isAnswerSlot(i) ? SECONDS_PER_STEP * 4 : 0;
+                ch.play(audioCtx, masterGain, w + shift, step, i);
+            }
+            // Subtle handclap on Answer beats (steps 4 + 12) whenever
+            // Hamboning is on and at least one Answer slot is filled —
+            // the mechanical "clap-back" that anchors the response side
+            // even without a drum in the Answer half.
+            if (isHamboneMode && anyAnswerActive() && (step === 4 || step === 12)) {
+                playHandclap(audioCtx, masterGain, w);
             }
         }
         if (step % 4 === 0) {
@@ -3955,6 +4017,10 @@
                 filterIndex = obj.filterIndex;
                 filterBaseHz = FILTER_PRESETS[filterIndex].hz;
             }
+            if (typeof obj.hamboneOn === 'boolean') {
+                isHamboneMode = obj.hamboneOn;
+                document.body.classList.toggle('hambone-mode', isHamboneMode);
+            }
             const idx = (obj.activeBankIndex | 0);
             if (idx >= 0 && idx < BANKS.length && BANKS[idx].unlocked) {
                 activeBankIndex = idx;
@@ -3979,13 +4045,14 @@
                 bandCount,
                 activeBankIndex,
                 unlockedBanks: BANKS.map(b => b.unlocked),
-                // Music-expansion params (Tier 1 + 2)
+                // Music-expansion params (Tier 1 + 2 + 3)
                 tempo: TEMPO,
                 keyShift: keyShiftSemitones,
                 songVariation: songVariationIndex,
                 swingOn: isSwingOn,
                 spaceIndex,
-                filterIndex
+                filterIndex,
+                hamboneOn: isHamboneMode
             }));
         } catch (e) { /* ignore */ }
     }
@@ -4595,6 +4662,8 @@
         if (spaceBtn) spaceBtn.addEventListener('click', () => { ensureAudio(); cycleSpace(); });
         const filterBtn = document.getElementById('filterBtn');
         if (filterBtn) filterBtn.addEventListener('click', () => { ensureAudio(); cycleFilter(); });
+        const hamboneBtn = document.getElementById('hamboneBtn');
+        if (hamboneBtn) hamboneBtn.addEventListener('click', () => { ensureAudio(); setHamboneMode(!isHamboneMode); });
 
         // ---- Dual Band Mode (v1.1, chunk A: mode + footswitch UI) ----
         const dualBandBtn = document.getElementById('dualBandBtn');
@@ -5524,6 +5593,7 @@
         updateSwingBtn();
         updateSpaceBtn();
         updateFilterBtn();
+        updateHamboneBtn();
         // If the kid found any eggs on a prior visit, restore the counter
         // chip with the saved count (no animation — it's not "new").
         if (achievements.size > 0 || moonUnlocked) {
