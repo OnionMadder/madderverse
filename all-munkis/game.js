@@ -185,6 +185,24 @@
     // clean).
     let isHamboneMode = false;
     function isAnswerSlot(idx) { return isHamboneMode && (idx % 2 === 1); }
+
+    // Loop capture (Tier 3, 2026-07-31): tap LOOP once → arms recording
+    // for the next bar boundary → captures 4 bars via a MediaRecorder
+    // tap on masterGain → decodes to an AudioBuffer → loops playback via
+    // AudioBufferSourceNode connected DIRECTLY to audioCtx.destination
+    // (bypasses the recorder tap so re-recording never captures its own
+    // playback). Tap again while playing = stop + clear. Loop buffer is
+    // NOT persisted across sessions — audio buffers are large and each
+    // session starts a fresh performance.
+    const LOOP_STATES = { OFF: 0, ARMED: 1, RECORDING: 2, PLAYING: 3 };
+    let loopState = LOOP_STATES.OFF;
+    let loopRecorderDest = null;    // MediaStreamDestinationNode
+    let loopRecorder     = null;    // MediaRecorder
+    let loopChunks       = [];
+    let loopBuffer       = null;    // decoded AudioBuffer
+    let loopSource       = null;    // AudioBufferSourceNode (playback)
+    let loopPlaybackGain = null;    // GainNode: playback -> destination (0.7 to avoid clipping)
+    let loopArmedTimer   = null;    // deferred start on next bar boundary
     // ---------- MUSIC EXPANSION (Tier 1) — 2026-07-31 ----------
     // Four global params the player controls via top-cluster pills. Each
     // persists in the save (see loadProgress / saveProgress). Combined
@@ -635,6 +653,21 @@
             }
             // Seed masterLP frequency from the saved FILTER choice.
             masterLP.frequency.value = filterBaseHz;
+
+            // Loop capture routing (Tier 3). masterGain → recorder tap
+            // captures the LIVE mix (raw-WebAudio Munki voices + Tone
+            // pad + reverb send). Playback goes DIRECTLY to destination
+            // via loopPlaybackGain, so a second recording pass won't
+            // capture its own playback = no feedback echo.
+            try {
+                if (typeof audioCtx.createMediaStreamDestination === 'function') {
+                    loopRecorderDest = audioCtx.createMediaStreamDestination();
+                    masterGain.connect(loopRecorderDest);
+                    loopPlaybackGain = audioCtx.createGain();
+                    loopPlaybackGain.gain.value = 0.7;   // headroom vs live mix
+                    loopPlaybackGain.connect(audioCtx.destination);
+                }
+            } catch (_) { /* browser without MediaStreamDestination — LOOP no-ops */ }
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
         if (!isPlaying) {
@@ -970,6 +1003,122 @@
     function anyAnswerActive() {
         for (let i = 1; i < NUM_SLOTS; i += 2) if (slots[i]) return true;
         return false;
+    }
+    // ---------- LOOP CAPTURE ----------
+    function loopSupported() {
+        return !!(loopRecorderDest && loopPlaybackGain && typeof MediaRecorder !== 'undefined');
+    }
+    function pickLoopMime() {
+        // Chrome / Firefox: webm/opus. Safari 14.1+: mp4/aac. Fall back
+        // to letting the browser pick if neither is explicitly supported.
+        const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+        for (const t of candidates) {
+            try { if (MediaRecorder.isTypeSupported(t)) return t; } catch (_) {}
+        }
+        return '';
+    }
+    function scheduleLoopArm() {
+        // Fire recording start at the NEXT bar boundary so the capture is
+        // beat-aligned. currentStep advances in schedule(); we poll until
+        // it hits 0 (or if we're already at 0, start immediately).
+        if (loopArmedTimer) { clearTimeout(loopArmedTimer); loopArmedTimer = null; }
+        const check = () => {
+            if (loopState !== LOOP_STATES.ARMED) return;
+            if (currentStep === 0) {
+                startLoopRecording();
+            } else {
+                loopArmedTimer = setTimeout(check, 20);
+            }
+        };
+        check();
+    }
+    function startLoopRecording() {
+        if (!loopSupported()) return;
+        loopState = LOOP_STATES.RECORDING;
+        updateLoopBtn();
+        loopChunks = [];
+        const mime = pickLoopMime();
+        try {
+            loopRecorder = mime
+                ? new MediaRecorder(loopRecorderDest.stream, { mimeType: mime })
+                : new MediaRecorder(loopRecorderDest.stream);
+        } catch (_) {
+            setLoopOff();
+            return;
+        }
+        loopRecorder.ondataavailable = e => { if (e.data && e.data.size) loopChunks.push(e.data); };
+        loopRecorder.onstop = async () => {
+            try {
+                const blob = new Blob(loopChunks, { type: loopChunks[0]?.type || 'audio/webm' });
+                const buf  = await blob.arrayBuffer();
+                loopBuffer = await audioCtx.decodeAudioData(buf);
+                startLoopPlayback();
+            } catch (_) {
+                setLoopOff();
+            }
+        };
+        loopRecorder.start();
+        // Record exactly BARS_PER_LOOP bars at the CURRENT tempo. Read
+        // SECONDS_PER_STEP fresh so a tempo change mid-record still lands
+        // on a beat-multiple, though the ideal is not to change tempo
+        // during capture.
+        const durationMs = SECONDS_PER_STEP * STEPS_PER_BAR * BARS_PER_LOOP * 1000;
+        setTimeout(() => {
+            if (loopRecorder && loopRecorder.state === 'recording') loopRecorder.stop();
+        }, durationMs);
+    }
+    function startLoopPlayback() {
+        if (!loopBuffer || !loopPlaybackGain) { setLoopOff(); return; }
+        loopSource = audioCtx.createBufferSource();
+        loopSource.buffer = loopBuffer;
+        loopSource.loop = true;
+        loopSource.connect(loopPlaybackGain);
+        loopSource.start();
+        loopState = LOOP_STATES.PLAYING;
+        updateLoopBtn();
+    }
+    function setLoopOff() {
+        if (loopSource) {
+            try { loopSource.stop(); } catch (_) {}
+            try { loopSource.disconnect(); } catch (_) {}
+            loopSource = null;
+        }
+        if (loopRecorder && loopRecorder.state === 'recording') {
+            try { loopRecorder.stop(); } catch (_) {}
+        }
+        loopRecorder = null;
+        loopChunks = [];
+        loopBuffer = null;
+        if (loopArmedTimer) { clearTimeout(loopArmedTimer); loopArmedTimer = null; }
+        loopState = LOOP_STATES.OFF;
+        updateLoopBtn();
+    }
+    function toggleLoop() {
+        if (!loopSupported()) return;
+        if (loopState === LOOP_STATES.OFF) {
+            loopState = LOOP_STATES.ARMED;
+            updateLoopBtn();
+            scheduleLoopArm();
+        } else {
+            // Any state → OFF (clears playback / cancels arm / stops record)
+            setLoopOff();
+        }
+    }
+    function updateLoopBtn() {
+        const el = document.getElementById('loopBtn');
+        if (!el) return;
+        const label = ({
+            [LOOP_STATES.OFF]: 'LOOP',
+            [LOOP_STATES.ARMED]: 'LOOP ARM',
+            [LOOP_STATES.RECORDING]: 'LOOP REC',
+            [LOOP_STATES.PLAYING]: 'LOOP ▶'
+        })[loopState] || 'LOOP';
+        el.textContent = label;
+        el.classList.toggle('is-armed',     loopState === LOOP_STATES.ARMED);
+        el.classList.toggle('is-recording', loopState === LOOP_STATES.RECORDING);
+        el.classList.toggle('is-playing',   loopState === LOOP_STATES.PLAYING);
+        el.classList.toggle('off',          loopState === LOOP_STATES.OFF);
+        el.setAttribute('aria-pressed', String(loopState !== LOOP_STATES.OFF));
     }
 
     function scheduleStep(step, bar, when) {
@@ -4664,6 +4813,8 @@
         if (filterBtn) filterBtn.addEventListener('click', () => { ensureAudio(); cycleFilter(); });
         const hamboneBtn = document.getElementById('hamboneBtn');
         if (hamboneBtn) hamboneBtn.addEventListener('click', () => { ensureAudio(); setHamboneMode(!isHamboneMode); });
+        const loopBtn = document.getElementById('loopBtn');
+        if (loopBtn) loopBtn.addEventListener('click', () => { ensureAudio(); toggleLoop(); });
 
         // ---- Dual Band Mode (v1.1, chunk A: mode + footswitch UI) ----
         const dualBandBtn = document.getElementById('dualBandBtn');
@@ -5594,6 +5745,7 @@
         updateSpaceBtn();
         updateFilterBtn();
         updateHamboneBtn();
+        updateLoopBtn();
         // If the kid found any eggs on a prior visit, restore the counter
         // chip with the saved count (no animation — it's not "new").
         if (achievements.size > 0 || moonUnlocked) {

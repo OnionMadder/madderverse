@@ -504,7 +504,7 @@ body.madballz-mode .btn-bass { display: inline-block; }
      SWING = lime       (OFF / ON)
    Suppressed in Madballz mode to keep that surface self-contained
    (Madballz has its own theme + BASS overlay). */
-.btn-mood, .btn-tempo, .btn-key, .btn-swing, .btn-space, .btn-filter, .btn-hambone {
+.btn-mood, .btn-tempo, .btn-key, .btn-swing, .btn-space, .btn-filter, .btn-hambone, .btn-loop {
     font-size: 13px;
     padding: 8px 14px;
     letter-spacing: 0.08em;
@@ -548,13 +548,51 @@ body.madballz-mode .btn-bass { display: inline-block; }
     box-shadow: 0 0 14px rgba(236, 72, 153, 0.45);
 }
 
+/* LOOP = capture cue. Off = dim red (idle). Armed = pulsing red border
+   (waiting for the next bar boundary). Recording = solid red (mic hot).
+   Playing = solid green (loop replaying). */
+.btn-loop { border: 2px solid #f87171; color: #f87171; text-shadow: 0 0 6px rgba(248, 113, 113, 0.5); }
+.btn-loop:hover, .btn-loop:active { background: rgba(248, 113, 113, 0.15); color: #fff; }
+.btn-loop.off {
+    border-color: rgba(248, 113, 113, 0.45);
+    color: rgba(248, 113, 113, 0.65);
+    text-shadow: none;
+}
+.btn-loop.is-armed {
+    border-color: #f87171;
+    color: #fff;
+    background: rgba(248, 113, 113, 0.25);
+    animation: loop-arm-pulse 0.6s ease-in-out infinite alternate;
+}
+@keyframes loop-arm-pulse {
+    from { box-shadow: 0 0 6px rgba(248, 113, 113, 0.35); }
+    to   { box-shadow: 0 0 18px rgba(248, 113, 113, 0.85); }
+}
+.btn-loop.is-recording {
+    border-color: #dc2626;
+    color: #fff;
+    background: rgba(220, 38, 38, 0.55);
+    box-shadow: 0 0 18px rgba(220, 38, 38, 0.85);
+}
+.btn-loop.is-playing {
+    border-color: #22c55e;
+    color: #fff;
+    background: rgba(34, 197, 94, 0.28);
+    text-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+    box-shadow: 0 0 14px rgba(34, 197, 94, 0.55);
+}
+@media (prefers-reduced-motion: reduce) {
+    .btn-loop.is-armed { animation: none; }
+}
+
 body.madballz-mode .btn-mood,
 body.madballz-mode .btn-tempo,
 body.madballz-mode .btn-key,
 body.madballz-mode .btn-swing,
 body.madballz-mode .btn-space,
 body.madballz-mode .btn-filter,
-body.madballz-mode .btn-hambone { display: none; }
+body.madballz-mode .btn-hambone,
+body.madballz-mode .btn-loop { display: none; }
 
 /* ====== HAMBONING MODE VISUAL ROLES (Tier 3) ======
    Position-based split: even-index slots (nth-child odd = 1st/3rd/5th
