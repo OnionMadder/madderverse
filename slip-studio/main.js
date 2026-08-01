@@ -1019,7 +1019,9 @@ async function uninstallPack(category) {
 // If more tracks land later, add them here — the picker already handles
 // N > 1 by randomising.
 const MUSIC_TRACKS = [
-    { src: "assets/audio/New Plan - Out To The World.mp3", label: "Out to the World" },
+    { src: "assets/audio/ambient-morning-wheel.mp3", label: "Morning Wheel" },
+    { src: "assets/audio/ambient-slipwater.mp3",     label: "Slipwater" },
+    { src: "assets/audio/ambient-kiln-glow.mp3",     label: "Kiln Glow" },
 ];
 
 // --- Sound effects ----------------------------------------------
