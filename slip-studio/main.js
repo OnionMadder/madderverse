@@ -195,9 +195,9 @@ const FOOT_BLEND  = 0.14; // allowed width opens to MAX_R over this rise
 // wet reads smoother (water fills the tooth), bone-dry shows the most
 // grain. `fired` is the bare (unglazed) fired earthenware look.
 const CLAY_STATES = {
-    wet:     { label: "Wet clay", color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.03 },
-    leather: { label: "Decorate", color: 0xb38566, roughness: 0.78, clearcoat: 0.18, clearcoatRoughness: 0.70, envMapIntensity: 0.55, bump: 0.05 },
-    fired:   { label: "Fired",    color: 0xbf6a45, roughness: 0.60, clearcoat: 0.15, clearcoatRoughness: 0.70, envMapIntensity: 0.62, bump: 0.04 },
+    wet:     { label: "Wet clay", color: 0xa3674a, roughness: 0.48, clearcoat: 0.40, clearcoatRoughness: 0.45, envMapIntensity: 0.85, bump: 0.06 },
+    leather: { label: "Decorate", color: 0xb38566, roughness: 0.78, clearcoat: 0.18, clearcoatRoughness: 0.70, envMapIntensity: 0.55, bump: 0.09 },
+    fired:   { label: "Fired",    color: 0xbf6a45, roughness: 0.60, clearcoat: 0.15, clearcoatRoughness: 0.70, envMapIntensity: 0.62, bump: 0.07 },
 };
 const INITIAL_STATE = "wet";
 
@@ -2070,7 +2070,7 @@ function paintProceduralClayGrain(ctx) {
             // as "this pot was thrown on a wheel".
             const wobble = (valueNoise(g3, 32, u * 0.4, v * 3) - 0.5);
             const lines  = Math.sin((v * 22 + u * 2 + wobble * 0.45) * Math.PI * 2);
-            const h = 0.5 + grain * 0.5 + lines * 0.24;
+            const h = 0.5 + grain * 0.5 + lines * 0.35;
             const c = Math.max(0, Math.min(255, h * 255)) | 0;
             const i = (y * BUMP_W + x) * 4;
             data[i] = data[i + 1] = data[i + 2] = c;
@@ -4480,16 +4480,9 @@ function advanceStage() {
             // stays where it is.
             if (state.savedPot && state.savedPot.clayState === "wet") state.savedPot.clayState = "leather";
             if (state.savedLid && state.savedLid.clayState === "wet") state.savedLid.clayState = "leather";
-            // Mug preset: arrive at Decorate with a single handle already
-            // attached (still reshapable / removable like any handle).
-            if (SHAPES[state.shape] && SHAPES[state.shape].handle && !state.isLid && !state.handle.on) {
-                setHandleCount(1);
-                setHandleOn(true);
-            }
-            // Teapot preset: fit the pouring spout on the far side too.
-            if (SHAPES[state.shape] && SHAPES[state.shape].spout && !state.isLid && !state.spout.on) {
-                setSpoutOn(true);
-            }
+            // (The mug's handle and the teapot's spout are fitted when the
+            // pot is seeded now — see resetPot — so they're shaped at wet
+            // alongside the body rather than appearing at Decorate.)
             state.dirty = true;
             scheduleCoach("leather"); // first time at Decorate → teach the dip
             break;
@@ -4918,6 +4911,16 @@ function resetPot() {
     // never starts, with no obvious way back — so a fresh pot re-frames.
     setZoom(1);
     setPhase(INITIAL_STATE);
+    // Mug / teapot presets seed with their handle (and the teapot's pouring
+    // spout) already fitted, so they get shaped at wet along with the body
+    // instead of appearing later at Decorate.
+    if (SHAPES[state.shape] && !state.isLid) {
+        if (SHAPES[state.shape].handle) {
+            setHandleCount(1);
+            setHandleOn(true);
+        }
+        if (SHAPES[state.shape].spout) setSpoutOn(true);
+    }
     state.dirty = false;
     draftClear(); // starting over — the old draft is no longer the user's work
     updateGlazeBar();
@@ -5122,7 +5125,7 @@ function updateToolbar() {
     // Rim styles: pots only, wet only (mutually exclusive with the lid picker).
     const rimStylePicker = document.getElementById("rimStylePicker");
     if (rimStylePicker) rimStylePicker.hidden = !(showShape);
-    const handleControlsOn = state.handle.on && !state.isLid && cs === "leather";
+    const handleControlsOn = state.handle.on && !state.isLid && cs === "wet";
     const handleStylePicker = document.getElementById("handleStylePicker");
     if (handleStylePicker) handleStylePicker.hidden = !handleControlsOn;
     const handleCountPicker = document.getElementById("handleCountPicker");
@@ -5178,9 +5181,10 @@ function updateToolbar() {
     // and remove so a single button covers both directions.
     const handleBtn = document.getElementById("handleBtn");
     if (handleBtn) {
-        // Handles are a finishing step now: attach + reshape them at the
-        // Decorate stage, on the finalized shape (not while sculpting wet).
-        const canHandle = !state.isLid && cs === "leather";
+        // Handles are part of shaping: attach + reshape them at wet, along
+        // with the pot. By Decorate the form is committed, so the handle
+        // controls go away with the rest of the shaping tools.
+        const canHandle = !state.isLid && cs === "wet";
         handleBtn.hidden = !canHandle;
         // Icon-only: the .is-active ring shows the on-state; aria-label
         // + title flip between Add/Remove so screen readers + hover

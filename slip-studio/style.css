@@ -1048,17 +1048,30 @@ body.tool-armed #scene:active { cursor: crosshair; }
     pointer-events: none;
 }
 .lid-style-picker[hidden] { display: none; }
-/* The handle-thickness picker rides INSIDE the decorate tray (handles
-   are attached at the leather stage, where the tray is open). Cancel the
-   fixed bottom:132px the lid picker uses at the wet stage — that dropped
-   it on top of the decorate size row. Let it flow as a centred row at the
-   top of the tray instead. Targeted by id so it wins regardless of order. */
-#handleStylePicker.handle-thickness-picker,
-#handleCountPicker.handle-count-picker {
+/* Wet-stage chip rows (rim style + the two handle rows) share one fixed
+   column. Each row would otherwise take .lid-style-picker's own
+   bottom:132px and they'd all stack on the same line on top of each
+   other. The column owns the positioning; the rows inside it flow. */
+.wet-picker-stack {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: max(132px, calc(env(safe-area-inset-bottom, 0px) + 132px));
+    z-index: 35;
+    display: flex;
+    flex-direction: column;
+    /* stretch, not center: each row stays viewport-wide and centres its own
+       chips, the way the free-floating rows did. Shrink-wrapping them makes
+       a row wider than a phone (the rim picker is ~429px) and pushes the
+       ends off both edges. */
+    align-items: stretch;
+    gap: 6px;
+    pointer-events: none;
+}
+.wet-picker-stack > .lid-style-picker {
     position: static;
     inset: auto;
     z-index: auto;
-    margin-bottom: 2px;
 }
 .lid-style-btn {
     pointer-events: auto;

@@ -251,7 +251,14 @@
     </div>
 
     <div class="lid-style-picker" id="lidStylePicker" role="group" aria-label="Lid style" hidden></div>
-    <div class="lid-style-picker" id="rimStylePicker" role="group" aria-label="Rim style" hidden></div>
+    <!-- Wet-stage chip rows, stacked in one fixed column so they can't land
+         on top of each other: rim style, then the handle chips. Handles are
+         attached and shaped at wet now, alongside the pot itself. -->
+    <div class="wet-picker-stack">
+        <div class="lid-style-picker" id="rimStylePicker" role="group" aria-label="Rim style" hidden></div>
+        <div class="lid-style-picker handle-thickness-picker" id="handleStylePicker" role="group" aria-label="Handle thickness" hidden></div>
+        <div class="lid-style-picker handle-count-picker" id="handleCountPicker" role="group" aria-label="Handle count" hidden></div>
+    </div>
     <div class="brush-bar" id="brushBar" role="group" aria-label="Brush size">
         <button class="brush-btn" type="button" aria-label="Fine brush" aria-pressed="false"><span class="brush-dot brush-dot-s"></span></button>
         <button class="brush-btn" type="button" aria-label="Medium brush" aria-pressed="false"><span class="brush-dot brush-dot-m"></span></button>
@@ -263,15 +270,6 @@
     </div>
 
     <div class="deco-stack" id="decoStack" hidden>
-        <!-- Handle thickness chips (THIN/MEDIUM/THICK). Nested at the top
-             of the decorate tray (not free-floating) so they can't overlap
-             the size row: handles are now attached at the leather stage,
-             where the tray is already open. Shown only when a handle is on
-             (see main.js updateToolbar). -->
-        <div class="lid-style-picker handle-thickness-picker" id="handleStylePicker" role="group" aria-label="Handle thickness" hidden></div>
-        <!-- Single vs. paired handle (ONE / TWO). Same chip row, shown with
-             the thickness picker whenever a handle is on. -->
-        <div class="lid-style-picker handle-count-picker" id="handleCountPicker" role="group" aria-label="Handle count" hidden></div>
         <div class="deco-tabs" role="tablist">
             <button class="deco-tab is-active" id="tabGlaze" type="button" role="tab" aria-selected="true">Glaze</button>
             <button class="deco-tab" id="tabDecorate" type="button" role="tab" aria-selected="false">Decorate</button>
