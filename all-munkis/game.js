@@ -2414,6 +2414,62 @@
     // toward unlocking the Madballz screen (see MADBALLZ_UNLOCK_THRESHOLD).
     const HORROR_TRIGGER_MODS = new Set(['ice', 'moon']);
 
+    // ---------- ROLE INFO (Tier-3 music-theory tooltips, 2026-07-31) ----------
+    // Long-press a tray chip → shows this one-liner as a small tooltip.
+    // Kept as a single central map (rather than a `roleInfo` field on
+    // each character) so adding characters + tooltips is decoupled.
+    // Format: 'ROLE · WHEN · SHORT DETAIL'. Kid-friendly, ≤60 chars.
+    const ROLE_INFO = {
+        // Rainbow crew — the shape of Bala's Theme.
+        red:    'BASS STAB · beats 1 + 3 · the low anchor',
+        orange: 'SNARE · beats 2 + 4 · the backbeat',
+        yellow: 'BELL TRIAD · top of every bar · C - E - G',
+        green:  'MELODIC HOOK · every quarter · C - E - G - E',
+        blue:   'SUB + BLIP · low on the beat · high on the &s',
+        purple: 'VIBRATO LEAD · off-beat 8ths · the answer voice',
+        // Evils.
+        moon:   'LONG SUB DRONE · one held note per bar',
+        ice:    'BELL ARPEGGIO · four rising notes on the &s',
+        // Madballz.
+        'mb-brainy':  'BONE RUMBLE · low noise thud',
+        'mb-zombi':   'ALIEN PLUCK · distorted stagger',
+        'mb-unc':     'CHOPPER BASS · pulsing anger',
+        'mb-snooz':   'YAWN PAD · long sigh',
+        'mb-pressio': 'TRIANGLE DRIP · light tick',
+        'mb-eyeball': 'ELECTRIC SQUARE · zapping accent',
+        'mb-sweats':  'HIGH SHIVER · nervous ping',
+        'mb-chad':    'SINE ARP · happy pattern'
+    };
+    // Tooltip render — anchored above the chip. Only ONE at a time
+    // (any new call kills the prior one). Auto-dismisses after 4s or
+    // on the next tray interaction (drag, tap on a different chip,
+    // second long-press).
+    let roleTooltipEl = null;
+    let roleTooltipTimer = null;
+    function showRoleTooltip(chipEl, text) {
+        hideRoleTooltip();
+        if (!text || !chipEl) return;
+        const t = document.createElement('div');
+        t.className = 'role-tooltip';
+        t.textContent = text;
+        document.body.appendChild(t);
+        const r = chipEl.getBoundingClientRect();
+        t.style.left = (r.left + r.width / 2) + 'px';
+        t.style.top  = (r.top - 8) + 'px';
+        requestAnimationFrame(() => t.classList.add('is-shown'));
+        roleTooltipEl = t;
+        roleTooltipTimer = setTimeout(hideRoleTooltip, 4000);
+    }
+    function hideRoleTooltip() {
+        if (roleTooltipTimer) { clearTimeout(roleTooltipTimer); roleTooltipTimer = null; }
+        if (roleTooltipEl) {
+            const t = roleTooltipEl;
+            roleTooltipEl = null;
+            t.classList.remove('is-shown');
+            setTimeout(() => t.remove(), 300);
+        }
+    }
+
     // ---------- NAMED COMBOS ----------
     // Detects arrangements worth calling out with a subtitle. Purely
     // display — no scoring, no persistence, no sound. When the current
@@ -3264,11 +3320,26 @@
                 ensureAudio();
                 try { chip.setPointerCapture(e.pointerId); } catch (_) {}
                 chip.classList.add('grabbing');
+                // Long-press timer (Tier-3 music-theory tooltip) — 600 ms
+                // hold with no drag = show the chip's role info. Same
+                // threshold as the stage-slot variant cycler for muscle-
+                // memory consistency. Any move past DRAG_THRESHOLD_PX or
+                // pointerup before the timer fires cancels it.
+                const charId = chip.dataset.char;
+                const hasInfo = !!ROLE_INFO[charId];
+                const timer = hasInfo ? setTimeout(() => {
+                    const st = trayDragState.get(e.pointerId);
+                    if (!st || st.dragging || st.longPressFired) return;
+                    st.longPressFired = true;
+                    showRoleTooltip(st.chip, ROLE_INFO[st.charId]);
+                }, LONG_PRESS_MS) : null;
                 trayDragState.set(e.pointerId, {
                     chip,
-                    charId: chip.dataset.char,
+                    charId,
                     startX: e.clientX, startY: e.clientY,
-                    dragging: false
+                    dragging: false,
+                    longPressTimer: timer,
+                    longPressFired: false
                 });
             });
             chip.addEventListener('pointermove', e => {
@@ -3279,6 +3350,8 @@
                 if (!state.dragging && (dx * dx + dy * dy) > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
                     state.dragging = true;
                     startTrayGhost(state.chip, e.clientX, e.clientY);
+                    if (state.longPressTimer) { clearTimeout(state.longPressTimer); state.longPressTimer = null; }
+                    hideRoleTooltip();
                 }
                 if (state.dragging) {
                     moveTrayGhost(e.clientX, e.clientY);
@@ -3295,7 +3368,12 @@
                     }
                 } catch (_) {}
                 state.chip.classList.remove('grabbing');
+                if (state.longPressTimer) { clearTimeout(state.longPressTimer); state.longPressTimer = null; }
                 document.querySelectorAll('.stage-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
+                if (state.longPressFired) {
+                    // Long-press already showed the tooltip — swallow the up.
+                    return;
+                }
                 if (state.dragging) {
                     const slot = findSlotAt(e.clientX, e.clientY);
                     if (slot) {
@@ -3321,6 +3399,7 @@
                 if (!state) return;
                 trayDragState.delete(e.pointerId);
                 state.chip.classList.remove('grabbing');
+                if (state.longPressTimer) { clearTimeout(state.longPressTimer); state.longPressTimer = null; }
                 document.querySelectorAll('.stage-slot.drop-target').forEach(s => s.classList.remove('drop-target'));
                 clearTrayGhost();
             });

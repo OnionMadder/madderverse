@@ -923,6 +923,50 @@ body.dual-band-mode .band-foot:not(.lit) {
     100% { transform: scale(1);    filter: brightness(1); }
 }
 
+/* ====== ROLE TOOLTIP (Tier-3 music-theory hint) ======
+   Long-press a tray chip shows this small tooltip anchored above it.
+   Fixed positioning so it survives tray-height changes, one at a time
+   (any new call kills the prior), auto-dismisses ~4s or on next
+   interaction. Amber accent to distinguish from the cyan variant hint
+   on stage slots. */
+.role-tooltip {
+    position: fixed;
+    transform: translate(-50%, -100%) scale(0.9);
+    padding: 8px 14px;
+    background: rgba(15, 23, 42, 0.96);
+    color: #fbbf24;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    max-width: 82vw;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    border: 1px solid rgba(251, 191, 36, 0.55);
+    border-radius: 10px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6),
+                0 0 14px rgba(251, 191, 36, 0.35);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 62;
+    transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.role-tooltip.is-shown {
+    opacity: 1;
+    transform: translate(-50%, -100%) scale(1);
+}
+.role-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(15, 23, 42, 0.96);
+    border-bottom: 0;
+}
+
 /* First-run hint anchored above the just-placed slot. Fades once,
    dismisses on next interaction OR ~3.4s auto-timer. */
 .variant-hint {
