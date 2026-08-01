@@ -194,6 +194,30 @@
     // every oscillator via a monkey-patch in ensureAudio. Musical
     // transposition without editing any per-Munki play() function.
     let pitchShiftSource = null;
+    // Tier-2 music: SPACE (reverb send) + FILTER (master lowpass base freq).
+    // SPACE routes a copy of the master signal through a Tone.Reverb bus
+    // (parallel to the dry masterLP path); the send gain scales wet.
+    // FILTER swaps the masterLP frequency — same node that setIceMuffle
+    // modulates during Ice horror, so we track a `filterBaseHz` the
+    // player picks and setIceMuffle multiplies against it during dread.
+    let masterComp = null;              // exposed ref for the SPACE parallel path
+    let spaceSend = null;               // GainNode: masterGain -> spaceSend -> reverb -> comp
+    let spaceReverb = null;
+    let spaceLevel = 0;                 // current send gain (0..0.6)
+    let filterBaseHz = 14000;           // player-set base LP freq (see FILTER_PRESETS)
+    const SPACE_PRESETS = [
+        { name: 'DRY',  send: 0.00, decay: 1.2 },
+        { name: 'ROOM', send: 0.16, decay: 1.8 },
+        { name: 'HALL', send: 0.34, decay: 3.4 },
+        { name: 'CAVE', send: 0.58, decay: 6.0 }
+    ];
+    let spaceIndex = 0;                 // 0 = DRY
+    const FILTER_PRESETS = [
+        { name: 'BRIGHT', hz: 14000 },
+        { name: 'WARM',   hz:  8000 },
+        { name: 'DARK',   hz:  3200 }
+    ];
+    let filterIndex = 0;                // 0 = BRIGHT
     let isBassOn     = false;                // optional booming bass overlay (Madballz Theme) — off by default; user toggles via BASS button
     let isJumpScareActive = false;           // debounce + visual gate for BOO
     let currentStep = 0;
@@ -559,6 +583,7 @@
             comp.release.value = 0.25;
             // Chain: masterGain -> 14 kHz LP -> compressor -> destination.
             masterGain.connect(masterLP).connect(comp).connect(audioCtx.destination);
+            masterComp = comp;   // exposed for the SPACE parallel path below
 
             // Global pitch shifter (Tier-1 music expansion): a
             // ConstantSourceNode outputting `keyShiftSemitones * 100`
@@ -579,6 +604,24 @@
             };
 
             buildToneLayer(); // no-op if Tone.js isn't loaded
+
+            // SPACE bus (Tier-2 music expansion). Parallel wet path:
+            //   masterGain -> spaceSend -> Tone.Reverb -> comp
+            // The dry path (masterGain -> masterLP -> comp) is unchanged.
+            // Bail silently if Tone.js didn't load — SPACE just stays DRY.
+            if (toneReady) {
+                spaceReverb = new Tone.Reverb({
+                    decay:    SPACE_PRESETS[spaceIndex].decay,
+                    preDelay: 0.03
+                });
+                spaceSend = audioCtx.createGain();
+                spaceSend.gain.value = SPACE_PRESETS[spaceIndex].send;
+                masterGain.connect(spaceSend);
+                Tone.connect(spaceSend, spaceReverb);
+                Tone.connect(spaceReverb, masterComp);
+            }
+            // Seed masterLP frequency from the saved FILTER choice.
+            masterLP.frequency.value = filterBaseHz;
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
         if (!isPlaying) {
@@ -811,6 +854,73 @@
         const el = document.getElementById('moodBtn');
         if (!el) return;
         el.textContent = SONG_VARIATIONS[songVariationIndex].name;
+    }
+    // SPACE + FILTER setters (Tier 2). Both idempotent + save on change.
+    function setSpace(idx) {
+        spaceIndex = idx % SPACE_PRESETS.length;
+        const preset = SPACE_PRESETS[spaceIndex];
+        spaceLevel = preset.send;
+        if (spaceSend && audioCtx) {
+            const now = audioCtx.currentTime;
+            spaceSend.gain.cancelScheduledValues(now);
+            spaceSend.gain.setValueAtTime(spaceSend.gain.value, now);
+            // 300ms glide keeps a mid-loop space change smooth; short
+            // enough that the tap feels responsive.
+            spaceSend.gain.linearRampToValueAtTime(preset.send, now + 0.3);
+        }
+        if (spaceReverb && spaceReverb.decay !== undefined) {
+            // Tone.Reverb regenerates its IR when decay changes. Fine
+            // to do on-the-fly; brief silence during regen is inaudible
+            // over an active mix.
+            try { spaceReverb.decay = preset.decay; } catch (_) {}
+        }
+    }
+    function cycleSpace() {
+        setSpace(spaceIndex + 1);
+        updateSpaceBtn();
+        saveProgress();
+    }
+    function setFilter(idx) {
+        filterIndex = idx % FILTER_PRESETS.length;
+        filterBaseHz = FILTER_PRESETS[filterIndex].hz;
+        // Reapply the muffle math: setIceMuffle now scales relative to
+        // filterBaseHz, so player choice + ice horror compose cleanly.
+        applyMasterFilter();
+    }
+    function cycleFilter() {
+        setFilter(filterIndex + 1);
+        updateFilterBtn();
+        saveProgress();
+    }
+    // Central applier: reads the current filter base + the live dread
+    // stage's ice-muffle multiplier and glides masterLP to the target.
+    // Called from setFilter AND from setIceMuffle so both routes stay
+    // in agreement.
+    function applyMasterFilter() {
+        if (!masterLP || !audioCtx) return;
+        const ice = typeof isIceOnStage === 'function' && isIceOnStage();
+        const stage = typeof dreadStageNow !== 'undefined' ? dreadStageNow : 'calm';
+        const suppress = isMadballzMode || isDualBandMode;
+        const mult = (suppress || !ice || stage === 'calm') ? 1.0
+                   : stage === 'unease'                     ? 0.55
+                   : stage === 'dread'                      ? 0.20
+                   :                                          0.05;   // terror
+        const target = filterBaseHz * mult;
+        const now = audioCtx.currentTime;
+        masterLP.frequency.cancelScheduledValues(now);
+        masterLP.frequency.setValueAtTime(masterLP.frequency.value, now);
+        masterLP.frequency.exponentialRampToValueAtTime(Math.max(200, target), now + 2.5);
+    }
+    function updateSpaceBtn() {
+        const el = document.getElementById('spaceBtn');
+        if (!el) return;
+        el.textContent = SPACE_PRESETS[spaceIndex].name;
+        el.classList.toggle('off', spaceIndex === 0);
+    }
+    function updateFilterBtn() {
+        const el = document.getElementById('filterBtn');
+        if (!el) return;
+        el.textContent = FILTER_PRESETS[filterIndex].name;
     }
 
     function scheduleStep(step, bar, when) {
@@ -3195,22 +3305,13 @@
     // logarithmic; edge-detected via iceMuffleLevel so it only re-ramps
     // when the (stage, ice-on-stage) state actually changes.
     function setIceMuffle(stage) {
-        if (!masterLP || !audioCtx) return;
-        const ice = isIceOnStage();
-        // Madballz mode keeps clean audio — no cold lowpass muffle even if
-        // dread is climbing (creeps/per-Munki reacts still fire; only the
-        // ice/moon horror audio layer is gated off).
-        const target = (isMadballzMode || isDualBandMode) ? 14000
-                     : (!ice || stage === 'calm')         ? 14000
-                     : stage === 'unease'                 ? 7000
-                     : stage === 'dread'                  ? 2500
-                     :                                       700;  // terror
-        if (target === iceMuffleLevel) return;
-        iceMuffleLevel = target;
-        const now = audioCtx.currentTime;
-        masterLP.frequency.cancelScheduledValues(now);
-        masterLP.frequency.setValueAtTime(masterLP.frequency.value, now);
-        masterLP.frequency.exponentialRampToValueAtTime(target, now + 2.5);
+        // Refactored 2026-07-31 for Tier-2 FILTER pill: ice horror now
+        // composes with the player's chosen master filter by multiplying
+        // filterBaseHz (BRIGHT/WARM/DARK) with a per-stage mult inside
+        // applyMasterFilter. The stage argument is intentionally
+        // unused here — applyMasterFilter reads dreadStageNow directly
+        // to stay in one source of truth.
+        applyMasterFilter();
     }
 
     const MOON_GLITCH_LINES = [
@@ -3350,6 +3451,15 @@
                 songVariationIndex = obj.songVariation;
             }
             if (typeof obj.swingOn === 'boolean') isSwingOn = obj.swingOn;
+            if (typeof obj.spaceIndex === 'number'
+                && obj.spaceIndex >= 0 && obj.spaceIndex < SPACE_PRESETS.length) {
+                spaceIndex = obj.spaceIndex;
+            }
+            if (typeof obj.filterIndex === 'number'
+                && obj.filterIndex >= 0 && obj.filterIndex < FILTER_PRESETS.length) {
+                filterIndex = obj.filterIndex;
+                filterBaseHz = FILTER_PRESETS[filterIndex].hz;
+            }
             const idx = (obj.activeBankIndex | 0);
             if (idx >= 0 && idx < BANKS.length && BANKS[idx].unlocked) {
                 activeBankIndex = idx;
@@ -3374,11 +3484,13 @@
                 bandCount,
                 activeBankIndex,
                 unlockedBanks: BANKS.map(b => b.unlocked),
-                // Music-expansion params (Tier 1)
+                // Music-expansion params (Tier 1 + 2)
                 tempo: TEMPO,
                 keyShift: keyShiftSemitones,
                 songVariation: songVariationIndex,
-                swingOn: isSwingOn
+                swingOn: isSwingOn,
+                spaceIndex,
+                filterIndex
             }));
         } catch (e) { /* ignore */ }
     }
@@ -3984,6 +4096,10 @@
         if (keyBtn) keyBtn.addEventListener('click', () => { ensureAudio(); cycleKey(); });
         const swingBtn = document.getElementById('swingBtn');
         if (swingBtn) swingBtn.addEventListener('click', () => { ensureAudio(); setSwing(!isSwingOn); });
+        const spaceBtn = document.getElementById('spaceBtn');
+        if (spaceBtn) spaceBtn.addEventListener('click', () => { ensureAudio(); cycleSpace(); });
+        const filterBtn = document.getElementById('filterBtn');
+        if (filterBtn) filterBtn.addEventListener('click', () => { ensureAudio(); cycleFilter(); });
 
         // ---- Dual Band Mode (v1.1, chunk A: mode + footswitch UI) ----
         const dualBandBtn = document.getElementById('dualBandBtn');
@@ -4911,6 +5027,8 @@
         updateTempoBtn();
         updateKeyBtn();
         updateSwingBtn();
+        updateSpaceBtn();
+        updateFilterBtn();
         // If the kid found any eggs on a prior visit, restore the counter
         // chip with the saved count (no animation — it's not "new").
         if (achievements.size > 0 || moonUnlocked) {

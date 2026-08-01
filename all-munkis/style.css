@@ -504,7 +504,7 @@ body.madballz-mode .btn-bass { display: inline-block; }
      SWING = lime       (OFF / ON)
    Suppressed in Madballz mode to keep that surface self-contained
    (Madballz has its own theme + BASS overlay). */
-.btn-mood, .btn-tempo, .btn-key, .btn-swing {
+.btn-mood, .btn-tempo, .btn-key, .btn-swing, .btn-space, .btn-filter {
     font-size: 13px;
     padding: 8px 14px;
     letter-spacing: 0.08em;
@@ -523,10 +523,23 @@ body.madballz-mode .btn-bass { display: inline-block; }
     color: rgba(163, 230, 53, 0.65);
     text-shadow: none;
 }
+/* SPACE = deep-teal wet-signal cue; FILTER = amber warmth cue. */
+.btn-space  { border: 2px solid #2dd4bf; color: #2dd4bf; text-shadow: 0 0 6px rgba(45, 212, 191, 0.55); }
+.btn-space:hover, .btn-space:active { background: rgba(45, 212, 191, 0.15); color: #fff; }
+.btn-space.off {
+    border-color: rgba(45, 212, 191, 0.45);
+    color: rgba(45, 212, 191, 0.65);
+    text-shadow: none;
+}
+.btn-filter { border: 2px solid #fbbf24; color: #fbbf24; text-shadow: 0 0 6px rgba(251, 191, 36, 0.55); }
+.btn-filter:hover, .btn-filter:active { background: rgba(251, 191, 36, 0.15); color: #fff; }
+
 body.madballz-mode .btn-mood,
 body.madballz-mode .btn-tempo,
 body.madballz-mode .btn-key,
-body.madballz-mode .btn-swing { display: none; }
+body.madballz-mode .btn-swing,
+body.madballz-mode .btn-space,
+body.madballz-mode .btn-filter { display: none; }
 
 /* BOO! — big ominous red button that triggers the jumpscare. */
 .btn-boo {
