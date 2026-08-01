@@ -383,7 +383,7 @@
             const id = slots[i];
             if (!id) continue;
             const ch = CHARACTERS[id];
-            if (ch && ch.play) ch.play(audioCtx, rowGain[r], w, step);
+            if (ch && ch.play) ch.play(audioCtx, rowGain[r], w, step, i);
         }
     }
     function setBandOn(i, on) {
@@ -940,7 +940,7 @@
                 const id = slots[i];
                 if (!id) continue;
                 const ch = CHARACTERS[id];
-                if (ch && ch.play) ch.play(audioCtx, masterGain, w, step);
+                if (ch && ch.play) ch.play(audioCtx, masterGain, w, step, i);
             }
         }
         if (step % 4 === 0) {
@@ -1244,208 +1244,606 @@
     const CHARACTERS = {
         red: {
             label: 'Red',
-            // Audio profile: saw bass stab (was "grumble"). Body color #dc2626
-            // → sprite letter R via COLOR_BY_BODY.
+            // Bass stab role — steps 0, 8. Body #dc2626 → sprite letter R.
+            // Variants (long-press to cycle):
+            //   WARM = current detuned-saw + resonant LP sweep
+            //   SUB  = 808-style sine boom with pitch drop
+            //   BUZZ = square-wave + waveshape aggressive click
             bodyColor: '#dc2626', bodyHi: '#fca5a5', bodyShade: '#7f1d1d',
-            play(ctx, out, when, step) {
-                if (step !== 0 && step !== 8) return;
-                const root = step === 0 ? 65.41 : 98.00;
-                const o1 = ctx.createOscillator();
-                const o2 = ctx.createOscillator();
-                const f = ctx.createBiquadFilter();
-                const g = ctx.createGain();
-                f.type = 'lowpass';
-                f.frequency.setValueAtTime(800, when);
-                f.frequency.exponentialRampToValueAtTime(300, when + 0.35);
-                f.Q.value = 5;
-                o1.type = 'sawtooth'; o1.frequency.value = root;
-                o2.type = 'sawtooth'; o2.frequency.value = root * 1.005;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.18, when + 0.01);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
-                o1.connect(f); o2.connect(f);
-                f.connect(g).connect(out);
-                o1.start(when); o1.stop(when + 0.45);
-                o2.start(when); o2.stop(when + 0.45);
+            variantNames: ['WARM', 'SUB', 'BUZZ'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    if (step !== 0 && step !== 8) return;
+                    const root = step === 0 ? 65.41 : 98.00;
+                    const o1 = ctx.createOscillator();
+                    const o2 = ctx.createOscillator();
+                    const f = ctx.createBiquadFilter();
+                    const g = ctx.createGain();
+                    f.type = 'lowpass';
+                    f.frequency.setValueAtTime(800, when);
+                    f.frequency.exponentialRampToValueAtTime(300, when + 0.35);
+                    f.Q.value = 5;
+                    o1.type = 'sawtooth'; o1.frequency.value = root;
+                    o2.type = 'sawtooth'; o2.frequency.value = root * 1.005;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.18, when + 0.01);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
+                    o1.connect(f); o2.connect(f);
+                    f.connect(g).connect(out);
+                    o1.start(when); o1.stop(when + 0.45);
+                    o2.start(when); o2.stop(when + 0.45);
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 0 && step !== 8) return;
+                    const root = step === 0 ? 55.00 : 82.41;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(root * 1.8, when);
+                    o.frequency.exponentialRampToValueAtTime(root, when + 0.05);
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.30, when + 0.005);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.6);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.65);
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 0 && step !== 8) return;
+                    const root = step === 0 ? 65.41 : 98.00;
+                    const o = ctx.createOscillator();
+                    const dist = ctx.createWaveShaper();
+                    dist.curve = distortionCurve(40);
+                    const g = ctx.createGain();
+                    o.type = 'square';
+                    o.frequency.value = root;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.14, when + 0.002);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.15);
+                    o.connect(dist).connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.17);
+                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
         orange: {
             label: 'Orange',
-            // Audio profile: snare drum (was "snare"). Body color #ff9800 → O.
+            // Snare role — steps 4, 12. Body #ff9800 → O.
+            // Variants:
+            //   SNAP = current bandpass noise + triangle body
+            //   BOOM = lower BP + longer decay (rock snare)
+            //   RIM  = highpass burst only, no body (rimshot / brush)
             bodyColor: '#ff9800', bodyHi: '#ffb74d', bodyShade: '#bf360c',
-            play(ctx, out, when, step) {
-                if (step !== 4 && step !== 12) return;
-                const n = noiseSource(ctx, 0.13);
-                const f = ctx.createBiquadFilter();
-                f.type = 'bandpass';
-                f.frequency.value = 2200;
-                f.Q.value = 1.2;
-                const g = ctx.createGain();
-                g.gain.setValueAtTime(0.32, when);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
-                n.connect(f).connect(g).connect(out);
-                n.start(when); n.stop(when + 0.14);
-                const o = ctx.createOscillator();
-                o.type = 'triangle';
-                o.frequency.setValueAtTime(210, when);
-                o.frequency.exponentialRampToValueAtTime(135, when + 0.06);
-                const og = ctx.createGain();
-                og.gain.setValueAtTime(0.14, when);
-                og.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
-                o.connect(og).connect(out);
-                o.start(when); o.stop(when + 0.08);
+            variantNames: ['SNAP', 'BOOM', 'RIM'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    if (step !== 4 && step !== 12) return;
+                    const n = noiseSource(ctx, 0.13);
+                    const f = ctx.createBiquadFilter();
+                    f.type = 'bandpass';
+                    f.frequency.value = 2200;
+                    f.Q.value = 1.2;
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0.32, when);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+                    n.connect(f).connect(g).connect(out);
+                    n.start(when); n.stop(when + 0.14);
+                    const o = ctx.createOscillator();
+                    o.type = 'triangle';
+                    o.frequency.setValueAtTime(210, when);
+                    o.frequency.exponentialRampToValueAtTime(135, when + 0.06);
+                    const og = ctx.createGain();
+                    og.gain.setValueAtTime(0.14, when);
+                    og.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
+                    o.connect(og).connect(out);
+                    o.start(when); o.stop(when + 0.08);
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 4 && step !== 12) return;
+                    const n = noiseSource(ctx, 0.28);
+                    const f = ctx.createBiquadFilter();
+                    f.type = 'bandpass';
+                    f.frequency.value = 900;
+                    f.Q.value = 0.8;
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0.28, when);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.26);
+                    n.connect(f).connect(g).connect(out);
+                    n.start(when); n.stop(when + 0.28);
+                    const o = ctx.createOscillator();
+                    o.type = 'triangle';
+                    o.frequency.setValueAtTime(160, when);
+                    o.frequency.exponentialRampToValueAtTime(80, when + 0.1);
+                    const og = ctx.createGain();
+                    og.gain.setValueAtTime(0.16, when);
+                    og.gain.exponentialRampToValueAtTime(0.001, when + 0.12);
+                    o.connect(og).connect(out);
+                    o.start(when); o.stop(when + 0.13);
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 4 && step !== 12) return;
+                    const n = noiseSource(ctx, 0.05);
+                    const f = ctx.createBiquadFilter();
+                    f.type = 'highpass';
+                    f.frequency.value = 5000;
+                    f.Q.value = 0.7;
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0.35, when);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.04);
+                    n.connect(f).connect(g).connect(out);
+                    n.start(when); n.stop(when + 0.05);
+                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
         yellow: {
             label: 'Yellow',
-            // Audio profile: bell triad on bar start (was "star"). Body #fbbf24 → Y.
+            // Bell triad role — step 0. Body #fbbf24 → Y.
+            // Variants:
+            //   SPARKLE = current 3 ascending sine bells C-E-G
+            //   GLOCK   = square-wave plucks, glockenspiel snap
+            //   CHIME   = 4 sines w/ long decay, church bell
             bodyColor: '#fbbf24', bodyHi: '#fde68a', bodyShade: '#92400e',
-            play(ctx, out, when, step) {
-                if (step !== 0) return;
-                const notes = [1046.5, 1318.51, 1567.98];
-                notes.forEach((freq, i) => {
-                    const o = ctx.createOscillator();
-                    const g = ctx.createGain();
-                    o.type = 'sine';
-                    o.frequency.value = freq;
-                    const t = when + i * 0.06;
-                    g.gain.setValueAtTime(0, t);
-                    g.gain.linearRampToValueAtTime(0.10, t + 0.005);
-                    g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
-                    o.connect(g).connect(out);
-                    o.start(t); o.stop(t + 0.65);
-                });
+            variantNames: ['SPARKLE', 'GLOCK', 'CHIME'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    if (step !== 0) return;
+                    const notes = [1046.5, 1318.51, 1567.98];
+                    notes.forEach((freq, i) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'sine';
+                        o.frequency.value = freq;
+                        const t = when + i * 0.06;
+                        g.gain.setValueAtTime(0, t);
+                        g.gain.linearRampToValueAtTime(0.10, t + 0.005);
+                        g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+                        o.connect(g).connect(out);
+                        o.start(t); o.stop(t + 0.65);
+                    });
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 0) return;
+                    const notes = [1046.5, 1318.51, 1567.98];
+                    notes.forEach((freq, i) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'square';
+                        o.frequency.value = freq;
+                        const t = when + i * 0.05;
+                        g.gain.setValueAtTime(0, t);
+                        g.gain.linearRampToValueAtTime(0.06, t + 0.002);
+                        g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+                        o.connect(g).connect(out);
+                        o.start(t); o.stop(t + 0.3);
+                    });
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 0) return;
+                    const notes = [523.25, 659.25, 783.99, 1046.5];
+                    notes.forEach((freq, i) => {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'sine';
+                        o.frequency.value = freq;
+                        const t = when + i * 0.08;
+                        g.gain.setValueAtTime(0, t);
+                        g.gain.linearRampToValueAtTime(0.08, t + 0.01);
+                        g.gain.exponentialRampToValueAtTime(0.001, t + 1.4);
+                        o.connect(g).connect(out);
+                        o.start(t); o.stop(t + 1.5);
+                    });
+                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
         green: {
             label: 'Green',
+            // Melodic hook role — steps 0/4/8/12 (C-E-G-E).
+            // Variants:
+            //   LEAD  = current saw hook with resonant LP sweep
+            //   PLUCK = triangle fast decay, guitar-like
+            //   SYNTH = saw + sub-octave square blend, longer sustain
             bodyColor: '#43a047', bodyHi: '#81c784', bodyShade: '#1b5e20',
-            play(ctx, out, when, step) {
-                const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
-                const freq = hook[step];
-                if (!freq) return;
-                const osc = ctx.createOscillator();
-                const g = ctx.createGain();
-                const f = ctx.createBiquadFilter();
-                f.type = 'lowpass';
-                f.frequency.setValueAtTime(2200, when);
-                f.frequency.exponentialRampToValueAtTime(900, when + 0.3);
-                f.Q.value = 4;
-                osc.type = 'sawtooth';
-                osc.frequency.value = freq;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.16, when + 0.015);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
-                osc.connect(f).connect(g).connect(out);
-                osc.start(when); osc.stop(when + 0.35);
+            variantNames: ['LEAD', 'PLUCK', 'SYNTH'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
+                    const freq = hook[step];
+                    if (!freq) return;
+                    const osc = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    const f = ctx.createBiquadFilter();
+                    f.type = 'lowpass';
+                    f.frequency.setValueAtTime(2200, when);
+                    f.frequency.exponentialRampToValueAtTime(900, when + 0.3);
+                    f.Q.value = 4;
+                    osc.type = 'sawtooth';
+                    osc.frequency.value = freq;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.16, when + 0.015);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
+                    osc.connect(f).connect(g).connect(out);
+                    osc.start(when); osc.stop(when + 0.35);
+                },
+                function(ctx, out, when, step) {
+                    const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
+                    const freq = hook[step];
+                    if (!freq) return;
+                    const osc = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.14, when + 0.003);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+                    osc.connect(g).connect(out);
+                    osc.start(when); osc.stop(when + 0.2);
+                },
+                function(ctx, out, when, step) {
+                    const hook = { 0: 523.25, 4: 659.25, 8: 783.99, 12: 659.25 };
+                    const freq = hook[step];
+                    if (!freq) return;
+                    const osc1 = ctx.createOscillator();
+                    const osc2 = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    osc1.type = 'sawtooth'; osc1.frequency.value = freq;
+                    osc2.type = 'square';   osc2.frequency.value = freq * 0.5;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.12, when + 0.02);
+                    g.gain.linearRampToValueAtTime(0.08, when + 0.3);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.55);
+                    osc1.connect(g); osc2.connect(g);
+                    g.connect(out);
+                    osc1.start(when); osc1.stop(when + 0.58);
+                    osc2.start(when); osc2.stop(when + 0.58);
+                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
         blue: {
             label: 'Blue',
-            // Audio profile: sub-bass + triangle blip (was "srivi"). Body #1e88e5 → B.
+            // Sub + blip role — sub on 0/6/10, blip on 3/8/13. Body #1e88e5 → B.
+            // Variants:
+            //   MOODY  = current sine sub sweep + triangle blip
+            //   TRAP   = 808 sub only (no blip on high steps)
+            //   BUBBLE = bouncy triangle sub + square blip (playful)
             bodyColor: '#1e88e5', bodyHi: '#90caf9', bodyShade: '#0d47a1',
-            play(ctx, out, when, step) {
-                const lowSteps = [0, 6, 10];
-                const highSteps = [3, 8, 13];
-                if (lowSteps.includes(step)) {
+            variantNames: ['MOODY', 'TRAP', 'BUBBLE'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    const lowSteps = [0, 6, 10];
+                    const highSteps = [3, 8, 13];
+                    if (lowSteps.includes(step)) {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(110, when);
+                        o.frequency.exponentialRampToValueAtTime(75, when + 0.15);
+                        g.gain.setValueAtTime(0.32, when);
+                        g.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
+                        o.connect(g).connect(out);
+                        o.start(when); o.stop(when + 0.24);
+                    }
+                    if (highSteps.includes(step)) {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(880, when);
+                        o.frequency.exponentialRampToValueAtTime(523.25, when + 0.06);
+                        g.gain.setValueAtTime(0.13, when);
+                        g.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
+                        o.connect(g).connect(out);
+                        o.start(when); o.stop(when + 0.1);
+                    }
+                },
+                function(ctx, out, when, step) {
+                    const lowSteps = [0, 6, 10];
+                    if (!lowSteps.includes(step)) return;
                     const o = ctx.createOscillator();
                     const g = ctx.createGain();
                     o.type = 'sine';
-                    o.frequency.setValueAtTime(110, when);
-                    o.frequency.exponentialRampToValueAtTime(75, when + 0.15);
-                    g.gain.setValueAtTime(0.32, when);
-                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.22);
+                    o.frequency.setValueAtTime(88, when);
+                    o.frequency.exponentialRampToValueAtTime(55, when + 0.08);
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.40, when + 0.005);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
                     o.connect(g).connect(out);
-                    o.start(when); o.stop(when + 0.24);
+                    o.start(when); o.stop(when + 0.45);
+                },
+                function(ctx, out, when, step) {
+                    const lowSteps = [0, 6, 10];
+                    const highSteps = [3, 8, 13];
+                    if (lowSteps.includes(step)) {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'triangle';
+                        o.frequency.setValueAtTime(196, when);
+                        o.frequency.exponentialRampToValueAtTime(147, when + 0.1);
+                        g.gain.setValueAtTime(0.28, when);
+                        g.gain.exponentialRampToValueAtTime(0.001, when + 0.2);
+                        o.connect(g).connect(out);
+                        o.start(when); o.stop(when + 0.22);
+                    }
+                    if (highSteps.includes(step)) {
+                        const o = ctx.createOscillator();
+                        const g = ctx.createGain();
+                        o.type = 'square';
+                        o.frequency.setValueAtTime(1046.5, when);
+                        o.frequency.exponentialRampToValueAtTime(783.99, when + 0.05);
+                        g.gain.setValueAtTime(0.10, when);
+                        g.gain.exponentialRampToValueAtTime(0.001, when + 0.07);
+                        o.connect(g).connect(out);
+                        o.start(when); o.stop(when + 0.08);
+                    }
                 }
-                if (highSteps.includes(step)) {
-                    const o = ctx.createOscillator();
-                    const g = ctx.createGain();
-                    o.type = 'triangle';
-                    o.frequency.setValueAtTime(880, when);
-                    o.frequency.exponentialRampToValueAtTime(523.25, when + 0.06);
-                    g.gain.setValueAtTime(0.13, when);
-                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.08);
-                    o.connect(g).connect(out);
-                    o.start(when); o.stop(when + 0.1);
-                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
         purple: {
             label: 'Purple',
-            // Audio profile: vibrato triangle melody (was "flute"/"Vibe"). Body #9c27b0 → P.
+            // Vibrato melody role — off-beat 8ths (2/6/10/14). Body #9c27b0 → P.
+            // Variants:
+            //   FLUTE = current triangle w/ LFO vibrato
+            //   VOICE = sine + formant BP, aah-like human voice
+            //   WAH   = saw w/ LFO on filter cutoff (guitar wah)
             bodyColor: '#9c27b0', bodyHi: '#ce93d8', bodyShade: '#4a148c',
-            play(ctx, out, when, step) {
-                const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
-                const freq = melody[step];
-                if (!freq) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                const lfo = ctx.createOscillator();
-                const lfoG = ctx.createGain();
-                lfo.frequency.value = 5;
-                lfoG.gain.value = 4;
-                lfo.connect(lfoG).connect(o.frequency);
-                o.type = 'triangle';
-                o.frequency.value = freq;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.13, when + 0.04);
-                g.gain.linearRampToValueAtTime(0.11, when + 0.2);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.35);
-                lfo.start(when); lfo.stop(when + 0.35);
+            variantNames: ['FLUTE', 'VOICE', 'WAH'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
+                    const freq = melody[step];
+                    if (!freq) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    const lfo = ctx.createOscillator();
+                    const lfoG = ctx.createGain();
+                    lfo.frequency.value = 5;
+                    lfoG.gain.value = 4;
+                    lfo.connect(lfoG).connect(o.frequency);
+                    o.type = 'triangle';
+                    o.frequency.value = freq;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.13, when + 0.04);
+                    g.gain.linearRampToValueAtTime(0.11, when + 0.2);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.32);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.35);
+                    lfo.start(when); lfo.stop(when + 0.35);
+                },
+                function(ctx, out, when, step) {
+                    const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
+                    const freq = melody[step];
+                    if (!freq) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    const f = ctx.createBiquadFilter();
+                    const lfo = ctx.createOscillator();
+                    const lfoG = ctx.createGain();
+                    lfo.frequency.value = 6;
+                    lfoG.gain.value = 10;
+                    lfo.connect(lfoG).connect(o.frequency);
+                    o.type = 'sine';
+                    o.frequency.value = freq;
+                    f.type = 'bandpass';
+                    f.frequency.value = 900;
+                    f.Q.value = 3;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.16, when + 0.06);
+                    g.gain.linearRampToValueAtTime(0.13, when + 0.24);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.4);
+                    o.connect(f).connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.42);
+                    lfo.start(when); lfo.stop(when + 0.42);
+                },
+                function(ctx, out, when, step) {
+                    const melody = { 2: 783.99, 6: 880.00, 10: 783.99, 14: 659.25 };
+                    const freq = melody[step];
+                    if (!freq) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    const f = ctx.createBiquadFilter();
+                    const lfo = ctx.createOscillator();
+                    const lfoG = ctx.createGain();
+                    lfo.frequency.value = 4;
+                    lfoG.gain.value = 800;
+                    lfo.connect(lfoG).connect(f.frequency);
+                    f.type = 'lowpass';
+                    f.frequency.value = 1200;
+                    f.Q.value = 8;
+                    o.type = 'sawtooth';
+                    o.frequency.value = freq;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.12, when + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.35);
+                    o.connect(f).connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.4);
+                    lfo.start(when); lfo.stop(when + 0.4);
+                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
         moon: {
             label: 'Moon',
+            // Long sub drone role — step 0. Body #1f2937 → sprite X.
+            // Variants:
+            //   DRONE = current held sine C2+C3, 2.4s
+            //   PULSE = same drone, LFO-breathed gain
+            //   HOWL  = filtered noise (wind) + low sine drone
             bodyColor: '#1f2937', bodyHi: '#4b5563', bodyShade: '#000000',
-            play(ctx, out, when, step) {
-                if (step !== 0) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'sine';
-                o.frequency.value = 65.41;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.32, when + 0.06);
-                g.gain.linearRampToValueAtTime(0.26, when + 1.6);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 2.45);
-                const o2 = ctx.createOscillator();
-                const g2 = ctx.createGain();
-                o2.type = 'sine';
-                o2.frequency.value = 130.81;
-                g2.gain.setValueAtTime(0, when);
-                g2.gain.linearRampToValueAtTime(0.06, when + 0.1);
-                g2.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
-                o2.connect(g2).connect(out);
-                o2.start(when); o2.stop(when + 2.45);
+            variantNames: ['DRONE', 'PULSE', 'HOWL'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    if (step !== 0) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.value = 65.41;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.32, when + 0.06);
+                    g.gain.linearRampToValueAtTime(0.26, when + 1.6);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + 2.45);
+                    const o2 = ctx.createOscillator();
+                    const g2 = ctx.createGain();
+                    o2.type = 'sine';
+                    o2.frequency.value = 130.81;
+                    g2.gain.setValueAtTime(0, when);
+                    g2.gain.linearRampToValueAtTime(0.06, when + 0.1);
+                    g2.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
+                    o2.connect(g2).connect(out);
+                    o2.start(when); o2.stop(when + 2.45);
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 0) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    const lfo = ctx.createOscillator();
+                    const lfoG = ctx.createGain();
+                    lfo.frequency.value = 0.7;
+                    lfoG.gain.value = 0.15;
+                    lfo.connect(lfoG).connect(g.gain);
+                    o.type = 'sine';
+                    o.frequency.value = 65.41;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.32, when + 0.1);
+                    g.gain.linearRampToValueAtTime(0.26, when + 1.8);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + 2.45);
+                    lfo.start(when); lfo.stop(when + 2.45);
+                    const o2 = ctx.createOscillator();
+                    const g2 = ctx.createGain();
+                    o2.type = 'sine';
+                    o2.frequency.value = 130.81;
+                    g2.gain.setValueAtTime(0, when);
+                    g2.gain.linearRampToValueAtTime(0.05, when + 0.2);
+                    g2.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
+                    o2.connect(g2).connect(out);
+                    o2.start(when); o2.stop(when + 2.45);
+                },
+                function(ctx, out, when, step) {
+                    if (step !== 0) return;
+                    const n = noiseSource(ctx, 2.4);
+                    const f = ctx.createBiquadFilter();
+                    f.type = 'bandpass';
+                    f.frequency.setValueAtTime(400, when);
+                    f.frequency.exponentialRampToValueAtTime(200, when + 2.0);
+                    f.Q.value = 3;
+                    const g = ctx.createGain();
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.14, when + 0.5);
+                    g.gain.linearRampToValueAtTime(0.10, when + 1.6);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
+                    n.connect(f).connect(g).connect(out);
+                    n.start(when); n.stop(when + 2.5);
+                    const o = ctx.createOscillator();
+                    const og = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.value = 55;
+                    og.gain.setValueAtTime(0, when);
+                    og.gain.linearRampToValueAtTime(0.18, when + 0.2);
+                    og.gain.exponentialRampToValueAtTime(0.001, when + 2.4);
+                    o.connect(og).connect(out);
+                    o.start(when); o.stop(when + 2.45);
+                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
         ice: {
             label: 'Ice',
+            // Bell arpeggio role — steps 3/7/11/15 (ascending). Body #f8fafc → Z.
+            // Variants:
+            //   TWINKLE = current triangle bells rising
+            //   CRYSTAL = sine bells w/ octave harmonic + long tail
+            //   SHIVER  = short percussive square bursts w/ pitch drop
             bodyColor: '#f8fafc', bodyHi: '#ffffff', bodyShade: '#94a3b8',
-            play(ctx, out, when, step) {
-                const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
-                const freq = seq[step];
-                if (!freq) return;
-                const o = ctx.createOscillator();
-                const g = ctx.createGain();
-                o.type = 'triangle';
-                o.frequency.value = freq;
-                g.gain.setValueAtTime(0, when);
-                g.gain.linearRampToValueAtTime(0.07, when + 0.015);
-                g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
-                o.connect(g).connect(out);
-                o.start(when); o.stop(when + 0.2);
+            variantNames: ['TWINKLE', 'CRYSTAL', 'SHIVER'],
+            variantPlays: [
+                function(ctx, out, when, step) {
+                    const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
+                    const freq = seq[step];
+                    if (!freq) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'triangle';
+                    o.frequency.value = freq;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.07, when + 0.015);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.18);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.2);
+                },
+                function(ctx, out, when, step) {
+                    const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
+                    const freq = seq[step];
+                    if (!freq) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'sine';
+                    o.frequency.value = freq;
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.09, when + 0.02);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.9);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.95);
+                    const o2 = ctx.createOscillator();
+                    const g2 = ctx.createGain();
+                    o2.type = 'sine';
+                    o2.frequency.value = freq * 2;
+                    g2.gain.setValueAtTime(0, when);
+                    g2.gain.linearRampToValueAtTime(0.02, when + 0.02);
+                    g2.gain.exponentialRampToValueAtTime(0.001, when + 0.6);
+                    o2.connect(g2).connect(out);
+                    o2.start(when); o2.stop(when + 0.65);
+                },
+                function(ctx, out, when, step) {
+                    const seq = { 3: 1046.50, 7: 1174.66, 11: 1318.51, 15: 1567.98 };
+                    const freq = seq[step];
+                    if (!freq) return;
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = 'square';
+                    o.frequency.setValueAtTime(freq * 1.4, when);
+                    o.frequency.exponentialRampToValueAtTime(freq * 0.6, when + 0.05);
+                    g.gain.setValueAtTime(0, when);
+                    g.gain.linearRampToValueAtTime(0.055, when + 0.003);
+                    g.gain.exponentialRampToValueAtTime(0.001, when + 0.06);
+                    o.connect(g).connect(out);
+                    o.start(when); o.stop(when + 0.08);
+                }
+            ],
+            play(ctx, out, when, step, slotIdx) {
+                const v = slotVariant.get(slotIdx) || 0;
+                this.variantPlays[v](ctx, out, when, step);
             }
         },
 
@@ -2084,7 +2482,27 @@
     const PLACED_SHOCK_MS = 600;
     const placedAt = new Map();         // slotIndex → performance.now()
     const manualExpression = new Map();  // slotIndex → 1..5 (set by tap-cycle)
+    // slotVariant: per-slot sonic variant index (Tier 2b, 2026-07-31).
+    // Long-press on a filled stage slot cycles the character's variant
+    // 0→1→2→0. Ephemeral — resets on setSlot, never persisted (slots
+    // don't survive a session refresh anyway). Fresh drops default to 0.
+    const slotVariant = new Map();       // slotIndex → 0..N-1
+    const LONG_PRESS_MS = 600;
     let beatCounter = 0;                 // monotonically ticks on every quarter note
+
+    // Cycle the variant on a slot. No-op if the character has only
+    // one variant (Madballz, etc.) so long-press on those chars is
+    // silent. Called by the long-press branch in attachSlotHandlers.
+    function cycleSlotVariant(idx) {
+        const id = slots[idx];
+        if (!id) return;
+        const ch = CHARACTERS[id];
+        if (!ch || !ch.variantNames || ch.variantNames.length <= 1) return;
+        const next = ((slotVariant.get(idx) || 0) + 1) % ch.variantNames.length;
+        slotVariant.set(idx, next);
+        renderSlot(idx);
+        try { if (navigator.vibrate) navigator.vibrate(15); } catch (_) {}
+    }
 
     function expressionForSlot(slotIndex) {
         if (slotIndex == null) return 1;
@@ -2415,9 +2833,23 @@
             // sprite just adds noise. Madballz aren't color-coded the same
             // way and their names (BRAINY, ZOMBI, CHAD…) carry info.
             const showLabel = ch.sheet === 'mb';
+            // Variant dots (Tier 2b): row of N dots under the sprite,
+            // one per available variant, filled dot = active. Rendered
+            // only when the character has 2+ variants (Madballz single-
+            // variant chars get no dots — nothing to indicate).
+            let dots = '';
+            if (ch.variantNames && ch.variantNames.length > 1) {
+                const v = slotVariant.get(index) || 0;
+                dots = '<div class="variant-dots" aria-hidden="true">'
+                    + ch.variantNames.map((_, i) =>
+                        `<span class="variant-dot${i === v ? ' is-on' : ''}"></span>`
+                    ).join('')
+                    + '</div>';
+            }
             slot.innerHTML = `
                 <div class="slot-icon">${characterArt(id, index)}</div>
                 ${showLabel ? `<div class="slot-label">${ch.label}</div>` : ''}
+                ${dots}
             `;
         } else {
             slot.classList.remove('active');
@@ -2447,6 +2879,7 @@
         munkiFear.delete(index);
         panicStartBeat.delete(index);
         fearFedAt.delete(index);
+        slotVariant.delete(index);   // fresh drops always start at variant 0
         if (afraidSlots.delete(index)) {
             const ael = document.querySelector(
                 `.stage-slot[data-index="${index}"]`);
@@ -2462,6 +2895,15 @@
             setTimeout(() => {
                 if (slots[index] === charId) renderSlot(index);
             }, PLACED_SHOCK_MS + 30);
+            // Kids don't automatically know long-press cycles the variant.
+            // Deferred until after the face-settles re-render so the hint
+            // anchors to the settled slot, not the mid-shock frame.
+            const ch = CHARACTERS[charId];
+            if (ch && ch.variantNames && ch.variantNames.length > 1) {
+                setTimeout(() => {
+                    if (slots[index] === charId) maybeShowVariantHint(index);
+                }, PLACED_SHOCK_MS + 60);
+            }
         } else {
             placedAt.delete(index);
         }
@@ -2696,13 +3138,29 @@
             if (!slots[idx]) return; // empty slot — nothing to grab or tap
             e.preventDefault();
             ensureAudio(); // unlock audio on first interaction
-            // setPointerCapture can throw InvalidPointerId for synthetic
-            // events (testing) — guard so the handler still records state.
             try { slot.setPointerCapture(e.pointerId); } catch (_) {}
+            // Long-press timer (Tier 2b) — 600 ms with no move + no
+            // release = variant cycle. Cancelled by any move past
+            // DRAG_THRESHOLD_PX or by pointerup before it fires.
+            slot.classList.add('press-pending');
+            const ch = CHARACTERS[slots[idx]];
+            const hasVariants = ch && ch.variantNames && ch.variantNames.length > 1;
+            const timer = hasVariants ? setTimeout(() => {
+                const st = slotDragState.get(e.pointerId);
+                if (!st || st.dragging || st.longPressFired) return;
+                st.longPressFired = true;
+                st.slot.classList.remove('press-pending');
+                st.slot.classList.add('press-fired');
+                setTimeout(() => st.slot.classList.remove('press-fired'), 300);
+                cycleSlotVariant(st.idx);
+                dismissVariantHint();
+            }, LONG_PRESS_MS) : null;
             slotDragState.set(e.pointerId, {
                 slot, idx,
                 startX: e.clientX, startY: e.clientY,
-                dragging: false
+                dragging: false,
+                longPressTimer: timer,
+                longPressFired: false
             });
         });
         stage.addEventListener('pointermove', e => {
@@ -2713,6 +3171,8 @@
             if (!state.dragging && (dx * dx + dy * dy) > DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) {
                 state.dragging = true;
                 state.slot.classList.add('dragging-off');
+                state.slot.classList.remove('press-pending');
+                if (state.longPressTimer) { clearTimeout(state.longPressTimer); state.longPressTimer = null; }
             }
         });
         stage.addEventListener('pointerup', e => {
@@ -2725,8 +3185,13 @@
                 }
             } catch (_) {}
             state.slot.classList.remove('dragging-off');
+            state.slot.classList.remove('press-pending');
+            if (state.longPressTimer) { clearTimeout(state.longPressTimer); state.longPressTimer = null; }
+            if (state.longPressFired) {
+                // Long-press already did its cycle — swallow the up.
+                return;
+            }
             if (state.dragging) {
-                // Drag — clear if the kid let go outside the stage area.
                 const overSlot = findSlotAt(e.clientX, e.clientY);
                 if (!overSlot) {
                     setSlot(state.idx, null);
@@ -2743,7 +3208,37 @@
             if (!state) return;
             slotDragState.delete(e.pointerId);
             state.slot.classList.remove('dragging-off');
+            state.slot.classList.remove('press-pending');
+            if (state.longPressTimer) { clearTimeout(state.longPressTimer); state.longPressTimer = null; }
         });
+    }
+
+    // First-run "HOLD TO CHANGE SOUND" hint — pops once, ever, after
+    // the kid's first Munki placement. Persisted via localStorage flag
+    // so returning players don't see it again.
+    const VARIANT_HINT_KEY = 'all-munkis-variant-hint-seen';
+    let variantHintShownThisSession = false;
+    let variantHintTimer = null;
+    function maybeShowVariantHint(slotIdx) {
+        if (variantHintShownThisSession) return;
+        try { if (localStorage.getItem(VARIANT_HINT_KEY)) return; } catch (_) {}
+        variantHintShownThisSession = true;
+        const slot = document.querySelector(`.stage-slot[data-index="${slotIdx}"]`);
+        if (!slot) return;
+        const hint = document.createElement('div');
+        hint.className = 'variant-hint';
+        hint.textContent = 'HOLD TO CHANGE SOUND';
+        slot.appendChild(hint);
+        requestAnimationFrame(() => hint.classList.add('is-shown'));
+        variantHintTimer = setTimeout(() => dismissVariantHint(), 3400);
+    }
+    function dismissVariantHint() {
+        if (variantHintTimer) { clearTimeout(variantHintTimer); variantHintTimer = null; }
+        document.querySelectorAll('.variant-hint').forEach(el => {
+            el.classList.remove('is-shown');
+            setTimeout(() => el.remove(), 350);
+        });
+        try { localStorage.setItem(VARIANT_HINT_KEY, '1'); } catch (_) {}
     }
 
     // ---------- UI SOUNDS ----------
