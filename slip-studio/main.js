@@ -1265,6 +1265,7 @@ const state = {
     glaze: null,                // chosen glaze id (once glazing), else null
     brushIndex: DEFAULT_BRUSH,  // index into BRUSHES
     alterMode: false,           // wet Alter tool: off = round throwing, on = push one side
+    handleMode: false,          // wet handle work: armed = wheel holds still to fit an ear
     facetCount: 0,              // 0 = round; else N flat sides carved via applyFacets
     rimStyle: "cut",            // lip treatment: cut | rounded | flared | rolled | collared
     rimScallop: 0,              // 0 = straight lip; else N scallops (lip waves up/down)
@@ -1766,7 +1767,11 @@ function init() {
         updateToolbar();
     });
     document.getElementById("handleBtn")?.addEventListener("click", () => {
-        setHandleOn(!state.handle.on);
+        const on = !state.handle.on;
+        setHandleOn(on);
+        // Adding an ear arms handle mode so the wheel stops while you fit
+        // it; removing one hands the wheel straight back.
+        setHandleMode(on);
     });
     document.getElementById("tallerBtn")?.addEventListener("click", () => nudgeHeight(+HEIGHT_STEP));
     document.getElementById("shorterBtn")?.addEventListener("click", () => nudgeHeight(-HEIGHT_STEP));
@@ -3528,6 +3533,14 @@ function setAlterMode(on) {
         b.setAttribute("aria-pressed", state.alterMode ? "true" : "false");
     }
 }
+// Handle mode: armed while you're fitting or reshaping an ear. Like the
+// Alter tool it holds the wheel still (see spinTargetFor) so the handle
+// doesn't turn away from you between adjustments — picking the chips,
+// lining up the next drag. Going back to the body disarms it and the
+// wheel drifts back up, so the throwing feel is only paused, not lost.
+function setHandleMode(on) {
+    state.handleMode = !!on;
+}
 // Facets button: cycle round → 6 → 8 → 12 flat sides. Each step rewrites
 // the displacement field (so it replaces any previous facet); "round"
 // clears it. A freehand alter can follow; the next facet tap overwrites.
@@ -4881,6 +4894,7 @@ function resetPot() {
     state.rimStyle = "cut";
     updateRimStylePicker();
     setAlterMode(false);
+    setHandleMode(false); // fresh pot throws on a live wheel
     profileDirty = true;
     state.glaze = null;
     state.glazeGradient = null;
@@ -5120,6 +5134,7 @@ function updateToolbar() {
     markShapeToolsOffered(showShape);
     syncSceneCursor();   // stage changes re-decide grab vs crosshair
     if (!showShape && state.alterMode) setAlterMode(false);
+    if (!showShape && state.handleMode) setHandleMode(false);
     if (decoStack) decoStack.hidden = cs !== "leather";
     if (lidStylePicker) lidStylePicker.hidden = !(state.isLid && cs === "wet");
     // Rim styles: pots only, wet only (mutually exclusive with the lid picker).
@@ -6199,6 +6214,7 @@ function onPointerDown(ev) {
                 ev.preventDefault();
                 return;
             }
+            setHandleMode(false); // working the body again — hand the wheel back
             sculpting = true;
             pushShapeHistory();   // one undo step per stroke, not per move
             wetStroke = { intent: "alter" };
@@ -6219,6 +6235,7 @@ function onPointerDown(ev) {
         // Grab LOCATION picks the family: the top lip is the "rim" family
         // (pull up/down to raise, sideways to flare/collar — decided by the
         // first clear drag axis); the body always shapes the wall in/out.
+        setHandleMode(false); // working the body again — hand the wheel back
         sculpting = true;
         pushShapeHistory();   // one undo step per stroke, not per move
         const rimGrab = p.y >= TOP * RIM_GRAB_FRAC;
@@ -6248,6 +6265,9 @@ function onPointerDown(ev) {
                     const { yBot, yTop } = handleAttachYs();
                     const f = yTop > yBot ? (local.y - yBot) / (yTop - yBot) : 0.5;
                     const zone = f > 0.65 ? "top" : (f < 0.35 ? "bottom" : "mid");
+                    // Grabbing an ear re-arms handle mode, so the wheel stays
+                    // held for as long as you keep working the handle.
+                    setHandleMode(true);
                     handleDrag = {
                         side: hit.side,
                         zone,
@@ -8839,8 +8859,9 @@ function resize() {
 // The auto-spin eases to a stop while you work (throwing/trimming/painting),
 // while you manually spin, and whenever zoomed in — then drifts back up once
 // you're idle at the default framing. The Decorate stage stands still: a
-// static pot to attach/reshape handles, dip and paint against. Wet throws on
-// a live wheel; fired spins to show off / photograph the finished piece.
+// static pot to dip and paint against. Wet throws on a live wheel, except
+// while handle mode is armed — an ear sits at a fixed angle, so fitting one
+// pauses the wheel. Fired spins to show off / photograph the finished piece.
 // Display mode turns slowly on its own, independent of the stage rules.
 function spinTargetFor() {
     const zoomed = state.zoom > 1.02;
@@ -8850,6 +8871,10 @@ function spinTargetFor() {
     // Altering is done off the wheel (you push a static wall), so the
     // wheel holds still whenever the Alter tool is armed on wet clay.
     const alterHold = state.alterMode && state.clayState === "wet";
+    // Same for handle work: an ear sits at a fixed angle, so the wheel
+    // holds while handle mode is armed rather than turning it away
+    // between adjustments.
+    const handleHold = state.handleMode && state.clayState === "wet";
     // Under reduced motion the decorative spins stop outright (fired and
     // Display are "admire it turning" states, not working ones); the wet
     // wheel keeps turning, just slower — see REDUCED_SPIN_SCALE.
@@ -8858,7 +8883,7 @@ function spinTargetFor() {
         : SPIN_SPEED;
     const displaySpin = reduceMotion ? 0 : DISPLAY_SPIN;
     if (state.displayMode) return displayDragging ? 0 : displaySpin;
-    return (busy || alterHold || state.clayState === "leather") ? 0 : idleSpin;
+    return (busy || alterHold || handleHold || state.clayState === "leather") ? 0 : idleSpin;
 }
 
 function tick() {
