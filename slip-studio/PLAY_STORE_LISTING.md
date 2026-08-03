@@ -1,4 +1,4 @@
-# Slip Studio — v2.2 release notes + Google Play Store listing
+# Slip Studio — v2.7.0 release notes + Google Play Store listing
 
 Copy-paste source for the **Play Console Main store listing** and the public
 v2.2 release notes. Voice = calm, confident, minimal — matches the app's own
@@ -29,69 +29,84 @@ Slip Studio — Shape Clay
 ## Short description  (max 80 chars)
 
 ```
-A calm 3D pottery studio. Carve, glaze, fire, and keep what you make.
+A calm 3D pottery studio. Shape, glaze, fire, and keep what you make.
 ```
-(68 chars)
 
-Alternative if you want to lead with the no-ads angle:
+Alternatives:
+```
+Shape clay on a 3D wheel. Glaze it, fire it, keep it. No ads, no timers.
+```
 ```
 A calm 3D pottery studio. No ads, no upsells, no internet needed.
 ```
-(64 chars)
+
 
 ## Full description  (max 4000 chars)
+
+> Written against **web v224 / v2.7.0 (vc22)**. Every count below was read out
+> of `main.js`, not estimated — see "v2.7.0 full feature list" at the bottom for
+> the source of each number. **If you change the feature set, change this copy in
+> the same commit.** Promising a tool that isn't in the build is a refund.
 
 ```
 Slip Studio is a calm place to shape clay.
 
-Pull a vase, a bowl, a cup, or a bottle from a slow-spinning wheel. Pinch a pair of amphora handles onto the sides and drag to shape them. Trim the foot at leather-hard. Pour two glazes for a soft top-to-bottom gradient. Scratch through with a needle for a carved sgraffito pattern. Fire it in the kiln and watch the raw chalky coat melt into a glossy finish. Keep what you make in a quiet portfolio that lives on your device, not on a server.
+Pull a pot from a slow-turning wheel with your finger. Glaze it, decorate it, fire it in the kiln, and keep it on a shelf that lives on your device — not on a server.
 
-There is no progress bar. There are no daily quests, no streaks, no notifications. Slip Studio is a studio, not a game.
+There is no score, no timer, no progress bar, no daily quest, no streak, and no notification. Slip Studio is a studio, not a game. If you want goals and levels, this isn't that. It's a quiet place to make things.
 
-WHAT YOU SHAPE
-• Four starter silhouettes: vase, bowl, cup, bottle
-• Throw clay on a contemplative, slow-turning wheel — clay feels heavy and lags your finger like real wet stoneware
-• Pull twin amphora-style handles onto the pot and drag them to widen, shift up or down — the handles attach automatically at the belly + shoulder and reshape as you sculpt
-• Add a matching lid in three styles: flat, domed, or tall — shape pot and lid in tandem, fire as a set
-• Trim the foot at leather-hard for a clean profile
+TRY THE WHOLE THING FREE FIRST
+The full studio runs in any browser at madderverse.org/slip-studio — no download, no account, nothing to buy. Try it before you pay. The app adds offline play, immersive fullscreen, and a portfolio that's yours for good.
 
-HOW YOU DECORATE
-• Glaze in 16 colours — painterly, three metallics, an iron red, a pearl, a true cobalt
-• Optional second glaze for a soft top-to-bottom gradient: primary at the rim, secondary pools in at the foot
-• Paint with brushes, splatter, ten stamp shapes, or eight repeating overlay patterns
-• Sgraffito (carve): scratch a needle through the glaze to reveal the clay underneath, with real groove depth from the bump shader
-• Eight paint colours, three brush sizes that stay constant as you zoom
+SHAPING
+• 11 starter forms: vase, bowl, cup, bottle, jar, egg, planter, goblet, bud vase, mug, and teapot with a pouring spout
+• Grab the wall to push clay in or out; grab the rim to raise or flare it. Clay lags your finger like real wet stoneware.
+• Alter the form off-round — dent, oval, or bulge one side
+• Facet the wall into 6, 8, or 12 panels
+• Scallop the rim into 6, 8, or 12 waves
+• Five rim finishes: cut, rounded, flared, rolled, collared
+• Pull one or two handles onto the pot and drag to reshape them
+• Trim the foot at leather-hard
+• Undo while shaping, trimming, glazing, and decorating
+
+GLAZING
+• 48 glazes in six palettes — Studio, Modern, Garden, Jewel, Sorbet, and Stoneware (speckled and crackle surfaces)
+• Dip from the rim down and let the drips run, or pour one of 30 ready-made gradients from five themed sets
+• Real glaze chemistry: overlap two dips and the overlap fires as a third colour you didn't pick. Every pair you find is logged in a recipe journal.
+• Three fired finishes: glossy, matte, or lustre
+• Wax resist — mask an area and it keeps the colour underneath while later dips run off it
+
+DECORATING
+• Paint and splatter in 32 colours across four palettes
+• Carve sgraffito through the glaze, with real groove depth
+• Slip trailing: pipe a raised bead of clay onto the surface
+• 42 motifs in seven packs — sumi-e animals and plants, dogs, Dutch berries, Roman figures, Egyptian hieroglyphs, mythical creatures. Place one as a tinted silhouette or in full colour, and drag it where you want it.
+• 25 repeating patterns in four packs: enamel, frescoes, shima-shima, art nouveau
+• Six friezes that wrap the pot as a band
+• Or bring in your own picture — it becomes a silhouette on your device and is never uploaded
 
 THE KILN
-Cinematic ~4.5-second firing sequence. The chamber closes around the scene, glows warm, melts the raw glaze to a glossy finish, and opens onto a fired pot. Save it, photograph it, or start again.
+The chamber closes around the scene, glows warm, and melts the raw chalky coat into a finished surface.
 
-PHOTOS WORTH KEEPING
-A built-in photo composer renders your pot at print size, on three styled backgrounds — a studio shelf, a sunlit window, or a museum plinth — square for a feed or tall for a phone wallpaper. Share the file or save it straight to your photos.
+LIDS AND SETS
+Add a lid in four styles — flat, domed, tall, or pointed — shape it against the pot, and fire the two as a set. A gradient poured over a set runs unbroken from the top of the lid to the foot of the pot.
+
+KEEPING WHAT YOU MAKE
+• A portfolio on your device, sorted onto named shelves you make yourself
+• Display mode — full screen, no interface, turning slowly on its backdrop
+• Photo export in five framings and three shapes: square, feed, or phone wallpaper
+• Export a whole shelf as one keepsake photo
+• 18 backdrops in six categories. Three come installed; the rest are free downloads you opt into one at a time, so the video backdrops only land on your phone if you want them.
 
 PAID ONCE. NOTHING ELSE.
-• No ads. Not banner, not interstitial, not "rewarded."
-• No subscriptions, no in-app purchases, no glaze packs to unlock.
-• No account. No sign-in.
-• Works offline — the studio, glazes, kiln, gallery, and starter backdrops are all bundled at install. Every save is local.
-• No analytics, no third-party trackers, no advertising profiles.
-
-ATMOSPHERE
-• Three hand-picked starter backdrops included at install; five more themed packs (Art, Botanical, Digital, Paper, Motion videos) are free downloads you opt into one at a time, so motion videos only land on your phone if you want them
-• Independent toggles for music and ambient sound — the wheel hum (deepens as it slows), the clay squelch, the kiln crackle
-• Multiple ambient music tracks, chosen at random each session
-
-BUILT FOR QUIET
-The app launches into an immersive view — no status bar, no navigation bar, just the wheel and the clay. The whole interface fits one thumb. Pinch to zoom, drag to spin, two-finger pan to look. Re-wet the pot any time before you fire.
-
-TRY BEFORE YOU BUY
-A free browser preview lives at madderverse.org/slip-studio/. The full studio is the same — the paid app adds offline play, no browser chrome, immersive fullscreen, and a portfolio that's yours forever.
+No ads — not banner, not interstitial, not "rewarded." No subscription, no in-app purchases, nothing to unlock. No account and no sign-in. No analytics, no third-party code, no advertising ID. Everything you make stays on your device, and the whole studio works offline.
 
 MADE BY MAD SUNDAR LLC
 Slip Studio is part of The Madderverse, a small collection of ad-free apps made by a parent who got tired of creative apps stuffed with timers and upsells. We don't do engagement traps. We do pots.
 
 Questions or data requests: hello@madderverse.org
 ```
-(~3,700 chars — fits under Play's 4,000 limit with room.)
+
 
 ## What's new  (v2.0 release — for history)
 
@@ -113,7 +128,7 @@ The five extra backdrop sets — Art, Botanical, Digital, Paper, and Motion vide
 Still no ads. Still no subscriptions. Still nothing to sign in to.
 ```
 
-## What's new  (v2.2 — THIS RELEASE, paste into Play Console "What's new")
+## What's new  (v2.2 / vc7 — for history)
 
 ```
 Slip Studio v2.2 — handles, carving, and gradient glazes.
@@ -150,11 +165,11 @@ Slip Studio v2.5 — glaze chemistry, wax resist, and a gallery for your pots.
 Still ad-free. No purchases. No internet needed.
 ```
 
-## What's new  (v2.7.0 / vc17 — THIS RELEASE, paste into Play Console "What's new")
+## What's new  (v2.7.0 / vc22 — THIS RELEASE, paste into Play Console "What's new")
 
-Covers web **v137 → v214** in one upload — everything since the live vc13 (web
-v136), including the three builds that were staged but never shipped. 490 chars,
-inside Play's 500-char limit.
+Covers web **v137 → v224** in one upload — everything since the live vc13 (web
+v136), including the six builds that were staged but never shipped (vc14–vc21).
+490 chars, inside Play's 500-char limit.
 
 ```
 Slip Studio v2.7 — a deeper wheel, and undo at last.
@@ -164,7 +179,7 @@ Slip Studio v2.7 — a deeper wheel, and undo at last.
 • Display mode: fill the screen with a finished pot.
 • Glaze recipes: overlapping dips react into new colors.
 • Name your own shelves in the gallery.
-• New teapot with a spout, wax resist, lustre finishes, 49 glazes.
+• New teapot with a spout, wax resist, lustre finishes, 48 glazes.
 • Your pot survives if the app closes mid-throw.
 
 Still ad-free. No purchases. No internet needed.
@@ -179,8 +194,8 @@ Data-safety/accessibility notes if Play ever asks, not in the changelog.
 ## Store event — "Major update" (Play Console → Promotional content → Add event)
 
 ⚠ **Stale block below is for vc14, never shipped.** The vc14 event was
-never created. Use the **vc20 block underneath instead** — it covers the
-whole v137 → v216 span in one go, which matches what the vc20 upload
+never created. Use the **vc22 block underneath instead** — it covers the
+whole v137 → v224 span in one go, which matches what the vc22 upload
 actually delivers.
 
 ### DRAFTED — vc14 event (historical, don't create)
@@ -199,19 +214,19 @@ whole collection in a gallery: a studio podium, a forest pedestal, or a sunlit
 shelf. Still ad-free, still no purchases, still works with no internet.
 ```
 
-### THIS RELEASE — vc20 event (paste into Play Console)
+### THIS RELEASE — vc22 event (paste into Play Console)
 
 Voice stays calm and confident — no urgency, no FOMO, no "limited time".
-Covers the same span as the release notes (web v137 → v216), just written
-for a returning owner rather than a new buyer. The vc20 additions on top
-of vc14's drafted story are the biggest ones: the whole sculpting overhaul,
+Covers the same span as the release notes (web v137 → v224), just written
+for a returning owner rather than a new buyer. The additions on top of
+vc14's drafted story are the biggest ones: the whole sculpting overhaul,
 Display mode, undo, glaze recipes, and named collections.
 
 - **Event type:** Major update
 - **Event name** (internal, 80 chars, cannot be changed):
   `v2.7.0 major update — sculpting depth, Display, undo`
 - **Countries:** All countries where the app is sold
-- **Duration:** 10–14 days starting the day vc20 goes live (Major-update
+- **Duration:** 10–14 days starting the day vc22 goes live (Major-update
   events get their best surface placement in the first week after publish)
 - **Languages:** English (matches the app)
 - **Notify existing users:** yes — this update is the story to tell them
@@ -285,15 +300,15 @@ Already set in the Capacitor wrap:
 
 ---
 
-## Graphics deliverables — v2.2 refresh
+## Graphics deliverables — v2.7.0 refresh
 
 ### Required
 
 | Asset | Spec | Source / status |
 |-------|------|-----------------|
 | **App icon (Play storefront)** | 512×512 PNG, 32-bit, ≤1 MB | Downscale `slip-studio-app/assets/icon.png` (1080² source) to 512×512. The launcher mipmaps for the device are already wired via `npx @capacitor/assets generate --android` — they're separate from the Play storefront icon. |
-| **Feature graphic** | exactly 1024×500, PNG/JPG, no alpha | The previous `slip-feature.png` was 1488×720 and Play rejects it. Either crop/resize that file to 1024×500, or compose a new one showing the v2.2 surface: a fired pot with twin handles, gradient glaze, in the museum-plinth photo style. |
-| **Phone screenshots** | min 2, max 8 — 16:9 OR 9:16 — 320–3840 px on each side — JPEG or PNG | See the v2.2 shot list below. Old `title.jpg / shape.jpg / decorate.jpg / fired.jpg / gallery.jpg` in `slip-studio-app/assets/` are PRE-v2.2 — recapture them. |
+| **Feature graphic** | exactly 1024×500, PNG/JPG, no alpha | `slip-feature-1024x500.png` already exists in `slip-studio-app/assets/` at the right size (the original `slip-feature.png` is 1488×720 and Play rejects it). It predates the sculpting overhaul, so recompose it if you want the graphic to show the current surface: a faceted or altered pot with a two-colour dip, in Display mode or the museum-plinth style. |
+| **Phone screenshots** | min 2, max 8 — 16:9 OR 9:16 — 320-3840 px on each side — JPEG or PNG | See the v2.7.0 shot list below. The existing `title.jpg / sculpt.jpg / glaze.jpg / finished.jpg` in `slip-studio-app/assets/` are from July 5-8 and predate the sculpting overhaul, the gallery rework and Display mode — recapture all of them. |
 
 ### Optional but high-leverage
 
@@ -303,161 +318,182 @@ Already set in the Capacitor wrap:
 | **10" tablet screenshots** | min 2, max 8 — 1440×2560 OR 2560×1440 ideal | Same shots, larger res. Optional but Play rewards full coverage. |
 | **Promo video (YouTube URL)** | 30 s, landscape 16:9, public OR unlisted YouTube link | The video lives on YouTube — Play just stores the URL. Recommend unlisted (won't surface on YouTube directly, but anyone with the link can watch). See shot list below. |
 
-### v2.2 phone screenshot shot list — capture these 8
+### v2.7.0 phone screenshot shot list — capture these 8
 
-Use the live web build at https://madderverse.org/slip-studio/ on your phone (or Chrome devtools mobile mode at 1080×1920) so the new fonts + v2.2 features render. **Hide the URL bar before each capture** (scroll once on mobile, F11 fullscreen on desktop).
+The screenshots in `slip-studio-app/assets/` are from **July 5–8** — before the
+sculpting overhaul, the gallery rework, and Display mode. They show an app that
+no longer exists. Recapture all of them.
 
-1. **Title screen** — landing with "Slip Studio" in Fraunces, the four shape swatches, three Studio backdrops, music + SFX toggles. Sells the calm minimal vibe before anything else.
-2. **Wet pot mid-sculpt** — vase shape, mid-throw, your finger pulling the belly outward, brush bar visible. Sells the interactive 3D core.
-3. **Twin handles attached** — pot with the two amphora ears visible on either side. Sells the v2.2 handle feature.
-4. **Decorate stage, sgraffito mid-stroke** — leather-hard pot with a colored glaze (try Celadon or Cobalt), Carve tool active, a scribed pattern partway done on the belly. Sells the carve feature.
-5. **Gradient glaze, leather** — pot with primary glaze on top (try Slate), secondary at the foot (Iron red or Honey for contrast). Sells the v2.2 two-tone glaze.
-6. **Kiln firing moment** — mid-kiln animation, dark vignette closing around the pot with the warm glow visible. Sells the cinematic. (Tap "Fire" then quickly screenshot during the 4.5s sequence — second 2-3 is the peak.)
-7. **Lid + pot assembled view, fired** — finished set with the lid resting on top of the pot, glossy fired glaze visible. Sells the matched-set feature.
-8. **Photo composer, museum plinth** — finished pot framed in the photo composer with the museum style selected. Sells the export.
+Use the live web build at https://madderverse.org/slip-studio/ on your phone (or
+Chrome devtools mobile at 1080×1920). **Hide the URL bar before each capture**
+(scroll once on mobile, F11 on desktop).
 
-Skip stamp/overlay/splatter for screenshots — they're secondary tools, less of a draw vs. sgraffito + gradient + handles.
+1. **Title screen** — the landing in Fraunces with the shape swatches visible. Sells the calm before anything else, and now genuinely fits a phone (v201).
+2. **Wet pot mid-sculpt** — finger pulling the belly of a vase outward, shape tools visible. The interactive 3D core.
+3. **A faceted or altered pot** — 8 facets, or a deliberately off-round belly. This is the single biggest thing added since the last store refresh and nothing on the listing shows it.
+4. **Dip in progress** — mid-pour, drips hanging off the glaze edge. Sells the glaze system better than a finished pot does.
+5. **Overlapping dips / recipe found** — two dips crossing, with the reaction colour in the overlap. The recipe journal toast if you can catch it.
+6. **Decorate stage with a motif placed** — a mythical or sumi-e motif on a glazed belly, tray open. Sells the 42-motif library.
+7. **Kiln firing moment** — second 2–3 of the sequence, warm glow at its peak.
+8. **Display mode** — the finished pot full-screen on a backdrop, no interface at all. Ends the set on the payoff.
 
-### v2.2 promo video shot list — 30s landscape (16:9), no narration
+Skip splatter, slip trailing, and bands — secondary tools that photograph weakly
+next to faceting, dips, and motifs.
 
-The video sells the THROWING → DECORATE → KILN → KEEP arc. No talking head, no captions over the action (the calm vibe is the brand). Soft ambient music from the app itself is fine. Pace: ~7 seconds per beat.
+### v2.7.0 promo video shot list — 30s landscape (16:9), no narration
+
+Sells the SHAPE → GLAZE → FIRE → KEEP arc. No talking head, no captions over the
+action. Ambient music from the app itself. ~7 seconds per beat.
 
 | Time | Beat | Shot |
 |------|------|------|
-| 0:00 – 0:03 | Title | "Slip Studio" landing in Fraunces, slow zoom into the spinning wheel behind it |
-| 0:03 – 0:11 | THROW | Wet vase, finger dragging the belly outward, then trimming the foot. Add a handle, drag it to reshape. |
-| 0:11 – 0:17 | DECORATE | Dry to leather, tap a glaze (Slate), tap a gradient secondary (Iron red), drag a sgraffito pattern across the belly |
-| 0:17 – 0:25 | KILN | Tap Fire. Full cinematic — close, glow, melt, open. Pot reveals finished glossy. |
-| 0:25 – 0:30 | KEEP | Photo composer modal opens, museum plinth style selected, preview shown. End on the still-life shot. |
+| 0:00 – 0:03 | Title | "Slip Studio" landing in Fraunces, slow push into the wheel behind it |
+| 0:03 – 0:11 | SHAPE | Wet vase, finger dragging the belly out, rim pulled up, then facets applied — the form visibly changes three times |
+| 0:11 – 0:17 | GLAZE | Dip from the rim, drips run, second dip crosses the first and the overlap turns a third colour |
+| 0:17 – 0:25 | FIRE | Tap Fire. Full sequence — close, glow, melt, open onto the finished surface. |
+| 0:25 – 0:30 | KEEP | Display mode: interface falls away, the pot turns slowly on its backdrop. End there. |
 
-End slate (optional final frame, ~1s): "Slip Studio" in Fraunces, "madderverse.org/slip-studio" small below. Helps with the brand recall when buyers see the Play listing video.
+End slate (~1s): "Slip Studio", with "madderverse.org/slip-studio" small beneath.
 
-Capture: use Android's built-in screen recorder (Quick Settings → Screen record) on an unlocked phone, landscape, audio = music only (mute mic). Upload to YouTube as unlisted, paste the URL into Play Console → Main store listing → Promo video field.
+Capture: Android Quick Settings → Screen record, landscape, mic muted. Upload to
+YouTube as unlisted, paste the URL into Play Console → Main store listing → Promo
+video.
 
-Visual direction = the app's own minimal palette: warm charcoal (`#1b1815`) bg, soft warm ink, no neon. Anti-onioncore. The point is calm.
+Visual direction = the app's own palette: warm charcoal (`#1b1815`), soft warm
+ink, no neon. Anti-onioncore. The point is calm.
+
 
 ---
 
 ## ASO / keyword notes
 
-- Play has no separate keywords field — discovery is driven by the title + descriptions. The full description naturally seeds: pottery, ceramics, clay, kiln, glaze, sgraffito, gradient glaze, amphora, 3D pottery, pottery app, calm, meditative, no ads, creative.
-- Lead the short description with **calm / 3D / no internet** OR **carve / glaze / fire** — both work; the latter is more action-forward, the former is more brand-forward.
+- Play has no keywords field — discovery runs off the title + descriptions. The full description naturally seeds: pottery, ceramics, clay, kiln, glaze, sgraffito, wax resist, slip trailing, faceting, 3D pottery, pottery app, calm, meditative, no ads, creative.
+- Lead the short description with **calm / 3D / no internet** OR **shape / glaze / fire** — the former is brand-forward, the latter action-forward.
+- The "try it free in a browser first" line is doing refund-prevention work, not just ASO. Keep it high in the description: a paid app with no Play-side trial means buyers otherwise use the refund window as the trial.
+- State plainly that it's a studio and not a game. Genre mismatch is a refund, and the sentence costs nothing.
 - Do **not** name competitor apps in any copy field.
+- Do **not** put "Teacher Approved" in the description — Google places that badge itself.
+
 
 ---
 
-# v2.2 full feature list
+# v2.7.0 full feature list
 
-The complete v2.2 surface, organized by area. Use this for the website, press kit,
-or to expand the store description if Play's character limit changes.
+The complete v224 surface by area. Source for the store description's numbers, and
+for the website or a press kit. Counts read out of `main.js`, not estimated.
 
-### Throwing
-- Four starter silhouettes: vase, bowl, cup, bottle
+### Shaping
+- 11 starter forms (`SHAPE_IDS`): vase, bowl, cup, bottle, jar, egg, planter, goblet, bud vase, mug (auto-handle), teapot (with pouring spout)
 - A continuously editable lathe profile — every height row is its own radius, sculpted with a Gaussian falloff
-- Three brush widths (Fine / Medium / Broad); fine brush gets a 2× rate cap so detail work stays responsive
-- Real wheel physics-feel: the foot can't bulge wider than the wheel head; the belly can
-- Rate-limited sculpting — clay LAGS the finger instead of snapping to it, more like wet stoneware
-- Push easier than pull (real clay asymmetry)
-- Thin walls resist further pressure — won't accidentally pinch to zero
-- Per-sample smoothing — the wheel "polishes" the clay under your finger
-- Pinch-to-zoom, drag-to-spin, two-finger pan; auto-spin eases out while you work
-
-### Handles  (v2.2)
-- Twin amphora-style ears, mirrored across the pot
-- Toggle on/off at wet with a single tap (+ Handle / Remove handle)
-- Auto-attach at the belly (widest body row) and the shoulder (where the profile narrows toward the rim)
-- Drag the ear itself to reshape: vertical = shift attach height, horizontal outward = wider bulge
-- Reshape sticks across sculpting passes, through the kiln, in saved gallery pieces
-- Endpoint geometry inset into the pot wall so the tube joint reads as embedded, not floating
+- Grab-location decides the gesture: body → push the wall in/out; rim (top ~16% of the profile) → the rim family
+- Rim-pull with a decisive axis lock: vertical → raise the pot, horizontal → flare or collar the lip
+- **Altering** — a per-vertex displacement field lets you dent, oval, or bulge ONE side. Round pots keep the fast analytic-normal path; altered surfaces get exact analytic normals from the radius grid.
+- **Faceting** — 6, 8, or 12 panels cut into the wall, tapered out at the foot
+- **Scalloped rim** — 6, 8, or 12 waves, applied parametrically so it composes with facets and altering
+- Five rim styles: cut, rounded, flared, rolled, collared
+- One or two handles, pulled on and dragged to reshape (top third moves the shoulder end, bottom the belly, middle repositions, horizontal sets the bulge)
+- Trim tool at leather-hard, scoped to the foot zone
+- Undo at the wet stage, on trim, on dips, and on decoration
+- Clay lags the finger; push is easier than pull; thin walls resist; the foot can't bulge past the wheel head
+- Pinch-to-zoom (0.6–3.2), drag-to-spin, two-finger pan
 
 ### The clay arc
-- Three stages: **Wet** (throw) → **Leather-hard** (decorate + trim) → **Fired** (keep)
+- Three stages: **Wet** (throw) → **Leather-hard** (glaze + decorate) → **Fired** (keep)
+- The wheel turns while you throw, holds still while you decorate, and spins to show the piece off once fired
 - "Re-wet" steps back from leather to wet at any time
-- Trim tool at leather-hard, scoped to the foot zone — narrower than wet-stage sculpting, cuts inward only
 
-### Glazes (16, plus optional gradient)
-- Painterly: Celadon, Cobalt, Oatmeal, Honey, Tenmoku, Blush, Forest, Slate, Plum, Sand, Iron red, Mint
-- Metallics: Gold, Copper, Platinum
-- Pearl (high clearcoat)
-- Each glaze has a chalky **raw** look at leather-hard and a glossy **fired** result — the kiln reveals the transformation live
-- **Two-tone gradient (v2.2):** pick a primary glaze, then a secondary on the "Bottom" row beneath it — the secondary blends in at the foot via a vertical smoothstep, both glazes tween raw→fired through the kiln together
+### Glazing
+- **48 glazes** in six packs (`GLAZE_PACKS`): Studio, Modern, Garden, Jewel, Sorbet, Stoneware — the last with speckle and crackle surfaces
+- Every glaze has a chalky **raw** look and a **fired** result; the kiln reveals the change live
+- **Dip system** — glaze coats from the rim down to wherever your finger stops, with drips hanging off the edge (Off / Few / Lots), non-destructive and replayable
+- **30 gradient presets** in five themed packs (`DIP_SET_PACKS`): Sky, Sea, Ember, Garden, Earth
+- **Glaze chemistry** — overlapping dips fire as an emergent third colour, via curated reaction pairs falling back to a geometric-mean blend in linear space
+- **Recipe journal** — every reaction pair you discover is collected
+- **Three finishes**: glossy, matte, lustre (lustre uses real iridescence)
+- **Wax resist** — seals whatever colour is under it at the moment you apply it; later dips run off; peel it to reveal
+- Handles take the glaze and the decoration, not just the clay
 
-### Decoration
-- Five tools: **Brush**, **Splatter**, **Stamp**, **Overlay**, **Carve** (sgraffito)
-- 10 stamp shapes: dot, ring, star, spark, heart, flower, cross, triangle, diamond, square
-- 8 overlay patterns (one tap fills the whole pot): dots, rings, stripes, grid, scatter, checker, waves, diagonal
-- 8 paint colours
-- Three brush/stamp sizes that stay constant in screen-space as you zoom
-- **Sgraffito (v2.2):** scratch through the glaze with a needle to reveal the clay underneath. Crisp scribed line (not a soft paintbrush), real groove depth from the bump shader, shadow inside the cut. Lines pass through the kiln intact.
+### Decorating
+- Grouped tool families: Paint (brush / splatter), Carve, Picture (motif), Pattern (overlay / tile / band)
+- **32 paint colours** in four packs: Basics, Warm, Cool, Bright
+- **Sgraffito** — scratch through to the clay with real groove depth from the bump shader, plus an aim ring on mouse
+- **Slip trailing** — a piped raised bead, colour plus positive relief
+- **42 motifs** in seven packs (`MOTIF_PACKS`): Sumi-e Animals, Sumi-e Plants, Dogs, Dutch Berries, Roman, Egyptian, Mythical — placed as a tinted silhouette or in full colour
+- **25 repeating patterns** in four packs (`PATTERN_PACKS`): Enamel, Frescoes, Shima-shima, Art Nouveau — 512×512 tiles wrapping exactly 4× around the pot
+- **6 frieze bands** (Egyptian) that repeat horizontally around the pot and slide up and down
+- Upload your own image — reduced to a silhouette **entirely on-device**, never transmitted
+- Motifs and bands are movable objects: Adjust selects a placed one and repositions or resizes it
+- Bounded undo history across the decoration layers
 
 ### The kiln
-- A cinematic ~4.5-second firing sequence — close, fire, cool, open
-- Dark vignette + warm inner glow + camera lean + music duck + kiln crackle SFX
-- The glaze visibly melts from raw matte to fired gloss inside the kiln view
-- Two-tone gradient glazes melt together — both primary and secondary tween through raw→fired
-- Reduced-motion honoured via `prefers-reduced-motion`
+- A firing sequence: the chamber closes, glows warm, the camera leans, the glaze melts raw → fired
+- Kiln SFX restored in vc20 (the file had been missing since v2.1 and every firing played silent)
+- Compresses to 1.6s and drops the vignette under `prefers-reduced-motion`
+- Cancelling out mid-fire (New pot, or opening the gallery) unwinds cleanly without falsely marking a piece fired
 
 ### Lids + matched sets
-- "+ Lid" at wet OR leather-hard seeds a fresh lid whose base radius matches your pot's rim exactly
-- Three lid styles (v2.2 redesigned proportions): **Flat** (actually flat — wide low lid with a small knob, ~14% pot height), **Domed** (graceful onion-dome, ~35%), **Tall** (slim finial, ~50%)
-- Style swap mid-shaping while wet
-- Match-rim button if you reshape the pot after seeding the lid
-- Swap between pot and lid at any pre-fired stage
-- Lid apex smoothed automatically — no pinprick at the top
-- Fired sets render in an assembled view — lid resting on pot — both pieces tween through the kiln together
-- The set saves as a single shared composite thumbnail (no awkward stacked halves)
+- Seed a lid whose base radius matches the pot's rim exactly
+- **Four lid styles**: flat, domed, tall, pointed
+- Lids stay round — altering, facets, and scallop never bleed onto them, and the pot's shape is restored on swap
+- Fired sets render assembled, both pieces tweening through the kiln together
+- A gradient across a set runs unbroken from the top of the lid to the pot's foot (shader vertical remap)
+- The set saves as one shared composite thumbnail
 
-### Portfolio (gallery)
-- Local-only — saves to IndexedDB on the device, never leaves
-- Two views: **Shelf** (default — title + glaze + save date) and **Compact** (icon grid)
-- Tap a title to rename a piece
-- Tap any piece to load it back into the studio as a fired finish
-- Sets appear as a single tile and reload as the assembled pair
-- Pieces remember their handle reshape, sgraffito carving, and gradient glaze
+### Portfolio
+- Local-only, in IndexedDB on the device
+- **Named collections / shelves** you create and sort pieces onto
+- Shelf and compact views; tap a title to rename; auto-titles from shape + glaze ("Bud vase in Ocean")
+- Thumbnails are transparent PNGs of the pot alone, composited over a showcase backdrop with a contact shadow
+- Tap any piece to load it back, straight into Display mode
+- Pieces remember handles, sgraffito, dips, wax, altering, facets, scallop, and rim style
+- A draft heartbeat recovers your work if the app is killed mid-pot
+
+### Display mode
+- Full-screen showcase: all interface hidden, the pot turning slowly on its backdrop with music
+- Drag to turn, tap or ✕ to exit, Escape on a keyboard
+- Reached from the fired stage or by tapping any gallery piece
 
 ### Photo export
-- Three framing styles: **Studio shelf**, **Sunlit window**, **Museum plinth**
-- Two aspect ratios: square (1:1) and portrait (9:16)
-- 1024-wide PNG output, composited over the active backdrop
-- Web Share (where supported) with anchor-download fallback
+- **Five framing styles**: Studio shelf, Sunlit window, Museum plinth, Spotlight, Pastel
+- **Three aspects**: square (1024), feed (1280), portrait/wallpaper (1820)
+- Export a whole shelf as a single kiln-shelf keepsake image
+- Descriptive filenames (`slip-studio-jar-ocean-2026-07-31.png`)
+- Web Share where supported, anchor-download fallback; cancelling the share sheet writes nothing
 
 ### Atmosphere
-- 18 backdrops in six categories: **Studio**, **Art**, **Botanical**, **Digital**, **Paper**, **Motion**
-- Studio (3 backdrops) is bundled at install in the Android app; the other five categories are opt-in download packs the player installs from the title-screen picker — Art / Botanical / Digital / Paper are ~1 MB each, Motion (3 looping videos) is ~23 MB
-- Three motion (looping video) backdrops: Balloons, Birds, Hearts
-- Pack files persist in the app's private Data dir via `@capacitor/filesystem`; tracked in `slip-packs-installed` (localStorage) and resolved at load time via `Capacitor.convertFileSrc`
-- Multiple ambient music tracks, randomised per session
-- Five sound effects, all subtle: wheel hum (volume tracks the spin, pitch deepens as it slows), clay squelch (throttled), water drip on re-wet, glaze pour on selection, kiln crackle on fire
-- Independent toggles for music and SFX
-- Wet clay subtly sparkles while you're actively sculpting (reactive sheen)
+- **18 backdrops** in six categories: Studio, Art, Botanical, Digital, Paper, Motion
+- Studio (3) ships in the app; the other five are free opt-in download packs installed from the picker — Art / Botanical / Digital / Paper are ~1 MB each, Motion (3 looping videos) ~23 MB. Partial writes are cleaned up so a retry starts clean.
+- Ambient music, plus five subtle SFX: wheel hum (tracks the spin), clay squelch, water drip on re-wet, glaze pour, kiln crackle
+- Independent music and sound toggles
 
-### Title button safety
-- Tapping the title button returns to the landing screen with a fresh wet pot in the studio
-- If there's unsaved work, a custom in-app modal asks "Discard this pot and start over?" before resetting
-- Esc and backdrop-tap both cancel the modal
+### Onboarding
+- Per-stage guiding-hand coach marks, once per stage, dismissed by the first real gesture
+- "How to play" on the landing replays them
+- The shaping tools breathe once on first sight so they're discoverable
 
-### Typography (v2.2)
-- Inter for UI (crisp at small sizes)
-- Fraunces for display titles ("Slip Studio" landing, gallery heading, photo composer caption)
-- Both vendored locally — no CDN, no FOIT after first load
-
-### Rendering
-- Real 3D via Three.js (vendored — no CDN, no network calls)
-- PBR clay with procedural image-based lighting, soft shadows, an editable bump layer for the clay grain + throwing lines + sgraffito grooves
-- Custom shader patches overlay decoration, sgraffito mask + clay-color uniform, and a gradient-glaze pass on the diffuse colour
-- Analytic normals (derived from the profile slope) — no faceting, no lighting seam at the lathe wrap
-- Symmetric top-cap normals on lids — no pinprick artifact at the apex
+### Accessibility
+- `prefers-reduced-motion` honoured **in JS as well as CSS** — decorative spin stops, the kiln compresses, the wet wheel keeps a 40% turn so it doesn't read as broken
+- Focus trapped in every dialog, as a stack, with Escape to close and focus restored on exit
+- Touch targets swept to WCAG 2.5.8 across the landing, decorate tray, and gallery — hit areas grown via non-layout `::before` overlays so the screen still fits a 360×640 phone
+- Canvas cursors signal whether a press will mark or turn
 
 ### Privacy + offline
-- No account, no sign-in, no online play
+- No account, no sign-in, no network calls after install
 - No analytics, no third-party SDKs, no advertising IDs
-- All work saves to local IndexedDB; preferences in localStorage
-- Runs fully offline after first launch
-- "Clear storage" in Android Settings wipes everything cleanly
+- Work saves to local IndexedDB; preferences in localStorage
+- Uploaded images are processed on-device and never leave it
+- Runs fully offline; "Clear storage" wipes everything cleanly
+
+### Rendering
+- Three.js, vendored locally — no CDN
+- PBR clay with image-based lighting, soft shadows, and a bump layer carrying clay grain, throwing lines, and sgraffito grooves
+- Custom shader patches for the decoration overlay, the sgraffito mask, the dip layer, and the gradient pass
+- Analytic normals throughout, including on altered (non-round) surfaces
+- Survives WebGL context loss and restore
 
 ### App shell (Android wrap)
-- Capacitor wrap (`slip-studio-app/`)
-- Immersive fullscreen: status bar + navigation bar hidden, swipe-to-reveal
-- Vendored Three.js + Inter + Fraunces so the app works without an internet connection
-- @capacitor/filesystem for on-demand backdrop pack downloads
+- Capacitor wrap (`slip-studio-app/`), outside git
+- Immersive fullscreen: status and navigation bars hidden, swipe-to-reveal
+- Vendored Three.js + Inter and Fraunces woff2 (shipped as of v216 — before that every user read the app in fallback fonts)
+- `@capacitor/filesystem` for on-demand backdrop packs
 - Built and signed with a local PKCS12 keystore (see CLAUDE.md → Slip Studio build recipe)
