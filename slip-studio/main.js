@@ -1855,6 +1855,11 @@ function init() {
     document.getElementById("saveBtn")?.addEventListener("click", () => savePot());
     document.getElementById("photoBtn")?.addEventListener("click", () => openPhotoModal());
     document.getElementById("displayBtn")?.addEventListener("click", () => enterDisplayMode());
+    document.getElementById("refireBtn")?.addEventListener("click", () => openRefire());
+    document.getElementById("refireCancel")?.addEventListener("click", () => closeRefire());
+    document.getElementById("refireModal")?.addEventListener("click", (e) => {
+        if (e.target && e.target.id === "refireModal") closeRefire();  // backdrop tap
+    });
     bindDisplayLayer();
     document.getElementById("photoClose")?.addEventListener("click", closePhotoModal);
     document.getElementById("photoSave")?.addEventListener("click", finalizePhoto);
@@ -2097,6 +2102,7 @@ function init() {
             // needs to be able to force a seed rather than fire repeatedly
             // and hope.
             setFiring, buildFiringBar, paintKilnEffects, FIRINGS, FIRING_IDS,
+            openRefire, closeRefire, refirePot,
             kilnInfo: () => (state.kiln ? { ...state.kiln } : null),
             setKiln: (type, seed) => {
                 state.kiln = type ? { type, seed: seed >>> 0 } : null;
@@ -4843,6 +4849,13 @@ function startFiringMoment() {
     } else {
         state._musicSavedVol = null;
     }
+    // updateToolbar's `firedAndCool` gate exists to keep Save / Photo /
+    // Display (and now Re-fire) out of reach during the sequence — but it
+    // only ever ran at setPhase(), BEFORE this function sets state.firing,
+    // and again at endFiringMoment() once it's back to false. So the gate
+    // never actually hid anything and a mid-tween Save really could capture
+    // a half-melted pot. Re-run it now that the flag is true.
+    updateToolbar();
 }
 
 // Abandon a kiln sequence in progress — the user walked away from it
@@ -4999,6 +5012,70 @@ function setFiring(id) {
     try { localStorage.setItem("slip-firing", id); } catch (_) {}
     haptic(8);
     updateFiringBar();
+}
+
+// --- Fire it again -----------------------------------------------
+// A finished pot can go back through the kiln in a different firing. This
+// is the cheapest thing that turns the gallery from an archive into a
+// reason to come back: every piece already made is a piece you can wonder
+// about differently.
+//
+// It cannot destroy anything. savePot always mints a fresh id, so saving
+// after a re-fire writes a NEW entry and the original stays exactly as it
+// was — a re-fire is always a second copy, never an edit of the first. The
+// modal says so, because someone who's afraid of losing a pot they like
+// won't press the button.
+function openRefire() {
+    if (state.clayState !== "fired" || state.firing) return;
+    const list = document.getElementById("refireList");
+    if (list) {
+        list.innerHTML = "";
+        // What it was fired as — marked so "try something else" is one read.
+        const current = state.kiln ? state.kiln.type : "electric";
+        FIRING_IDS.forEach((id) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "collection-option refire-option" + (id === current ? " is-current" : "");
+            b.innerHTML = `<span class="refire-name">${FIRINGS[id].label}</span>` +
+                          `<span class="refire-blurb">${FIRINGS[id].blurb}</span>`;
+            if (id === current) b.innerHTML += `<span class="refire-current">as fired</span>`;
+            b.addEventListener("click", () => refirePot(id));
+            list.appendChild(b);
+        });
+    }
+    const m = document.getElementById("refireModal");
+    if (m) { m.hidden = false; m.classList.add("is-open"); trapFocus(m); }
+}
+function closeRefire() {
+    const m = document.getElementById("refireModal");
+    if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
+}
+function refirePot(type) {
+    if (!FIRINGS[type] || state.firing || state.clayState !== "fired") return;
+    closeRefire();
+    state.firingType = type;
+    try { localStorage.setItem("slip-firing", type); } catch (_) {}
+    updateFiringBar();
+    // A re-fire is a genuinely new trip through the kiln, so it rolls a
+    // fresh seed — firing the same pot in wood twice gives two pots, which
+    // is the whole point.
+    state.kiln = (type !== "electric")
+        ? { type, seed: (Math.random() * 0xffffffff) >>> 0 }
+        : null;
+    if (state.savedPot) { state.savedPot.firingType = type; state.savedPot.kiln = state.kiln ? { ...state.kiln } : null; }
+    if (state.savedLid) { state.savedLid.firingType = type; state.savedLid.kiln = state.kiln ? { ...state.kiln } : null; }
+    renderDips();
+    // A set's partner has to pick up the new firing too — it takes the
+    // snapshot, so re-sync from whichever piece isn't active.
+    const partnerSaved = state.isLid ? state.savedPot : state.savedLid;
+    if (partnerSaved) syncPartnerMesh(partnerSaved);
+    // This is a different pot from the one in the gallery, so Save must be
+    // live again — including for a set, where savePot no-ops when clean.
+    state.dirty = true;
+    playSfx("kiln");
+    haptic(30);
+    startFiringMoment();    // the vignette closes over the change and reveals it
+    updateToolbar();        // hides Save/Photo/Display for the duration
 }
 
 function setFinish(id) {
@@ -5493,6 +5570,10 @@ function updateToolbar() {
     if (photoBtn) photoBtn.hidden = !firedAndCool;
     const displayBtn = document.getElementById("displayBtn");
     if (displayBtn) displayBtn.hidden = !firedAndCool;
+    // Fire it again — same gate as the others, so it can't be tapped
+    // mid-sequence and start a second firing over the first.
+    const refireBtn = document.getElementById("refireBtn");
+    if (refireBtn) refireBtn.hidden = !firedAndCool;
     // Lid button (dual-purpose): visible while you're on the pot at
     // any pre-fired stage. Creates a lid partner the first time you
     // tap it; on subsequent taps (a lid already exists) it swaps you
@@ -9924,7 +10005,9 @@ function onDialogEscape(e) {
     const photo   = document.getElementById("photoModal");
     const wall    = document.getElementById("wallModal");
     const gallery = document.getElementById("gallery");
+    const refire  = document.getElementById("refireModal");
     // Innermost first: photo and the wall can both open over the gallery.
+    if (refire && !refire.hidden)      { closeRefire();     return; }
     if (photo && !photo.hidden)        { closePhotoModal(); return; }
     if (wall && !wall.hidden)          { closeWall();       return; }
     if (gallery && !gallery.hidden)    { closeGallery();    return; }

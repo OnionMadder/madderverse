@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=229" />
+    <link rel="stylesheet" href="style.css?v=231" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -358,6 +358,9 @@
             <button id="displayBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Display" title="Display — admire your pot full-screen">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-display"/></svg>
             </button>
+            <button id="refireBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Fire it again" title="Fire it again — try a different firing">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-kiln"/></svg>
+            </button>
             <button id="photoBtn" class="tool-btn tool-btn-icon" type="button" hidden aria-label="Photo" title="Photo">
                 <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true"><use href="#icon-photo"/></svg>
             </button>
@@ -411,6 +414,21 @@
             <div class="collection-list" id="collectionList"></div>
             <div class="confirm-modal-actions">
                 <button class="confirm-modal-btn" id="collectionCancel" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fire it again: put a finished pot back through the kiln in a
+         different firing. Never destructive — the saved pot stays in the
+         gallery and saving after a re-fire writes a NEW entry, so this is
+         always a second copy rather than a change to the first. -->
+    <div id="refireModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="Fire it again" hidden>
+        <div class="confirm-modal-card">
+            <p class="confirm-modal-message">Fire it again</p>
+            <p class="refire-note">Your saved pot is kept. Firing again gives you another one.</p>
+            <div class="collection-list refire-list" id="refireList"></div>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn" id="refireCancel" type="button">Not now</button>
             </div>
         </div>
     </div>
@@ -504,7 +522,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=229"></script>
+    <script type="module" src="main.js?v=231"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

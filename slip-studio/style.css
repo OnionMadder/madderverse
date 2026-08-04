@@ -2486,6 +2486,35 @@ body.display-mode #coach { display: none !important; }
     pointer-events: none;
 }
 
+/* ---------- Fire it again ---------- */
+/* The reassurance line is doing real work: someone who thinks re-firing
+   might overwrite a pot they like will never press the button. */
+.refire-note {
+    margin: -6px 0 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--ink-faint);
+    text-align: center;
+}
+.refire-list { gap: 8px; }
+.refire-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 11px 14px;
+    min-height: 44px;
+    text-align: left;
+}
+.refire-name  { font-size: 15px; }
+.refire-blurb { font-size: 12px; color: var(--ink-faint); line-height: 1.35; }
+.refire-current {
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-style: italic;
+    margin-top: 2px;
+}
+
 /* ---------- The test-tile wall ---------- */
 /* Two tabs over one modal: the wall of fired tiles + the rack, and the
    recipe journal. The panel is the flex child that scrolls, so the rack
