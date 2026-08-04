@@ -8475,8 +8475,20 @@ function makeLidPartner() {
     seedLidForRim(rimR, state.lidStyle);
     profileDirty = true;
     state.glaze = null;
+    state.glazeGradient = null;
+    // Dips too. This line was missing, so a lid seeded from an already-DIPPED
+    // pot (the Decorate-stage flow) arrived wearing the pot's glaze and named
+    // for it — "Lid in Ocean" before you'd touched it — while a lid seeded at
+    // wet, before any dipping, came out bare. Same button, different result
+    // depending on when you pressed it. Everything else here already resets
+    // (glaze, decoration, bump, altering, facets, scallop), so this was an
+    // oversight from when dips were added after the flat-glaze system, not a
+    // decision. A fresh lid starts clean; glaze it to match if you want a set.
+    state.dips = [];
+    dipPreview = null;
     clearDeco();
     resetBumpLayer();
+    renderDips();
     setPhase(INITIAL_STATE);
     state.dirty = true;
     updateHandleVisibility(); // hide handle while shaping the lid
