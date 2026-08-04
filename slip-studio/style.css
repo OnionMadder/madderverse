@@ -2452,6 +2452,40 @@ body.display-mode #coach { display: none !important; }
     .display-hint, .display-exit { transition: none; }
 }
 
+/* ---------- Firing type ---------- */
+/* Sits under Finish in the Glaze panel — both answer "how does it come out
+   of the kiln". The blurb earns its space: you can't preview a firing
+   before you commit to it, so a sentence is the only thing telling you what
+   Soda or Raku will do. .deco-stack is pointer-events:none, so the chips
+   need pointer-events:auto or taps fall straight through to the canvas. */
+.firing-bar { margin-top: 2px; }
+.firing-chip { pointer-events: auto; }
+/* .dip-chip draws 23px tall, under the 24px WCAG 2.5.8 floor, though its
+   measured hit box already came to 34. This pins that explicitly so the
+   floor can't be lost to a later padding change — belt and braces, not a
+   fix for a live violation. Probed at 34px effective with the midpoint
+   between the two rows owned by NEITHER chip, so the expansions don't
+   overlap (an overlap is worse than a small target: the later element in
+   DOM order silently takes the tap). Scoped to these two single-row bars
+   deliberately — the dip bar WRAPS, where the same expansion could collide
+   between wrapped rows. */
+.finish-chip, .firing-chip { position: relative; }
+.finish-chip::before, .firing-chip::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 100%; height: 33px;
+}
+.firing-blurb {
+    margin: 4px 0 0 44px;
+    font-size: 12px;
+    line-height: 1.35;
+    color: var(--ink-faint);
+    max-width: 300px;
+    pointer-events: none;
+}
+
 /* ---------- The test-tile wall ---------- */
 /* Two tabs over one modal: the wall of fired tiles + the rack, and the
    recipe journal. The panel is the flex child that scrolls, so the rack

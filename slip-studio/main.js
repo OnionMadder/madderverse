@@ -241,6 +241,27 @@ const FINISHES = {
 };
 const FINISH_IDS = ["glossy", "matte", "lustre"];
 const DEFAULT_FINISH = "glossy";
+
+// --- Firing type -------------------------------------------------
+// The kiln used to be a reveal of something already decided: you glazed a
+// pot, you fired it, you got the colours you picked. Real firing isn't like
+// that, and the difference is most of the appeal of ceramics — ash lands
+// where flame touches, a pot facing the firebox flashes down one side, two
+// identical pots in one load come out different.
+//
+// Electric is the default and stays exact, so chance is always something
+// you opt INTO. The others let the kiln contribute. Hard rule: a firing can
+// never make a piece worse — every result reads as different and
+// interesting, never as damage. Nothing here is irreversible either; a
+// saved pot can be loaded and re-fired, and that saves as a NEW entry.
+const FIRINGS = {
+    electric: { label: "Electric", blurb: "Exactly what you glazed." },
+    wood:     { label: "Wood",     blurb: "Ash and flame-marks down one side." },
+    soda:     { label: "Soda",     blurb: "Vapour glaze — orange peel and a soft blush." },
+    raku:     { label: "Raku",     blurb: "Pulled hot and smoked. Crackle and shine." },
+};
+const FIRING_IDS = ["electric", "wood", "soda", "raku"];
+const DEFAULT_FIRING = "electric";
 // Merge the active finish into a fired look. Called for both the live pot
 // (currentLook) and the partner piece (lookForPiece) so a set matches.
 function withFinish(firedLook, finishId) {
@@ -1406,6 +1427,16 @@ const state = {
     dipColor: null,
     dipFxId: null,          // glaze id of the armed dip, for surface FX (speckle/crackle)
     finish: "glossy",       // global fired finish: glossy | matte | lustre
+    // How this piece will be fired (chosen before the kiln) and what the
+    // kiln actually did (rolled AT the kiln, then replayed). `kiln` stays
+    // null until a piece is fired with something other than electric.
+    firingType: (() => {
+        try {
+            const saved = localStorage.getItem("slip-firing");
+            return (saved && FIRINGS[saved]) ? saved : DEFAULT_FIRING;
+        } catch (_) { return DEFAULT_FIRING; }
+    })(),
+    kiln: null,             // { type, seed } — see paintKilnEffects
     dripAmount: "few",
     // Editable bump layer: painted into by wet-clay texture stamps
     // (positive relief) and leather-hard carving (negative grooves).
@@ -2062,6 +2093,16 @@ function init() {
             // Test-tile wall. The rack fires on a timer and the modal is the
             // only way in, so these exist to drive + assert it from a page
             // script (the preview pane pauses rAF; see CLAUDE.md).
+            // Firing types. The roll happens inside advanceStage, so a test
+            // needs to be able to force a seed rather than fire repeatedly
+            // and hope.
+            setFiring, buildFiringBar, paintKilnEffects, FIRINGS, FIRING_IDS,
+            kilnInfo: () => (state.kiln ? { ...state.kiln } : null),
+            setKiln: (type, seed) => {
+                state.kiln = type ? { type, seed: seed >>> 0 } : null;
+                renderDips();
+                return state.kiln;
+            },
             openWall, closeWall, setWallTab, buildTilePicker,
             pickTileGlaze, addRackTile, fireRack, emptyRack,
             recordRecipePairs, announceRecipes, tileBands, tileKey,
@@ -2552,6 +2593,134 @@ function paintDipList(ctx, list) {
 // speckle and/or a raku crackle network, painted into the dip band
 // [rim .. line] and clipped there so it never bleeds onto bare clay.
 // Deterministic from d.seed so a saved pot replays identically.
+// --- What the kiln did -------------------------------------------
+// Painted into the SAME dip canvas as the glaze, as one more replayed pass
+// (see renderDips) — so effects need no new texture, no new uniform and no
+// shader cache-key bump, and they ride the existing save/load and partner
+// paths for free. They carry their own alpha, so they land on bare clay as
+// readily as on glaze, which is what makes smoke and ash read correctly.
+//
+// Everything derives from (type, seed) through mulberry32, the same
+// contract makeDrips and paintGlazeFx already follow: all the variation is
+// baked in at paint time so a reload reproduces the pot exactly. In a
+// feature about keeping what you make, a pot that changed when you came
+// back would be the worst possible bug.
+//
+// Deliberately tuned UNDER what looks right in isolation. An effect that
+// makes someone lean in beats one that makes them feel the app overrode
+// their choices.
+const KILN_ASH_COLOR   = 0xb08a4a;   // wood ash, warm and translucent
+const KILN_FLAME_COLOR = 0xc26a2f;   // flashing on the side facing the fire
+const KILN_SODA_COLOR  = 0xd8c4a0;   // vapour blush
+const KILN_SMOKE_COLOR = 0x231e1a;   // raku carbon
+function paintKilnEffects(ctx, kiln) {
+    if (!ctx || !kiln || !kiln.type || kiln.type === "electric") return;
+    const rng = mulberry32((kiln.seed || 1) ^ 0x85ebca6b);
+    // Where the flame came from. Everything directional keys off this, so
+    // one pot's marks all agree about which side faced the fire.
+    const uf = rng() * GLAZE_W;
+    // Angular falloff from the flame side, wrapped around the seam.
+    const facing = (x) => {
+        let d = Math.abs(x - uf);
+        if (d > GLAZE_W / 2) d = GLAZE_W - d;
+        return 1 - d / (GLAZE_W / 2);            // 1 facing the fire, 0 away
+    };
+    ctx.save();
+    if (kiln.type === "wood") {
+        // Ash settles heavier up top (shoulder and rim catch it) and on the
+        // side that faced the flame. Painted as soft translucent daubs
+        // rather than a flat wash so it reads as deposit, not a filter.
+        const count = 1400;
+        for (let i = 0; i < count; i++) {
+            const x = rng() * GLAZE_W, y = rng() * GLAZE_H;
+            const top = 1 - y / GLAZE_H;                       // 1 rim, 0 foot
+            const w = facing(x) * (0.35 + 0.65 * top);
+            if (rng() > w * 0.9) continue;
+            const r = 6 + rng() * 26;
+            ctx.fillStyle = rgba(KILN_ASH_COLOR, 0.020 + rng() * 0.045 * w);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            if (x > GLAZE_W - r) { ctx.beginPath(); ctx.arc(x - GLAZE_W, y, r, 0, Math.PI * 2); ctx.fill(); }
+        }
+        // A few long flame-marks licking up the facing side.
+        const marks = 3 + Math.floor(rng() * 3);
+        for (let i = 0; i < marks; i++) {
+            const x = uf + (rng() - 0.5) * GLAZE_W * 0.34;
+            const y0 = GLAZE_H * (0.15 + rng() * 0.4);
+            const len = GLAZE_H * (0.22 + rng() * 0.3);
+            const g = ctx.createLinearGradient(0, y0, 0, y0 + len);
+            g.addColorStop(0, rgba(KILN_FLAME_COLOR, 0.16 + rng() * 0.1));
+            g.addColorStop(1, rgba(KILN_FLAME_COLOR, 0));
+            ctx.fillStyle = g;
+            const w = 14 + rng() * 26;
+            const wx = ((x % GLAZE_W) + GLAZE_W) % GLAZE_W;
+            ctx.fillRect(wx - w / 2, y0, w, len);
+            if (wx - w / 2 < 0) ctx.fillRect(wx - w / 2 + GLAZE_W, y0, w, len);
+        }
+    } else if (kiln.type === "soda") {
+        // Orange peel: dense, tiny, low-alpha stipple over the whole piece.
+        const count = 3200;
+        for (let i = 0; i < count; i++) {
+            const x = rng() * GLAZE_W, y = rng() * GLAZE_H;
+            const r = 0.8 + rng() * 2.2;
+            ctx.fillStyle = rgba(KILN_SODA_COLOR, 0.05 + rng() * 0.09);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // The broad blush where the vapour actually struck.
+        for (let i = 0; i < 500; i++) {
+            const x = rng() * GLAZE_W, y = rng() * GLAZE_H;
+            const w = facing(x);
+            if (rng() > w) continue;
+            const r = 18 + rng() * 46;
+            ctx.fillStyle = rgba(KILN_SODA_COLOR, 0.012 + rng() * 0.03 * w);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            if (x > GLAZE_W - r) { ctx.beginPath(); ctx.arc(x - GLAZE_W, y, r, 0, Math.PI * 2); ctx.fill(); }
+        }
+    } else if (kiln.type === "raku") {
+        // Smoke pools low and in the lee of the flame — the reverse of ash.
+        for (let i = 0; i < 900; i++) {
+            const x = rng() * GLAZE_W, y = rng() * GLAZE_H;
+            const low = y / GLAZE_H;                            // 1 at the foot
+            const w = (1 - facing(x)) * (0.3 + 0.7 * low);
+            if (rng() > w) continue;
+            const r = 10 + rng() * 34;
+            ctx.fillStyle = rgba(KILN_SMOKE_COLOR, 0.02 + rng() * 0.06 * w);
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+            if (x > GLAZE_W - r) { ctx.beginPath(); ctx.arc(x - GLAZE_W, y, r, 0, Math.PI * 2); ctx.fill(); }
+        }
+        // Crazing across the whole surface — the signature raku craze, and
+        // the same walk paintGlazeFx uses for its crackle glazes.
+        const lines = 46;
+        for (let i = 0; i < lines; i++) {
+            let x = rng() * GLAZE_W, y = rng() * GLAZE_H;
+            let ang = rng() * Math.PI * 2;
+            const seg = 10 + Math.floor(rng() * 12);
+            const step = (0.4 + rng() * 0.8) * (GLAZE_H / seg);
+            ctx.strokeStyle = rgba(KILN_SMOKE_COLOR, 0.16 + rng() * 0.2);
+            ctx.lineWidth = 0.6 + rng() * 0.8;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            for (let s = 0; s < seg; s++) {
+                ang += (rng() - 0.5) * 1.0;
+                x += Math.cos(ang) * step;
+                y += Math.sin(ang) * step;
+                const wx = ((x % GLAZE_W) + GLAZE_W) % GLAZE_W;
+                if (Math.abs(wx - x) > 0.5) { ctx.moveTo(wx, y); x = wx; }
+                else ctx.lineTo(wx, y);
+            }
+            ctx.stroke();
+        }
+    }
+    ctx.restore();
+}
+
 function paintGlazeFx(ctx, d) {
     const fx = glazeFx(d.fxId);
     if (!fx) return;
@@ -2606,6 +2775,10 @@ function renderDips() {
     const list = dipPreview ? state.dips.concat(dipPreview) : state.dips;
     paintDipList(ctx, list);
     applyFrozenDip(ctx, state.resistCanvas, state.frozenDipCanvas);
+    // What the kiln did goes on LAST, over both the glaze and the sealed
+    // area — ash and smoke land on the finished surface, including on top
+    // of wax-resisted bare clay. Only present once the piece has fired.
+    paintKilnEffects(ctx, state.kiln);
     if (state.dipTex) state.dipTex.needsUpdate = true;
     // Keep the surface finish in sync — a dipped pot goes glossy, an
     // un-dipped one drops back to bare clay (see currentLook).
@@ -4617,6 +4790,18 @@ function advanceStage() {
                 if (state.spout.on) rebuildSpoutGeometry();
                 updateHandleVisibility();
             }
+            // Roll what the kiln does BEFORE the phase change, so the
+            // effects are already in the dip layer when the glow comes up
+            // and get revealed by it rather than popping in afterwards.
+            // Rolled once, here, and stored — never at render time.
+            state.kiln = (state.firingType && state.firingType !== "electric")
+                ? { type: state.firingType, seed: (Math.random() * 0xffffffff) >>> 0 }
+                : null;
+            // A set goes into the kiln together, so the partner shares the
+            // SAME roll — one firing, one flame direction across both halves.
+            if (state.savedPot) { state.savedPot.firingType = state.firingType; state.savedPot.kiln = state.kiln ? { ...state.kiln } : null; }
+            if (state.savedLid) { state.savedLid.firingType = state.firingType; state.savedLid.kiln = state.kiln ? { ...state.kiln } : null; }
+            renderDips();
             setPhase("fired");
             playSfx("kiln");
             haptic(30); // a firmer rumble for the commitment to fire
@@ -4669,6 +4854,10 @@ function startFiringMoment() {
 function cancelFiringMoment() {
     if (!state.firing) return;
     state.firing = false;
+    // The kiln roll belonged to a firing that never completed — drop it, or
+    // a pot nobody fired keeps ash from a firing that didn't happen. Callers
+    // that restore a piece (loadPot) set their own afterwards.
+    state.kiln = null;
     const v = document.getElementById("kilnVignette");
     if (v) {
         v.style.opacity = "0";
@@ -4771,6 +4960,47 @@ function buildFinishBar() {
     });
     updateFinishBar();
 }
+// Firing type — sits with Finish because both answer "how does it come out
+// of the kiln", and both are chosen before the Fire button rather than
+// painted on. The blurb is not decoration: choosing a firing you can't
+// preview needs a sentence saying what it does.
+function buildFiringBar() {
+    const wrap = document.getElementById("firingBar");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    const label = document.createElement("span");
+    label.className = "dip-label";
+    label.textContent = "Firing";
+    wrap.appendChild(label);
+    FIRING_IDS.forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dip-chip firing-chip";
+        b.dataset.firing = id;
+        b.textContent = FIRINGS[id].label;
+        b.title = FIRINGS[id].blurb;
+        b.addEventListener("click", () => setFiring(id));
+        wrap.appendChild(b);
+    });
+    updateFiringBar();
+}
+function updateFiringBar() {
+    document.querySelectorAll("[data-firing]").forEach((b) => {
+        const on = b.dataset.firing === state.firingType;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    const blurb = document.getElementById("firingBlurb");
+    if (blurb) blurb.textContent = (FIRINGS[state.firingType] || FIRINGS[DEFAULT_FIRING]).blurb;
+}
+function setFiring(id) {
+    if (!FIRINGS[id]) return;
+    state.firingType = id;
+    try { localStorage.setItem("slip-firing", id); } catch (_) {}
+    haptic(8);
+    updateFiringBar();
+}
+
 function setFinish(id) {
     if (!FINISHES[id]) return;
     state.finish = id;
@@ -4999,6 +5229,10 @@ function resetPot() {
     state.glazeGradient = null;
     state.dips = [];
     dipPreview = null;
+    // Explicit, not left to cancelFiringMoment: that early-returns when the
+    // sequence has already FINISHED, so a fresh pot would otherwise inherit
+    // the ash off the last one. firingType is a preference and stays.
+    state.kiln = null;
     renderDips();
     clearDeco();
     resetDecoHistory(); // fresh pot → no undo carryover
@@ -5361,6 +5595,7 @@ function buildGlazeBar() {
     buildGradientBar();
     buildDipBar();
     buildFinishBar();
+    buildFiringBar();
     updateGlazeBar();
 }
 
@@ -7220,6 +7455,8 @@ function corePieceFields() {
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
         finish: state.finish,
+        firingType: state.firingType,
+        kiln: state.kiln ? { ...state.kiln } : null,          // what the kiln did — replayed, not re-rolled
         dips: state.dips.map((d) => ({ ...d })),
         deco: state.decoCanvas.toDataURL("image/png"),        // composite (thumbnails, partner, legacy)
         paintDeco: state.paintCanvas.toDataURL("image/png"),  // baked freehand layer (editable reload)
@@ -7366,6 +7603,8 @@ function capturePieceState() {
         glaze: state.glaze,
         glazeGradient: state.glazeGradient,
         finish: state.finish,
+        firingType: state.firingType,
+        kiln: state.kiln ? { ...state.kiln } : null,
         dips: state.dips.map((d) => ({ ...d })),
         decoCanvas: decoCopy,
         paintCanvas: paintCopy,
@@ -7398,6 +7637,8 @@ function restorePieceState(saved) {
     state.glaze = saved.glaze;
     state.glazeGradient = saved.glazeGradient || null;
     state.finish = saved.finish || DEFAULT_FINISH;
+    state.firingType = saved.firingType || DEFAULT_FIRING;
+    state.kiln = saved.kiln ? { ...saved.kiln } : null;   // replay, never re-roll
     state.dips = saved.dips ? saved.dips.map((d) => ({ ...d })) : [];
     renderDips();
     state.isLid = saved.isLid;
@@ -7664,6 +7905,10 @@ function syncPartnerMesh(saved) {
     if (state.partnerDipCtx) {
         paintDipList(state.partnerDipCtx, saved.dips || []);
         applyFrozenDip(state.partnerDipCtx, state.partnerResistCanvas, state.partnerFrozenDipCanvas);
+        // Same order as the active piece — the lid of a wood-fired set has
+        // to carry the same ash as the pot, or the two halves disagree
+        // about which firing they were in.
+        paintKilnEffects(state.partnerDipCtx, saved.kiln);
         if (state.partnerDipTex) state.partnerDipTex.needsUpdate = true;
     }
     state.partnerClayBaseColor.setHex(CLAY_STATES[saved.clayState || "fired"].color);
@@ -8060,6 +8305,11 @@ async function loadPot(entry, opts) {
     state.glaze = entry.glaze || null;
     state.glazeGradient = entry.glazeGradient || null;
     state.finish = entry.finish || DEFAULT_FINISH;
+    // A loaded pot shows the firing it actually got. cancelFiringMoment ran
+    // at the top of loadPot and cleared any in-flight roll, so this is the
+    // only thing setting it.
+    state.firingType = entry.firingType || DEFAULT_FIRING;
+    state.kiln = entry.kiln ? { ...entry.kiln } : null;
     // Glaze dips. Back-compat: pots saved with the old whole-pot "rainbow"
     // glaze had no dips — turn that into a rainbow dip preset instead.
     state.dips = Array.isArray(entry.dips) ? entry.dips.map((d) => ({ ...d })) : [];
