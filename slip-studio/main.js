@@ -1484,6 +1484,7 @@ const state = {
     savedLid: null,                       // paused lid state while user edits the pot
     lidStyle: "domed",                    // flat | domed | tall — picked while shaping a lid
     lidMaxY: null,                        // y where the lid silhouette caps (set in seedLidForRim)
+    lidBaseRatio: 1,                      // lid base ÷ the rim it was cut for — the overhang (seedLidForRim)
     partnerMesh: null,                    // second mesh, used for the fired-set assembly view
     partnerMaterial: null,
     partnerTarget: null,                  // material look the partner is tweening toward
@@ -1613,6 +1614,7 @@ function snapShapeState() {
         rimStyle: state.rimStyle,
         heightScale: state.heightScale,
         lidMaxY: state.lidMaxY,
+        lidBaseRatio: state.lidBaseRatio,
     };
 }
 // Call BEFORE a mutation, once per user action — at the START of a drag,
@@ -1633,6 +1635,7 @@ function undoShape() {
     state.rimScallop = snap.rimScallop || 0;
     state.rimStyle = snap.rimStyle || "cut";
     state.lidMaxY = snap.lidMaxY;
+    state.lidBaseRatio = snap.lidBaseRatio || 1;
     // Height lives on the group transform, not the profile, so it has to be
     // pushed back through the setter to move the mesh and the partner lid.
     if (Math.abs((snap.heightScale ?? 1) - state.heightScale) > 1e-4) {
@@ -2058,7 +2061,7 @@ function init() {
             displace, displaceInfo: () => ({ active: displaceActive }),
             setAlterMode, alterToward, applyFacets, clearDisplace, writeProfileToGeometry,
             cycleScallop, cycleFacets,
-            setRimStyle, computeStyledProfile, RIM_STYLE_IDS,
+            setRimStyle, computeStyledProfile, RIM_STYLE_IDS, rimRadiusOf,
             setPhase, advanceStage, stepBack, setBrush, setGlaze, setShape, setLidStyle,
             startFiringMoment, endFiringMoment,
             // Reduced motion can't be emulated from a page script, so expose
@@ -3763,6 +3766,16 @@ function seedLidForRim(rimR, style) {
     state.lidMaxY = lidCapY(controls);
     applyControlsToProfile(controls);
     smoothLidApex();
+    // A seeded lid's base ring comes out slightly WIDER than the rim it was
+    // cut for (~1.07x on the current styles) — a lid overhangs the lip
+    // rather than sitting flush inside it, which is how a real one sits.
+    // The exact figure is emergent: the control points scale linearly with
+    // rimR, but the spline interpolation onto the row grid decides the final
+    // row-1 radius. Record the ratio here so matchLidRim can aim at the same
+    // fit instead of assuming flush — it used to rescale to exactly the rim,
+    // which shaved the overhang off a correctly-sized lid every time it was
+    // pressed and left the lid dropping into the opening.
+    state.lidBaseRatio = rimR > 0 ? profile[1] / rimR : 1;
 }
 
 // Round off the lid's apex so it doesn't render as a pinprick. The
@@ -8002,6 +8015,9 @@ function capturePieceState() {
         finish: state.finish,
         firingType: state.firingType,
         kiln: state.kiln ? { ...state.kiln } : null,
+        // Can't be recomputed from the silhouette the way lidMaxY is — it
+        // needs the rim the lid was originally cut for — so it rides along.
+        lidBaseRatio: state.lidBaseRatio,
         dips: state.dips.map((d) => ({ ...d })),
         decoCanvas: decoCopy,
         paintCanvas: paintCopy,
@@ -8044,6 +8060,7 @@ function restorePieceState(saved) {
     // cap check at sculptToward is a no-op and the lid can regrow
     // above its collapsed rings.
     state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
+    state.lidBaseRatio = saved.lidBaseRatio || 1;
     // Restore the baked freehand layer + placements. Older captured states
     // (and disk-loaded partners) carry only the flattened composite — treat
     // it as the baked layer with no movable placements.
@@ -8458,7 +8475,8 @@ function makeLidPartner() {
     if (state.clayState !== "leather" && state.clayState !== "wet") return;
     if (state.isLid) return;          // already a lid
     if (state.savedPot) return;       // a partner already exists
-    const rimR = profile[ROWS];
+    // Size the lid to the rim the pot actually SHOWS, not its raw top row.
+    const rimR = rimRadiusOf(profile, state.rimStyle);
     state.savedPot = capturePieceState();
     state.isLid = true;
     // The shaping history belongs to the POT that was just parked. Carrying
@@ -8506,7 +8524,11 @@ function setLidStyle(style) {
     state.lidStyle = style;
     if (reseeds) {
         pushShapeHistory();   // reseeding replaces the lid silhouette — undoable
-        const rimR = (state.savedPot && state.savedPot.profile) ? state.savedPot.profile[ROWS] : profile[ROWS];
+        // Reseed against the pot's DRAWN rim. The fallback is the lid's own
+        // profile, which carries no rim style — pass null so it's read raw.
+        const rimR = (state.savedPot && state.savedPot.profile)
+            ? rimRadiusOf(state.savedPot.profile, state.savedPot.rimStyle)
+            : rimRadiusOf(profile, null);
         seedLidForRim(rimR, style);
         profileDirty = true;
         clearDeco();
@@ -8547,6 +8569,37 @@ function updateLidStylePicker() {
 // So "cut" is a true no-op that restores the sculpted edge exactly,
 // switching styles never compounds, and the transform is idempotent.
 const _styledProfile = new Float32Array(ROWS + 1);
+// The radius of a pot's rim AS DRAWN. RIM_STYLES are applied at render time
+// by computeStyledProfile, so the raw profile's top row is NOT where the lip
+// actually sits: measured against a default vase, flared reads ~47% wider
+// than the raw value and collared ~45% narrower, with rolled at -38% and
+// rounded at -18%. Sizing a lid off the raw profile therefore fits it to a
+// rim the pot doesn't have. Only "cut" agrees — the default, and the only
+// style that existed before rim styles landed — which is why lid fitting
+// looked correct until someone used one of the new ones.
+//
+// Pass a null style for a LID profile: lids are never rim-styled, and
+// running a lid through a pot's style would invent a lip it doesn't have.
+//
+// This applies the style function to the rim row DIRECTLY rather than going
+// through computeStyledProfile, which is not pure: its clamp calls
+// maxRadiusAt, and maxRadiusAt returns 0 for anything above a lid's cap
+// whenever state.isLid is set. Asking it about a POT's profile while a LID
+// is the live piece — precisely what matchLidRim does — collapsed every
+// styled rim to ALTER_MIN_R (0.03), so the match silently no-opped on its
+// `newRim <= MIN_R` guard and the button appeared to do nothing.
+//
+// Safe to skip the rest of computeStyledProfile: its two smoothing passes
+// only touch the anchor junction (rows a..a+3), never the rim row, and the
+// upper clamp never binds for a rim radius on a normal pot.
+function rimRadiusOf(profileArr, rimStyle) {
+    if (!profileArr) return 0;
+    const f = (rimStyle && RIM_STYLES[rimStyle]) || null;
+    if (!f) return profileArr[ROWS];
+    const a = ROWS - RIM_ZONE_ROWS;
+    if (a < 1) return profileArr[ROWS];
+    return THREE.MathUtils.clamp(f(profileArr[a], 1), ALTER_MIN_R, MAX_R);
+}
 function computeStyledProfile(src, rimStyle, isLid) {
     const f = (!isLid && rimStyle && RIM_STYLES[rimStyle]) ? RIM_STYLES[rimStyle] : null;
     if (!f) return src;                 // cut / lid → the pure profile, untouched
@@ -8619,12 +8672,19 @@ function matchLidRim() {
     // always pinned to 0; row 1 is the first real radius of the lid
     // and corresponds to the "sits on pot" contact ring). profile[ROWS]
     // for the lid is the APEX (= 0), not the base.
-    const newRim = state.savedPot.profile ? state.savedPot.profile[ROWS] : 0;
+    // The DRAWN rim, not the raw top row — see rimRadiusOf. Matching against
+    // the raw value fitted the lid to a lip the pot doesn't have, which on a
+    // collared pot meant a lid ~45% too wide and on a flared one ~32% too narrow.
+    const newRim = rimRadiusOf(state.savedPot.profile, state.savedPot.rimStyle);
+    // Aim at the same fit seeding produces — rim x the overhang ratio — not
+    // flush against the rim. Older saves predate the recorded ratio; 1 keeps
+    // their existing behaviour rather than silently resizing a loaded lid.
+    const target = newRim * (state.lidBaseRatio || 1);
     const oldBase = profile[1];
-    if (newRim <= MIN_R || oldBase <= MIN_R) return;
-    if (Math.abs(newRim - oldBase) < 1e-4) return;
+    if (target <= MIN_R || oldBase <= MIN_R) return;
+    if (Math.abs(target - oldBase) < 1e-4) return;
     pushShapeHistory();   // refitting rescales the whole lid — undoable
-    const ratio = newRim / oldBase;
+    const ratio = target / oldBase;
     for (let r = 0; r <= ROWS; r++) profile[r] *= ratio;
     clampProfile();
     state.lidMaxY = lidCapFromProfile(profile);
