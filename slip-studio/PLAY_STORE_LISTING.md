@@ -1,4 +1,4 @@
-# Slip Studio — v2.7.0 release notes + Google Play Store listing
+# Slip Studio — v2.8.0 release notes + Google Play Store listing
 
 Copy-paste source for the **Play Console Main store listing** and the public
 v2.2 release notes. Voice = calm, confident, minimal — matches the app's own
@@ -43,66 +43,79 @@ A calm 3D pottery studio. No ads, no upsells, no internet needed.
 
 ## Full description  (max 4000 chars)
 
-> Written against **web v224 / v2.7.0 (vc22)**. Every count below was read out
-> of `main.js`, not estimated — see "v2.7.0 full feature list" at the bottom for
-> the source of each number. **If you change the feature set, change this copy in
+> Written against **web v235 / v2.8.0 (vc23)**. Every count below was read out
+> of `main.js`, not estimated — see the full feature list at the bottom for the
+> source of each number. **If you change the feature set, change this copy in
 > the same commit.** Promising a tool that isn't in the build is a refund.
+>
+> ⚠ **What is live right now is only the first two paragraphs of this block**
+> (verified on the store page 2026-08-04): the "calm place to shape clay" opener
+> and the "Pull a vase, a bowl, a cup, or a bottle…" paragraph, and nothing
+> after it. That is ~470 characters out of Play's 4,000. Everything below —
+> the ad-free/no-IAP/offline promise, the feature words search runs on, and the
+> entire v2.3–v2.8 surface — has never been on the listing. With 10+ lifetime
+> downloads, discovery is the bigger problem than retention, and this is the
+> cheapest lever on it: no build, no upload, just a paste.
 
 ```
 Slip Studio is a calm place to shape clay.
 
-Pull a pot from a slow-turning wheel with your finger. Glaze it, decorate it, fire it in the kiln, and keep it on a shelf that lives on your device — not on a server.
+Pull a pot from a slow-turning wheel with your finger. Glaze it, decorate it, fire it, and keep it on a shelf that lives on your device — not on a server.
 
-There is no score, no timer, no progress bar, no daily quest, no streak, and no notification. Slip Studio is a studio, not a game. If you want goals and levels, this isn't that. It's a quiet place to make things.
+No score, no timer, no daily quest, no streak, no notification. Slip Studio is a studio, not a game. If you want goals and levels, this isn't that.
 
-TRY THE WHOLE THING FREE FIRST
-The full studio runs in any browser at madderverse.org/slip-studio — no download, no account, nothing to buy. Try it before you pay. The app adds offline play, immersive fullscreen, and a portfolio that's yours for good.
+TRY IT FREE FIRST
+The whole studio runs in any browser at madderverse.org/slip-studio — no download, no account, nothing to buy. Try it before you pay. The app adds offline play and fullscreen.
 
 SHAPING
 • 11 starter forms: vase, bowl, cup, bottle, jar, egg, planter, goblet, bud vase, mug, and teapot with a pouring spout
-• Grab the wall to push clay in or out; grab the rim to raise or flare it. Clay lags your finger like real wet stoneware.
+• Grab the wall to push clay in or out, the rim to raise or flare it. Clay lags your finger like real wet stoneware.
 • Alter the form off-round — dent, oval, or bulge one side
-• Facet the wall into 6, 8, or 12 panels
-• Scallop the rim into 6, 8, or 12 waves
+• Facet the wall or scallop the rim, 6, 8 or 12 around
 • Five rim finishes: cut, rounded, flared, rolled, collared
-• Pull one or two handles onto the pot and drag to reshape them
+• Pull one or two handles onto the pot and drag to reshape
 • Trim the foot at leather-hard
-• Undo while shaping, trimming, glazing, and decorating
+• Undo while shaping, trimming, glazing and decorating
 
 GLAZING
 • 48 glazes in six palettes — Studio, Modern, Garden, Jewel, Sorbet, and Stoneware (speckled and crackle surfaces)
 • Dip from the rim down and let the drips run, or pour one of 30 ready-made gradients from five themed sets
-• Real glaze chemistry: overlap two dips and the overlap fires as a third colour you didn't pick. Every pair you find is logged in a recipe journal.
+• Real glaze chemistry: overlap two dips and the overlap fires as a third colour you didn't pick. 72 reactions to find, each one logged in a recipe journal.
+• A wall of test tiles for trying pairs without using up a pot — dip, fire a rack of six, pin the results up
 • Three fired finishes: glossy, matte, or lustre
 • Wax resist — mask an area and it keeps the colour underneath while later dips run off it
 
 DECORATING
 • Paint and splatter in 32 colours across four palettes
 • Carve sgraffito through the glaze, with real groove depth
-• Slip trailing: pipe a raised bead of clay onto the surface
-• 42 motifs in seven packs — sumi-e animals and plants, dogs, Dutch berries, Roman figures, Egyptian hieroglyphs, mythical creatures. Place one as a tinted silhouette or in full colour, and drag it where you want it.
+• Slip trailing: pipe a raised bead of clay
+• 42 motifs in seven packs — sumi-e animals and plants, dogs, Dutch berries, Roman figures, Egyptian hieroglyphs, mythical creatures. Place one as a silhouette or in full colour.
 • 25 repeating patterns in four packs: enamel, frescoes, shima-shima, art nouveau
-• Six friezes that wrap the pot as a band
+• Six friezes that wrap the pot
 • Or bring in your own picture — it becomes a silhouette on your device and is never uploaded
 
 THE KILN
 The chamber closes around the scene, glows warm, and melts the raw chalky coat into a finished surface.
 
+• Fire electric for exactly what you glazed, or let the kiln have a say: wood lays ash and flame-marks down the side that faced the fire, soda blushes the surface, raku smokes and crazes.
+• Fire it again: put a finished pot back through in a different firing. Your original is kept, so nothing you like is ever at risk.
+• Pack a shelf and fire up to six pots together. Where each one stands changes how it comes out: the front catches nearly twice the marking of the back.
+
 LIDS AND SETS
-Add a lid in four styles — flat, domed, tall, or pointed — shape it against the pot, and fire the two as a set. A gradient poured over a set runs unbroken from the top of the lid to the foot of the pot.
+Add a lid in four styles — flat, domed, tall or pointed — shape it against the pot and fire the two as a set. A gradient poured over a set runs unbroken from the lid's top to the pot's foot.
 
 KEEPING WHAT YOU MAKE
-• A portfolio on your device, sorted onto named shelves you make yourself
+• A portfolio on your device, sorted onto shelves you name yourself
 • Display mode — full screen, no interface, turning slowly on its backdrop
 • Photo export in five framings and three shapes: square, feed, or phone wallpaper
 • Export a whole shelf as one keepsake photo
-• 18 backdrops in six categories. Three come installed; the rest are free downloads you opt into one at a time, so the video backdrops only land on your phone if you want them.
+• 18 backdrops in six categories — three installed, the rest free opt-in downloads
 
 PAID ONCE. NOTHING ELSE.
-No ads — not banner, not interstitial, not "rewarded." No subscription, no in-app purchases, nothing to unlock. No account and no sign-in. No analytics, no third-party code, no advertising ID. Everything you make stays on your device, and the whole studio works offline.
+No ads. No subscription, no in-app purchases, nothing to unlock. No account, no sign-in, no analytics, no third-party code, no advertising ID. Everything you make stays on your device, and it all works offline.
 
 MADE BY MAD SUNDAR LLC
-Slip Studio is part of The Madderverse, a small collection of ad-free apps made by a parent who got tired of creative apps stuffed with timers and upsells. We don't do engagement traps. We do pots.
+Part of The Madderverse, a small collection of ad-free apps made by a parent tired of creative apps stuffed with timers and upsells. We don't do engagement traps. We do pots.
 
 Questions or data requests: hello@madderverse.org
 ```
