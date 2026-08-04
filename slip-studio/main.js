@@ -5763,6 +5763,15 @@ function stageLabelText() {
 // back button (hidden at the ends), the brush bar (wet sculpting +
 // leather-hard trimming), and the glaze palette (only while bone-dry
 // / decorating).
+// True when the active piece is a lid sitting at an EARLIER stage than the
+// pot it belongs to — the "added a lid from Decorate" case. Stated as its
+// own function because the advance button's visibility rule is the only
+// thing standing between that lid and a dead end.
+function lidIsBehindPartner() {
+    if (!state.isLid || !state.savedPot) return false;
+    return PHASES.indexOf(state.savedPot.clayState) > PHASES.indexOf(state.clayState);
+}
+
 function updateToolbar() {
     const cs = state.clayState;
     const label = document.getElementById("stageLabel");
@@ -5775,9 +5784,18 @@ function updateToolbar() {
         advance.textContent = ADVANCE_LABEL[cs];
         // The advance button only PROGRESSES the clay arc (Dry → Fire). At
         // fired there's nothing to progress — starting over is the corner
-        // "New pot" (title) button — so hide it. Also hidden on the lid screen
-        // (the pot's Dry/Fire carries the lid along).
-        advance.hidden = cs === "fired" || (state.isLid && cs !== "fired");
+        // "New pot" (title) button — so hide it.
+        //
+        // On a lid it's normally hidden too: the pot's Dry/Fire carries the
+        // lid along (v151). That assumed lids are born at wet ALONGSIDE the
+        // pot. A lid added from Decorate isn't — makeLidPartner seeds it at
+        // wet while the pot stays at leather, so it starts a stage behind,
+        // and with no advance button there was no way to dry it. No dry
+        // meant no Decorate tray, so it could never be glazed: the pot's
+        // Fire promoted it silently and it came out of the kiln bare.
+        // Show the advance while a lid is behind its partner so it can
+        // catch up; once level, the pot drives again.
+        advance.hidden = cs === "fired" || (state.isLid && !lidIsBehindPartner());
     }
     // The corner return arrow becomes a "New pot" pill once fired (starting
     // over = returnToTitle → reset + shape picker); a round ↩ icon otherwise.
