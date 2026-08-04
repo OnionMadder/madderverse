@@ -5335,7 +5335,11 @@ async function fireKilnLoad() {
                 ts: Date.now(),
                 thumb: captureThumb(),
                 setId: null,               // a load fires pieces individually
-                title: entry.title || defaultPotTitle(),
+                // Keep the original's name (it may have been renamed by
+                // hand) but tag the firing, so a load doesn't fill the
+                // gallery with pieces indistinguishable from their sources.
+                // defaultPotTitle already tags itself — don't double up.
+                title: entry.title ? firingSuffix(state.kiln, entry.title) : defaultPotTitle(),
                 collectionId: entry.collectionId || null,
             });
             made++;
@@ -7810,8 +7814,28 @@ function defaultPotTitle() {
     // Reuse the gallery's glaze/dip naming against the live state so a DIPPED
     // pot is named by its dip (Ocean, Rainbow, …) — not "Bare clay".
     const look = glazeNameFor({ glaze: state.glaze, dips: state.dips });
-    if (look === "Bare clay") return `Bare-clay ${base.toLowerCase()}`;
-    return `${base} in ${look}`;
+    const name = look === "Bare clay" ? `Bare-clay ${base.toLowerCase()}` : `${base} in ${look}`;
+    // Name the firing when the kiln had a say. Without this a pot and its
+    // own re-fire save under the SAME title — and since re-firing exists so
+    // you can compare the two, a gallery that can't tell them apart defeats
+    // the feature. Electric stays unmarked: it's the plain case, and every
+    // pot made before firing types existed is electric.
+    return firingSuffix(state.kiln, name);
+}
+// Shared by the live title and the kiln-load members, which title pieces
+// from a saved entry rather than from live state.
+function firingSuffix(kiln, name) {
+    // Idempotent: strip a tag we added earlier before adding one, or
+    // re-firing a re-fire stacks up "Jar in Ocean · Wood · Raku". Also means
+    // re-firing a wood pot back to electric correctly drops the tag.
+    let base = name;
+    for (const id of FIRING_IDS) {
+        const tag = ` · ${FIRINGS[id].label}`;
+        if (base.endsWith(tag)) { base = base.slice(0, -tag.length); break; }
+    }
+    if (!kiln || !kiln.type || kiln.type === "electric") return base;
+    const label = (FIRINGS[kiln.type] || {}).label || kiln.type;
+    return `${base} · ${label}`;
 }
 
 // Everything that describes ONE piece — geometry, glaze, decoration
