@@ -165,9 +165,27 @@ Slip Studio v2.5 — glaze chemistry, wax resist, and a gallery for your pots.
 Still ad-free. No purchases. No internet needed.
 ```
 
-## What's new  (v2.7.0 / vc22 — THIS RELEASE, paste into Play Console "What's new")
+## What's new  (v2.8.0 / vc23 — THIS RELEASE, paste into Play Console "What's new")
 
-Covers web **v137 → v224** in one upload — everything since the live vc13 (web
+The replayability release: web **v225 → v232**. Everything here is about
+having a reason to open the app again — a place to experiment cheaply, and a
+kiln that no longer gives you back exactly what you put in. 476 chars.
+
+```
+Slip Studio v2.8 — the kiln gets a say.
+
+• Wood, soda and raku firings. Ash, flashing, smoke and crackle — the kiln adds its own marks.
+• Fire it again: put a finished pot back through in a different firing. Your original is kept.
+• Kiln loads: pack a shelf and fire up to six pots together. Where each one stands changes how it comes out.
+• A test-tile wall for trying glaze pairs without using a pot.
+• 72 glaze reactions to discover, up from 21.
+
+Still ad-free. No purchases. No internet needed.
+```
+
+## What's new  (v2.7.0 / vc22 — shipped 2026-08-01, for history)
+
+Covered web **v137 → v224** in one upload — everything since the live vc13 (web
 v136), including the six builds that were staged but never shipped (vc14–vc21).
 490 chars, inside Play's 500-char limit.
 
