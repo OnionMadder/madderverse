@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=231" />
+    <link rel="stylesheet" href="style.css?v=232" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -433,10 +433,48 @@
         </div>
     </div>
 
+    <!-- Kiln load: pack a shelf with finished pots and fire them together.
+         Where a piece stands changes what comes out of it — front catches
+         the flame, the bottom shelf sits in the run. Like re-firing, this
+         is never destructive: each piece is saved as a NEW entry and the
+         originals stay in the gallery untouched. -->
+    <div class="gallery" id="kilnLoadModal" role="dialog" aria-label="Kiln load" hidden>
+        <div class="gallery-bar">
+            <span class="gallery-title">Kiln load <span class="recipe-count" id="kilnLoadCount"></span></span>
+            <span class="gallery-bar-right">
+                <button class="tool-btn" id="kilnLoadClear" type="button">Unpack</button>
+                <button class="tool-btn" id="kilnLoadClose" type="button">Close</button>
+            </span>
+        </div>
+        <div class="kiln-scroll">
+            <p class="kiln-note">Pots on the same shelf come out differently depending on where they stand. Your saved pots are kept — a firing makes new ones.</p>
+            <div class="kiln-shelf" id="kilnShelf">
+                <div class="kiln-fire-side" aria-hidden="true"><span>the fire</span></div>
+                <div class="kiln-grid" id="kilnGrid" role="group" aria-label="Kiln shelf"></div>
+            </div>
+            <div class="kiln-firing" id="kilnLoadFirings" role="group" aria-label="Firing type"></div>
+        </div>
+        <div class="kiln-actions">
+            <button class="tool-btn kiln-fire-btn" id="kilnLoadFire" type="button" disabled>Fire the load</button>
+        </div>
+    </div>
+
+    <!-- Piece picker for a shelf slot. -->
+    <div id="kilnPickModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="Choose a pot" hidden>
+        <div class="confirm-modal-card">
+            <p class="confirm-modal-message" id="kilnPickTitle">Put a pot here</p>
+            <div class="kiln-pick-list" id="kilnPickList"></div>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn" id="kilnPickCancel" type="button">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <div class="gallery" id="gallery" role="dialog" aria-label="Your pots" hidden>
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
             <span class="gallery-bar-right">
+                <button class="tool-btn" id="galleryKilnLoad" type="button" title="Pack a kiln shelf and fire several pots together">Kiln load</button>
                 <button class="tool-btn" id="galleryRecipes" type="button" title="Test tiles and the glaze recipes you've found">The wall</button>
                 <button class="tool-btn" id="galleryShelfBtn" type="button" title="Save all your pots as one shelf photo">Shelf photo</button>
                 <button class="tool-btn" id="galleryViewToggle" type="button">Grid</button>
@@ -522,7 +560,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=231"></script>
+    <script type="module" src="main.js?v=232"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

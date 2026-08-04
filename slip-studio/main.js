@@ -1898,6 +1898,14 @@ function init() {
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
     document.getElementById("galleryRecipes")?.addEventListener("click", () => openWall("wall"));
+    document.getElementById("galleryKilnLoad")?.addEventListener("click", () => openKilnLoad());
+    document.getElementById("kilnLoadClose")?.addEventListener("click", () => closeKilnLoad());
+    document.getElementById("kilnLoadClear")?.addEventListener("click", () => emptyKilnLoad());
+    document.getElementById("kilnLoadFire")?.addEventListener("click", () => fireKilnLoad());
+    document.getElementById("kilnPickCancel")?.addEventListener("click", () => closeKilnPick());
+    document.getElementById("kilnPickModal")?.addEventListener("click", (e) => {
+        if (e.target && e.target.id === "kilnPickModal") closeKilnPick();
+    });
     document.getElementById("wallClose")?.addEventListener("click", closeWall);
     document.getElementById("wallTabWall")?.addEventListener("click", () => setWallTab("wall"));
     document.getElementById("wallTabRecipes")?.addEventListener("click", () => setWallTab("recipes"));
@@ -2103,6 +2111,15 @@ function init() {
             // and hope.
             setFiring, buildFiringBar, paintKilnEffects, FIRINGS, FIRING_IDS,
             openRefire, closeRefire, refirePot,
+            // Kiln loads. fireKilnLoad is async and cycles pieces through the
+            // live studio, so a test needs to await it and inspect the shelf.
+            openKilnLoad, closeKilnLoad, fireKilnLoad, emptyKilnLoad,
+            openKilnPick, closeKilnPick, renderKilnGrid, slotFx, slotLabel,
+            KILN_SLOTS, KILN_COLS,
+            kilnLoad: () => kilnLoad.slice(),
+            setKilnSlot: (i, id) => { kilnLoad[i] = id; return renderKilnGrid(); },
+            setLoadFiring: (t) => { kilnLoadFiring = t; buildKilnFirings(); },
+            loadFiring: () => kilnLoadFiring,
             kilnInfo: () => (state.kiln ? { ...state.kiln } : null),
             setKiln: (type, seed) => {
                 state.kiln = type ? { type, seed: seed >>> 0 } : null;
@@ -2619,8 +2636,33 @@ const KILN_ASH_COLOR   = 0xb08a4a;   // wood ash, warm and translucent
 const KILN_FLAME_COLOR = 0xc26a2f;   // flashing on the side facing the fire
 const KILN_SODA_COLOR  = 0xd8c4a0;   // vapour blush
 const KILN_SMOKE_COLOR = 0x231e1a;   // raku carbon
+// Where a piece STOOD in the kiln, for a load fired on a shelf. 2 rows x 3
+// columns; column 0 is nearest the firebox, row 0 is the top shelf.
+//
+// `slot == null` is a lone piece and MUST reproduce the original single-pot
+// look exactly — intensity 1 and the same vertical weighting — or every pot
+// already saved would change appearance the next time it loaded.
+const KILN_COLS = 3, KILN_ROWS = 2, KILN_SLOTS = KILN_COLS * KILN_ROWS;
+function slotFx(slot) {
+    if (slot == null) return { intensity: 1, high: null };   // null => original path
+    const row = Math.floor(slot / KILN_COLS), col = slot % KILN_COLS;
+    return {
+        // Nearer the firebox catches more of everything.
+        intensity: [1.32, 1.0, 0.66][col],
+        // Top shelf takes falling ash on its shoulders; the bottom shelf is
+        // sheltered but everything runs further down it.
+        high: row === 0,
+    };
+}
+function slotLabel(slot) {
+    if (slot == null) return "";
+    const row = Math.floor(slot / KILN_COLS), col = slot % KILN_COLS;
+    return `${row === 0 ? "Top" : "Bottom"} shelf, ${["front", "middle", "back"][col]}`;
+}
 function paintKilnEffects(ctx, kiln) {
     if (!ctx || !kiln || !kiln.type || kiln.type === "electric") return;
+    const fx = slotFx(kiln.slot);
+    const K = fx.intensity;                      // alpha multiplier
     const rng = mulberry32((kiln.seed || 1) ^ 0x85ebca6b);
     // Where the flame came from. Everything directional keys off this, so
     // one pot's marks all agree about which side faced the fire.
@@ -2640,10 +2682,15 @@ function paintKilnEffects(ctx, kiln) {
         for (let i = 0; i < count; i++) {
             const x = rng() * GLAZE_W, y = rng() * GLAZE_H;
             const top = 1 - y / GLAZE_H;                       // 1 rim, 0 foot
-            const w = facing(x) * (0.35 + 0.65 * top);
+            // high === null is a lone piece: keep the original weighting so
+            // pots saved before shelves existed reload unchanged.
+            const vert = fx.high === null ? (0.35 + 0.65 * top)
+                       : fx.high         ? (0.28 + 0.72 * top)     // top shelf: ash falls on it
+                                         : (0.55 + 0.45 * (1 - top)); // bottom: it runs down
+            const w = facing(x) * vert;
             if (rng() > w * 0.9) continue;
             const r = 6 + rng() * 26;
-            ctx.fillStyle = rgba(KILN_ASH_COLOR, 0.020 + rng() * 0.045 * w);
+            ctx.fillStyle = rgba(KILN_ASH_COLOR, (0.020 + rng() * 0.045 * w) * K);
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
             ctx.fill();
@@ -2656,7 +2703,7 @@ function paintKilnEffects(ctx, kiln) {
             const y0 = GLAZE_H * (0.15 + rng() * 0.4);
             const len = GLAZE_H * (0.22 + rng() * 0.3);
             const g = ctx.createLinearGradient(0, y0, 0, y0 + len);
-            g.addColorStop(0, rgba(KILN_FLAME_COLOR, 0.16 + rng() * 0.1));
+            g.addColorStop(0, rgba(KILN_FLAME_COLOR, (0.16 + rng() * 0.1) * K));
             g.addColorStop(1, rgba(KILN_FLAME_COLOR, 0));
             ctx.fillStyle = g;
             const w = 14 + rng() * 26;
@@ -2670,7 +2717,7 @@ function paintKilnEffects(ctx, kiln) {
         for (let i = 0; i < count; i++) {
             const x = rng() * GLAZE_W, y = rng() * GLAZE_H;
             const r = 0.8 + rng() * 2.2;
-            ctx.fillStyle = rgba(KILN_SODA_COLOR, 0.05 + rng() * 0.09);
+            ctx.fillStyle = rgba(KILN_SODA_COLOR, (0.05 + rng() * 0.09) * K);
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
             ctx.fill();
@@ -2681,7 +2728,7 @@ function paintKilnEffects(ctx, kiln) {
             const w = facing(x);
             if (rng() > w) continue;
             const r = 18 + rng() * 46;
-            ctx.fillStyle = rgba(KILN_SODA_COLOR, 0.012 + rng() * 0.03 * w);
+            ctx.fillStyle = rgba(KILN_SODA_COLOR, (0.012 + rng() * 0.03 * w) * K);
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
             ctx.fill();
@@ -2692,10 +2739,14 @@ function paintKilnEffects(ctx, kiln) {
         for (let i = 0; i < 900; i++) {
             const x = rng() * GLAZE_W, y = rng() * GLAZE_H;
             const low = y / GLAZE_H;                            // 1 at the foot
-            const w = (1 - facing(x)) * (0.3 + 0.7 * low);
+            // Bottom shelf sits in the thickest smoke; the top shelf less so.
+            const vert = fx.high === null ? (0.3 + 0.7 * low)
+                       : fx.high         ? (0.24 + 0.56 * low)
+                                         : (0.42 + 0.72 * low);
+            const w = (1 - facing(x)) * vert;
             if (rng() > w) continue;
             const r = 10 + rng() * 34;
-            ctx.fillStyle = rgba(KILN_SMOKE_COLOR, 0.02 + rng() * 0.06 * w);
+            ctx.fillStyle = rgba(KILN_SMOKE_COLOR, (0.02 + rng() * 0.06 * w) * K);
             ctx.beginPath();
             ctx.arc(x, y, r, 0, Math.PI * 2);
             ctx.fill();
@@ -2709,7 +2760,7 @@ function paintKilnEffects(ctx, kiln) {
             let ang = rng() * Math.PI * 2;
             const seg = 10 + Math.floor(rng() * 12);
             const step = (0.4 + rng() * 0.8) * (GLAZE_H / seg);
-            ctx.strokeStyle = rgba(KILN_SMOKE_COLOR, 0.16 + rng() * 0.2);
+            ctx.strokeStyle = rgba(KILN_SMOKE_COLOR, (0.16 + rng() * 0.2) * K);
             ctx.lineWidth = 0.6 + rng() * 0.8;
             ctx.beginPath();
             ctx.moveTo(x, y);
@@ -5076,6 +5127,229 @@ function refirePot(type) {
     haptic(30);
     startFiringMoment();    // the vignette closes over the change and reveals it
     updateToolbar();        // hides Save/Photo/Display for the duration
+}
+
+// --- Kiln loads ---------------------------------------------------
+// Pack a shelf with finished pots and fire them together, where each piece
+// stands somewhere: front catches the flame, the bottom shelf sits in the
+// run. One firing, six different results.
+//
+// The app renders ONE editable piece plus an optional partner, so a literal
+// six-mesh kiln interior would mean six sets of deco/dip/bump canvases —
+// tens of MB of texture on a phone, for a view you look at once. It doesn't
+// need that. The shelf is staged from the thumbnails the gallery already
+// has, and the firing runs pieces through the live studio ONE AT A TIME:
+// load, apply that slot's kiln, capture a fresh thumb, write a new entry.
+// Same guarantee as re-firing — the originals are never touched.
+let kilnLoad = new Array(KILN_SLOTS).fill(null);   // entry ids by slot
+let kilnLoadFiring = DEFAULT_FIRING;
+let kilnPickSlot = -1;
+let kilnFiring = false;                            // a load is being processed
+
+function kilnLoadFilled() { return kilnLoad.filter(Boolean).length; }
+
+async function openKilnLoad() {
+    // Loading pieces through the studio discards whatever is on the wheel.
+    if (state.dirty && !(await showConfirm(
+        "Firing a load will clear the pot you're working on. Discard it?",
+        { confirmLabel: "Discard", cancelLabel: "Keep editing" }))) return;
+    kilnLoadFiring = state.firingType && state.firingType !== "electric"
+        ? state.firingType : "wood";   // electric on a shared shelf is a no-op
+    await renderKilnGrid();
+    buildKilnFirings();
+    const m = document.getElementById("kilnLoadModal");
+    if (m) { m.hidden = false; trapFocus(m); }
+}
+function closeKilnLoad() {
+    if (kilnFiring) return;            // don't walk out mid-firing
+    const m = document.getElementById("kilnLoadModal");
+    if (m) { m.hidden = true; releaseFocus(m); }
+}
+
+async function renderKilnGrid() {
+    const grid = document.getElementById("kilnGrid");
+    if (!grid) return;
+    let all = [];
+    try { all = await dbAll(); } catch (_) {}
+    const byId = new Map(all.map((e) => [e.id, e]));
+    grid.innerHTML = "";
+    for (let i = 0; i < KILN_SLOTS; i++) {
+        const id = kilnLoad[i];
+        const entry = id ? byId.get(id) : null;
+        if (id && !entry) kilnLoad[i] = null;      // deleted from the gallery
+        const cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "kiln-slot" + (entry ? " is-full" : "");
+        cell.dataset.slot = String(i);
+        cell.setAttribute("aria-label", entry
+            ? `${entry.title || "Pot"} — ${slotLabel(i)}. Tap to remove.`
+            : `Empty. ${slotLabel(i)}. Tap to add a pot.`);
+        if (entry) {
+            const img = document.createElement("img");
+            img.className = "kiln-slot-thumb";
+            img.src = entry.thumb;
+            img.alt = "";
+            cell.appendChild(img);
+        } else {
+            const plus = document.createElement("span");
+            plus.className = "kiln-slot-plus";
+            plus.textContent = "+";
+            cell.appendChild(plus);
+        }
+        const cap = document.createElement("span");
+        cap.className = "kiln-slot-cap";
+        cap.textContent = ["front", "middle", "back"][i % KILN_COLS];
+        cell.appendChild(cap);
+        cell.addEventListener("click", () => {
+            if (kilnFiring) return;
+            if (kilnLoad[i]) { kilnLoad[i] = null; renderKilnGrid(); haptic(8); }
+            else openKilnPick(i);
+        });
+        grid.appendChild(cell);
+    }
+    const n = kilnLoadFilled();
+    const countEl = document.getElementById("kilnLoadCount");
+    if (countEl) countEl.textContent = `${n} / ${KILN_SLOTS}`;
+    const fire = document.getElementById("kilnLoadFire");
+    if (fire) { fire.disabled = kilnFiring || n === 0; fire.textContent = kilnFiring ? "Firing…" : "Fire the load"; }
+    const clear = document.getElementById("kilnLoadClear");
+    if (clear) clear.disabled = kilnFiring || n === 0;
+}
+
+function buildKilnFirings() {
+    const wrap = document.getElementById("kilnLoadFirings");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    const label = document.createElement("span");
+    label.className = "dip-label";
+    label.textContent = "Firing";
+    wrap.appendChild(label);
+    // Electric is excluded on purpose: it's exact by definition, so a shared
+    // shelf would do nothing at all and the feature would read as broken.
+    FIRING_IDS.filter((id) => id !== "electric").forEach((id) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "dip-chip firing-chip";
+        b.dataset.loadFiring = id;
+        b.textContent = FIRINGS[id].label;
+        b.title = FIRINGS[id].blurb;
+        b.addEventListener("click", () => {
+            if (kilnFiring) return;
+            kilnLoadFiring = id;
+            buildKilnFirings();
+            haptic(8);
+        });
+        wrap.appendChild(b);
+    });
+    wrap.querySelectorAll("[data-load-firing]").forEach((b) => {
+        const on = b.dataset.loadFiring === kilnLoadFiring;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+}
+
+async function openKilnPick(slot) {
+    kilnPickSlot = slot;
+    const list = document.getElementById("kilnPickList");
+    const title = document.getElementById("kilnPickTitle");
+    if (title) title.textContent = slotLabel(slot);
+    let all = [];
+    try { all = await dbAll(); } catch (_) {}
+    // One entry per set — a set fires as its pot member, like everywhere else.
+    const seen = new Set();
+    const pots = all.filter((e) => {
+        if (e.setId) { if (seen.has(e.setId)) return false; seen.add(e.setId); }
+        return !kilnLoad.includes(e.id);            // already on the shelf
+    }).reverse();
+    if (list) {
+        list.innerHTML = "";
+        if (!pots.length) {
+            const p = document.createElement("p");
+            p.className = "kiln-pick-empty";
+            p.textContent = all.length ? "Every saved pot is already on the shelf." : "Fire and save a pot first — then you can pack a shelf.";
+            list.appendChild(p);
+        }
+        pots.forEach((e) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "kiln-pick-item";
+            const img = document.createElement("img");
+            img.src = e.thumb; img.alt = "";
+            const cap = document.createElement("span");
+            cap.textContent = e.title || "Pot";
+            b.append(img, cap);
+            b.addEventListener("click", () => {
+                kilnLoad[kilnPickSlot] = e.id;
+                closeKilnPick();
+                renderKilnGrid();
+                haptic(12);
+            });
+            list.appendChild(b);
+        });
+    }
+    const m = document.getElementById("kilnPickModal");
+    if (m) { m.hidden = false; m.classList.add("is-open"); trapFocus(m); }
+}
+function closeKilnPick() {
+    const m = document.getElementById("kilnPickModal");
+    if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
+    kilnPickSlot = -1;
+}
+
+function emptyKilnLoad() {
+    if (kilnFiring) return;
+    kilnLoad = new Array(KILN_SLOTS).fill(null);
+    renderKilnGrid();
+}
+
+// Fire everything on the shelf. One base seed for the load — so every piece
+// agrees which side the fire was on — with the slot mixed in so no two come
+// out the same.
+async function fireKilnLoad() {
+    if (kilnFiring || !kilnLoadFilled()) return;
+    kilnFiring = true;
+    renderKilnGrid();
+    const shelf = document.getElementById("kilnShelf");
+    if (shelf && !reduceMotion) shelf.classList.add("is-firing");
+    playSfx("kiln");
+    haptic(30);
+    const base = (Math.random() * 0xffffffff) >>> 0;
+    const type = kilnLoadFiring;
+    let made = 0;
+    try {
+        if (!reduceMotion) await new Promise((r) => setTimeout(r, 1400));
+        let all = [];
+        try { all = await dbAll(); } catch (_) {}
+        const byId = new Map(all.map((e) => [e.id, e]));
+        for (let i = 0; i < KILN_SLOTS; i++) {
+            const entry = kilnLoad[i] ? byId.get(kilnLoad[i]) : null;
+            if (!entry) continue;
+            // Run this piece through the live studio, mark it, photograph it.
+            await loadPot(entry, { phase: "fired" });
+            state.firingType = type;
+            state.kiln = { type, seed: (base ^ Math.imul(i + 1, 0x9e3779b9)) >>> 0, slot: i };
+            renderDips();
+            await dbPut({
+                ...corePieceFields(),
+                id: Date.now().toString(36) + i.toString(36),
+                ts: Date.now(),
+                thumb: captureThumb(),
+                setId: null,               // a load fires pieces individually
+                title: entry.title || defaultPotTitle(),
+                collectionId: entry.collectionId || null,
+            });
+            made++;
+        }
+    } finally {
+        kilnFiring = false;
+        if (shelf) shelf.classList.remove("is-firing");
+        state.dirty = false;   // everything made is already in the gallery
+        kilnLoad = new Array(KILN_SLOTS).fill(null);
+        await renderKilnGrid();
+    }
+    closeKilnLoad();
+    showToast(made === 1 ? "1 piece out of the kiln" : `${made} pieces out of the kiln`);
+    await openGallery();       // the payoff: the shelf, unpacked
 }
 
 function setFinish(id) {
@@ -10006,8 +10280,13 @@ function onDialogEscape(e) {
     const wall    = document.getElementById("wallModal");
     const gallery = document.getElementById("gallery");
     const refire  = document.getElementById("refireModal");
-    // Innermost first: photo and the wall can both open over the gallery.
+    const kilnPick = document.getElementById("kilnPickModal");
+    const kilnLoadM = document.getElementById("kilnLoadModal");
+    // Innermost first: photo and the wall can both open over the gallery,
+    // and the piece picker opens over the kiln shelf.
+    if (kilnPick && !kilnPick.hidden)  { closeKilnPick();   return; }
     if (refire && !refire.hidden)      { closeRefire();     return; }
+    if (kilnLoadM && !kilnLoadM.hidden){ closeKilnLoad();   return; }
     if (photo && !photo.hidden)        { closePhotoModal(); return; }
     if (wall && !wall.hidden)          { closeWall();       return; }
     if (gallery && !gallery.hidden)    { closeGallery();    return; }

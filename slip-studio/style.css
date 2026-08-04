@@ -2486,6 +2486,126 @@ body.display-mode #coach { display: none !important; }
     pointer-events: none;
 }
 
+/* ---------- Kiln load ---------- */
+/* One scroll container with the Fire row pinned, same shape as the tile
+   wall — a fixed-height block above a scrolling one crushes on a phone. */
+.kiln-scroll { overflow-y: auto; flex: 1; min-height: 0; }
+.kiln-note {
+    margin: 0 2px 14px;
+    color: var(--ink-dim);
+    font-size: 14px;
+    line-height: 1.45;
+    max-width: 520px;
+}
+.kiln-shelf {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    align-items: stretch;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--g-card-border, rgba(255, 255, 255, 0.12));
+}
+/* Which end the flame comes from, so "front" means something. */
+.kiln-fire-side {
+    flex-shrink: 0;
+    width: 26px;
+    border-radius: 9px;
+    background: linear-gradient(180deg, rgba(217, 122, 47, 0.5), rgba(194, 106, 47, 0.16));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.kiln-fire-side span {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 235, 215, 0.85);
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+}
+.kiln-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    flex: 1;
+}
+.kiln-slot {
+    position: relative;
+    appearance: none;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px dashed rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    aspect-ratio: 1 / 1;
+    min-height: 74px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px;
+    color: var(--ink-faint);
+}
+.kiln-slot.is-full { border-style: solid; border-color: var(--g-card-border, rgba(255,255,255,0.16)); background: rgba(255,255,255,0.07); }
+.kiln-slot-thumb { width: 100%; height: 100%; object-fit: contain; min-height: 0; }
+.kiln-slot-plus { font-size: 22px; line-height: 1; opacity: 0.6; }
+.kiln-slot-cap { font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; opacity: 0.5; }
+.kiln-firing { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.kiln-actions {
+    flex-shrink: 0;
+    padding-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+}
+.kiln-fire-btn { min-height: 40px; }
+/* The load going through: a warm pulse over the shelf. Skipped outright
+   under reduced motion — the shelf just refills. */
+.kiln-shelf.is-firing::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 8% 50%, rgba(255, 170, 90, 0.55), rgba(255, 130, 50, 0.16) 60%, transparent 78%);
+    animation: kiln-load-glow 1.4s ease-in-out;
+}
+@keyframes kiln-load-glow {
+    0%   { opacity: 0; }
+    35%  { opacity: 1; }
+    100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .kiln-shelf.is-firing::after { animation: none; opacity: 0; }
+}
+.kiln-pick-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+    gap: 8px;
+    max-height: 46vh;
+    overflow-y: auto;
+    margin-bottom: 12px;
+}
+.kiln-pick-item {
+    appearance: none;
+    background: var(--g-card, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--g-card-border, rgba(255, 255, 255, 0.12));
+    border-radius: 10px;
+    padding: 6px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--ink-dim);
+    font: inherit;
+    font-size: 11px;
+    min-height: 44px;
+}
+.kiln-pick-item img { width: 100%; aspect-ratio: 1/1; object-fit: contain; }
+.kiln-pick-empty { color: var(--ink-faint); font-size: 13px; text-align: center; margin: 6px 0 2px; }
+
 /* ---------- Fire it again ---------- */
 /* The reassurance line is doing real work: someone who thinks re-firing
    might overwrite a pot they like will never press the button. */
