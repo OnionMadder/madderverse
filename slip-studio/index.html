@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=224" />
+    <link rel="stylesheet" href="style.css?v=226" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -245,7 +245,7 @@
              start stays the default, recovery is the offer. -->
         <button id="resumeBtn" class="landing-btn landing-btn-resume" type="button" hidden>Continue your pot</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
-        <button id="landingRecipes" class="landing-link" type="button">Glaze recipes</button>
+        <button id="landingRecipes" class="landing-link" type="button">The wall</button>
         <button id="landingHowto" class="landing-link" type="button">How to play</button>
         <a id="landingAppLink" class="landing-link landing-app-link" href="https://play.google.com/store/apps/details?id=org.madderverse.slipstudio" target="_blank" rel="noopener">Get the Android app &#x2197;</a>
     </div>
@@ -417,7 +417,7 @@
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
             <span class="gallery-bar-right">
-                <button class="tool-btn" id="galleryRecipes" type="button" title="Glaze recipes you've discovered">Recipes</button>
+                <button class="tool-btn" id="galleryRecipes" type="button" title="Test tiles and the glaze recipes you've found">The wall</button>
                 <button class="tool-btn" id="galleryShelfBtn" type="button" title="Save all your pots as one shelf photo">Shelf photo</button>
                 <button class="tool-btn" id="galleryViewToggle" type="button">Grid</button>
                 <button class="tool-btn" id="galleryClose" type="button">Close</button>
@@ -443,15 +443,55 @@
 
     <!-- Glaze recipe journal: the curated dip-chemistry pairs, revealed as
          you discover them at the kiln. A calm collectible, nothing gated. -->
-    <div class="gallery" id="recipeModal" role="dialog" aria-label="Glaze recipes" hidden>
+    <!-- The test-tile wall. Trying a glaze pair on a whole pot is slow, so the
+         recipe journal was effectively undiscoverable (21 curated pairs out of
+         1,128 possible). A rack of small tiles makes experimenting deliberate,
+         the way a real studio's tile wall does. The journal lives here too, as
+         a tab, rather than as a second modal. -->
+    <div class="gallery" id="wallModal" role="dialog" aria-label="The wall" hidden>
         <div class="gallery-bar">
-            <span class="gallery-title">Glaze recipes <span class="recipe-count" id="recipeCount"></span></span>
+            <span class="gallery-title">The wall <span class="recipe-count" id="recipeCount"></span></span>
             <span class="gallery-bar-right">
-                <button class="tool-btn" id="recipeClose" type="button">Close</button>
+                <button class="tool-btn" id="wallClose" type="button">Close</button>
             </span>
         </div>
-        <p class="recipe-intro">Dip one glaze over another, then fire — some pairs react into a whole new colour. Find them all.</p>
-        <div class="recipe-grid" id="recipeGrid"></div>
+        <div class="wall-tabs" role="tablist" aria-label="Wall view">
+            <button class="wall-tab is-active" id="wallTabWall" type="button" role="tab" aria-selected="true">Wall</button>
+            <button class="wall-tab" id="wallTabRecipes" type="button" role="tab" aria-selected="false">Recipes</button>
+        </div>
+
+        <div class="wall-panel" id="wallPanelWall">
+            <div class="wall-tiles" id="wallTiles"></div>
+            <p class="wall-empty" id="wallEmpty">Dip a tile in one glaze, then part-way in a second. Fire the rack and see what the overlap does.</p>
+            <div class="rack" id="rack">
+                <div class="rack-head">
+                    <span class="rack-label">The rack</span>
+                    <button class="tool-btn rack-clear" id="rackClear" type="button">Empty</button>
+                </div>
+                <div class="rack-slots" id="rackSlots" role="group" aria-label="Tiles waiting to be fired"></div>
+                <div class="tile-pick" id="tilePick">
+                    <div class="glaze-pack-tabs" id="tilePackTabs" role="tablist" aria-label="Glaze pack"></div>
+                    <div class="tile-pick-row">
+                        <span class="tile-pick-label">First</span>
+                        <span class="tile-pick-bar" id="tileBarA" role="group" aria-label="First glaze"></span>
+                    </div>
+                    <div class="tile-pick-row">
+                        <span class="tile-pick-label">Then</span>
+                        <span class="tile-pick-bar" id="tileBarB" role="group" aria-label="Second glaze, optional"></span>
+                    </div>
+                </div>
+                <div class="rack-actions">
+                    <div class="tile-preview-wrap"><div class="tile-preview" id="tilePreview"></div></div>
+                    <button class="tool-btn" id="tileAdd" type="button" disabled>Add to rack</button>
+                    <button class="tool-btn rack-fire" id="rackFire" type="button" disabled>Fire the rack</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="wall-panel" id="wallPanelRecipes" hidden>
+            <p class="recipe-intro">Dip one glaze over another, then fire — some pairs react into a whole new colour. Find them all.</p>
+            <div class="recipe-grid" id="recipeGrid"></div>
+        </div>
     </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -462,7 +502,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=224"></script>
+    <script type="module" src="main.js?v=226"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

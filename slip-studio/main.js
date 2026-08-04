@@ -1778,8 +1778,13 @@ function init() {
     document.getElementById("shapeUndo")?.addEventListener("click", undoShape);
     document.getElementById("galleryBtn")?.addEventListener("click", () => openGallery());
     document.getElementById("galleryClose")?.addEventListener("click", closeGallery);
-    document.getElementById("galleryRecipes")?.addEventListener("click", openRecipes);
-    document.getElementById("recipeClose")?.addEventListener("click", closeRecipes);
+    document.getElementById("galleryRecipes")?.addEventListener("click", () => openWall("wall"));
+    document.getElementById("wallClose")?.addEventListener("click", closeWall);
+    document.getElementById("wallTabWall")?.addEventListener("click", () => setWallTab("wall"));
+    document.getElementById("wallTabRecipes")?.addEventListener("click", () => setWallTab("recipes"));
+    document.getElementById("tileAdd")?.addEventListener("click", addRackTile);
+    document.getElementById("rackFire")?.addEventListener("click", fireRack);
+    document.getElementById("rackClear")?.addEventListener("click", emptyRack);
     document.getElementById("galleryShelfBtn")?.addEventListener("click", () => exportShelfPhoto());
     document.getElementById("galleryViewToggle")?.addEventListener("click", () => {
         setGalleryView(state.galleryView === "shelf" ? "compact" : "shelf");
@@ -1902,7 +1907,7 @@ function init() {
     });
     document.getElementById("landingRecipes")?.addEventListener("click", () => {
         dismissLanding();
-        openRecipes();
+        openWall("wall");
     });
     // "How to play": start the studio and replay the coach hands stage by stage.
     document.getElementById("landingHowto")?.addEventListener("click", () => {
@@ -1971,6 +1976,17 @@ function init() {
             loadPot, openGallery, closeGallery, exportShelfPhoto, renderShelfCanvas, captureThumb, stageThumb, keyOutThumbBg, ensureGalleryBgImg,
             dbAll, dbDelete, dismissLanding,
             openRecipes, closeRecipes, checkRecipeDiscoveries, loadDiscoveredRecipes, showToast,
+            // Test-tile wall. The rack fires on a timer and the modal is the
+            // only way in, so these exist to drive + assert it from a page
+            // script (the preview pane pauses rAF; see CLAUDE.md).
+            openWall, closeWall, setWallTab, buildTilePicker,
+            pickTileGlaze, addRackTile, fireRack, emptyRack,
+            recordRecipePairs, announceRecipes, tileBands, tileKey,
+            tiles: () => wallTiles.slice(),
+            rack:  () => wallRack.slice(),
+            tilePick: () => ({ a: tilePickA, b: tilePickB }),
+            clearTiles: () => { wallTiles = []; saveTiles(wallTiles); renderWallTiles(); },
+            fireMs: () => (reduceMotion ? 0 : TILE_FIRE_MS),
             loadCollections, createCollection, assignToCollection, setGalleryFilter, getGalleryFilter, chooseCollection,
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
@@ -8756,14 +8772,14 @@ function loadDiscoveredRecipes() {
 function saveDiscoveredRecipes(set) {
     try { localStorage.setItem(RECIPES_STORE_KEY, JSON.stringify([...set])); } catch (_) {}
 }
-// Scan the just-fired piece's dips for curated reacting pairs. Two single-
-// glaze dips always share the rim band (both coat from the rim down), so a
-// present pair means the reaction actually fired. Records new finds + toasts.
-function checkRecipeDiscoveries() {
-    const ids = [];
-    for (const d of state.dips) if (d && d.fxId && GLAZES[d.fxId]) ids.push(d.fxId);
-    const uniq = [...new Set(ids)];
-    if (uniq.length < 2) return;
+// Record every curated pair present in a set of glaze ids. Shared by the two
+// things that can fire a reaction: a pot whose dips overlap, and a test tile
+// off the rack. Returns the keys newly found (so the caller decides how to
+// announce them — the wall fires six tiles at once and wants one toast, not
+// six). Persists only when something is actually new.
+function recordRecipePairs(ids) {
+    const uniq = [...new Set((ids || []).filter((id) => id && GLAZES[id]))];
+    if (uniq.length < 2) return [];
     const disc = loadDiscoveredRecipes();
     const newly = [];
     for (let i = 0; i < uniq.length; i++) {
@@ -8772,11 +8788,22 @@ function checkRecipeDiscoveries() {
             if (RECIPE_KEY_SET.has(key) && !disc.has(key)) { disc.add(key); newly.push(key); }
         }
     }
-    if (!newly.length) return;
-    saveDiscoveredRecipes(disc);
+    if (newly.length) saveDiscoveredRecipes(disc);
+    return newly;
+}
+function announceRecipes(newly) {
+    if (!newly || !newly.length) return;
     showToast(newly.length === 1
         ? `New glaze recipe: ${RECIPE_NAMES[newly[0]] || "?"} ✨`
         : `${newly.length} new glaze recipes ✨`);
+}
+// Scan the just-fired piece's dips for curated reacting pairs. Two single-
+// glaze dips always share the rim band (both coat from the rim down), so a
+// present pair means the reaction actually fired. Records new finds + toasts.
+function checkRecipeDiscoveries() {
+    const ids = [];
+    for (const d of state.dips) if (d && d.fxId && GLAZES[d.fxId]) ids.push(d.fxId);
+    announceRecipes(recordRecipePairs(ids));
 }
 function hexCss(n) { return "#" + (n >>> 0).toString(16).padStart(6, "0"); }
 function renderRecipeGrid() {
@@ -8818,15 +8845,320 @@ function renderRecipeGrid() {
     }
     if (countEl) countEl.textContent = `${found} / ${RECIPE_KEYS.length}`;
 }
-function openRecipes() {
+// --- The test-tile wall -----------------------------------------
+// Trying a glaze pair meant throwing, glazing and firing a whole pot, so
+// the journal above was effectively undiscoverable: 21 curated pairs out of
+// 1,128 possible combinations. A real studio solves this with a wall of
+// small fired test tiles, and so do we.
+//
+// A tile is FULLY described by its one or two glaze ids — the visual is
+// derived from GLAZES + reactGlaze, never stored. That keeps a tile at ~20
+// bytes (localStorage, no IndexedDB version bump) and means the tile and the
+// pot can never disagree about what a combination looks like.
+const TILES_STORE_KEY = "slip-tiles";
+const RACK_STORE_KEY  = "slip-rack";
+const RACK_SIZE = 6;
+const TILE_FIRE_MS = 1100;
+
+// Sorted so a|b and b|a are one tile. Same key shape as RECIPE_KEYS.
+function tileKey(a, b) { return b ? [a, b].sort().join("|") : a; }
+
+function loadTiles() {
+    try {
+        const a = JSON.parse(localStorage.getItem(TILES_STORE_KEY) || "[]");
+        if (!Array.isArray(a)) return [];
+        return a.filter((t) => t && GLAZES[t.a] && (!t.b || GLAZES[t.b]));
+    } catch (_) { return []; }
+}
+function saveTiles(list) {
+    try { localStorage.setItem(TILES_STORE_KEY, JSON.stringify(list)); } catch (_) {}
+}
+// The rack persists: it's a studio, and leaving work out overnight is what
+// studios are for.
+function loadRack() {
+    try {
+        const a = JSON.parse(localStorage.getItem(RACK_STORE_KEY) || "[]");
+        if (!Array.isArray(a)) return [];
+        return a.filter((t) => t && GLAZES[t.a] && (!t.b || GLAZES[t.b])).slice(0, RACK_SIZE);
+    } catch (_) { return []; }
+}
+function saveRack(list) {
+    try { localStorage.setItem(RACK_STORE_KEY, JSON.stringify(list)); } catch (_) {}
+}
+
+let wallTiles = [];        // fired, newest first
+let wallRack  = [];        // waiting to be fired
+let tilePickA = null;      // picker selection
+let tilePickB = null;
+let rackFiring = false;
+
+// The three bands of a test tile: glaze A alone, the overlap, glaze B alone.
+// reactGlaze resolves curated pairs first and falls back to blendGlaze, so
+// this is the same answer the shader gives on a pot. Raw (unfired) tiles use
+// the chalky pre-kiln colours, which is what makes the firing worth watching.
+function tileBands(a, b, fired) {
+    const key = fired ? "fired" : "raw";
+    const ca = GLAZES[a][key].color;
+    if (!b) return [ca];
+    const cb = GLAZES[b][key].color;
+    const mid = fired ? reactGlaze(ca, cb) : blendGlaze(ca, cb);
+    return [ca, mid, cb];
+}
+function tileFaceCss(a, b, fired) {
+    const c = tileBands(a, b, fired).map(hexCss);
+    if (c.length === 1) return c[0];
+    return `linear-gradient(${c[0]} 0%, ${c[0]} 38%, ${c[1]} 38%, ${c[1]} 62%, ${c[2]} 62%, ${c[2]} 100%)`;
+}
+// Two stacked faces rather than one: a CSS gradient can't be transitioned,
+// so the kiln melt is the fired face fading up over the raw one.
+function makeTileEl(a, b, opts) {
+    const o = opts || {};
+    const el = document.createElement("div");
+    el.className = "tile" + (o.fired ? " is-fired" : "") + (o.big ? " tile-big" : "");
+    el.dataset.a = a;
+    if (b) el.dataset.b = b;
+    const raw = document.createElement("div");
+    raw.className = "tile-face tile-raw";
+    raw.style.background = tileFaceCss(a, b, false);
+    const fire = document.createElement("div");
+    fire.className = "tile-face tile-fired";
+    fire.style.background = tileFaceCss(a, b, true);
+    const hole = document.createElement("span");
+    hole.className = "tile-hole";
+    el.append(raw, fire, hole);
+    el.title = tileLabel(a, b);
+    return el;
+}
+function tileLabel(a, b) {
+    if (!b) return GLAZES[a].name;
+    const key = tileKey(a, b);
+    const named = RECIPE_NAMES[key];
+    return named ? `${GLAZES[a].name} + ${GLAZES[b].name} — ${named}` : `${GLAZES[a].name} + ${GLAZES[b].name}`;
+}
+
+function renderWallTiles() {
+    const grid = document.getElementById("wallTiles");
+    const empty = document.getElementById("wallEmpty");
+    if (!grid) return;
+    grid.innerHTML = "";
+    for (const t of wallTiles) {
+        const wrap = document.createElement("div");
+        wrap.className = "tile-cell";
+        wrap.appendChild(makeTileEl(t.a, t.b, { fired: true }));
+        const cap = document.createElement("span");
+        cap.className = "tile-cap";
+        cap.textContent = t.b ? `${GLAZES[t.a].name} + ${GLAZES[t.b].name}` : GLAZES[t.a].name;
+        wrap.appendChild(cap);
+        const named = t.b ? RECIPE_NAMES[tileKey(t.a, t.b)] : null;
+        if (named) {
+            const n = document.createElement("span");
+            n.className = "tile-name";
+            n.textContent = named;
+            wrap.appendChild(n);
+        }
+        grid.appendChild(wrap);
+    }
+    if (empty) empty.hidden = wallTiles.length > 0;
+}
+
+function renderRack() {
+    const slots = document.getElementById("rackSlots");
+    if (!slots) return;
+    slots.innerHTML = "";
+    for (let i = 0; i < RACK_SIZE; i++) {
+        const t = wallRack[i];
+        const slot = document.createElement("div");
+        slot.className = "rack-slot" + (t ? " is-full" : "");
+        if (t) {
+            slot.appendChild(makeTileEl(t.a, t.b, { fired: false, big: true }));
+            const x = document.createElement("button");
+            x.type = "button";
+            x.className = "rack-x";
+            x.setAttribute("aria-label", `Take ${tileLabel(t.a, t.b)} off the rack`);
+            x.textContent = "×";
+            x.addEventListener("click", () => {
+                if (rackFiring) return;
+                wallRack.splice(i, 1);
+                saveRack(wallRack);
+                renderRack();
+                syncTilePick();
+                haptic(8);
+            });
+            slot.appendChild(x);
+        }
+        slots.appendChild(slot);
+    }
+    const fire = document.getElementById("rackFire");
+    if (fire) fire.disabled = rackFiring || wallRack.length === 0;
+    const clear = document.getElementById("rackClear");
+    if (clear) clear.disabled = rackFiring || wallRack.length === 0;
+}
+
+// Picker: pack tabs + two glaze rows, mirroring the glaze/gradient pair the
+// Glaze panel already uses, so the interaction is one someone has met before.
+function buildTilePicker() {
+    const tabs = document.getElementById("tilePackTabs");
+    if (tabs) {
+        tabs.innerHTML = "";
+        for (const [id, pack] of Object.entries(GLAZE_PACKS)) {
+            const tab = document.createElement("button");
+            tab.type = "button";
+            tab.className = "glaze-pack-tab";
+            tab.dataset.tilePack = id;
+            tab.textContent = pack.label;
+            tab.addEventListener("click", () => setTilePack(id));
+            tabs.appendChild(tab);
+        }
+    }
+    buildTileBars();
+}
+function setTilePack(id) {
+    if (!GLAZE_PACKS[id] || state.glazePack === id) return;
+    state.glazePack = id;
+    try { localStorage.setItem("slip-glaze-pack", id); } catch (_) {}
+    syncGlazePackTabs();
+    buildGlazeBar();   // keep the pot's own picker in step
+    buildTileBars();
+}
+function buildTileBars() {
+    for (const which of ["A", "B"]) {
+        const bar = document.getElementById("tileBar" + which);
+        if (!bar) continue;
+        bar.innerHTML = "";
+        currentPackIds().forEach((id) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "glaze-btn";
+            b.dataset.tileGlaze = id;
+            b.dataset.slot = which;
+            b.style.background = hexCss(GLAZES[id].fired.color);
+            b.setAttribute("aria-label", `${GLAZES[id].name}, ${which === "A" ? "first" : "second"} glaze`);
+            b.setAttribute("aria-pressed", "false");
+            b.addEventListener("click", () => pickTileGlaze(which, id));
+            bar.appendChild(b);
+        });
+    }
+    document.querySelectorAll("#tilePackTabs .glaze-pack-tab").forEach((t) => {
+        t.classList.toggle("is-active", t.dataset.tilePack === state.glazePack);
+    });
+    syncTilePick();
+}
+function pickTileGlaze(which, id) {
+    if (which === "A") tilePickA = (tilePickA === id) ? null : id;
+    else               tilePickB = (tilePickB === id) ? null : id;
+    if (tilePickA && tilePickA === tilePickB) tilePickB = null; // a pair of one isn't a pair
+    haptic(8);
+    syncTilePick();
+}
+function syncTilePick() {
+    document.querySelectorAll("[data-tile-glaze]").forEach((b) => {
+        const sel = b.dataset.slot === "A" ? tilePickA : tilePickB;
+        const on = b.dataset.tileGlaze === sel;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+        // The same glaze twice is one glaze — dim it in the other row.
+        const other = b.dataset.slot === "A" ? tilePickB : tilePickA;
+        const dim = !!other && b.dataset.tileGlaze === other;
+        b.classList.toggle("is-disabled", dim);
+        b.disabled = dim;
+    });
+    const prev = document.getElementById("tilePreview");
+    if (prev) {
+        prev.innerHTML = "";
+        if (tilePickA) prev.appendChild(makeTileEl(tilePickA, tilePickB, { fired: false, big: true }));
+    }
+    const add = document.getElementById("tileAdd");
+    if (add) add.disabled = rackFiring || !tilePickA || wallRack.length >= RACK_SIZE;
+}
+function addRackTile() {
+    if (rackFiring || !tilePickA || wallRack.length >= RACK_SIZE) return;
+    wallRack.push({ a: tilePickA, b: tilePickB || null });
+    saveRack(wallRack);
+    tilePickA = null; tilePickB = null;
+    renderRack();
+    syncTilePick();
+    haptic(12);
+}
+function emptyRack() {
+    if (rackFiring || !wallRack.length) return;
+    wallRack = [];
+    saveRack(wallRack);
+    renderRack();
+    syncTilePick();
+}
+
+// Fire everything on the rack. The melt is the fired face fading up over the
+// raw one; reduced motion skips it rather than compressing, since there's no
+// camera work here to preserve. Re-firing a pair you already have refreshes
+// its place on the wall instead of stacking a duplicate.
+function fireRack() {
+    if (rackFiring || !wallRack.length) return;
+    rackFiring = true;
+    renderRack();
+    syncTilePick();
+    const batch = wallRack.slice();
+    const rack = document.getElementById("rack");
+    if (rack) rack.classList.add("is-firing");
+    playSfx("kiln");
+    haptic(18);
+
+    const ms = reduceMotion ? 0 : TILE_FIRE_MS;
+    if (!reduceMotion) {
+        document.querySelectorAll("#rackSlots .tile").forEach((el) => el.classList.add("is-firing", "is-fired"));
+    }
+    setTimeout(() => {
+        const newly = [];
+        for (const t of batch) {
+            newly.push(...recordRecipePairs([t.a, t.b]));
+            const key = tileKey(t.a, t.b);
+            const at = wallTiles.findIndex((w) => tileKey(w.a, w.b) === key);
+            if (at !== -1) wallTiles.splice(at, 1);
+            wallTiles.unshift({ a: t.a, b: t.b || null, t: Date.now() });
+        }
+        saveTiles(wallTiles);
+        wallRack = [];
+        saveRack(wallRack);
+        rackFiring = false;
+        if (rack) rack.classList.remove("is-firing");
+        renderWallTiles();
+        renderRack();
+        syncTilePick();
+        renderRecipeGrid();   // the count in the header tracks finds immediately
+        announceRecipes(newly);
+    }, ms);
+}
+
+function setWallTab(which) {
+    const isWall = which !== "recipes";
+    const pw = document.getElementById("wallPanelWall");
+    const pr = document.getElementById("wallPanelRecipes");
+    if (pw) pw.hidden = !isWall;
+    if (pr) pr.hidden = isWall;
+    const tw = document.getElementById("wallTabWall");
+    const tr = document.getElementById("wallTabRecipes");
+    if (tw) { tw.classList.toggle("is-active", isWall);  tw.setAttribute("aria-selected", isWall ? "true" : "false"); }
+    if (tr) { tr.classList.toggle("is-active", !isWall); tr.setAttribute("aria-selected", isWall ? "false" : "true"); }
+}
+function openWall(tab) {
+    wallTiles = loadTiles();
+    wallRack  = loadRack();
+    buildTilePicker();
+    renderWallTiles();
+    renderRack();
     renderRecipeGrid();
-    const m = document.getElementById("recipeModal");
+    setWallTab(tab || "wall");
+    const m = document.getElementById("wallModal");
     if (m) { m.hidden = false; trapFocus(m); }
 }
-function closeRecipes() {
-    const m = document.getElementById("recipeModal");
+function closeWall() {
+    const m = document.getElementById("wallModal");
     if (m) { m.hidden = true; releaseFocus(m); }
 }
+// Kept as the journal's entry points — every existing caller (the landing
+// link, the gallery bar) now lands on the wall, which is where the journal
+// lives.
+function openRecipes()  { openWall("recipes"); }
+function closeRecipes() { closeWall(); }
 
 // Minimal transient toast (recipe discoveries + future gentle notices).
 let toastHideT = 0, toastGoneT = 0;
@@ -9257,11 +9589,11 @@ function onDialogEscape(e) {
     // fine with a thumb, a dead end for anyone on a keyboard.
     if (state.displayMode) { exitDisplayMode(); return; }
     const photo   = document.getElementById("photoModal");
-    const recipes = document.getElementById("recipeModal");
+    const wall    = document.getElementById("wallModal");
     const gallery = document.getElementById("gallery");
-    // Innermost first: photo and recipes can both open over the gallery.
+    // Innermost first: photo and the wall can both open over the gallery.
     if (photo && !photo.hidden)        { closePhotoModal(); return; }
-    if (recipes && !recipes.hidden)    { closeRecipes();    return; }
+    if (wall && !wall.hidden)          { closeWall();       return; }
     if (gallery && !gallery.hidden)    { closeGallery();    return; }
 }
 

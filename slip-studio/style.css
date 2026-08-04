@@ -2382,7 +2382,8 @@ body.tool-armed #scene:active { cursor: crosshair; }
 .motif-pack-tab.is-active, .dip-pack-tab.is-active,
 .dip-toggle.is-active, .dip-chip.is-active,
 .deco-variant.is-active, .deco-act.is-active,
-.photo-chip.is-active, .lid-style-btn.is-active {
+.photo-chip.is-active, .lid-style-btn.is-active,
+.wall-tab.is-active {
     color: var(--pill-active-ink);
     background: var(--pill-active-bg);
     border-color: transparent;
@@ -2451,6 +2452,160 @@ body.display-mode #coach { display: none !important; }
     .display-hint, .display-exit { transition: none; }
 }
 
+/* ---------- The test-tile wall ---------- */
+/* Two tabs over one modal: the wall of fired tiles + the rack, and the
+   recipe journal. The panel is the flex child that scrolls, so the rack
+   stays reachable on a short phone (the landing overflow lesson, v201). */
+.wall-tabs { display: flex; gap: 6px; margin: 2px 0 10px; flex-shrink: 0; }
+.wall-tab {
+    appearance: none;
+    border: 1px solid var(--g-card-border, rgba(255, 255, 255, 0.12));
+    background: rgba(0, 0, 0, 0.22);
+    color: var(--ink-dim);
+    font: inherit;
+    font-size: 14px;
+    padding: 9px 16px;
+    min-height: 38px;
+    border-radius: 999px;
+    cursor: pointer;
+}
+/* ONE scroll container per panel, not a scrolling grid above a fixed-height
+   rack. The rack is ~440px tall with the picker open; pinning it to the
+   bottom on a 360x640 phone crushed the wall to 12px AND still overflowed by
+   47px — the v201 mistake in miniature. Everything scrolls together; only the
+   Fire row is sticky, so the action is always reachable without costing the
+   wall its height. */
+.wall-panel { overflow-y: auto; flex: 1; min-height: 0; }
+.wall-panel[hidden] { display: none; }
+.wall-tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+    gap: 14px 10px;
+    align-content: start;
+    padding-bottom: 12px;
+}
+.tile-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.tile-cap  { font-size: 10px; color: var(--ink-faint); text-align: center; line-height: 1.25; }
+.tile-name { font-family: "Fraunces", Georgia, serif; font-size: 12px; color: var(--g-title, #efe7db); text-align: center; }
+.wall-empty {
+    margin: 0 2px 12px;
+    color: var(--ink-dim);
+    font-size: 14px;
+    max-width: 460px;
+    line-height: 1.45;
+    flex-shrink: 0;
+}
+
+/* A tile is two stacked faces — a CSS gradient can't be transitioned, so the
+   kiln melt is the fired face fading up over the raw one. */
+.tile {
+    position: relative;
+    width: 54px;
+    height: 76px;
+    border-radius: 5px 5px 4px 4px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.34);
+    flex-shrink: 0;
+}
+.tile-face { position: absolute; inset: 0; }
+.tile-fired { opacity: 0; }
+.tile.is-fired .tile-fired { opacity: 1; }
+.tile.is-firing .tile-fired { transition: opacity 1000ms ease-in; }
+/* Fired tiles catch the light; raw ones are chalky and flat. */
+.tile.is-fired::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(122deg, rgba(255, 255, 255, 0.19) 0%, rgba(255, 255, 255, 0) 46%);
+    pointer-events: none;
+}
+/* Every real test tile has one. */
+.tile-hole {
+    position: absolute;
+    top: 5px; left: 50%;
+    width: 7px; height: 7px;
+    margin-left: -3.5px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.42);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.5);
+}
+
+.rack {
+    border-top: 1px solid var(--g-card-border, rgba(255, 255, 255, 0.12));
+    padding-top: 12px;
+    margin-top: 4px;
+}
+.rack-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.rack-label { font-family: "Fraunces", Georgia, serif; font-size: 15px; color: var(--g-title, #efe7db); }
+.rack-slots { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.rack-slot {
+    position: relative;
+    width: 56px;
+    height: 78px;
+    border-radius: 5px;
+    border: 1px dashed rgba(255, 255, 255, 0.16);
+}
+.rack-slot.is-full { border-color: transparent; }
+/* 28px visible with the hit area pushed to 36 via ::before. The slots sit in
+   a row with 8px gaps and the × hangs off the corner, so the expansion is
+   capped to that slack — an overlap would silently steal the neighbouring
+   tile's tap (the v202 lesson). */
+.rack-x {
+    position: absolute;
+    top: -8px; right: -8px;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--g-card-border, rgba(255, 255, 255, 0.18));
+    background: rgba(20, 18, 16, 0.92);
+    color: var(--ink-dim);
+    font: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+.rack-x::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 36px; height: 36px;
+}
+.tile-pick { margin-bottom: 10px; }
+.tile-pick-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.tile-pick-label { font-size: 12px; color: var(--ink-faint); width: 34px; flex-shrink: 0; }
+.tile-pick-bar { display: flex; gap: 6px; flex-wrap: wrap; }
+/* The pack tabs are 19px tall — below the 24px WCAG 2.5.8 floor. They sit in
+   their own row with 10px of slack above the first swatch row, so the hit
+   area grows to 32 without touching anything. */
+#tilePackTabs .glaze-pack-tab { position: relative; }
+#tilePackTabs .glaze-pack-tab::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 100%; height: 32px;
+}
+/* Sticky so Fire stays reachable however far down the wall you've scrolled. */
+.rack-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    position: sticky;
+    bottom: 0;
+    padding: 8px 0 4px;
+    background: var(--veil);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+.tile-preview-wrap { width: 56px; height: 78px; flex-shrink: 0; }
+.tile-big { width: 56px; height: 78px; }
+.rack.is-firing { pointer-events: none; }
+
 /* ---------- Glaze recipe journal ---------- */
 .recipe-count { color: var(--ink-dim); font-size: 0.72em; margin-left: 6px; font-variant-numeric: tabular-nums; }
 .recipe-intro {
@@ -2464,8 +2619,9 @@ body.display-mode #coach { display: none !important; }
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
     gap: 10px;
-    overflow-y: auto;
     padding-bottom: 24px;
+    /* .wall-panel is the scroller now — the grid just lays out. */
+    align-content: start;
 }
 .recipe-card {
     background: var(--g-card, rgba(255, 255, 255, 0.06));
