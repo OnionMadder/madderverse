@@ -493,34 +493,91 @@ const FIRED_HEX_TO_ID = (() => {
 // so lookup is order-independent. Values are fired hexes. Chosen along
 // intuitive colour theory (blue+yellow=green, blue+red=purple, red+yellow
 // =orange) plus a few kiln surprises, favouring pairs within the same pack.
+// Twelve per pack. The picker shows one pack at a time, so pairs are kept
+// WITHIN a pack — a cross-pack reaction is one nobody would stumble on.
+// Where real glaze chemistry has a name for what happens, it gets used:
+// tenmoku broken by a light glaze really is hare's fur, iron over shino
+// really is kaki, gold specks in a black glaze really are oil spot.
 const REACTION_PAIRS = (() => {
     const raw = {
-        // Studio
+        // Studio — iron, ash and cobalt: the classic stoneware palette
         "cobalt|honey":     0x3f6b3a,   // blue over amber → moss green
         "cobalt|forest":    0x244f4a,   // blue + green → deep teal
         "cobalt|blush":     0x6e4a6b,   // blue + rose → plum
         "celadon|honey":    0x6f7a33,   // green + amber → olive
         "honey|tenmoku":    0x7a481f,   // amber over iron → tortoiseshell (kaki)
         "blush|celadon":    0x9a8a5e,   // rose + green → soft khaki
-        // Modern
+        "celadon|tenmoku":  0x5e6b3a,   // celadon breaking over iron → tea dust
+        "cobalt|oatmeal":   0x8fa3c4,   // cobalt thinned by white → clair de lune
+        "oatmeal|tenmoku":  0x7a6248,   // light over black iron streaks → hare's fur
+        "cobalt|slate":     0x5a7a9e,   // two blues go opalescent → chun
+        "forest|tenmoku":   0x2f5e38,   // green so deep it reads black → oribe
+        "celadon|slate":    0x53705f,   // grey-blue + green → patina
+        // Modern — metals and their oxides
         "ironred|copper":   0x8a3a1f,   // reds deepen → oxblood
         "plum|mint":        0x5e6b7a,   // violet + green → slate
         "gold|copper":      0xc07a2f,   // metals → rich bronze
-        // Garden
+        "gold|ironred":     0xc26a1f,   // gold over iron → persimmon
+        "copper|mint":      0x2f7a5e,   // copper going green — the real patina
+        "copper|platinum":  0xb08a72,   // copper under white metal → rose gold
+        "pearl|plum":       0xb894b0,   // violet through pearl → orchid mist
+        "plum|sand":        0x8a7060,   // violet + ochre → fossil
+        "gold|mint":        0x9eb04a,   // yellow + green → chartreuse
+        "ironred|pearl":    0xd99a86,   // iron blushing through white → peach bloom
+        "copper|sand":      0xb87a45,   // copper + sand → ochre
+        "platinum|plum":    0xa08aae,   // violet + white metal → moonstone
+        // Garden — the muddier, earthier half of the wheel
         "indigo|coral":     0x6b3a6b,   // blue + coral → mulberry
         "teal|terracotta":  0x6b6b3a,   // teal + rust → bronze-olive
         "olive|lilac":      0x7a6b4a,   // olive + lilac → muted taupe
-        // Jewel
+        "coral|teal":       0x4a7a5e,   // complementaries knock each other back → kelp
+        "lilac|seafoam":    0x8aa8b8,   // violet + green-blue → sea mist
+        "indigo|olive":     0x3f4a33,   // blue into olive → deep moss
+        "seafoam|terracotta": 0x9e8a6b, // green-blue + rust → adobe
+        "charcoal|coral":   0x8a3f2a,   // coral smothered → smoked clay
+        "lilac|teal":       0x5a6b9e,   // violet + teal → storm blue
+        "coral|olive":      0xa87a3a,   // coral + olive → autumn ochre
+        "charcoal|seafoam": 0x3f5a4a,   // green in shadow → pine
+        "indigo|terracotta": 0x5e3a52,  // blue + rust → aubergine
+        // Jewel — saturated, so the reactions go rich rather than muddy
         "ruby|sapphire":    0x5e2d8a,   // red + blue → amethyst
         "sapphire|topaz":   0x0f6b45,   // blue + gold → emerald
         "ruby|topaz":       0xc9552f,   // red + gold → burnt orange
         "emerald|garnet":   0x5a5a24,   // green + wine → deep olive
         "turquoise|garnet": 0x4a5a5e,   // aqua + wine → petrol
-        // Sorbet
+        "amethyst|topaz":   0x8a6b52,   // violet + gold → antique bronze
+        "emerald|turquoise": 0x0f8a6b,  // two greens → malachite
+        "emerald|ruby":     0x5e4a2f,   // red + green → bloodstone
+        "onyx|topaz":       0x5a4a1f,   // gold specks in black — oil spot
+        "amethyst|sapphire": 0x3a2d8a,  // violet + blue → lapis
+        "topaz|turquoise":  0x7a9e3a,   // gold + aqua → peridot
+        "amethyst|garnet":  0x5e2444,   // wine + violet → port
+        // Sorbet — pastels stay pale; the surprise is the hue, not the depth
         "lemon|sky":        0xa6d68a,   // yellow + blue → pistachio
         "bubblegum|sky":    0xc4b0ec,   // pink + blue → lavender
         "lemon|bubblegum":  0xf2b98a,   // yellow + pink → peach
         "lavender|peach":   0xe0b8c4,   // lavender + peach → dusty rose
+        "periwinkle|pistachio": 0xa6c4c0, // blue + green pastel → seaglass
+        "lemon|rosewater":  0xf2d9a6,   // yellow + pink-white → custard
+        "peach|sky":        0xcfc4cc,   // complementaries → oyster
+        "bubblegum|pistachio": 0xd0c090, // pink + green → marzipan
+        "peach|periwinkle": 0xd4b8c4,   // peach + blue-violet → shell pink
+        "lavender|pistachio": 0xb8c4a6, // violet + green → sage mist
+        "rosewater|sky":    0xc8c4e0,   // pink + blue → iris
+        "lavender|lemon":   0xd6d0a6,   // violet + yellow → chamomile
+        // Stoneware — the pack with the most real chemistry behind it
+        "ash|shino":        0xa87a52,   // shino under ash → carbon trap
+        "shino|tessha":     0x8a4a24,   // iron over shino → kaki (persimmon)
+        "ash|tessha":       0x7a7260,   // iron softened by ash → wood ash
+        "rakublue|rakupearl": 0x8aa8b8, // raku blue crazing through pearl
+        "mossware|shino":   0x8a7a3a,   // ash running over moss → ash run
+        "dune|tessha":      0x9e8252,   // iron washed thin over dune
+        "pebble|rakublue":  0x5e7a8a,   // blue over grey grit → river stone
+        "mossware|rakublue": 0x5e9e7a,  // where a green glaze breaks blue
+        "ash|dune":         0xa89a72,   // two pale ashes → bone
+        "pebble|shino":     0xa87a5e,   // shino flashing on grit → salt blush
+        "rakupearl|tessha": 0xc4b49a,   // iron under rice-ash white → nuka
+        "dune|mossware":    0xa89e52,   // straw ash over green → rice straw
     };
     const m = {};
     for (const [k, v] of Object.entries(raw)) {
@@ -532,14 +589,40 @@ const REACTION_PAIRS = (() => {
 // so the recipe journal (see openRecipes) can label a discovered combo.
 const RECIPE_NAMES = (() => {
     const raw = {
+        // Studio
         "cobalt|honey": "Moss", "cobalt|forest": "Deep teal", "cobalt|blush": "Plum",
         "celadon|honey": "Olive", "honey|tenmoku": "Tortoiseshell", "blush|celadon": "Khaki",
+        "celadon|tenmoku": "Tea dust", "cobalt|oatmeal": "Clair de lune",
+        "oatmeal|tenmoku": "Hare's fur", "cobalt|slate": "Chun blue",
+        "forest|tenmoku": "Oribe", "celadon|slate": "Patina",
+        // Modern
         "ironred|copper": "Oxblood", "plum|mint": "Slate", "gold|copper": "Bronze",
+        "gold|ironred": "Persimmon", "copper|mint": "Verdigris", "copper|platinum": "Rose gold",
+        "pearl|plum": "Orchid mist", "plum|sand": "Fossil", "gold|mint": "Chartreuse",
+        "ironred|pearl": "Peach bloom", "copper|sand": "Ochre", "platinum|plum": "Moonstone",
+        // Garden
         "indigo|coral": "Mulberry", "teal|terracotta": "Bronze olive", "olive|lilac": "Taupe",
+        "coral|teal": "Kelp", "lilac|seafoam": "Sea mist", "indigo|olive": "Deep moss",
+        "seafoam|terracotta": "Adobe", "charcoal|coral": "Smoked clay", "lilac|teal": "Storm blue",
+        "coral|olive": "Autumn ochre", "charcoal|seafoam": "Pine", "indigo|terracotta": "Aubergine",
+        // Jewel
         "ruby|sapphire": "Amethyst", "sapphire|topaz": "Emerald", "ruby|topaz": "Burnt orange",
         "emerald|garnet": "Deep olive", "turquoise|garnet": "Petrol",
+        "amethyst|topaz": "Antique bronze", "emerald|turquoise": "Malachite",
+        "emerald|ruby": "Bloodstone", "onyx|topaz": "Oil spot", "amethyst|sapphire": "Lapis",
+        "topaz|turquoise": "Peridot", "amethyst|garnet": "Port",
+        // Sorbet
         "lemon|sky": "Pistachio", "bubblegum|sky": "Lavender", "lemon|bubblegum": "Peach",
-        "lavender|peach": "Dusty rose",
+        "lavender|peach": "Dusty rose", "periwinkle|pistachio": "Seaglass",
+        "lemon|rosewater": "Custard", "peach|sky": "Oyster", "bubblegum|pistachio": "Marzipan",
+        "peach|periwinkle": "Shell pink", "lavender|pistachio": "Sage mist",
+        "rosewater|sky": "Iris", "lavender|lemon": "Chamomile",
+        // Stoneware
+        "ash|shino": "Carbon trap", "shino|tessha": "Kaki", "ash|tessha": "Wood ash",
+        "rakublue|rakupearl": "Crackle blue", "mossware|shino": "Ash run",
+        "dune|tessha": "Iron wash", "pebble|rakublue": "River stone",
+        "mossware|rakublue": "Celadon break", "ash|dune": "Bone", "pebble|shino": "Salt blush",
+        "rakupearl|tessha": "Nuka", "dune|mossware": "Rice straw",
     };
     const m = {};
     for (const [k, v] of Object.entries(raw)) m[k.split("|").sort().join("|")] = v;
