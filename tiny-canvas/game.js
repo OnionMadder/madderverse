@@ -2778,18 +2778,54 @@
         window.addEventListener("resize", function () {
             if (resizeRaf) cancelAnimationFrame(resizeRaf);
             resizeRaf = requestAnimationFrame(function () {
-                /* Preserve current drawing across resize. */
-                let snap = null;
-                try {
-                    snap = ctx2d.getImageData(0, 0,
-                        canvas.width, canvas.height);
-                } catch (_) {}
+                /* Carry the drawing across the rotation, SCALED AND
+                   CENTRED. This used to snapshot with getImageData and
+                   paste it back with putImageData(snap, 0, 0) — which
+                   neither scales nor centres, so rotating to landscape
+                   dumped the portrait-shaped drawing against the
+                   top-left corner.
+
+                   The scale factor is deliberately min(W,H)-based
+                   rather than a straight width or height ratio: the
+                   line-art SVG letterboxes its 800x800 viewBox into the
+                   viewport with preserveAspectRatio, i.e. it lives in
+                   the largest centred SQUARE. Matching that keeps the
+                   kid's strokes registered with the printed lines
+                   through a rotation instead of sliding off them.
+
+                   drawImage rather than putImageData because
+                   putImageData cannot scale and ignores transforms. */
+                const oldW = canvas.width, oldH = canvas.height;
+                let carry = null;
+                if (oldW && oldH) {
+                    carry = document.createElement("canvas");
+                    carry.width  = oldW;
+                    carry.height = oldH;
+                    try { carry.getContext("2d").drawImage(canvas, 0, 0); }
+                    catch (_) { carry = null; }
+                }
+
+                /* setupCanvas resizes the backing store, clears it and
+                   resets history — correct, because history patches are
+                   recorded in the OLD pixel geometry and replaying one
+                   after a rotation would paint it in the wrong place. */
                 setupCanvas();
-                if (snap) {
+
+                if (carry) {
+                    const newW = canvas.width, newH = canvas.height;
+                    const k  = Math.min(newW, newH) / Math.min(oldW, oldH);
+                    const dw = oldW * k, dh = oldH * k;
                     ctx2d.save();
                     ctx2d.setTransform(1, 0, 0, 1, 0, 0);
-                    try { ctx2d.putImageData(snap, 0, 0); } catch (_) {}
+                    ctx2d.globalCompositeOperation = "source-over";
+                    ctx2d.globalAlpha = 1;
+                    try {
+                        ctx2d.drawImage(carry,
+                            (newW - dw) / 2, (newH - dh) / 2, dw, dh);
+                    } catch (_) {}
                     ctx2d.restore();
+                    state.dirty = true;
+                    updateStatus();
                 }
             });
         });
