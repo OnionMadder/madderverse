@@ -41,6 +41,12 @@ www/
 # Rasterized icon sources for @capacitor/assets, generated from icons/*.svg
 .assetsrc/
 
+# Master coloring-page art (2816x1536 originals, ~53MB) — the shipped
+# pages in assets/coloring-pages/ are generated from these by
+# scripts/process-coloring-pages.py. Untracked like all Madderverse
+# working art; keep local copies safe, this is the only source.
+art-src/
+
 # Signing material — NEVER commit. Mirrored to ~/Keystore-Backups/tiny-canvas/,
 # which is the only durable copy since android/ is untracked.
 *.keystore

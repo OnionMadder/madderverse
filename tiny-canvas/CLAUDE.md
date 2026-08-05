@@ -7,8 +7,13 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=25** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=26** — bump it
   on every change to style.css / templates.js / game.js.
+- **The coloring pages are REAL ART now (2026-08-05).** The 34
+  hand-drawn SVG templates were replaced by 14 full-scene raster
+  coloring pages (+ BLANK) — see "The raster coloring pages" below.
+  These 14 are the FREE set; Pro (decided, unbuilt) will add more
+  pages on top, never instead.
 - **Android release is BUILT and SIGNED but NOT UPLOADED.** versionCode
   2 / versionName 1.0.1, targeting API 35. The upload keystore exists
   (§F) — do not generate another. Play rejected vc1 for targeting API
@@ -63,22 +68,23 @@ Capacitor when you're packaging for a store.
 
 - **5 screens**, swapped via the `[hidden]` attribute on
   `<main class="screen">`: title → picker → draw → gallery → settings.
-- **35 line-art templates** (BLANK + 34 themed pages): smiley sun,
-  cat, rocket, fish, house, dog, bear, butterfly, bird, car, airplane,
-  truck, unicorn, dragon, castle, donut, ice cream, dinosaur, robot,
-  snowflake, flower, tree, rainbow, cupcake, hot-air balloon, sailboat,
-  train, frog, owl, turtle, ladybug, penguin, mushroom, crab. Each is a
-  `viewBox="0 0 800 800"` SVG drawn in `currentColor` strokes; rendered
-  as a `pointer-events: none` overlay above the kid's canvas so the kid
-  colors UNDER the lines.
+- **15 templates: 14 raster coloring scenes + BLANK** (since
+  2026-08-05): kitchen cat, puppy, unicorn, sunny day, big fish,
+  butterfly, bird nest, teddy bear, rocket ship, robot lab, road trip,
+  airplane, donut chest, cozy cabin. Real coloring-book art — dense
+  full-bleed scenes, ~1.83:1 landscape — rendered as a
+  `pointer-events: none` overlay above the kid's canvas so the kid
+  colors UNDER the lines. See "The raster coloring pages" below for
+  the format and pipeline. The engine still fully supports the
+  original inline-SVG template format (BLANK is the only remaining
+  svg entry; the 34 retired SVG pages are in git history).
 - **Templates must be built from CLOSED shapes.** The fill tool
-  rasterizes this SVG into a boundary mask, so any gap in a path lets
-  fill escape into the rest of the page. Prefer `<circle>`, `<ellipse>`,
-  `<rect>` and paths ending in `Z`; an open polyline is fine only for
-  decoration that isn't meant to hold colour (a ground line, a rope).
-  A line drawn ACROSS an enclosed shape is a useful trick — it splits
-  that shape into separate fill zones (the cupcake pleats, the turtle
-  shell segments, the balloon panels all use this).
+  rasterizes the overlay into a boundary mask, so any gap in a line
+  lets fill escape into the rest of the page. This can't be judged by
+  eye — audit every new page (see "Auditing a page for fillable
+  regions"). For SVG pages, prefer `<circle>`, `<ellipse>`, `<rect>`
+  and paths ending in `Z`; an open stroke is fine only for decoration
+  that isn't meant to hold colour.
 - **6 distinct brushes** (PEN / MARKER / CRAYON / PENCIL / PAINT /
   GLITTER), each with its own beginStroke + drawSegment + textural
   feel. Plus ERASER, plus the FILL bucket.
@@ -157,6 +163,15 @@ tiny-canvas/
     fonts/                # self-hosted woff2 — bungee-latin,
                           # vt323, press-start-2p (74.7KB total).
                           # Do NOT move these back to a CDN.
+    coloring-pages/       # the 14 shipped pages — 1800px RGBA,
+                          # lines baked as alpha (~3.4MB total).
+                          # GENERATED — regenerate via
+                          # scripts/process-coloring-pages.py
+
+  art-src/
+    coloring-pages/       # UNTRACKED master art — the 2816x1536
+                          # white-paper originals (53MB). Never
+                          # ships; keep it, it's the only source.
 
   icons/
     icon.svg              # master 1024x1024 app icon (full bleed)
@@ -171,6 +186,8 @@ tiny-canvas/
   scripts/
     capture-screenshots.js  # Playwright-driven, captures 5 screens
                             # at 6 device profiles into ./screenshots/
+    process-coloring-pages.py  # art-src masters -> assets pages +
+                               # fillable-region audit (Pillow+numpy)
 
   package.json            # Capacitor 6 + plugins
   capacitor.config.json   # appId org.madderverse.tinycanvas, webDir "www"
@@ -245,10 +262,59 @@ separate rasterized mask. It also means fill never depends on what the
 kid already drew: tapping a region always fills that region, whatever
 is in it.
 
+## The raster coloring pages (the shipped format since 2026-08-05)
+
+The 14 pages are AI-generated coloring-book scenes. Sources are
+2816x1536 PNGs (line art on white paper) in `art-src/coloring-pages/`
+— **untracked working art**, keep them, they're the masters. What
+ships is `assets/coloring-pages/*.png`: 1800px-wide RGBA where the
+**lines are baked as ALPHA** (constant ink `#1c2226` = `--line-ink`,
+alpha = inverted luminance). ~3.4MB total for all 14 (the sources are
+53MB). Produced by `scripts/process-coloring-pages.py` — grayscale →
+LANCZOS downscale → luminance-to-alpha LUT (≥225 → 0, ≤100 → 255,
+ramp between; kills the paper-grain texture) → despeckle ink blobs
+under 30px → audit. Run it from `tiny-canvas/` after dropping new
+sources in.
+
+Why alpha instead of black-on-white: the overlay sits ABOVE the kid's
+canvas, so an opaque page would hide every stroke; and the fill mask
+thresholds **alpha ≥ 96**, so baked-as-alpha art feeds the existing
+SVG mask path with zero format branching in the threshold.
+
+Engine specifics worth knowing:
+
+- A template is `{ id, name, image: "assets/coloring-pages/x.png" }`;
+  `loadTemplate` puts an `<img>` in the overlay, `buildFillMask` and
+  `composePng` `drawImage` it directly (no Blob/serialize roundtrip —
+  that path still exists for SVG pages).
+- **Every geometry consumer measures the ART element's own box** via
+  `overlayArtEl()` (`svg` or `img`), never the `.line-art` container.
+  The container is a generous landscape frame (94vw x 78vh); the art
+  letterboxes itself inside it with max-width/max-height + auto
+  sizing, which keeps the element's layout rect identical to its
+  displayed bitmap. Don't give `.line-art img` an `object-fit` that
+  letterboxes INSIDE the element — that would silently break mask
+  alignment.
+- **The page edge is a fill boundary on raster pages.** The scenes are
+  full-bleed — sky/wall/floor run to the image border — so
+  `buildFillMask` marks a 2-device-px frame around the image rect
+  (`markPageBorder`). Without it a tap on the sky escapes the page and
+  floods the paper margins around the whole screen. SVG pages keep
+  their old open-margin behavior; BLANK still floods the whole canvas.
+- If a fill lands before the page's `<img>` finishes loading, the mask
+  build waits on the img's load event, and `fillGeomKey`'s re-measure
+  invalidates any mask built against the pre-load empty rect.
+
 ## Adding a new template
 
-Append to `window.TINY_CANVAS_TEMPLATES` in `templates.js`. Each entry
-is `{ id, name, svg }`. The SVG must:
+Raster (preferred): drop the source PNG in `art-src/coloring-pages/`,
+run `python scripts/process-coloring-pages.py`, check its audit line
+(region count at both scales, no leak-shaped "largest region" jump),
+then append `{ id, name, image: "assets/coloring-pages/<id>.png" }`
+to `window.TINY_CANVAS_TEMPLATES`. The picker auto-discovers it.
+
+SVG (legacy, still supported): append `{ id, name, svg }`. The SVG
+must:
 
 1. Use `viewBox="0 0 800 800"` (matches the canvas logical size).
 2. Set `fill="none"`, `stroke="currentColor"`, `stroke-width="6-10"`,
@@ -292,9 +358,15 @@ Two things this catches that reading the SVG does not:
   sub-pixel mismatch where a leaflet joins a shaft opens a gap the fill
   escapes through, merging two cells into one.
 
-Current baseline: **34 drawable pages, 406 fillable regions, median 11
-per page**, no leaks. If a page you add lands at 3-4 regions, look for
-open strokes before assuming it's just a simple drawing.
+Current baseline (the 14 raster scenes, audited at 1800px wide,
+regions ≥ 64px, image perimeter counted as boundary): **3,793 fillable
+regions total, 58 (rocket) to 458 (robot) per page, median ~276**, no
+leaks; counts hold at a 900px re-audit. The retired SVG set's baseline
+was 406 regions across 34 pages — the new pages are ~20x denser, which
+is exactly the "real coloring page" feel. If a new page lands far
+below this band, or one region spans an implausible share of the page,
+look for an ink gap in the source art. (`scripts/
+process-coloring-pages.py` prints this audit automatically.)
 
 When closing a curve into a ribbon (the donut's icing drizzles), offset
 the source curve both ways rather than hand-drawing a second edge: move
@@ -862,7 +934,7 @@ complete; the parent finds the upgrade by going looking.
 
 | Dimension | Free | Pro adds |
 |---|---|---|
-| Pages | 35 | +100 in themed packs |
+| Pages | 14 scenes + blank | more scenes in themed packs |
 | Fill patterns | solid only | the 8 tiles (BUILT, currently ungated) |
 | Stamps | — | 60+ |
 | Paper textures | 1 | ~8 |
@@ -884,44 +956,25 @@ pattern fills is then a check in the chip handler.
 ⚠ `privacy/index.html` and `STORE_LISTING.md` both currently state **"no
 in-app purchases."** Both need updating before any billing ships.
 
-## Better coloring-page art — the open question
+## Better coloring-page art — RESOLVED 2026-08-05
 
-The current 35 templates are hand-written SVG and, in Onion's words,
-"fine right now for a free filler app but the art leaves a lot to be
-desired." Raising that bar is the biggest single lever on perceived
-quality. Unresolved as of 2026-08-05; here is the state of the analysis.
+This was the "biggest single lever on perceived quality" open question,
+and it closed with the raster-page shipment (see "The raster coloring
+pages" above). How the analysis resolved, for the record:
 
-**The engine only accepts inline SVG today.** `loadTemplate` does
-`overlay.innerHTML = tpl.svg` and `buildFillMask` does
-`host.querySelector("svg")`, thresholding **alpha ≥ 96**. A PNG has no
-alpha — black lines on white — so raster art needs a **luminance**
-threshold branch. Small change, not architectural.
+- The luminance-threshold prediction became a **luminance→alpha bake at
+  build time** instead of a runtime branch — the engine's alpha≥96
+  threshold then needed no change at all.
+- **Vectorizing lost to raster**: these scenes are dense enough that a
+  trace would not be smaller, and the optimized PNGs came in at ~3.4MB
+  for all 14, which made the tracer's size argument moot.
+- **Landscape was handled explicitly** (aspect-preserving letterbox +
+  the page-edge fill boundary) rather than cropping the scenes square.
+- **Provenance**: the pages are AI-generated for this app (no stock
+  license to clear); watermark check happened during the audit pass.
 
-**Prefer vectorizing over shipping raster.** `tools/vectorize-character.py`
-in the comic-chat-composer repo is OpenCV-based and built for exactly
-this: its notes record the trace coming out **60–70% smaller than the
-PNGs** and being resolution-independent, which matters because the canvas
-is viewport-sized. Two findings carry over verbatim: **do not smooth
-traced contours** (Catmull-Rom overshoots and shreds thin lines — emit
-polylines), and **score the trace against the original image, not against
-your own threshold mask**, or you have only proven the tracer matched the
-threshold.
-
-**Whatever the source, audit it.** Closedness is what decides a page,
-and it cannot be judged by eye — the snowflake looked correct and had 2
-fillable regions. Rasterize, threshold at 96, count connected components
-that do not touch the edge. Baseline for the current set is **34 pages,
-406 regions, median 11**. See "Auditing a page for fillable regions".
-
-**Two constraints on any new art source:**
-
-- **Aspect ratio.** Templates are a square `viewBox="0 0 800 800"`
-  letterboxed into the viewport. Landscape art becomes a short band with
-  large empty margins on a portrait phone. Either keep pages squarish or
-  handle landscape explicitly.
-- **Provenance.** AI-generated or stock art needs its commercial terms
-  confirmed before it goes in a **paid** kids app, and any candidate
-  should be checked for watermarks.
+The audit requirement carries forward unchanged — see "Auditing a page
+for fillable regions" for the current baseline.
 
 ## Roadmap
 
@@ -970,8 +1023,11 @@ Don't re-plan these — they're done and verified:
    desktop browser: below 1030px the layout is a different arrangement.
 2. **Upload to Play.** The signed AAB exists (vc2 / 1.0.1 / API 35).
    Everything from §F2 onward is Play Console work, user-side.
-3. **Better page art** — see "Better coloring-page art", the biggest
-   lever on perceived quality.
+3. ~~**Better page art**~~ — DONE 2026-08-05: the 14 raster scenes
+   shipped, replacing the hand-drawn SVG set. ⚠ Two knock-ons:
+   `cover.jpg` still shows the retired SVG butterfly page (regenerate
+   from a real scene when convenient), and the staged store screenshots
+   predate the new pages entirely.
 4. **Pro billing** — see "Tiny Canvas Pro". Decided, unbuilt.
 5. **Stamps** — spec called for 60+. `STAMPS` array parallel to
    `BRUSHES`, tool button switching to a place-on-tap mode.

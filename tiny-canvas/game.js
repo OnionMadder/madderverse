@@ -969,12 +969,23 @@
        loudly; it just fills the wrong region, which reads as "the
        coloring page leaks". Cheaper to re-measure on every fill than to
        chase that. */
-    function fillGeomKey() {
+    /* The overlay's art element. Templates come in two formats — the
+       original inline SVG and the raster coloring pages (an <img> whose
+       lines are baked as alpha) — and every geometry consumer treats
+       them the same: measure the element's box, draw it into that box.
+       The <img> is sized with max-width/max-height + auto, so its
+       layout box IS its displayed content (no object-fit letterbox
+       inside the element to account for). */
+    function overlayArtEl() {
         const host = $("#lineArt");
-        const svg  = host && host.querySelector("svg");
-        const c    = canvas.getBoundingClientRect();
-        if (!svg) return canvas.width + "x" + canvas.height + ":none";
-        const r = svg.getBoundingClientRect();
+        return host ? host.querySelector("svg, img") : null;
+    }
+
+    function fillGeomKey() {
+        const art = overlayArtEl();
+        const c   = canvas.getBoundingClientRect();
+        if (!art) return canvas.width + "x" + canvas.height + ":none";
+        const r = art.getBoundingClientRect();
         return [canvas.width, canvas.height,
                 Math.round(r.left - c.left), Math.round(r.top - c.top),
                 Math.round(r.width), Math.round(r.height),
@@ -1000,43 +1011,103 @@
                 resolve(mask);
             }
 
-            const host = $("#lineArt");
-            const svg  = host && host.querySelector("svg");
+            const art = overlayArtEl();
             /* BLANK page — no line art, so nothing bounds the fill and
                a tap floods the whole canvas. That's the correct
                behaviour: on a blank page, fill IS "paint the paper". */
-            if (!svg) { done(); return; }
-
-            const svgRect    = svg.getBoundingClientRect();
-            const canvasRect = canvas.getBoundingClientRect();
-            if (!svgRect.width || !canvasRect.width) { done(); return; }
-
-            /* CSS px -> device px, same ratio the kid's strokes use. */
-            const scale = W / canvasRect.width;
-            const x = (svgRect.left - canvasRect.left) * scale;
-            const y = (svgRect.top  - canvasRect.top)  * scale;
-            const w = svgRect.width  * scale;
-            const h = svgRect.height * scale;
+            if (!art) { done(); return; }
 
             const off = document.createElement("canvas");
             off.width  = W;
             off.height = H;
             const o = off.getContext("2d", { willReadFrequently: true });
 
-            const blob = new Blob([svg.outerHTML],
+            /* Measure at DRAW time, not at call time — a raster page
+               may still be loading, and before load its <img> has no
+               intrinsic size so its box is empty. */
+            function artBox() {
+                const aR = art.getBoundingClientRect();
+                const cR = canvas.getBoundingClientRect();
+                if (!aR.width || !cR.width) return null;
+                /* CSS px -> device px, same ratio the kid's strokes use. */
+                const scale = W / cR.width;
+                return { x: (aR.left - cR.left) * scale,
+                         y: (aR.top  - cR.top)  * scale,
+                         w: aR.width  * scale,
+                         h: aR.height * scale };
+            }
+
+            function threshold() {
+                let d;
+                try {
+                    d = o.getImageData(0, 0, W, H).data;
+                } catch (_) { return false; }
+                for (let i = 0, a = 3; i < mask.length; i++, a += 4) {
+                    if (d[a] >= FILL_BOUNDARY_ALPHA) mask[i] = 1;
+                }
+                return true;
+            }
+
+            /* On a raster page the page EDGE is a boundary too: the
+               scenes are full-bleed, so their sky / wall / floor
+               regions run right to the image border. Without this a
+               tap on the sky escapes the page and floods the paper
+               margins all the way around the screen. A 2-device-px
+               frame confines fills to the page — the way a paper
+               coloring book behaves. SVG pages keep their old
+               open-margin behavior. */
+            function markPageBorder(b) {
+                const x0 = Math.max(0, Math.round(b.x));
+                const y0 = Math.max(0, Math.round(b.y));
+                const x1 = Math.min(W - 1, Math.round(b.x + b.w) - 1);
+                const y1 = Math.min(H - 1, Math.round(b.y + b.h) - 1);
+                if (x1 <= x0 || y1 <= y0) return;
+                for (let t = 0; t < 2; t++) {
+                    const ya = Math.min(y0 + t, H - 1);
+                    const yb = Math.max(y1 - t, 0);
+                    for (let x = x0; x <= x1; x++) {
+                        mask[ya * W + x] = 1;
+                        mask[yb * W + x] = 1;
+                    }
+                    const xa = Math.min(x0 + t, W - 1);
+                    const xb = Math.max(x1 - t, 0);
+                    for (let y = y0; y <= y1; y++) {
+                        mask[y * W + xa] = 1;
+                        mask[y * W + xb] = 1;
+                    }
+                }
+            }
+
+            /* Raster page: the <img> is already a drawable — no
+               serialize/blob roundtrip. Its alpha channel IS the line
+               art (ink baked as alpha), so the same threshold works. */
+            if (art.tagName === "IMG") {
+                const drawRaster = function () {
+                    const b = artBox();
+                    if (!b) { done(); return; }
+                    o.drawImage(art, b.x, b.y, b.w, b.h);
+                    if (threshold()) markPageBorder(b);
+                    done();
+                };
+                if (art.complete && art.naturalWidth) drawRaster();
+                else {
+                    art.addEventListener("load",  drawRaster, { once: true });
+                    art.addEventListener("error", done,       { once: true });
+                }
+                return;
+            }
+
+            /* SVG page: rasterize via Blob URL -> Image, as before. */
+            const b0 = artBox();
+            if (!b0) { done(); return; }
+            const blob = new Blob([art.outerHTML],
                                   { type: "image/svg+xml" });
             const url  = URL.createObjectURL(blob);
             const img  = new Image();
             img.onload = function () {
-                o.drawImage(img, x, y, w, h);
+                o.drawImage(img, b0.x, b0.y, b0.w, b0.h);
                 URL.revokeObjectURL(url);
-                let d;
-                try {
-                    d = o.getImageData(0, 0, W, H).data;
-                } catch (_) { done(); return; }
-                for (let i = 0, a = 3; i < mask.length; i++, a += 4) {
-                    if (d[a] >= FILL_BOUNDARY_ALPHA) mask[i] = 1;
-                }
+                threshold();
                 done();
             };
             img.onerror = function () {
@@ -1806,7 +1877,20 @@
         state.templateId   = tpl.id;
         state.templateName = tpl.name;
         const overlay = $("#lineArt");
-        overlay.innerHTML = tpl.svg || "";
+        if (tpl.image) {
+            /* Raster coloring page. Built as an element (not innerHTML)
+               so the src assignment and load events are on a node we
+               control; buildFillMask waits on this img's load if a
+               fill lands before the file arrives. */
+            const img = document.createElement("img");
+            img.src = tpl.image;
+            img.alt = "";
+            img.draggable = false;
+            overlay.innerHTML = "";
+            overlay.appendChild(img);
+        } else {
+            overlay.innerHTML = tpl.svg || "";
+        }
         /* New page, new boundaries. */
         invalidateFillMask();
         $("#drawTitle").innerHTML = "&lt;&nbsp;" + tpl.name + "&nbsp;&gt;";
@@ -1836,11 +1920,20 @@
 
             const thumb = document.createElement("div");
             thumb.className = "pick-thumb";
-            thumb.innerHTML = tpl.svg ||
-                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">' +
-                '<rect x="100" y="100" width="600" height="600" fill="none" ' +
-                'stroke="currentColor" stroke-width="6" stroke-dasharray="20 16"/>' +
-                '</svg>';
+            if (tpl.image) {
+                const im = document.createElement("img");
+                im.src = tpl.image;
+                im.alt = "";
+                im.loading = "lazy";
+                im.draggable = false;
+                thumb.appendChild(im);
+            } else {
+                thumb.innerHTML = tpl.svg ||
+                    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">' +
+                    '<rect x="100" y="100" width="600" height="600" fill="none" ' +
+                    'stroke="currentColor" stroke-width="6" stroke-dasharray="20 16"/>' +
+                    '</svg>';
+            }
             card.appendChild(thumb);
 
             const name = document.createElement("span");
@@ -2642,23 +2735,31 @@
             /* Line-art overlay, scaled by the SAME ratio used for the
                kid's strokes so the printed page lines up exactly with
                anything the kid drew on top of them. */
-            const lineArtHost = $("#lineArt");
-            const overlaySvg  = lineArtHost && lineArtHost.querySelector("svg");
-            if (!overlaySvg) { resolve(off.toDataURL("image/png")); return; }
+            const art = overlayArtEl();
+            if (!art) { resolve(off.toDataURL("image/png")); return; }
 
-            const svgRect    = overlaySvg.getBoundingClientRect();
+            const artRect    = art.getBoundingClientRect();
             const canvasRect = canvas.getBoundingClientRect();
-            if (svgRect.width === 0 || canvasRect.width === 0) {
+            if (artRect.width === 0 || canvasRect.width === 0) {
                 resolve(off.toDataURL("image/png"));
                 return;
             }
             const scale = outW / canvasRect.width;
-            const laX = (svgRect.left - canvasRect.left) * scale;
-            const laY = (svgRect.top  - canvasRect.top)  * scale;
-            const laW = svgRect.width  * scale;
-            const laH = svgRect.height * scale;
+            const laX = (artRect.left - canvasRect.left) * scale;
+            const laY = (artRect.top  - canvasRect.top)  * scale;
+            const laW = artRect.width  * scale;
+            const laH = artRect.height * scale;
 
-            const blob = new Blob([overlaySvg.outerHTML],
+            /* Raster page — the <img> is drawable as-is. */
+            if (art.tagName === "IMG") {
+                if (art.complete && art.naturalWidth) {
+                    o.drawImage(art, laX, laY, laW, laH);
+                }
+                resolve(off.toDataURL("image/png"));
+                return;
+            }
+
+            const blob = new Blob([art.outerHTML],
                                   { type: "image/svg+xml" });
             const url  = URL.createObjectURL(blob);
             const img  = new Image();

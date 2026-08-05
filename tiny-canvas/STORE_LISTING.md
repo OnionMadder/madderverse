@@ -47,10 +47,10 @@ A polished kids coloring app. Ad-free. No accounts. Nothing leaves the device.
 ## 4. Promotional text (App Store Connect, max 170 chars — can change post-submission without re-review)
 
 ```
-20 coloring pages, 6 distinct brushes, 36 colors, a sparkly gallery — all offline. No ads, no in-app purchases, no accounts. Your child's drawings stay on the device.
+14 richly detailed coloring scenes, 6 brushes, tap-to-fill, 42 colors, a sparkly gallery — all offline. No ads, no accounts. Your child's drawings stay on the device.
 ```
 
-(170 chars exactly.)
+(166 chars.)
 
 ---
 
@@ -60,9 +60,9 @@ A polished kids coloring app. Ad-free. No accounts. Nothing leaves the device.
 Tiny Canvas is a polished coloring app for kids that gets out of the way and lets them color. Pick a page, choose a brush, color it in, save it to the gallery. That's it.
 
 ✦ WHAT'S INSIDE
-• 20 hand-drawn coloring pages: friendly dog, smiling cat, unicorn, dragon, dinosaur, robot, rocket, castle, ice cream, donut, snowflake, and more.
-• 6 distinct brush types — pen, marker, crayon, pencil, paint, glitter — each with its own feel and texture.
-• 36 colors organized in 5 friendly groups: rainbow, pastels, neons, earth tones, and metallics.
+• 14 richly detailed coloring scenes: a cat in a cozy kitchen, a puppy in the forest, a unicorn glade, a rocket on the moon, a robot workshop, an underwater world, and more — plus a blank page for free drawing.
+• 6 distinct brush types — pen, marker, crayon, pencil, paint, glitter — each with its own feel and texture. Plus a tap-to-fill paint bucket with 8 fun patterns.
+• 42 colors organized in 5 friendly groups: rainbow, pastels, neons, earth tones, and metallics — plus a custom color picker.
 • Brush smoothing for little hands. Eraser, undo, clear.
 • A personal gallery where every saved drawing lives. Auto-save means nothing gets lost.
 • Sweet little sound effects you can turn off in Settings.
