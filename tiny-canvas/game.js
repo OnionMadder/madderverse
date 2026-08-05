@@ -2588,6 +2588,12 @@
 
     window.addEventListener("beforeinstallprompt", function (e) {
         e.preventDefault();
+        /* Never offer "install this app" from inside the installed app.
+           Chrome's Android WebView does fire beforeinstallprompt, so
+           without this gate the native build shows an INSTALL APP button
+           on its own title screen — which does nothing useful and reads
+           as a bug to anyone holding the phone. */
+        if (isNative()) return;
         deferredInstall = e;
         if (installBtn) installBtn.hidden = false;
     });
