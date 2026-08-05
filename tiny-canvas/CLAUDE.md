@@ -4,6 +4,25 @@ A polished kids coloring app. Pick a page, color it in, save it.
 Shipping to **App Store + Google Play + the web**, all from one codebase
 via Capacitor.
 
+## Where things stand (2026-08-05)
+
+- **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=25** — bump it
+  on every change to style.css / templates.js / game.js.
+- **Android release is BUILT and SIGNED but NOT UPLOADED.** versionCode
+  2 / versionName 1.0.1, targeting API 35. The upload keystore exists
+  (§F) — do not generate another. Play rejected vc1 for targeting API
+  34; that is fixed.
+- **Store assets are ready** in `store/` — 512 and 1024 icons, feature
+  graphic. `store/screenshots/` is still **empty** and screenshots are
+  the remaining blocker for the listing.
+- **Pro tier is decided but not built.** Pattern fills are the first
+  piece and are in, ungated. No billing code exists yet. See "Tiny
+  Canvas Pro" below.
+- **Rotation, stroke feel and fill behaviour are all device-verified.**
+  The only headless-unverifiable path left is anything that runs inside
+  requestAnimationFrame.
+
 **Read these first:**
 - The repo-root [`../CLAUDE.md`](../CLAUDE.md) for project-wide rules
   (no build system on the *static-site* games; absolute URLs for SEO;
@@ -63,6 +82,14 @@ Capacitor when you're packaging for a store.
 - **6 distinct brushes** (PEN / MARKER / CRAYON / PENCIL / PAINT /
   GLITTER), each with its own beginStroke + drawSegment + textural
   feel. Plus ERASER, plus the FILL bucket.
+- **FILL does MS Paint semantics**, not just template regions: it
+  spreads over pixels matching the colour under the finger and stops at
+  anything different, so the kid's OWN strokes bound it. The printed
+  line art is an absolute boundary on top of that via the mask.
+- **8 fill patterns** (dots, stripes, checks, stars, hearts, scales,
+  zigzag, grid) + solid. Each is a MASK painted in the armed colour, so
+  one tile serves all 42 colours; gaps are left untouched so paper shows
+  through. All drawn in code — no image assets.
 - **42 colors in 5 groups** (RAINBOW 12 / PASTELS 10 / NEONS 7 /
   EARTH 8 / METALLIC 5) via tab switcher, plus a custom picker.
   ⚠ The fill tool distinguishes colours by a squared tolerance of 6, so
@@ -168,6 +195,7 @@ tiny-canvas/
 | **STATE** | Single object. `screen`, `templateId/Name`, brush + size + color, smoothing buffer (`smoothX/Y`), drawing state, history stack, parent-gate flags, settings sub-object. |
 | **AUDIO** | Lazy `ensureAudio()`. `sfxTap/Erase/Save/Swoosh` — all SFX-toggle-gated via `audioEnabled()`. |
 | **CANVAS SETUP** | `setupCanvas()` measures the canvas's **own laid-out box** (falling back to `innerWidth`/`innerHeight` only when it has none yet, i.e. the draw screen is still hidden at init), sets `STAGE_W`/`STAGE_H` from it, resizes the backing store to `STAGE_W*dpr × STAGE_H*dpr` and rescales the context. `getPos(e)` maps pointer coords into logical canvas space off that same box. **Both must derive from the same measurement** — see "Things that bite". |
+| **FILL PATTERNS** | `FILL_PATTERNS` (8 tiles + solid), each a `draw(ctx,size)` that paints coverage into a tile; `patternTile(id)` rasterizes once per DPR and caches a `Uint8Array` of alpha. `state.fillPattern` holds the armed id. Chips live in the pattern row, which swaps in for the SIZE row when FILL is armed. |
 | **FILL MASK** | `buildFillMask()` rasterizes the line-art SVG into a 1-byte-per-pixel boundary mask aligned to the canvas, `floodFillAt()` scanline-fills the tapped region against it. `fillGeomKey()` fingerprints every geometry input (canvas size, svg rect, template id) so a stale mask rebuilds itself. Boundary threshold `FILL_BOUNDARY_ALPHA=96` — high on purpose so fill runs *under* the antialiased stroke skirt and leaves no pale halo; the line art draws on top, so the underlap is invisible. |
 | **HISTORY** | Dirty-rect patches, not full snapshots. `beginHistoryCapture()` blits the canvas into an offscreen buffer (cheap, no encode); the stroke path grows a bounding box via `growBounds`; `commitHistory()` keeps only that rectangle as raw `ImageData`. `undo()` is synchronous (`putImageData`). See "Things that bite" for why the box needs slack. |
 | **DRAWING** | Pointer handlers delegate to the active brush. Midpoint-quadratic smoothing one layer above the brush API: pointer-down → set smoothX/Y = raw point + brush.beginStroke; pointer-move → drawSegment from smoothed to midpoint(last, current); pointer-up → drawSegment final raw segment so the line doesn't stop short of the finger. |
@@ -799,6 +827,102 @@ From `scripts/capture-screenshots.js`:
 
 ---
 
+## Tiny Canvas Pro — decided, not built
+
+A **99¢ one-off unlock**, decided 2026-08-05. Not a separate app, not
+packs, not a subscription.
+
+**The governing rule, in Onion's words:**
+
+> "we never ever remove the value from the 'lowest common denominator'
+> audience. every kid should be able to play the game, period. and they
+> should want to play it, because it's fun and has features and never
+> shows ads. that's the whole model, the walled purchase is just a way
+> for me to recover costs of creating apps."
+
+So Pro is **purely additive**. Never propose capping, watermarking or
+degrading anything free already does. Tools, colours and core mechanics
+belong to everyone; Pro is **content abundance**, in the shape of Slip
+Studio's value pass — many dimensions each with lots of options, never
+engagement tricks.
+
+**Why one unlock rather than packs:** Pootery carries five product ids,
+five entitlements and a Play Console catalogue to keep in sync. A single
+flag means every future pack lands in Pro automatically, so what a
+parent bought keeps growing without a single new SKU.
+
+**Where the upsell lives:** behind the **existing parent gate**, in
+Settings. NOT in the picker. No padlocks, no greyed rows, no "Pro"
+badges in the child's flow — Apple Kids and Play Families both look for
+pressure on children, and a kid tapping a locked unicorn ten times is
+unkind regardless of policy. The kid should experience the free app as
+complete; the parent finds the upgrade by going looking.
+
+**Planned contents** (free keeps everything it has):
+
+| Dimension | Free | Pro adds |
+|---|---|---|
+| Pages | 35 | +100 in themed packs |
+| Fill patterns | solid only | the 8 tiles (BUILT, currently ungated) |
+| Stamps | — | 60+ |
+| Paper textures | 1 | ~8 |
+| Frames | — | ~12 |
+| Brushes | 7 | +4 (spray, smudge, rainbow, glow) |
+| Export | plain PNG | framed presets, print layout |
+
+Pattern fills, paper textures and frames are the cheap ones — they reuse
+the fill mask, a CSS background swap, and `composePng()` respectively.
+Pages and stamps are genuine content work.
+
+**Billing is not written.** When it is: RevenueCat with ONE entitlement
+(Pootery's `initBilling` / `purchasePack` / `restorePurchases` /
+`syncEntitlements` is the reference, minus four fifths of it), a
+"Restore Purchases" button because both stores expect one, and the flag
+mirrored to Capacitor Preferences like settings already are. Gating
+pattern fills is then a check in the chip handler.
+
+⚠ `privacy/index.html` and `STORE_LISTING.md` both currently state **"no
+in-app purchases."** Both need updating before any billing ships.
+
+## Better coloring-page art — the open question
+
+The current 35 templates are hand-written SVG and, in Onion's words,
+"fine right now for a free filler app but the art leaves a lot to be
+desired." Raising that bar is the biggest single lever on perceived
+quality. Unresolved as of 2026-08-05; here is the state of the analysis.
+
+**The engine only accepts inline SVG today.** `loadTemplate` does
+`overlay.innerHTML = tpl.svg` and `buildFillMask` does
+`host.querySelector("svg")`, thresholding **alpha ≥ 96**. A PNG has no
+alpha — black lines on white — so raster art needs a **luminance**
+threshold branch. Small change, not architectural.
+
+**Prefer vectorizing over shipping raster.** `tools/vectorize-character.py`
+in the comic-chat-composer repo is OpenCV-based and built for exactly
+this: its notes record the trace coming out **60–70% smaller than the
+PNGs** and being resolution-independent, which matters because the canvas
+is viewport-sized. Two findings carry over verbatim: **do not smooth
+traced contours** (Catmull-Rom overshoots and shreds thin lines — emit
+polylines), and **score the trace against the original image, not against
+your own threshold mask**, or you have only proven the tracer matched the
+threshold.
+
+**Whatever the source, audit it.** Closedness is what decides a page,
+and it cannot be judged by eye — the snowflake looked correct and had 2
+fillable regions. Rasterize, threshold at 96, count connected components
+that do not touch the edge. Baseline for the current set is **34 pages,
+406 regions, median 11**. See "Auditing a page for fillable regions".
+
+**Two constraints on any new art source:**
+
+- **Aspect ratio.** Templates are a square `viewBox="0 0 800 800"`
+  letterboxed into the viewport. Landscape art becomes a short band with
+  large empty margins on a portrait phone. Either keep pages squarish or
+  handle landscape explicitly.
+- **Provenance.** AI-generated or stock art needs its commercial terms
+  confirmed before it goes in a **paid** kids app, and any candidate
+  should be checked for watermarks.
+
 ## Roadmap
 
 ### Shipped since the v1.0 checklist was written (2026-08-04)
@@ -822,22 +946,42 @@ Don't re-plan these — they're done and verified:
   `clearCanvas()` wiped the entry it had just pushed, so an accidental
   CLEAR destroyed the drawing outright.
 
+### Also shipped 2026-08-05 (all device-verified)
+
+- **Fill does MS Paint semantics** — bounded by the kid's own strokes,
+  not just template lines.
+- **Fill tolerance corrected** 48 → 6. It was wider than the palette's
+  own minimum separation, so tapping a line could swallow an adjacent
+  fill. The duplicate `#00ffd5` was removed; separation is now 18.4.
+- **Strokes are smooth** — the wet-layer rewrite; no more beads at each
+  pointer sample.
+- **One undo, in the tray.** Both marquees removed. Madderverse dropped
+  from the footer.
+- **Rotation keeps the drawing centred** (was pinned to the top-left).
+- **Pattern fills** — the first Pro content layer, currently ungated.
+- **cover.jpg** exists and is live on the hub.
+- **Store assets** in `store/`; **release keystore** generated and
+  backed up; **API 35** build produced.
+
 ### Still open
 
-1. **Stamps** — the spec called for 60+, still deferred. Whole new tool
-   category. Implementation pattern: `STAMPS` array parallel to
-   `BRUSHES`, tool button switching to a mode where pointer-down places
-   the stamp SVG instead of drawing a stroke.
-2. **More templates** — 35 now; more is always better for a colouring
-   app. Read the region-audit section above before authoring.
-3. **Native save-to-photo-library directly** (skip share sheet) —
+1. **Screenshots** — `store/screenshots/` is empty and this is the
+   remaining blocker for the Play listing. Shoot on a device, not a
+   desktop browser: below 1030px the layout is a different arrangement.
+2. **Upload to Play.** The signed AAB exists (vc2 / 1.0.1 / API 35).
+   Everything from §F2 onward is Play Console work, user-side.
+3. **Better page art** — see "Better coloring-page art", the biggest
+   lever on perceived quality.
+4. **Pro billing** — see "Tiny Canvas Pro". Decided, unbuilt.
+5. **Stamps** — spec called for 60+. `STAMPS` array parallel to
+   `BRUSHES`, tool button switching to a place-on-tap mode.
+6. **More templates** — read the region-audit section before authoring.
+7. **Native save-to-photo-library directly** (skip share sheet) —
    requires `@capacitor-community/camera-preview` or a small custom
    plugin. Share-sheet path works.
-4. **Cover.jpg for the hub** — still missing from `tiny-canvas/`.
-5. **Localization** — the locale stub in Settings is shipped UI. Add a
+8. **Localization** — the locale stub in Settings is shipped UI. Add a
    locale dictionary + i18n wrapper around all visible strings.
-6. **More brushes** — spray, smudge.
-7. **Rotation / orientation-change behaviour is UNVERIFIED.** The
-   resize path rebuilds the backing store inside a `requestAnimationFrame`
-   callback, which never fires in a non-compositing preview, so this
-   could not be exercised. Needs a real device.
+9. **More brushes** — spray, smudge.
+10. **Edge-to-edge, before the API 36 bump.** The current opt-out is
+    deprecated in 36; the titlebar and tool rail need real safe-area
+    padding. Groundwork is half done.

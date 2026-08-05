@@ -521,7 +521,9 @@ Two things that make it unlike every other game in this repo:
   `tiny-canvas/assets/fonts/`. Don't "helpfully" restore either one.
   This is the documented per-product exception — see `DESIGN.md §16`.
 
-**Status: advertised on the hub since 2026-08-04** — grid card (last
+**Status: web build advertised on the hub since 2026-08-04; Android release built, signed and targeting API 35 but NOT yet uploaded — screenshots are the remaining blocker.** A 99¢ Pro unlock is decided but unbuilt; see the game's own CLAUDE.md.
+
+**Status detail:** — grid card (last
 real card, before "More Soon"), JSON-LD `ItemList` position 9,
 `sitemap.xml`, `llms.txt`. `cover.jpg` exists.
 
@@ -539,7 +541,7 @@ hand-painted asset.
 
 Its own cache-bust convention applies: **bump `?v=N` in
 `tiny-canvas/index.html` on every change** to `style.css`,
-`templates.js` or `game.js` (currently v12).
+`templates.js` or `game.js` (currently v25).
 
 ---
 
