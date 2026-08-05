@@ -1026,10 +1026,11 @@ Don't re-plan these — they're done and verified:
 2. **Upload to Play.** The signed AAB exists (vc2 / 1.0.1 / API 35).
    Everything from §F2 onward is Play Console work, user-side.
 3. ~~**Better page art**~~ — DONE 2026-08-05: the 14 raster scenes
-   shipped, replacing the hand-drawn SVG set. ⚠ Two knock-ons:
-   `cover.jpg` still shows the retired SVG butterfly page (regenerate
-   from a real scene when convenient), and the staged store screenshots
-   predate the new pages entirely.
+   shipped, replacing the hand-drawn SVG set. `cover.jpg` was
+   regenerated the same day from the KITCHEN CAT page via
+   `scripts/make-cover.py` (half-colored with the fill tool's own
+   region model — re-run the script to regenerate). Remaining knock-on:
+   the staged store screenshots still predate the new pages entirely.
 4. **Pro billing** — see "Tiny Canvas Pro". Decided, unbuilt.
 5. **Stamps** — spec called for 60+. `STAMPS` array parallel to
    `BRUSHES`, tool button switching to a place-on-tap mode.
