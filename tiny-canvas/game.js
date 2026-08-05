@@ -1100,11 +1100,24 @@
                 return;
             }
 
-            /* Tolerance, squared. Brush strokes and the SVG's own edges
-               are antialiased, so an exact match would stop a pixel or
-               two early and ring every fill with a pale halo. Kept
-               modest so a soft edge isn't treated as open ground. */
-            const TOL2 = 48 * 48;
+            /* Tolerance, squared. Some slack is needed because brush
+               strokes and SVG edges are antialiased, so an exact match
+               stops a pixel early and rings the fill with a pale halo.
+
+               ⚠ But it MUST stay below the closest pair of colours in
+               COLOR_GROUPS, or the flood cannot tell them apart. The
+               palette's tightest pair is #00ffcc / #00ffd5, a distance
+               of just 9. At the old tolerance of 48 they were the same
+               colour as far as fill was concerned: draw an outline in
+               one, fill the interior with the other, then tap the
+               outline to recolour it and the flood ran straight through
+               into the interior and swallowed it whole. 31 of the
+               palette's pairs were colliding that way.
+
+               6 is comfortably under 9 and still absorbs antialiasing.
+               If new colours are ever added, re-check the minimum
+               pairwise distance against this number. */
+            const TOL2 = 6 * 6;
             function matches(i) {
                 if (mask[i]) return false;
                 const q = i * 4;
