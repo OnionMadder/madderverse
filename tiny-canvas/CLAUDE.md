@@ -571,7 +571,54 @@ It should list only `index.html`, `game.js`, `templates.js`,
 Anything else — `CLAUDE.md`, `cover.jpg`, `node_modules/` — means the
 staging step was bypassed.
 
-## F. Android signing key (CRITICAL, ONE-WAY DOOR)
+## F. Android signing key — DONE (2026-08-05)
+
+**The upload keystore exists. Do not generate another one.**
+
+```
+  keystore : android/app/tiny-canvas-release.keystore   (PKCS12, 10000 days)
+  props    : android/keystore.properties                (gitignored)
+  alias    : tinycanvas
+  store pw : tinycanvas_2026_release
+  key pw   : tinycanvas_2026_release
+  DN       : CN=Tiny Canvas, OU=Mad Sundar LLC, O=Mad Sundar LLC, C=US
+  SHA256   : 5B:08:5A:48:7C:05:A3:A8:B9:CB:0C:E0:B3:11:E6:70:
+             77:C7:BF:DA:07:C5:B0:B5:1E:02:BA:9B:6C:0D:84:25
+```
+
+**No `L=` / `ST=` fields, deliberately** — the older Pootery and Slip
+Studio keystores carry a Minneapolis/Minnesota decoy that is not Onion's
+location; All Munkis already dropped them and this follows All Munkis.
+
+**Backed up to `~/Keystore-Backups/tiny-canvas/`** (keystore, properties
+and a README with these details). That backup is the ONLY durable copy —
+`android/` is untracked and both files are gitignored. Losing it means
+the listing can never be updated again; you would have to republish
+under a new package id and lose installs and reviews. Put a second copy
+somewhere physically separate.
+
+`app/build.gradle` reads the creds from `android/keystore.properties`
+via a `signingConfigs.release` block, the same shape all-munkis uses,
+and bails safely when the file is absent so debug builds still work on a
+machine without the keystore.
+
+### Release builds
+
+```bash
+node scripts/build-www.mjs && npx cap copy android
+cd android && JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot"     ./gradlew assembleRelease bundleRelease --console=plain
+#   APK (sideload/testing) -> app/build/outputs/apk/release/app-release.apk
+#   AAB (Play upload)      -> app/build/outputs/bundle/release/app-release.aab
+```
+
+Bump `versionCode` (and `versionName`) in `android/app/build.gradle`
+before every Play upload. Verify a build actually got signed with:
+
+```bash
+jarsigner -verify -verbose:summary -certs app-release.aab | grep CN=
+```
+
+## F2. Play Console steps (still to do, user-side)
 
 **Application ID: `org.madderverse.tinycanvas` — DECIDED 2026-08-04,
 don't relitigate.** That is the `org.madderverse.*` namespace, i.e. the
