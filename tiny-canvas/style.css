@@ -587,8 +587,18 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 .draw-marquee span {
     display: inline-block;
     white-space: nowrap;
-    animation: marquee 42s linear infinite;
-    padding-left: 100%;
+    /* Starts ALREADY full of text. It used to be `padding-left: 100%`
+       on a 42s loop, so the strip spent the first ~20 seconds empty —
+       a kid arriving on the draw screen saw a blank pink pill under
+       the header that reads as a broken text field, not as decoration.
+       The span repeats its phrase, so sliding to -50% loops seamlessly
+       with the strip full the whole time. */
+    animation: marquee-slide 38s linear infinite;
+}
+
+@keyframes marquee-slide {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
 }
 
 /* The "stack" becomes a frameless container for the fixed-position
@@ -706,10 +716,24 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 
 /* Floating undo button — top-right of the viewport, clear of the
    floating titlebar. */
+/* ⚠ These two float BELOW the titlebar, not level with it.
+   Both used to sit at top:16px — which is exactly where the titlebar's
+   back button and status label already are. The PAGES pill landed on
+   top of "← HOME", covering the arrow, and UNDO landed under "READY"
+   at the very edge of the screen, clipped and (being disabled by
+   default) faded to 35% opacity. The single most important safety
+   control in a kids' drawing app was a pale grey sliver hiding behind
+   a status label.
+   --overlay-top clears the titlebar and respects the notch, since the
+   page is viewport-fit=cover. */
+:root {
+    --overlay-top: calc(env(safe-area-inset-top, 0px) + 76px);
+}
+
 #screen-draw #undoBtn {
     position: fixed;
-    top: 16px;
-    right: 16px;
+    top: var(--overlay-top);
+    right: 14px;
     z-index: 60;
 }
 
@@ -719,8 +743,8 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    a tiny grid glyph + a short label so it reads at a glance. */
 #screen-draw .pages-btn {
     position: fixed;
-    top: 16px;
-    left: 16px;
+    top: var(--overlay-top);
+    left: 14px;
     z-index: 60;
     width: auto;
     height: 40px;
@@ -900,14 +924,16 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 /* Shared floating-overlay button base — actual fixed positioning is
    set per-screen (see #screen-draw .canvas-overlay-btn above). */
 .canvas-overlay-btn {
-    width: 40px;
-    height: 40px;
+    /* 48px, not 40 — this is the undo target for a small child, and 40
+       was under the 44px minimum touch target both platforms publish. */
+    width: 48px;
+    height: 48px;
     padding: 0;
     border-radius: 50%;
     background: rgba(12, 31, 37, 0.85);
     border: 1px solid var(--teal-low);
     color: var(--teal);
-    font-size: 20px;
+    font-size: 24px;
     line-height: 1;
     cursor: pointer;
     backdrop-filter: blur(4px);
@@ -933,7 +959,11 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 .canvas-overlay-btn:active { transform: translateY(1px); }
 
 .canvas-overlay-btn[disabled] {
-    opacity: 0.35;
+    /* Was 0.35 — near-invisible against the light paper canvas, on the
+       one control a kid reaches for after a mistake. Still clearly
+       "off", but still clearly THERE, so it can be found before it's
+       needed. */
+    opacity: 0.6;
     cursor: not-allowed;
     color: var(--ink-low);
     border-color: var(--ink-low);
@@ -995,7 +1025,11 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    label underneath — readable at any rail width, never truncates. */
 .tool-modes {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* 4 across, not 3. With 3 columns the seven brush tools left FILL
+       stranded alone on a third row beside two empty cells, which reads
+       as an unfinished grid. Four columns packs them 4+3 and lets the
+       full-width ERASE close the block deliberately. */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
 }
 
@@ -1147,9 +1181,13 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     gap: 4px;
     padding-bottom: 4px;
     border-bottom: 1px dashed var(--teal-low);
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
+    /* WRAP, don't scroll. Five tabs don't fit 390px, and this used to
+       scroll with `scrollbar-width: none` — so METALLIC was simply cut
+       off mid-word with no scrollbar, no fade, nothing to suggest it
+       could be reached. A hidden-scrollbar overflow reads as a broken
+       layout, not as an invitation to swipe. Wrapping shows all five. */
+    flex-wrap: wrap;
+    row-gap: 5px;
 }
 .palette-tabs-host::-webkit-scrollbar { display: none; }
 

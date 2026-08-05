@@ -1546,8 +1546,18 @@
         });
     }
 
+    /* Held across rebuilds. The custom swatch lives in the markup as a
+       sibling of #colorPalette (buildPalette rewrites that container's
+       innerHTML, which would destroy it), but visually it belongs as
+       the LAST swatch in the wrapping flow — as a sibling it stacked to
+       the right of the whole block and floated off on its own line.
+       innerHTML="" only detaches it; holding the node keeps its
+       listeners, so re-appending each rebuild is safe. */
+    let customSwatchEl = null;
+
     function buildPalette() {
         const palette = $("#colorPalette");
+        if (!customSwatchEl) customSwatchEl = $("#customSwatch");
         palette.innerHTML = "";
         const colors = COLOR_GROUPS[state.colorGroup].colors;
         colors.forEach(function (hex) {
@@ -1572,13 +1582,37 @@
             });
             palette.appendChild(sw);
         });
+        /* Custom swatch goes last, inside the same wrapping flow. */
+        if (customSwatchEl) palette.appendChild(customSwatchEl);
     }
 
     function refreshPaletteActive() {
+        let matchedPreset = false;
         $$("#colorPalette .swatch").forEach(function (sw) {
-            sw.classList.toggle("active",
-                sw.getAttribute("data-color") === state.currentColor);
+            const on = sw.getAttribute("data-color") === state.currentColor;
+            if (on) matchedPreset = true;
+            sw.classList.toggle("active", on);
         });
+        syncCustomColorInput(matchedPreset);
+    }
+
+    /* Point the native colour input at whatever colour is actually
+       armed. Its value was set once in the HTML and never touched
+       again, so the picker always opened on that hardcoded pink no
+       matter what the kid was drawing with — you'd tap it to nudge
+       your green and land back at magenta.
+       The swatch itself KEEPS its rainbow gradient rather than being
+       repainted with the chosen colour: the rainbow is what says "pick
+       any colour", and overwriting it would spend that affordance on
+       the first use. Which colour is armed is shown by the active ring
+       instead, same as every preset. */
+    function syncCustomColorInput(matchedPreset) {
+        const custom = $("#customColor");
+        const wrap   = $("#customSwatch");
+        if (custom && /^#[0-9a-f]{6}$/i.test(state.currentColor)) {
+            custom.value = state.currentColor;
+        }
+        if (wrap) wrap.classList.toggle("active", !matchedPreset);
     }
 
     function refreshToolButtons() {
@@ -1885,7 +1919,6 @@
         if (custom) {
             const applyCustom = function () {
                 state.currentColor = custom.value;
-                if (customWrap) customWrap.style.background = custom.value;
                 /* Same courtesy the preset swatches do: picking a
                    colour while the eraser is armed means the kid wants
                    to draw, not rub out. */
