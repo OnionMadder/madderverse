@@ -179,36 +179,6 @@ a:focus-visible {
     position: relative;
 }
 
-.marquee-tape {
-    width: 100%;
-    overflow: hidden;
-    border-top: 2px solid var(--pink);
-    border-bottom: 2px solid var(--pink);
-    background: repeating-linear-gradient(45deg,
-        rgba(255, 46, 136, 0.12) 0 12px,
-        transparent 12px 24px);
-    padding: 6px 0;
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 1.2px;
-    color: var(--ink);
-    box-shadow:
-        0 0 12px rgba(255, 46, 136, 0.25),
-        inset 0 0 24px rgba(0, 0, 0, 0.4);
-}
-
-.marquee-tape span {
-    display: inline-block;
-    white-space: nowrap;
-    animation: marquee 28s linear infinite;
-    padding-left: 100%;
-}
-
-@keyframes marquee {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-100%); }
-}
-
 .big-title {
     font-family: var(--font-title);
     margin: 0;
@@ -559,47 +529,6 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 }
 #screen-draw .screen-title  { color: var(--pink-deep);  }
 #screen-draw .screen-status { color: var(--teal-low);   }
-
-/* Marquee strip — slim pink-bordered ribbon sitting just below the
-   floating titlebar. Same energy as before, repositioned for the
-   floating layout. */
-.draw-marquee {
-    position: fixed;
-    top: 64px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(640px, calc(100vw - 24px));
-    overflow: hidden;
-    border: 1.5px solid var(--pink);
-    border-radius: 14px;
-    background: rgba(251, 250, 246, 0.65);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    padding: 3px 0;
-    font-family: var(--font-mono);
-    font-size: 9px;
-    letter-spacing: 1.2px;
-    color: var(--pink-deep);
-    box-shadow: 0 0 10px rgba(255, 46, 136, 0.18);
-    z-index: 45;
-}
-
-.draw-marquee span {
-    display: inline-block;
-    white-space: nowrap;
-    /* Starts ALREADY full of text. It used to be `padding-left: 100%`
-       on a 42s loop, so the strip spent the first ~20 seconds empty —
-       a kid arriving on the draw screen saw a blank pink pill under
-       the header that reads as a broken text field, not as decoration.
-       The span repeats its phrase, so sliding to -50% loops seamlessly
-       with the strip full the whole time. */
-    animation: marquee-slide 38s linear infinite;
-}
-
-@keyframes marquee-slide {
-    from { transform: translateX(0); }
-    to   { transform: translateX(-50%); }
-}
 
 /* The "stack" becomes a frameless container for the fixed-position
    canvas + line-art + onion. No layout duties. */
@@ -1667,7 +1596,7 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
        floating panel anchored to the right edge of the viewport. */
     .draw-side-rail {
         position: fixed;
-        top: 112px;                /* below titlebar + marquee */
+        top: 112px;                /* below the titlebar */
         right: 12px;
         bottom: 40px;              /* clear of slim footer */
         width: 320px;
@@ -2070,9 +1999,7 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .big-title,
-    .marquee-tape span,
-    .draw-marquee span {
+    .big-title {
         animation: none;
     }
 }
