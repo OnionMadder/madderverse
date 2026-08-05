@@ -508,6 +508,18 @@ From `tiny-canvas/`:
 
 ## F. Android signing key (CRITICAL, ONE-WAY DOOR)
 
+**Application ID: `org.madderverse.tinycanvas` — DECIDED 2026-08-04,
+don't relitigate.** That is the `org.madderverse.*` namespace, i.e. the
+**Mad Sundar LLC** dev account, matching Pootery and Slip Studio.
+
+It is deliberately NOT the `com.onionmadder.*` namespace that All Munkis
+(`com.onionmadder.munkis`) and mComic '96 (`com.onionmadder.mcomic`)
+moved to. Those went to Onion's personal dev account, and Play does not
+let two accounts share a package id — so this choice picks the account
+too, and it cannot be changed after the first upload without shipping as
+a brand-new listing. `capacitor.config.json` and `STORE_LISTING.md`
+already agree; if you change one, change all three.
+
 The release keystore signs every Play Store update for the life of
 the app. If you lose it, you cannot publish updates as the same app
 — you must start fresh under a new application ID.
@@ -518,6 +530,14 @@ the app. If you lose it, you cannot publish updates as the same app
               -keyalg RSA -keysize 2048 -validity 10000 \
               -alias tinycanvas
       ```
+- [ ] **Give the DN no `L=` / `ST=` fields.** The older Mad Sundar
+      keystores (Pootery, Slip Studio) carry `L=Minneapolis,
+      ST=Minnesota`, which is a decoy and *not* Onion's location — the
+      root CLAUDE.md warns never to repeat those values as her location
+      anywhere. The newer All Munkis keystore dropped them entirely
+      (`CN=All Munkis, O=Onion Madder, C=US`). Follow All Munkis, not
+      the older pair: a DN with no location can't leak one. So:
+      `CN=Tiny Canvas, OU=Mad Sundar LLC, O=Mad Sundar LLC, C=US`.
 - [ ] **Back up the .jks file to TWO physically separate locations**
       (e.g. encrypted USB drive in a different room + a password
       manager attachment).
