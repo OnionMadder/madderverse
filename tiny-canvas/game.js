@@ -52,7 +52,7 @@
             label: "NEONS",
             colors: [
                 "#ff0080", "#ff5500", "#ffea00", "#00ff5e",
-                "#00ffd5", "#00b0ff", "#7a00ff", "#ff00d4"
+                "#00b0ff", "#7a00ff", "#ff00d4"
             ]
         },
         earth: {

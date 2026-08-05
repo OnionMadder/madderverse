@@ -57,6 +57,14 @@ cut(/[ \t]*<a class="madder-home"[\s\S]*?<\/a>\r?\n/,
 cut(/[ \t]*<footer class="site-footer-slim"[\s\S]*?<\/footer>\r?\n/,
     "site footer");
 
+/* INSTALL APP is a PWA prompt and is meaningless inside the installed
+   app. game.js also refuses to reveal it when isNative(), but that is a
+   runtime guard on markup that should not be in the payload at all —
+   strip it so the native build cannot show it even if the guard is
+   later changed or the WebView behaves unexpectedly. */
+cut(/[ \t]*<button class="big-btn install" id="btnInstall"[\s\S]*?<\/button>\r?\n/,
+    "INSTALL APP button");
+
 /* Belt and braces: if any of that chrome is reintroduced, keep it hidden
    in the app rather than letting it render a dead link. */
 html = html.replace("</head>",

@@ -40,3 +40,9 @@ www/
 
 # Rasterized icon sources for @capacitor/assets, generated from icons/*.svg
 .assetsrc/
+
+# Signing material — NEVER commit. Mirrored to ~/Keystore-Backups/tiny-canvas/,
+# which is the only durable copy since android/ is untracked.
+*.keystore
+*.jks
+keystore.properties
