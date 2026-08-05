@@ -1,7 +1,7 @@
 {
     "appId": "org.madderverse.tinycanvas",
     "appName": "Tiny Canvas",
-    "webDir": ".",
+    "webDir": "www",
     "bundledWebRuntime": false,
     "server": {
         "androidScheme": "https"
