@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=22" />
+    <link rel="stylesheet" href="style.css?v=25" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -386,6 +386,14 @@
 
                 </div>
 
+                <!-- Shown only while FILL is armed, standing in for the
+                     SIZE row (a bucket has no nib). Chips injected by
+                     buildPatternButtons(). -->
+                <div class="tool-row pattern-row" hidden>
+                    <span class="row-label">FILL</span>
+                    <div class="pattern-host" id="patternRow"></div>
+                </div>
+
                 <div class="tool-row size-row">
                     <span class="row-label">SIZE</span>
                     <!-- Size buttons injected by rebuildSizeButtons() each
@@ -634,8 +642,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=22"></script>
-<script src="game.js?v=22"></script>
+<script src="templates.js?v=25"></script>
+<script src="game.js?v=25"></script>
 
 </body>
 </html>

@@ -394,7 +394,8 @@
         templateId:    null,                    /* current template */
         templateName:  "BLANK",
         currentColor:  COLOR_GROUPS.rainbow.colors[0],
-        currentTool:   "pen",                   /* any key in BRUSHES */
+        currentTool:   "pen",
+        fillPattern:   "solid",   /* id from FILL_PATTERNS */                   /* any key in BRUSHES */
         colorGroup:    "rainbow",               /* active palette group */
         brushSize:     BRUSHES.pen.defaultSize, /* size for whichever brush is active */
         eraserSize:    BRUSHES.eraser.defaultSize,
@@ -1047,6 +1048,145 @@
         return fillMaskPending;
     }
 
+    /* ---------- 4c. FILL PATTERNS ----------
+
+       Tap-to-fill can lay down a repeating pattern instead of a flat
+       colour. The pattern is a MASK, painted in whichever colour is
+       armed — so one tile works with all 42 colours rather than being
+       one fixed look. That is the same call Slip Studio made with
+       tint-able motif silhouettes, and it is why a handful of tiles
+       reads as a lot of content.
+
+       Every tile is drawn in code. No image assets: they cost nothing
+       to ship, stay crisp at any DPR, and keep the app's "bundles
+       everything, requests nothing" posture intact.
+
+       Gaps in the pattern are left ALONE rather than painted, so the
+       paper (or whatever the region already held) shows through and the
+       result reads as stamped rather than as a flat two-tone block. */
+
+    const PATTERN_TILE = 30;        /* logical px, before DPR scaling */
+
+    const FILL_PATTERNS = [
+        { id: "solid", label: "SOLID", draw: null },
+
+        { id: "dots", label: "DOTS", draw: function (c, s) {
+            for (const [x, y] of [[0.25, 0.25], [0.75, 0.75]]) {
+                c.beginPath();
+                c.arc(x * s, y * s, s * 0.15, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+
+        { id: "stripes", label: "STRIPES", draw: function (c, s) {
+            c.lineWidth = s * 0.22;
+            c.beginPath();
+            for (let i = -1; i <= 2; i++) {
+                c.moveTo(i * s - s * 0.2, -s * 0.2);
+                c.lineTo(i * s + s * 1.2, s * 1.2);
+            }
+            c.stroke();
+        } },
+
+        { id: "check", label: "CHECKS", draw: function (c, s) {
+            c.fillRect(0, 0, s / 2, s / 2);
+            c.fillRect(s / 2, s / 2, s / 2, s / 2);
+        } },
+
+        { id: "stars", label: "STARS", draw: function (c, s) {
+            const star = function (cx, cy, r) {
+                c.beginPath();
+                for (let i = 0; i < 10; i++) {
+                    const a = (Math.PI / 5) * i - Math.PI / 2;
+                    const rr = i % 2 ? r * 0.45 : r;
+                    const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+                    if (i) c.lineTo(x, y); else c.moveTo(x, y);
+                }
+                c.closePath();
+                c.fill();
+            };
+            star(s * 0.3, s * 0.3, s * 0.2);
+            star(s * 0.78, s * 0.74, s * 0.15);
+        } },
+
+        { id: "hearts", label: "HEARTS", draw: function (c, s) {
+            const heart = function (cx, cy, r) {
+                c.beginPath();
+                c.moveTo(cx, cy + r * 0.75);
+                c.bezierCurveTo(cx - r * 1.5, cy - r * 0.4,
+                                cx - r * 0.5, cy - r * 1.2, cx, cy - r * 0.35);
+                c.bezierCurveTo(cx + r * 0.5, cy - r * 1.2,
+                                cx + r * 1.5, cy - r * 0.4, cx, cy + r * 0.75);
+                c.fill();
+            };
+            heart(s * 0.3, s * 0.32, s * 0.2);
+            heart(s * 0.78, s * 0.76, s * 0.16);
+        } },
+
+        { id: "scales", label: "SCALES", draw: function (c, s) {
+            c.lineWidth = s * 0.1;
+            for (let row = -1; row <= 2; row++) {
+                for (let i = -1; i <= 2; i++) {
+                    c.beginPath();
+                    c.arc(i * s * 0.5 + ((row & 1) ? s * 0.25 : 0),
+                          row * s * 0.5, s * 0.28, 0, Math.PI);
+                    c.stroke();
+                }
+            }
+        } },
+
+        { id: "zigzag", label: "ZIGZAG", draw: function (c, s) {
+            c.lineWidth = s * 0.13;
+            c.lineJoin = "round";
+            for (let row = -1; row <= 1; row++) {
+                c.beginPath();
+                for (let i = -1; i <= 3; i++) {
+                    const x = i * s * 0.5;
+                    const y = row * s + ((i & 1) ? s * 0.16 : s * 0.44);
+                    if (i === -1) c.moveTo(x, y); else c.lineTo(x, y);
+                }
+                c.stroke();
+            }
+        } },
+
+        { id: "grid", label: "GRID", draw: function (c, s) {
+            c.lineWidth = s * 0.08;
+            c.beginPath();
+            c.moveTo(0, s / 2); c.lineTo(s, s / 2);
+            c.moveTo(s / 2, 0); c.lineTo(s / 2, s);
+            c.stroke();
+        } }
+    ];
+
+    /* id@dpr -> { w, h, a: Uint8Array } of coverage, built once. */
+    const _patternCache = {};
+
+    function patternTile(id) {
+        let def = null;
+        for (let i = 0; i < FILL_PATTERNS.length; i++) {
+            if (FILL_PATTERNS[i].id === id) { def = FILL_PATTERNS[i]; break; }
+        }
+        if (!def || !def.draw) return null;
+        const dpr = Math.max(1, Math.round(state.dpr || 1));
+        const key = id + "@" + dpr;
+        if (_patternCache[key]) return _patternCache[key];
+        const s = PATTERN_TILE * dpr;
+        const cv = document.createElement("canvas");
+        cv.width = s; cv.height = s;
+        const c = cv.getContext("2d", { willReadFrequently: true });
+        c.fillStyle = "#000";
+        c.strokeStyle = "#000";
+        c.lineCap = "round";
+        def.draw(c, s);
+        let src;
+        try { src = c.getImageData(0, 0, s, s).data; }
+        catch (_) { return null; }
+        const a = new Uint8Array(s * s);
+        for (let i = 0, q = 3; i < a.length; i++, q += 4) a[i] = src[q];
+        _patternCache[key] = { w: s, h: s, a: a };
+        return _patternCache[key];
+    }
+
     /* "#rrggbb" -> [r,g,b]. Every colour in COLOR_GROUPS is 6-digit
        hex, so this stays deliberately narrow. */
     function hexToRgb(hex) {
@@ -1138,11 +1278,14 @@
                 const y = (seed / W) | 0;
                 let   x = seed - y * W;
 
-                /* Walk left to the start of this span. `seen` is tested
-                   BEFORE matches() throughout: a pixel we already filled
-                   now carries the fill colour and would fail the seed
-                   comparison, so the visited flag is what keeps the walk
-                   honest once the region starts being painted. */
+                /* The walk MARKS the region and paints nothing. Painting
+                   as we went made pattern fills impossible: a pattern
+                   leaves gaps, and those gaps have to show whatever was
+                   underneath — which is already overwritten by the time
+                   you know where the gaps fall. Marking first also means
+                   `data` still holds the original pixels throughout, so
+                   matches() stays honest without depending on `seen`
+                   being tested first. */
                 while (x > 0 && !seen[y * W + x - 1] &&
                        matches(y * W + x - 1)) x--;
 
@@ -1152,11 +1295,6 @@
                     if (seen[i] || !matches(i)) break;
                     seen[i] = 1;
                     growBoundsDevice(x, y);
-                    const q = i * 4;
-                    data[q]     = r;
-                    data[q + 1] = g;
-                    data[q + 2] = b;
-                    data[q + 3] = 255;
 
                     if (y > 0) {
                         const up = i - W;
@@ -1171,6 +1309,41 @@
                         else if (!openDn)        { spanDown = false; }
                     }
                     x++;
+                }
+            }
+
+            /* ---- paint pass ----
+               Solid writes the colour everywhere in the region. A
+               pattern writes it only where the tile has coverage, and
+               blends the tile's antialiased edge so the marks are not
+               jagged; untouched gaps keep whatever the region held. */
+            const tile = patternTile(state.fillPattern);
+            if (!tile) {
+                for (let i = 0; i < seen.length; i++) {
+                    if (!seen[i]) continue;
+                    const q = i * 4;
+                    data[q] = r; data[q + 1] = g; data[q + 2] = b; data[q + 3] = 255;
+                }
+            } else {
+                const tw = tile.w, th = tile.h, ta = tile.a;
+                for (let i = 0; i < seen.length; i++) {
+                    if (!seen[i]) continue;
+                    const y = (i / W) | 0, x = i - y * W;
+                    const cov = ta[(y % th) * tw + (x % tw)];
+                    if (!cov) continue;
+                    const q = i * 4;
+                    if (cov === 255) {
+                        data[q] = r; data[q + 1] = g; data[q + 2] = b; data[q + 3] = 255;
+                    } else {
+                        /* source-over of the tint at `cov` alpha */
+                        const af = cov / 255;
+                        const da = data[q + 3] / 255;
+                        const oa = af + da * (1 - af);
+                        data[q]     = Math.round((r * af + data[q]     * da * (1 - af)) / oa);
+                        data[q + 1] = Math.round((g * af + data[q + 1] * da * (1 - af)) / oa);
+                        data[q + 2] = Math.round((b * af + data[q + 2] * da * (1 - af)) / oa);
+                        data[q + 3] = Math.round(oa * 255);
+                    }
                 }
             }
 
@@ -1800,6 +1973,12 @@
         const sizes = sizesForCurrentTool();
         const row = host.closest(".size-row");
         if (row) row.hidden = sizes.length === 0;
+        /* FILL swaps the SIZE row for the pattern row. */
+        const prow = document.querySelector(".pattern-row");
+        if (prow) {
+            prow.hidden = !isFillTool();
+            if (isFillTool()) buildPatternButtons();
+        }
         host.innerHTML = "";
         sizes.forEach(function (n) {
             const btn = document.createElement("button");
@@ -1822,6 +2001,51 @@
             host.appendChild(btn);
         });
         refreshSizeButtons();
+    }
+
+    /* Pattern chips. Each renders its own tile so the choice is shown
+       rather than named — a five-year-old is not reading "ZIGZAG". */
+    function buildPatternButtons() {
+        const host = $("#patternRow");
+        if (!host || host.childElementCount) return;
+        FILL_PATTERNS.forEach(function (p) {
+            const b = document.createElement("button");
+            b.className = "pattern-btn";
+            b.type = "button";
+            b.setAttribute("data-pattern", p.id);
+            b.setAttribute("aria-label", p.label);
+            b.title = p.label;
+            const cv = document.createElement("canvas");
+            cv.width = 34; cv.height = 34;
+            const c = cv.getContext("2d");
+            c.fillStyle = "#eafffb";
+            if (!p.draw) {
+                c.fillRect(0, 0, 34, 34);
+            } else {
+                c.strokeStyle = "#eafffb";
+                c.lineCap = "round";
+                /* tile is PATTERN_TILE across; draw it at chip scale so
+                   the swatch shows the same density the fill will. */
+                const k = 34 / PATTERN_TILE;
+                c.save(); c.scale(k, k);
+                p.draw(c, PATTERN_TILE);
+                c.restore();
+            }
+            b.appendChild(cv);
+            b.addEventListener("click", function () {
+                state.fillPattern = p.id;
+                refreshPatternButtons();
+            });
+            host.appendChild(b);
+        });
+        refreshPatternButtons();
+    }
+
+    function refreshPatternButtons() {
+        $$("#patternRow .pattern-btn").forEach(function (b) {
+            b.classList.toggle("active",
+                b.getAttribute("data-pattern") === state.fillPattern);
+        });
     }
 
     function refreshSizeButtons() {

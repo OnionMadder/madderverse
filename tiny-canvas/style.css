@@ -2180,3 +2180,51 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     opacity: 0;
     cursor: pointer;
 }
+
+/* ----- 18. Fill patterns (Pro content layer) -----
+   Chips show their own tile rather than a label: the audience cannot
+   read "ZIGZAG". Sits where the SIZE row goes, since a bucket has no
+   nib and the two are never both relevant. */
+
+.pattern-host {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 2px 4px 6px;
+}
+
+.pattern-btn {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: grid;
+    place-items: center;
+    background: var(--bg-deep);
+    border: 2px solid var(--teal-low);
+    border-radius: 9px;
+    cursor: pointer;
+    overflow: hidden;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.pattern-btn canvas { display: block; width: 34px; height: 34px; }
+
+.pattern-btn:hover,
+.pattern-btn:focus-visible {
+    border-color: var(--teal);
+    outline: none;
+}
+
+.pattern-btn.active {
+    border-color: var(--pink-bright);
+    box-shadow: 0 0 0 2px rgba(255, 46, 136, 0.3),
+                0 0 12px rgba(255, 46, 136, 0.35);
+}
+
+/* The HTML `hidden` attribute sets display:none from the UA sheet, which
+   an author rule like `.tool-row { display: flex }` outranks — so hiding
+   the SIZE row for FILL (or the pattern row for brushes) left an empty
+   labelled row sitting there. Author-level rule to win it back. */
+.tool-row[hidden] { display: none !important; }
