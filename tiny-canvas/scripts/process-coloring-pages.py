@@ -14,7 +14,15 @@ Pipeline per page:
   3. despeckle: drop ink blobs (alpha >= 96 connected components) smaller
      than MIN_INK_AREA px — kills grain flecks that would render as gray
      dots on the transparent overlay
-  4. save RGBA with constant ink color
+  4. save as a PALETTE PNG: the ink RGB is constant and only alpha
+     varies, so the image is really an 8-bit alpha map. A P-mode PNG
+     with a 256-entry palette (every entry the ink color) + a tRNS
+     alpha ramp encodes 1 byte/px instead of 4 — ~45% smaller than the
+     RGBA encode and decodes bit-for-bit identical (verified against
+     the RGBA original when this was adopted 2026-08-05). Lossless
+     WebP was measured too (~5% smaller again) and rejected: it does
+     not round-trip RGB under fully-transparent pixels and changes the
+     file extension for a marginal win.
 
 Then an audit pass per page (the same thing game.js's fill tool sees):
 threshold alpha >= 96 (FILL_BOUNDARY_ALPHA), treat the image perimeter as
@@ -108,12 +116,13 @@ def process(name):
         faint = (alpha > 0) & (alpha < 40) & ~ink
         alpha[faint] = np.where(alpha[faint] < 24, 0, alpha[faint])
 
-    rgba = np.zeros((th, TARGET_W, 4), dtype=np.uint8)
-    rgba[..., 0] = INK[0]; rgba[..., 1] = INK[1]; rgba[..., 2] = INK[2]
-    rgba[..., 3] = alpha
-
+    # palette PNG: pixel value = alpha, palette = 256 x ink RGB,
+    # tRNS = identity alpha ramp (see the header note)
+    pal_img = Image.fromarray(alpha, "P")
+    pal_img.putpalette(list(INK) * 256)
     out_path = os.path.join(OUT, name)
-    Image.fromarray(rgba, "RGBA").save(out_path, optimize=True)
+    pal_img.save(out_path, "PNG", optimize=True,
+                 transparency=bytes(range(256)))
     kb = os.path.getsize(out_path) / 1024
 
     a1 = audit(alpha, "@%d" % TARGET_W)

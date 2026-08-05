@@ -163,9 +163,9 @@ tiny-canvas/
     fonts/                # self-hosted woff2 — bungee-latin,
                           # vt323, press-start-2p (74.7KB total).
                           # Do NOT move these back to a CDN.
-    coloring-pages/       # the 14 shipped pages — 1800px RGBA,
-                          # lines baked as alpha (~3.4MB total).
-                          # GENERATED — regenerate via
+    coloring-pages/       # the 14 shipped pages — 1800px palette
+                          # PNGs, lines baked as alpha (~1.9MB
+                          # total). GENERATED — regenerate via
                           # scripts/process-coloring-pages.py
 
   art-src/
@@ -267,10 +267,12 @@ is in it.
 The 14 pages are AI-generated coloring-book scenes. Sources are
 2816x1536 PNGs (line art on white paper) in `art-src/coloring-pages/`
 — **untracked working art**, keep them, they're the masters. What
-ships is `assets/coloring-pages/*.png`: 1800px-wide RGBA where the
-**lines are baked as ALPHA** (constant ink `#1c2226` = `--line-ink`,
-alpha = inverted luminance). ~3.4MB total for all 14 (the sources are
-53MB). Produced by `scripts/process-coloring-pages.py` — grayscale →
+ships is `assets/coloring-pages/*.png`: 1800px-wide **palette PNGs**
+where the **lines are baked as ALPHA** (constant ink `#1c2226` =
+`--line-ink`, alpha = inverted luminance; the palette encoding is 1
+byte/px — see the note in the script for why, and why lossless WebP
+was rejected). ~1.9MB total for all 14 (the sources are 53MB).
+Produced by `scripts/process-coloring-pages.py` — grayscale →
 LANCZOS downscale → luminance-to-alpha LUT (≥225 → 0, ≤100 → 255,
 ramp between; kills the paper-grain texture) → despeckle ink blobs
 under 30px → audit. Run it from `tiny-canvas/` after dropping new
@@ -966,7 +968,7 @@ pages" above). How the analysis resolved, for the record:
   build time** instead of a runtime branch — the engine's alpha≥96
   threshold then needed no change at all.
 - **Vectorizing lost to raster**: these scenes are dense enough that a
-  trace would not be smaller, and the optimized PNGs came in at ~3.4MB
+  trace would not be smaller, and the optimized PNGs came in at ~1.9MB
   for all 14, which made the tracer's size argument moot.
 - **Landscape was handled explicitly** (aspect-preserving letterbox +
   the page-edge fill boundary) rather than cropping the scenes square.
