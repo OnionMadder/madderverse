@@ -134,6 +134,7 @@
     const BRUSHES = {
         pen: {
             label:       "PEN",
+            alpha:       1,
             defaultSize: 10,
             beginStroke: function (ctx, p, size, color) {
                 ctx.globalCompositeOperation = "source-over";
@@ -157,10 +158,11 @@
 
         marker: {
             label:       "MARKER",
+            alpha:       0.78,
             defaultSize: 28,
             beginStroke: function (ctx, p, size, color) {
                 ctx.globalCompositeOperation = "source-over";
-                ctx.globalAlpha = 0.78;
+                ctx.globalAlpha = 1;
                 ctx.fillStyle   = color;
                 ctx.strokeStyle = color;
                 ctx.lineWidth   = size;
@@ -183,10 +185,11 @@
                random offsets at moderate alpha — multiple dabs per
                segment build up the waxy/grainy look. */
             label:       "CRAYON",
+            alpha:       0.45,
             defaultSize: 18,
             beginStroke: function (ctx, p, size, color) {
                 ctx.globalCompositeOperation = "source-over";
-                ctx.globalAlpha = 0.45;
+                ctx.globalAlpha = 1;
                 ctx.fillStyle   = color;
                 this._stampDot(ctx, p.x, p.y, size);
             },
@@ -218,10 +221,11 @@
                narrower than the nominal size because pencils make
                narrow marks even at "thick" settings. */
             label:       "PENCIL",
+            alpha:       0.55,
             defaultSize: 4,
             beginStroke: function (ctx, p, size, color) {
                 ctx.globalCompositeOperation = "source-over";
-                ctx.globalAlpha = 0.55;
+                ctx.globalAlpha = 1;
                 const w = Math.max(1, size * 0.5);
                 ctx.strokeStyle = color;
                 ctx.fillStyle   = color;
@@ -245,6 +249,7 @@
                with width variation. Wider base softens the edge;
                narrow center gives a saturated core. */
             label:       "PAINT",
+            alpha:       1,   /* keeps its own per-pass alphas — they are the soft edge */
             defaultSize: 28,
             beginStroke: function (ctx, p, size, color) {
                 ctx.globalCompositeOperation = "source-over";
@@ -290,13 +295,14 @@
                random positions along the path. Reads as "shimmery"
                without needing actual animation. */
             label:       "GLITTER",
+            alpha:       0.55,
             defaultSize: 18,
             beginStroke: function (ctx, p, size, color) {
                 ctx.globalCompositeOperation = "source-over";
                 ctx.lineCap = "round";
                 ctx.lineJoin = "round";
                 /* Tinted soft base */
-                ctx.globalAlpha = 0.45;
+                ctx.globalAlpha = 1;
                 ctx.fillStyle = color;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
@@ -305,7 +311,7 @@
             },
             drawSegment: function (ctx, p0, p1, size, color) {
                 /* Soft tinted base stroke */
-                ctx.globalAlpha = 0.42;
+                ctx.globalAlpha = 1;
                 ctx.strokeStyle = color;
                 ctx.lineWidth   = size;
                 ctx.beginPath();
@@ -353,6 +359,7 @@
 
         eraser: {
             label:       "ERASER",
+            alpha:       1,
             defaultSize: 28,
             beginStroke: function (ctx, p, size) {
                 ctx.globalCompositeOperation = "destination-out";
@@ -1384,6 +1391,77 @@
         if (eR) eR.setAttribute("transform", t);
     }
 
+    /* ---------- 4b. WET STROKE LAYER ----------
+
+       Why this exists: every brush except PEN paints translucent
+       (marker .78, crayon .45, pencil .55, glitter .42), and each
+       drawSegment used to stroke a SEPARATE path straight onto the
+       canvas with round caps. Consecutive segments overlap at their
+       shared endpoint, so translucent ink landed on translucent ink and
+       compounded — leaving a visibly darker dot at every single pointer
+       sample. On pencil and glitter it read as a string of beads rather
+       than a line.
+
+       Real paint programs solve this by keeping the in-progress stroke
+       on its own layer at FULL opacity — overlapping opaque ink of one
+       colour is idempotent, so no beads form — and blending that layer
+       down once, at the brush's alpha, when compositing. We already
+       snapshot the pre-stroke canvas into histCanvas for undo, so the
+       live redraw is just: restore base, then lay the wet layer over it
+       at the brush's alpha.
+
+       Cost is two full-canvas drawImage calls per pointermove, both GPU
+       blits. The eraser stays OFF this path — it works in
+       destination-out on the real canvas and has nothing to blend. */
+
+    let strokeLayer = null;
+    let strokeCtx   = null;
+
+    function ensureStrokeLayer() {
+        if (!strokeLayer) {
+            strokeLayer = document.createElement("canvas");
+            strokeCtx = strokeLayer.getContext("2d");
+        }
+        if (strokeLayer.width  !== canvas.width ||
+            strokeLayer.height !== canvas.height) {
+            strokeLayer.width  = canvas.width;
+            strokeLayer.height = canvas.height;
+        }
+        const dpr = state.dpr || 1;
+        strokeCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        strokeCtx.lineCap  = "round";
+        strokeCtx.lineJoin = "round";
+    }
+
+    function clearStrokeLayer() {
+        ensureStrokeLayer();
+        strokeCtx.save();
+        strokeCtx.setTransform(1, 0, 0, 1, 0, 0);
+        strokeCtx.clearRect(0, 0, strokeLayer.width, strokeLayer.height);
+        strokeCtx.restore();
+    }
+
+    /* Rebuild the visible canvas = pre-stroke snapshot + wet layer at
+       the brush's alpha. */
+    function compositeStroke() {
+        if (!strokeLayer || !histCanvas) return;
+        const a = currentBrush().alpha;
+        ctx2d.save();
+        ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+        ctx2d.globalCompositeOperation = "source-over";
+        ctx2d.globalAlpha = 1;
+        ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+        ctx2d.drawImage(histCanvas, 0, 0);
+        ctx2d.globalAlpha = (typeof a === "number") ? a : 1;
+        ctx2d.drawImage(strokeLayer, 0, 0);
+        ctx2d.restore();
+    }
+
+    /* True while a wet stroke is being composited. */
+    function usesStrokeLayer() {
+        return state.currentTool !== "eraser";
+    }
+
     /* ---------- 5. DRAWING ---------- */
 
     function attachDrawing() {
@@ -1422,7 +1500,13 @@
         const brush = currentBrush();
         const size  = activeSize();
         const color = state.currentColor;
-        brush.beginStroke(ctx2d, p, size, color);
+        if (usesStrokeLayer()) {
+            clearStrokeLayer();
+            brush.beginStroke(strokeCtx, p, size, color);
+            compositeStroke();
+        } else {
+            brush.beginStroke(ctx2d, p, size, color);
+        }
         growBounds(p.x, p.y, size + STROKE_BOUNDS_SLACK);
         state.dirty = true;
         updateStatus();
@@ -1435,11 +1519,34 @@
 
     function onPointerMove(e) {
         if (!state.isDrawing) return;
-        const p = getPos(e);
         const brush = currentBrush();
         const size  = activeSize();
         const color = state.currentColor;
+        const target = usesStrokeLayer() ? strokeCtx : ctx2d;
 
+        /* Pointermove is throttled to the display refresh, so a fast
+           swipe arrives as a few widely-spaced points and the line
+           renders as visible straight facets. getCoalescedEvents hands
+           back every sample the digitiser actually captured between
+           frames, which is what makes a quick stroke read as a curve
+           rather than a polygon. Falls back to the single event where
+           unsupported. */
+        let points;
+        if (typeof e.getCoalescedEvents === "function") {
+            const raw = e.getCoalescedEvents();
+            points = (raw && raw.length ? raw : [e]).map(getPos);
+        } else {
+            points = [getPos(e)];
+        }
+
+        for (let n = 0; n < points.length; n++) {
+            drawOneMove(points[n], brush, size, color, target);
+        }
+
+        if (usesStrokeLayer()) compositeStroke();
+    }
+
+    function drawOneMove(p, brush, size, color, ctx) {
         if (state.settings.smoothing) {
             /* Midpoint-quadratic smoothing: draw from the current
                smoothed point to the midpoint of (lastRaw, currentRaw).
@@ -1448,14 +1555,14 @@
                event tremor. */
             const midX = (state.lastX + p.x) / 2;
             const midY = (state.lastY + p.y) / 2;
-            brush.drawSegment(ctx2d,
+            brush.drawSegment(ctx,
                 { x: state.smoothX, y: state.smoothY },
                 { x: midX,          y: midY },
                 size, color);
             state.smoothX = midX;
             state.smoothY = midY;
         } else {
-            brush.drawSegment(ctx2d,
+            brush.drawSegment(ctx,
                 { x: state.lastX, y: state.lastY },
                 p, size, color);
             state.smoothX = p.x;
@@ -1476,12 +1583,18 @@
                Without this the smoothed line stops short of the kid's
                finger. */
             const brush = currentBrush();
-            brush.drawSegment(ctx2d,
+            brush.drawSegment(usesStrokeLayer() ? strokeCtx : ctx2d,
                 { x: state.smoothX, y: state.smoothY },
                 { x: state.lastX,   y: state.lastY },
                 activeSize(), state.currentColor);
             growBounds(state.lastX, state.lastY,
                        activeSize() + STROKE_BOUNDS_SLACK);
+        }
+        /* Flatten the wet layer down one last time so the canvas holds
+           the finished stroke before history reads it. */
+        if (wasDrawing && usesStrokeLayer()) {
+            compositeStroke();
+            clearStrokeLayer();
         }
         /* Bank the stroke as one undo step, keeping only the rectangle
            it actually touched. */
