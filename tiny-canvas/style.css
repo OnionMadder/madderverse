@@ -659,35 +659,8 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     --overlay-top: calc(env(safe-area-inset-top, 0px) + 76px);
 }
 
-#screen-draw #undoBtn {
-    position: fixed;
-    top: var(--overlay-top);
-    right: 14px;
-    z-index: 60;
-    /* A labelled pill, mirroring PAGES on the left, rather than a bare
-       glyph in a circle. An unlabelled icon at the screen edge is not
-       findable in a hurry — which is precisely when undo is wanted. */
-    width: auto;
-    height: 44px;
-    padding: 0 14px;
-    border-radius: 22px;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 18px;
-}
-
-.undo-glyph { line-height: 1; }
-
-.undo-label {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: 1.4px;
-    line-height: 1;
-}
-
-/* Tray UNDO sits with CLEAR/SAVE and carries the same glyph. */
-#drawUndo { gap: 8px; }
+/* Tray UNDO sits with CLEAR/SAVE — there is no floating twin any more.
+   Two undo buttons was one too many; the tray is where people look. */
 #drawUndo .btn-glyph { font-size: 17px; }
 
 /* Floating PAGES button — top-left mirror of UNDO. Optional template
@@ -1228,7 +1201,12 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 
 .btn-control {
     flex: 1;
-    padding: 14px;
+    /* Flex items default to min-width:auto, so `flex: 1` alone will NOT
+       shrink a button below its label + padding — the three-button row
+       overflowed and the tray grew a horizontal scrollbar with SAVE cut
+       off. Same family as the `1fr` = `minmax(auto, 1fr)` trap. */
+    min-width: 0;
+    padding: 14px 10px;
     font-family: var(--font-title);
     font-size: clamp(13px, 2.4vw, 16px);
     letter-spacing: 2px;

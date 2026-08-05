@@ -1309,16 +1309,14 @@
         maybeShowIdleScribble();
     }
 
-    /* Two undo controls, kept in lockstep: the floating one over the
-       canvas (reachable mid-drawing) and the one in the tool tray next
-       to CLEAR/SAVE (where people actually look for it). */
+    /* One undo control, in the tool tray beside CLEAR and SAVE. There
+       was briefly a floating twin over the canvas as well; two was one
+       too many, and the tray is where people look. */
     function updateUndoButton() {
-        const empty = state.history.length === 0;
-        [$("#undoBtn"), $("#drawUndo")].forEach(function (btn) {
-            if (!btn) return;
-            if (empty) btn.setAttribute("disabled", "");
-            else       btn.removeAttribute("disabled");
-        });
+        const btn = $("#drawUndo");
+        if (!btn) return;
+        if (state.history.length === 0) btn.setAttribute("disabled", "");
+        else                            btn.removeAttribute("disabled");
     }
 
     /* ---------- 4. IDLE SCRIBBLE ----------
@@ -2694,7 +2692,6 @@
         $("#drawSave").addEventListener("click", function () {
             saveDrawing();
         });
-        $("#undoBtn").addEventListener("click", undo);
         const trayUndo = $("#drawUndo");
         if (trayUndo) trayUndo.addEventListener("click", undo);
         $("#detailClose").addEventListener("click", closeDetail);
