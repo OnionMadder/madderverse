@@ -9549,10 +9549,22 @@ function setGalleryView(name) {
     openGallery();
 }
 
+// The button names the view you'd switch TO. It used to say "Shelf", which
+// collided twice over in one row: with "Shelf photo" (exports the whole
+// gallery as an image) and with collections, which are also called shelves.
+// Three different meanings of one word, two of them adjacent buttons. The
+// big view is "Cards" now — accurate to what it draws, and unambiguous.
+//
+// The stored value stays "shelf". It's the localStorage key `slip-gallery-view`
+// and renaming it would reset everyone's saved preference for a label change.
 function syncGalleryViewToggle() {
     const btn = document.getElementById("galleryViewToggle");
     if (!btn) return;
-    btn.textContent = state.galleryView === "shelf" ? "Grid" : "Shelf";
+    const toCards = state.galleryView !== "shelf";
+    btn.textContent = toCards ? "Cards" : "Grid";
+    const label = toCards ? "Show pots as cards" : "Show pots as a grid";
+    btn.setAttribute("aria-label", label);
+    btn.setAttribute("title", label);
 }
 function closeGallery() {
     const g = document.getElementById("gallery");
