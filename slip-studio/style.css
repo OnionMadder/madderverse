@@ -1992,12 +1992,25 @@ body.tool-armed #scene:active { cursor: crosshair; }
     padding: max(16px, env(safe-area-inset-top, 0px)) 16px 16px;
 }
 .gallery[hidden] { display: none; }
+/* The wall and the kiln load are opened FROM the gallery bar, and all three
+   are .gallery (z-index 60) — so with equal z-index the winner was decided
+   by DOM order. #wallModal happens to sit after #gallery and painted on top;
+   #kilnLoadModal sits before it and painted underneath, so tapping "Kiln
+   load" changed the backdrop but left the gallery covering it and read as a
+   dead button. Raised explicitly so neither depends on where it lands in the
+   markup, and so closing one drops you back onto the gallery. */
+#wallModal, #kilnLoadModal { z-index: 62; }
+
 .gallery-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 10px 12px;
     margin-bottom: 16px;
+    /* Five buttons don't fit beside the title at 360px — Close was hanging
+       off the right edge, half on screen. Wrapping keeps every control
+       reachable instead of silently pushing the most important one away. */
+    flex-wrap: wrap;
 }
 .gallery-title {
     font-family: var(--font-display);
@@ -2161,6 +2174,8 @@ body.tool-armed #scene:active { cursor: crosshair; }
 .gallery-bar-right {
     display: inline-flex;
     gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 /* ---------- Photo modal ---------- */
