@@ -506,6 +506,71 @@ From `tiny-canvas/`:
 - [ ] Open the Xcode project, run on a simulator — eyeball the home
       screen icon. Same for an Android emulator.
 
+## Android build (sideload) — and what does NOT survive a regenerate
+
+**`android/` is not committed**, matching every other Madderverse app
+(`slip-studio-app/`, `pootery-app/`, `cookie-cache-app/`,
+`all-munkis-app/` all keep the Capacitor wrap outside git). So the
+native project is disposable — but two hand-applied fixes go with it,
+and both fail *silently*:
+
+**1. `android/app/src/main/res/values/colors.xml` must be recreated.**
+`npx @capacitor/assets generate` rewrites `res/values/` and **deletes**
+the `colors.xml` the Capacitor template ships — while `styles.xml` still
+references `@color/colorPrimaryDark`. Builds keep working only because
+stale merged resources under `android/app/build/` still carry the value;
+a clean checkout fails outright. `colorPrimaryDark` is also the
+status-bar colour at targetSdk 34, so without it the bar above the app
+renders Capacitor's grey-blue instead of the app's near-black teal:
+
+```xml
+<!-- android/app/src/main/res/values/colors.xml -->
+<resources>
+    <color name="colorPrimary">#06141a</color>
+    <color name="colorPrimaryDark">#06141a</color>
+    <color name="colorAccent">#ff2e88</color>
+</resources>
+```
+
+**2. Signing config**, once a release keystore exists (see below).
+
+### Full sideload recipe
+
+```bash
+npm install
+node scripts/build-www.mjs        # stage www/ — NEVER set webDir to "."
+npx cap add android               # only if android/ is absent
+# rasterize icons/*.svg to .assetsrc/{icon,icon-foreground,splash}.png at 1024
+npx @capacitor/assets generate --android --assetPath .assetsrc \
+    --iconBackgroundColor '#06141a' --splashBackgroundColor '#06141a'
+# >>> recreate colors.xml here — see above <<<
+npx cap copy android
+cd android && JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-21.0.11.10-hotspot" \
+    ./gradlew assembleDebug --console=plain
+# -> app/build/outputs/apk/debug/app-debug.apk
+```
+
+**`assembleDebug` for sideloading, deliberately.** A test build has no
+business generating the release keystore — that is a one-way door (§F)
+and there is no reason to burn it before an actual upload.
+`assembleRelease` needs the signing flags; an AAB is not installable.
+
+**JDK 21 must be pinned** — the machine default is 17 and Gradle fails
+with `invalid source release: 21`.
+
+**Sanity-check the payload after building**, because `webDir` mistakes
+are invisible until someone inspects the APK:
+
+```bash
+unzip -l app-debug.apk | grep assets/public
+```
+
+It should list only `index.html`, `game.js`, `templates.js`,
+`style.css`, `manifest.webmanifest`, `assets/fonts/*`, `icons/*`,
+`legal/*`, plus Capacitor's own `cordova.js` / `cordova_plugins.js`.
+Anything else — `CLAUDE.md`, `cover.jpg`, `node_modules/` — means the
+staging step was bypassed.
+
 ## F. Android signing key (CRITICAL, ONE-WAY DOOR)
 
 **Application ID: `org.madderverse.tinycanvas` — DECIDED 2026-08-04,
