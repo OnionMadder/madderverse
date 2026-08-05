@@ -664,7 +664,31 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     top: var(--overlay-top);
     right: 14px;
     z-index: 60;
+    /* A labelled pill, mirroring PAGES on the left, rather than a bare
+       glyph in a circle. An unlabelled icon at the screen edge is not
+       findable in a hurry — which is precisely when undo is wanted. */
+    width: auto;
+    height: 44px;
+    padding: 0 14px;
+    border-radius: 22px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
 }
+
+.undo-glyph { line-height: 1; }
+
+.undo-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.4px;
+    line-height: 1;
+}
+
+/* Tray UNDO sits with CLEAR/SAVE and carries the same glyph. */
+#drawUndo { gap: 8px; }
+#drawUndo .btn-glyph { font-size: 17px; }
 
 /* Floating PAGES button — top-left mirror of UNDO. Optional template
    picker so kids who want a guided coloring page can grab one without

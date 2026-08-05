@@ -918,10 +918,15 @@
 
        So we rasterize the same overlay SVG into an offscreen canvas,
        positioned with the identical svgRect/canvasRect math composePng()
-       uses for export, and keep a 1-byte-per-pixel boundary mask. The
-       fill walks that mask instead of comparing canvas colors, which
-       also means filling never depends on what the kid already drew —
-       tapping a region always fills that region, whatever is in it.
+       uses for export, and keep a 1-byte-per-pixel boundary mask.
+
+       That mask is only HALF the boundary though. A fill also has to
+       stop at the kid's own strokes, the way MS Paint does — draw a
+       closed shape freehand and tapping inside it should fill just that
+       shape. Walking the mask alone ignored the bitmap entirely, so on
+       a blank page there was nothing to stop the flood and one tap
+       filled the whole screen. See floodFillAt for the colour-matching
+       half.
 
        Threshold is deliberately high (not 1): the SVG strokes are
        antialiased, so a low threshold would stop the fill at the faint
@@ -1063,8 +1068,6 @@
             /* Tapped directly on a line — nothing to fill. */
             if (mask[sy * W + sx]) return;
 
-            beginHistoryCapture();
-
             const rgb = hexToRgb(state.currentColor);
             const r = rgb[0], g = rgb[1], b = rgb[2];
 
@@ -1073,6 +1076,40 @@
                 image = ctx2d.getImageData(0, 0, W, H);
             } catch (_) { return; }
             const data = image.data;
+
+            /* MS Paint semantics: spread across pixels that match the
+               colour under the finger, and stop at anything different —
+               the kid's own strokes included. The printed line art is
+               still an absolute boundary via the mask, so this composes
+               with a coloring page instead of replacing it.
+               Matching on all four channels means transparent paper
+               (0,0,0,0) is its own "colour" and reads as a region. */
+            const si = (sy * W + sx) * 4;
+            const seedR = data[si], seedG = data[si + 1],
+                  seedB = data[si + 2], seedA = data[si + 3];
+
+            /* Already this colour — nothing would change. */
+            if (seedA === 255 && seedR === r && seedG === g && seedB === b) {
+                return;
+            }
+
+            /* Tolerance, squared. Brush strokes and the SVG's own edges
+               are antialiased, so an exact match would stop a pixel or
+               two early and ring every fill with a pale halo. Kept
+               modest so a soft edge isn't treated as open ground. */
+            const TOL2 = 48 * 48;
+            function matches(i) {
+                if (mask[i]) return false;
+                const q = i * 4;
+                const dr = data[q]     - seedR;
+                const dg = data[q + 1] - seedG;
+                const db = data[q + 2] - seedB;
+                const da = data[q + 3] - seedA;
+                return dr * dr + dg * dg + db * db + da * da <= TOL2;
+            }
+
+            beginHistoryCapture();
+
             const seen = new Uint8Array(W * H);
             const stack = [sy * W + sx];
 
@@ -1081,14 +1118,18 @@
                 const y = (seed / W) | 0;
                 let   x = seed - y * W;
 
-                /* Walk left to the start of this span. */
-                while (x > 0 && !mask[y * W + x - 1] &&
-                       !seen[y * W + x - 1]) x--;
+                /* Walk left to the start of this span. `seen` is tested
+                   BEFORE matches() throughout: a pixel we already filled
+                   now carries the fill colour and would fail the seed
+                   comparison, so the visited flag is what keeps the walk
+                   honest once the region starts being painted. */
+                while (x > 0 && !seen[y * W + x - 1] &&
+                       matches(y * W + x - 1)) x--;
 
                 let spanUp = false, spanDown = false;
                 while (x < W) {
                     const i = y * W + x;
-                    if (mask[i] || seen[i]) break;
+                    if (seen[i] || !matches(i)) break;
                     seen[i] = 1;
                     growBoundsDevice(x, y);
                     const q = i * 4;
@@ -1099,13 +1140,13 @@
 
                     if (y > 0) {
                         const up = i - W;
-                        const openUp = !mask[up] && !seen[up];
+                        const openUp = !seen[up] && matches(up);
                         if (openUp && !spanUp) { stack.push(up); spanUp = true; }
                         else if (!openUp)      { spanUp = false; }
                     }
                     if (y < H - 1) {
                         const dn = i + W;
-                        const openDn = !mask[dn] && !seen[dn];
+                        const openDn = !seen[dn] && matches(dn);
                         if (openDn && !spanDown) { stack.push(dn); spanDown = true; }
                         else if (!openDn)        { spanDown = false; }
                     }
@@ -1261,14 +1302,16 @@
         maybeShowIdleScribble();
     }
 
+    /* Two undo controls, kept in lockstep: the floating one over the
+       canvas (reachable mid-drawing) and the one in the tool tray next
+       to CLEAR/SAVE (where people actually look for it). */
     function updateUndoButton() {
-        const btn = $("#undoBtn");
-        if (!btn) return;
-        if (state.history.length === 0) {
-            btn.setAttribute("disabled", "");
-        } else {
-            btn.removeAttribute("disabled");
-        }
+        const empty = state.history.length === 0;
+        [$("#undoBtn"), $("#drawUndo")].forEach(function (btn) {
+            if (!btn) return;
+            if (empty) btn.setAttribute("disabled", "");
+            else       btn.removeAttribute("disabled");
+        });
     }
 
     /* ---------- 4. IDLE SCRIBBLE ----------
@@ -2539,6 +2582,8 @@
             saveDrawing();
         });
         $("#undoBtn").addEventListener("click", undo);
+        const trayUndo = $("#drawUndo");
+        if (trayUndo) trayUndo.addEventListener("click", undo);
         $("#detailClose").addEventListener("click", closeDetail);
         $("#detailDelete").addEventListener("click", deleteCurrent);
         $("#detailExport").addEventListener("click", exportCurrent);
