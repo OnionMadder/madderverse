@@ -53,7 +53,7 @@ Other top-level entries:
 The hub grid lists only finished, shipping games. **Every game directory that is NOT on the hub grid is a work-in-progress** — present on disk and sometimes reachable by direct URL, but deliberately not advertised, and intentionally excluded from `sitemap.xml`, `llms.txt`, and the hub's JSON-LD `ItemList`. Do not add a WIP game to the hub / sitemap / schema until the user says it's ready.
 
 - **Advertised (on the hub, in grid order, as of 2026-07-24):** Slip Studio, All Munkis, Pootery, Groodle, Tub's Cookie Cache, George's Jump, Friend Picker, **Florigami**. *(Florigami was added to the grid / sitemap / llms / JSON-LD when it went live — see its section at the very bottom. Slip Studio was **relisted 2026-07-02** after earning Google Play's Teacher Approved badge — it had been unlisted 2026-07-01 when it migrated to nodehole; it's now effectively dual-listed like George's Jump. George's Jump is also published on nodehole — deliberately dual-listed, it's an all-audiences game. See "The nodehole sister site" below for games migrated off the hub. Glass Gallery and Tonehouse were unlisted from the hub 2026-07-02 — dirs kept on disk, reachable by direct URL.)*
-- **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `tiny-canvas/`, `spoiler-alert/`, `smash-studio/`, `sua-sponte/`, `misfile/` (and any future dir not yet on the grid). The last four were committed to `main` on 2026-07-24 as WIP — reachable by direct URL but deliberately off the hub/sitemap/llms/JSON-LD. `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
+- **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `spoiler-alert/`, `smash-studio/`, `sua-sponte/`, `misfile/` (and any future dir not yet on the grid). *(`tiny-canvas/` was **listed on the hub 2026-08-04** — grid card, JSON-LD `ItemList` position 9, `sitemap.xml`, `llms.txt` — and is no longer WIP for web purposes; its store release is still outstanding.)* The last four were committed to `main` on 2026-07-24 as WIP — reachable by direct URL but deliberately off the hub/sitemap/llms/JSON-LD. `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
 - **Migrated to nodehole (unlisted from the hub, but `dir kept on disk`):** `krazy-kritters/` (removed 2026-06-30, dir deleted), `hole-up/` + `gazonionaire/` (2026-07-01, dirs kept, web-only). These are pulled from the grid / JSON-LD / `sitemap.xml` / `llms.txt` but stay reachable by direct URL. See below. *(`slip-studio/` was also migrated here 2026-07-01 but was **relisted on the hub 2026-07-02** after Teacher Approved — it's back in the grid / JSON-LD / sitemap / llms while its nodehole copy also stands, so treat it as dual-listed, not migrated-away.)*
 
 ## The nodehole sister site
@@ -498,6 +498,48 @@ Lives at `florigami/` (flat shape: `index.html` + `game.js` + `style.css`, plus 
 - **Species (unlock chain, total-discovery gates):** cosmos (free) → tulips (first cosmos hybrid) → pansies (5 cosmos dex slots) → hyacinths (10 total) → lilies (14) → mums (18) → windflowers (23) → roses (28, the endgame). All 8 share the unified genetics above (see `mixSpecies`); they differ only by art/silhouette + signature rare pattern.
 - **Phase 3 systems (2026-07-24):** rare-tier collectibles (bigger sparkle + jingle + keepsake card + a `★ Rares` trophy shelf), a card-list Floridex with All/Found/Rare filters + inline flavor + locked-species tabs, and progression-unlocked **garden ornaments** (cozy scene decorations, no gameplay effect). Display name is variablized as `GAME_NAME` in `game.js` (drives topbar + `document.title` + toasts).
 - Dev handle: `window.__petalcraft` (kept on the old name as invisible plumbing; state, `advanceDay`, `unlockAll`, `reset`, `mockSprites`, `mockBackdrop`, rarity helpers). Phase 6 (Android paid app via Capacitor, pkg `org.madderverse.florigami`) is not built yet — see `DESIGN.md §7`.
+- **`cover.jpg` was reshot 2026-08-04.** The old one still had **"Petalcraft"** painted into the artwork — the rename missed it, and it sat on the hub card for ten days. If you rename anything again, grep the *docs and markup* for the old name but also **look at the images**; a name baked into a JPEG is invisible to grep. The current cover is composed from real shipped assets, not hand-painted: **`assets/img/backdrops/garden-day.jpg`** full-bleed as the backdrop — the same file `BACKDROPS.garden` loads at runtime, deliberately NOT the 8.3MB `assets/img/garden.png`, which is *untracked local working art* (a cover has to be regenerable from what's in the repo; the two are the same photograph, mean abs diff 0.99/255) — plus eight bloom frames cropped straight out of the `cosmos`/`daisy`/`pansy` sheets (col 3 of 4 = `bloom`; rows are `spriteColorsFor()` order, dex then rares). Two rares are deliberately in the front row — they're the only patterned rows, so they're what makes the cover show the collection hook instead of just flowers. Regenerate by rebuilding that composition and screenshotting at 1280×720 with headless Chrome, then Pillow to JPEG q88 progressive.
+
+---
+
+## Tiny Canvas — kids coloring app (LIVE on the hub, has its own guide)
+
+Lives at `tiny-canvas/`. **Read [`tiny-canvas/CLAUDE.md`](tiny-canvas/CLAUDE.md)
+before touching it** — it's the only game here with enough machinery to
+need its own guide, and the traps in it are not obvious.
+
+Two things that make it unlike every other game in this repo:
+
+- **It's the first madderverse product with a build system.** Capacitor
+  wrap for iOS + Android, `package.json`, `node_modules/`. It still
+  works as a plain static site (no bundler), so local dev is unchanged,
+  but the native path is real.
+- **It deliberately ships NO third-party requests at all** — no
+  GoatCounter (Apple's Kids category forbids third-party analytics SDKs
+  that collect identifying data) and, as of 2026-08-04, no Google Fonts
+  either; the three fonts are self-hosted woff2 in
+  `tiny-canvas/assets/fonts/`. Don't "helpfully" restore either one.
+  This is the documented per-product exception — see `DESIGN.md §16`.
+
+**Status: advertised on the hub since 2026-08-04** — grid card (last
+real card, before "More Soon"), JSON-LD `ItemList` position 9,
+`sitemap.xml`, `llms.txt`. `cover.jpg` exists.
+
+**The web game is what's listed; the STORE release is not done.** The
+v1.0 shipping checklist in its CLAUDE.md still has the whole accounts /
+signing / store-listing half outstanding, so don't describe Tiny Canvas
+as being on Google Play or the App Store anywhere — listing copy, social
+posts, or the hub's own About text.
+
+`cover.jpg` was generated by rendering the app's own butterfly template
+and colouring the left half with the same mask + flood-fill algorithm
+the FILL tool uses, so the cover literally shows what the product does
+and can't drift from it. Regenerating means re-running that: it isn't a
+hand-painted asset.
+
+Its own cache-bust convention applies: **bump `?v=N` in
+`tiny-canvas/index.html` on every change** to `style.css`,
+`templates.js` or `game.js` (currently v12).
 
 ---
 
