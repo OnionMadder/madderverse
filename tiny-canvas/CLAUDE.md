@@ -614,6 +614,39 @@ via a `signingConfigs.release` block, the same shape all-munkis uses,
 and bails safely when the file is absent so debug builds still work on a
 machine without the keystore.
 
+### Android 15 / API 35 (Play's current floor)
+
+Play rejects anything targeting below **API 35**. The Capacitor 6
+template ships targetSdk 34, so this had to be raised — and it is not
+just a number:
+
+- `android/variables.gradle` -> `compileSdkVersion`/`targetSdkVersion` 35
+- **AGP 8.2.1 cannot compile against SDK 35.** Raised to **8.6.1**,
+  which needs Gradle **8.9** (`gradle/wrapper/gradle-wrapper.properties`).
+  Leaving AGP alone fails the build outright.
+- **API 35 ENFORCES edge-to-edge.** The status and navigation bars
+  become transparent overlays and the app draws underneath them, so the
+  titlebar would slide under the clock and `colorPrimaryDark` would stop
+  colouring the status bar at all. `res/values-v35/styles.xml` sets
+  `android:windowOptOutEdgeToEdgeEnforcement`, Google's opt-out for this
+  transition. It is in `values-v35` because the attribute does not exist
+  on older API levels.
+
+⚠ **The opt-out is deprecated in API 36** and stops working once the app
+targets it. Before the next targetSdk bump, the titlebar and tool rail
+need real safe-area padding. The page already sets `viewport-fit=cover`
+and the overlay-top property already consumes `safe-area-inset-top`, so
+this is half done rather than untouched.
+
+Verify what a build actually targets before uploading — the manifest is
+the thing Play reads, not the gradle file:
+
+```bash
+aapt dump badging app-release.apk | grep -E "package|targetSdkVersion"
+# package: ... versionCode='2' versionName='1.0.1' compileSdkVersion='35'
+# targetSdkVersion:'35'
+```
+
 ### Release builds
 
 ```bash
