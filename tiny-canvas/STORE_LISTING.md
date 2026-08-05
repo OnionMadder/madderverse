@@ -7,7 +7,7 @@ consoles' character limits differ, both versions are provided.
 **Bundle ID / Application ID:** `org.madderverse.tinycanvas`
 **Studio name:** Mad Sundar LLC
 **Trade name (display in stores):** Onion Madder
-**Privacy policy URL:** `https://madderverse.org/tiny-canvas/legal/privacy.html`
+**Privacy policy URL:** `https://madderverse.org/tiny-canvas/privacy/`
 **Terms URL:** `https://madderverse.org/tiny-canvas/legal/terms.html`
 **Support email:** `support@madderverse.org`
 **Marketing URL (optional):** `https://madderverse.org/tiny-canvas/`
@@ -82,7 +82,7 @@ Apple App Store Kids category compliant. Google Play Designed for Families compl
 ✦ FROM THE MADDERVERSE
 Tiny Canvas is part of The Madderverse, a small constellation of free, ad-free, kid-friendly games and apps made by indie developers at Mad Sundar LLC.
 
-Privacy: https://madderverse.org/tiny-canvas/legal/privacy.html
+Privacy: https://madderverse.org/tiny-canvas/privacy/
 Terms: https://madderverse.org/tiny-canvas/legal/terms.html
 Questions? support@madderverse.org
 ```

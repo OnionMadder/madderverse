@@ -14,9 +14,11 @@ via Capacitor.
   the design source for this app**.
 - [`STORE_LISTING.md`](STORE_LISTING.md) for paste-ready App Store
   Connect + Google Play Console metadata.
-- [`legal/privacy.html`](legal/privacy.html) and
-  [`legal/terms.html`](legal/terms.html) — published to
-  madderverse.org as the store-listing privacy/terms URLs.
+- [`privacy/index.html`](privacy/index.html) — the store-listing
+  privacy URL, `https://madderverse.org/tiny-canvas/privacy/`, matching
+  the cookie-cache and slip-studio pattern. `legal/privacy.html` and
+  [`legal/terms.html`](legal/terms.html) are the older long-form pages
+  and ship inside the app.
 
 ## What's different about Tiny Canvas (vs. the static-site games)
 
@@ -61,8 +63,13 @@ Capacitor when you're packaging for a store.
 - **6 distinct brushes** (PEN / MARKER / CRAYON / PENCIL / PAINT /
   GLITTER), each with its own beginStroke + drawSegment + textural
   feel. Plus ERASER, plus the FILL bucket.
-- **36 colors organized in 5 groups** (RAINBOW / PASTELS / NEONS /
-  EARTH / METALLIC) via tab switcher.
+- **42 colors in 5 groups** (RAINBOW 12 / PASTELS 10 / NEONS 7 /
+  EARTH 8 / METALLIC 5) via tab switcher, plus a custom picker.
+  ⚠ The fill tool distinguishes colours by a squared tolerance of 6, so
+  any colour added here must sit further than that from every existing
+  one. The palette shipped with #00ffcc and #00ffd5 only 9 apart, which
+  let fill run straight between them; the neons duplicate was removed
+  and the minimum separation is now 18.4.
 - **Per-tool sizes** — 5 sizes for brushes (4/10/18/28/42), 3 for
   eraser (14/28/50). Each brush's defaultSize is a member of
   BRUSH_SIZES so its size button is always active on tool-switch.
@@ -98,7 +105,9 @@ Capacitor when you're packaging for a store.
   Data Safety declaration. See `style.css` §0.
 - **PWA**: manifest + theme-color + Apple PWA chrome.
   `beforeinstallprompt` reveals the INSTALL APP button on supported
-  Chromium browsers.
+  Chromium browsers — **web only**. `scripts/build-www.mjs` strips that
+  button out of the native payload entirely (Chrome's Android WebView
+  does fire the event, so the app was offering to install itself).
 - **Capacitor native plugins wired**: Preferences (mirror localStorage
   to native KV store), Filesystem + Share (native export to Save to
   Photos / Save to Files sheet), StatusBar (DARK + `#06141a`),
@@ -137,12 +146,15 @@ tiny-canvas/
                             # at 6 device profiles into ./screenshots/
 
   package.json            # Capacitor 6 + plugins
-  capacitor.config.json   # appId org.madderverse.tinycanvas, webDir "."
+  capacitor.config.json   # appId org.madderverse.tinycanvas, webDir "www"
   .gitignore              # node_modules + native build outputs
 
   STORE_LISTING.md        # paste-ready store-listing metadata
   CLAUDE.md               # this file
-  cover.jpg               # hub card art (TODO — placeholder until shot)
+  cover.jpg               # hub card art (1280x720, live on the hub)
+  privacy/index.html      # /tiny-canvas/privacy/ — store privacy URL
+  www/                    # generated app payload (gitignored)
+  android/                # Capacitor project (UNTRACKED, see below)
 ```
 
 ## Architecture (`game.js`, top → bottom)
