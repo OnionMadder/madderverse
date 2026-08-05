@@ -26,14 +26,18 @@ window.TINY_CANVAS_TEMPLATES = [
             /* sun body */
             '<circle cx="400" cy="400" r="200"/>' +
             /* rays — eight evenly spaced spokes */
-            '<line x1="400" y1="120" x2="400" y2="180"/>' +
-            '<line x1="400" y1="620" x2="400" y2="680"/>' +
-            '<line x1="120" y1="400" x2="180" y2="400"/>' +
-            '<line x1="620" y1="400" x2="680" y2="400"/>' +
-            '<line x1="200" y1="200" x2="245" y2="245"/>' +
-            '<line x1="555" y1="555" x2="600" y2="600"/>' +
-            '<line x1="200" y1="600" x2="245" y2="555"/>' +
-            '<line x1="555" y1="245" x2="600" y2="200"/>' +
+            /* Closed spikes, one rotate group each. These were bare
+               <line>s: a sun with eight rays no kid could colour in.
+               Kept detached from the disc by a ~20px gap so the body
+               stays a single cell. */
+            '<g transform="rotate(0 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
+            '<g transform="rotate(45 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
+            '<g transform="rotate(90 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
+            '<g transform="rotate(135 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
+            '<g transform="rotate(180 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
+            '<g transform="rotate(225 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
+            '<g transform="rotate(270 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
+            '<g transform="rotate(315 400 400)"><path d="M378 182 L422 182 L400 112 Z"/></g>' +
             /* face — eyes + smile */
             '<circle cx="335" cy="370" r="14" fill="currentColor"/>' +
             '<circle cx="465" cy="370" r="14" fill="currentColor"/>' +
@@ -112,13 +116,13 @@ window.TINY_CANVAS_TEMPLATES = [
             /* tail */
             '<path d="M180 400 L80 280 L120 400 L80 520 Z"/>' +
             /* top fin */
-            '<path d="M380 252 Q400 180 460 230"/>' +
+            '<path d="M379 250 Q400 180 458 240 Z"/>' +
             /* bottom fin */
-            '<path d="M380 548 Q400 620 460 570"/>' +
+            '<path d="M361 546 Q400 620 437 558 Z"/>' +
             /* side fin */
-            '<path d="M380 400 Q360 470 440 480"/>' +
+            '<path d="M380 400 Q360 470 440 480 Z"/>' +
             /* gill arc */
-            '<path d="M260 320 Q240 400 260 480"/>' +
+            '<path d="M260 303 Q240 400 260 499"/>' +
             /* eye */
             '<circle cx="555" cy="370" r="26"/>' +
             '<circle cx="555" cy="370" r="10" fill="currentColor"/>' +
@@ -496,10 +500,17 @@ window.TINY_CANVAS_TEMPLATES = [
             /* frosting edge — wavy inner ring */
             '<path d="M400 160 Q510 140 580 195 Q655 250 660 330 Q680 415 635 480 Q605 565 525 605 Q445 640 360 630 Q280 620 220 555 Q160 495 145 410 Q135 320 185 245 Q235 175 320 150 Q360 140 400 145 Z"/>' +
             /* drizzle ribbons */
-            '<path d="M250 245 Q305 285 270 345"/>' +
-            '<path d="M530 230 Q565 280 510 320"/>' +
-            '<path d="M540 480 Q590 460 580 405"/>' +
-            '<path d="M260 480 Q230 540 295 555"/>' +
+            /* Closed ribbons, not open curves. Each is the source
+               curve offset +-11 units: the ends move along their own
+               tangent normals and the control point is the intersection
+               of the two offset tangent lines, which keeps the offset
+               curve tangent to the original at both ends so the ribbon
+               keeps an even width instead of pinching. Each ribbon is
+               now its own fillable cell floating in the frosting. */
+            '<path d="M244 254 Q290 288 260 339 L280 351 Q320 282 256 236 Z"/>' +
+            '<path d="M521 236 Q550 277 504 311 L516 329 Q580 283 539 224 Z"/>' +
+            '<path d="M544 490 Q602 467 591 403 L569 407 Q578 453 536 470 Z"/>' +
+            '<path d="M250 475 Q214 548 293 566 L297 544 Q246 532 270 485 Z"/>' +
             /* sprinkles */
             '<ellipse cx="220" cy="350" rx="6" ry="14" transform="rotate(30 220 350)" fill="currentColor"/>' +
             '<ellipse cx="300" cy="210" rx="6" ry="14" transform="rotate(-20 300 210)" fill="currentColor"/>' +
@@ -630,51 +641,390 @@ window.TINY_CANVAS_TEMPLATES = [
     {
         id: "snowflake",
         name: "SNOWFLAKE",
+        /* Every element here is a CLOSED path on purpose. The first
+           version drew the arms as bare <line>s with open chevrons
+           hanging off them, which looks like a snowflake but has no
+           enclosed area at all — so the fill tool had exactly one
+           region to work with (the whole page) and tapping anywhere
+           flooded the lot.
+           Rebuilt as: a flat-top centre hexagon whose top edge the
+           arm shafts sit flush on, then per arm a closed shaft, a
+           closed tip triangle and four closed leaflets. 37 fillable
+           cells. Shaft edges are deliberately VERTICAL (x=380/420) so
+           the leaflets can attach at exact coordinates — a tapered
+           shaft needs the attachment x recomputed per height, and a
+           sub-pixel mismatch there opens a gap the fill escapes
+           through. */
         svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
-            /* center hexagon */
-            '<path d="M400 350 L450 380 L450 430 L400 460 L350 430 L350 380 Z"/>' +
-            /* six arms via rotate-transform groups */
+            /* centre hexagon — flat-top, so each arm base sits on an edge */
+            '<path d="M460 400 L430 348 L370 348 L340 400 L370 452 L430 452 Z"/>' +
             '<g transform="rotate(0 400 400)">' +
-                '<line x1="400" y1="350" x2="400" y2="120"/>' +
-                '<path d="M370 200 L400 170 L430 200"/>' +
-                '<path d="M375 250 L400 225 L425 250"/>' +
-                '<path d="M380 290 L400 270 L420 290"/>' +
+                /* shaft */
+                '<path d="M380 348 L380 170 L420 170 L420 348 Z"/>' +
+                /* tip */
+                '<path d="M380 170 L420 170 L400 106 Z"/>' +
+                /* lower leaflets */
+                '<path d="M380 300 L332 266 L346 240 L380 264 Z"/>' +
+                '<path d="M420 300 L468 266 L454 240 L420 264 Z"/>' +
+                /* upper leaflets */
+                '<path d="M380 232 L342 204 L352 180 L380 202 Z"/>' +
+                '<path d="M420 232 L458 204 L448 180 L420 202 Z"/>' +
             '</g>' +
             '<g transform="rotate(60 400 400)">' +
-                '<line x1="400" y1="350" x2="400" y2="120"/>' +
-                '<path d="M370 200 L400 170 L430 200"/>' +
-                '<path d="M375 250 L400 225 L425 250"/>' +
-                '<path d="M380 290 L400 270 L420 290"/>' +
+                /* shaft */
+                '<path d="M380 348 L380 170 L420 170 L420 348 Z"/>' +
+                /* tip */
+                '<path d="M380 170 L420 170 L400 106 Z"/>' +
+                /* lower leaflets */
+                '<path d="M380 300 L332 266 L346 240 L380 264 Z"/>' +
+                '<path d="M420 300 L468 266 L454 240 L420 264 Z"/>' +
+                /* upper leaflets */
+                '<path d="M380 232 L342 204 L352 180 L380 202 Z"/>' +
+                '<path d="M420 232 L458 204 L448 180 L420 202 Z"/>' +
             '</g>' +
             '<g transform="rotate(120 400 400)">' +
-                '<line x1="400" y1="350" x2="400" y2="120"/>' +
-                '<path d="M370 200 L400 170 L430 200"/>' +
-                '<path d="M375 250 L400 225 L425 250"/>' +
-                '<path d="M380 290 L400 270 L420 290"/>' +
+                /* shaft */
+                '<path d="M380 348 L380 170 L420 170 L420 348 Z"/>' +
+                /* tip */
+                '<path d="M380 170 L420 170 L400 106 Z"/>' +
+                /* lower leaflets */
+                '<path d="M380 300 L332 266 L346 240 L380 264 Z"/>' +
+                '<path d="M420 300 L468 266 L454 240 L420 264 Z"/>' +
+                /* upper leaflets */
+                '<path d="M380 232 L342 204 L352 180 L380 202 Z"/>' +
+                '<path d="M420 232 L458 204 L448 180 L420 202 Z"/>' +
             '</g>' +
             '<g transform="rotate(180 400 400)">' +
-                '<line x1="400" y1="350" x2="400" y2="120"/>' +
-                '<path d="M370 200 L400 170 L430 200"/>' +
-                '<path d="M375 250 L400 225 L425 250"/>' +
-                '<path d="M380 290 L400 270 L420 290"/>' +
+                /* shaft */
+                '<path d="M380 348 L380 170 L420 170 L420 348 Z"/>' +
+                /* tip */
+                '<path d="M380 170 L420 170 L400 106 Z"/>' +
+                /* lower leaflets */
+                '<path d="M380 300 L332 266 L346 240 L380 264 Z"/>' +
+                '<path d="M420 300 L468 266 L454 240 L420 264 Z"/>' +
+                /* upper leaflets */
+                '<path d="M380 232 L342 204 L352 180 L380 202 Z"/>' +
+                '<path d="M420 232 L458 204 L448 180 L420 202 Z"/>' +
             '</g>' +
             '<g transform="rotate(240 400 400)">' +
-                '<line x1="400" y1="350" x2="400" y2="120"/>' +
-                '<path d="M370 200 L400 170 L430 200"/>' +
-                '<path d="M375 250 L400 225 L425 250"/>' +
-                '<path d="M380 290 L400 270 L420 290"/>' +
+                /* shaft */
+                '<path d="M380 348 L380 170 L420 170 L420 348 Z"/>' +
+                /* tip */
+                '<path d="M380 170 L420 170 L400 106 Z"/>' +
+                /* lower leaflets */
+                '<path d="M380 300 L332 266 L346 240 L380 264 Z"/>' +
+                '<path d="M420 300 L468 266 L454 240 L420 264 Z"/>' +
+                /* upper leaflets */
+                '<path d="M380 232 L342 204 L352 180 L380 202 Z"/>' +
+                '<path d="M420 232 L458 204 L448 180 L420 202 Z"/>' +
             '</g>' +
             '<g transform="rotate(300 400 400)">' +
-                '<line x1="400" y1="350" x2="400" y2="120"/>' +
-                '<path d="M370 200 L400 170 L430 200"/>' +
-                '<path d="M375 250 L400 225 L425 250"/>' +
-                '<path d="M380 290 L400 270 L420 290"/>' +
+                /* shaft */
+                '<path d="M380 348 L380 170 L420 170 L420 348 Z"/>' +
+                /* tip */
+                '<path d="M380 170 L420 170 L400 106 Z"/>' +
+                /* lower leaflets */
+                '<path d="M380 300 L332 266 L346 240 L380 264 Z"/>' +
+                '<path d="M420 300 L468 266 L454 240 L420 264 Z"/>' +
+                /* upper leaflets */
+                '<path d="M380 232 L342 204 L352 180 L380 202 Z"/>' +
+                '<path d="M420 232 L458 204 L448 180 L420 202 Z"/>' +
             '</g>' +
-            /* tiny stars around */
+            /* tiny solid stars — decoration, not fillable */
             '<path d="M120 200 L128 215 L144 218 L128 222 L120 237 L112 222 L96 218 L112 215 Z" fill="currentColor"/>' +
             '<path d="M680 600 L688 615 L704 618 L688 622 L680 637 L672 622 L656 618 L672 615 Z" fill="currentColor"/>' +
-            '<path d="M680 200 L687 213 L700 215 L687 217 L680 230 L673 217 L660 215 L673 213 Z" fill="currentColor"/>' +
-            '<path d="M120 600 L127 613 L140 615 L127 617 L120 630 L113 617 L100 615 L113 613 Z" fill="currentColor"/>' +
+            '<path d="M660 190 L667 204 L681 207 L667 210 L660 224 L653 210 L639 207 L653 204 Z" fill="currentColor"/>' +
+            '<path d="M140 610 L147 624 L161 627 L147 630 L140 644 L133 630 L119 627 L133 624 Z" fill="currentColor"/>' +
+        '</svg>'
+    },
+    {
+        id: "flower",
+        name: "BIG FLOWER",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* stem — a closed sliver, not a line, so it can be filled */
+            '<path d="M386 430 L386 706 L414 706 L414 430 Z"/>' +
+            /* leaves */
+            '<path d="M386 552 C 322 492, 244 512, 232 574 C 296 616, 366 606, 386 552 Z"/>' +
+            '<path d="M414 622 C 478 562, 556 582, 568 644 C 504 686, 434 676, 414 622 Z"/>' +
+            /* six petals around the centre */
+            '<ellipse cx="400" cy="182" rx="62" ry="88"/>' +
+            '<ellipse cx="400" cy="182" rx="62" ry="88" transform="rotate(60 400 300)"/>' +
+            '<ellipse cx="400" cy="182" rx="62" ry="88" transform="rotate(120 400 300)"/>' +
+            '<ellipse cx="400" cy="182" rx="62" ry="88" transform="rotate(180 400 300)"/>' +
+            '<ellipse cx="400" cy="182" rx="62" ry="88" transform="rotate(240 400 300)"/>' +
+            '<ellipse cx="400" cy="182" rx="62" ry="88" transform="rotate(300 400 300)"/>' +
+            /* centre */
+            '<circle cx="400" cy="300" r="58"/>' +
+        '</svg>'
+    },
+    {
+        id: "tree",
+        name: "TALL TREE",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* trunk */
+            '<path d="M366 700 L366 486 L434 486 L434 700 Z"/>' +
+            /* canopy — one closed lumpy blob */
+            '<path d="M400 112 C 252 112, 196 244, 258 322 C 192 378, 238 480, 344 480 L 456 480 C 562 480, 608 378, 542 322 C 604 244, 548 112, 400 112 Z"/>' +
+            /* a couple of apples */
+            '<circle cx="330" cy="270" r="34"/>' +
+            '<circle cx="470" cy="230" r="34"/>' +
+            '<circle cx="440" cy="370" r="34"/>' +
+            /* grass line */
+            '<path d="M110 700 L690 700"/>' +
+        '</svg>'
+    },
+    {
+        id: "rainbow",
+        name: "RAINBOW",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* four closed half-annulus bands — each one fills separately */
+            '<path d="M80 600 A 320 320 0 0 1 720 600 L 665 600 A 265 265 0 0 0 135 600 Z"/>' +
+            '<path d="M135 600 A 265 265 0 0 1 665 600 L 610 600 A 210 210 0 0 0 190 600 Z"/>' +
+            '<path d="M190 600 A 210 210 0 0 1 610 600 L 555 600 A 155 155 0 0 0 245 600 Z"/>' +
+            '<path d="M245 600 A 155 155 0 0 1 555 600 L 500 600 A 100 100 0 0 0 300 600 Z"/>' +
+            /* a cloud at each foot */
+            '<path d="M96 672 C 58 672, 52 622, 96 616 C 102 572, 172 566, 190 604 C 240 592, 266 648, 228 672 Z"/>' +
+            '<path d="M704 672 C 742 672, 748 622, 704 616 C 698 572, 628 566, 610 604 C 560 592, 534 648, 572 672 Z"/>' +
+        '</svg>'
+    },
+    {
+        id: "cupcake",
+        name: "CUPCAKE",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* wrapper */
+            '<path d="M266 434 L330 704 L470 704 L534 434 Z"/>' +
+            /* pleats — these split the wrapper into separate fill zones */
+            '<line x1="332" y1="434" x2="366" y2="704"/>' +
+            '<line x1="400" y1="434" x2="400" y2="704"/>' +
+            '<line x1="468" y1="434" x2="434" y2="704"/>' +
+            /* frosting */
+            '<path d="M266 434 C 240 348, 296 300, 340 314 C 352 246, 448 236, 466 302 C 528 292, 562 356, 534 434 Z"/>' +
+            /* cherry */
+            '<circle cx="400" cy="212" r="44"/>' +
+            '<path d="M400 168 C 404 132, 430 116, 456 118"/>' +
+        '</svg>'
+    },
+    {
+        id: "hot-air-balloon",
+        name: "BALLOON RIDE",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* envelope */
+            '<path d="M400 104 C 258 104, 186 228, 228 340 C 258 418, 340 476, 400 508 C 460 476, 542 418, 572 340 C 614 228, 542 104, 400 104 Z"/>' +
+            /* two seams — split the envelope into three fillable panels */
+            '<path d="M330 122 C 284 248, 300 404, 356 496"/>' +
+            '<path d="M470 122 C 516 248, 500 404, 444 496"/>' +
+            /* ropes */
+            '<line x1="326" y1="474" x2="356" y2="576"/>' +
+            '<line x1="474" y1="474" x2="444" y2="576"/>' +
+            /* basket */
+            '<path d="M350 576 L362 668 L438 668 L450 576 Z"/>' +
+            '<line x1="354" y1="614" x2="446" y2="614"/>' +
+        '</svg>'
+    },
+    {
+        id: "sailboat",
+        name: "SAILBOAT",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* hull */
+            '<path d="M172 552 L628 552 L562 664 L238 664 Z"/>' +
+            /* mast */
+            '<path d="M392 168 L392 552 L408 552 L408 168 Z"/>' +
+            /* main sail + jib */
+            '<path d="M424 196 L424 516 L610 516 Z"/>' +
+            '<path d="M376 244 L376 516 L228 516 Z"/>' +
+            /* flag */
+            '<path d="M408 168 L470 190 L408 212 Z"/>' +
+            /* water */
+            '<path d="M110 704 q42 -26 84 0 t84 0 t84 0 t84 0 t84 0 t84 0"/>' +
+        '</svg>'
+    },
+    {
+        id: "train",
+        name: "TRAIN",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* boiler + cab */
+            '<rect x="176" y="384" width="392" height="176" rx="16"/>' +
+            '<rect x="430" y="252" width="138" height="132" rx="14"/>' +
+            '<rect x="464" y="284" width="70" height="66" rx="8"/>' +
+            /* funnel */
+            '<path d="M234 384 L234 300 L300 300 L300 384 Z"/>' +
+            '<rect x="216" y="262" width="102" height="40" rx="10"/>' +
+            /* wheels */
+            '<circle cx="252" cy="600" r="54"/>' +
+            '<circle cx="252" cy="600" r="18"/>' +
+            '<circle cx="400" cy="600" r="54"/>' +
+            '<circle cx="400" cy="600" r="18"/>' +
+            '<circle cx="548" cy="600" r="54"/>' +
+            '<circle cx="548" cy="600" r="18"/>' +
+            /* rail */
+            '<path d="M110 672 L690 672"/>' +
+        '</svg>'
+    },
+    {
+        id: "frog",
+        name: "FROG",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* back feet */
+            '<ellipse cx="242" cy="618" rx="72" ry="40"/>' +
+            '<ellipse cx="558" cy="618" rx="72" ry="40"/>' +
+            /* body */
+            '<ellipse cx="400" cy="452" rx="212" ry="168"/>' +
+            /* eye domes */
+            '<circle cx="318" cy="296" r="62"/>' +
+            '<circle cx="482" cy="296" r="62"/>' +
+            '<circle cx="318" cy="302" r="20" fill="currentColor"/>' +
+            '<circle cx="482" cy="302" r="20" fill="currentColor"/>' +
+            /* smile — splits the body into two fill zones */
+            '<path d="M286 466 Q400 552 514 466"/>' +
+            /* tummy */
+            '<path d="M400 508 C 336 508, 306 560, 322 606 C 372 632, 428 632, 478 606 C 494 560, 464 508, 400 508 Z"/>' +
+        '</svg>'
+    },
+    {
+        id: "owl",
+        name: "SLEEPY OWL",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* branch */
+            '<path d="M104 682 L696 682 L696 714 L104 714 Z"/>' +
+            /* body */
+            '<path d="M400 132 C 250 132, 190 288, 202 424 C 214 566, 302 660, 400 660 C 498 660, 586 566, 598 424 C 610 288, 550 132, 400 132 Z"/>' +
+            /* ear tufts */
+            '<path d="M250 196 L214 118 L302 156 Z"/>' +
+            '<path d="M550 196 L586 118 L498 156 Z"/>' +
+            /* wings */
+            '<path d="M214 376 C 176 464, 198 566, 252 606 C 268 524, 262 434, 240 380 Z"/>' +
+            '<path d="M586 376 C 624 464, 602 566, 548 606 C 532 524, 538 434, 560 380 Z"/>' +
+            /* eyes */
+            '<circle cx="324" cy="322" r="76"/>' +
+            '<circle cx="476" cy="322" r="76"/>' +
+            '<circle cx="324" cy="322" r="28" fill="currentColor"/>' +
+            '<circle cx="476" cy="322" r="28" fill="currentColor"/>' +
+            /* beak */
+            '<path d="M400 372 L362 428 L438 428 Z"/>' +
+            /* tummy */
+            '<path d="M400 452 C 334 452, 304 530, 322 606 C 362 642, 438 642, 478 606 C 496 530, 466 452, 400 452 Z"/>' +
+            /* feet */
+            '<path d="M348 660 L336 682 L392 682 L386 660 Z"/>' +
+            '<path d="M452 660 L464 682 L408 682 L414 660 Z"/>' +
+        '</svg>'
+    },
+    {
+        id: "turtle",
+        name: "TURTLE",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* flippers */
+            '<ellipse cx="212" cy="288" rx="74" ry="46" transform="rotate(-28 212 288)"/>' +
+            '<ellipse cx="212" cy="512" rx="74" ry="46" transform="rotate(28 212 512)"/>' +
+            '<ellipse cx="560" cy="288" rx="74" ry="46" transform="rotate(28 560 288)"/>' +
+            '<ellipse cx="560" cy="512" rx="74" ry="46" transform="rotate(-28 560 512)"/>' +
+            /* head */
+            '<circle cx="646" cy="400" r="64"/>' +
+            '<circle cx="668" cy="380" r="13" fill="currentColor"/>' +
+            /* shell */
+            '<ellipse cx="400" cy="400" rx="224" ry="168"/>' +
+            '<ellipse cx="400" cy="400" rx="128" ry="92"/>' +
+            /* shell segments — split the outer ring into six fill zones */
+            '<line x1="400" y1="232" x2="400" y2="308"/>' +
+            '<line x1="400" y1="492" x2="400" y2="568"/>' +
+            '<line x1="248" y1="304" x2="304" y2="352"/>' +
+            '<line x1="248" y1="496" x2="304" y2="448"/>' +
+            '<line x1="552" y1="304" x2="496" y2="352"/>' +
+            '<line x1="552" y1="496" x2="496" y2="448"/>' +
+        '</svg>'
+    },
+    {
+        id: "ladybug",
+        name: "LADYBUG",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* antennae */
+            '<path d="M340 244 C 316 190, 288 168, 258 162"/>' +
+            '<path d="M460 244 C 484 190, 512 168, 542 162"/>' +
+            '<circle cx="252" cy="156" r="20"/>' +
+            '<circle cx="548" cy="156" r="20"/>' +
+            /* head */
+            '<circle cx="400" cy="256" r="92"/>' +
+            '<circle cx="366" cy="240" r="14" fill="currentColor"/>' +
+            '<circle cx="434" cy="240" r="14" fill="currentColor"/>' +
+            /* shell */
+            '<circle cx="400" cy="454" r="204"/>' +
+            /* wing split */
+            '<line x1="400" y1="252" x2="400" y2="658"/>' +
+            /* spots — outlined so each one fills on its own */
+            '<circle cx="308" cy="378" r="40"/>' +
+            '<circle cx="492" cy="378" r="40"/>' +
+            '<circle cx="286" cy="512" r="34"/>' +
+            '<circle cx="514" cy="512" r="34"/>' +
+            '<circle cx="356" cy="592" r="30"/>' +
+            '<circle cx="444" cy="592" r="30"/>' +
+        '</svg>'
+    },
+    {
+        id: "penguin",
+        name: "PENGUIN",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* feet */
+            '<path d="M336 664 L296 710 L392 710 L380 664 Z"/>' +
+            '<path d="M464 664 L504 710 L408 710 L420 664 Z"/>' +
+            /* body */
+            '<path d="M400 118 C 282 118, 232 254, 242 400 C 252 560, 312 668, 400 668 C 488 668, 548 560, 558 400 C 568 254, 518 118, 400 118 Z"/>' +
+            /* flippers */
+            '<path d="M244 322 C 198 396, 202 522, 246 566 C 260 486, 258 384, 244 322 Z"/>' +
+            '<path d="M556 322 C 602 396, 598 522, 554 566 C 540 486, 542 384, 556 322 Z"/>' +
+            /* tummy */
+            '<path d="M400 250 C 334 250, 302 376, 312 480 C 322 590, 360 644, 400 644 C 440 644, 478 590, 488 480 C 498 376, 466 250, 400 250 Z"/>' +
+            /* eyes + beak */
+            '<circle cx="356" cy="240" r="26"/>' +
+            '<circle cx="444" cy="240" r="26"/>' +
+            '<circle cx="356" cy="244" r="11" fill="currentColor"/>' +
+            '<circle cx="444" cy="244" r="11" fill="currentColor"/>' +
+            '<path d="M400 286 L362 322 L400 356 L438 322 Z"/>' +
+        '</svg>'
+    },
+    {
+        id: "mushroom",
+        name: "MUSHROOM",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* stem */
+            '<path d="M322 396 L322 618 C 322 664, 478 664, 478 618 L478 396 Z"/>' +
+            /* cap */
+            '<path d="M152 400 C 152 232, 648 232, 648 400 Z"/>' +
+            /* spots */
+            '<circle cx="268" cy="342" r="42"/>' +
+            '<circle cx="400" cy="298" r="48"/>' +
+            '<circle cx="532" cy="342" r="42"/>' +
+            /* face */
+            '<circle cx="366" cy="470" r="12" fill="currentColor"/>' +
+            '<circle cx="434" cy="470" r="12" fill="currentColor"/>' +
+            '<path d="M362 526 Q400 556 438 526"/>' +
+            /* grass */
+            '<path d="M120 664 L680 664"/>' +
+        '</svg>'
+    },
+    {
+        id: "crab",
+        name: "CRAB",
+        svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">' +
+            /* legs */
+            '<path d="M228 480 L138 528"/>' +
+            '<path d="M232 528 L150 596"/>' +
+            '<path d="M262 566 L206 648"/>' +
+            '<path d="M572 480 L662 528"/>' +
+            '<path d="M568 528 L650 596"/>' +
+            '<path d="M538 566 L594 648"/>' +
+            /* claws */
+            '<path d="M214 328 C 146 296, 100 350, 146 392 C 104 428, 152 484, 216 444 Z"/>' +
+            '<path d="M586 328 C 654 296, 700 350, 654 392 C 696 428, 648 484, 584 444 Z"/>' +
+            /* body */
+            '<ellipse cx="400" cy="452" rx="204" ry="146"/>' +
+            /* eye stalks */
+            '<path d="M336 316 L336 380 L352 380 L352 316 Z"/>' +
+            '<path d="M448 316 L448 380 L464 380 L464 316 Z"/>' +
+            '<circle cx="344" cy="292" r="34"/>' +
+            '<circle cx="456" cy="292" r="34"/>' +
+            '<circle cx="344" cy="296" r="13" fill="currentColor"/>' +
+            '<circle cx="456" cy="296" r="13" fill="currentColor"/>' +
+            /* smile */
+            '<path d="M330 486 Q400 542 470 486"/>' +
         '</svg>'
     }
 ];

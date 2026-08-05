@@ -31,11 +31,18 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Tiny Canvas" />
     <meta name="application-name" content="Tiny Canvas" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bungee&family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <!-- Fonts are SELF-HOSTED in assets/fonts/ via @font-face in
+         style.css — deliberately NOT fonts.googleapis.com. A CDN font
+         breaks the offline promise and hands Google the client IP on
+         every launch, contradicting this app's "no data collected"
+         Data Safety declaration. See style.css §0. -->
     <link rel="stylesheet" href="../assets/css/site-footer.css" />
-    <link rel="stylesheet" href="style.css" />
+    <!-- Cache-bust: bump ?v=N on EVERY change to style.css,
+         templates.js or game.js. Without it the browser happily
+         serves a stale game.js against a fresh index.html and the
+         change reads as "did nothing" — the same trap Slip Studio
+         and Florigami both hit. See their CLAUDE.md notes. -->
+    <link rel="stylesheet" href="style.css?v=12" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -273,6 +280,39 @@
             </svg>
         </aside>
 
+        <!-- ============================================================
+             COACH — one-time first-run hint on the draw screen.
+             A touch dot travels the squiggle as the squiggle strokes
+             itself in, which reads as "drag here to draw" without
+             relying on words a pre-reader can't read yet.
+
+             The caption sits ABOVE the art on purpose: the tool rail
+             is a bottom sheet, and Slip Studio shipped a bad-rating
+             bug where its coach caption hid behind the open tray.
+
+             pointer-events: none throughout — the coach must never
+             swallow the first stroke it is asking the kid to make.
+             ============================================================ -->
+        <div class="coach" id="coach" hidden aria-hidden="true">
+            <div class="coach-stage">
+                <p class="coach-cap" id="coachCap">DRAW ANYWHERE</p>
+                <svg class="coach-art" viewBox="0 0 400 300" aria-hidden="true">
+                    <path id="coachPath" class="coach-path"
+                          d="M 60 205 C 120 105, 180 265, 240 165 S 340 95, 355 155" />
+                    <g class="coach-dot">
+                        <circle class="coach-ring" r="26" />
+                        <circle class="coach-nub"  r="13" />
+                        <animateMotion id="coachMotion" dur="2.6s"
+                                       repeatCount="indefinite"
+                                       calcMode="linear" keyPoints="0;1"
+                                       keyTimes="0;1">
+                            <mpath href="#coachPath" />
+                        </animateMotion>
+                    </g>
+                </svg>
+            </div>
+        </div>
+
         <div class="draw-side-rail">
 
             <button class="drawer-handle" type="button"
@@ -343,6 +383,15 @@
                         <span class="tool-label">GLITTER</span>
                     </button>
 
+                    <button class="tool-btn" data-tool="fill" type="button">
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 5 L14 13 L8.5 18.5 Q7 20 5.5 18.5 L3 16 Q1.5 14.5 3 13 Z"/>
+                            <line x1="6" y1="5" x2="9" y2="2"/>
+                            <path d="M19 12 Q21.5 15.5 21.5 17.2 Q21.5 19.5 19 19.5 Q16.5 19.5 16.5 17.2 Q16.5 15.5 19 12 Z" fill="currentColor" stroke="none"/>
+                        </svg>
+                        <span class="tool-label">FILL</span>
+                    </button>
+
                     <button class="tool-btn tool-eraser" data-tool="eraser" type="button">
                         <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 17 L11 10 L18 17 L14 21 L8 21 Z"/>
@@ -369,6 +418,13 @@
                 <div class="tool-row palette-row">
                     <span class="row-label">COLOR</span>
                     <div class="palette color-palette" id="colorPalette" role="listbox" aria-label="Brush colors"></div>
+                    <!-- Custom colour. Sits OUTSIDE #colorPalette because
+                         buildPalette() rewrites that container's innerHTML
+                         on every group switch and would wipe it. -->
+                    <label class="swatch swatch-custom" id="customSwatch"
+                           title="Pick any color" aria-label="Pick any color">
+                        <input type="color" id="customColor" value="#ff2e88" />
+                    </label>
                 </div>
 
             </div>
@@ -474,12 +530,12 @@
                 <input type="checkbox" id="setSfx" class="settings-toggle" />
             </label>
 
-            <label class="settings-row settings-row-disabled">
+            <label class="settings-row">
                 <span class="settings-label">
                     Music
-                    <span class="settings-sub">Coming in a future update</span>
+                    <span class="settings-sub">A quiet drifting hum</span>
                 </span>
-                <input type="checkbox" id="setMusic" class="settings-toggle" disabled />
+                <input type="checkbox" id="setMusic" class="settings-toggle" />
             </label>
         </div>
 
@@ -495,6 +551,13 @@
                     <option value="en">English</option>
                 </select>
             </label>
+        </div>
+
+        <div class="settings-card">
+            <h3 class="settings-section">HELP</h3>
+            <button class="big-btn" id="btnHowToPlay" type="button">
+                <span class="btn-label">HOW TO PLAY</span>
+            </button>
         </div>
 
         <div class="settings-card">
@@ -582,8 +645,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js"></script>
-<script src="game.js"></script>
+<script src="templates.js?v=12"></script>
+<script src="game.js?v=12"></script>
 
 </body>
 </html>

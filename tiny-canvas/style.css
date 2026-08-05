@@ -7,6 +7,50 @@
    substrate. UI chrome stays dark.
    ============================================================ */
 
+/* ----- 0. Fonts (SELF-HOSTED — do not put these back on a CDN) -----
+   Vendored locally rather than loaded from fonts.googleapis.com. Two
+   reasons, both load-bearing for this particular product:
+
+     1. Offline. The app's whole promise is that it works with no
+        network. A CDN font means the logo and every label silently
+        fall back to system fonts the moment the kid is off-grid —
+        and with Bungee and Press Start 2P that isn't graceful
+        degradation, it's a different-looking app.
+
+     2. Data Safety. Tiny Canvas declares "no data collected" and
+        deliberately ships no analytics (see the GoatCounter note in
+        index.html). A Google Fonts request hands Google the client IP
+        on every single launch, contradicting exactly that claim — and
+        it is the sort of thing a Designed for Families review looks
+        for.
+
+   All three are SIL Open Font License, free to self-host.
+   74.7KB total: bungee 14.3K, vt323 31.2K, press-start-2p 29.2K. */
+
+@font-face {
+    font-family: "Bungee";
+    src: url("assets/fonts/bungee-latin.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "VT323";
+    src: url("assets/fonts/vt323.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Press Start 2P";
+    src: url("assets/fonts/press-start-2p.woff2") format("woff2");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* ----- 1. Tokens (canon — see ../DESIGN.md §2) ----- */
 
 :root {
@@ -1993,4 +2037,179 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     .draw-marquee span {
         animation: none;
     }
+}
+
+/* ============================================================
+   16. COACH — first-run onboarding
+   ============================================================
+   Shown once on the draw screen, then never again unless replayed
+   from Settings. A touch dot travels the squiggle while the squiggle
+   strokes itself in: a wordless "drag here" that works before the
+   caption can be read.
+
+   pointer-events stays none on every part of this — the coach is
+   asking for a stroke, so it must not be able to eat one.
+   ============================================================ */
+
+.coach {
+    position: fixed;
+    inset: 0;
+    z-index: 88;              /* under the rail (80 is the sheet, but
+                                 the sheet is closed while coaching)
+                                 and under the parent gate (9000) */
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    animation: coachIn 0.45s ease-out both;
+}
+
+.coach[hidden] { display: none; }
+
+.coach.is-leaving {
+    animation: coachOut 0.3s ease-in both;
+}
+
+.coach-stage {
+    width: min(400px, 88vw);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    /* Lift the whole group above centre so it clears the closed
+       bottom sheet and the onion in the lower-left. */
+    transform: translateY(-8vh);
+}
+
+.coach-cap {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: 2px;
+    color: var(--paper);
+    text-align: center;
+    text-shadow:
+        2px 2px 0 var(--line-ink),
+        0 0 14px rgba(0, 0, 0, 0.85);
+}
+
+.coach-art {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+}
+
+.coach-path {
+    fill: none;
+    stroke: var(--paper);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 620;
+    stroke-dashoffset: 620;
+    filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.7));
+    animation: coachTrace 2.6s linear infinite;
+}
+
+.coach-ring {
+    fill: rgba(255, 255, 255, 0.22);
+    stroke: var(--paper);
+    stroke-width: 2.5;
+}
+
+.coach-nub {
+    fill: var(--pink);
+    stroke: var(--paper);
+    stroke-width: 2.5;
+}
+
+@keyframes coachTrace {
+    0%   { stroke-dashoffset: 620; }
+    88%  { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: 0; }
+}
+
+@keyframes coachIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes coachOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+/* Breathe the two buttons the coach can't point at directly.
+   A caption alone doesn't move a thumb toward controls nobody has
+   noticed — Slip Studio learned this the hard way. Three breaths,
+   then it stops on its own; retired for good on first tap. */
+.pages-btn.is-new,
+.drawer-handle.is-new {
+    animation: coachBreathe 1.5s ease-in-out 3;
+}
+
+@keyframes coachBreathe {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.09); }
+}
+
+/* Reduced motion: keep the coach (it teaches something real) but
+   hold it still — full squiggle drawn, dot parked at the start. The
+   travelling dot is stopped in JS by removing <animateMotion>, since
+   SMIL ignores this media query entirely. */
+@media (prefers-reduced-motion: reduce) {
+    .coach,
+    .coach.is-leaving {
+        animation: none;
+    }
+    .coach-path {
+        stroke-dashoffset: 0;
+        animation: none;
+    }
+    .pages-btn.is-new,
+    .drawer-handle.is-new {
+        animation: none;
+    }
+}
+
+/* ----- 17. Custom colour swatch -----
+   Lives beside #colorPalette rather than inside it, because
+   buildPalette() rewrites that container on every group switch.
+   The native <input type="color"> is stretched over the whole
+   swatch and made invisible, so the kid taps a normal-looking
+   round swatch and gets the platform picker. */
+
+.swatch-custom {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+    /* Rainbow until the kid picks something; JS then paints the
+       chosen colour onto the background. */
+    background:
+        conic-gradient(#ff2e88, #ff7a1f, #ffd23f, #9be15d,
+                       #00ffcc, #4fc3f7, #a86bff, #ff2e88);
+}
+
+.swatch-custom::after {
+    /* Little nib so it reads as "choose", not "a colour". */
+    content: "+";
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: #fff;
+    text-shadow: 0 0 3px #000, 1px 1px 0 #000;
+    pointer-events: none;
+}
+
+.swatch-custom input[type="color"] {
+    position: absolute;
+    inset: -4px;
+    width: calc(100% + 8px);
+    height: calc(100% + 8px);
+    padding: 0;
+    border: none;
+    background: none;
+    opacity: 0;
+    cursor: pointer;
 }

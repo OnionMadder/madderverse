@@ -42,15 +42,25 @@ Capacitor when you're packaging for a store.
 
 - **5 screens**, swapped via the `[hidden]` attribute on
   `<main class="screen">`: title → picker → draw → gallery → settings.
-- **21 line-art templates** (BLANK + 20 themed pages): smiley sun,
+- **35 line-art templates** (BLANK + 34 themed pages): smiley sun,
   cat, rocket, fish, house, dog, bear, butterfly, bird, car, airplane,
   truck, unicorn, dragon, castle, donut, ice cream, dinosaur, robot,
-  snowflake. Each is a `viewBox="0 0 800 800"` SVG drawn in
-  `currentColor` strokes; rendered as a `pointer-events: none` overlay
-  above the kid's canvas so the kid colors UNDER the lines.
+  snowflake, flower, tree, rainbow, cupcake, hot-air balloon, sailboat,
+  train, frog, owl, turtle, ladybug, penguin, mushroom, crab. Each is a
+  `viewBox="0 0 800 800"` SVG drawn in `currentColor` strokes; rendered
+  as a `pointer-events: none` overlay above the kid's canvas so the kid
+  colors UNDER the lines.
+- **Templates must be built from CLOSED shapes.** The fill tool
+  rasterizes this SVG into a boundary mask, so any gap in a path lets
+  fill escape into the rest of the page. Prefer `<circle>`, `<ellipse>`,
+  `<rect>` and paths ending in `Z`; an open polyline is fine only for
+  decoration that isn't meant to hold colour (a ground line, a rope).
+  A line drawn ACROSS an enclosed shape is a useful trick — it splits
+  that shape into separate fill zones (the cupcake pleats, the turtle
+  shell segments, the balloon panels all use this).
 - **6 distinct brushes** (PEN / MARKER / CRAYON / PENCIL / PAINT /
   GLITTER), each with its own beginStroke + drawSegment + textural
-  feel. Plus ERASER.
+  feel. Plus ERASER, plus the FILL bucket.
 - **36 colors organized in 5 groups** (RAINBOW / PASTELS / NEONS /
   EARTH / METALLIC) via tab switcher.
 - **Per-tool sizes** — 5 sizes for brushes (4/10/18/28/42), 3 for
@@ -70,10 +80,22 @@ Capacitor when you're packaging for a store.
   PNG / external links (home button + footer). Once unlocked, holds
   for the session. Apple Kids category compliant.
 - **Settings screen** — brush smoothing toggle, SFX toggle, music
-  toggle (disabled, "Coming soon"), locale stub (English only for
-  v1, designed for future expansion).
-- **Web Audio synthesized SFX** (tap / save / erase / swoosh). No
-  audio files. SFX-toggle-gated.
+  toggle, locale stub (English only for v1, designed for future
+  expansion).
+- **Web Audio synthesized SFX** (tap / save / erase / swoosh) **and a
+  synthesized ambient music bed**. No audio files at all — the music is
+  four detuned voices on a pentatonic chord, each breathing on its own
+  slow LFO through a lowpass, with no scheduler (so nothing drifts out
+  of sync over a long session). Default OFF, 4s fade-in, stops on
+  visibilitychange. Generating it rather than shipping a track also
+  keeps this clear of the licensing trap Slip Studio hit, where a stock
+  -music subscription turned out not to cover an app with a music
+  toggle — see the root CLAUDE.md.
+- **Self-hosted fonts** in `assets/fonts/` (Bungee, VT323, Press Start
+  2P as woff2, 74.7KB total). Deliberately NOT fonts.googleapis.com: a
+  CDN font breaks the offline promise, and hands Google the client IP
+  on every launch, which contradicts this app's "no data collected"
+  Data Safety declaration. See `style.css` §0.
 - **PWA**: manifest + theme-color + Apple PWA chrome.
   `beforeinstallprompt` reveals the INSTALL APP button on supported
   Chromium browsers.
@@ -92,8 +114,13 @@ tiny-canvas/
                           # settings card, parent-gate modal, toasts
   game.js                 # IIFE: canvas + 6 brushes + auto-save +
                           # parent gate + settings + native bridge
-  templates.js            # window.TINY_CANVAS_TEMPLATES — 21 SVG pages
+  templates.js            # window.TINY_CANVAS_TEMPLATES — 35 SVG pages
   manifest.webmanifest    # PWA manifest, theme-color #ff2e88
+
+  assets/
+    fonts/                # self-hosted woff2 — bungee-latin,
+                          # vt323, press-start-2p (74.7KB total).
+                          # Do NOT move these back to a CDN.
 
   icons/
     icon.svg              # master 1024x1024 app icon (full bleed)
@@ -122,13 +149,15 @@ tiny-canvas/
 
 | Section | What lives there |
 |---|---|
-| **CONFIG** | `STAGE_W=800`, `STAGE_H=800`, `COLOR_GROUPS` (5 named groups, 36 colors), `BRUSH_SIZES` (5), `ERASER_SIZES` (3), storage keys, `MAX_HISTORY=20`, `SAVE_MAX=60`, `AUTOSAVE_INTERVAL_MS=60000` |
-| **BRUSHES** | Map keyed by brush id. Each entry: `{ label, defaultSize, beginStroke(ctx,p,size,color), drawSegment(ctx,p0,p1,size,color) }`. Adding a 7th brush is two-line: entry here + button in DOM. |
+| **CONFIG** | `STAGE_W`/`STAGE_H` (set at runtime from the canvas's own box — NOT constants, see CANVAS SETUP), `COLOR_GROUPS` (5 named groups, 36 colors), `BRUSH_SIZES` (5), `ERASER_SIZES` (3), storage keys, `MAX_HISTORY=30`, `HISTORY_BYTE_BUDGET=24MB`, `STROKE_BOUNDS_SLACK=12`, `SAVE_MAX=60`, `AUTOSAVE_INTERVAL_MS=60000` |
+| **BRUSHES** | Map keyed by brush id. Each entry: `{ label, defaultSize, beginStroke(ctx,p,size,color), drawSegment(ctx,p0,p1,size,color) }`. Adding a brush is two-line: entry here + button in DOM. **`fill` lives in this table but is not a stroke tool** — it has no beginStroke/drawSegment and is flagged `sizeless: true`; `onPointerDown` intercepts it before the stroke path. It's in the table only so the tool button, active-state refresh and tool-switch handler all work off one list. |
+| **MUSIC** | `MUSIC_VOICES` / `startMusic` / `stopMusic` / `syncMusic`. Synthesized ambient bed, no audio files, default off. |
 | **CAPACITOR NATIVE BRIDGE** | `getCapacitor()`, `isNative()`, `nativePlugin(name)`, `rehydrateFromNativePrefs()`, `mirrorToNativePrefs()`, `setStorage()` / `removeStorage()` (write-through wrappers), `setupStatusBar()`, `hideSplashScreen()`, `nativeExport(rec)` (Filesystem + Share). |
 | **STATE** | Single object. `screen`, `templateId/Name`, brush + size + color, smoothing buffer (`smoothX/Y`), drawing state, history stack, parent-gate flags, settings sub-object. |
 | **AUDIO** | Lazy `ensureAudio()`. `sfxTap/Erase/Save/Swoosh` — all SFX-toggle-gated via `audioEnabled()`. |
-| **CANVAS SETUP** | `setupCanvas()` resizes the backing store to `STAGE_W*dpr × STAGE_H*dpr` and rescales the 2D context. `getPos(e)` converts pointer coords to logical 800×800 units. |
-| **HISTORY** | `pushHistory()` snapshots the canvas via `getImageData` before each stroke. |
+| **CANVAS SETUP** | `setupCanvas()` measures the canvas's **own laid-out box** (falling back to `innerWidth`/`innerHeight` only when it has none yet, i.e. the draw screen is still hidden at init), sets `STAGE_W`/`STAGE_H` from it, resizes the backing store to `STAGE_W*dpr × STAGE_H*dpr` and rescales the context. `getPos(e)` maps pointer coords into logical canvas space off that same box. **Both must derive from the same measurement** — see "Things that bite". |
+| **FILL MASK** | `buildFillMask()` rasterizes the line-art SVG into a 1-byte-per-pixel boundary mask aligned to the canvas, `floodFillAt()` scanline-fills the tapped region against it. `fillGeomKey()` fingerprints every geometry input (canvas size, svg rect, template id) so a stale mask rebuilds itself. Boundary threshold `FILL_BOUNDARY_ALPHA=96` — high on purpose so fill runs *under* the antialiased stroke skirt and leaves no pale halo; the line art draws on top, so the underlap is invisible. |
+| **HISTORY** | Dirty-rect patches, not full snapshots. `beginHistoryCapture()` blits the canvas into an offscreen buffer (cheap, no encode); the stroke path grows a bounding box via `growBounds`; `commitHistory()` keeps only that rectangle as raw `ImageData`. `undo()` is synchronous (`putImageData`). See "Things that bite" for why the box needs slack. |
 | **DRAWING** | Pointer handlers delegate to the active brush. Midpoint-quadratic smoothing one layer above the brush API: pointer-down → set smoothX/Y = raw point + brush.beginStroke; pointer-move → drawSegment from smoothed to midpoint(last, current); pointer-up → drawSegment final raw segment so the line doesn't stop short of the finger. |
 | **TEMPLATES** | `loadTemplate(tpl)` swaps line-art SVG, sets the title, clears the canvas, calls `tryRestoreInProgress(tpl.id)` to silently paint back any saved in-progress strokes for this template. |
 | **UI BUILDERS** | `buildPicker`, `buildPaletteTabs`, `buildPalette`, `rebuildSizeButtons` (driven by tool), `attachToolHandlers`, `attachSettingsHandlers`. |
@@ -146,25 +175,35 @@ tiny-canvas/
 
 ```
 +------------------------------------+
-|  .canvas-wrap (dark teal frame)    |
-|  +------------------------------+  |
-|  | #drawCanvas       z = 1      |  |   ← kid's strokes
-|  | (paper background, 800x800   |  |
-|  |  logical, DPR-scaled)        |  |
-|  +------------------------------+  |
-|  | .line-art (SVG overlay)      |  |   ← printed lines
-|  |  pointer-events: none        |  |     (stay above strokes)
-|  |  z = 2                       |  |
-|  +------------------------------+  |
-|  | .canvas-overlay-btn (undo)   |  |   ← floating control
-|  |  z = 2                       |  |
-|  +------------------------------+  |
+|  #drawCanvas          z = 1        |   ← kid's strokes
+|  (viewport-sized, DPR-scaled)      |
 +------------------------------------+
+|  #lineArt (SVG overlay)   z = 2    |   ← printed lines
+|  pointer-events: none              |     (stay above strokes)
+|  viewBox 0 0 800 800, letterboxed  |
++------------------------------------+
+|  .canvas-overlay-btn      z = 2    |   ← floating controls
+|  (undo, PAGES)                     |
++------------------------------------+
+
+        ... and off-screen, never composited:
+
+  fillMask  Uint8Array, 1 byte/px      ← the SAME line art,
+  aligned to the canvas backing store    rasterized as a
+                                         boundary mask
 ```
 
 The line-art is `currentColor` so it inherits `var(--line-ink)` from
 CSS — never re-stroke individual elements with explicit colors inside
 the SVG.
+
+**The consequence of this layering is the whole reason the fill tool is
+built the way it is.** The lines live in an SVG *above* the canvas, so
+the canvas bitmap contains no line information whatsoever — a naive
+flood fill on it would bleed straight across the page. Hence the
+separate rasterized mask. It also means fill never depends on what the
+kid already drew: tapping a region always fills that region, whatever
+is in it.
 
 ## Adding a new template
 
@@ -179,6 +218,51 @@ is `{ id, name, svg }`. The SVG must:
    background; the SVG just draws lines on top.
 4. Keep strokes thick enough that color stays cleanly enclosed at
    normal viewing size (6-10 stroke-width works at 800px logical).
+5. **Draw every colourable feature as a CLOSED shape.** This is the one
+   that gets missed. An open `<line>` or a path without `Z` still
+   *looks* right — it just can't hold colour, so the feature is dead to
+   the fill tool. The snowflake shipped with eight arms made of bare
+   lines and had exactly 2 fillable regions; the smiley sun's eight rays
+   were `<line>`s; the fish's fins were open curves. All three read fine
+   to the eye and were useless to a bucket.
+   Genuinely-open strokes are still correct for things that shouldn't
+   hold colour — a mouth, a ground line, the sailboat's waves, the
+   fish's scale arcs. The test is "would a kid want to colour this
+   separately?"
+
+### Auditing a page for fillable regions
+
+Don't eyeball it. Rasterize the SVG and count connected components of
+non-boundary pixels — that is exactly what the fill tool sees:
+
+```js
+// in the browser console on the draw screen
+const t = TINY_CANVAS_TEMPLATES.find(x => x.id === 'donut');
+// rasterize t.svg to an offscreen canvas at 700x700, threshold
+// alpha >= 96 into a mask, then flood-fill each unvisited non-mask
+// pixel and count regions that do NOT touch the canvas edge.
+```
+
+Two things this catches that reading the SVG does not:
+
+- **A feature that appears separated but isn't.** The fish's gill arc
+  stopped ~18px short of the body outline at both ends, so the "head"
+  it appears to divide off was not actually a separate region.
+- **Shapes that attach at a coordinate that doesn't quite meet.** A
+  sub-pixel mismatch where a leaflet joins a shaft opens a gap the fill
+  escapes through, merging two cells into one.
+
+Current baseline: **34 drawable pages, 406 fillable regions, median 11
+per page**, no leaks. If a page you add lands at 3-4 regions, look for
+open strokes before assuming it's just a simple drawing.
+
+When closing a curve into a ribbon (the donut's icing drizzles), offset
+the source curve both ways rather than hand-drawing a second edge: move
+the endpoints along their own tangent normals and put the control point
+at the **intersection of the two offset tangent lines**. That keeps the
+offset tangent to the original at both ends so the ribbon holds an even
+width. Offsetting the control point along a single normal pinches it in
+the middle.
 
 The picker auto-discovers the array, so no other code change is needed.
 
@@ -274,11 +358,42 @@ App Store Connect / Play Console upload slot
 
 ## Things that bite
 
-- **DPR scaling matters.** The canvas backing store is `STAGE_W*dpr ×
-  STAGE_H*dpr`, the 2D context is scaled by DPR, and pointer coords
-  are normalized in `getPos()` to logical 800×800 space.
+- **⚠ `window.innerWidth` is NOT the canvas's width, and assuming it is
+  was a real shipped bug.** `setupCanvas()` used to size the backing
+  store from `innerWidth`/`innerHeight` while the element laid out
+  narrower — a desktop scrollbar is enough, and a WebView inset does it
+  vertically. That made `canvas.width / rect.width` **2.117 when dpr was
+  2**, and everything that assumed the ratio *was* dpr silently landed
+  in the wrong place:
+  - `buildFillMask()` positioned the mask by the true ratio while
+    `floodFillAt()` seeded by dpr. They disagreed by 10px horizontally
+    and **46px vertically** — enough to seed fills in the wrong region,
+    which from the outside looks exactly like "the coloring page leaks."
+    Hours went into auditing templates before the cause turned out to be
+    here.
+  - Every brush stroke was compressed toward the top-left. At the edge
+    of the screen the line landed ~10px from the finger.
+
+  Both `setupCanvas()` and `getPos()` now derive from
+  `canvas.getBoundingClientRect()`. **Keep them deriving from one
+  measurement.** If you add another consumer of canvas geometry, do not
+  reach for `devicePixelRatio` or `innerWidth` — ask the canvas.
+- **A stale fill mask fails silently, so the mask self-validates.**
+  Explicit invalidation on template-load and resize is not enough: the
+  mask is positioned from the *live* svg rect against the *live* backing
+  store, so any layout shift that doesn't route through `setupCanvas()`
+  leaves a mask that still looks valid and is drawn in the wrong place.
+  `fillGeomKey()` re-measures on every fill and rebuilds on any change.
+  Cheap; the alternative is unfalsifiable bug reports about leaking
+  pages.
+- **Undo's dirty rect needs slack around the stroke.** Several brushes
+  paint wider than their nominal nib — glitter throws sparkles out to
+  `size/2 + ~2.4`, paint stacks passes wider than the line. Anything
+  drawn outside the recorded rectangle **survives the undo as a stray
+  mark**. `STROKE_BOUNDS_SLACK = 12` logical px covers the current set;
+  a new brush that scatters further must raise it.
 - **`getImageData` can throw** under cross-origin / taint rules. The
-  history code wraps it in try/catch.
+  history and fill code wrap it in try/catch.
 - **`composePng()` is async** because it inline-renders the SVG via a
   Blob URL → Image roundtrip. Only `await` it on save.
 - **Audio is gesture-gated.** First `pointerdown` / `keydown` unlocks
@@ -301,6 +416,23 @@ App Store Connect / Play Console upload slot
   three stacked passes at different widths/alphas. Don't replace
   with a CSS filter or compositor blur — the edge has to be baked
   into the bitmap for save/export to capture it.
+- **Bump `?v=N` in `index.html` on EVERY change** to `style.css`,
+  `templates.js` or `game.js` (currently **v12**). Without it the
+  browser serves a stale `game.js` against a fresh `index.html` and the
+  change reads as "did nothing" — the same trap Slip Studio and
+  Florigami both hit. Note that a hard-reload which refetches
+  subresources does **not** necessarily refetch the *document*: if the
+  cached `index.html` still says `?v=11` you keep getting the old
+  bundle. Load `/?cb=<anything>` to bust the document itself.
+- **`requestAnimationFrame` is paused when the page isn't compositing.**
+  The resize handler rebuilds the backing store inside a rAF callback,
+  so in a hidden/headless preview pane it never fires and the canvas
+  stays stale relative to the layout — which then misaligns the fill
+  mask and mimics a template leak. This is a harness artifact, not an
+  app bug, but it will waste your afternoon. Same issue Slip Studio
+  documents. If the viewport reports `innerWidth === 0`, nothing has
+  laid out and no geometry assertion means anything; give the pane a
+  real size first.
 - **`viewport-fit=cover` is set** but `user-scalable=no` is **not** —
   unlike Pootery. We allow pinch-zoom so kids can get close to a
   specific area of a coloring page. Capacitor's iOS WebView respects
@@ -490,29 +622,45 @@ From `scripts/capture-screenshots.js`:
 
 ---
 
-## Roadmap (v1.1+)
+## Roadmap
 
-Things v1.0 deferred:
+### Shipped since the v1.0 checklist was written (2026-08-04)
 
-1. **Stamps** — the user's spec called for 60+ stamps, deferred per
-   user instruction. Whole new tool category. Implementation pattern:
-   add `STAMPS` array (parallel to BRUSHES), tool button that switches
-   to a "stamp" mode where pointer-down places the stamp SVG at the
-   coords instead of drawing a stroke.
-2. **Onboarding** — wordless first-launch tour. Storage flag tracks
-   if it's been seen. Not required for App Store approval; UX win.
-3. **Music** — the disabled toggle in Settings is shipped UI for
-   this. Likely approach: ambient Tone.js-style synth loop, very
-   quiet (~0.04 gain), togglable.
-4. **More templates** — aim for 30-40 in v1.2.
-5. **Native save-to-photo-library directly** (skip share sheet) —
-   requires adding `@capacitor-community/camera-preview` or building
-   a tiny custom plugin. Share-sheet path works for v1.0.
-6. **Cover.jpg for the hub** — currently missing from `tiny-canvas/`.
-   The hub already has the game card linking here (committed
-   2026-05-14 as `5ad3773`).
-7. **Localization** — the locale stub in Settings is shipped UI. Add
-   a locale dictionary + i18n wrapper around all visible strings.
-8. **More brushes** — spray, smudge, fill bucket.
-9. **Color picker** — full-spectrum picker as a power-user option
-   beyond the 36 grouped colors.
+Don't re-plan these — they're done and verified:
+
+- **FILL bucket** — mask-based tap-to-fill. The single biggest
+  functional gap for a colouring app; kids under ~6 can't keep a brush
+  inside lines.
+- **First-run onboarding** — coach marks, gated per screen, replayable.
+- **Templates 21 → 35**, and every page audited for fillable regions
+  (snowflake rebuilt from 2 regions to 37; smiley sun 3 → 11; fish
+  4 → 8; donut 3 → 7).
+- **Music** — synthesized ambient bed, replacing the disabled toggle.
+- **Colour picker** — native `<input type="color">` beside the 36
+  presets.
+- **Self-hosted fonts** — no more fonts.googleapis.com.
+- **Undo rebuilt** — dirty-rect patches instead of full-canvas PNG
+  dataURLs; depth 12 → 30; synchronous. **CLEAR is now undoable**, which
+  it never was: the handler called `pushHistory()` and then
+  `clearCanvas()` wiped the entry it had just pushed, so an accidental
+  CLEAR destroyed the drawing outright.
+
+### Still open
+
+1. **Stamps** — the spec called for 60+, still deferred. Whole new tool
+   category. Implementation pattern: `STAMPS` array parallel to
+   `BRUSHES`, tool button switching to a mode where pointer-down places
+   the stamp SVG instead of drawing a stroke.
+2. **More templates** — 35 now; more is always better for a colouring
+   app. Read the region-audit section above before authoring.
+3. **Native save-to-photo-library directly** (skip share sheet) —
+   requires `@capacitor-community/camera-preview` or a small custom
+   plugin. Share-sheet path works.
+4. **Cover.jpg for the hub** — still missing from `tiny-canvas/`.
+5. **Localization** — the locale stub in Settings is shipped UI. Add a
+   locale dictionary + i18n wrapper around all visible strings.
+6. **More brushes** — spray, smudge.
+7. **Rotation / orientation-change behaviour is UNVERIFIED.** The
+   resize path rebuilds the backing store inside a `requestAnimationFrame`
+   callback, which never fires in a non-compositing preview, so this
+   could not be exercised. Needs a real device.

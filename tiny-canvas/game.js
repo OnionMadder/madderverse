@@ -85,9 +85,18 @@
     const IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
     const FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
     const GATE_UNLOCKED_KEY  = "tinyCanvas.parentGate.unlockedUntil.v1";
-    /* History is smaller now that each snapshot is a viewport-sized
-       canvas — store as PNG dataURLs to cut RAM ~10x vs ImageData. */
-    const MAX_HISTORY        = 12;
+    /* History entries are dirty-rect ImageData patches, not full-canvas
+       snapshots — see the HISTORY section for why. Cheap enough to
+       afford real depth; the byte budget is the backstop for the rare
+       full-canvas entry (a CLEAR). */
+    const MAX_HISTORY          = 30;
+    const HISTORY_BYTE_BUDGET  = 24 * 1024 * 1024;
+    /* Logical-px slack added around every stroke's dirty rect. Covers
+       brushes that paint wider than their nominal nib: glitter throws
+       sparkles to size/2 + ~2.4, paint stacks passes wider than the
+       line. Cheap insurance — an under-sized rect leaves stray marks
+       behind after an undo. */
+    const STROKE_BOUNDS_SLACK  = 12;
     const SAVE_MAX           = 60;     /* gallery item cap */
     const AUTOSAVE_INTERVAL_MS = 60_000;
     const GATE_UNLOCK_MS     = 24 * 60 * 60 * 1000;  /* 24h persistent unlock */
@@ -329,6 +338,19 @@
             }
         },
 
+        /* FILL is not a stroke tool — it has no beginStroke/drawSegment
+           and never reaches the pointer-move path. onPointerDown
+           intercepts it and calls floodFillAt() instead. It lives in
+           this table anyway so the tool button, the active-state
+           refresh and the tool-switch handler all keep working off one
+           list. `sizeless` tells rebuildSizeButtons to hide the SIZE
+           row — a bucket has no nib. */
+        fill: {
+            label:       "FILL",
+            sizeless:    true,
+            defaultSize: 0
+        },
+
         eraser: {
             label:       "ERASER",
             defaultSize: 28,
@@ -393,11 +415,18 @@
         }
     };
 
-    /* True if the current tool draws color (everything except eraser). */
-    function isBrushTool() { return state.currentTool !== "eraser"; }
+    /* True if the current tool lays down a stroke in color — i.e.
+       everything except the eraser and the sizeless fill bucket. */
+    function isBrushTool() {
+        return state.currentTool !== "eraser" && !isFillTool();
+    }
+    function isFillTool() { return state.currentTool === "fill"; }
 
-    /* Size set + active size for whichever tool is current. */
+    /* Size set + active size for whichever tool is current. Fill has
+       no sizes at all, so it returns an empty set and the SIZE row
+       hides itself. */
     function sizesForCurrentTool() {
+        if (isFillTool()) return [];
         return isBrushTool() ? BRUSH_SIZES : ERASER_SIZES;
     }
     function activeSize() {
@@ -715,6 +744,100 @@
         src.start(now);
     }
 
+    /* ---------- 3b. MUSIC (synthesised, no audio files) ----------
+
+       The Settings screen shipped a permanently disabled "Music —
+       coming in a future update" toggle. Rather than delete the row,
+       this makes it real.
+
+       The bed is generated, never sampled: four detuned voices on a
+       pentatonic chord, each breathing on its own slow LFO, through a
+       lowpass. No scheduler (so nothing drifts out of sync over a long
+       session) and no audio files at all — which also keeps it clear
+       of the licensing trap that bit Slip Studio, where a stock-music
+       subscription turned out not to cover an app with a music toggle.
+
+       Default OFF. Deliberately quiet — this is a kids' colouring app,
+       not a jukebox. */
+
+    const MUSIC_VOICES = [
+        { hz: 174.61, lfo: 0.031 },   /* F3  */
+        { hz: 261.63, lfo: 0.043 },   /* C4  */
+        { hz: 349.23, lfo: 0.037 },   /* F4  */
+        { hz: 392.00, lfo: 0.026 }    /* G4  */
+    ];
+    const MUSIC_GAIN = 0.035;
+    let musicRig = null;
+
+    function startMusic() {
+        if (musicRig) return;
+        const ctx = ensureAudio();
+        if (!ctx) return;
+
+        const master = ctx.createGain();
+        master.gain.value = 0;
+        const lp = ctx.createBiquadFilter();
+        lp.type = "lowpass";
+        lp.frequency.value = 820;
+        lp.Q.value = 0.4;
+        lp.connect(master);
+        master.connect(ctx.destination);
+
+        const parts = [];
+        MUSIC_VOICES.forEach(function (v, i) {
+            const osc = ctx.createOscillator();
+            osc.type = i % 2 ? "sine" : "triangle";
+            osc.frequency.value = v.hz;
+            osc.detune.value = (i - 1.5) * 4;      /* gentle chorus */
+
+            const vg = ctx.createGain();
+            /* Base equals the LFO depth, so the swing lands in
+               [0, 2*amp] and never inverts phase. */
+            const amp = 1 / MUSIC_VOICES.length;
+            vg.gain.value = amp;
+
+            const lfo = ctx.createOscillator();
+            lfo.frequency.value = v.lfo;
+            const lfoAmt = ctx.createGain();
+            lfoAmt.gain.value = amp;
+            lfo.connect(lfoAmt);
+            lfoAmt.connect(vg.gain);
+
+            osc.connect(vg);
+            vg.connect(lp);
+            osc.start();
+            lfo.start();
+            parts.push({ osc: osc, lfo: lfo });
+        });
+
+        /* Long fade-in so it never announces itself. */
+        master.gain.linearRampToValueAtTime(MUSIC_GAIN, ctx.currentTime + 4);
+        musicRig = { ctx: ctx, master: master, parts: parts };
+    }
+
+    function stopMusic() {
+        if (!musicRig) return;
+        const rig = musicRig;
+        musicRig = null;
+        const now = rig.ctx.currentTime;
+        try {
+            rig.master.gain.cancelScheduledValues(now);
+            rig.master.gain.setValueAtTime(rig.master.gain.value, now);
+            rig.master.gain.linearRampToValueAtTime(0, now + 1.2);
+        } catch (_) {}
+        setTimeout(function () {
+            rig.parts.forEach(function (p) {
+                try { p.osc.stop(); } catch (_) {}
+                try { p.lfo.stop(); } catch (_) {}
+            });
+        }, 1500);
+    }
+
+    function syncMusic() {
+        if (state.settings.music) startMusic();
+        else                      stopMusic();
+    }
+
     /* ---------- 4. CANVAS SETUP ---------- */
 
     const canvas = $("#drawCanvas");
@@ -725,23 +848,42 @@
         state.dpr = dpr;
         /* Logical canvas size = viewport size (CSS pixels). Capped at
            2x DPR to keep backing store bounded on large laptop screens. */
-        STAGE_W = Math.max(320, window.innerWidth  || 800);
-        STAGE_H = Math.max(320, window.innerHeight || 800);
+        /* Size from the canvas's OWN laid-out box, not window.innerWidth.
+           They are not the same number — a classic desktop scrollbar makes
+           innerWidth ~22px wider than the element, and Android WebView
+           insets can do the same vertically. Sizing the backing store from
+           innerWidth while the element lays out narrower means
+           canvas.width / rect.width != dpr, and every consumer that
+           assumes it IS dpr silently lands in the wrong place: the fill
+           mask is positioned by the true ratio while the fill seed was
+           computed with dpr, so taps seeded in the wrong region and the
+           coloring page appeared to leak. Fall back to innerWidth only
+           when the canvas has no box yet (screen still hidden at init). */
+        const box = canvas.getBoundingClientRect();
+        STAGE_W = Math.max(320, Math.round(box.width)  || window.innerWidth  || 800);
+        STAGE_H = Math.max(320, Math.round(box.height) || window.innerHeight || 800);
         canvas.width  = STAGE_W * dpr;
         canvas.height = STAGE_H * dpr;
         ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx2d.lineCap  = "round";
         ctx2d.lineJoin = "round";
+        /* The mask is sized to the backing store and positioned from
+           the live SVG rect, so a resize or rotate invalidates both. */
+        invalidateFillMask();
         clearCanvas();
     }
 
-    function clearCanvas() {
+    /* keepHistory: the CLEAR button passes true so the wipe itself is
+       undoable. Everything else (new page, resize) passes nothing and
+       resets the stack, because history from a previous drawing can't
+       be replayed onto a different one. */
+    function clearCanvas(keepHistory) {
         ctx2d.save();
         ctx2d.globalCompositeOperation = "source-over";
         ctx2d.setTransform(1, 0, 0, 1, 0, 0);
         ctx2d.clearRect(0, 0, canvas.width, canvas.height);
         ctx2d.restore();
-        state.history.length = 0;
+        if (!keepHistory) state.history.length = 0;
         state.dirty = false;
         updateUndoButton();
         updateStatus();
@@ -751,45 +893,372 @@
        canvas is fixed inset 0 and fills the viewport, clientX/Y maps
        directly to canvas CSS coordinates. */
     function getPos(e) {
-        return { x: e.clientX, y: e.clientY };
+        /* Map the pointer into LOGICAL canvas coords via the canvas's own
+           box. This used to return clientX/clientY raw, on the assumption
+           that the canvas is fixed inset:0 so the two are identical. They
+           are identical only while the backing store was sized from the
+           same number the element actually laid out at — and it wasn't
+           (setupCanvas used window.innerWidth, which a scrollbar or a
+           WebView inset makes wider than the element). The mismatch
+           compressed every stroke toward the top-left: at the far edge of
+           a 375px-wide box sized from a 397px innerWidth, the line landed
+           about 10px from the finger. */
+        const cr = canvas.getBoundingClientRect();
+        if (!cr.width || !cr.height) return { x: e.clientX, y: e.clientY };
+        return { x: (e.clientX - cr.left) * (STAGE_W / cr.width),
+                 y: (e.clientY - cr.top)  * (STAGE_H / cr.height) };
     }
 
-    function pushHistory() {
-        /* Snapshot before the stroke begins so undo restores the
-           pre-stroke state. Stored as compressed PNG dataURLs rather
-           than raw ImageData since the backing store is now
-           viewport-sized — ImageData would eat ~20MB per frame at
-           common laptop resolutions. */
-        try {
-            const snap = canvas.toDataURL("image/png");
-            state.history.push(snap);
-            if (state.history.length > MAX_HISTORY) {
-                state.history.shift();
+    /* ---------- 4a. FILL MASK + FLOOD FILL ----------
+
+       The coloring page is an SVG in #lineArt sitting ABOVE the canvas
+       at pointer-events:none — the kid colors underneath it. That means
+       the canvas bitmap holds no line information at all, so a naive
+       flood fill would bleed straight across the whole page.
+
+       So we rasterize the same overlay SVG into an offscreen canvas,
+       positioned with the identical svgRect/canvasRect math composePng()
+       uses for export, and keep a 1-byte-per-pixel boundary mask. The
+       fill walks that mask instead of comparing canvas colors, which
+       also means filling never depends on what the kid already drew —
+       tapping a region always fills that region, whatever is in it.
+
+       Threshold is deliberately high (not 1): the SVG strokes are
+       antialiased, so a low threshold would stop the fill at the faint
+       outer skirt of the line and leave a pale halo ringing every
+       region. At 96 the fill runs under the skirt and stops at the
+       stroke core — and since the line art draws on TOP of the canvas,
+       that underlap is invisible. */
+
+    const FILL_BOUNDARY_ALPHA = 96;
+    let fillMask        = null;   /* Uint8Array, 1 = line, 0 = fillable */
+    let fillMaskW       = 0;
+    let fillMaskH       = 0;
+    let fillMaskPending = null;   /* in-flight build, so two fast taps
+                                     share one rasterization */
+    let fillMaskGeom    = "";     /* geometry fingerprint the cached
+                                     mask was built against */
+
+    /* Called whenever the page or the backing store changes shape. */
+    function invalidateFillMask() {
+        fillMask        = null;
+        fillMaskPending = null;
+        fillMaskGeom    = "";
+    }
+
+    /* Fingerprint of every input the mask's geometry depends on.
+       Explicit invalidation alone is not enough: the mask is positioned
+       from the LIVE svg rect measured against the LIVE canvas backing
+       store, so anything that moves or resizes either one — a resize
+       whose handler hasn't run yet, an orientation change, a layout
+       shift from the tool drawer — leaves a mask that still looks valid
+       but is drawn in the wrong place. A misaligned mask doesn't fail
+       loudly; it just fills the wrong region, which reads as "the
+       coloring page leaks". Cheaper to re-measure on every fill than to
+       chase that. */
+    function fillGeomKey() {
+        const host = $("#lineArt");
+        const svg  = host && host.querySelector("svg");
+        const c    = canvas.getBoundingClientRect();
+        if (!svg) return canvas.width + "x" + canvas.height + ":none";
+        const r = svg.getBoundingClientRect();
+        return [canvas.width, canvas.height,
+                Math.round(r.left - c.left), Math.round(r.top - c.top),
+                Math.round(r.width), Math.round(r.height),
+                state.templateId || ""].join(",");
+    }
+
+    function buildFillMask() {
+        const key = fillGeomKey();
+        if (fillMask && fillMaskGeom === key) return Promise.resolve(fillMask);
+        if (fillMask) invalidateFillMask();   /* geometry moved under us */
+        if (fillMaskPending) return fillMaskPending;
+        fillMaskGeom = key;
+
+        const W = canvas.width, H = canvas.height;
+        fillMaskPending = new Promise(function (resolve) {
+            const mask = new Uint8Array(W * H);
+            fillMaskW = W;
+            fillMaskH = H;
+
+            function done() {
+                fillMask        = mask;
+                fillMaskPending = null;
+                resolve(mask);
             }
-        } catch (_) {
-            /* Taint rules etc — ignore */
+
+            const host = $("#lineArt");
+            const svg  = host && host.querySelector("svg");
+            /* BLANK page — no line art, so nothing bounds the fill and
+               a tap floods the whole canvas. That's the correct
+               behaviour: on a blank page, fill IS "paint the paper". */
+            if (!svg) { done(); return; }
+
+            const svgRect    = svg.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            if (!svgRect.width || !canvasRect.width) { done(); return; }
+
+            /* CSS px -> device px, same ratio the kid's strokes use. */
+            const scale = W / canvasRect.width;
+            const x = (svgRect.left - canvasRect.left) * scale;
+            const y = (svgRect.top  - canvasRect.top)  * scale;
+            const w = svgRect.width  * scale;
+            const h = svgRect.height * scale;
+
+            const off = document.createElement("canvas");
+            off.width  = W;
+            off.height = H;
+            const o = off.getContext("2d", { willReadFrequently: true });
+
+            const blob = new Blob([svg.outerHTML],
+                                  { type: "image/svg+xml" });
+            const url  = URL.createObjectURL(blob);
+            const img  = new Image();
+            img.onload = function () {
+                o.drawImage(img, x, y, w, h);
+                URL.revokeObjectURL(url);
+                let d;
+                try {
+                    d = o.getImageData(0, 0, W, H).data;
+                } catch (_) { done(); return; }
+                for (let i = 0, a = 3; i < mask.length; i++, a += 4) {
+                    if (d[a] >= FILL_BOUNDARY_ALPHA) mask[i] = 1;
+                }
+                done();
+            };
+            img.onerror = function () {
+                URL.revokeObjectURL(url);
+                done();
+            };
+            img.src = url;
+        });
+        return fillMaskPending;
+    }
+
+    /* "#rrggbb" -> [r,g,b]. Every colour in COLOR_GROUPS is 6-digit
+       hex, so this stays deliberately narrow. */
+    function hexToRgb(hex) {
+        const h = String(hex).replace("#", "");
+        return [parseInt(h.slice(0, 2), 16) || 0,
+                parseInt(h.slice(2, 4), 16) || 0,
+                parseInt(h.slice(4, 6), 16) || 0];
+    }
+
+    /* Scanline flood fill in device pixels, bounded by the mask.
+       Packed indices (y*W+x) on a plain stack — the stack holds span
+       seeds, not pixels, so it stays small even on a full-page fill. */
+    function floodFillAt(p) {
+        buildFillMask().then(function (mask) {
+            const W = fillMaskW, H = fillMaskH;
+            if (!W || !H) return;
+            /* p is already in logical canvas coords (getPos maps it there
+               off the canvas's own box), so logical -> device is just the
+               backing-store ratio. This composes to exactly the same
+               client -> device transform buildFillMask uses to position
+               the art, which is what keeps seed and mask in one space. */
+            if (!STAGE_W || !STAGE_H) return;
+            const sx = Math.round(p.x * (W / STAGE_W));
+            const sy = Math.round(p.y * (H / STAGE_H));
+            if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
+            /* Tapped directly on a line — nothing to fill. */
+            if (mask[sy * W + sx]) return;
+
+            beginHistoryCapture();
+
+            const rgb = hexToRgb(state.currentColor);
+            const r = rgb[0], g = rgb[1], b = rgb[2];
+
+            let image;
+            try {
+                image = ctx2d.getImageData(0, 0, W, H);
+            } catch (_) { return; }
+            const data = image.data;
+            const seen = new Uint8Array(W * H);
+            const stack = [sy * W + sx];
+
+            while (stack.length) {
+                const seed = stack.pop();
+                const y = (seed / W) | 0;
+                let   x = seed - y * W;
+
+                /* Walk left to the start of this span. */
+                while (x > 0 && !mask[y * W + x - 1] &&
+                       !seen[y * W + x - 1]) x--;
+
+                let spanUp = false, spanDown = false;
+                while (x < W) {
+                    const i = y * W + x;
+                    if (mask[i] || seen[i]) break;
+                    seen[i] = 1;
+                    growBoundsDevice(x, y);
+                    const q = i * 4;
+                    data[q]     = r;
+                    data[q + 1] = g;
+                    data[q + 2] = b;
+                    data[q + 3] = 255;
+
+                    if (y > 0) {
+                        const up = i - W;
+                        const openUp = !mask[up] && !seen[up];
+                        if (openUp && !spanUp) { stack.push(up); spanUp = true; }
+                        else if (!openUp)      { spanUp = false; }
+                    }
+                    if (y < H - 1) {
+                        const dn = i + W;
+                        const openDn = !mask[dn] && !seen[dn];
+                        if (openDn && !spanDown) { stack.push(dn); spanDown = true; }
+                        else if (!openDn)        { spanDown = false; }
+                    }
+                    x++;
+                }
+            }
+
+            /* putImageData ignores the DPR transform, so drop to
+               identity for the write and restore it after. */
+            ctx2d.save();
+            ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+            ctx2d.putImageData(image, 0, 0);
+            ctx2d.restore();
+
+            /* +1 because growBoundsDevice records pixel indices, and
+               the rect is exclusive at the far edge. */
+            sMaxX += 1; sMaxY += 1;
+            commitHistory();
+
+            state.dirty = true;
+            updateStatus();
+            markInProgressDirty();
+            hideIdleScribble();
+            triggerOnionReaction("drawing", 500);
+            sfxTap();
+        });
+    }
+
+    /* ---------- HISTORY (dirty-rect patches) ----------
+
+       History used to be a full-canvas PNG dataURL per stroke. That
+       cost a toDataURL() encode of the whole viewport-sized backing
+       store on EVERY pointerdown — tens of milliseconds of jank right
+       at the moment the kid starts drawing — and each entry weighed a
+       hundred-odd KB, which is why the depth was capped at 12.
+
+       Now: snapshot the canvas into an offscreen buffer with
+       drawImage (a cheap blit, no encode), track the bounding box the
+       stroke actually touches, and on commit keep ONLY that rectangle
+       as raw ImageData. A typical stroke covers a tiny fraction of the
+       screen, so entries are small, undo is instant, and the depth
+       affords 30 instead of 12.
+
+       It also makes undo SYNCHRONOUS — the old version had to decode
+       an Image before it could paint, so an undo could still be
+       pending a frame or two after the click. */
+
+    let histCanvas = null;
+    let histCtx    = null;
+    let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
+
+    function ensureHistCanvas() {
+        if (!histCanvas) {
+            histCanvas = document.createElement("canvas");
+            histCtx = histCanvas.getContext("2d", { willReadFrequently: true });
         }
+        if (histCanvas.width  !== canvas.width ||
+            histCanvas.height !== canvas.height) {
+            histCanvas.width  = canvas.width;
+            histCanvas.height = canvas.height;
+        }
+    }
+
+    /* Snapshot the pre-change canvas and reset the dirty box. */
+    function beginHistoryCapture() {
+        ensureHistCanvas();
+        histCtx.setTransform(1, 0, 0, 1, 0, 0);
+        histCtx.clearRect(0, 0, histCanvas.width, histCanvas.height);
+        histCtx.drawImage(canvas, 0, 0);
+        sMinX = Infinity; sMinY = Infinity;
+        sMaxX = -Infinity; sMaxY = -Infinity;
+    }
+
+    /* Grow the dirty box around a point given in LOGICAL px.
+       `pad` is a logical-px radius — pass the brush size plus slack,
+       because several brushes scatter past their nominal width
+       (glitter throws sparkles out to size/2 + ~2.4, paint stacks
+       passes wider than the nib). Under-padding here is the one way
+       this design can go visibly wrong: anything drawn outside the
+       recorded rect survives an undo as a stray mark. */
+    function growBounds(x, y, pad) {
+        const d = state.dpr || 1;
+        const r = (pad || 0) * d;
+        const dx = x * d, dy = y * d;
+        if (dx - r < sMinX) sMinX = dx - r;
+        if (dy - r < sMinY) sMinY = dy - r;
+        if (dx + r > sMaxX) sMaxX = dx + r;
+        if (dy + r > sMaxY) sMaxY = dy + r;
+    }
+
+    /* Device-px variant, used by the fill tool which already works
+       in device space. */
+    function growBoundsDevice(x, y) {
+        if (x < sMinX) sMinX = x;
+        if (y < sMinY) sMinY = y;
+        if (x > sMaxX) sMaxX = x;
+        if (y > sMaxY) sMaxY = y;
+    }
+
+    function markWholeCanvasDirty() {
+        sMinX = 0; sMinY = 0;
+        sMaxX = canvas.width; sMaxY = canvas.height;
+    }
+
+    function historyBytes() {
+        let n = 0;
+        for (let i = 0; i < state.history.length; i++) {
+            n += state.history[i].patch.data.length;
+        }
+        return n;
+    }
+
+    function trimHistory() {
+        while (state.history.length > MAX_HISTORY) state.history.shift();
+        /* A full-canvas patch (a CLEAR) is ~4.8MB on a phone, so cap
+           by bytes too. Always keep at least one entry. */
+        while (state.history.length > 1 &&
+               historyBytes() > HISTORY_BYTE_BUDGET) {
+            state.history.shift();
+        }
+    }
+
+    function commitHistory() {
+        if (!histCanvas) return;
+        if (!isFinite(sMinX) || sMaxX < sMinX) return;   /* nothing drawn */
+        const W = canvas.width, H = canvas.height;
+        const x = Math.max(0, Math.floor(sMinX));
+        const y = Math.max(0, Math.floor(sMinY));
+        const w = Math.min(W, Math.ceil(sMaxX)) - x;
+        const h = Math.min(H, Math.ceil(sMaxY)) - y;
+        if (w <= 0 || h <= 0) return;
+        let patch;
+        try {
+            patch = histCtx.getImageData(x, y, w, h);
+        } catch (_) { return; }
+        state.history.push({ x: x, y: y, patch: patch });
+        trimHistory();
         updateUndoButton();
     }
 
     function undo() {
-        const snap = state.history.pop();
-        if (!snap) return;
-        const img = new Image();
-        img.onload = function () {
-            ctx2d.save();
-            ctx2d.setTransform(1, 0, 0, 1, 0, 0);
-            ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-            ctx2d.drawImage(img, 0, 0, canvas.width, canvas.height);
-            ctx2d.restore();
-        };
-        img.onerror = function () {};
-        img.src = snap;
+        const entry = state.history.pop();
+        if (!entry) return;
+        ctx2d.save();
+        ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+        ctx2d.putImageData(entry.patch, entry.x, entry.y);
+        ctx2d.restore();
         updateUndoButton();
         if (state.history.length === 0) state.dirty = false;
         markInProgressDirty();
         triggerOnionReaction("undo");
         updateStatus();
+        maybeShowIdleScribble();
     }
 
     function updateUndoButton() {
@@ -888,8 +1357,20 @@
     function onPointerDown(e) {
         e.preventDefault();
         try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-        pushHistory();
+        /* The first real gesture retires the coach — a kid who has
+           already started drawing does not need to be told how. */
+        dismissCoach();
+        /* Reaching the canvas at all means the kid is done with the
+           sheet — slide it back down so it stops covering the art. */
+        if (isDrawerOpen()) setDrawerOpen(false);
         const p = getPos(e);
+        /* Fill is a one-shot tap, not a stroke: it never sets
+           isDrawing, so pointermove stays inert and no stroke is
+           finished on pointerup. It pushes its own history entry once
+           it knows it will actually paint something — pushing here
+           would burn an undo step on a tap that landed on a line. */
+        if (isFillTool()) { floodFillAt(p); return; }
+        beginHistoryCapture();
         state.isDrawing = true;
         state.lastX  = p.x;
         state.lastY  = p.y;
@@ -899,6 +1380,7 @@
         const size  = activeSize();
         const color = state.currentColor;
         brush.beginStroke(ctx2d, p, size, color);
+        growBounds(p.x, p.y, size + STROKE_BOUNDS_SLACK);
         state.dirty = true;
         updateStatus();
         markInProgressDirty();
@@ -937,11 +1419,14 @@
             state.smoothY = p.y;
         }
 
+        growBounds(p.x, p.y, size + STROKE_BOUNDS_SLACK);
+
         state.lastX = p.x;
         state.lastY = p.y;
     }
 
     function onPointerUp() {
+        const wasDrawing = state.isDrawing;
         if (state.isDrawing && state.settings.smoothing) {
             /* Finish the smoothed stroke by drawing one final segment
                from the last smoothed point to the actual raw point.
@@ -952,7 +1437,12 @@
                 { x: state.smoothX, y: state.smoothY },
                 { x: state.lastX,   y: state.lastY },
                 activeSize(), state.currentColor);
+            growBounds(state.lastX, state.lastY,
+                       activeSize() + STROKE_BOUNDS_SLACK);
         }
+        /* Bank the stroke as one undo step, keeping only the rectangle
+           it actually touched. */
+        if (wasDrawing) commitHistory();
         state.isDrawing = false;
         /* Reset shared canvas state so the next stroke begins clean. */
         ctx2d.globalCompositeOperation = "source-over";
@@ -977,6 +1467,8 @@
         state.templateName = tpl.name;
         const overlay = $("#lineArt");
         overlay.innerHTML = tpl.svg || "";
+        /* New page, new boundaries. */
+        invalidateFillMask();
         $("#drawTitle").innerHTML = "&lt;&nbsp;" + tpl.name + "&nbsp;&gt;";
         clearCanvas();
         state.savedId = null;
@@ -1096,13 +1588,17 @@
         });
     }
 
-    /* Size set is per-tool (brush has 5, eraser has 3) — rebuild the
-       buttons each time the tool changes so the visible dots match
-       what's actually selectable. */
+    /* Size set is per-tool (brush has 5, eraser has 3, fill has none)
+       — rebuild the buttons each time the tool changes so the visible
+       dots match what's actually selectable. An empty set hides the
+       whole row, label included, rather than leaving a stranded SIZE
+       caption over nothing. */
     function rebuildSizeButtons() {
         const host = $("#sizeRow");
         if (!host) return;
         const sizes = sizesForCurrentTool();
+        const row = host.closest(".size-row");
+        if (row) row.hidden = sizes.length === 0;
         host.innerHTML = "";
         sizes.forEach(function (n) {
             const btn = document.createElement("button");
@@ -1134,6 +1630,42 @@
         });
     }
 
+    /* ---------- TOOL DRAWER (phone bottom sheet) ----------
+
+       Below 768px the rail is a bottom sheet that sits collapsed to
+       its 54px handle and slides up when .is-open is set. The CSS for
+       that class shipped, but nothing ever set it — there was no
+       drawer reference in the JS at all, no :focus-within fallback and
+       no swipe handler. On a phone that left the kid with the default
+       pen in the default colour and no way to reach brushes, sizes,
+       colours, the eraser or fill.
+
+       Above 768px .drawer-handle is display:none and the rail is
+       always visible, so the class is inert there. */
+
+    function isDrawerOpen() {
+        const rail = $(".draw-side-rail");
+        return !!rail && rail.classList.contains("is-open");
+    }
+
+    function setDrawerOpen(open) {
+        const rail   = $(".draw-side-rail");
+        const handle = $(".drawer-handle");
+        if (!rail || !handle) return;
+        rail.classList.toggle("is-open", !!open);
+        handle.setAttribute("aria-expanded", open ? "true" : "false");
+        handle.setAttribute("aria-label", open ? "Hide tools" : "Show tools");
+    }
+
+    function attachDrawerHandler() {
+        const handle = $(".drawer-handle");
+        if (!handle) return;
+        handle.addEventListener("click", function () {
+            retireCoachButtons();
+            setDrawerOpen(!isDrawerOpen());
+        });
+    }
+
     function attachToolHandlers() {
         $$(".tool-btn").forEach(function (b) {
             b.addEventListener("click", function () {
@@ -1145,7 +1677,9 @@
                    We just always reset to the default on tool switch;
                    it's predictable and avoids "why did my line get
                    tiny" confusion. */
-                if (isBrushTool()) {
+                if (isFillTool()) {
+                    /* no size to adopt — the bucket has no nib */
+                } else if (isBrushTool()) {
                     state.brushSize = BRUSHES[newTool].defaultSize;
                 } else {
                     state.eraserSize = BRUSHES.eraser.defaultSize;
@@ -1154,6 +1688,106 @@
                 rebuildSizeButtons();
             });
         });
+    }
+
+    /* ---------- 7c. COACH (first-run onboarding) ----------
+
+       Three things are invisible on arrival: that you can draw
+       anywhere, that PAGES holds 21 coloring pages, and that TOOLS
+       holds the brushes, colours and the fill bucket. The coach
+       teaches the first with a moving touch dot; the other two get a
+       short breathe on the buttons themselves, because a caption
+       alone doesn't move a thumb toward a control nobody has noticed.
+
+       Shown once, then never again unless replayed from Settings.
+       Dismissed by the first real gesture — the kid who already
+       started drawing doesn't need to be told how. */
+
+    const COACH_KEY   = "tinyCanvas.coach.draw.v1";
+    const OFFERED_KEY = "tinyCanvas.coach.offered.v1";
+    const COACH_TIMEOUT_MS = 9000;
+
+    let coachTimer = 0;
+
+    function prefersReducedMotion() {
+        try {
+            return window.matchMedia &&
+                   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        } catch (_) { return false; }
+    }
+
+    function coachSeen() {
+        try { return localStorage.getItem(COACH_KEY) === "1"; }
+        catch (_) { return true; }   /* no storage — don't nag every launch */
+    }
+
+    function markCoachSeen() {
+        try { setStorage(COACH_KEY, "1"); } catch (_) {}
+    }
+
+    function showCoach() {
+        const el = $("#coach");
+        if (!el) return;
+        /* SMIL ignores prefers-reduced-motion, so the travelling dot
+           has to be removed rather than styled away. The squiggle and
+           caption stay — they still teach the gesture. */
+        if (prefersReducedMotion()) {
+            const motion = $("#coachMotion");
+            if (motion && motion.parentNode) {
+                motion.parentNode.removeChild(motion);
+            }
+        }
+        el.classList.remove("is-leaving");
+        el.removeAttribute("hidden");
+        clearTimeout(coachTimer);
+        coachTimer = setTimeout(dismissCoach, COACH_TIMEOUT_MS);
+    }
+
+    function dismissCoach() {
+        const el = $("#coach");
+        clearTimeout(coachTimer);
+        if (!el || el.hasAttribute("hidden")) return;
+        markCoachSeen();
+        if (prefersReducedMotion()) {
+            el.setAttribute("hidden", "");
+            return;
+        }
+        el.classList.add("is-leaving");
+        setTimeout(function () {
+            el.setAttribute("hidden", "");
+            el.classList.remove("is-leaving");
+        }, 300);
+    }
+
+    /* Breathe PAGES + TOOLS so they get noticed at all. Retired the
+       moment either is tapped — an affordance the kid has already
+       found never needs advertising again. */
+    function offerCoachButtons() {
+        try { if (localStorage.getItem(OFFERED_KEY) === "1") return; }
+        catch (_) { return; }
+        const pages  = $(".pages-btn");
+        const handle = $(".drawer-handle");
+        if (pages)  pages.classList.add("is-new");
+        if (handle) handle.classList.add("is-new");
+    }
+
+    function retireCoachButtons() {
+        try { setStorage(OFFERED_KEY, "1"); } catch (_) {}
+        const pages  = $(".pages-btn");
+        const handle = $(".drawer-handle");
+        if (pages)  pages.classList.remove("is-new");
+        if (handle) handle.classList.remove("is-new");
+    }
+
+    /* Settings → HOW TO PLAY. Clears both flags and replays. */
+    function replayCoaching() {
+        try {
+            setStorage(COACH_KEY, "0");
+            setStorage(OFFERED_KEY, "0");
+        } catch (_) {}
+        showScreen("draw");
+        offerCoachButtons();
+        showCoach();
     }
 
     /* ---------- 8. SCREEN SWITCHER ---------- */
@@ -1171,6 +1805,14 @@
         sfxSwoosh();
         if (name === "gallery")  renderGallery();
         if (name === "settings") syncSettingsUI();
+        if (name === "draw") {
+            if (!coachSeen()) {
+                offerCoachButtons();
+                showCoach();
+            }
+        } else {
+            dismissCoach();
+        }
     }
 
     /* ---------- 8a. SETTINGS PERSISTENCE ---------- */
@@ -1218,6 +1860,44 @@
                 state.settings.sfx = sfx.checked;
                 persistSettings();
             });
+        }
+        const music = $("#setMusic");
+        if (music) {
+            music.addEventListener("change", function () {
+                state.settings.music = music.checked;
+                persistSettings();
+                /* The toggle itself is the user gesture that lets the
+                   AudioContext start, so act on it immediately. */
+                syncMusic();
+            });
+        }
+        /* Don't keep humming in the pocket. */
+        document.addEventListener("visibilitychange", function () {
+            if (document.hidden) stopMusic();
+            else if (state.settings.music) startMusic();
+        });
+
+        /* Custom colour — the 36 swatches cover the common ground, this
+           covers "but I want THAT green". Native input so it uses the
+           platform picker kids' parents already know. */
+        const custom = $("#customColor");
+        const customWrap = $("#customSwatch");
+        if (custom) {
+            const applyCustom = function () {
+                state.currentColor = custom.value;
+                if (customWrap) customWrap.style.background = custom.value;
+                /* Same courtesy the preset swatches do: picking a
+                   colour while the eraser is armed means the kid wants
+                   to draw, not rub out. */
+                if (state.currentTool === "eraser") {
+                    state.currentTool = "pen";
+                    refreshToolButtons();
+                    rebuildSizeButtons();
+                }
+                refreshPaletteActive();
+            };
+            custom.addEventListener("input",  applyCustom);
+            custom.addEventListener("change", applyCustom);
         }
         if (locale) {
             locale.addEventListener("change", function () {
@@ -1760,6 +2440,7 @@
         buildPaletteTabs();
         buildPalette();
         attachToolHandlers();
+        attachDrawerHandler();
         attachDrawing();
         attachSettingsHandlers();
         rebuildSizeButtons();
@@ -1793,9 +2474,13 @@
         });
         /* Floating PAGES button on the draw screen — opens the
            template picker as an optional browse view. */
+        const howTo = $("#btnHowToPlay");
+        if (howTo) howTo.addEventListener("click", replayCoaching);
+
         const pagesBtn = $("#pagesBtn");
         if (pagesBtn) {
             pagesBtn.addEventListener("click", function () {
+                retireCoachButtons();
                 showScreen("picker");
             });
         }
@@ -1803,8 +2488,14 @@
             showScreen("title");
         });
         $("#drawClear").addEventListener("click", function () {
-            pushHistory();
-            clearCanvas();
+            /* CLEAR is undoable. It used to call pushHistory() and
+               then clearCanvas(), which wiped the very entry it had
+               just pushed — so an accidental CLEAR destroyed the
+               drawing with no way back, on a kids' app. */
+            beginHistoryCapture();
+            markWholeCanvasDirty();
+            commitHistory();
+            clearCanvas(true);
             clearInProgress();
             triggerOnionReaction("cleared");
             /* Bring the idle scribble back if we're on BLANK — the
