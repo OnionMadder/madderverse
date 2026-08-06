@@ -613,6 +613,7 @@
         currentTool:   "pen",
         fillPattern:   "solid",   /* id from FILL_PATTERNS */                   /* any key in BRUSHES */
         stampId:       "heart",   /* id from STAMPS (STAMP tool) */
+        stampPack:     "classics", /* active STAMP_PACKS tab */
         rainbowHue:    0,         /* per-stroke hue cursor (RAINBOW brush) */
         proUnlocked:   false,     /* native purchase flag — see isPro() */
         colorGroup:    "rainbow",               /* active palette group */
@@ -2053,7 +2054,7 @@
     /* ---------- 4d. STAMPS (Pro tool) ----------
 
        One-shot tap shapes, tinted by the armed color — the same
-       "mask, not fixed art" call as pattern fills, so 24 shapes x 42
+       "mask, not fixed art" call as pattern fills, so 60 shapes x 42
        colors reads as a lot of content. Each draw() renders into a
        100x100 unit box centered on the origin (-50..50); placeStampAt
        translates/scales, so stamps stay crisp at any size and DPR.
@@ -2327,8 +2328,593 @@
             c.beginPath();
             c.arc(0, 4, 24, Math.PI * 0.15, Math.PI * 0.85);
             c.stroke();
+        } },
+
+        /* --- Unlocked wave 2 (2026-08-05): 36 more, same contract.
+           Two styles, deliberately mixed: filled silhouettes (bold,
+           icon-like) and stroked doodles with filled accents (faces,
+           food) — a stroke in the armed color on a filled area of the
+           same color is invisible, so anything with interior detail
+           must be stroked-outline with the paper showing through. */
+
+        /* NATURE */
+        { id: "tree", label: "TREE", draw: function (c) {
+            c.fillRect(-6, 12, 12, 32);
+            c.beginPath();
+            c.arc(-16, 2, 17, 0, Math.PI * 2);
+            c.arc(16, 2, 17, 0, Math.PI * 2);
+            c.arc(0, -18, 20, 0, Math.PI * 2);
+            c.fill();
+        } },
+        { id: "leaf", label: "LEAF", draw: function (c) {
+            c.beginPath();
+            c.moveTo(0, -42);
+            c.quadraticCurveTo(34, -14, 4, 28);
+            c.quadraticCurveTo(0, 32, -4, 28);
+            c.quadraticCurveTo(-34, -14, 0, -42);
+            c.fill();
+            c.beginPath();
+            c.moveTo(0, 30); c.lineTo(0, 46);
+            c.stroke();
+        } },
+        { id: "mushroom", label: "MUSHROOM", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 2, 38, Math.PI, 0);
+            c.quadraticCurveTo(38, 12, 28, 12);
+            c.lineTo(-28, 12);
+            c.quadraticCurveTo(-38, 12, -38, 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-11, 12); c.lineTo(-13, 40);
+            c.quadraticCurveTo(0, 48, 13, 40);
+            c.lineTo(11, 12);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "tulip", label: "TULIP", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-24, -40);
+            c.quadraticCurveTo(-30, -6, 0, -2);
+            c.quadraticCurveTo(30, -6, 24, -40);
+            c.quadraticCurveTo(12, -26, 0, -40);
+            c.quadraticCurveTo(-12, -26, -24, -40);
+            c.fill();
+            c.beginPath();
+            c.moveTo(0, -2); c.lineTo(0, 44);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(0, 28);
+            c.quadraticCurveTo(-24, 24, -28, 8);
+            c.quadraticCurveTo(-8, 14, 0, 28);
+            c.fill();
+        } },
+
+        /* ANIMALS */
+        { id: "cat", label: "CAT", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-30, -20); c.lineTo(-34, -44); c.lineTo(-13, -31);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(30, -20); c.lineTo(34, -44); c.lineTo(13, -31);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.arc(0, 0, 33, 0, Math.PI * 2);
+            c.stroke();
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.arc(s * 13, -6, 4.5, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.moveTo(-5, 8); c.lineTo(5, 8); c.lineTo(0, 14);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(-16, 12); c.lineTo(-42, 8);
+            c.moveTo(-16, 18); c.lineTo(-42, 20);
+            c.moveTo(16, 12); c.lineTo(42, 8);
+            c.moveTo(16, 18); c.lineTo(42, 20);
+            c.stroke();
+        } },
+        { id: "dog", label: "DOG", draw: function (c) {
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.ellipse(s * 30, -4, 10, 22, s * 0.35, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.arc(0, 0, 31, 0, Math.PI * 2);
+            c.stroke();
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.arc(s * 12, -8, 4.5, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.ellipse(0, 8, 7, 5.5, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(0, 14); c.quadraticCurveTo(0, 23, 10, 23);
+            c.stroke();
+        } },
+        { id: "bunny", label: "BUNNY", draw: function (c) {
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.ellipse(s * 13, -28, 9, 21, s * 0.12, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.arc(0, 14, 29, 0, Math.PI * 2);
+            c.stroke();
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.arc(s * 11, 8, 4.5, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.moveTo(-4, 20); c.lineTo(4, 20); c.lineTo(0, 26);
+            c.closePath(); c.fill();
+        } },
+        { id: "bird", label: "BIRD", draw: function (c) {
+            c.beginPath();
+            c.ellipse(4, 8, 26, 19, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.arc(-20, -16, 14, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-32, -20); c.lineTo(-48, -14); c.lineTo(-32, -9);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(26, 2); c.lineTo(47, -10); c.lineTo(42, 10);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(-4, 27); c.lineTo(-4, 38);
+            c.moveTo(10, 27); c.lineTo(10, 38);
+            c.stroke();
+        } },
+        { id: "bee", label: "BEE", draw: function (c) {
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.ellipse(s * 12, -26, 15, 9, s * 0.5, 0, Math.PI * 2);
+                c.stroke();
+            }
+            c.beginPath();
+            c.ellipse(0, 8, 26, 19, 0, 0, Math.PI * 2);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(-9, -9); c.lineTo(-9, 25);
+            c.moveTo(0, -11); c.lineTo(0, 27);
+            c.moveTo(9, -9); c.lineTo(9, 25);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(26, 8); c.lineTo(40, 8);
+            c.stroke();
+        } },
+        { id: "snail", label: "SNAIL", draw: function (c) {
+            c.beginPath();
+            c.arc(8, 4, 25, 0, Math.PI * 2); c.stroke();
+            c.beginPath();
+            c.arc(11, 7, 13, 0, Math.PI * 1.6); c.stroke();
+            c.beginPath();
+            c.moveTo(-34, 32);
+            c.quadraticCurveTo(-48, 32, -44, 14);
+            c.quadraticCurveTo(-42, 2, -35, 0);
+            c.quadraticCurveTo(-28, 26, 30, 27);
+            c.quadraticCurveTo(42, 28, 40, 32);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.moveTo(-40, 2); c.lineTo(-46, -13);
+            c.moveTo(-33, 0); c.lineTo(-29, -15);
+            c.stroke();
+            c.beginPath(); c.arc(-47, -15, 3, 0, Math.PI * 2); c.fill();
+            c.beginPath(); c.arc(-28, -17, 3, 0, Math.PI * 2); c.fill();
+        } },
+        { id: "frog", label: "FROG", draw: function (c) {
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.arc(s * 18, -22, 12, 0, Math.PI * 2);
+                c.stroke();
+                c.beginPath();
+                c.arc(s * 18, -22, 4.5, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.ellipse(0, 10, 34, 23, 0, 0, Math.PI * 2);
+            c.stroke();
+            c.beginPath();
+            c.arc(0, 8, 18, Math.PI * 0.15, Math.PI * 0.85);
+            c.stroke();
+        } },
+        { id: "turtle", label: "TURTLE", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 8, 30, Math.PI, 0);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.arc(36, 2, 9, 0, Math.PI * 2);
+            c.fill();
+            c.fillRect(-24, 8, 10, 12);
+            c.fillRect(14, 8, 10, 12);
+            c.beginPath();
+            c.moveTo(-29, 10); c.lineTo(-42, 16); c.lineTo(-29, 18);
+            c.closePath(); c.fill();
+        } },
+        { id: "duck", label: "DUCK", draw: function (c) {
+            c.beginPath();
+            c.ellipse(6, 14, 30, 20, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.arc(-18, -16, 15, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-31, -18); c.lineTo(-49, -12); c.lineTo(-31, -6);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(26, 4); c.lineTo(46, -8); c.lineTo(38, 12);
+            c.closePath(); c.fill();
+        } },
+        { id: "dino", label: "DINO", draw: function (c) {
+            c.beginPath();
+            c.ellipse(8, 14, 30, 18, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-14, 8);
+            c.quadraticCurveTo(-34, -4, -34, -30);
+            c.quadraticCurveTo(-34, -42, -25, -42);
+            c.quadraticCurveTo(-15, -42, -18, -30);
+            c.quadraticCurveTo(-20, -8, -4, 4);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.moveTo(32, 10);
+            c.quadraticCurveTo(52, 16, 47, 30);
+            c.quadraticCurveTo(36, 24, 26, 26);
+            c.closePath();
+            c.fill();
+            c.fillRect(-10, 28, 10, 14);
+            c.fillRect(12, 28, 10, 14);
+        } },
+
+        /* FOOD */
+        { id: "donut", label: "DONUT", draw: function (c) {
+            c.save();
+            c.lineWidth = 24;
+            c.beginPath();
+            c.arc(0, 0, 28, 0, Math.PI * 2);
+            c.stroke();
+            c.restore();
+        } },
+        { id: "pizza", label: "PIZZA", draw: function (c) {
+            c.beginPath();
+            c.moveTo(0, 46);
+            c.lineTo(-28, -22);
+            c.quadraticCurveTo(0, -38, 28, -22);
+            c.closePath();
+            c.stroke();
+            c.beginPath();
+            c.moveTo(-23, -10);
+            c.quadraticCurveTo(0, -24, 23, -10);
+            c.stroke();
+            for (const p of [[-8, -2], [9, 2], [0, 18]]) {
+                c.beginPath();
+                c.arc(p[0], p[1], 6, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "candy", label: "CANDY", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 0, 18, 0, Math.PI * 2);
+            c.fill();
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.moveTo(s * 16, -6);
+                c.lineTo(s * 38, -16);
+                c.lineTo(s * 33, 0);
+                c.lineTo(s * 38, 16);
+                c.lineTo(s * 16, 6);
+                c.closePath();
+                c.fill();
+            }
+        } },
+        { id: "cherry", label: "CHERRY", draw: function (c) {
+            c.beginPath(); c.arc(-14, 20, 15, 0, Math.PI * 2); c.fill();
+            c.beginPath(); c.arc(17, 24, 14, 0, Math.PI * 2); c.fill();
+            c.beginPath();
+            c.moveTo(-12, 8); c.quadraticCurveTo(-4, -24, 8, -38);
+            c.moveTo(18, 12); c.quadraticCurveTo(15, -14, 8, -38);
+            c.stroke();
+            c.beginPath();
+            c.ellipse(17, -38, 12, 6, -0.5, 0, Math.PI * 2);
+            c.fill();
+        } },
+        { id: "cookie", label: "COOKIE", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 0, 36, 0, Math.PI * 2);
+            c.stroke();
+            for (const p of [[-14, -10], [10, -16], [16, 10], [-8, 14], [1, -1]]) {
+                c.beginPath();
+                c.arc(p[0], p[1], 5.5, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "strawberry", label: "BERRY", draw: function (c) {
+            c.beginPath();
+            c.moveTo(0, 42);
+            c.bezierCurveTo(-38, 18, -30, -20, 0, -14);
+            c.bezierCurveTo(30, -20, 38, 18, 0, 42);
+            c.stroke();
+            for (const p of [[-12, 4], [12, 4], [0, 18], [-6, -4], [6, -4]]) {
+                c.beginPath();
+                c.arc(p[0], p[1], 3, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.moveTo(-18, -13);
+            c.lineTo(-8, -30); c.lineTo(-4, -16);
+            c.lineTo(0, -34); c.lineTo(4, -16);
+            c.lineTo(8, -30); c.lineTo(18, -13);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "melon", label: "MELON", draw: function (c) {
+            c.beginPath();
+            c.arc(0, -8, 38, 0, Math.PI);
+            c.closePath();
+            c.stroke();
+            c.beginPath();
+            c.arc(0, -8, 28, 0, Math.PI);
+            c.stroke();
+            for (const p of [[-13, 6], [0, 12], [13, 6]]) {
+                c.beginPath();
+                c.ellipse(p[0], p[1], 3, 5, 0, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "carrot", label: "CARROT", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-12, -18); c.lineTo(12, -18); c.lineTo(2, 42);
+            c.quadraticCurveTo(0, 46, -2, 42);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.moveTo(0, -20); c.lineTo(-14, -44);
+            c.moveTo(0, -20); c.lineTo(0, -46);
+            c.moveTo(0, -20); c.lineTo(14, -44);
+            c.stroke();
+        } },
+
+        /* SPACE */
+        { id: "planet", label: "PLANET", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 0, 25, 0, Math.PI * 2);
+            c.fill();
+            c.save();
+            c.rotate(-0.35);
+            c.beginPath();
+            c.ellipse(0, 0, 45, 12, 0, 0, Math.PI * 2);
+            c.stroke();
+            c.restore();
+        } },
+        { id: "alien", label: "ALIEN", draw: function (c) {
+            c.beginPath();
+            c.ellipse(0, 4, 25, 30, 0, 0, Math.PI * 2);
+            c.stroke();
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.ellipse(s * 11, 0, 7, 12, s * 0.5, 0, Math.PI * 2);
+                c.fill();
+                c.beginPath();
+                c.moveTo(s * 11, -25); c.lineTo(s * 21, -42);
+                c.stroke();
+                c.beginPath();
+                c.arc(s * 22, -44, 3.5, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.arc(0, 20, 8, Math.PI * 0.2, Math.PI * 0.8);
+            c.stroke();
+        } },
+        { id: "comet", label: "COMET", draw: function (c) {
+            c.beginPath();
+            c.arc(-20, 20, 15, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-10, 8); c.lineTo(42, -30);
+            c.moveTo(-6, 18); c.lineTo(46, -8);
+            c.moveTo(-10, 30); c.lineTo(36, 12);
+            c.stroke();
+        } },
+        { id: "ufo", label: "UFO", draw: function (c) {
+            c.beginPath();
+            c.arc(0, -10, 18, Math.PI, 0);
+            c.stroke();
+            c.beginPath();
+            c.ellipse(0, -2, 42, 13, 0, 0, Math.PI * 2);
+            c.fill();
+            for (const x of [-22, 0, 22]) {
+                c.beginPath();
+                c.moveTo(x, 12); c.lineTo(x * 1.3, 32);
+                c.stroke();
+            }
+        } },
+        { id: "shoot", label: "SHOOTING", draw: function (c) {
+            c.save();
+            c.translate(-14, -12);
+            _starPath(c, 5, 22, 10);
+            c.fill();
+            c.restore();
+            c.beginPath();
+            c.moveTo(4, -2); c.lineTo(44, 18);
+            c.moveTo(-4, 10); c.lineTo(36, 32);
+            c.stroke();
+        } },
+        { id: "starduo", label: "STARS", draw: function (c) {
+            c.save(); c.translate(-16, -8);
+            _starPath(c, 5, 24, 10.5); c.fill();
+            c.restore();
+            c.save(); c.translate(22, 16);
+            _starPath(c, 5, 16, 7); c.fill();
+            c.restore();
+            c.save(); c.translate(12, -30);
+            _starPath(c, 4, 10, 3.5); c.fill();
+            c.restore();
+        } },
+
+        /* VEHICLES */
+        { id: "car", label: "CAR", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-44, 16);
+            c.lineTo(-40, 0); c.lineTo(-22, -2);
+            c.lineTo(-12, -18); c.lineTo(16, -18);
+            c.lineTo(26, -2); c.lineTo(42, 2); c.lineTo(44, 16);
+            c.closePath();
+            c.fill();
+            for (const x of [-24, 24]) {
+                c.beginPath();
+                c.arc(x, 20, 10, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "truck", label: "TRUCK", draw: function (c) {
+            c.fillRect(-46, -14, 52, 28);
+            c.beginPath();
+            c.moveTo(6, -6); c.lineTo(28, -6); c.lineTo(40, 6);
+            c.lineTo(40, 14); c.lineTo(6, 14);
+            c.closePath();
+            c.fill();
+            for (const x of [-30, -8, 26]) {
+                c.beginPath();
+                c.arc(x, 20, 9, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "boat", label: "BOAT", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-42, 14); c.lineTo(42, 14); c.lineTo(26, 32);
+            c.lineTo(-26, 32);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.moveTo(0, 8); c.lineTo(0, -44);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(5, -40); c.lineTo(34, 4); c.lineTo(5, 4);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(-5, -32); c.lineTo(-28, 4); c.lineTo(-5, 4);
+            c.closePath(); c.fill();
+        } },
+        { id: "plane", label: "PLANE", draw: function (c) {
+            c.beginPath();
+            c.ellipse(0, 6, 40, 11, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-8, 2); c.lineTo(-30, -32); c.lineTo(-12, -32);
+            c.lineTo(10, 0);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(28, 0); c.lineTo(42, -22); c.lineTo(46, -2);
+            c.closePath(); c.fill();
+        } },
+        { id: "train", label: "TRAIN", draw: function (c) {
+            c.fillRect(-46, -24, 30, 44);
+            c.fillRect(-18, -4, 60, 24);
+            c.fillRect(26, -20, 12, 16);
+            for (const x of [-34, -10, 12, 32]) {
+                c.beginPath();
+                c.arc(x, 24, 8, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "heli", label: "COPTER", draw: function (c) {
+            c.beginPath();
+            c.ellipse(-6, 8, 26, 17, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(16, 4); c.lineTo(44, 0); c.lineTo(44, 10); c.lineTo(18, 14);
+            c.closePath(); c.fill();
+            c.beginPath();
+            c.moveTo(-6, -8); c.lineTo(-6, -20);
+            c.moveTo(-44, -22); c.lineTo(32, -22);
+            c.moveTo(44, -8); c.lineTo(44, 16);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(-26, 32); c.lineTo(14, 32);
+            c.moveTo(-18, 26); c.lineTo(-18, 32);
+            c.moveTo(6, 26); c.lineTo(6, 32);
+            c.stroke();
+        } },
+        { id: "bike", label: "BIKE", draw: function (c) {
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.arc(s * 26, 16, 17, 0, Math.PI * 2);
+                c.stroke();
+            }
+            c.beginPath();
+            c.moveTo(-26, 16); c.lineTo(-8, -12); c.lineTo(14, -12);
+            c.lineTo(26, 16); c.lineTo(-2, 16); c.lineTo(-8, -12);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(14, -12); c.lineTo(18, -24);
+            c.moveTo(12, -26); c.lineTo(26, -24);
+            c.moveTo(-8, -12); c.lineTo(-12, -20);
+            c.moveTo(-18, -21); c.lineTo(-6, -21);
+            c.stroke();
+        } },
+        { id: "bus", label: "BUS", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-44, -20);
+            c.lineTo(40, -20);
+            c.quadraticCurveTo(46, -20, 46, -12);
+            c.lineTo(46, 16); c.lineTo(-44, 16);
+            c.lineTo(-46, -4);
+            c.closePath();
+            c.stroke();
+            c.beginPath();
+            c.moveTo(-44, -2); c.lineTo(46, -2);
+            c.stroke();
+            for (const x of [-26, 26]) {
+                c.beginPath();
+                c.arc(x, 20, 9, 0, Math.PI * 2);
+                c.fill();
+            }
         } }
     ];
+
+    /* Stamp PACKS — the chip row shows one pack at a time, tabs
+       above it (same pattern as the palette groups). Grouping is by
+       id so the 24 original draw functions stay where they are.
+       A pack id listed here but missing from STAMPS is skipped, so a
+       typo degrades to a shorter pack, not a crash. */
+    const STAMP_PACKS = [
+        { id: "classics", label: "CLASSICS",
+          ids: ["heart", "star", "sparkle", "rainbow", "smiley", "crown",
+                "gem", "balloon", "note", "bolt"] },
+        { id: "animals", label: "ANIMALS",
+          ids: ["cat", "dog", "bunny", "bird", "paw", "fish", "ladybug",
+                "butterfly", "bee", "snail", "frog", "turtle", "duck",
+                "dino"] },
+        { id: "nature", label: "NATURE",
+          ids: ["flower", "tulip", "tree", "leaf", "mushroom", "sun",
+                "moon", "cloud", "drop", "snowflake"] },
+        { id: "food", label: "FOOD",
+          ids: ["apple", "icecream", "cupcake", "donut", "pizza", "candy",
+                "cherry", "cookie", "strawberry", "melon", "carrot"] },
+        { id: "space", label: "SPACE",
+          ids: ["rocket", "planet", "alien", "ufo", "comet", "shoot",
+                "starduo"] },
+        { id: "vehicles", label: "VEHICLES",
+          ids: ["car", "truck", "bus", "train", "boat", "plane", "heli",
+                "bike"] }
+    ].map(function (pk) {
+        return {
+            id: pk.id, label: pk.label,
+            stamps: pk.ids.map(function (id) {
+                return STAMPS.find(function (s) { return s.id === id; });
+            }).filter(Boolean)
+        };
+    });
 
     function placeStampAt(p) {
         let def = null;
@@ -2989,10 +3575,33 @@
 
     /* ---------- 7. UI BUILDERS ---------- */
 
+    /* One section per pack. Pro packs are filtered OUT (not locked,
+       not greyed — absent) on a locked build, and empty packs render
+       nothing anywhere, so the picker looks complete at every tier.
+       Headers appear only once there are at least two visible
+       sections — a lone STARTERS header would just be noise. */
     function buildPicker() {
         const grid = $("#pickerGrid");
         grid.innerHTML = "";
-        window.TINY_CANVAS_TEMPLATES.forEach(function (tpl) {
+        const packs = (window.TINY_CANVAS_PAGE_PACKS || []).filter(
+            function (pk) {
+                return pk.pages.length && (isPro() || !pk.pro);
+            });
+        const showHeaders = packs.length > 1;
+        packs.forEach(function (pk) {
+            if (showHeaders) {
+                const h = document.createElement("h3");
+                h.className = "picker-section";
+                h.textContent = pk.label;
+                grid.appendChild(h);
+            }
+            pk.pages.forEach(function (tpl) {
+                grid.appendChild(buildPickCard(tpl));
+            });
+        });
+    }
+
+    function buildPickCard(tpl) {
             const card = document.createElement("button");
             card.className = "pick-card";
             card.type = "button";
@@ -3025,8 +3634,7 @@
                 await loadTemplate(tpl);
                 showScreen("draw");
             });
-            grid.appendChild(card);
-        });
+            return card;
     }
 
     /* Palette-group tabs build once at init; the active tab swaps
@@ -3156,7 +3764,7 @@
         const srow = document.querySelector(".stamp-row");
         if (srow) {
             srow.hidden = !isStampTool();
-            if (isStampTool()) buildStampButtons();
+            if (isStampTool()) { buildStampTabs(); buildStampButtons(); }
         }
         host.innerHTML = "";
         sizes.forEach(function (n) {
@@ -3227,12 +3835,47 @@
         });
     }
 
-    /* Stamp chips — same shown-not-named treatment as pattern chips:
-       each renders its own shape. Built lazily on first STAMP arm. */
-    function buildStampButtons() {
-        const host = $("#stampRow");
+    /* Stamp pack tabs — built once on first STAMP arm; clicking swaps
+       which pack's chips render below. Same visual as palette tabs. */
+    function buildStampTabs() {
+        const host = $("#stampPackTabs");
         if (!host || host.childElementCount) return;
-        STAMPS.forEach(function (s) {
+        STAMP_PACKS.forEach(function (pk) {
+            const tab = document.createElement("button");
+            tab.className = "palette-tab";
+            tab.type = "button";
+            tab.setAttribute("data-stamp-pack", pk.id);
+            tab.textContent = pk.label;
+            tab.addEventListener("click", function () {
+                state.stampPack = pk.id;
+                buildStampButtons(true);
+                refreshStampTabs();
+                sfxTap();
+            });
+            host.appendChild(tab);
+        });
+        refreshStampTabs();
+    }
+
+    function refreshStampTabs() {
+        $$("#stampPackTabs .palette-tab").forEach(function (t) {
+            t.classList.toggle("active",
+                t.getAttribute("data-stamp-pack") === state.stampPack);
+        });
+    }
+
+    /* Stamp chips — same shown-not-named treatment as pattern chips:
+       each renders its own shape. Built lazily on first STAMP arm;
+       rebuilt (force) on pack switch. Switching packs does NOT
+       re-arm a stamp — the armed one keeps working from any tab. */
+    function buildStampButtons(force) {
+        const host = $("#stampRow");
+        if (!host || (host.childElementCount && !force)) return;
+        host.innerHTML = "";
+        const pack = STAMP_PACKS.find(function (pk) {
+            return pk.id === state.stampPack;
+        }) || STAMP_PACKS[0];
+        pack.stamps.forEach(function (s) {
             const b = document.createElement("button");
             b.className = "pattern-btn";
             b.type = "button";

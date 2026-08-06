@@ -412,6 +412,27 @@ a:focus-visible {
     gap: 12px;
 }
 
+/* Pack section headers inside the picker grid — full-width rows
+   between card groups. Only rendered when 2+ sections are visible. */
+.picker-section {
+    grid-column: 1 / -1;
+    margin: 10px 0 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 2.4px;
+    color: var(--teal-dim);
+    text-shadow: 1px 1px 0 #000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.picker-section::after {
+    content: "";
+    flex: 1;
+    border-bottom: 1px dashed var(--teal-low);
+}
+
 .pick-card {
     background:
         repeating-linear-gradient(0deg,
@@ -2282,6 +2303,16 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    the SIZE row for FILL (or the pattern row for brushes) left an empty
    labelled row sitting there. Author-level rule to win it back. */
 .tool-row[hidden] { display: none !important; }
+
+/* Stamp row stacks pack tabs over the chip host (the row-label sits
+   to the left of both). Reuses .palette-tabs-host / .palette-tab. */
+.stamp-stack {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
 
 /* ---------- Zoom layer + controls ---------- */
 

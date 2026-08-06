@@ -137,7 +137,18 @@ def process(name):
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    names = sorted(f for f in os.listdir(SRC) if f.endswith(".png"))
-    for n in names:
+    # Subfolders are page PACKS: art-src/coloring-pages/<pack>/x.png
+    # mirrors to assets/coloring-pages/<pack>/x.png (the pro packs —
+    # ocean/, dinosaurs/, ... — live in pack dirs; the free set stays
+    # at the top level). After processing, append each new page to its
+    # pack's `pages` array in templates.js.
+    names = []
+    for root, _dirs, files in os.walk(SRC):
+        for f in files:
+            if f.endswith(".png"):
+                names.append(os.path.relpath(os.path.join(root, f), SRC))
+    for n in sorted(names):
+        sub = os.path.dirname(os.path.join(OUT, n))
+        if sub: os.makedirs(sub, exist_ok=True)
         process(n)
     print("done:", len(names), "pages")

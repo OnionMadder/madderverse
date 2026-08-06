@@ -549,7 +549,7 @@ process-coloring-pages.py`. See the game's CLAUDE.md ("The raster
 coloring pages").
 
 **The Pro value-pass content is BUILT (2026-08-05)**: 4 new brushes,
-a 24-shape STAMP tool, 8 paper textures, 12 export frames — gated by
+a 60-shape STAMP tool, 8 paper textures, 12 export frames — gated by
 `isPro()` (always true on web = the showcase). Pattern fills stay
 free forever. **Billing is WIRED the same day** (RevenueCat, one
 `pro` entitlement, parent-gated Settings card; inert until Onion
@@ -559,7 +559,7 @@ locked decisions in the game's CLAUDE.md.
 
 Its own cache-bust convention applies: **bump `?v=N` in
 `tiny-canvas/index.html` on every change** to `style.css`,
-`templates.js` or `game.js` (currently v29).
+`templates.js` or `game.js` (currently v30).
 
 ---
 

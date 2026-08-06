@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=29" />
+    <link rel="stylesheet" href="style.css?v=30" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -487,7 +487,10 @@
                      buildStampButtons(). -->
                 <div class="tool-row stamp-row" hidden>
                     <span class="row-label">STAMP</span>
-                    <div class="pattern-host" id="stampRow"></div>
+                    <div class="stamp-stack">
+                        <div class="palette-tabs-host" id="stampPackTabs"></div>
+                        <div class="pattern-host" id="stampRow"></div>
+                    </div>
                 </div>
 
                 <div class="tool-row size-row">
@@ -677,7 +680,7 @@
             <h3 class="settings-section">TINY CANVAS PRO</h3>
             <p class="settings-blurb">
                 A one-time upgrade for grown-ups: 4 extra brushes
-                (spray, rainbow, glow, smudge), a stamp tool with 24
+                (spray, rainbow, glow, smudge), a stamp tool with 60
                 shapes, 8 paper textures and 12 photo frames. No
                 subscriptions, no ads &mdash; and everything the free
                 app does stays free forever.
@@ -774,8 +777,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=29"></script>
-<script src="game.js?v=29"></script>
+<script src="templates.js?v=30"></script>
+<script src="game.js?v=30"></script>
 
 </body>
 </html>

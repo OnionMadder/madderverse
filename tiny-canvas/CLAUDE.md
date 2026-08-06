@@ -7,8 +7,18 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=29** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=30** — bump it
   on every change to style.css / templates.js / game.js.
+- **Page PACKS + stamp packs landed (2026-08-05, Unlocked wave 2).**
+  `templates.js` now exposes `TINY_CANVAS_PAGE_PACKS` (STARTERS free +
+  OCEAN/DINOSAURS pro, both awaiting Onion's art — an empty pack
+  renders nothing; headers appear once 2+ sections are visible) with
+  `TINY_CANVAS_TEMPLATES` derived as the flat view. The pipeline
+  script mirrors `art-src/coloring-pages/<pack>/` subfolders into
+  `assets/`. Stamps grew 24 → **60 in 6 pack tabs**
+  (CLASSICS/ANIMALS/NATURE/FOOD/SPACE/VEHICLES — `STAMP_PACKS`
+  groups by id; new shapes with interior detail are stroked-outline
+  because same-color strokes on a fill are invisible).
 - **Pro BILLING is WIRED (2026-08-05) but inert until activated.** The
   RevenueCat module + parent-gated Settings card are in game.js ("PRO
   BILLING" section carries the full activation checklist). It needs:
@@ -29,7 +39,8 @@ via Capacitor.
   These 14 are the FREE set; Pro will add more pages on top, never
   instead.
 - **The Pro value-pass CONTENT is BUILT (2026-08-05):** 4 new brushes
-  (spray/rainbow/glow/smudge), a STAMP tool with 24 shapes, 8 paper
+  (spray/rainbow/glow/smudge), a STAMP tool with 60 shapes in 6
+  themed packs (CLASSICS/ANIMALS/NATURE/FOOD/SPACE/VEHICLES), 8 paper
   textures, 12 export frames — all gated by `isPro()`, which is
   always true on web (the showcase) and false on native until billing
   sets the flag. Pattern fills stay free forever. See "Tiny Canvas
@@ -108,8 +119,8 @@ Capacitor when you're packaging for a store.
 - **10 distinct brushes** — 6 free (PEN / MARKER / CRAYON / PENCIL /
   PAINT / GLITTER) + 4 Pro (SPRAY / RAINBOW / GLOW / SMUDGE), each
   with its own beginStroke + drawSegment + textural feel. Plus
-  ERASER, the FILL bucket, and the Pro STAMP tool (24 tap-to-place
-  shapes tinted by the armed color).
+  ERASER, the FILL bucket, and the Pro STAMP tool (60 tap-to-place
+  shapes tinted by the armed color, in 6 themed pack tabs).
 - **FILL does MS Paint semantics**, not just template regions: it
   spreads over pixels matching the colour under the finger and stops at
   anything different, so the kid's OWN strokes bound it. The printed
@@ -1120,7 +1131,8 @@ Don't re-plan these — they're done and verified:
    parent-gated Settings card, see "Tiny Canvas Pro"). Remaining is
    user-side activation: RC account, key paste, Play product,
    entitlement, cap sync, license-tester purchase test.
-5. ~~**Stamps**~~ — DONE 2026-08-05 (24 shapes; spec said 60+, so
+5. ~~**Stamps**~~ — DONE 2026-08-05 (60 shapes in 6 packs; originally
+   24; spec said 60+, so
    more shapes is still an open widening).
 6. **More templates** — read the region-audit section before
    authoring. Next batch is Pro page content (Onion's art).
