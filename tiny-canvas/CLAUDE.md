@@ -7,13 +7,19 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=26** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=27** — bump it
   on every change to style.css / templates.js / game.js.
 - **The coloring pages are REAL ART now (2026-08-05).** The 34
   hand-drawn SVG templates were replaced by 14 full-scene raster
   coloring pages (+ BLANK) — see "The raster coloring pages" below.
-  These 14 are the FREE set; Pro (decided, unbuilt) will add more
-  pages on top, never instead.
+  These 14 are the FREE set; Pro will add more pages on top, never
+  instead.
+- **The Pro value-pass CONTENT is BUILT (2026-08-05):** 4 new brushes
+  (spray/rainbow/glow/smudge), a STAMP tool with 24 shapes, 8 paper
+  textures, 12 export frames — all gated by `isPro()`, which is
+  always true on web (the showcase) and false on native until billing
+  sets the flag. Pattern fills stay free forever. See "Tiny Canvas
+  Pro" below for the locked decisions and engine notes.
 - **Android release is BUILT and SIGNED but NOT UPLOADED.** versionCode
   2 / versionName 1.0.1, targeting API 35. The upload keystore exists
   (§F) — do not generate another. Play rejected vc1 for targeting API
@@ -85,9 +91,11 @@ Capacitor when you're packaging for a store.
   regions"). For SVG pages, prefer `<circle>`, `<ellipse>`, `<rect>`
   and paths ending in `Z`; an open stroke is fine only for decoration
   that isn't meant to hold colour.
-- **6 distinct brushes** (PEN / MARKER / CRAYON / PENCIL / PAINT /
-  GLITTER), each with its own beginStroke + drawSegment + textural
-  feel. Plus ERASER, plus the FILL bucket.
+- **10 distinct brushes** — 6 free (PEN / MARKER / CRAYON / PENCIL /
+  PAINT / GLITTER) + 4 Pro (SPRAY / RAINBOW / GLOW / SMUDGE), each
+  with its own beginStroke + drawSegment + textural feel. Plus
+  ERASER, the FILL bucket, and the Pro STAMP tool (24 tap-to-place
+  shapes tinted by the armed color).
 - **FILL does MS Paint semantics**, not just template regions: it
   spreads over pixels matching the colour under the finger and stops at
   anything different, so the kid's OWN strokes bound it. The printed
@@ -901,10 +909,11 @@ From `scripts/capture-screenshots.js`:
 
 ---
 
-## Tiny Canvas Pro — decided, not built
+## Tiny Canvas Pro — CONTENT BUILT (2026-08-05), billing not
 
 A **99¢ one-off unlock**, decided 2026-08-05. Not a separate app, not
-packs, not a subscription.
+packs, not a subscription. **The value-pass content shipped the same
+day** — see "What's built" below; only the billing layer remains.
 
 **The governing rule, in Onion's words:**
 
@@ -932,31 +941,57 @@ pressure on children, and a kid tapping a locked unicorn ten times is
 unkind regardless of policy. The kid should experience the free app as
 complete; the parent finds the upgrade by going looking.
 
-**Planned contents** (free keeps everything it has):
+**What's built (the 2026-08-05 value pass — all code, no assets):**
 
-| Dimension | Free | Pro adds |
+| Dimension | Free | Pro (BUILT) |
 |---|---|---|
-| Pages | 14 scenes + blank | more scenes in themed packs |
-| Fill patterns | solid only | the 8 tiles (BUILT, currently ungated) |
-| Stamps | — | 60+ |
-| Paper textures | 1 | ~8 |
-| Frames | — | ~12 |
-| Brushes | 7 | +4 (spray, smudge, rainbow, glow) |
-| Export | plain PNG | framed presets, print layout |
+| Pages | 14 scenes + blank | more scenes later (art task, pipeline ready) |
+| Fill patterns | ALL 8 tiles — **free forever**, decided 2026-08-05 | — |
+| Brushes | 6 + eraser + fill | +4: SPRAY, RAINBOW, GLOW, SMUDGE |
+| Stamps | — | STAMP tool, 24 code-drawn shapes × any color |
+| Paper textures | classic | +7 (dotty/grid/lines/kraft/mint/sky/blush) |
+| Export frames | plain PNG | 12 frames, applied at export only |
 
-Pattern fills, paper textures and frames are the cheap ones — they reuse
-the fill mask, a CSS background swap, and `composePng()` respectively.
-Pages and stamps are genuine content work.
+**Three decisions locked with Onion (2026-08-05, don't relitigate):**
+1. **Pattern fills stay free forever.** They shipped ungated a day
+   earlier; clawing them back would remove value from kids. Pro sells
+   on brushes/stamps/papers/frames/pages instead.
+2. **The WEB build gets everything.** `isPro()` returns true off
+   native — web is the showcase/trial (Slip Studio's model); the 99¢
+   gate exists only in the store apps.
+3. **All four content layers in one pass** rather than staging them.
+
+**How the gating works (`game.js`):** `isPro()` = `!isNative() ||
+state.proUnlocked`; the flag loads from `tinyCanvas.pro.v1` (mirrored
+to Capacitor Preferences). Gated DOM carries `data-pro hidden`;
+`revealProUI()` un-hides it in one pass at init. On a locked native
+build the Pro tools/rows simply don't exist in the UI — no padlocks,
+per the rule above. The stamp chip row needs no `data-pro`: its
+visibility is tool-driven, and an unreachable tool never arms.
+
+Engine notes: GLOW redraws the whole stroke path per move on the wet
+layer (per-segment translucent passes bead at the joints — that's why
+it's shaped differently from PAINT); SMUDGE and the eraser carry
+`direct: true` and bypass the wet layer (smudge must read real canvas
+pixels); RAINBOW subdivides segments to ~5px hue slices so fast swipes
+don't band; frames render at export/preview from the clean stored
+record, never baked in; paper is visual-only (a fixed layer under the
+transparent canvas + the same tile painted by `composePng`), so fill
+semantics are untouched.
 
 **Billing is not written.** When it is: RevenueCat with ONE entitlement
 (Pootery's `initBilling` / `purchasePack` / `restorePurchases` /
 `syncEntitlements` is the reference, minus four fifths of it), a
-"Restore Purchases" button because both stores expect one, and the flag
-mirrored to Capacitor Preferences like settings already are. Gating
-pattern fills is then a check in the chip handler.
+"Restore Purchases" button because both stores expect one, and the
+purchase success handler just sets `tinyCanvas.pro.v1` = "1" +
+`revealProUI()`. The Settings upsell card (parent-gated) gets built
+WITH billing — building purchase UI before it can purchase invites an
+Apple rejection for non-functional elements.
 
 ⚠ `privacy/index.html` and `STORE_LISTING.md` both currently state **"no
-in-app purchases."** Both need updating before any billing ships.
+in-app purchases."** Both need updating before any billing ships. The
+store listing copy deliberately still describes the FREE tier (6
+brushes, no stamps) — that is what an unpurchased native install shows.
 
 ## Better coloring-page art — RESOLVED 2026-08-05
 
@@ -1031,16 +1066,20 @@ Don't re-plan these — they're done and verified:
    `scripts/make-cover.py` (half-colored with the fill tool's own
    region model — re-run the script to regenerate). Remaining knock-on:
    the staged store screenshots still predate the new pages entirely.
-4. **Pro billing** — see "Tiny Canvas Pro". Decided, unbuilt.
-5. **Stamps** — spec called for 60+. `STAMPS` array parallel to
-   `BRUSHES`, tool button switching to a place-on-tap mode.
-6. **More templates** — read the region-audit section before authoring.
+4. **Pro billing** — see "Tiny Canvas Pro". The CONTENT is built
+   (brushes/stamps/papers/frames, 2026-08-05); RevenueCat + the
+   parent-gated Settings upsell card are what remain.
+5. ~~**Stamps**~~ — DONE 2026-08-05 (24 shapes; spec said 60+, so
+   more shapes is still an open widening).
+6. **More templates** — read the region-audit section before
+   authoring. Next batch is Pro page content (Onion's art).
 7. **Native save-to-photo-library directly** (skip share sheet) —
    requires `@capacitor-community/camera-preview` or a small custom
    plugin. Share-sheet path works.
 8. **Localization** — the locale stub in Settings is shipped UI. Add a
    locale dictionary + i18n wrapper around all visible strings.
-9. **More brushes** — spray, smudge.
+9. ~~**More brushes**~~ — DONE 2026-08-05 (spray, rainbow, glow,
+   smudge).
 10. **Edge-to-edge, before the API 36 bump.** The current opt-out is
     deprecated in 36; the titlebar and tool rail need real safe-area
     padding. Groundwork is half done.

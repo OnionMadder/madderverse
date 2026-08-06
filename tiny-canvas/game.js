@@ -85,6 +85,12 @@
     const IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
     const FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
     const GATE_UNLOCKED_KEY  = "tinyCanvas.parentGate.unlockedUntil.v1";
+    /* Pro unlock flag — "1" once the one-off purchase is made. Only
+       consulted on NATIVE: the web build always has everything (it is
+       the showcase/trial, same call Slip Studio made). Billing will
+       set this via RevenueCat later; until then native stays free-tier.
+       See isPro(). */
+    const PRO_KEY            = "tinyCanvas.pro.v1";
     /* History entries are dirty-rect ImageData patches, not full-canvas
        snapshots — see the HISTORY section for why. Cheap enough to
        afford real depth; the byte budget is the backstop for the rare
@@ -344,6 +350,203 @@
             }
         },
 
+        /* ---- Pro brushes (see isPro() — always on for web) ---- */
+
+        spray: {
+            /* Spray-paint mist: fine dots scattered in a disc along the
+               path. Dots land opaque on the wet layer, so overlaps
+               within one stroke don't darken; the composite alpha
+               gives the whole mist a soft look. */
+            label:       "SPRAY",
+            alpha:       0.85,
+            defaultSize: 28,
+            beginStroke: function (ctx, p, size, color) {
+                ctx.globalCompositeOperation = "source-over";
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = color;
+                this._mist(ctx, p.x, p.y, size);
+            },
+            drawSegment: function (ctx, p0, p1, size) {
+                const d = dist(p0, p1);
+                const steps = Math.max(1, Math.ceil(d / (size * 0.3)));
+                const pts = interp(p0, p1, steps);
+                for (let i = 0; i < pts.length; i++) {
+                    this._mist(ctx, pts[i].x, pts[i].y, size);
+                }
+            },
+            _mist: function (ctx, x, y, size) {
+                const r = size * 0.7;
+                const n = 6 + Math.floor(size * 0.5);
+                for (let k = 0; k < n; k++) {
+                    /* sqrt puts more dots near the center, like a real
+                       spray cone */
+                    const ang = Math.random() * Math.PI * 2;
+                    const dst = Math.sqrt(Math.random()) * r;
+                    const dr  = 0.7 + Math.random() * 1.3;
+                    ctx.beginPath();
+                    ctx.arc(x + Math.cos(ang) * dst,
+                            y + Math.sin(ang) * dst, dr, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        },
+
+        rainbow: {
+            /* Hue cycles with distance travelled, so a long swoop lays
+               down a whole rainbow. Ignores the armed color entirely —
+               that IS the toy. Hue cursor lives on state (reset each
+               stroke, random start so two strokes differ). */
+            label:       "RAINBOW",
+            alpha:       1,
+            defaultSize: 18,
+            beginStroke: function (ctx, p, size) {
+                ctx.globalCompositeOperation = "source-over";
+                ctx.globalAlpha = 1;
+                ctx.lineCap  = "round";
+                ctx.lineJoin = "round";
+                ctx.lineWidth = size;
+                state.rainbowHue = Math.floor(Math.random() * 360);
+                ctx.fillStyle = "hsl(" + state.rainbowHue + ",95%,60%)";
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
+                ctx.fill();
+            },
+            drawSegment: function (ctx, p0, p1, size) {
+                /* Subdivide so the hue advances in ~5px slices — a fast
+                   swipe delivers long segments, and one hue per segment
+                   reads as banded color blocks instead of a gradient. */
+                const d = dist(p0, p1);
+                const slices = Math.max(1, Math.ceil(d / 5));
+                const rate = 360 / (size * 18);   /* one cycle per ~18 widths */
+                ctx.lineWidth = size;
+                let from = p0;
+                for (let i = 1; i <= slices; i++) {
+                    const t = i / slices;
+                    const to = { x: p0.x + (p1.x - p0.x) * t,
+                                 y: p0.y + (p1.y - p0.y) * t };
+                    state.rainbowHue =
+                        (state.rainbowHue + dist(from, to) * rate) % 360;
+                    ctx.strokeStyle =
+                        "hsl(" + Math.round(state.rainbowHue) + ",95%,60%)";
+                    ctx.beginPath();
+                    ctx.moveTo(from.x, from.y);
+                    ctx.lineTo(to.x, to.y);
+                    ctx.stroke();
+                    from = to;
+                }
+            }
+        },
+
+        glow: {
+            /* Neon: a wide soft halo in the armed color under a bright
+               near-white core, baked into the bitmap so save/export
+               keep it (no CSS filters).
+
+               Unlike PAINT this can't stroke per segment: translucent
+               passes double-darken where round caps overlap the
+               previous segment, and the halo turns into a chain of
+               beads. So GLOW keeps the whole stroke's point list and
+               redraws the FULL path each move — clearing the wet
+               layer first makes that free of accumulation, and one
+               stroke() per pass has no interior joints to darken. */
+            label:       "GLOW",
+            alpha:       1,   /* passes carry their own alphas */
+            defaultSize: 18,
+            beginStroke: function (ctx, p, size, color) {
+                this._pts = [{ x: p.x, y: p.y }];
+                this._redraw(ctx, size, color);
+            },
+            drawSegment: function (ctx, p0, p1, size, color) {
+                this._pts.push({ x: p1.x, y: p1.y });
+                this._redraw(ctx, size, color);
+            },
+            _redraw: function (ctx, size, color) {
+                clearStrokeLayer();
+                ctx.globalCompositeOperation = "source-over";
+                ctx.lineCap  = "round";
+                ctx.lineJoin = "round";
+                const passes = [
+                    { w: size * 2.4,  a: 0.14 },
+                    { w: size * 1.35, a: 0.32 },
+                    { w: size * 0.72, a: 0.95 },
+                    { w: size * 0.30, a: 0.65, white: true }
+                ];
+                const pts = this._pts;
+                for (let i = 0; i < passes.length; i++) {
+                    ctx.globalAlpha  = passes[i].a;
+                    ctx.strokeStyle  = passes[i].white ? "#ffffff" : color;
+                    ctx.fillStyle    = ctx.strokeStyle;
+                    ctx.lineWidth    = passes[i].w;
+                    if (pts.length === 1) {
+                        ctx.beginPath();
+                        ctx.arc(pts[0].x, pts[0].y, passes[i].w / 2,
+                                0, Math.PI * 2);
+                        ctx.fill();
+                        continue;
+                    }
+                    ctx.beginPath();
+                    ctx.moveTo(pts[0].x, pts[0].y);
+                    for (let k = 1; k < pts.length; k++) {
+                        ctx.lineTo(pts[k].x, pts[k].y);
+                    }
+                    ctx.stroke();
+                }
+            }
+        },
+
+        smudge: {
+            /* Finger-smear: samples a patch of the ACTUAL canvas and
+               drags it along the stroke at partial alpha. Has to read
+               what is already painted, so it draws direct on the main
+               context — `direct` keeps it off the wet layer (which
+               only holds the in-flight stroke). */
+            label:       "SMUDGE",
+            alpha:       1,
+            direct:      true,
+            defaultSize: 28,
+            beginStroke: function (ctx, p, size) {
+                /* nothing to lay down — the smear starts on move */
+            },
+            drawSegment: function (ctx, p0, p1, size) {
+                const d = dist(p0, p1);
+                const steps = Math.min(6, Math.max(1, Math.ceil(d / (size * 0.25))));
+                const pts = interp(p0, p1, steps);
+                let from = p0;
+                for (let i = 0; i < pts.length; i++) {
+                    this._smear(ctx, from, pts[i], size);
+                    from = pts[i];
+                }
+            },
+            _smear: function (ctx, from, to, size) {
+                const dpr = state.dpr || 1;
+                const rDev = Math.round(size * dpr / 2);
+                const side = rDev * 2;
+                if (!this._patch || this._patch.width < side) {
+                    this._patch = document.createElement("canvas");
+                    this._patch.width = this._patch.height = side;
+                    this._pctx = this._patch.getContext("2d");
+                } else if (this._patch.width !== side) {
+                    /* keep the buffer at the largest size seen; draw
+                       into the top-left side x side corner below */
+                }
+                const pc = this._pctx;
+                pc.clearRect(0, 0, side, side);
+                pc.drawImage(canvas,
+                    Math.round(from.x * dpr) - rDev,
+                    Math.round(from.y * dpr) - rDev,
+                    side, side, 0, 0, side, side);
+                ctx.save();
+                ctx.globalCompositeOperation = "source-over";
+                ctx.globalAlpha = 0.45;
+                ctx.beginPath();
+                ctx.arc(to.x, to.y, size / 2, 0, Math.PI * 2);
+                ctx.clip();
+                ctx.drawImage(this._patch, 0, 0, side, side,
+                    to.x - size / 2, to.y - size / 2, size, size);
+                ctx.restore();
+            }
+        },
+
         /* FILL is not a stroke tool — it has no beginStroke/drawSegment
            and never reaches the pointer-move path. onPointerDown
            intercepts it and calls floodFillAt() instead. It lives in
@@ -357,9 +560,19 @@
             defaultSize: 0
         },
 
+        /* STAMP is a one-shot tap like FILL — onPointerDown intercepts
+           it and calls placeStampAt(). The SIZE row applies (it scales
+           the stamp); the stamp-row chips pick the shape. Pro. */
+        stamp: {
+            label:       "STAMP",
+            stamp:       true,
+            defaultSize: 28
+        },
+
         eraser: {
             label:       "ERASER",
             alpha:       1,
+            direct:      true,   /* destination-out must hit the real canvas */
             defaultSize: 28,
             beginStroke: function (ctx, p, size) {
                 ctx.globalCompositeOperation = "destination-out";
@@ -383,8 +596,11 @@
     };
 
     /* Brushes that draw color (everything except eraser). Used for
-       deciding which size set + palette state apply. */
-    const BRUSH_IDS  = ["pen", "marker", "crayon", "pencil", "paint", "glitter"];
+       deciding which size set + palette state apply. The last four
+       are Pro (their buttons carry data-pro and stay hidden on a
+       locked native build — see revealProUI). */
+    const BRUSH_IDS  = ["pen", "marker", "crayon", "pencil", "paint", "glitter",
+                        "spray", "rainbow", "glow", "smudge"];
     const TOOL_IDS   = BRUSH_IDS.concat("eraser");
 
     /* ---------- 1. STATE ---------- */
@@ -396,6 +612,9 @@
         currentColor:  COLOR_GROUPS.rainbow.colors[0],
         currentTool:   "pen",
         fillPattern:   "solid",   /* id from FILL_PATTERNS */                   /* any key in BRUSHES */
+        stampId:       "heart",   /* id from STAMPS (STAMP tool) */
+        rainbowHue:    0,         /* per-stroke hue cursor (RAINBOW brush) */
+        proUnlocked:   false,     /* native purchase flag — see isPro() */
         colorGroup:    "rainbow",               /* active palette group */
         brushSize:     BRUSHES.pen.defaultSize, /* size for whichever brush is active */
         eraserSize:    BRUSHES.eraser.defaultSize,
@@ -419,30 +638,70 @@
             smoothing: true,    /* brush smoothing on by default — better for kids */
             sfx:       true,    /* SFX on by default */
             music:     false,   /* music not implemented v1; toggle disabled */
-            locale:    "en"
+            locale:    "en",
+            paper:     "classic" /* id from PAPERS — Pro paper texture */
         }
     };
 
-    /* True if the current tool lays down a stroke in color — i.e.
-       everything except the eraser and the sizeless fill bucket. */
-    function isBrushTool() {
-        return state.currentTool !== "eraser" && !isFillTool();
+    /* ---------- 1b. PRO TIER ----------
+       Pro is the 99c one-off unlock (native stores only). The rules,
+       per the plan in CLAUDE.md:
+       - Purely ADDITIVE. Free keeps everything it has; Pro content
+         simply does not APPEAR when locked — no padlocks, no greyed
+         rows, no pressure in the kid's flow.
+       - The WEB build always has everything: it is the showcase/trial
+         (decided 2026-08-05, same call as Slip Studio's web build).
+       - Billing (RevenueCat) is NOT built yet. On native the flag
+         defaults false, so the unreleased native build shows the free
+         tier until billing lands and sets PRO_KEY.
+       Gated content: SPRAY / RAINBOW / GLOW / SMUDGE brushes, the
+       STAMP tool, PAPER textures, export FRAMES. Pattern fills are
+       deliberately FREE — they shipped ungated and stay that way. */
+
+    function isPro() {
+        return !isNative() || state.proUnlocked;
     }
-    function isFillTool() { return state.currentTool === "fill"; }
+
+    function loadProFlag() {
+        try { state.proUnlocked = localStorage.getItem(PRO_KEY) === "1"; }
+        catch (_) { state.proUnlocked = false; }
+    }
+
+    /* Everything Pro-gated in the DOM carries data-pro; reveal in one
+       pass at init. Hidden means display:none — the free UI has no
+       trace of it, per the no-locks rule. */
+    function revealProUI() {
+        if (!isPro()) return;
+        $$("[data-pro]").forEach(function (el) {
+            el.removeAttribute("hidden");
+        });
+    }
+
+    /* True if the current tool lays down a stroke in color — i.e.
+       everything except the eraser and the two one-shot tap tools
+       (fill, stamp). Stamp still counts for SIZE purposes though —
+       see sizesForCurrentTool. */
+    function isBrushTool() {
+        return state.currentTool !== "eraser" && !isFillTool() && !isStampTool();
+    }
+    function isFillTool()  { return state.currentTool === "fill"; }
+    function isStampTool() { return state.currentTool === "stamp"; }
 
     /* Size set + active size for whichever tool is current. Fill has
        no sizes at all, so it returns an empty set and the SIZE row
        hides itself. */
     function sizesForCurrentTool() {
         if (isFillTool()) return [];
-        return isBrushTool() ? BRUSH_SIZES : ERASER_SIZES;
+        /* Stamp scales off the brush sizes (a stamp is ~3x its nib). */
+        return (isBrushTool() || isStampTool()) ? BRUSH_SIZES : ERASER_SIZES;
     }
     function activeSize() {
-        return isBrushTool() ? state.brushSize : state.eraserSize;
+        return (isBrushTool() || isStampTool()) ? state.brushSize
+                                                : state.eraserSize;
     }
     function setActiveSize(n) {
-        if (isBrushTool()) state.brushSize = n;
-        else               state.eraserSize = n;
+        if (isBrushTool() || isStampTool()) state.brushSize = n;
+        else                                state.eraserSize = n;
     }
 
     function currentBrush() {
@@ -502,7 +761,7 @@
        on Android and webview clears on iOS. Rehydration on app start
        reads Preferences back into localStorage. */
     const STORAGE_KEYS_TO_MIRROR = [
-        STORAGE_KEY, SETTINGS_KEY, IN_PROGRESS_KEY, FIRST_SAVE_KEY
+        STORAGE_KEY, SETTINGS_KEY, IN_PROGRESS_KEY, FIRST_SAVE_KEY, PRO_KEY
     ];
 
     async function rehydrateFromNativePrefs() {
@@ -1439,6 +1698,421 @@
         });
     }
 
+    /* ---------- 4d. STAMPS (Pro tool) ----------
+
+       One-shot tap shapes, tinted by the armed color — the same
+       "mask, not fixed art" call as pattern fills, so 24 shapes x 42
+       colors reads as a lot of content. Each draw() renders into a
+       100x100 unit box centered on the origin (-50..50); placeStampAt
+       translates/scales, so stamps stay crisp at any size and DPR.
+       All drawn in code — no image assets, per the app's "bundles
+       everything, requests nothing" posture.
+
+       Filled stamps are solid silhouettes; stroked ones (smiley,
+       snowflake, rainbow...) read as doodles with the paper showing
+       through. lineWidth 7 is in unit space and scales with the
+       stamp. */
+
+    function _starPath(c, points, rOuter, rInner) {
+        c.beginPath();
+        for (let i = 0; i < points * 2; i++) {
+            const a = (Math.PI / points) * i - Math.PI / 2;
+            const r = (i % 2) ? rInner : rOuter;
+            const x = Math.cos(a) * r, y = Math.sin(a) * r;
+            if (i) c.lineTo(x, y); else c.moveTo(x, y);
+        }
+        c.closePath();
+    }
+
+    const STAMPS = [
+        { id: "heart", label: "HEART", draw: function (c) {
+            c.beginPath();
+            c.moveTo(0, 38);
+            c.bezierCurveTo(-62, -8, -34, -52, 0, -18);
+            c.bezierCurveTo(34, -52, 62, -8, 0, 38);
+            c.fill();
+        } },
+        { id: "star", label: "STAR", draw: function (c) {
+            _starPath(c, 5, 46, 20);
+            c.fill();
+        } },
+        { id: "sparkle", label: "SPARKLE", draw: function (c) {
+            _starPath(c, 4, 46, 11);
+            c.fill();
+        } },
+        { id: "flower", label: "FLOWER", draw: function (c) {
+            for (let i = 0; i < 6; i++) {
+                const a = (Math.PI / 3) * i;
+                c.beginPath();
+                c.ellipse(Math.cos(a) * 26, Math.sin(a) * 26,
+                          17, 12, a, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.arc(0, 0, 12, 0, Math.PI * 2);
+            c.fill();
+        } },
+        { id: "butterfly", label: "BUTTERFLY", draw: function (c) {
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.ellipse(s * 22, -14, 20, 15, s * 0.5, 0, Math.PI * 2);
+                c.fill();
+                c.beginPath();
+                c.ellipse(s * 17, 16, 14, 11, s * -0.4, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.ellipse(0, 0, 5, 26, 0, 0, Math.PI * 2);
+            c.fill();
+        } },
+        { id: "sun", label: "SUN", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 0, 24, 0, Math.PI * 2);
+            c.fill();
+            for (let i = 0; i < 8; i++) {
+                const a = (Math.PI / 4) * i;
+                c.save();
+                c.rotate(a);
+                c.beginPath();
+                c.moveTo(-6, -30); c.lineTo(6, -30); c.lineTo(0, -47);
+                c.closePath();
+                c.fill();
+                c.restore();
+            }
+        } },
+        { id: "moon", label: "MOON", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 0, 40, Math.PI * 0.32, Math.PI * 1.68);
+            c.arc(-18, 0, 32, Math.PI * 1.62, Math.PI * 0.38, true);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "cloud", label: "CLOUD", draw: function (c) {
+            c.beginPath();
+            c.arc(-22, 8, 16, 0, Math.PI * 2);
+            c.arc(0, -6, 22, 0, Math.PI * 2);
+            c.arc(24, 8, 15, 0, Math.PI * 2);
+            c.rect(-24, 6, 48, 18);
+            c.fill();
+        } },
+        { id: "drop", label: "RAINDROP", draw: function (c) {
+            c.beginPath();
+            c.moveTo(0, -44);
+            c.bezierCurveTo(24, -8, 30, 10, 0, 40);
+            c.bezierCurveTo(-30, 10, -24, -8, 0, -44);
+            c.fill();
+        } },
+        { id: "rainbow", label: "RAINBOW", draw: function (c) {
+            for (const r of [40, 27, 14]) {
+                c.beginPath();
+                c.arc(0, 22, r, Math.PI, 0);
+                c.stroke();
+            }
+        } },
+        { id: "snowflake", label: "SNOWFLAKE", draw: function (c) {
+            for (let i = 0; i < 6; i++) {
+                c.save();
+                c.rotate((Math.PI / 3) * i);
+                c.beginPath();
+                c.moveTo(0, 0); c.lineTo(0, -42);
+                c.moveTo(-9, -28); c.lineTo(0, -20); c.lineTo(9, -28);
+                c.stroke();
+                c.restore();
+            }
+        } },
+        { id: "bolt", label: "BOLT", draw: function (c) {
+            c.beginPath();
+            c.moveTo(10, -46); c.lineTo(-22, 6); c.lineTo(-2, 6);
+            c.lineTo(-10, 46); c.lineTo(22, -8); c.lineTo(2, -8);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "balloon", label: "BALLOON", draw: function (c) {
+            c.beginPath();
+            c.ellipse(0, -14, 22, 27, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-5, 12); c.lineTo(5, 12); c.lineTo(0, 19);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.moveTo(0, 19);
+            c.quadraticCurveTo(10, 32, 0, 46);
+            c.stroke();
+        } },
+        { id: "crown", label: "CROWN", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-38, 26); c.lineTo(-42, -18); c.lineTo(-20, 0);
+            c.lineTo(0, -30); c.lineTo(20, 0); c.lineTo(42, -18);
+            c.lineTo(38, 26);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "gem", label: "GEM", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-30, -18); c.lineTo(30, -18); c.lineTo(44, 2);
+            c.lineTo(0, 42); c.lineTo(-44, 2);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "note", label: "MUSIC", draw: function (c) {
+            c.beginPath();
+            c.ellipse(-14, 28, 13, 9, -0.3, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-3, 26); c.lineTo(-3, -34);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(-3, -34);
+            c.quadraticCurveTo(26, -26, 22, -2);
+            c.quadraticCurveTo(16, -18, -3, -18);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "paw", label: "PAW", draw: function (c) {
+            c.beginPath();
+            c.ellipse(0, 16, 22, 18, 0, 0, Math.PI * 2);
+            c.fill();
+            const toes = [[-28, -8, 9], [-10, -22, 10], [10, -22, 10], [28, -8, 9]];
+            for (const t of toes) {
+                c.beginPath();
+                c.arc(t[0], t[1], t[2], 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "fish", label: "FISH", draw: function (c) {
+            c.beginPath();
+            c.ellipse(-6, 0, 28, 18, 0, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(18, 0); c.lineTo(44, -18); c.lineTo(44, 18);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "ladybug", label: "LADYBUG", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 2, 30, 0, Math.PI * 2);
+            c.stroke();
+            c.beginPath();
+            c.moveTo(0, -28); c.lineTo(0, 32);
+            c.stroke();
+            c.beginPath();
+            c.arc(0, -34, 11, 0, Math.PI * 2);
+            c.fill();
+            for (const s of [[-14, -8], [14, -8], [-12, 16], [12, 16]]) {
+                c.beginPath();
+                c.arc(s[0], s[1], 5.5, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "apple", label: "APPLE", draw: function (c) {
+            c.beginPath();
+            c.arc(-11, 8, 21, 0, Math.PI * 2);
+            c.arc(11, 8, 21, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.moveTo(0, -10); c.quadraticCurveTo(-2, -28, 6, -38);
+            c.stroke();
+            c.beginPath();
+            c.ellipse(18, -30, 12, 7, -0.6, 0, Math.PI * 2);
+            c.fill();
+        } },
+        { id: "icecream", label: "ICE CREAM", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-20, -2); c.lineTo(20, -2); c.lineTo(0, 46);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.arc(-11, -14, 14, 0, Math.PI * 2);
+            c.arc(11, -14, 14, 0, Math.PI * 2);
+            c.arc(0, -28, 14, 0, Math.PI * 2);
+            c.fill();
+        } },
+        { id: "cupcake", label: "CUPCAKE", draw: function (c) {
+            c.beginPath();
+            c.moveTo(-26, 4); c.lineTo(-18, 42); c.lineTo(18, 42);
+            c.lineTo(26, 4);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.arc(-14, -4, 12, 0, Math.PI * 2);
+            c.arc(0, -14, 14, 0, Math.PI * 2);
+            c.arc(14, -4, 12, 0, Math.PI * 2);
+            c.fill();
+            c.beginPath();
+            c.arc(0, -34, 6, 0, Math.PI * 2);
+            c.fill();
+        } },
+        { id: "rocket", label: "ROCKET", draw: function (c) {
+            c.beginPath();
+            c.moveTo(0, -46);
+            c.quadraticCurveTo(18, -20, 14, 18);
+            c.lineTo(-14, 18);
+            c.quadraticCurveTo(-18, -20, 0, -46);
+            c.fill();
+            c.beginPath();
+            c.moveTo(-14, 4); c.lineTo(-30, 30); c.lineTo(-12, 22);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.moveTo(14, 4); c.lineTo(30, 30); c.lineTo(12, 22);
+            c.closePath();
+            c.fill();
+            c.beginPath();
+            c.moveTo(-7, 24); c.lineTo(7, 24); c.lineTo(0, 44);
+            c.closePath();
+            c.fill();
+        } },
+        { id: "smiley", label: "SMILEY", draw: function (c) {
+            c.beginPath();
+            c.arc(0, 0, 40, 0, Math.PI * 2);
+            c.stroke();
+            for (const s of [-1, 1]) {
+                c.beginPath();
+                c.arc(s * 15, -10, 5.5, 0, Math.PI * 2);
+                c.fill();
+            }
+            c.beginPath();
+            c.arc(0, 4, 24, Math.PI * 0.15, Math.PI * 0.85);
+            c.stroke();
+        } }
+    ];
+
+    function placeStampAt(p) {
+        let def = null;
+        for (let i = 0; i < STAMPS.length; i++) {
+            if (STAMPS[i].id === state.stampId) { def = STAMPS[i]; break; }
+        }
+        if (!def) def = STAMPS[0];
+        /* A stamp is ~3x its nominal nib — sizes 4..42 give 13..134px
+           shapes, which spans "little sticker" to "half the screen". */
+        const size = activeSize() * 3.2;
+        beginHistoryCapture();
+        ctx2d.save();
+        ctx2d.globalCompositeOperation = "source-over";
+        ctx2d.globalAlpha = 1;
+        ctx2d.translate(p.x, p.y);
+        ctx2d.scale(size / 100, size / 100);
+        ctx2d.fillStyle   = state.currentColor;
+        ctx2d.strokeStyle = state.currentColor;
+        ctx2d.lineCap  = "round";
+        ctx2d.lineJoin = "round";
+        ctx2d.lineWidth = 7;
+        def.draw(ctx2d);
+        ctx2d.restore();
+        growBounds(p.x, p.y, size / 2 + STROKE_BOUNDS_SLACK);
+        commitHistory();
+        state.dirty = true;
+        updateStatus();
+        markInProgressDirty();
+        hideIdleScribble();
+        triggerOnionReaction("drawing", 500);
+        sfxTap();
+    }
+
+    /* ---------- 4e. PAPER TEXTURES (Pro) ----------
+
+       A purely VISUAL layer behind the transparent canvas — the fill
+       tool matches canvas pixels, so paper never affects fills, and
+       the eraser (destination-out) reveals it naturally. Tiles are
+       drawn in code at runtime (no assets) and applied as a repeating
+       background on #paperLayer; composePng paints the same tile into
+       exports so a saved drawing looks like the screen did.
+
+       Light tints + faint marks only: the printed line art is
+       near-black and the deco colors assume light paper. */
+
+    const PAPER_TILE_PX = 120;
+
+    const PAPERS = [
+        { id: "classic", label: "CLASSIC", base: "#fbfaf6" },
+        { id: "dotty",   label: "DOTTY",   base: "#fbfaf6", draw: function (c, s) {
+            c.fillStyle = "rgba(28,34,38,0.08)";
+            for (let y = 0; y < 4; y++) {
+                for (let x = 0; x < 4; x++) {
+                    c.beginPath();
+                    c.arc(x * s / 4 + s / 8, y * s / 4 + s / 8, 1.6, 0, Math.PI * 2);
+                    c.fill();
+                }
+            }
+        } },
+        { id: "grid",    label: "GRID",    base: "#fbfaf6", draw: function (c, s) {
+            c.strokeStyle = "rgba(79,195,247,0.16)";
+            c.lineWidth = 1;
+            c.beginPath();
+            for (let i = 0; i <= 4; i++) {
+                c.moveTo(i * s / 4 + 0.5, 0); c.lineTo(i * s / 4 + 0.5, s);
+                c.moveTo(0, i * s / 4 + 0.5); c.lineTo(s, i * s / 4 + 0.5);
+            }
+            c.stroke();
+        } },
+        { id: "lines",   label: "LINES",   base: "#fdfcf7", draw: function (c, s) {
+            c.strokeStyle = "rgba(91,108,255,0.14)";
+            c.lineWidth = 1;
+            c.beginPath();
+            for (let i = 0; i < 3; i++) {
+                c.moveTo(0, i * s / 3 + s / 6 + 0.5);
+                c.lineTo(s, i * s / 3 + s / 6 + 0.5);
+            }
+            c.stroke();
+        } },
+        { id: "kraft",   label: "KRAFT",   base: "#f2e7d4", draw: function (c, s) {
+            /* seeded speckle so the tile is deterministic */
+            let seed = 42;
+            const rnd = function () {
+                seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+                return seed / 0x7fffffff;
+            };
+            c.fillStyle = "rgba(120,94,60,0.10)";
+            for (let i = 0; i < 60; i++) {
+                c.beginPath();
+                c.arc(rnd() * s, rnd() * s, 0.6 + rnd() * 1.0, 0, Math.PI * 2);
+                c.fill();
+            }
+        } },
+        { id: "mint",    label: "MINT",    base: "#edf7ee" },
+        { id: "sky",     label: "SKY",     base: "#edf4fb" },
+        { id: "blush",   label: "BLUSH",   base: "#fdf0f4" }
+    ];
+
+    function paperDefFor(id) {
+        for (let i = 0; i < PAPERS.length; i++) {
+            if (PAPERS[i].id === id) return PAPERS[i];
+        }
+        return PAPERS[0];
+    }
+
+    const _paperTileCache = {};
+
+    /* Tile canvas (base + marks) — used for the on-screen layer AND
+       composePng's export background, so the two can't disagree. */
+    function paperTileCanvas(def) {
+        if (_paperTileCache[def.id]) return _paperTileCache[def.id];
+        const cv = document.createElement("canvas");
+        cv.width = cv.height = PAPER_TILE_PX;
+        const c = cv.getContext("2d");
+        c.fillStyle = def.base;
+        c.fillRect(0, 0, PAPER_TILE_PX, PAPER_TILE_PX);
+        if (def.draw) def.draw(c, PAPER_TILE_PX);
+        _paperTileCache[def.id] = cv;
+        return cv;
+    }
+
+    function applyPaper() {
+        const layer = $("#paperLayer");
+        if (!layer) return;
+        const def = paperDefFor(isPro() ? state.settings.paper : "classic");
+        layer.style.backgroundColor = def.base;
+        if (def.draw) {
+            layer.style.backgroundImage =
+                "url(" + paperTileCanvas(def).toDataURL() + ")";
+            layer.style.backgroundSize = PAPER_TILE_PX + "px " +
+                                         PAPER_TILE_PX + "px";
+        } else {
+            layer.style.backgroundImage = "none";
+        }
+    }
+
     /* ---------- HISTORY (dirty-rect patches) ----------
 
        History used to be a full-canvas PNG dataURL per stroke. That
@@ -1712,9 +2386,11 @@
         ctx2d.restore();
     }
 
-    /* True while a wet stroke is being composited. */
+    /* True while a wet stroke is being composited. Brushes flagged
+       `direct` (eraser's destination-out, smudge's read-the-canvas
+       smear) must hit the real canvas instead. */
     function usesStrokeLayer() {
-        return state.currentTool !== "eraser";
+        return !currentBrush().direct;
     }
 
     /* ---------- 5. DRAWING ---------- */
@@ -1746,6 +2422,9 @@
            it knows it will actually paint something — pushing here
            would burn an undo step on a tap that landed on a line. */
         if (isFillTool()) { floodFillAt(p); return; }
+        /* Stamp is a one-shot tap too — places the armed shape and
+           handles its own history entry. */
+        if (isStampTool()) { placeStampAt(p); return; }
         beginHistoryCapture();
         state.isDrawing = true;
         state.lastX  = p.x;
@@ -2072,6 +2751,12 @@
             prow.hidden = !isFillTool();
             if (isFillTool()) buildPatternButtons();
         }
+        /* STAMP shows its shape row alongside SIZE. */
+        const srow = document.querySelector(".stamp-row");
+        if (srow) {
+            srow.hidden = !isStampTool();
+            if (isStampTool()) buildStampButtons();
+        }
         host.innerHTML = "";
         sizes.forEach(function (n) {
             const btn = document.createElement("button");
@@ -2141,6 +2826,83 @@
         });
     }
 
+    /* Stamp chips — same shown-not-named treatment as pattern chips:
+       each renders its own shape. Built lazily on first STAMP arm. */
+    function buildStampButtons() {
+        const host = $("#stampRow");
+        if (!host || host.childElementCount) return;
+        STAMPS.forEach(function (s) {
+            const b = document.createElement("button");
+            b.className = "pattern-btn";
+            b.type = "button";
+            b.setAttribute("data-stamp", s.id);
+            b.setAttribute("aria-label", s.label);
+            b.title = s.label;
+            const cv = document.createElement("canvas");
+            cv.width = 34; cv.height = 34;
+            const c = cv.getContext("2d");
+            c.translate(17, 17);
+            c.scale(0.30, 0.30);
+            c.fillStyle = "#eafffb";
+            c.strokeStyle = "#eafffb";
+            c.lineCap = "round";
+            c.lineJoin = "round";
+            c.lineWidth = 8;
+            s.draw(c);
+            b.appendChild(cv);
+            b.addEventListener("click", function () {
+                state.stampId = s.id;
+                refreshStampButtons();
+            });
+            host.appendChild(b);
+        });
+        refreshStampButtons();
+    }
+
+    function refreshStampButtons() {
+        $$("#stampRow .pattern-btn").forEach(function (b) {
+            b.classList.toggle("active",
+                b.getAttribute("data-stamp") === state.stampId);
+        });
+    }
+
+    /* Paper chips — each shows its actual tile. Row carries data-pro,
+       so on a locked native build it never appears at all. */
+    function buildPaperButtons() {
+        const host = $("#paperRow");
+        if (!host || host.childElementCount) return;
+        PAPERS.forEach(function (pd) {
+            const b = document.createElement("button");
+            b.className = "pattern-btn paper-btn";
+            b.type = "button";
+            b.setAttribute("data-paper", pd.id);
+            b.setAttribute("aria-label", pd.label + " paper");
+            b.title = pd.label;
+            const cv = document.createElement("canvas");
+            cv.width = 34; cv.height = 34;
+            const c = cv.getContext("2d");
+            c.drawImage(paperTileCanvas(pd), 0, 0, PAPER_TILE_PX, PAPER_TILE_PX,
+                        0, 0, 34, 34);
+            b.appendChild(cv);
+            b.addEventListener("click", function () {
+                state.settings.paper = pd.id;
+                persistSettings();
+                applyPaper();
+                refreshPaperButtons();
+                sfxTap();
+            });
+            host.appendChild(b);
+        });
+        refreshPaperButtons();
+    }
+
+    function refreshPaperButtons() {
+        $$("#paperRow .paper-btn").forEach(function (b) {
+            b.classList.toggle("active",
+                b.getAttribute("data-paper") === state.settings.paper);
+        });
+    }
+
     function refreshSizeButtons() {
         $$("#sizeRow .size-btn").forEach(function (b) {
             b.classList.toggle("active",
@@ -2197,7 +2959,7 @@
                    tiny" confusion. */
                 if (isFillTool()) {
                     /* no size to adopt — the bucket has no nib */
-                } else if (isBrushTool()) {
+                } else if (isBrushTool() || isStampTool()) {
                     state.brushSize = BRUSHES[newTool].defaultSize;
                 } else {
                     state.eraserSize = BRUSHES.eraser.defaultSize;
@@ -2725,9 +3487,25 @@
             off.height = outH;
             const o = off.getContext("2d");
 
-            /* Paper background */
-            o.fillStyle = "#fbfaf6";
+            /* Paper background — the same tile the on-screen
+               #paperLayer shows, scaled by the same screen->export
+               ratio as the strokes, so the saved file looks like the
+               screen did. Falls back to the classic plain paper. */
+            const pd = paperDefFor(isPro() ? state.settings.paper : "classic");
+            o.fillStyle = pd.base;
             o.fillRect(0, 0, outW, outH);
+            if (pd.draw) {
+                const cRect = canvas.getBoundingClientRect();
+                const k = cRect.width ? (outW / cRect.width) : 1;
+                const pat = o.createPattern(paperTileCanvas(pd), "repeat");
+                if (pat) {
+                    o.save();
+                    o.scale(k, k);
+                    o.fillStyle = pat;
+                    o.fillRect(0, 0, outW / k, outH / k);
+                    o.restore();
+                }
+            }
 
             /* Kid's strokes — full canvas scaled to output */
             o.drawImage(canvas, 0, 0, outW, outH);
@@ -2863,10 +3641,313 @@
         }
     }
 
+    /* ---------- 10b. EXPORT FRAMES (Pro) ----------
+
+       Decorative borders applied at EXPORT time, never baked into the
+       stored gallery record — picking a different frame later always
+       works from the clean drawing. Each frame draws its band onto an
+       existing canvas; the band is min(W,H)*8%, and motifs are clipped
+       to the band so they can't spill onto the artwork (scallop's
+       bumps are the deliberate exception). All code, no assets. */
+
+    function _framePerim(W, H, bw, step) {
+        /* Points spaced along the band's centerline. */
+        const pts = [];
+        const m = bw / 2;
+        for (let x = m; x <= W - m; x += step) {
+            pts.push([x, m], [x, H - m]);
+        }
+        for (let y = m + step; y <= H - m - step; y += step) {
+            pts.push([m, y], [W - m, y]);
+        }
+        return pts;
+    }
+
+    function _bandClip(c, W, H, bw) {
+        c.beginPath();
+        c.rect(0, 0, W, H);
+        c.rect(bw, bw, W - bw * 2, H - bw * 2);
+        c.clip("evenodd");
+    }
+
+    function _fillBand(c, W, H, bw, style) {
+        c.save();
+        _bandClip(c, W, H, bw);
+        c.fillStyle = style;
+        c.fillRect(0, 0, W, H);
+        c.restore();
+    }
+
+    function _miniHeart(c, x, y, r) {
+        c.beginPath();
+        c.moveTo(x, y + r * 0.75);
+        c.bezierCurveTo(x - r * 1.5, y - r * 0.4,
+                        x - r * 0.5, y - r * 1.2, x, y - r * 0.35);
+        c.bezierCurveTo(x + r * 0.5, y - r * 1.2,
+                        x + r * 1.5, y - r * 0.4, x, y + r * 0.75);
+        c.fill();
+    }
+
+    const FRAMES = [
+        { id: "none",     label: "NONE",     draw: null },
+
+        { id: "solid",    label: "PINK",     draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#ff2e88");
+            c.strokeStyle = "#ffffff";
+            c.lineWidth = Math.max(2, bw * 0.08);
+            c.strokeRect(bw, bw, W - bw * 2, H - bw * 2);
+        } },
+
+        { id: "rainbow",  label: "RAINBOW",  draw: function (c, W, H, bw) {
+            const g = c.createLinearGradient(0, 0, W, H);
+            ["#ff4d4d", "#ff9d42", "#ffd23f", "#9be15d",
+             "#4fc3f7", "#a86bff", "#ff4d4d"].forEach(function (hex, i, arr) {
+                g.addColorStop(i / (arr.length - 1), hex);
+            });
+            _fillBand(c, W, H, bw, g);
+        } },
+
+        { id: "candy",    label: "CANDY",    draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#ffffff");
+            c.save();
+            _bandClip(c, W, H, bw);
+            c.strokeStyle = "#ff4d6d";
+            c.lineWidth = bw * 0.45;
+            const step = bw * 1.4;
+            c.beginPath();
+            for (let x = -H; x < W + H; x += step) {
+                c.moveTo(x, -4);
+                c.lineTo(x + H, H + 4);
+            }
+            c.stroke();
+            c.restore();
+        } },
+
+        { id: "polka",    label: "POLKA",    draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#1ac88a");
+            c.save();
+            _bandClip(c, W, H, bw);
+            c.fillStyle = "#ffffff";
+            _framePerim(W, H, bw, bw * 1.1).forEach(function (p) {
+                c.beginPath();
+                c.arc(p[0], p[1], bw * 0.18, 0, Math.PI * 2);
+                c.fill();
+            });
+            c.restore();
+        } },
+
+        { id: "stars",    label: "STARS",    draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#2b3a8f");
+            c.save();
+            _bandClip(c, W, H, bw);
+            c.fillStyle = "#ffd23f";
+            _framePerim(W, H, bw, bw * 1.5).forEach(function (p) {
+                c.save();
+                c.translate(p[0], p[1]);
+                _starPath(c, 5, bw * 0.32, bw * 0.14);
+                c.fill();
+                c.restore();
+            });
+            c.restore();
+        } },
+
+        { id: "hearts",   label: "HEARTS",   draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#fdd7e4");
+            c.save();
+            _bandClip(c, W, H, bw);
+            c.fillStyle = "#ff2e88";
+            _framePerim(W, H, bw, bw * 1.4).forEach(function (p) {
+                _miniHeart(c, p[0], p[1], bw * 0.3);
+            });
+            c.restore();
+        } },
+
+        { id: "scallop",  label: "SCALLOP",  draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#ff7a1f");
+            /* bumps ride the inner edge, deliberately over the art */
+            c.fillStyle = "#ff7a1f";
+            const r = bw * 0.45, step = r * 2;
+            for (let x = bw + r; x < W - bw; x += step) {
+                c.beginPath(); c.arc(x, bw, r, 0, Math.PI); c.fill();
+                c.beginPath(); c.arc(x, H - bw, r, Math.PI, 0); c.fill();
+            }
+            for (let y = bw + r; y < H - bw; y += step) {
+                c.beginPath(); c.arc(bw, y, r, -Math.PI / 2, Math.PI / 2); c.fill();
+                c.beginPath(); c.arc(W - bw, y, r, Math.PI / 2, -Math.PI / 2); c.fill();
+            }
+        } },
+
+        { id: "zigzag",   label: "ZIGZAG",   draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#ffd23f");
+            c.save();
+            _bandClip(c, W, H, bw);
+            c.strokeStyle = "#ff7a1f";
+            c.lineWidth = bw * 0.18;
+            c.lineJoin = "round";
+            const step = bw * 0.9, m = bw / 2;
+            c.beginPath();
+            for (let x = 0; x < W + step; x += step) {
+                c.lineTo(x, ((x / step) & 1) ? m * 0.5 : m * 1.5);
+            }
+            for (let x = 0; x < W + step; x += step) {
+                c.moveTo(x, H - (((x / step) & 1) ? m * 0.5 : m * 1.5));
+                if (x > 0) {
+                    c.lineTo(x - step, H - (((x / step - 1) & 1) ? m * 0.5 : m * 1.5));
+                }
+            }
+            c.stroke();
+            c.restore();
+        } },
+
+        { id: "confetti", label: "CONFETTI", draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#ffffff");
+            c.save();
+            _bandClip(c, W, H, bw);
+            let seed = 7;
+            const rnd = function () {
+                seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+                return seed / 0x7fffffff;
+            };
+            const cols = ["#ff2e88", "#ff9d42", "#ffd23f",
+                          "#1ac88a", "#4fc3f7", "#a86bff"];
+            const n = Math.round((W + H) / bw * 6);
+            for (let i = 0; i < n; i++) {
+                /* random point somewhere in the band ring */
+                const edge = rnd();
+                let x, y;
+                if (edge < 0.25)      { x = rnd() * W; y = rnd() * bw; }
+                else if (edge < 0.5)  { x = rnd() * W; y = H - rnd() * bw; }
+                else if (edge < 0.75) { x = rnd() * bw; y = rnd() * H; }
+                else                  { x = W - rnd() * bw; y = rnd() * H; }
+                c.save();
+                c.translate(x, y);
+                c.rotate(rnd() * Math.PI);
+                c.fillStyle = cols[(rnd() * cols.length) | 0];
+                c.fillRect(-bw * 0.09, -bw * 0.045, bw * 0.18, bw * 0.09);
+                c.restore();
+            }
+            c.restore();
+        } },
+
+        { id: "stitched", label: "STITCHED", draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#f2e7d4");
+            c.strokeStyle = "#a8845c";
+            c.lineWidth = Math.max(2, bw * 0.07);
+            c.setLineDash([bw * 0.35, bw * 0.25]);
+            c.strokeRect(bw * 0.5, bw * 0.5, W - bw, H - bw);
+            c.setLineDash([]);
+        } },
+
+        { id: "clouds",   label: "CLOUDS",   draw: function (c, W, H, bw) {
+            _fillBand(c, W, H, bw, "#9ed1f7");
+            c.save();
+            _bandClip(c, W, H, bw);
+            c.fillStyle = "#ffffff";
+            _framePerim(W, H, bw, bw * 1.6).forEach(function (p, i) {
+                const r = bw * (0.22 + ((i % 3) * 0.05));
+                c.beginPath();
+                c.arc(p[0] - r, p[1] + r * 0.3, r * 0.8, 0, Math.PI * 2);
+                c.arc(p[0], p[1] - r * 0.3, r, 0, Math.PI * 2);
+                c.arc(p[0] + r, p[1] + r * 0.3, r * 0.8, 0, Math.PI * 2);
+                c.fill();
+            });
+            c.restore();
+        } },
+
+        { id: "gold",     label: "GOLD",     draw: function (c, W, H, bw) {
+            const g = c.createLinearGradient(0, 0, W, H);
+            g.addColorStop(0,    "#d4af37");
+            g.addColorStop(0.35, "#f7e08c");
+            g.addColorStop(0.65, "#c79a2a");
+            g.addColorStop(1,    "#f2d878");
+            _fillBand(c, W, H, bw, g);
+            c.strokeStyle = "#8a6d1d";
+            c.lineWidth = Math.max(2, bw * 0.06);
+            c.strokeRect(bw, bw, W - bw * 2, H - bw * 2);
+        } }
+    ];
+
+    function frameDefFor(id) {
+        for (let i = 0; i < FRAMES.length; i++) {
+            if (FRAMES[i].id === id) return FRAMES[i];
+        }
+        return FRAMES[0];
+    }
+
+    /* Render a gallery record with a frame → PNG dataURL. */
+    function frameRecPng(rec, frameId) {
+        return new Promise(function (resolve) {
+            const def = frameDefFor(frameId);
+            if (!def.draw) { resolve(rec.png); return; }
+            const img = new Image();
+            img.onload = function () {
+                const cv = document.createElement("canvas");
+                cv.width = img.width;
+                cv.height = img.height;
+                const c = cv.getContext("2d");
+                c.drawImage(img, 0, 0);
+                const bw = Math.round(Math.min(img.width, img.height) * 0.08);
+                def.draw(c, img.width, img.height, bw);
+                resolve(cv.toDataURL("image/png"));
+            };
+            img.onerror = function () { resolve(rec.png); };
+            img.src = rec.png;
+        });
+    }
+
+    /* Frame currently previewed in the detail panel. Transient —
+       resets to NONE every time the panel opens. */
+    let detailFrameId = "none";
+
+    function buildFrameButtons() {
+        const host = $("#frameRow");
+        if (!host || host.childElementCount) return;
+        FRAMES.forEach(function (f) {
+            const b = document.createElement("button");
+            b.className = "pattern-btn frame-btn";
+            b.type = "button";
+            b.setAttribute("data-frame", f.id);
+            b.setAttribute("aria-label", f.label + " frame");
+            b.title = f.label;
+            const cv = document.createElement("canvas");
+            cv.width = 34; cv.height = 34;
+            const c = cv.getContext("2d");
+            c.fillStyle = "#fbfaf6";
+            c.fillRect(0, 0, 34, 34);
+            if (f.draw) f.draw(c, 34, 34, 7);
+            b.appendChild(cv);
+            b.addEventListener("click", function () {
+                detailFrameId = f.id;
+                refreshFrameButtons();
+                const id = $("#picDetail").dataset.id;
+                const rec = loadGallery().find(function (r) { return r.id === id; });
+                if (!rec) return;
+                if (f.id === "none") { $("#detailImg").src = rec.png; return; }
+                frameRecPng(rec, f.id).then(function (png) {
+                    /* Kid may have tapped another chip while this one
+                       rendered — only apply if still the armed frame. */
+                    if (detailFrameId === f.id) $("#detailImg").src = png;
+                });
+            });
+            host.appendChild(b);
+        });
+        refreshFrameButtons();
+    }
+
+    function refreshFrameButtons() {
+        $$("#frameRow .frame-btn").forEach(function (b) {
+            b.classList.toggle("active",
+                b.getAttribute("data-frame") === detailFrameId);
+        });
+    }
+
     function openDetail(rec) {
         $("#detailTemplate").textContent = rec.name;
         $("#detailDate").textContent     = formatDate(rec.date);
         $("#detailImg").src              = rec.png;
+        detailFrameId = "none";
+        buildFrameButtons();
+        refreshFrameButtons();
         const panel = $("#picDetail");
         panel.removeAttribute("hidden");
         panel.dataset.id = rec.id;
@@ -2898,8 +3979,15 @@
         const id = $("#picDetail").dataset.id;
         if (!id) return;
         parentGate("export", async function () {
-            const rec = loadGallery().find(function (r) { return r.id === id; });
+            let rec = loadGallery().find(function (r) { return r.id === id; });
             if (!rec) return;
+
+            /* Frame chosen in the detail panel is applied to the
+               exported copy only — the stored record stays clean. */
+            if (isPro() && detailFrameId !== "none") {
+                const framed = await frameRecPng(rec, detailFrameId);
+                rec = Object.assign({}, rec, { png: framed });
+            }
 
             if (isNative()) {
                 const ok = await nativeExport(rec);
@@ -2965,6 +4053,7 @@
            so the first localStorage reads see the canonical native
            values, not stale web-cache values. No-op on web. */
         await rehydrateFromNativePrefs();
+        loadProFlag();
         loadSettings();
         setupCanvas();
         buildPicker();
@@ -2976,6 +4065,13 @@
         attachSettingsHandlers();
         rebuildSizeButtons();
         refreshToolButtons();
+        /* Pro content: reveal the gated UI (always on web — see
+           isPro), then build + apply the paper layer. Order matters:
+           reveal first so the paper row exists un-hidden when its
+           chips build. */
+        revealProUI();
+        buildPaperButtons();
+        applyPaper();
 
         $("#btnStart").addEventListener("click", async function () {
             /* START COLORING goes straight to a blank canvas instead of

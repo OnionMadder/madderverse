@@ -1050,6 +1050,12 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
 }
 
+/* Pro tool buttons ship hidden and are revealed by revealProUI().
+   .tool-btn sets display:flex, which outranks the UA's [hidden]
+   display:none — same specificity war the .tool-row[hidden] rule
+   below fights. Without this, "hidden" Pro tools render anyway. */
+.tool-btn[hidden] { display: none !important; }
+
 /* Eraser is visually distinct from the 6 brushes — spans the full
    width below the brush grid, gets a teal outline so "destructive"
    reads at a glance. Active state still goes pink. */
@@ -2259,3 +2265,30 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    the SIZE row for FILL (or the pattern row for brushes) left an empty
    labelled row sitting there. Author-level rule to win it back. */
 .tool-row[hidden] { display: none !important; }
+
+/* ---------- Pro: paper layer, frame row ---------- */
+
+/* Visual paper behind the transparent canvas (z 2 < canvas z 5).
+   applyPaper() sets background-color + repeating tile. pointer-events
+   none — it is scenery, taps belong to the canvas. */
+.paper-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    background-repeat: repeat;
+}
+
+/* Frame chips in the gallery detail panel. Reuses the pattern-chip
+   look; the row itself mirrors .tool-row without being inside the
+   drawer. */
+.detail-frame-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px 0;
+}
+.detail-frame-row[hidden] { display: none !important; }
+.detail-frame-row .pattern-host {
+    padding: 0;
+}

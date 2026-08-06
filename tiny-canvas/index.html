@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=26" />
+    <link rel="stylesheet" href="style.css?v=27" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -134,6 +134,12 @@
     </div>
 
     <div class="draw-stack">
+
+        <!-- Paper texture layer (Pro) — sits UNDER the transparent
+             canvas; applyPaper() sets its color + tile. Purely visual:
+             fill and export are unaffected (composePng paints the same
+             tile itself). -->
+        <div class="paper-layer" id="paperLayer" aria-hidden="true"></div>
 
         <!-- The canvas the kid draws ON. Fills the entire viewport so
              strokes can happen anywhere — not constrained to a small
@@ -366,6 +372,65 @@
                         <span class="tool-label">GLITTER</span>
                     </button>
 
+                    <!-- Pro tools. data-pro + hidden: revealProUI() shows
+                         them when isPro() — always on web, purchase-flag
+                         on native. The free UI carries no trace of them
+                         (no padlocks — see the Pro rules in CLAUDE.md). -->
+                    <button class="tool-btn" data-tool="spray" data-pro type="button" hidden>
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="7" y="8" width="8" height="13" rx="2"/>
+                            <path d="M9 8 L9 5 L13 5 L13 8"/>
+                            <line x1="10" y1="3" x2="12" y2="3"/>
+                            <circle cx="18" cy="6" r="0.8" fill="currentColor"/>
+                            <circle cx="20" cy="9" r="0.8" fill="currentColor"/>
+                            <circle cx="18" cy="12" r="0.8" fill="currentColor"/>
+                        </svg>
+                        <span class="tool-label">SPRAY</span>
+                    </button>
+
+                    <button class="tool-btn" data-tool="rainbow" data-pro type="button" hidden>
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M3 19 A9 9 0 0 1 21 19"/>
+                            <path d="M7 19 A5 5 0 0 1 17 19"/>
+                            <path d="M11 19 A1 1 0 0 1 13 19"/>
+                        </svg>
+                        <span class="tool-label">RAINBOW</span>
+                    </button>
+
+                    <button class="tool-btn" data-tool="glow" data-pro type="button" hidden>
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="4"/>
+                            <line x1="12" y1="2.5" x2="12" y2="5.5"/>
+                            <line x1="12" y1="18.5" x2="12" y2="21.5"/>
+                            <line x1="2.5" y1="12" x2="5.5" y2="12"/>
+                            <line x1="18.5" y1="12" x2="21.5" y2="12"/>
+                            <line x1="5.3" y1="5.3" x2="7.4" y2="7.4"/>
+                            <line x1="16.6" y1="16.6" x2="18.7" y2="18.7"/>
+                            <line x1="16.6" y1="7.4" x2="18.7" y2="5.3"/>
+                            <line x1="5.3" y1="18.7" x2="7.4" y2="16.6"/>
+                        </svg>
+                        <span class="tool-label">GLOW</span>
+                    </button>
+
+                    <button class="tool-btn" data-tool="smudge" data-pro type="button" hidden>
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 18 Q8 8 12 12 Q16 16 20 6"/>
+                            <circle cx="6" cy="20" r="0.9" fill="currentColor"/>
+                            <circle cx="10" cy="19" r="0.9" fill="currentColor"/>
+                            <circle cx="14" cy="20" r="0.9" fill="currentColor"/>
+                        </svg>
+                        <span class="tool-label">SMUDGE</span>
+                    </button>
+
+                    <button class="tool-btn" data-tool="stamp" data-pro type="button" hidden>
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 4 Q9 2.5 12 2.5 Q15 2.5 15 4 L14 9 L10 9 Z"/>
+                            <path d="M6 13 Q6 10.5 12 10.5 Q18 10.5 18 13 L18 15 L6 15 Z"/>
+                            <line x1="4" y1="19" x2="20" y2="19"/>
+                        </svg>
+                        <span class="tool-label">STAMP</span>
+                    </button>
+
                     <button class="tool-btn" data-tool="fill" type="button">
                         <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M6 5 L14 13 L8.5 18.5 Q7 20 5.5 18.5 L3 16 Q1.5 14.5 3 13 Z"/>
@@ -394,6 +459,16 @@
                     <div class="pattern-host" id="patternRow"></div>
                 </div>
 
+                <!-- Shown only while STAMP is armed (Pro). Visibility is
+                     purely tool-driven (rebuildSizeButtons) — no data-pro
+                     needed, since the STAMP tool button itself is gated
+                     and an unreachable tool never arms. Chips injected by
+                     buildStampButtons(). -->
+                <div class="tool-row stamp-row" hidden>
+                    <span class="row-label">STAMP</span>
+                    <div class="pattern-host" id="stampRow"></div>
+                </div>
+
                 <div class="tool-row size-row">
                     <span class="row-label">SIZE</span>
                     <!-- Size buttons injected by rebuildSizeButtons() each
@@ -416,6 +491,13 @@
                            title="Pick any color" aria-label="Pick any color">
                         <input type="color" id="customColor" value="#ff2e88" />
                     </label>
+                </div>
+
+                <!-- Paper textures (Pro) — swaps the visual paper behind
+                     the canvas. Chips injected by buildPaperButtons(). -->
+                <div class="tool-row paper-row" data-pro hidden>
+                    <span class="row-label">PAPER</span>
+                    <div class="pattern-host" id="paperRow"></div>
                 </div>
 
             </div>
@@ -477,6 +559,13 @@
             </div>
             <div class="detail-canvas-wrap">
                 <img id="detailImg" alt="Drawing preview" />
+            </div>
+            <!-- Export frames (Pro) — preview here, applied to the
+                 EXPORTED copy only; the stored record stays clean.
+                 Chips injected by buildFrameButtons(). -->
+            <div class="detail-frame-row" data-pro hidden>
+                <span class="row-label">FRAME</span>
+                <div class="pattern-host frame-host" id="frameRow"></div>
             </div>
             <div class="detail-actions">
                 <button class="btn-control" id="detailDelete" type="button">
@@ -642,8 +731,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=26"></script>
-<script src="game.js?v=26"></script>
+<script src="templates.js?v=27"></script>
+<script src="game.js?v=27"></script>
 
 </body>
 </html>
