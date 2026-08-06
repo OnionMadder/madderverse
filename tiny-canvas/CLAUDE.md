@@ -10,12 +10,18 @@ via Capacitor.
   on the hub grid since 2026-08-04. Cache-bust is at **?v=30** — bump it
   on every change to style.css / templates.js / game.js.
 - **Page PACKS + stamp packs landed (2026-08-05, Unlocked wave 2).**
-  `templates.js` now exposes `TINY_CANVAS_PAGE_PACKS` (STARTERS free +
-  OCEAN/DINOSAURS pro, both awaiting Onion's art — an empty pack
-  renders nothing; headers appear once 2+ sections are visible) with
-  `TINY_CANVAS_TEMPLATES` derived as the flat view. The pipeline
+  `templates.js` exposes `TINY_CANVAS_PAGE_PACKS` with
+  `TINY_CANVAS_TEMPLATES` derived as the flat view; the pipeline
   script mirrors `art-src/coloring-pages/<pack>/` subfolders into
-  `assets/`. Stamps grew 24 → **60 in 6 pack tabs**
+  `assets/`. **Both pro packs are FILLED (later same day): OCEAN
+  (shipwreck, coral reef, mermaids, atlantis, big fish) and
+  DINOSAURS (stego family, t-rex, longneck, raptor, dino parade)** —
+  5 pages each, Onion's target for Unlocked packs. ⚠ **BIG FISH
+  moved from STARTERS into OCEAN** (Onion moved its art-src file);
+  the free set is now 13 scenes + BLANK. Picker headers
+  (STARTERS/OCEAN/DINOSAURS) appear when 2+ sections are visible; a
+  locked native build renders pro sections as absent, not padlocked.
+  Stamps grew 24 → **60 in 6 pack tabs**
   (CLASSICS/ANIMALS/NATURE/FOOD/SPACE/VEHICLES — `STAMP_PACKS`
   groups by id; new shapes with interior detail are stroked-outline
   because same-color strokes on a fill are invisible).

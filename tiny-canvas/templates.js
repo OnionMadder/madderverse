@@ -50,7 +50,6 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "dog",       name: "PUPPY",          image: "assets/coloring-pages/dog.png" },
             { id: "unicorn",   name: "UNICORN",        image: "assets/coloring-pages/unicorn.png" },
             { id: "sun",       name: "SUNNY DAY",      image: "assets/coloring-pages/sun.png" },
-            { id: "fish",      name: "BIG FISH",       image: "assets/coloring-pages/fish.png" },
             { id: "butterfly", name: "BUTTERFLY",      image: "assets/coloring-pages/butterfly.png" },
             { id: "bird",      name: "BIRD NEST",      image: "assets/coloring-pages/bird.png" },
             { id: "bear",      name: "TEDDY BEAR",     image: "assets/coloring-pages/bear.png" },
@@ -65,15 +64,24 @@ window.TINY_CANVAS_PAGE_PACKS = [
     {
         id: "ocean", label: "OCEAN", pro: true,
         pages: [
-            /* Art in progress — entries land here as
-               assets/coloring-pages/ocean/<id>.png ships. */
+            /* BIG FISH moved here from STARTERS 2026-08-05 (Onion's
+               call — its art-src file moved into ocean/); the free
+               set is 13 scenes + BLANK. */
+            { id: "shipwreck", name: "SHIPWRECK",  image: "assets/coloring-pages/ocean/shipwreck.png" },
+            { id: "reef",      name: "CORAL REEF", image: "assets/coloring-pages/ocean/reef.png" },
+            { id: "mermaids",  name: "MERMAIDS",   image: "assets/coloring-pages/ocean/mermaids.png" },
+            { id: "atlantis",  name: "ATLANTIS",   image: "assets/coloring-pages/ocean/atlantis.png" },
+            { id: "fish",      name: "BIG FISH",   image: "assets/coloring-pages/ocean/fish.png" }
         ]
     },
     {
         id: "dinosaurs", label: "DINOSAURS", pro: true,
         pages: [
-            /* Art in progress — entries land here as
-               assets/coloring-pages/dinosaurs/<id>.png ships. */
+            { id: "stego-family", name: "STEGO FAMILY", image: "assets/coloring-pages/dinosaurs/family.png" },
+            { id: "trex",         name: "T-REX",        image: "assets/coloring-pages/dinosaurs/predator.png" },
+            { id: "longneck",     name: "LONGNECK",     image: "assets/coloring-pages/dinosaurs/longneck.png" },
+            { id: "raptor",       name: "RAPTOR",       image: "assets/coloring-pages/dinosaurs/feathered.png" },
+            { id: "dino-parade",  name: "DINO PARADE",  image: "assets/coloring-pages/dinosaurs/herd.png" }
         ]
     }
 ];
