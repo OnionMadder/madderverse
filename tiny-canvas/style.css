@@ -440,7 +440,11 @@ a:focus-visible {
 }
 
 .pick-thumb {
-    aspect-ratio: 1 / 1;
+    /* 3:2, matching the landscape coloring pages (~1.83:1) closely
+       enough that the art fills the card instead of floating in
+       letterbox bands the way it did in the old 1:1 box. The BLANK
+       card's square dashed SVG still centers fine. */
+    aspect-ratio: 3 / 2;
     background: var(--paper);
     border-radius: var(--radius-sm);
     overflow: hidden;
@@ -677,6 +681,14 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     max-width: 100%;
     max-height: 100%;
     filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.06));
+    /* Fade in on load instead of popping (opacity only — no motion,
+       so no reduced-motion gate needed). loadTemplate adds
+       .art-loading and removes it once the file has arrived. */
+    transition: opacity 0.3s ease-out;
+}
+
+.line-art img.art-loading {
+    opacity: 0;
 }
 
 /* Floating undo button — top-right of the viewport, clear of the

@@ -7,7 +7,7 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=28** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=29** — bump it
   on every change to style.css / templates.js / game.js.
 - **Pro BILLING is WIRED (2026-08-05) but inert until activated.** The
   RevenueCat module + parent-gated Settings card are in game.js ("PRO
@@ -587,6 +587,12 @@ App Store Connect / Play Console upload slot
     to pinch. The one-shot undo is gated on the COMMIT timestamp so a
     no-op tap (landed on a line) can't undo older work.
   - The canvas is `touch-action: none`; one finger always draws.
+  - **Brush/stamp/eraser sizes are zoom-compensated** —
+    `effectiveSize()` = `activeSize() / view.s`, used at every drawing
+    call site, so the nib keeps a constant ON-SCREEN size and zooming
+    in is the fine-detail mode (verified: a 10-device-px pen line at
+    1x is 3 device px at 3.4x). UI code keeps reading `activeSize()`
+    — the size buttons show the kid's nominal pick.
 - **`viewport-fit=cover` is set** but `user-scalable=no` is **not** —
   unlike Pootery. Browser pinch still works on the non-draw screens;
   on the canvas the app's own pinch (above) takes over. Capacitor's

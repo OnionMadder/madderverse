@@ -896,6 +896,17 @@
         return (isBrushTool() || isStampTool()) ? state.brushSize
                                                 : state.eraserSize;
     }
+    /* Drawing size in LOGICAL canvas px, compensated for zoom: divide
+       by the view scale so the nib keeps a constant ON-SCREEN size.
+       Zooming in is therefore how you do fine detail — the same
+       finger-sized dot paints a quarter the canvas area at 2x. Safe
+       to read per-stroke: a zoom change mid-stroke is impossible (the
+       second finger cancels the stroke before the pinch starts).
+       UI code (size buttons) keeps comparing activeSize() — the
+       nominal size is what the kid picked. */
+    function effectiveSize() {
+        return activeSize() / (view.s || 1);
+    }
     function setActiveSize(n) {
         if (isBrushTool() || isStampTool()) state.brushSize = n;
         else                                state.eraserSize = n;
@@ -2326,8 +2337,10 @@
         }
         if (!def) def = STAMPS[0];
         /* A stamp is ~3x its nominal nib — sizes 4..42 give 13..134px
-           shapes, which spans "little sticker" to "half the screen". */
-        const size = activeSize() * 3.2;
+           shapes, which spans "little sticker" to "half the screen".
+           effectiveSize keeps that ON-SCREEN size constant under zoom,
+           so zooming in places smaller, finer stamps. */
+        const size = effectiveSize() * 3.2;
         beginHistoryCapture();
         ctx2d.save();
         ctx2d.globalCompositeOperation = "source-over";
@@ -2801,7 +2814,7 @@
         state.smoothX = p.x;
         state.smoothY = p.y;
         const brush = currentBrush();
-        const size  = activeSize();
+        const size  = effectiveSize();
         const color = state.currentColor;
         if (usesStrokeLayer()) {
             clearStrokeLayer();
@@ -2828,7 +2841,7 @@
         if (pinch) { updatePinch(); return; }
         if (!state.isDrawing) return;
         const brush = currentBrush();
-        const size  = activeSize();
+        const size  = effectiveSize();
         const color = state.currentColor;
         const target = usesStrokeLayer() ? strokeCtx : ctx2d;
 
@@ -2901,9 +2914,9 @@
             brush.drawSegment(usesStrokeLayer() ? strokeCtx : ctx2d,
                 { x: state.smoothX, y: state.smoothY },
                 { x: state.lastX,   y: state.lastY },
-                activeSize(), state.currentColor);
+                effectiveSize(), state.currentColor);
             growBounds(state.lastX, state.lastY,
-                       activeSize() + STROKE_BOUNDS_SLACK);
+                       effectiveSize() + STROKE_BOUNDS_SLACK);
         }
         /* Flatten the wet layer down one last time so the canvas holds
            the finished stroke before history reads it. */
@@ -2944,9 +2957,15 @@
                control; buildFillMask waits on this img's load if a
                fill lands before the file arrives. */
             const img = document.createElement("img");
+            img.className = "art-loading";
             img.src = tpl.image;
             img.alt = "";
             img.draggable = false;
+            const reveal = function () {
+                img.classList.remove("art-loading");
+            };
+            if (img.complete && img.naturalWidth) reveal();
+            else img.addEventListener("load", reveal, { once: true });
             overlay.innerHTML = "";
             overlay.appendChild(img);
         } else {
