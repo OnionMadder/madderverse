@@ -26,15 +26,25 @@ Pootery is a free, ad-free pottery game: shape clay on a wheel, decorate it with
 
 ## Games
 
+The catalog is organized into three shelves: Make Stuff (creative tools), Cozy (calm collection games), and Arcade & Silly (action and party play).
+
+Make Stuff:
+
 - Slip Studio — calm, meditative 3D pottery wheel (also a Teacher Approved paid Android app): https://madderverse.org/slip-studio/
+- Tiny Canvas — coloring app for kids (pick a page, tap to fill it with color, save it to a gallery): https://madderverse.org/tiny-canvas/
 - All Munkis — drag-and-drop beat maker: https://madderverse.org/all-munkis/
-- Pootery: Throw, Glaze, Fire — pottery studio: https://madderverse.org/pootery/
 - Groodle — draw-and-dance maker: https://madderverse.org/groodle/
+- Pootery: Throw, Glaze, Fire — pottery studio: https://madderverse.org/pootery/
+
+Cozy:
+
+- Florigami — cozy flower-breeding puzzle (cross colors, discover hybrids, fill the Bloombook): https://madderverse.org/florigami/
+
+Arcade & Silly:
+
 - Tub's Cookie Cache — arcade muncher: https://madderverse.org/cookie-cache/
 - George's Jump — arcade jumper: https://madderverse.org/georges-jump/
 - Friend Picker — silly party toy: https://madderverse.org/friend-picker/
-- Florigami — cozy flower-breeding puzzle (cross colors, discover hybrids, fill the Bloombook): https://madderverse.org/florigami/
-- Tiny Canvas — coloring app for kids (pick a page, tap to fill it with color, save it to a gallery): https://madderverse.org/tiny-canvas/
 
 ## Key pages
 

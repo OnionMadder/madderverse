@@ -79,6 +79,23 @@ body.kids-hub {
     .container { padding: 0 1.5rem 4rem; }
 }
 
+/* Shelves: the grid is split into labeled sections (Make Stuff /
+   Cozy / Arcade & Silly). Each .shelf holds its own .game-grid. */
+.shelf + .shelf { margin-top: 2.25rem; }
+
+.shelf-title {
+    font-family: monospace;
+    font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    color: var(--accent-pink);
+    margin: 0 0 0.9rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid rgba(255, 0, 255, 0.25);
+    text-shadow: 0 0 12px rgba(255, 0, 255, 0.35);
+}
+
 /* Game grid: landscape monitor-style cards. 1-up on phones (the
    landscape covers want room to breathe), 2-up around tablet,
    3-up on desktop. .site-footer rules live in assets/css/site-footer.css. */
@@ -173,7 +190,7 @@ body.kids-hub {
     pointer-events: none;
 }
 
-.game-card h2 {
+.game-card h3 {
     margin: 0.15rem 0 0.35rem;
     font-size: clamp(1rem, 2.4vw, 1.25rem);
     color: var(--accent-cyan);
