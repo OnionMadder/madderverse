@@ -9,19 +9,22 @@ via Capacitor.
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
   on the hub grid since 2026-08-04. Cache-bust is at **?v=30** — bump it
   on every change to style.css / templates.js / game.js.
-- **Page PACKS + stamp packs landed (2026-08-05, Unlocked wave 2).**
-  `templates.js` exposes `TINY_CANVAS_PAGE_PACKS` with
-  `TINY_CANVAS_TEMPLATES` derived as the flat view; the pipeline
-  script mirrors `art-src/coloring-pages/<pack>/` subfolders into
-  `assets/`. **Both pro packs are FILLED (later same day): OCEAN
-  (shipwreck, coral reef, mermaids, atlantis, big fish) and
-  DINOSAURS (stego family, t-rex, longneck, raptor, dino parade)** —
-  5 pages each, Onion's target for Unlocked packs. ⚠ **BIG FISH
-  moved from STARTERS into OCEAN** (Onion moved its art-src file);
-  the free set is now 13 scenes + BLANK. Picker headers
-  (STARTERS/OCEAN/DINOSAURS) appear when 2+ sections are visible; a
-  locked native build renders pro sections as absent, not padlocked.
-  Stamps grew 24 → **60 in 6 pack tabs**
+- **Page catalog REWORKED (2026-08-05 late, Onion's design — the
+  current model).** `TINY_CANVAS_PAGE_PACKS` in templates.js: an
+  **EXTRAS pack (pro:false — BLANK + beans, monster, robot lab, dog
+  choir)** and **eight pro CATEGORIES — BASIC, ANIMALS, HOME, FOOD,
+  GO GO GO (transportation/), OCEAN, DINOSAURS, PLACES** — six
+  scenes each (ocean + dinosaurs currently five; sixths welcome), 46
+  category pages + 4 extras = 50 on disk. In each category exactly
+  ONE page carries **`free: true`** (its free representative: sun,
+  cat, cabin, donut, rocket, fish, longneck, egypt). buildPicker:
+  unlocked → nine headed sections, everything; locked native → ONE
+  flat headerless grid of extras + the eight free reps (13 cards
+  with BLANK). **`?free=1` forces the free tier on web** (FORCE_FREE
+  in isPro) — the only way to preview it there, and what free-tier
+  store screenshots get shot against. The pipeline mirrors
+  `art-src/coloring-pages/<pack>/` subfolders into `assets/`.
+  Stamps: **60 in 6 pack tabs**
   (CLASSICS/ANIMALS/NATURE/FOOD/SPACE/VEHICLES — `STAMP_PACKS`
   groups by id; new shapes with interior detail are stroked-outline
   because same-color strokes on a fill are invisible).

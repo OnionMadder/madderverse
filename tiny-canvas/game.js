@@ -659,7 +659,17 @@
        STAMP tool, PAPER textures, export FRAMES. Pattern fills are
        deliberately FREE — they shipped ungated and stay that way. */
 
+    /* Dev/preview override: ?free=1 shows the FREE tier on web —
+       there is no other way to see it there (web is always Pro), and
+       it's what the free-tier store screenshots get shot against. */
+    const FORCE_FREE = (function () {
+        try {
+            return new URLSearchParams(window.location.search).has("free");
+        } catch (_) { return false; }
+    })();
+
     function isPro() {
+        if (FORCE_FREE) return false;
         return !isNative() || state.proUnlocked;
     }
 
@@ -3575,28 +3585,36 @@
 
     /* ---------- 7. UI BUILDERS ---------- */
 
-    /* One section per pack. Pro packs are filtered OUT (not locked,
-       not greyed — absent) on a locked build, and empty packs render
-       nothing anywhere, so the picker looks complete at every tier.
-       Headers appear only once there are at least two visible
-       sections — a lone STARTERS header would just be noise. */
+    /* Unlocked: one headed section per pack, all pages. Locked
+       native: ONE flat headerless grid — the EXTRAS pages plus each
+       category's `free: true` representative. Pro content is absent,
+       never padlocked or greyed, so the free app reads as complete.
+       Empty packs render nothing at either tier. */
     function buildPicker() {
         const grid = $("#pickerGrid");
         grid.innerHTML = "";
         const packs = (window.TINY_CANVAS_PAGE_PACKS || []).filter(
-            function (pk) {
-                return pk.pages.length && (isPro() || !pk.pro);
+            function (pk) { return pk.pages.length; });
+        if (isPro()) {
+            const showHeaders = packs.length > 1;
+            packs.forEach(function (pk) {
+                if (showHeaders) {
+                    const h = document.createElement("h3");
+                    h.className = "picker-section";
+                    h.textContent = pk.label;
+                    grid.appendChild(h);
+                }
+                pk.pages.forEach(function (tpl) {
+                    grid.appendChild(buildPickCard(tpl));
+                });
             });
-        const showHeaders = packs.length > 1;
+            return;
+        }
         packs.forEach(function (pk) {
-            if (showHeaders) {
-                const h = document.createElement("h3");
-                h.className = "picker-section";
-                h.textContent = pk.label;
-                grid.appendChild(h);
-            }
             pk.pages.forEach(function (tpl) {
-                grid.appendChild(buildPickCard(tpl));
+                if (!pk.pro || tpl.free) {
+                    grid.appendChild(buildPickCard(tpl));
+                }
             });
         });
     }
