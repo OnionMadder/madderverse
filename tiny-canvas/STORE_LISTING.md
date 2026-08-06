@@ -69,7 +69,7 @@ Tiny Canvas is a polished coloring app for kids that gets out of the way and let
 
 ✦ WHAT'S NOT INSIDE
 • No ads. Ever.
-• No in-app purchases.
+• No subscriptions, no coins, nothing aimed at kids. The only purchase is one optional, one-time Pro upgrade for grown-ups, behind a parent gate — and everything the free app does stays free forever.
 • No accounts, no sign-in, no social features.
 • No data collection, no analytics, no advertising IDs.
 • No links out of the app without a parent gate.
@@ -159,7 +159,7 @@ Most questions answered the same way as Apple. Expected result:
 | User-generated content shared online | **No** |
 | Personally identifying information shared | **No** |
 | Location shared | **No** |
-| Digital purchases | **No** |
+| Digital purchases | **Yes** — one optional one-time IAP (Tiny Canvas Pro, $0.99), behind a parent gate |
 | Unrestricted internet access from the app | **No** |
 | Designed for Families | **Yes** |
 | Target age | **Ages 5 & Under** |
@@ -276,7 +276,12 @@ Apple lets you upload 3-10 screenshots per device class. Recommended:
 ## 16. Pricing & availability
 
 - **Price:** Free
-- **In-app purchases:** None
+- **In-app purchases:** One — `tiny_canvas_pro`, **$0.99 one-time**
+  ("Tiny Canvas Pro": +4 brushes, 24-shape stamp tool, 8 papers, 12
+  export frames). No subscriptions. Both consoles must list the IAP;
+  RevenueCat is the validation layer (see game.js "PRO BILLING" for
+  the full activation checklist — RC project, `pro` entitlement,
+  current Offering, then paste the goog_ key into RC_PUBLIC_API_KEY).
 - **Availability:** All countries (no regional restrictions)
 - **App Store Family Sharing:** Eligible (free app)
 - **Google Play countries:** All available

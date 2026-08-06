@@ -7,8 +7,22 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=27** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=28** — bump it
   on every change to style.css / templates.js / game.js.
+- **Pro BILLING is WIRED (2026-08-05) but inert until activated.** The
+  RevenueCat module + parent-gated Settings card are in game.js ("PRO
+  BILLING" section carries the full activation checklist). It needs:
+  the RC account/project (user-side), the `goog_` key pasted into
+  `RC_PUBLIC_API_KEY`, the `tiny_canvas_pro` Play product + `pro`
+  entitlement, and `npx cap sync` (the plugin is in package.json,
+  pinned ^9 for Capacitor 6 — if Capacitor is ever bumped, move the
+  plugin major with it). With the placeholder key the card never
+  shows, so no dead purchase UI ships. Privacy pages + terms +
+  STORE_LISTING were all updated for the single optional IAP.
+- **Zoom + pan shipped (2026-08-05)** — the detailed pages needed it.
+  Two fingers pinch/pan, +/- buttons (left edge), ctrl+wheel; one
+  finger always draws. See "Zoom" under Things that bite for the
+  geometry invariants.
 - **The coloring pages are REAL ART now (2026-08-05).** The 34
   hand-drawn SVG templates were replaced by 14 full-scene raster
   coloring pages (+ BLANK) — see "The raster coloring pages" below.
@@ -229,7 +243,7 @@ tiny-canvas/
 | **SCREENS** | `showScreen(name)` toggles `[hidden]` on the 5 screen containers, fires `sfxSwoosh`. Settings screen rebuilds toggle states on entry. |
 | **SETTINGS** | `loadSettings()` / `persistSettings()` (via setStorage). `syncSettingsUI()` mirrors state → DOM. |
 | **PARENT GATE** | `parentGate(label, onPass)` is the public entry point. Caches unlock state per session. `renderParentGate()` generates a random 2-digit addition + 3 distractors within ±10. Wrong shakes + shows feedback; cancel closes; correct fires the deferred callback. |
-| **AUTOSAVE** | `persistInProgress()` writes `canvas.toDataURL()` + templateId to the in-progress key. Fires every 60s while strokes are pending, on visibilitychange-hidden, on beforeunload/pagehide. `tryRestoreInProgress(templateId)` paints back the saved PNG on template re-entry. `clearInProgress()` fires on SAVE (work graduated) and CLEAR (work discarded). |
+| **AUTOSAVE** | `persistInProgress()` writes `canvasSnapshotPng()` (a bounded scale-down of the RAW canvas — strokes on transparency) + templateId to the in-progress key. ⚠ It briefly used `composePng()`, which bakes the paper + line art into an opaque image; restoring that dragged the old paper texture around as canvas pixels and double-painted the line art — fixed 2026-08-05 with the paper-texture work. Fires every 60s while strokes are pending, on visibilitychange-hidden, on beforeunload/pagehide. `tryRestoreInProgress(templateId)` paints back the saved PNG on template re-entry. `clearInProgress()` fires on SAVE (work graduated) and CLEAR (work discarded). |
 | **TOASTS** | `showSavedToast` (every save, 1.4s) and `showFirstSaveToast` (one-shot ever, 2.4s, flagged via `tinyCanvas.firstSaveCelebrated.v1`). |
 | **GALLERY** | `loadGallery` / `persistGallery` (via setStorage). `composePng()` renders canvas + line-art onto an offscreen 800×800 canvas → PNG dataURL. `saveDrawing()` writes the record + fires both toasts + clears in-progress. `openDetail`, `deleteCurrent` (parent-gated), `exportCurrent` (parent-gated; branches to nativeExport on iOS/Android, anchor-download on web). |
 | **PWA** | `beforeinstallprompt` listener — reveals `#btnInstall` on the title screen. |
@@ -555,10 +569,28 @@ App Store Connect / Play Console upload slot
   documents. If the viewport reports `innerWidth === 0`, nothing has
   laid out and no geometry assertion means anything; give the pane a
   real size first.
+- **Zoom is ONE CSS transform on `#zoomLayer`** (paper + canvas + line
+  art as a unit; see game.js "ZOOM + PAN VIEW"). It works with zero
+  changes to the drawing pipeline because every geometry consumer
+  measures live client rects, which reflect the transform — the scale
+  factors cancel. The invariants that keep it true:
+  - **`setupCanvas` must `resetView()` BEFORE measuring** — a zoomed
+    canvas box would multiply the backing store by the zoom factor.
+  - **Map client→device coords PER AXIS**, never with one shared
+    ratio: the STAGE_W/H floor of 320 makes the x and y ratios diverge
+    on viewports under 320px, and a shared ratio misplaces the fill
+    mask exactly like the innerWidth bug above (found via a 284px
+    preview pane; `artBox()` and `composePng` both carry the fix).
+  - A second finger mid-stroke cancels the partial stroke by restoring
+    the `histCanvas` snapshot; landing within 500ms of a fill/stamp
+    commit undoes it (`lastOneShotCommit`) — both are a kid reaching
+    to pinch. The one-shot undo is gated on the COMMIT timestamp so a
+    no-op tap (landed on a line) can't undo older work.
+  - The canvas is `touch-action: none`; one finger always draws.
 - **`viewport-fit=cover` is set** but `user-scalable=no` is **not** —
-  unlike Pootery. We allow pinch-zoom so kids can get close to a
-  specific area of a coloring page. Capacitor's iOS WebView respects
-  this.
+  unlike Pootery. Browser pinch still works on the non-draw screens;
+  on the canvas the app's own pinch (above) takes over. Capacitor's
+  iOS WebView respects this.
 
 ---
 
@@ -979,19 +1011,31 @@ record, never baked in; paper is visual-only (a fixed layer under the
 transparent canvas + the same tile painted by `composePng`), so fill
 semantics are untouched.
 
-**Billing is not written.** When it is: RevenueCat with ONE entitlement
-(Pootery's `initBilling` / `purchasePack` / `restorePurchases` /
-`syncEntitlements` is the reference, minus four fifths of it), a
-"Restore Purchases" button because both stores expect one, and the
-purchase success handler just sets `tinyCanvas.pro.v1` = "1" +
-`revealProUI()`. The Settings upsell card (parent-gated) gets built
-WITH billing — building purchase UI before it can purchase invites an
-Apple rejection for non-functional elements.
+**Billing is WIRED (2026-08-05), inert until activated.** The game.js
+"PRO BILLING" section holds `initBilling` / `syncEntitlements` /
+`purchasePro` / `restoreProPurchases` / `unlockPro` / `syncProCard` +
+the full activation checklist (RC project → `goog_` key into
+`RC_PUBLIC_API_KEY` → Play product `tiny_canvas_pro` @ $0.99 → RC
+entitlement `pro` in a current Offering → `npx cap sync`). One product,
+one entitlement, anonymous RC user (no accounts), price string pulled
+live from the store. The parent-gated Settings card shows ONLY when
+native + locked + the store answered — with the placeholder key it
+never renders, so no dead purchase UI can ship. `findProPackage` reads
+`getOfferings()` correctly ({current, all} — NO `.offerings` wrapper;
+that shape bug once blocked every Pootery purchase). Plugin:
+`@revenuecat/purchases-capacitor` **^9** (the Capacitor-6-compatible
+major — Pootery runs ^13 on Capacitor 8; move this in lockstep with
+any Capacitor bump).
 
-⚠ `privacy/index.html` and `STORE_LISTING.md` both currently state **"no
-in-app purchases."** Both need updating before any billing ships. The
-store listing copy deliberately still describes the FREE tier (6
-brushes, no stamps) — that is what an unpurchased native install shows.
+The privacy pages (`privacy/index.html`, `legal/privacy.html`),
+`legal/terms.html`, the in-app ABOUT blurb and `STORE_LISTING.md` were
+all updated 2026-08-05 for the single optional IAP. ⚠ Two submission-
+time flags for Onion: the Play **Data safety** form and Apple's **App
+Privacy** currently plan "no data collected" — RevenueCat receives the
+store receipt + a random per-install id, so check the current
+RC-in-kids-apps guidance when filling those forms; and the store
+listing description deliberately still describes the FREE tier (6
+brushes, no stamps) — that is what an unpurchased install shows.
 
 ## Better coloring-page art — RESOLVED 2026-08-05
 
@@ -1066,9 +1110,10 @@ Don't re-plan these — they're done and verified:
    `scripts/make-cover.py` (half-colored with the fill tool's own
    region model — re-run the script to regenerate). Remaining knock-on:
    the staged store screenshots still predate the new pages entirely.
-4. **Pro billing** — see "Tiny Canvas Pro". The CONTENT is built
-   (brushes/stamps/papers/frames, 2026-08-05); RevenueCat + the
-   parent-gated Settings upsell card are what remain.
+4. **Pro billing** — CODE DONE 2026-08-05 (RevenueCat module +
+   parent-gated Settings card, see "Tiny Canvas Pro"). Remaining is
+   user-side activation: RC account, key paste, Play product,
+   entitlement, cap sync, license-tester purchase test.
 5. ~~**Stamps**~~ — DONE 2026-08-05 (24 shapes; spec said 60+, so
    more shapes is still an open widening).
 6. **More templates** — read the region-audit section before

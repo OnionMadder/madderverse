@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=27" />
+    <link rel="stylesheet" href="style.css?v=28" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -135,23 +135,44 @@
 
     <div class="draw-stack">
 
-        <!-- Paper texture layer (Pro) — sits UNDER the transparent
-             canvas; applyPaper() sets its color + tile. Purely visual:
-             fill and export are unaffected (composePng paints the same
-             tile itself). -->
-        <div class="paper-layer" id="paperLayer" aria-hidden="true"></div>
+        <!-- Zoom layer — paper + canvas + line art zoom and pan as one
+             unit via a CSS transform (applyView in game.js). Every
+             geometry consumer measures live client rects, which
+             reflect the transform, so stroke mapping / fill mask /
+             export all compensate without special cases. Everything
+             OUTSIDE this wrapper (buttons, onion, scribble, drawer)
+             stays unzoomed chrome. -->
+        <div class="zoom-layer" id="zoomLayer">
 
-        <!-- The canvas the kid draws ON. Fills the entire viewport so
-             strokes can happen anywhere — not constrained to a small
-             centered box. Logical size matches viewport at setup time.
-             Renders below the line-art overlay. -->
-        <canvas id="drawCanvas" width="800" height="800"
-                aria-label="Coloring canvas. Drag to draw."></canvas>
+            <!-- Paper texture layer (Pro) — sits UNDER the transparent
+                 canvas; applyPaper() sets its color + tile. Purely visual:
+                 fill and export are unaffected (composePng paints the same
+                 tile itself). -->
+            <div class="paper-layer" id="paperLayer" aria-hidden="true"></div>
 
-        <!-- Line-art SVG sits ABOVE the canvas at a fixed centered size,
-             pointer-events: none so taps go through to the canvas.
-             innerHTML swapped in by loadTemplate(). -->
-        <div class="line-art" id="lineArt" aria-hidden="true"></div>
+            <!-- The canvas the kid draws ON. Fills the entire viewport so
+                 strokes can happen anywhere — not constrained to a small
+                 centered box. Logical size matches viewport at setup time.
+                 Renders below the line-art overlay. -->
+            <canvas id="drawCanvas" width="800" height="800"
+                    aria-label="Coloring canvas. Drag to draw."></canvas>
+
+            <!-- Line-art sits ABOVE the canvas at a fixed centered size,
+                 pointer-events: none so taps go through to the canvas.
+                 innerHTML swapped in by loadTemplate(). -->
+            <div class="line-art" id="lineArt" aria-hidden="true"></div>
+
+        </div>
+
+        <!-- Zoom controls — the detailed coloring pages need a closer
+             look. Pinch works too (two fingers); these are the
+             discoverable/desktop path. -->
+        <div class="zoom-ctrls" aria-label="Zoom">
+            <button class="canvas-overlay-btn zoom-btn" id="zoomInBtn"
+                    type="button" aria-label="Zoom in">+</button>
+            <button class="canvas-overlay-btn zoom-btn" id="zoomOutBtn"
+                    type="button" aria-label="Zoom out" disabled>&minus;</button>
+        </div>
 
         <!-- ============================================================
              IDLE SCRIBBLE
@@ -648,12 +669,34 @@
             </button>
         </div>
 
+        <!-- Pro upgrade card — the ONLY place Pro is offered, per the
+             no-pressure rule (nothing in the kid's flow). Hidden unless
+             the build is native + locked + the store answered
+             (syncProCard). Both buttons are parent-gated. -->
+        <div class="settings-card" id="proCard" hidden>
+            <h3 class="settings-section">TINY CANVAS PRO</h3>
+            <p class="settings-blurb">
+                A one-time upgrade for grown-ups: 4 extra brushes
+                (spray, rainbow, glow, smudge), a stamp tool with 24
+                shapes, 8 paper textures and 12 photo frames. No
+                subscriptions, no ads &mdash; and everything the free
+                app does stays free forever.
+            </p>
+            <button class="big-btn primary" id="btnBuyPro" type="button">
+                <span class="btn-label">UNLOCK PRO &mdash; <span id="proPrice">$0.99</span></span>
+            </button>
+            <button class="big-btn" id="btnRestorePro" type="button">
+                <span class="btn-label">RESTORE PURCHASES</span>
+            </button>
+        </div>
+
         <div class="settings-card">
             <h3 class="settings-section">ABOUT</h3>
             <p class="settings-blurb">
                 Tiny Canvas is made by Mad Sundar LLC. We do not collect
                 personal information from children. There are no ads and
-                no in-app purchases.
+                no subscriptions; the only purchase is the optional
+                one-time Pro upgrade, kept behind a parent gate.
             </p>
             <p class="settings-blurb settings-version">
                 Tiny Canvas v1.0
@@ -731,8 +774,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=27"></script>
-<script src="game.js?v=27"></script>
+<script src="templates.js?v=28"></script>
+<script src="game.js?v=28"></script>
 
 </body>
 </html>

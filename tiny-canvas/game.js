@@ -677,6 +677,203 @@
         });
     }
 
+    /* ---------- 1c. PRO BILLING (RevenueCat) ----------
+
+       ONE product, ONE entitlement — the whole reason Pro is a single
+       unlock (see CLAUDE.md). Modeled on Pootery's billing module,
+       minus four fifths of it: no pack mapping, no Supabase user ids
+       (Tiny Canvas has no accounts — RC's anonymous app-user id plus
+       Restore Purchases covers device moves, and Apple Kids forbids
+       accounts anyway).
+
+       Activation checklist (all user-side, mirrors Pootery's):
+         1. RC dashboard: new project -> Android app with package id
+            org.madderverse.tinycanvas -> copy the PUBLIC SDK key
+            (goog_...) into RC_PUBLIC_API_KEY below. (iOS later: add
+            an iOS app, appl_... key, branch on platform.)
+         2. Play Console -> Monetize -> In-app products -> create
+            product id `tiny_canvas_pro`, $0.99, Active.
+         3. RC dashboard: add product `tiny_canvas_pro`, create
+            entitlement `pro`, attach the product to it, and put the
+            product in a "current" Offering.
+         4. `npx cap sync` (registers the native module — without it
+            window.Capacitor.Plugins.Purchases never exists and
+            billing silently no-ops).
+         5. Test via Play Console License Testing before production.
+
+       While the key below is the REPLACE_ placeholder, _rcReady stays
+       false and the Settings Pro card never shows — so an unconfigured
+       build carries no dead purchase UI (Apple rejects those). Web
+       never shows it either: isPro() is already true there. */
+
+    const RC_PUBLIC_API_KEY  = "goog_REPLACE_WITH_TINY_CANVAS_KEY";
+    const RC_PRO_ENTITLEMENT = "pro";
+    const RC_PRO_PRODUCT_ID  = "tiny_canvas_pro";
+
+    function rcPlugin() {
+        return window.Capacitor &&
+               window.Capacitor.Plugins &&
+               window.Capacitor.Plugins.Purchases;
+    }
+
+    function rcConfigured() {
+        return RC_PUBLIC_API_KEY &&
+               RC_PUBLIC_API_KEY.indexOf("REPLACE_") < 0;
+    }
+
+    let _rcReady       = false;
+    let _rcPriceString = "";    /* store-localized, e.g. "$0.99" */
+
+    /* Find the Pro package in an offerings result. getOfferings()
+       resolves to PurchasesOfferings DIRECTLY ({ current, all }) —
+       there is NO `.offerings` wrapper; reading one was the Pootery
+       bug that made every pack report "not available." Prefer the
+       current offering, fall back to scanning all of them so a
+       missing "current" pointer can't block the product. */
+    function findProPackage(offResult) {
+        const matches = function (p) {
+            return p && p.product &&
+                   p.product.identifier === RC_PRO_PRODUCT_ID;
+        };
+        let pkgs = (offResult && offResult.current &&
+                    offResult.current.availablePackages) || [];
+        if (!pkgs.some(matches) && offResult && offResult.all) {
+            Object.keys(offResult.all).forEach(function (k) {
+                const o = offResult.all[k];
+                if (o && o.availablePackages) {
+                    pkgs = pkgs.concat(o.availablePackages);
+                }
+            });
+        }
+        return pkgs.find(matches) || null;
+    }
+
+    async function initBilling() {
+        const P = rcPlugin();
+        if (!P) return;                /* web build / no native bridge */
+        if (!rcConfigured()) {
+            console.warn("[TinyCanvas] RC_PUBLIC_API_KEY not set — billing inert");
+            return;
+        }
+        try {
+            /* No appUserID — RC generates an anonymous one and keeps
+               it stable per install; Restore covers reinstalls. */
+            await P.configure({ apiKey: RC_PUBLIC_API_KEY });
+            _rcReady = true;
+            await syncEntitlements();
+            /* Prefetch the price so the card can show the store's own
+               localized string rather than a hardcoded "$0.99". */
+            try {
+                const off = await P.getOfferings();
+                const pkg = findProPackage(off);
+                if (pkg && pkg.product && pkg.product.priceString) {
+                    _rcPriceString = pkg.product.priceString;
+                }
+            } catch (_) { /* price is cosmetic — card falls back */ }
+        } catch (e) {
+            console.warn("[TinyCanvas] RC init failed", e);
+        }
+        syncProCard();
+    }
+
+    /* Pull entitlements from RC; an active `pro` unlocks. Never
+       auto-relocks — same call Pootery made: a lapsed entitlement
+       (refund) leaving a stale local unlock is rare and harmless
+       next to yanking content out of a kid's hands mid-drawing. */
+    async function syncEntitlements() {
+        const P = rcPlugin();
+        if (!P || !_rcReady) return;
+        try {
+            const result = await P.getCustomerInfo();
+            const info   = result && result.customerInfo;
+            const active = (info && info.entitlements &&
+                            info.entitlements.active) || {};
+            if (active[RC_PRO_ENTITLEMENT]) unlockPro();
+        } catch (e) {
+            console.warn("[TinyCanvas] entitlement sync failed", e);
+        }
+    }
+
+    /* The single switch billing flips. Idempotent. */
+    function unlockPro() {
+        if (state.proUnlocked) { syncProCard(); return; }
+        state.proUnlocked = true;
+        setStorage(PRO_KEY, "1");
+        revealProUI();
+        applyPaper();
+        syncProCard();
+    }
+
+    async function purchasePro() {
+        const P = rcPlugin();
+        if (!P || !_rcReady) {
+            /* The card only shows when _rcReady, so reaching here
+               means the store stopped answering mid-session. */
+            alert("Couldn't reach the store just now. Check your " +
+                  "connection and try again.");
+            return;
+        }
+        try {
+            const off = await P.getOfferings();
+            const pkg = findProPackage(off);
+            if (!pkg) {
+                console.warn("[TinyCanvas] no RC package for " +
+                             RC_PRO_PRODUCT_ID);
+                alert("The upgrade isn't available right now. " +
+                      "Try again later.");
+                return;
+            }
+            const purchase = await P.purchasePackage({ aPackage: pkg });
+            const info   = purchase && purchase.customerInfo;
+            const active = (info && info.entitlements &&
+                            info.entitlements.active) || {};
+            if (active[RC_PRO_ENTITLEMENT]) {
+                unlockPro();
+                alert("Tiny Canvas Pro unlocked! New brushes, stamps, " +
+                      "papers and frames are ready in the drawing tools.");
+            }
+        } catch (e) {
+            if (e && e.userCancelled) return;
+            console.warn("[TinyCanvas] purchase failed", e);
+            alert("The purchase didn't go through. Nothing was " +
+                  "charged — try again, or use Restore Purchases if " +
+                  "you've bought Pro before.");
+        }
+    }
+
+    /* Both stores expect a Restore button next to any purchase. */
+    async function restoreProPurchases() {
+        const P = rcPlugin();
+        if (!P || !_rcReady) {
+            alert("Restore is only available in the installed app.");
+            return;
+        }
+        try {
+            await P.restorePurchases();
+            await syncEntitlements();
+            alert(state.proUnlocked
+                ? "Purchases restored — Pro is unlocked."
+                : "No previous purchase was found for this Google " +
+                  "account.");
+        } catch (e) {
+            console.warn("[TinyCanvas] restore failed", e);
+            alert("Restore failed. Make sure you're signed in to the " +
+                  "same store account that bought Pro.");
+        }
+    }
+
+    /* The parent-facing card in Settings. Shows ONLY on a native
+       build that is locked AND has a live store connection — web
+       never sees it (already Pro), an unconfigured build never sees
+       it (no dead buttons), and a purchased build hides it again. */
+    function syncProCard() {
+        const card = $("#proCard");
+        if (!card) return;
+        card.hidden = !(isNative() && !isPro() && _rcReady);
+        const price = $("#proPrice");
+        if (price && _rcPriceString) price.textContent = _rcPriceString;
+    }
+
     /* True if the current tool lays down a stroke in color — i.e.
        everything except the eraser and the two one-shot tap tools
        (fill, stamp). Stamp still counts for SIZE purposes though —
@@ -1126,6 +1323,12 @@
            computed with dpr, so taps seeded in the wrong region and the
            coloring page appeared to leak. Fall back to innerWidth only
            when the canvas has no box yet (screen still hidden at init). */
+        /* ⚠ Reset the zoom BEFORE measuring — the canvas's box
+           reflects the #zoomLayer transform, and sizing the backing
+           store from a zoomed box would multiply it by the zoom
+           factor. A resize/rotate resetting the view is also the
+           sane UX. */
+        resetView();
         const box = canvas.getBoundingClientRect();
         STAGE_W = Math.max(320, Math.round(box.width)  || window.innerWidth  || 800);
         STAGE_H = Math.max(320, Math.round(box.height) || window.innerHeight || 800);
@@ -1174,6 +1377,136 @@
         if (!cr.width || !cr.height) return { x: e.clientX, y: e.clientY };
         return { x: (e.clientX - cr.left) * (STAGE_W / cr.width),
                  y: (e.clientY - cr.top)  * (STAGE_H / cr.height) };
+    }
+
+    /* ---------- 4b. ZOOM + PAN VIEW ----------
+
+       The raster coloring pages are dense full scenes — small regions
+       need a closer look. The view is ONE CSS transform on #zoomLayer
+       (paper + canvas + line art move as a unit). No drawing code
+       changes: getPos, the fill mask and composePng all measure live
+       client rects, which reflect the transform, so the scale factors
+       cancel everywhere. fillGeomKey even self-invalidates on zoom
+       because the measured rects change.
+
+       ⚠ The one consumer that must NOT see the transform is
+       setupCanvas — it sizes the backing store from the canvas's box,
+       and a zoomed box would double the store. It calls resetView()
+       before measuring.
+
+       Gestures: two fingers pinch-zoom + pan (one finger always
+       draws — drawing is the point); +/- buttons for the
+       discoverable/desktop path; ctrl+wheel zooms, plain wheel pans
+       when zoomed. A second finger landing mid-stroke cancels the
+       partial stroke (restored from the history snapshot); landing
+       right after a fill/stamp tap undoes it — both are the kid
+       reaching to pinch, not two intentional marks. */
+
+    const ZOOM_MIN = 1, ZOOM_MAX = 4, ZOOM_STEP = 1.5;
+    const view = { s: 1, tx: 0, ty: 0 };
+    let pinch = null;               /* active two-finger gesture */
+    const activePointers = new Map();
+    let lastOneShotCommit = 0;      /* fill/stamp commit time, for the
+                                       pinch-undo grace window */
+
+    function applyView() {
+        view.s = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, view.s));
+        /* Clamp pan so the content always covers the viewport — no
+           bare void beyond the paper's edge. */
+        const minTx = STAGE_W * (1 - view.s);
+        const minTy = STAGE_H * (1 - view.s);
+        view.tx = Math.min(0, Math.max(minTx, view.tx));
+        view.ty = Math.min(0, Math.max(minTy, view.ty));
+        const layer = $("#zoomLayer");
+        if (layer) {
+            layer.style.transform = "translate(" + view.tx + "px, " +
+                view.ty + "px) scale(" + view.s + ")";
+        }
+        syncZoomButtons();
+    }
+
+    /* Zoom by `factor` keeping the content under client point (cx,cy)
+       stationary. */
+    function zoomAt(factor, cx, cy) {
+        const s0 = view.s;
+        const s1 = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s0 * factor));
+        if (s1 === s0) { syncZoomButtons(); return; }
+        const px = (cx - view.tx) / s0;
+        const py = (cy - view.ty) / s0;
+        view.s  = s1;
+        view.tx = cx - px * s1;
+        view.ty = cy - py * s1;
+        applyView();
+    }
+
+    function resetView() {
+        view.s = 1; view.tx = 0; view.ty = 0;
+        applyView();
+    }
+
+    function syncZoomButtons() {
+        const zin  = $("#zoomInBtn");
+        const zout = $("#zoomOutBtn");
+        if (zin)  zin.disabled  = view.s >= ZOOM_MAX - 0.001;
+        if (zout) zout.disabled = view.s <= ZOOM_MIN + 0.001;
+    }
+
+    /* A second finger arrived while a stroke was in flight: put the
+       canvas back to the pre-stroke snapshot (beginHistoryCapture
+       already blitted it into histCanvas) and drop the stroke. Works
+       for wet-layer AND direct brushes — the snapshot restore covers
+       both. */
+    function cancelStrokeForPinch() {
+        if (!state.isDrawing) return;
+        state.isDrawing = false;
+        if (histCanvas) {
+            ctx2d.save();
+            ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+            ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+            ctx2d.drawImage(histCanvas, 0, 0);
+            ctx2d.restore();
+        }
+        clearStrokeLayer();
+    }
+
+    function beginPinch() {
+        cancelStrokeForPinch();
+        /* A fill/stamp that just committed was the leading edge of
+           this pinch — take it back. Guarded by the commit timestamp
+           so a no-op tap (landed on a line) can't undo older work. */
+        if (Date.now() - lastOneShotCommit < 500) {
+            lastOneShotCommit = 0;
+            undo();
+        }
+        const pts = Array.from(activePointers.values());
+        const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+        pinch = {
+            d0:   Math.max(1, Math.sqrt(dx * dx + dy * dy)),
+            s0:   view.s,
+            tx0:  view.tx,
+            ty0:  view.ty,
+            mid0: { x: (pts[0].x + pts[1].x) / 2,
+                    y: (pts[0].y + pts[1].y) / 2 }
+        };
+    }
+
+    function updatePinch() {
+        if (!pinch || activePointers.size < 2) return;
+        const pts = Array.from(activePointers.values());
+        const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+        const d   = Math.max(1, Math.sqrt(dx * dx + dy * dy));
+        const mid = { x: (pts[0].x + pts[1].x) / 2,
+                      y: (pts[0].y + pts[1].y) / 2 };
+        const s1 = Math.min(ZOOM_MAX,
+                   Math.max(ZOOM_MIN, pinch.s0 * (d / pinch.d0)));
+        /* Content point that was under the original midpoint follows
+           the live midpoint — zoom + pan in one gesture. */
+        const px = (pinch.mid0.x - pinch.tx0) / pinch.s0;
+        const py = (pinch.mid0.y - pinch.ty0) / pinch.s0;
+        view.s  = s1;
+        view.tx = mid.x - px * s1;
+        view.ty = mid.y - py * s1;
+        applyView();
     }
 
     /* ---------- 4a. FILL MASK + FLOOD FILL ----------
@@ -1287,13 +1620,20 @@
             function artBox() {
                 const aR = art.getBoundingClientRect();
                 const cR = canvas.getBoundingClientRect();
-                if (!aR.width || !cR.width) return null;
-                /* CSS px -> device px, same ratio the kid's strokes use. */
-                const scale = W / cR.width;
-                return { x: (aR.left - cR.left) * scale,
-                         y: (aR.top  - cR.top)  * scale,
-                         w: aR.width  * scale,
-                         h: aR.height * scale };
+                if (!aR.width || !cR.width || !cR.height) return null;
+                /* CSS px -> device px, PER AXIS — the same ratios
+                   getPos and the flood-fill seed use. A single shared
+                   ratio assumes the backing store is a uniform scale
+                   of the CSS box, and the STAGE_W/H floor of 320
+                   breaks that on viewports under 320px: x and y
+                   ratios diverge and the mask lands offset from the
+                   art, which reads as "the page leaks". */
+                const sx = W / cR.width;
+                const sy = H / cR.height;
+                return { x: (aR.left - cR.left) * sx,
+                         y: (aR.top  - cR.top)  * sy,
+                         w: aR.width  * sx,
+                         h: aR.height * sy };
             }
 
             function threshold() {
@@ -1688,6 +2028,7 @@
                the rect is exclusive at the far edge. */
             sMaxX += 1; sMaxY += 1;
             commitHistory();
+            lastOneShotCommit = Date.now();
 
             state.dirty = true;
             updateStatus();
@@ -2002,6 +2343,7 @@
         ctx2d.restore();
         growBounds(p.x, p.y, size / 2 + STROKE_BOUNDS_SLACK);
         commitHistory();
+        lastOneShotCommit = Date.now();
         state.dirty = true;
         updateStatus();
         markInProgressDirty();
@@ -2401,6 +2743,28 @@
         canvas.addEventListener("pointerup",   onPointerUp);
         canvas.addEventListener("pointercancel", onPointerUp);
         canvas.addEventListener("pointerleave",  onPointerUp);
+        /* Desktop zoom: ctrl/cmd+wheel zooms at the cursor, plain
+           wheel pans while zoomed in. */
+        canvas.addEventListener("wheel", function (e) {
+            e.preventDefault();
+            if (e.ctrlKey || e.metaKey) {
+                zoomAt(Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
+            } else if (view.s > 1) {
+                view.tx -= e.deltaX;
+                view.ty -= e.deltaY;
+                applyView();
+            }
+        }, { passive: false });
+        const zin  = $("#zoomInBtn");
+        const zout = $("#zoomOutBtn");
+        if (zin) zin.addEventListener("click", function () {
+            zoomAt(ZOOM_STEP, window.innerWidth / 2, window.innerHeight / 2);
+            sfxTap();
+        });
+        if (zout) zout.addEventListener("click", function () {
+            zoomAt(1 / ZOOM_STEP, window.innerWidth / 2, window.innerHeight / 2);
+            sfxTap();
+        });
         /* Eye tracking lives at document level so the onion looks at
            the cursor even when it's over the tool rail or titlebar. */
         document.addEventListener("pointermove", onionTrackGaze, { passive: true });
@@ -2409,6 +2773,11 @@
     function onPointerDown(e) {
         e.preventDefault();
         try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        /* Two fingers = pinch zoom/pan, never two marks. The second
+           finger cancels any in-flight stroke (see beginPinch). */
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (activePointers.size === 2) { beginPinch(); return; }
+        if (activePointers.size > 2 || pinch) return;
         /* The first real gesture retires the coach — a kid who has
            already started drawing does not need to be told how. */
         dismissCoach();
@@ -2452,6 +2821,11 @@
     }
 
     function onPointerMove(e) {
+        if (activePointers.has(e.pointerId)) {
+            activePointers.set(e.pointerId,
+                               { x: e.clientX, y: e.clientY });
+        }
+        if (pinch) { updatePinch(); return; }
         if (!state.isDrawing) return;
         const brush = currentBrush();
         const size  = activeSize();
@@ -2509,7 +2883,14 @@
         state.lastY = p.y;
     }
 
-    function onPointerUp() {
+    function onPointerUp(e) {
+        if (e && e.pointerId !== undefined) {
+            activePointers.delete(e.pointerId);
+        }
+        if (pinch) {
+            if (activePointers.size < 2) pinch = null;
+            return;
+        }
         const wasDrawing = state.isDrawing;
         if (state.isDrawing && state.settings.smoothing) {
             /* Finish the smoothed stroke by drawing one final segment
@@ -2555,6 +2936,7 @@
         }
         state.templateId   = tpl.id;
         state.templateName = tpl.name;
+        resetView();
         const overlay = $("#lineArt");
         if (tpl.image) {
             /* Raster coloring page. Built as an element (not innerHTML)
@@ -3123,6 +3505,7 @@
         if (sfx)       sfx.checked       = !!state.settings.sfx;
         if (music)     music.checked     = !!state.settings.music;
         if (locale)    locale.value      = state.settings.locale || "en";
+        syncProCard();
     }
 
     function attachSettingsHandlers() {
@@ -3313,13 +3696,39 @@
         inProgressDirty = true;
     }
 
+    /* Bounded snapshot of ONLY the kid's strokes — transparency
+       preserved, no paper, no line art. This used to be composePng(),
+       which bakes the paper color AND the line art into an opaque
+       image; restoring that back onto the transparent canvas dragged
+       yesterday's paper texture around as canvas pixels (switch to
+       SKY paper and the old KRAFT tile is still baked into the
+       drawing) and double-painted the line art at whatever geometry
+       the old viewport had. Restore needs the same thing the canvas
+       held: strokes on transparency. */
+    function canvasSnapshotPng() {
+        const cw = canvas.width, ch = canvas.height;
+        if (!cw || !ch) return null;
+        const aspect = cw / ch;
+        let outW, outH;
+        if (aspect >= 1) {
+            outW = SAVE_LONG_SIDE;
+            outH = Math.round(SAVE_LONG_SIDE / aspect);
+        } else {
+            outH = SAVE_LONG_SIDE;
+            outW = Math.round(SAVE_LONG_SIDE * aspect);
+        }
+        const off = document.createElement("canvas");
+        off.width = outW; off.height = outH;
+        off.getContext("2d").drawImage(canvas, 0, 0, outW, outH);
+        return off.toDataURL("image/png");
+    }
+
     async function persistInProgress() {
         if (!inProgressDirty) return;
         if (!state.templateId) return;
         try {
-            /* Use composePng so the autosaved PNG is bounded —
-               viewport canvas at native size would blow localStorage. */
-            const png = await composePng();
+            const png = canvasSnapshotPng();
+            if (!png) return;
             const rec = {
                 templateId:   state.templateId,
                 templateName: state.templateName,
@@ -3522,11 +3931,14 @@
                 resolve(off.toDataURL("image/png"));
                 return;
             }
-            const scale = outW / canvasRect.width;
-            const laX = (artRect.left - canvasRect.left) * scale;
-            const laY = (artRect.top  - canvasRect.top)  * scale;
-            const laW = artRect.width  * scale;
-            const laH = artRect.height * scale;
+            /* Per-axis ratios — see the matching note in artBox():
+               the STAGE floor can make x and y diverge. */
+            const scaleX = outW / canvasRect.width;
+            const scaleY = outH / canvasRect.height;
+            const laX = (artRect.left - canvasRect.left) * scaleX;
+            const laY = (artRect.top  - canvasRect.top)  * scaleY;
+            const laW = artRect.width  * scaleX;
+            const laH = artRect.height * scaleY;
 
             /* Raster page — the <img> is drawable as-is. */
             if (art.tagName === "IMG") {
@@ -4072,6 +4484,19 @@
         revealProUI();
         buildPaperButtons();
         applyPaper();
+        /* Billing: deliberately NOT awaited — boot must not block on
+           the store network. The cached PRO_KEY already applied above;
+           RC confirms/unlocks in the background. No-op on web and on
+           builds without a real RC key. */
+        initBilling();
+        const buyPro = $("#btnBuyPro");
+        if (buyPro) buyPro.addEventListener("click", function () {
+            parentGate("purchase", purchasePro);
+        });
+        const restorePro = $("#btnRestorePro");
+        if (restorePro) restorePro.addEventListener("click", function () {
+            parentGate("restore", restoreProPurchases);
+        });
 
         $("#btnStart").addEventListener("click", async function () {
             /* START COLORING goes straight to a blank canvas instead of

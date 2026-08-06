@@ -550,13 +550,16 @@ coloring pages").
 
 **The Pro value-pass content is BUILT (2026-08-05)**: 4 new brushes,
 a 24-shape STAMP tool, 8 paper textures, 12 export frames — gated by
-`isPro()` (always true on web = the showcase; native waits on the
-unbuilt RevenueCat billing to set `tinyCanvas.pro.v1`). Pattern fills
-stay free forever. Details + locked decisions in the game's CLAUDE.md.
+`isPro()` (always true on web = the showcase). Pattern fills stay
+free forever. **Billing is WIRED the same day** (RevenueCat, one
+`pro` entitlement, parent-gated Settings card; inert until Onion
+creates the RC project and pastes the key — checklist in game.js) and
+**pinch/button zoom shipped** for the detailed pages. Details +
+locked decisions in the game's CLAUDE.md.
 
 Its own cache-bust convention applies: **bump `?v=N` in
 `tiny-canvas/index.html` on every change** to `style.css`,
-`templates.js` or `game.js` (currently v27).
+`templates.js` or `game.js` (currently v28).
 
 ---
 

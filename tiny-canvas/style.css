@@ -561,6 +561,11 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     z-index: 5;
     aspect-ratio: auto;        /* override the 1:1 from base styles */
     display: block;
+    /* All touch gestures belong to the app: one finger draws, two
+       fingers pinch-zoom/pan (see the ZOOM + PAN VIEW section in
+       game.js). Without this some browsers claim the pinch for
+       viewport zoom mid-gesture. */
+    touch-action: none;
 }
 
 /* Line art renders centered on top of the canvas. Kid sees the
@@ -2265,6 +2270,48 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    the SIZE row for FILL (or the pattern row for brushes) left an empty
    labelled row sitting there. Author-level rule to win it back. */
 .tool-row[hidden] { display: none !important; }
+
+/* ---------- Zoom layer + controls ---------- */
+
+/* Wraps paper + canvas + line art; applyView() drives the transform.
+   position:fixed descendants inside a transformed element resolve
+   against IT (a transform makes a containing block), and since this
+   wrapper is itself fixed inset:0, their geometry is unchanged at
+   scale 1. z-index 5 keeps the whole zoomed unit under the floating
+   chrome (titlebar 50, undo 55, PAGES 60). */
+.zoom-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    transform-origin: 0 0;
+    will-change: transform;
+}
+
+.zoom-ctrls {
+    position: fixed;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 55;
+}
+
+.zoom-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+    line-height: 1;
+    display: grid;
+    place-items: center;
+    padding: 0;
+}
+
+.zoom-btn[disabled] {
+    opacity: 0.35;
+    pointer-events: none;
+}
 
 /* ---------- Pro: paper layer, frame row ---------- */
 
