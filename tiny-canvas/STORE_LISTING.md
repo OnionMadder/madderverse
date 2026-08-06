@@ -278,7 +278,7 @@ Apple lets you upload 3-10 screenshots per device class. Recommended:
 - **Price:** Free
 - **In-app purchases:** One — `tiny_canvas_pro`, **$0.99 one-time**
   ("Tiny Canvas Pro": all 8 coloring-page packs — BASIC, ANIMALS,
-  HOME, FOOD, GO GO GO, OCEAN, DINOSAURS, PLACES — 46 scenes vs. the
+  HOME, FOOD, GO GO GO, OCEAN, DINOSAURS, PLACES — 48 scenes vs. the
   free tier's 12, +4 brushes, 60-shape stamp tool, 8 papers, 12
   export frames). No subscriptions. Both consoles must list the IAP;
   RevenueCat is the validation layer (see game.js "PRO BILLING" for

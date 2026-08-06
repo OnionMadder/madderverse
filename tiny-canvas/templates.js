@@ -117,7 +117,8 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "shipwreck", name: "SHIPWRECK",  image: "assets/coloring-pages/ocean/shipwreck.png" },
             { id: "reef",      name: "CORAL REEF", image: "assets/coloring-pages/ocean/reef.png" },
             { id: "mermaids",  name: "MERMAIDS",   image: "assets/coloring-pages/ocean/mermaids.png" },
-            { id: "atlantis",  name: "ATLANTIS",   image: "assets/coloring-pages/ocean/atlantis.png" }
+            { id: "atlantis",  name: "ATLANTIS",   image: "assets/coloring-pages/ocean/atlantis.png" },
+            { id: "treasure",  name: "TREASURE",   image: "assets/coloring-pages/ocean/treasure.png" }
         ]
     },
     {
@@ -127,7 +128,8 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "stego-family", name: "STEGO FAMILY", image: "assets/coloring-pages/dinosaurs/family.png" },
             { id: "trex",         name: "T-REX",        image: "assets/coloring-pages/dinosaurs/predator.png" },
             { id: "raptor",       name: "RAPTOR",       image: "assets/coloring-pages/dinosaurs/feathered.png" },
-            { id: "dino-parade",  name: "DINO PARADE",  image: "assets/coloring-pages/dinosaurs/herd.png" }
+            { id: "dino-parade",  name: "DINO PARADE",  image: "assets/coloring-pages/dinosaurs/herd.png" },
+            { id: "dino-meadow",  name: "DINO MEADOW",  image: "assets/coloring-pages/dinosaurs/pastoral.png" }
         ]
     },
     {

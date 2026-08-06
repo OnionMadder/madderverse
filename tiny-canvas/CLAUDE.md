@@ -14,8 +14,9 @@ via Capacitor.
   **EXTRAS pack (pro:false — BLANK + beans, monster, robot lab, dog
   choir)** and **eight pro CATEGORIES — BASIC, ANIMALS, HOME, FOOD,
   GO GO GO (transportation/), OCEAN, DINOSAURS, PLACES** — six
-  scenes each (ocean + dinosaurs currently five; sixths welcome), 46
-  category pages + 4 extras = 50 on disk. In each category exactly
+  scenes each (ocean + dinosaurs got their sixths — TREASURE and
+  DINO MEADOW — on 2026-08-06), 48 category pages + 4 extras = 52 on
+  disk. In each category exactly
   ONE page carries **`free: true`** (its free representative: sun,
   cat, cabin, donut, rocket, fish, longneck, egypt). buildPicker:
   unlocked → nine headed sections, everything; locked native → ONE
