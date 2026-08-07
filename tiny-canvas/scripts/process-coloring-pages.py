@@ -42,12 +42,21 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC  = os.path.join(ROOT, "art-src", "coloring-pages")
 OUT  = os.path.join(ROOT, "assets", "coloring-pages")
+THUMBS = os.path.join(OUT, "thumbs")
 
 TARGET_W     = 1800
 LO, HI       = 100, 225
 INK          = (0x1c, 0x22, 0x26)   # --line-ink
 MIN_INK_AREA = 30       # px at TARGET_W scale
 MASK_THRESH  = 96       # game.js FILL_BOUNDARY_ALPHA
+
+# Picker thumbnails. The picker builds a card per page at init, and the
+# cards live on a hidden screen — a hidden <img> can never intersect the
+# viewport, so loading="lazy" does NOT defer it and the browser fetches
+# every page up front. At full size that measured 6.2MB over the wire and
+# 52 x 1800x982 = 92 megapixels (~351MB of RGBA) decoded, to paint
+# thumbnails ~150px wide. These are what the picker actually loads.
+THUMB_W      = 360      # ~2x the largest card at 3x DPR
 MIN_REGION   = 64       # ignore sub-64px cells in the audit count
 
 LUT = np.zeros(256, dtype=np.uint8)
@@ -97,6 +106,25 @@ def audit(alpha, tag):
         tag, len(big), MIN_REGION, (100.0 * big.max() / total) if len(big) else 0)
 
 
+def write_thumb(alpha, name):
+    """Picker thumbnail from the SAME alpha the page ships with, so a
+       thumb can never drift from its page. Greyscale-resized (the
+       palette image can't be resampled meaningfully) then re-encoded in
+       the identical alpha-as-palette format the page uses, so the picker
+       needs no format branching."""
+    h, w = alpha.shape
+    tw = min(THUMB_W, w)
+    th = max(1, round(h * tw / w))
+    small = np.asarray(Image.fromarray(alpha, "L").resize((tw, th),
+                                                          Image.LANCZOS))
+    im = Image.fromarray(small, "P")
+    im.putpalette(list(INK) * 256)
+    path = os.path.join(THUMBS, name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    im.save(path, "PNG", optimize=True, transparency=bytes(range(256)))
+    return os.path.getsize(path) / 1024
+
+
 def process(name):
     src = Image.open(os.path.join(SRC, name)).convert("L")
     w, h = src.size
@@ -125,18 +153,21 @@ def process(name):
                  transparency=bytes(range(256)))
     kb = os.path.getsize(out_path) / 1024
 
+    tkb = write_thumb(alpha, name)
+
     a1 = audit(alpha, "@%d" % TARGET_W)
     w9 = 900
     h9 = round(th * w9 / TARGET_W)
     small9 = Image.fromarray(alpha, "L").resize((w9, h9), Image.LANCZOS)
     a2 = audit(np.asarray(small9), "@900")
 
-    print("%-14s %4dx%-4d %7.0fKB  speckles:%-5d %s | %s" %
-          (name, TARGET_W, th, kb, killed, a1, a2))
+    print("%-14s %4dx%-4d %7.0fKB  thumb:%5.0fKB  speckles:%-5d %s | %s" %
+          (name, TARGET_W, th, kb, tkb, killed, a1, a2))
 
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
+    os.makedirs(THUMBS, exist_ok=True)
     # Subfolders are page PACKS: art-src/coloring-pages/<pack>/x.png
     # mirrors to assets/coloring-pages/<pack>/x.png (the pro packs —
     # ocean/, dinosaurs/, ... — live in pack dirs; the free set stays

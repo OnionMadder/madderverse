@@ -3590,8 +3590,18 @@
        category's `free: true` representative. Pro content is absent,
        never padlocked or greyed, so the free app reads as complete.
        Empty packs render nothing at either tier. */
+    /* Built on first entry to the picker, NOT at init. The cards live on
+       a hidden screen, and a hidden <img> can never intersect the
+       viewport — so `loading="lazy"` does not defer it and building this
+       early made the browser fetch every page up front (measured: 6.2MB,
+       and 92 megapixels decoded). Deferring means the fetch happens when
+       the grid is actually on screen, where lazy loading works. */
+    let pickerBuilt = false;
+
     function buildPicker() {
         const grid = $("#pickerGrid");
+        if (pickerBuilt && grid.childElementCount) return;
+        pickerBuilt = true;
         grid.innerHTML = "";
         const packs = (window.TINY_CANVAS_PAGE_PACKS || []).filter(
             function (pk) { return pk.pages.length; });
@@ -3619,6 +3629,14 @@
         });
     }
 
+    const PAGES_DIR = "assets/coloring-pages/";
+
+    function thumbSrc(image) {
+        return image.indexOf(PAGES_DIR) === 0
+            ? PAGES_DIR + "thumbs/" + image.slice(PAGES_DIR.length)
+            : image;
+    }
+
     function buildPickCard(tpl) {
             const card = document.createElement("button");
             card.className = "pick-card";
@@ -3629,9 +3647,19 @@
             thumb.className = "pick-thumb";
             if (tpl.image) {
                 const im = document.createElement("img");
-                im.src = tpl.image;
+                /* 360px thumb, not the 1800px page — by convention at
+                   assets/coloring-pages/thumbs/<same relative path>
+                   (written by scripts/process-coloring-pages.py from the
+                   page's own alpha, so it cannot drift). Falls back to
+                   the full page if a thumb is ever missing. */
+                im.src = thumbSrc(tpl.image);
+                im.onerror = function () {
+                    im.onerror = null;
+                    im.src = tpl.image;
+                };
                 im.alt = "";
                 im.loading = "lazy";
+                im.decoding = "async";
                 im.draggable = false;
                 thumb.appendChild(im);
             } else {
@@ -4145,6 +4173,7 @@
         state.screen = name;
         document.body.className = "screen-" + name;
         sfxSwoosh();
+        if (name === "picker")   buildPicker();
         if (name === "gallery")  renderGallery();
         if (name === "settings") syncSettingsUI();
         if (name === "draw") {
@@ -5308,7 +5337,8 @@
         loadProFlag();
         loadSettings();
         setupCanvas();
-        buildPicker();
+        /* buildPicker() is deliberately NOT called here — showScreen
+           builds it on first entry. See the note on buildPicker. */
         buildPaletteTabs();
         buildPalette();
         attachToolHandlers();
