@@ -4547,18 +4547,89 @@
         }
     }
 
+    /* ---------- CONTENT CROP ----------
+
+       The export is cropped to what is actually ON the page. Pages are
+       all 1.833:1, but the art inside them is not: the full scenes ink
+       100% of the page width while the single-object EXTRAS use as
+       little as 31% (leaf) or 35% (beans), so framing to the page edge
+       left those exports mostly empty paper.
+
+       The crop is the union of TWO things, and it needs both: the
+       page's own ink, and wherever the kid actually painted. Cropping
+       to the page ink alone would clip a kid who coloured out past the
+       lines onto the paper — which the canvas allows and which fill
+       only stops for fills, not brush strokes. */
+
+    const INK_ALPHA_MIN    = 16;    /* line-art ink counts from here */
+    const STROKE_ALPHA_MIN = 3;     /* kid's colour counts from here */
+    const CROP_MARGIN_FRAC = 0.03;  /* breathing room, frac of long side */
+    const CROP_MIN_FRAC    = 0.25;  /* never crop tighter than this */
+    const BBOX_SCAN_W      = 256;   /* scan downscaled — a few px of
+                                       slop is invisible under the margin */
+    const inkBoxCache = Object.create(null);
+
+    /* Bounding box of pixels with alpha >= minA, returned as 0..1
+       fractions of the source's own box. null when nothing qualifies
+       (an untouched canvas, or a page whose art failed to load). */
+    function alphaBBox(src, sw, sh, minA) {
+        if (!src || !sw || !sh) return null;
+        const w = Math.max(1, Math.min(BBOX_SCAN_W, Math.round(sw)));
+        const h = Math.max(1, Math.round(w * (sh / sw)));
+        const off = document.createElement("canvas");
+        off.width = w; off.height = h;
+        const c = off.getContext("2d", { willReadFrequently: true });
+        let d;
+        try {
+            c.drawImage(src, 0, 0, w, h);
+            d = c.getImageData(0, 0, w, h).data;
+        } catch (_) {
+            return null;              /* taint / decode failure */
+        }
+        let x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                if (d[(y * w + x) * 4 + 3] >= minA) {
+                    if (x < x0) x0 = x;
+                    if (x > x1) x1 = x;
+                    if (y < y0) y0 = y;
+                    if (y > y1) y1 = y;
+                }
+            }
+        }
+        if (x1 < 0) return null;
+        return { x: x0 / w, y: y0 / h,
+                 w: (x1 - x0 + 1) / w, h: (y1 - y0 + 1) / h };
+    }
+
+    /* Hand a drawable line-art image to `done`, or null when there is
+       none (BLANK). Raster pages are drawable as-is; SVG pages take the
+       Blob URL -> Image roundtrip, which is why composePng is async. */
+    function withArtImage(art, done) {
+        if (!art) { done(null); return; }
+        if (art.tagName === "IMG") {
+            done(art.complete && art.naturalWidth ? art : null);
+            return;
+        }
+        const blob = new Blob([art.outerHTML], { type: "image/svg+xml" });
+        const url  = URL.createObjectURL(blob);
+        const img  = new Image();
+        img.onload  = function () { URL.revokeObjectURL(url); done(img); };
+        img.onerror = function () { URL.revokeObjectURL(url); done(null); };
+        img.src = url;
+    }
+
     /* Composite the live canvas + line-art into a bounded PNG dataURL
        (long side = SAVE_LONG_SIDE, so localStorage stays sane).
 
-       ⚠ The export is framed to the PAGE, not to the viewport. The
-       drawing canvas fills the whole screen, so sizing the output from
-       it stamped the device's window aspect onto every save — a wide
-       desktop viewport exported a 2.1:1 image with the 1.83:1 page
+       ⚠ The export is framed to the CONTENT, never to the viewport.
+       The drawing canvas fills the whole screen, so sizing the output
+       from it stamped the device's window aspect onto every save — a
+       wide desktop viewport exported a 2.1:1 image with the 1.83:1 page
        letterboxed inside a band of bare paper. The page is the artwork;
-       the paper around it is just backdrop. So the output takes the ART
-       element's aspect, the kid's strokes are cropped to that same rect,
-       and the line art fills the result edge to edge. BLANK (no art
-       element) has no page to frame to and keeps the viewport aspect.
+       the paper around it is just backdrop. Output now takes the aspect
+       of the cropped content box (see CONTENT CROP above), so a tall
+       subject on a wide page exports tall.
 
        Zoom is neutralized first: every rect here is a LIVE client rect,
        so saving while pinched in would otherwise export the zoomed crop.
@@ -4567,22 +4638,23 @@
        the async drawing off the captured numbers. */
     function composePng() {
         return new Promise(function (resolve) {
-            const art        = overlayArtEl();
-            const zoomed     = view.s !== 1 || view.tx !== 0 || view.ty !== 0;
-            const savedView  = { s: view.s, tx: view.tx, ty: view.ty };
+            const art       = overlayArtEl();
+            const zoomed    = view.s !== 1 || view.tx !== 0 || view.ty !== 0;
+            const savedView = { s: view.s, tx: view.tx, ty: view.ty };
             if (zoomed) resetView();
 
             const canvasRect = canvas.getBoundingClientRect();
             const artRect    = art ? art.getBoundingClientRect() : null;
             const framed     = !!artRect && artRect.width > 0 &&
-                               artRect.height > 0 && canvasRect.width > 0;
+                               artRect.height > 0;
 
-            /* Region of the on-screen canvas the export covers, in CSS
-               px relative to the canvas box. */
-            const regionW = framed ? artRect.width  : canvasRect.width;
-            const regionH = framed ? artRect.height : canvasRect.height;
-            const regionX = framed ? artRect.left - canvasRect.left : 0;
-            const regionY = framed ? artRect.top  - canvasRect.top  : 0;
+            /* The page's box, in CSS px relative to the canvas box.
+               Falls back to the whole canvas for BLANK. */
+            const box = framed
+                ? { x: artRect.left - canvasRect.left,
+                    y: artRect.top  - canvasRect.top,
+                    w: artRect.width, h: artRect.height }
+                : { x: 0, y: 0, w: canvasRect.width, h: canvasRect.height };
 
             if (zoomed) {
                 view.s  = savedView.s;
@@ -4591,85 +4663,147 @@
                 applyView();
             }
 
-            const aspect = regionW / regionH;
-            let outW, outH;
-            if (aspect >= 1) {
-                outW = SAVE_LONG_SIDE;
-                outH = Math.round(SAVE_LONG_SIDE / aspect);
-            } else {
-                outH = SAVE_LONG_SIDE;
-                outW = Math.round(SAVE_LONG_SIDE * aspect);
-            }
-
-            const off = document.createElement("canvas");
-            off.width = outW;
-            off.height = outH;
-            const o = off.getContext("2d");
-
-            /* Paper background — the same tile the on-screen
-               #paperLayer shows, scaled by the same screen->export
-               ratio as the strokes, so the saved file looks like the
-               screen did. Falls back to the classic plain paper. */
-            const pd = paperDefFor(isPro() ? state.settings.paper : "classic");
-            o.fillStyle = pd.base;
-            o.fillRect(0, 0, outW, outH);
-            if (pd.draw) {
-                const k = regionW ? (outW / regionW) : 1;
-                const pat = o.createPattern(paperTileCanvas(pd), "repeat");
-                if (pat) {
-                    o.save();
-                    o.scale(k, k);
-                    o.fillStyle = pat;
-                    o.fillRect(0, 0, outW / k, outH / k);
-                    o.restore();
-                }
-            }
-
-            /* Kid's strokes — the export region of the canvas, blitted
-               to fill the output. Per-axis CSS->device ratios, never one
-               shared ratio: the STAGE floor can make x and y diverge
-               (see the matching note in artBox()). */
-            if (canvasRect.width > 0 && canvasRect.height > 0) {
-                const devX = canvas.width  / canvasRect.width;
-                const devY = canvas.height / canvasRect.height;
-                const sx = Math.max(0, regionX * devX);
-                const sy = Math.max(0, regionY * devY);
-                const sw = Math.min(canvas.width  - sx, regionW * devX);
-                const sh = Math.min(canvas.height - sy, regionH * devY);
-                if (sw > 0 && sh > 0) {
-                    o.drawImage(canvas, sx, sy, sw, sh, 0, 0, outW, outH);
-                }
-            }
-
-            /* Line art — fills the output exactly when framed to the
-               page, so the printed lines land on the kid's colour the
-               same way they did on screen. */
-            if (!framed) { resolve(off.toDataURL("image/png")); return; }
-
-            /* Raster page — the <img> is drawable as-is. */
-            if (art.tagName === "IMG") {
-                if (art.complete && art.naturalWidth) {
-                    o.drawImage(art, 0, 0, outW, outH);
-                }
-                resolve(off.toDataURL("image/png"));
+            if (canvasRect.width <= 0 || canvasRect.height <= 0) {
+                resolve(canvas.toDataURL("image/png"));
                 return;
             }
 
-            const blob = new Blob([art.outerHTML],
-                                  { type: "image/svg+xml" });
-            const url  = URL.createObjectURL(blob);
-            const img  = new Image();
-            img.onload = function () {
-                o.drawImage(img, 0, 0, outW, outH);
-                URL.revokeObjectURL(url);
-                resolve(off.toDataURL("image/png"));
-            };
-            img.onerror = function () {
-                URL.revokeObjectURL(url);
-                resolve(off.toDataURL("image/png"));
-            };
-            img.src = url;
+            withArtImage(art, function (artImg) {
+                resolve(renderExport(artImg, box, canvasRect));
+            });
         });
+    }
+
+    /* Everything below is synchronous — the only async part of an
+       export is getting the line art drawable. */
+    function renderExport(artImg, box, canvasRect) {
+        /* ---- crop: union of the page's ink and the kid's strokes ---- */
+        let crop = { x: box.x, y: box.y, w: box.w, h: box.h };
+        const parts = [];
+
+        if (artImg) {
+            /* Static per template — scan once, then reuse. */
+            const key = state.templateId || "?";
+            let ib = inkBoxCache[key];
+            if (ib === undefined) {
+                ib = alphaBBox(artImg,
+                               artImg.naturalWidth  || artImg.width,
+                               artImg.naturalHeight || artImg.height,
+                               INK_ALPHA_MIN);
+                inkBoxCache[key] = ib;
+            }
+            if (ib) {
+                parts.push({ x: box.x + ib.x * box.w,
+                             y: box.y + ib.y * box.h,
+                             w: ib.w * box.w, h: ib.h * box.h });
+            }
+        }
+
+        const sb = alphaBBox(canvas, canvas.width, canvas.height,
+                             STROKE_ALPHA_MIN);
+        if (sb) {
+            parts.push({ x: sb.x * canvasRect.width,
+                         y: sb.y * canvasRect.height,
+                         w: sb.w * canvasRect.width,
+                         h: sb.h * canvasRect.height });
+        }
+
+        if (parts.length) {
+            let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+            parts.forEach(function (p) {
+                l = Math.min(l, p.x);         t = Math.min(t, p.y);
+                r = Math.max(r, p.x + p.w);   b = Math.max(b, p.y + p.h);
+            });
+            const m = Math.max(r - l, b - t) * CROP_MARGIN_FRAC;
+            l -= m; t -= m; r += m; b += m;
+
+            /* A single dot shouldn't export as a postage stamp. */
+            const minW = box.w * CROP_MIN_FRAC;
+            const minH = box.h * CROP_MIN_FRAC;
+            if (r - l < minW) { const c = (l + r) / 2; l = c - minW / 2; r = c + minW / 2; }
+            if (b - t < minH) { const c = (t + b) / 2; t = c - minH / 2; b = c + minH / 2; }
+
+            /* Don't let the margin wander off the page. The bound is
+               the page box widened by wherever the kid painted — so a
+               full-bleed scene exports as exactly the page (its ink
+               already fills it) instead of gaining a paper mat, while a
+               kid who coloured out past the lines still gets all of it.
+               Clamped to the canvas too: there is nothing to sample
+               past the paper. */
+            let bl = box.x, bt = box.y;
+            let br = box.x + box.w, bb = box.y + box.h;
+            if (sb) {
+                bl = Math.min(bl, sb.x * canvasRect.width);
+                bt = Math.min(bt, sb.y * canvasRect.height);
+                br = Math.max(br, (sb.x + sb.w) * canvasRect.width);
+                bb = Math.max(bb, (sb.y + sb.h) * canvasRect.height);
+            }
+            l = Math.max(Math.max(0, bl), l);
+            t = Math.max(Math.max(0, bt), t);
+            r = Math.min(Math.min(canvasRect.width,  br), r);
+            b = Math.min(Math.min(canvasRect.height, bb), b);
+            if (r - l > 4 && b - t > 4) crop = { x: l, y: t, w: r - l, h: b - t };
+        }
+
+        const aspect = crop.w / crop.h;
+        let outW, outH;
+        if (aspect >= 1) {
+            outW = SAVE_LONG_SIDE;
+            outH = Math.round(SAVE_LONG_SIDE / aspect);
+        } else {
+            outH = SAVE_LONG_SIDE;
+            outW = Math.round(SAVE_LONG_SIDE * aspect);
+        }
+
+        const off = document.createElement("canvas");
+        off.width = outW;
+        off.height = outH;
+        const o = off.getContext("2d");
+
+        /* CSS px -> export px. Per-axis, never one shared ratio: the
+           STAGE floor can make x and y diverge (see artBox()). */
+        const kx = outW / crop.w;
+        const ky = outH / crop.h;
+
+        /* Paper background — the same tile the on-screen #paperLayer
+           shows, at the same scale AND phase, so the saved file looks
+           like the screen did. Falls back to the classic plain paper. */
+        const pd = paperDefFor(isPro() ? state.settings.paper : "classic");
+        o.fillStyle = pd.base;
+        o.fillRect(0, 0, outW, outH);
+        if (pd.draw) {
+            const pat = o.createPattern(paperTileCanvas(pd), "repeat");
+            if (pat) {
+                o.save();
+                o.scale(kx, ky);
+                o.translate(-crop.x, -crop.y);
+                o.fillStyle = pat;
+                o.fillRect(crop.x, crop.y, crop.w, crop.h);
+                o.restore();
+            }
+        }
+
+        /* Kid's strokes — the crop region of the canvas, blitted to
+           fill the output. */
+        const devX = canvas.width  / canvasRect.width;
+        const devY = canvas.height / canvasRect.height;
+        const sx = Math.max(0, crop.x * devX);
+        const sy = Math.max(0, crop.y * devY);
+        const sw = Math.min(canvas.width  - sx, crop.w * devX);
+        const sh = Math.min(canvas.height - sy, crop.h * devY);
+        if (sw > 0 && sh > 0) {
+            o.drawImage(canvas, sx, sy, sw, sh, 0, 0, outW, outH);
+        }
+
+        /* Line art — positioned relative to the crop, so the printed
+           lines land on the kid's colour exactly as they did on screen. */
+        if (artImg) {
+            o.drawImage(artImg,
+                        (box.x - crop.x) * kx, (box.y - crop.y) * ky,
+                        box.w * kx, box.h * ky);
+        }
+
+        return off.toDataURL("image/png");
     }
 
     async function saveDrawing() {
