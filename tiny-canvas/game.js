@@ -4181,8 +4181,12 @@
                 offerCoachButtons();
                 showCoach();
             }
+            /* After layout settles — the page <img> has to have a box
+               before the fraction it covers means anything. */
+            setTimeout(maybeShowRotateHint, 400);
         } else {
             dismissCoach();
+            hideRotateHint();
         }
     }
 
@@ -4517,6 +4521,63 @@
             t.classList.remove("is-show");
             setTimeout(function () { t.setAttribute("hidden", ""); }, 250);
         }, 1400);
+    }
+
+    /* ---------- ROTATE HINT ----------
+
+       The pages are 1.833 landscape. Held portrait on a phone that
+       renders the page at ~22% of the screen (353x192 inside 375x812);
+       turning the phone roughly doubles it. So: suggest it once, gently,
+       and never get in the way.
+
+       Gated on the MEASURED page fraction rather than a device guess —
+       that is the actual condition that makes rotating worth it, so it
+       can't misfire on a tablet, in landscape, on a squarer future page,
+       or on BLANK (which has no art element and fills the canvas
+       already). Once per session, not once ever: a nag that repeats
+       every launch would be worse than the problem. */
+    /* Measured page/canvas area ratios: phone portrait 375x812 = 22.3%
+       (the case this exists for), tablet portrait 768x1024 = 36.2%
+       (fine as-is), phone landscape = 51.5%. 0.30 sits between the two
+       portrait cases with room either side — 0.35 cleared the tablet by
+       only 1.2 points, close enough that a slightly different tablet
+       would have been nagged. */
+    const ROTATE_HINT_MAX_FRAC = 0.30;   /* page/canvas area ratio */
+    const ROTATE_HINT_MS       = 4500;
+    let rotateHintShown = false;
+
+    function rotateHintWorthIt() {
+        const art = overlayArtEl();
+        if (!art) return false;                       /* BLANK */
+        if (innerWidth > innerHeight) return false;   /* already landscape */
+        if (view.s !== 1) return false;               /* zoomed in on purpose */
+        const ar = art.getBoundingClientRect();
+        const cr = canvas.getBoundingClientRect();
+        if (!ar.width || !cr.width) return false;
+        return (ar.width * ar.height) / (cr.width * cr.height)
+               < ROTATE_HINT_MAX_FRAC;
+    }
+
+    function hideRotateHint() {
+        const t = $("#rotateHint");
+        if (!t || t.hidden) return;
+        clearTimeout(hideRotateHint._timer);
+        t.classList.remove("is-show");
+        setTimeout(function () { t.setAttribute("hidden", ""); }, 250);
+    }
+
+    function maybeShowRotateHint() {
+        if (rotateHintShown) return;
+        if (state.screen !== "draw") return;
+        if (!rotateHintWorthIt()) return;
+        const t = $("#rotateHint");
+        if (!t) return;
+        rotateHintShown = true;
+        t.removeAttribute("hidden");
+        // eslint-disable-next-line no-unused-expressions
+        t.offsetHeight;
+        t.classList.add("is-show");
+        hideRotateHint._timer = setTimeout(hideRotateHint, ROTATE_HINT_MS);
     }
 
     function showFirstSaveToast() {
@@ -5556,6 +5617,15 @@
                     state.dirty = true;
                     updateStatus();
                 }
+
+                /* Turning the phone is the thing the hint asked for —
+                   take it down immediately rather than leaving it
+                   floating over the landscape layout. Also covers the
+                   case where the kid arrived in landscape and then
+                   rotated TO portrait, which is when the hint becomes
+                   worth showing. */
+                if (innerWidth > innerHeight) hideRotateHint();
+                else maybeShowRotateHint();
             });
         });
 
