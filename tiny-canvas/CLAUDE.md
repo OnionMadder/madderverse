@@ -9,22 +9,29 @@ via Capacitor.
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
   on the hub grid since 2026-08-04. Cache-bust is at **?v=30** — bump it
   on every change to style.css / templates.js / game.js.
-- **Page catalog REWORKED (2026-08-05 late, Onion's design — the
-  current model).** `TINY_CANVAS_PAGE_PACKS` in templates.js: an
-  **EXTRAS pack (pro:false — BLANK + beans, monster, robot lab, dog
-  choir)** and **eight pro CATEGORIES — BASIC, ANIMALS, HOME, FOOD,
-  GO GO GO (transportation/), OCEAN, DINOSAURS, PLACES** — six
-  scenes each (ocean + dinosaurs got their sixths — TREASURE and
-  DINO MEADOW — on 2026-08-06), 48 category pages + 4 extras = 52 on
-  disk. In each category exactly
-  ONE page carries **`free: true`** (its free representative: sun,
-  cat, cabin, donut, rocket, fish, longneck, egypt). buildPicker:
-  unlocked → nine headed sections, everything; locked native → ONE
-  flat headerless grid of extras + the eight free reps (13 cards
-  with BLANK). **`?free=1` forces the free tier on web** (FORCE_FREE
-  in isPro) — the only way to preview it there, and what free-tier
+- **Page catalog REWORKED AGAIN (2026-08-07, Onion's art — 72
+  pages, the current model).** `TINY_CANVAS_PAGE_PACKS` in
+  templates.js: a **FREE pack (pro:false — BLANK + sun, rainbow,
+  leaf, icecube, markers, beans)** and **eleven pro CATEGORIES of
+  six — ANIMALS, BUGS (folder `insects/`), OCEAN, DINOSAURS, SPACE,
+  GO GO GO (folder `transportation/`), MUSIC, FOOD, HOME, PLACES,
+  SNOWFLAKES** = 66 category pages + 6 basics + BLANK = 73 entries
+  (72 image files). Four categories are new this rework — bugs,
+  music, snowflakes, space. Each category carries exactly ONE
+  `free: true` representative (cat, ladybug, fish, longneck, base,
+  rocket, guitar, donut, cabin, egypt, 1flake), so the **free tier
+  shows 18 cards** (BLANK + 6 basics + 11 reps) and Pro adds the
+  other 54. buildPicker: unlocked → 12 headed sections, everything;
+  locked native → ONE flat headerless grid of the free pack + the 11
+  reps. **`?free=1` forces the free tier on web** (FORCE_FREE in
+  isPro) — the only way to preview it there, and what free-tier
   store screenshots get shot against. The pipeline mirrors
-  `art-src/coloring-pages/<pack>/` subfolders into `assets/`.
+  `art-src/coloring-pages/<pack>/` subfolders into `assets/` (folder
+  name == pack id; page ids must be unique across ALL packs — they
+  are the localStorage in-progress keys). *(Previous 2026-08-05
+  layout was 52 pages / 8 categories + an EXTRAS pack of
+  beans/monster/robot/singing; monster/robot/singing are retired,
+  beans moved into the FREE pack.)*
   Stamps: **60 in 6 pack tabs**
   (CLASSICS/ANIMALS/NATURE/FOOD/SPACE/VEHICLES — `STAMP_PACKS`
   groups by id; new shapes with interior detail are stroked-outline
@@ -124,16 +131,15 @@ Capacitor when you're packaging for a store.
 
 - **5 screens**, swapped via the `[hidden]` attribute on
   `<main class="screen">`: title → picker → draw → gallery → settings.
-- **15 templates: 14 raster coloring scenes + BLANK** (since
-  2026-08-05): kitchen cat, puppy, unicorn, sunny day, big fish,
-  butterfly, bird nest, teddy bear, rocket ship, robot lab, road trip,
-  airplane, donut chest, cozy cabin. Real coloring-book art — dense
-  full-bleed scenes, ~1.83:1 landscape — rendered as a
-  `pointer-events: none` overlay above the kid's canvas so the kid
-  colors UNDER the lines. See "The raster coloring pages" below for
-  the format and pipeline. The engine still fully supports the
-  original inline-SVG template format (BLANK is the only remaining
-  svg entry; the 34 retired SVG pages are in git history).
+- **73 templates: 72 raster coloring scenes + BLANK** (the
+  2026-08-07 catalog — see the "Page catalog" bullet up top for the
+  12-pack breakdown). Real coloring-book art — dense full-bleed
+  scenes, ~1.83:1 landscape — rendered as a `pointer-events: none`
+  overlay above the kid's canvas so the kid colors UNDER the lines.
+  See "The raster coloring pages" below for the format and pipeline.
+  The engine still fully supports the original inline-SVG template
+  format (BLANK is the only remaining svg entry; the 34 retired SVG
+  pages are in git history).
 - **Templates must be built from CLOSED shapes.** The fill tool
   rasterizes the overlay into a boundary mask, so any gap in a line
   lets fill escape into the rest of the page. This can't be judged by
@@ -418,14 +424,18 @@ Two things this catches that reading the SVG does not:
   sub-pixel mismatch where a leaflet joins a shaft opens a gap the fill
   escapes through, merging two cells into one.
 
-Current baseline (the 14 raster scenes, audited at 1800px wide,
-regions ≥ 64px, image perimeter counted as boundary): **3,793 fillable
-regions total, 58 (rocket) to 458 (robot) per page, median ~276**, no
-leaks; counts hold at a 900px re-audit. The retired SVG set's baseline
-was 406 regions across 34 pages — the new pages are ~20x denser, which
-is exactly the "real coloring page" feel. If a new page lands far
-below this band, or one region spans an implausible share of the page,
-look for an ink gap in the source art. (`scripts/
+Current baseline (the 72 raster scenes, 2026-08-07, audited at 1800px
+wide, regions ≥ 64px, image perimeter counted as boundary): dense
+**scene** pages run **120–692** fillable regions (median ~230), no
+leaks; counts hold at a 900px re-audit. **Single-OBJECT pages read
+differently and that is fine** — leaf (2 regions), icecube (11),
+bananas (25), donut (57), and the snowflakes/guitar/harp all show ONE
+region covering 70–89% of the open area, because the object sits on
+open paper and the background is legitimately one connected fill. The
+leak signature is a page that should be a dense scene but shows few
+regions + one giant region; none of the 72 do. If a NEW page lands far
+below the scene band AND isn't a single object, look for an ink gap in
+the source art. (`scripts/
 process-coloring-pages.py` prints this audit automatically.)
 
 When closing a curve into a ribbon (the donut's icing drizzles), offset
