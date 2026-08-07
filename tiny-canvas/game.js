@@ -673,6 +673,38 @@
         return !isNative() || state.proUnlocked;
     }
 
+    /* Tier filters. Pro content is ABSENT for free, never padlocked or
+       greyed — the free app has to read as complete, not as a demo with
+       the good parts crossed out. Each of these returns the full table
+       for Pro and the `free: true` subset otherwise. */
+    function availableStampPacks() {
+        return isPro() ? STAMP_PACKS
+                       : STAMP_PACKS.filter(function (p) { return p.free; });
+    }
+
+    function availablePapers() {
+        return isPro() ? PAPERS
+                       : PAPERS.filter(function (p) { return p.free; });
+    }
+
+    function availableFrames() {
+        return isPro() ? FRAMES
+                       : FRAMES.filter(function (f) { return f.free; });
+    }
+
+    function isAvailable(list, id) {
+        return list.some(function (x) { return x.id === id; });
+    }
+
+    /* The paper actually in force. A stored id the current tier can't
+       use (bought Pro on the web, then opened the free native build)
+       falls back to CLASSIC rather than rendering a paper the kid isn't
+       entitled to. */
+    function activePaperId() {
+        const id = state.settings.paper;
+        return isAvailable(availablePapers(), id) ? id : "classic";
+    }
+
     function loadProFlag() {
         try { state.proUnlocked = localStorage.getItem(PRO_KEY) === "1"; }
         catch (_) { state.proUnlocked = false; }
@@ -2897,8 +2929,13 @@
        id so the 24 original draw functions stay where they are.
        A pack id listed here but missing from STAMPS is skipped, so a
        typo degrades to a shorter pack, not a crash. */
+    /* `free: true` marks the pack the free tier gets. Stamps are the
+       most replayable thing in the app — tap, instant result, no skill
+       floor — and shipping zero of them to free made the free game
+       coloring-only. CLASSICS goes free; the other five (50 stamps) are
+       the Pro pitch. Same reasoning as pattern fills staying free. */
     const STAMP_PACKS = [
-        { id: "classics", label: "CLASSICS",
+        { id: "classics", label: "CLASSICS", free: true,
           ids: ["heart", "star", "sparkle", "rainbow", "smiley", "crown",
                 "gem", "balloon", "note", "bolt"] },
         { id: "animals", label: "ANIMALS",
@@ -2919,7 +2956,7 @@
                 "bike"] }
     ].map(function (pk) {
         return {
-            id: pk.id, label: pk.label,
+            id: pk.id, label: pk.label, free: !!pk.free,
             stamps: pk.ids.map(function (id) {
                 return STAMPS.find(function (s) { return s.id === id; });
             }).filter(Boolean)
@@ -2976,8 +3013,8 @@
     const PAPER_TILE_PX = 120;
 
     const PAPERS = [
-        { id: "classic", label: "CLASSIC", base: "#fbfaf6" },
-        { id: "dotty",   label: "DOTTY",   base: "#fbfaf6", draw: function (c, s) {
+        { id: "classic", label: "CLASSIC", base: "#fbfaf6", free: true },
+        { id: "dotty",   label: "DOTTY",   base: "#fbfaf6", free: true, draw: function (c, s) {
             c.fillStyle = "rgba(28,34,38,0.08)";
             for (let y = 0; y < 4; y++) {
                 for (let x = 0; x < 4; x++) {
@@ -3052,7 +3089,7 @@
     function applyPaper() {
         const layer = $("#paperLayer");
         if (!layer) return;
-        const def = paperDefFor(isPro() ? state.settings.paper : "classic");
+        const def = paperDefFor(activePaperId());
         layer.style.backgroundColor = def.base;
         if (def.draw) {
             layer.style.backgroundImage =
@@ -3886,7 +3923,11 @@
     function buildStampTabs() {
         const host = $("#stampPackTabs");
         if (!host || host.childElementCount) return;
-        STAMP_PACKS.forEach(function (pk) {
+        const packs = availableStampPacks();
+        /* One pack (the free tier) needs no tab row — a single tab is
+           chrome that explains nothing and hints at what's missing. */
+        host.hidden = packs.length < 2;
+        packs.forEach(function (pk) {
             const tab = document.createElement("button");
             tab.className = "palette-tab";
             tab.type = "button";
@@ -3918,9 +3959,15 @@
         const host = $("#stampRow");
         if (!host || (host.childElementCount && !force)) return;
         host.innerHTML = "";
-        const pack = STAMP_PACKS.find(function (pk) {
+        const packs = availableStampPacks();
+        /* Fall back to the first AVAILABLE pack, not STAMP_PACKS[0] —
+           on the free tier the stored pack may be one this tier can't
+           see, which would render an empty chip row. */
+        const pack = packs.find(function (pk) {
             return pk.id === state.stampPack;
-        }) || STAMP_PACKS[0];
+        }) || packs[0];
+        if (!pack) return;
+        state.stampPack = pack.id;
         pack.stamps.forEach(function (s) {
             const b = document.createElement("button");
             b.className = "pattern-btn";
@@ -3956,12 +4003,15 @@
         });
     }
 
-    /* Paper chips — each shows its actual tile. Row carries data-pro,
-       so on a locked native build it never appears at all. */
+    /* Paper chips — each shows its actual tile. Free gets CLASSIC +
+       DOTTY; a single chip would be a control with nothing to choose,
+       so the row only earns its place at two or more. */
     function buildPaperButtons() {
         const host = $("#paperRow");
         if (!host || host.childElementCount) return;
-        PAPERS.forEach(function (pd) {
+        const papers = availablePapers();
+        host.hidden = papers.length < 2;
+        papers.forEach(function (pd) {
             const b = document.createElement("button");
             b.className = "pattern-btn paper-btn";
             b.type = "button";
@@ -4858,7 +4908,7 @@
         /* Paper background — the same tile the on-screen #paperLayer
            shows, at the same scale AND phase, so the saved file looks
            like the screen did. Falls back to the classic plain paper. */
-        const pd = paperDefFor(isPro() ? state.settings.paper : "classic");
+        const pd = paperDefFor(activePaperId());
         o.fillStyle = pd.base;
         o.fillRect(0, 0, outW, outH);
         if (pd.draw) {
@@ -5030,10 +5080,13 @@
         c.fill();
     }
 
+    /* `free: true` picks the two the free tier gets — one plain, one
+       playful — so a free kid can still finish a picture and hand it
+       over framed. The other ten are Pro. */
     const FRAMES = [
-        { id: "none",     label: "NONE",     draw: null },
+        { id: "none",     label: "NONE",     free: true, draw: null },
 
-        { id: "solid",    label: "PINK",     draw: function (c, W, H, bw) {
+        { id: "solid",    label: "PINK",     free: true, draw: function (c, W, H, bw) {
             _fillBand(c, W, H, bw, "#ff2e88");
             c.strokeStyle = "#ffffff";
             c.lineWidth = Math.max(2, bw * 0.08);
@@ -5093,7 +5146,7 @@
             c.restore();
         } },
 
-        { id: "hearts",   label: "HEARTS",   draw: function (c, W, H, bw) {
+        { id: "hearts",   label: "HEARTS",   free: true, draw: function (c, W, H, bw) {
             _fillBand(c, W, H, bw, "#fdd7e4");
             c.save();
             _bandClip(c, W, H, bw);
@@ -5244,7 +5297,7 @@
     function buildFrameButtons() {
         const host = $("#frameRow");
         if (!host || host.childElementCount) return;
-        FRAMES.forEach(function (f) {
+        availableFrames().forEach(function (f) {
             const b = document.createElement("button");
             b.className = "pattern-btn frame-btn";
             b.type = "button";
@@ -5326,7 +5379,7 @@
 
             /* Frame chosen in the detail panel is applied to the
                exported copy only — the stored record stays clean. */
-            if (isPro() && detailFrameId !== "none") {
+            if (detailFrameId !== "none") {
                 const framed = await frameRecPng(rec, detailFrameId);
                 rec = Object.assign({}, rec, { png: framed });
             }

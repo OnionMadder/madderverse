@@ -95,6 +95,14 @@
 
 * { box-sizing: border-box; }
 
+/* [hidden] must actually hide. The UA rule is [hidden]{display:none},
+   which ANY author display rule outranks — so a component with its own
+   display (flex, grid, block) silently ignores the attribute. That bit
+   the stamp pack-tab row, which stayed on screen at display:flex while
+   .hidden was set. This file already carried seven per-component
+   patches for the same thing; this is the general case. */
+[hidden] { display: none !important; }
+
 html, body {
     margin: 0;
     padding: 0;
