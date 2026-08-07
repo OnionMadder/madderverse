@@ -28,12 +28,24 @@
        bounded size regardless of device aspect or pixel density. */
     const SAVE_LONG_SIDE = 1024;
 
-    /* Color palette — 36 colors organized in 5 groups so kids can find
-       a color by category instead of scrolling a flat row. The pink/teal
-       canon anchors RAINBOW; the rest fill out coverage. */
+    /* Color palette — grouped so kids find a color by category instead
+       of scrolling one long row. The pink/teal canon anchors RAINBOW.
+
+       `free: true` groups are the base set every kid gets (43 colors +
+       the custom picker), so NO color is ever locked away — the custom
+       swatch alone covers the whole spectrum. The themed groups without
+       the flag are Pro: curated palettes that pair with the Pro page
+       categories (an OCEAN palette for the ocean scenes, GALAXY for
+       space, and so on). Availability is filtered by availableColorGroups().
+
+       ⚠ Fill tells colors apart at euclidean distance 6 (TOL2 = 36 in
+       floodFillAt). Every color here — across ALL groups, since a kid
+       mixes groups in one drawing — sits >13 from every other. If you
+       add colors, re-run the pairwise check (min distance must stay
+       well above 6) before shipping. */
     const COLOR_GROUPS = {
         rainbow: {
-            label: "RAINBOW",
+            label: "RAINBOW", free: true,
             colors: [
                 "#ff2e88", "#ff4d4d", "#ff7a1f", "#ff9d42",
                 "#ffd23f", "#9be15d", "#1ac88a", "#00ffcc",
@@ -41,7 +53,7 @@
             ]
         },
         pastels: {
-            label: "PASTELS",
+            label: "PASTELS", free: true,
             colors: [
                 "#ffcbe0", "#ffd6c2", "#ffe9a8", "#f0f4a8",
                 "#c8f0c8", "#b6efe6", "#bfe2ff", "#cfd2ff",
@@ -49,21 +61,21 @@
             ]
         },
         neons: {
-            label: "NEONS",
+            label: "NEONS", free: true,
             colors: [
                 "#ff0080", "#ff5500", "#ffea00", "#00ff5e",
                 "#00b0ff", "#7a00ff", "#ff00d4"
             ]
         },
         earth: {
-            label: "EARTH",
+            label: "EARTH", free: true,
             colors: [
                 "#4a2510", "#6b3a1a", "#a05a2c", "#c98a52",
                 "#e2b888", "#6b7a4a", "#8a9a5b", "#3a5a4a"
             ]
         },
         metallic: {
-            label: "METALLIC",
+            label: "METALLIC", free: true,
             colors: [
                 "#d4af37",   /* gold */
                 "#c0c0c0",   /* silver */
@@ -71,6 +83,50 @@
                 "#8c7853",   /* bronze */
                 "#e5e4e2",   /* platinum */
                 "#fff"       /* white */
+            ]
+        },
+
+        /* ---- Pro: themed palettes that pair with the categories ---- */
+        ocean: {
+            label: "OCEAN",   /* ocean scenes: deep sea -> shallows -> shore */
+            colors: [
+                "#012a4a", "#01579b", "#0288d1", "#26c6da",
+                "#4dd6b8", "#80deea", "#ff8a65", "#ffe0b2"
+            ]
+        },
+        galaxy: {
+            label: "GALAXY",  /* space scenes: nebula, cosmos, starlight */
+            colors: [
+                "#1a0b3d", "#4a148c", "#8e24aa", "#c2185b",
+                "#3949ab", "#ff4081", "#ffd54f", "#b0bec5"
+            ]
+        },
+        garden: {
+            label: "GARDEN",  /* bugs, animals, backyard: leaves + blooms */
+            colors: [
+                "#2e7d32", "#66bb6a", "#9ccc65", "#d32f2f",
+                "#f06292", "#64b5f6", "#8d6e63", "#f9a825"
+            ]
+        },
+        frost: {
+            label: "FROST",   /* snowflakes + winter: ice and slate */
+            colors: [
+                "#e1f5fe", "#a6daf0", "#81d4fa", "#5eb3e4",
+                "#9fa8da", "#cfd8dc", "#607d8b", "#2e4a5a"
+            ]
+        },
+        jungle: {
+            label: "JUNGLE",  /* dinosaurs: prehistoric moss, bark, amber */
+            colors: [
+                "#33691e", "#558b2f", "#7cb342", "#00695c",
+                "#5d4037", "#a1887f", "#c9b8a8", "#ffb300"
+            ]
+        },
+        sunset: {
+            label: "SUNSET",  /* tropical places + warmth: dusk over the shore */
+            colors: [
+                "#bf360c", "#e64a19", "#ff7043", "#ff9800",
+                "#ffb74d", "#ec407a", "#ffca28", "#880e4f"
             ]
         }
     };
@@ -690,6 +746,25 @@
     function availableFrames() {
         return isPro() ? FRAMES
                        : FRAMES.filter(function (f) { return f.free; });
+    }
+
+    /* Color GROUP keys the current tier may use. Pro sees all; free sees
+       the base groups only. The custom picker stays available to both,
+       so free is never blocked from any single color — just from the
+       curated themed packs. */
+    function availableColorGroups() {
+        return Object.keys(COLOR_GROUPS).filter(function (k) {
+            return isPro() || COLOR_GROUPS[k].free;
+        });
+    }
+
+    /* The color group actually selectable now. A stored group the tier
+       can't use (bought Pro on web, opened free native) falls back to
+       the first available rather than showing an empty/absent tab. */
+    function activeColorGroup() {
+        const groups = availableColorGroups();
+        return groups.indexOf(state.colorGroup) >= 0
+             ? state.colorGroup : groups[0];
     }
 
     function isAvailable(list, id) {
@@ -3726,7 +3801,10 @@
         const tabsHost = $("#paletteTabs");
         if (!tabsHost) return;
         tabsHost.innerHTML = "";
-        Object.keys(COLOR_GROUPS).forEach(function (key) {
+        /* Keep the active group valid for the tier before rendering, so
+           the highlighted tab always exists in the row. */
+        state.colorGroup = activeColorGroup();
+        availableColorGroups().forEach(function (key) {
             const grp = COLOR_GROUPS[key];
             const tab = document.createElement("button");
             tab.className = "palette-tab";
@@ -3763,7 +3841,7 @@
         const palette = $("#colorPalette");
         if (!customSwatchEl) customSwatchEl = $("#customSwatch");
         palette.innerHTML = "";
-        const colors = COLOR_GROUPS[state.colorGroup].colors;
+        const colors = COLOR_GROUPS[activeColorGroup()].colors;
         colors.forEach(function (hex) {
             const sw = document.createElement("button");
             sw.className = "swatch";
