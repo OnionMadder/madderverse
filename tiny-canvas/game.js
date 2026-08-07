@@ -4547,21 +4547,51 @@
         }
     }
 
-    /* Composite the live canvas + line-art SVG into a fixed-size PNG
-       dataURL. With the canvas now filling the viewport, we scale to
-       a bounded SAVE_LONG_SIDE square so localStorage stays sane and
-       gallery thumbnails are consistent across devices.
+    /* Composite the live canvas + line-art into a bounded PNG dataURL
+       (long side = SAVE_LONG_SIDE, so localStorage stays sane).
 
-       Aspect is preserved by scaling so the longer viewport dimension
-       maps to SAVE_LONG_SIDE; the shorter dimension is centered with
-       paper-color fill. The line-art SVG is drawn on top at its
-       same visible proportion of the viewport so saved drawings
-       look like what the kid saw on screen. */
+       ⚠ The export is framed to the PAGE, not to the viewport. The
+       drawing canvas fills the whole screen, so sizing the output from
+       it stamped the device's window aspect onto every save — a wide
+       desktop viewport exported a 2.1:1 image with the 1.83:1 page
+       letterboxed inside a band of bare paper. The page is the artwork;
+       the paper around it is just backdrop. So the output takes the ART
+       element's aspect, the kid's strokes are cropped to that same rect,
+       and the line art fills the result edge to edge. BLANK (no art
+       element) has no page to frame to and keeps the viewport aspect.
+
+       Zoom is neutralized first: every rect here is a LIVE client rect,
+       so saving while pinched in would otherwise export the zoomed crop.
+       Measure with the view reset, restore it in the same synchronous
+       block (layout is forced, but nothing repaints between), then do
+       the async drawing off the captured numbers. */
     function composePng() {
         return new Promise(function (resolve) {
-            const cw = canvas.width;
-            const ch = canvas.height;
-            const aspect = cw / ch;
+            const art        = overlayArtEl();
+            const zoomed     = view.s !== 1 || view.tx !== 0 || view.ty !== 0;
+            const savedView  = { s: view.s, tx: view.tx, ty: view.ty };
+            if (zoomed) resetView();
+
+            const canvasRect = canvas.getBoundingClientRect();
+            const artRect    = art ? art.getBoundingClientRect() : null;
+            const framed     = !!artRect && artRect.width > 0 &&
+                               artRect.height > 0 && canvasRect.width > 0;
+
+            /* Region of the on-screen canvas the export covers, in CSS
+               px relative to the canvas box. */
+            const regionW = framed ? artRect.width  : canvasRect.width;
+            const regionH = framed ? artRect.height : canvasRect.height;
+            const regionX = framed ? artRect.left - canvasRect.left : 0;
+            const regionY = framed ? artRect.top  - canvasRect.top  : 0;
+
+            if (zoomed) {
+                view.s  = savedView.s;
+                view.tx = savedView.tx;
+                view.ty = savedView.ty;
+                applyView();
+            }
+
+            const aspect = regionW / regionH;
             let outW, outH;
             if (aspect >= 1) {
                 outW = SAVE_LONG_SIDE;
@@ -4584,8 +4614,7 @@
             o.fillStyle = pd.base;
             o.fillRect(0, 0, outW, outH);
             if (pd.draw) {
-                const cRect = canvas.getBoundingClientRect();
-                const k = cRect.width ? (outW / cRect.width) : 1;
+                const k = regionW ? (outW / regionW) : 1;
                 const pat = o.createPattern(paperTileCanvas(pd), "repeat");
                 if (pat) {
                     o.save();
@@ -4596,34 +4625,31 @@
                 }
             }
 
-            /* Kid's strokes — full canvas scaled to output */
-            o.drawImage(canvas, 0, 0, outW, outH);
-
-            /* Line-art overlay, scaled by the SAME ratio used for the
-               kid's strokes so the printed page lines up exactly with
-               anything the kid drew on top of them. */
-            const art = overlayArtEl();
-            if (!art) { resolve(off.toDataURL("image/png")); return; }
-
-            const artRect    = art.getBoundingClientRect();
-            const canvasRect = canvas.getBoundingClientRect();
-            if (artRect.width === 0 || canvasRect.width === 0) {
-                resolve(off.toDataURL("image/png"));
-                return;
+            /* Kid's strokes — the export region of the canvas, blitted
+               to fill the output. Per-axis CSS->device ratios, never one
+               shared ratio: the STAGE floor can make x and y diverge
+               (see the matching note in artBox()). */
+            if (canvasRect.width > 0 && canvasRect.height > 0) {
+                const devX = canvas.width  / canvasRect.width;
+                const devY = canvas.height / canvasRect.height;
+                const sx = Math.max(0, regionX * devX);
+                const sy = Math.max(0, regionY * devY);
+                const sw = Math.min(canvas.width  - sx, regionW * devX);
+                const sh = Math.min(canvas.height - sy, regionH * devY);
+                if (sw > 0 && sh > 0) {
+                    o.drawImage(canvas, sx, sy, sw, sh, 0, 0, outW, outH);
+                }
             }
-            /* Per-axis ratios — see the matching note in artBox():
-               the STAGE floor can make x and y diverge. */
-            const scaleX = outW / canvasRect.width;
-            const scaleY = outH / canvasRect.height;
-            const laX = (artRect.left - canvasRect.left) * scaleX;
-            const laY = (artRect.top  - canvasRect.top)  * scaleY;
-            const laW = artRect.width  * scaleX;
-            const laH = artRect.height * scaleY;
+
+            /* Line art — fills the output exactly when framed to the
+               page, so the printed lines land on the kid's colour the
+               same way they did on screen. */
+            if (!framed) { resolve(off.toDataURL("image/png")); return; }
 
             /* Raster page — the <img> is drawable as-is. */
             if (art.tagName === "IMG") {
                 if (art.complete && art.naturalWidth) {
-                    o.drawImage(art, laX, laY, laW, laH);
+                    o.drawImage(art, 0, 0, outW, outH);
                 }
                 resolve(off.toDataURL("image/png"));
                 return;
@@ -4634,7 +4660,7 @@
             const url  = URL.createObjectURL(blob);
             const img  = new Image();
             img.onload = function () {
-                o.drawImage(img, laX, laY, laW, laH);
+                o.drawImage(img, 0, 0, outW, outH);
                 URL.revokeObjectURL(url);
                 resolve(off.toDataURL("image/png"));
             };

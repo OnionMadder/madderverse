@@ -266,7 +266,7 @@ tiny-canvas/
 | **PARENT GATE** | `parentGate(label, onPass)` is the public entry point. Caches unlock state per session. `renderParentGate()` generates a random 2-digit addition + 3 distractors within ±10. Wrong shakes + shows feedback; cancel closes; correct fires the deferred callback. |
 | **AUTOSAVE** | `persistInProgress()` writes `canvasSnapshotPng()` (a bounded scale-down of the RAW canvas — strokes on transparency) + templateId to the in-progress key. ⚠ It briefly used `composePng()`, which bakes the paper + line art into an opaque image; restoring that dragged the old paper texture around as canvas pixels and double-painted the line art — fixed 2026-08-05 with the paper-texture work. Fires every 60s while strokes are pending, on visibilitychange-hidden, on beforeunload/pagehide. `tryRestoreInProgress(templateId)` paints back the saved PNG on template re-entry. `clearInProgress()` fires on SAVE (work graduated) and CLEAR (work discarded). |
 | **TOASTS** | `showSavedToast` (every save, 1.4s) and `showFirstSaveToast` (one-shot ever, 2.4s, flagged via `tinyCanvas.firstSaveCelebrated.v1`). |
-| **GALLERY** | `loadGallery` / `persistGallery` (via setStorage). `composePng()` renders canvas + line-art onto an offscreen 800×800 canvas → PNG dataURL. `saveDrawing()` writes the record + fires both toasts + clears in-progress. `openDetail`, `deleteCurrent` (parent-gated), `exportCurrent` (parent-gated; branches to nativeExport on iOS/Android, anchor-download on web). |
+| **GALLERY** | `loadGallery` / `persistGallery` (via setStorage). `composePng()` renders canvas + line-art onto an offscreen canvas (long side `SAVE_LONG_SIDE`) → PNG dataURL, **framed to the page, not the viewport** — see "Things that bite". `saveDrawing()` writes the record + fires both toasts + clears in-progress. `openDetail`, `deleteCurrent` (parent-gated), `exportCurrent` (parent-gated; branches to nativeExport on iOS/Android, anchor-download on web). |
 | **PWA** | `beforeinstallprompt` listener — reveals `#btnInstall` on the title screen. |
 | **KEYBOARD** | Ctrl/Cmd+Z = undo (only on the draw screen). |
 | **INIT** | `init()` is async: `await rehydrateFromNativePrefs()` → `loadSettings()` → builders → handlers → `startAutosave()` → `setupStatusBar()` + delayed `hideSplashScreen()`. |
@@ -553,6 +553,28 @@ App Store Connect / Play Console upload slot
   history and fill code wrap it in try/catch.
 - **`composePng()` is async** because it inline-renders the SVG via a
   Blob URL → Image roundtrip. Only `await` it on save.
+- **The export is framed to the PAGE, not the viewport** (fixed
+  2026-08-06). `composePng` used to size the output from
+  `canvas.width/height` — but the canvas fills the whole screen, so
+  every save carried the *device's window aspect*: a 2.07:1 desktop
+  viewport exported a 2.07:1 PNG with the 1.83:1 page letterboxed
+  inside a band of bare paper, and the Pro frames then framed the
+  paper rather than the drawing. Output now takes the ART element's
+  aspect, the strokes are blitted from that same rect, and the line
+  art fills the result edge to edge. Two things this must keep doing:
+  **BLANK has no art element** and correctly falls back to the
+  viewport aspect (there is no page to frame to); and **zoom is
+  neutralized first** — every rect here is a live client rect, so
+  saving while pinched in would otherwise export the zoomed crop. The
+  view is reset, measured, and restored inside one synchronous block
+  (layout is forced, nothing repaints between), then the async drawing
+  runs off the captured numbers.
+- **All 52 pages are 1.833:1, but the ART inside them is not.** A
+  page that renders mostly-empty is a *source-art* property, not an
+  export bug: ink covers 100% of the page width on most scenes but
+  only 31% (leaf) and 35% (beans) on the single-object EXTRAS. Measure
+  before blaming the engine — `Image.getbbox()` on the alpha channel
+  of `assets/coloring-pages/*.png` gives it in one line.
 - **Audio is gesture-gated.** First `pointerdown` / `keydown` unlocks
   the `AudioContext`. Title-screen audio is silent until the first
   tap.
