@@ -55,13 +55,28 @@ via Capacitor.
   always true on web (the showcase) and false on native until billing
   sets the flag. Pattern fills stay free forever. See "Tiny Canvas
   Pro" below for the locked decisions and engine notes.
-- **Android release is BUILT and SIGNED but NOT UPLOADED.** versionCode
-  2 / versionName 1.0.1, targeting API 35. The upload keystore exists
-  (§F) — do not generate another. Play rejected vc1 for targeting API
-  34; that is fixed.
-- **Store assets are ready** in `store/` — 512 and 1024 icons, feature
-  graphic. `store/screenshots/` is still **empty** and screenshots are
-  the remaining blocker for the listing.
+- **⚠ Android vc2 / 1.0.1 is SUBMITTED and IN REVIEW on Play**
+  (2026-08-06, Onion's report; the listing and screenshots are done —
+  the older "NOT UPLOADED / screenshots are the blocker" note was
+  stale). Targeting API 35; Play rejected vc1 for targeting 34 and
+  that is fixed. The upload keystore exists (§F) — do not generate
+  another.
+
+  **The build in review is far behind the web.** Verified inside
+  `android/app/build/outputs/bundle/release/app-release.aab` (built
+  Aug 5): `base/assets/public/index.html` reads `?v=22` and its
+  `game.js` is 117,900 bytes against the current 229,833. So it
+  predates the 14 raster coloring pages, the whole Pro value pass
+  (brushes / stamps / papers / frames / billing), zoom, and the
+  2026-08-06 export fixes. **This is known and deliberate — Onion is
+  letting it clear review and updating immediately after.** Do not
+  treat the in-review build as representative of the code, and do not
+  push her to replace the submission.
+
+  For that update build: bump `versionCode` to 3 in
+  `android/app/build.gradle`, and note `www/` is still staged at v22 —
+  re-run `node scripts/build-www.mjs` before `npx cap copy android`,
+  or the "new" build ships the old payload again.
 - **Pro tier is decided but not built.** Pattern fills are the first
   piece and are in, ungated. No billing code exists yet. See "Tiny
   Canvas Pro" below.
