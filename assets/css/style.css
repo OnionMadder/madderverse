@@ -133,6 +133,8 @@ body.kids-hub {
     box-shadow:
         0 1px 0 rgba(255, 255, 255, 0.04) inset,
         0 6px 24px rgba(0, 0, 0, 0.45);
+    color: inherit;
+    text-decoration: none;
 }
 
 @media (min-width: 600px) {
@@ -251,10 +253,16 @@ body.kids-hub {
 
 .game-card:active { transform: translateY(0) scale(0.99); }
 
-.play-btn:active, .play-btn:hover {
+@media (hover: hover) {
+    .game-card:hover .play-btn {
+        background: var(--accent-cyan);
+        color: #000;
+        box-shadow: 0 0 25px var(--accent-cyan);
+    }
+}
+.game-card:active .play-btn {
     background: var(--accent-cyan);
     color: #000;
-    box-shadow: 0 0 25px var(--accent-cyan);
 }
 
 /* Article pages (about, legal) */
