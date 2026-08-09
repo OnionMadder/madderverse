@@ -26,9 +26,10 @@
 
    - FREE (pro: false) — BLANK + six basics. Everyone gets these.
    - Eleven themed CATEGORIES (pro: true) — six scenes each. In
-     each, exactly ONE page carries `free: true` — the category's
-     free representative. Free tier = BLANK + 6 basics + 11 reps
-     = 18 pages; Pro adds the other 54.
+     each, THREE pages carry `free: true` — the category's free
+     representatives (bumped 2026-08-09; was one apiece). Free
+     tier = BLANK + 6 basics + 33 reps = 40 pages; Pro adds the
+     other 33.
 
    The picker (buildPicker in game.js) renders:
    - unlocked (all of web, purchased native): every pack as its
@@ -63,8 +64,8 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "animals", label: "ANIMALS", pro: true,
         pages: [
             { id: "cat",     name: "KITCHEN CAT", image: "assets/coloring-pages/animals/cat.png", free: true },
-            { id: "dog",     name: "PUPPY",       image: "assets/coloring-pages/animals/dog.png" },
-            { id: "unicorn", name: "UNICORN",     image: "assets/coloring-pages/animals/unicorn.png" },
+            { id: "dog",     name: "PUPPY",       image: "assets/coloring-pages/animals/dog.png", free: true },
+            { id: "unicorn", name: "UNICORN",     image: "assets/coloring-pages/animals/unicorn.png", free: true },
             { id: "bird",    name: "BIRD NEST",   image: "assets/coloring-pages/animals/bird.png" },
             { id: "lizard",  name: "IGUANA",      image: "assets/coloring-pages/animals/lizard.png" },
             { id: "skunk",   name: "SKUNK",       image: "assets/coloring-pages/animals/skunk.png" }
@@ -74,10 +75,10 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "insects", label: "BUGS", pro: true,
         pages: [
             { id: "ladybug",   name: "LADYBUG",    image: "assets/coloring-pages/insects/ladybug.png", free: true },
-            { id: "butterfly", name: "BUTTERFLY",  image: "assets/coloring-pages/insects/butterfly.png" },
+            { id: "butterfly", name: "BUTTERFLY",  image: "assets/coloring-pages/insects/butterfly.png", free: true },
             { id: "bees",      name: "BEEHIVE",    image: "assets/coloring-pages/insects/bees.png" },
             { id: "ants",      name: "ANT CITY",   image: "assets/coloring-pages/insects/ants.png" },
-            { id: "snails",    name: "SNAIL RACE", image: "assets/coloring-pages/insects/snails.png" },
+            { id: "snails",    name: "SNAIL RACE", image: "assets/coloring-pages/insects/snails.png", free: true },
             { id: "spider",    name: "SPIDER WEB", image: "assets/coloring-pages/insects/spider.png" }
         ]
     },
@@ -85,10 +86,10 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "ocean", label: "OCEAN", pro: true,
         pages: [
             { id: "fish",      name: "BIG FISH",   image: "assets/coloring-pages/ocean/fish.png", free: true },
-            { id: "reef",      name: "CORAL REEF", image: "assets/coloring-pages/ocean/reef.png" },
+            { id: "reef",      name: "CORAL REEF", image: "assets/coloring-pages/ocean/reef.png", free: true },
             { id: "shipwreck", name: "SHIPWRECK",  image: "assets/coloring-pages/ocean/shipwreck.png" },
             { id: "mermaids",  name: "MERMAIDS",   image: "assets/coloring-pages/ocean/mermaids.png" },
-            { id: "treasure",  name: "TREASURE",   image: "assets/coloring-pages/ocean/treasure.png" },
+            { id: "treasure",  name: "TREASURE",   image: "assets/coloring-pages/ocean/treasure.png", free: true },
             { id: "atlantis",  name: "ATLANTIS",   image: "assets/coloring-pages/ocean/atlantis.png" }
         ]
     },
@@ -96,9 +97,9 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "dinosaurs", label: "DINOSAURS", pro: true,
         pages: [
             { id: "longneck",     name: "LONGNECK",     image: "assets/coloring-pages/dinosaurs/longneck.png", free: true },
-            { id: "trex",         name: "T-REX",        image: "assets/coloring-pages/dinosaurs/predator.png" },
+            { id: "trex",         name: "T-REX",        image: "assets/coloring-pages/dinosaurs/predator.png", free: true },
             { id: "raptor",       name: "RAPTOR",       image: "assets/coloring-pages/dinosaurs/feathered.png" },
-            { id: "stego-family", name: "STEGO FAMILY", image: "assets/coloring-pages/dinosaurs/family.png" },
+            { id: "stego-family", name: "STEGO FAMILY", image: "assets/coloring-pages/dinosaurs/family.png", free: true },
             { id: "dino-parade",  name: "DINO PARADE",  image: "assets/coloring-pages/dinosaurs/herd.png" },
             { id: "dino-meadow",  name: "DINO MEADOW",  image: "assets/coloring-pages/dinosaurs/pastoral.png" }
         ]
@@ -107,19 +108,19 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "space", label: "SPACE", pro: true,
         pages: [
             { id: "base",      name: "MOON BASE",       image: "assets/coloring-pages/space/base.png", free: true },
-            { id: "spacewalk", name: "SPACEWALK",       image: "assets/coloring-pages/space/spacewalk.png" },
+            { id: "spacewalk", name: "SPACEWALK",       image: "assets/coloring-pages/space/spacewalk.png", free: true },
             { id: "picnic",    name: "ALIEN PICNIC",    image: "assets/coloring-pages/space/picnic.png" },
             { id: "comet",     name: "COMET RIDE",      image: "assets/coloring-pages/space/comet.png" },
             { id: "control",   name: "MISSION CONTROL", image: "assets/coloring-pages/space/control.png" },
-            { id: "earth",     name: "EARTHRISE",       image: "assets/coloring-pages/space/earth.png" }
+            { id: "earth",     name: "EARTHRISE",       image: "assets/coloring-pages/space/earth.png", free: true }
         ]
     },
     {
         id: "transportation", label: "GO GO GO", pro: true,
         pages: [
             { id: "rocket",   name: "ROCKET SHIP", image: "assets/coloring-pages/transportation/rocket.png", free: true },
-            { id: "car",      name: "ROAD TRIP",   image: "assets/coloring-pages/transportation/car.png" },
-            { id: "truck",    name: "FIRE TRUCK",  image: "assets/coloring-pages/transportation/truck.png" },
+            { id: "car",      name: "ROAD TRIP",   image: "assets/coloring-pages/transportation/car.png", free: true },
+            { id: "truck",    name: "FIRE TRUCK",  image: "assets/coloring-pages/transportation/truck.png", free: true },
             { id: "airplane", name: "AIRPLANE",    image: "assets/coloring-pages/transportation/airplane.png" },
             { id: "ship",     name: "CRUISE SHIP", image: "assets/coloring-pages/transportation/ship.png" },
             { id: "hover",    name: "HOVER CAR",   image: "assets/coloring-pages/transportation/hover.png" }
@@ -129,19 +130,19 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "music", label: "MUSIC", pro: true,
         pages: [
             { id: "guitar",  name: "GUITAR",  image: "assets/coloring-pages/music/guitar.png", free: true },
-            { id: "drums",   name: "DRUMS",   image: "assets/coloring-pages/music/drums.png" },
+            { id: "drums",   name: "DRUMS",   image: "assets/coloring-pages/music/drums.png", free: true },
             { id: "bass",    name: "BASS",    image: "assets/coloring-pages/music/bass.png" },
             { id: "harp",    name: "HARP",    image: "assets/coloring-pages/music/harp.png" },
             { id: "synth",   name: "SYNTH",   image: "assets/coloring-pages/music/synth.png" },
-            { id: "maracas", name: "MARACAS", image: "assets/coloring-pages/music/maracas.png" }
+            { id: "maracas", name: "MARACAS", image: "assets/coloring-pages/music/maracas.png", free: true }
         ]
     },
     {
         id: "food", label: "FOOD", pro: true,
         pages: [
             { id: "donut",     name: "DONUT",       image: "assets/coloring-pages/food/donut.png", free: true },
-            { id: "cupcakes",  name: "CUPCAKES",    image: "assets/coloring-pages/food/cupcakes.png" },
-            { id: "bananas",   name: "BANANAS",     image: "assets/coloring-pages/food/bananas.png" },
+            { id: "cupcakes",  name: "CUPCAKES",    image: "assets/coloring-pages/food/cupcakes.png", free: true },
+            { id: "bananas",   name: "BANANAS",     image: "assets/coloring-pages/food/bananas.png", free: true },
             { id: "breakfast", name: "BREAKFAST",   image: "assets/coloring-pages/food/breakfast.png" },
             { id: "curry",     name: "CURRY FEAST", image: "assets/coloring-pages/food/curry.png" },
             { id: "dinner",    name: "FISH DINNER", image: "assets/coloring-pages/food/dinner.png" }
@@ -151,19 +152,19 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "home", label: "HOME", pro: true,
         pages: [
             { id: "cabin",    name: "COZY CABIN", image: "assets/coloring-pages/home/cabin.png", free: true },
-            { id: "bear",     name: "TEDDY BEAR", image: "assets/coloring-pages/home/bear.png" },
+            { id: "bear",     name: "TEDDY BEAR", image: "assets/coloring-pages/home/bear.png", free: true },
             { id: "kitchen",  name: "KITCHEN",    image: "assets/coloring-pages/home/kitchen.png" },
             { id: "den",      name: "PIANO ROOM", image: "assets/coloring-pages/home/den.png" },
             { id: "garage",   name: "GARAGE",     image: "assets/coloring-pages/home/garage.png" },
-            { id: "backyard", name: "BACKYARD",   image: "assets/coloring-pages/home/backyard.png" }
+            { id: "backyard", name: "BACKYARD",   image: "assets/coloring-pages/home/backyard.png", free: true }
         ]
     },
     {
         id: "places", label: "PLACES", pro: true,
         pages: [
             { id: "egypt",        name: "EGYPT",         image: "assets/coloring-pages/places/egypt.png", free: true },
-            { id: "brazil",       name: "BRAZIL",        image: "assets/coloring-pages/places/brazil.png" },
-            { id: "alaska",       name: "ALASKA",        image: "assets/coloring-pages/places/alaska.png" },
+            { id: "brazil",       name: "BRAZIL",        image: "assets/coloring-pages/places/brazil.png", free: true },
+            { id: "alaska",       name: "ALASKA",        image: "assets/coloring-pages/places/alaska.png", free: true },
             { id: "cabo",         name: "CABO",          image: "assets/coloring-pages/places/cabo.png" },
             { id: "tamilnadu",    name: "TAMIL NADU",    image: "assets/coloring-pages/places/tamilnadu.png" },
             { id: "newhampshire", name: "NEW HAMPSHIRE", image: "assets/coloring-pages/places/newhampshire.png" }
@@ -173,8 +174,8 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "snowflakes", label: "SNOWFLAKES", pro: true,
         pages: [
             { id: "1flake", name: "SNOWFLAKE 1", image: "assets/coloring-pages/snowflakes/1flake.png", free: true },
-            { id: "2flake", name: "SNOWFLAKE 2", image: "assets/coloring-pages/snowflakes/2flake.png" },
-            { id: "3flake", name: "SNOWFLAKE 3", image: "assets/coloring-pages/snowflakes/3flake.png" },
+            { id: "2flake", name: "SNOWFLAKE 2", image: "assets/coloring-pages/snowflakes/2flake.png", free: true },
+            { id: "3flake", name: "SNOWFLAKE 3", image: "assets/coloring-pages/snowflakes/3flake.png", free: true },
             { id: "4flake", name: "SNOWFLAKE 4", image: "assets/coloring-pages/snowflakes/4flake.png" },
             { id: "5flake", name: "SNOWFLAKE 5", image: "assets/coloring-pages/snowflakes/5flake.png" },
             { id: "6flake", name: "SNOWFLAKE 6", image: "assets/coloring-pages/snowflakes/6flake.png" }

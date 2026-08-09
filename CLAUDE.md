@@ -562,7 +562,7 @@ locked decisions in the game's CLAUDE.md.
 
 Its own cache-bust convention applies: **bump `?v=N` in
 `tiny-canvas/index.html` on every change** to `style.css`,
-`templates.js` or `game.js` (currently v33).
+`templates.js` or `game.js` (currently v45).
 
 ---
 

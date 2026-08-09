@@ -140,6 +140,7 @@
     const SETTINGS_KEY       = "tinyCanvas.settings.v1";
     const IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
     const FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
+    const ERASE_TIP_KEY      = "tinyCanvas.eraseTipShown.v1";
     const GATE_UNLOCKED_KEY  = "tinyCanvas.parentGate.unlockedUntil.v1";
     /* Pro unlock flag — "1" once the one-off purchase is made. Only
        consulted on NATIVE: the web build always has everything (it is
@@ -194,54 +195,11 @@
     }
 
     const BRUSHES = {
-        pen: {
-            label:       "PEN",
-            alpha:       1,
-            defaultSize: 10,
-            beginStroke: function (ctx, p, size, color) {
-                ctx.globalCompositeOperation = "source-over";
-                ctx.globalAlpha = 1;
-                ctx.fillStyle   = color;
-                ctx.strokeStyle = color;
-                ctx.lineWidth   = size;
-                ctx.lineCap     = "round";
-                ctx.lineJoin    = "round";
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
-                ctx.fill();
-            },
-            drawSegment: function (ctx, p0, p1) {
-                ctx.beginPath();
-                ctx.moveTo(p0.x, p0.y);
-                ctx.lineTo(p1.x, p1.y);
-                ctx.stroke();
-            }
-        },
-
-        marker: {
-            label:       "MARKER",
-            alpha:       0.78,
-            defaultSize: 28,
-            beginStroke: function (ctx, p, size, color) {
-                ctx.globalCompositeOperation = "source-over";
-                ctx.globalAlpha = 1;
-                ctx.fillStyle   = color;
-                ctx.strokeStyle = color;
-                ctx.lineWidth   = size;
-                ctx.lineCap     = "round";
-                ctx.lineJoin    = "round";
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
-                ctx.fill();
-            },
-            drawSegment: function (ctx, p0, p1) {
-                ctx.beginPath();
-                ctx.moveTo(p0.x, p0.y);
-                ctx.lineTo(p1.x, p1.y);
-                ctx.stroke();
-            }
-        },
-
+        /* PEN, MARKER, PENCIL and PAINT were retired 2026-08-09 —
+           they read as redundant variants of a solid-colour stroke.
+           CRAYON kept as the textured default; GLITTER for the
+           sparkle novelty; the four Pro brushes (SPRAY / RAINBOW /
+           GLOW / SMUDGE) do the rest. */
         crayon: {
             /* Stippled-grain texture. Dabs along the path with small
                random offsets at moderate alpha — multiple dabs per
@@ -273,80 +231,6 @@
                     const rr = r * (0.62 + Math.random() * 0.38);
                     ctx.beginPath();
                     ctx.arc(x + ox, y + oy, rr, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-        },
-
-        pencil: {
-            /* Thin, scratchy, low-alpha hand-drawn feel. The width is
-               narrower than the nominal size because pencils make
-               narrow marks even at "thick" settings. */
-            label:       "PENCIL",
-            alpha:       0.55,
-            defaultSize: 4,
-            beginStroke: function (ctx, p, size, color) {
-                ctx.globalCompositeOperation = "source-over";
-                ctx.globalAlpha = 1;
-                const w = Math.max(1, size * 0.5);
-                ctx.strokeStyle = color;
-                ctx.fillStyle   = color;
-                ctx.lineWidth   = w;
-                ctx.lineCap     = "round";
-                ctx.lineJoin    = "round";
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, w / 2, 0, Math.PI * 2);
-                ctx.fill();
-            },
-            drawSegment: function (ctx, p0, p1) {
-                ctx.beginPath();
-                ctx.moveTo(p0.x, p0.y);
-                ctx.lineTo(p1.x, p1.y);
-                ctx.stroke();
-            }
-        },
-
-        paint: {
-            /* Watercolor / paint feel — stacked translucent passes
-               with width variation. Wider base softens the edge;
-               narrow center gives a saturated core. */
-            label:       "PAINT",
-            alpha:       1,   /* keeps its own per-pass alphas — they are the soft edge */
-            defaultSize: 28,
-            beginStroke: function (ctx, p, size, color) {
-                ctx.globalCompositeOperation = "source-over";
-                ctx.fillStyle   = color;
-                ctx.strokeStyle = color;
-                ctx.lineCap     = "round";
-                ctx.lineJoin    = "round";
-                this._stackDab(ctx, p.x, p.y, size);
-            },
-            drawSegment: function (ctx, p0, p1, size) {
-                /* Three passes: wide+faint, mid, narrow+strong. */
-                const passes = [
-                    { w: size * 1.25, a: 0.18 },
-                    { w: size * 0.85, a: 0.30 },
-                    { w: size * 0.50, a: 0.45 }
-                ];
-                for (let i = 0; i < passes.length; i++) {
-                    ctx.globalAlpha = passes[i].a;
-                    ctx.lineWidth   = passes[i].w;
-                    ctx.beginPath();
-                    ctx.moveTo(p0.x, p0.y);
-                    ctx.lineTo(p1.x, p1.y);
-                    ctx.stroke();
-                }
-            },
-            _stackDab: function (ctx, x, y, size) {
-                const passes = [
-                    { r: size * 0.62, a: 0.18 },
-                    { r: size * 0.42, a: 0.30 },
-                    { r: size * 0.25, a: 0.45 }
-                ];
-                for (let i = 0; i < passes.length; i++) {
-                    ctx.globalAlpha = passes[i].a;
-                    ctx.beginPath();
-                    ctx.arc(x, y, passes[i].r, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
@@ -626,27 +510,43 @@
         },
 
         eraser: {
+            /* Peels the top layer instead of wiping to bare paper.
+               beginStroke/drawSegment defer to eraserPaintReveal
+               (defined next to the reveal snapshot helpers), which
+               samples pixels from revealCanvas — the canvas as it
+               was BEFORE the most recent non-erase op. `direct:
+               true` keeps this off the wet-stroke layer; the
+               reveal composite has to hit the real canvas. */
             label:       "ERASER",
             alpha:       1,
-            direct:      true,   /* destination-out must hit the real canvas */
+            direct:      true,
             defaultSize: 28,
             beginStroke: function (ctx, p, size) {
-                ctx.globalCompositeOperation = "destination-out";
-                ctx.globalAlpha = 1;
-                ctx.fillStyle   = "#000";
-                ctx.strokeStyle = "#000";
-                ctx.lineWidth   = size;
-                ctx.lineCap     = "round";
-                ctx.lineJoin    = "round";
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, size / 2, 0, Math.PI * 2);
-                ctx.fill();
+                const r = size / 2;
+                eraserPaintReveal(ctx,
+                    function (m) {
+                        m.beginPath();
+                        m.arc(p.x, p.y, r, 0, Math.PI * 2);
+                        m.fill();
+                    },
+                    p.x - r, p.y - r, p.x + r, p.y + r);
             },
-            drawSegment: function (ctx, p0, p1) {
-                ctx.beginPath();
-                ctx.moveTo(p0.x, p0.y);
-                ctx.lineTo(p1.x, p1.y);
-                ctx.stroke();
+            drawSegment: function (ctx, p0, p1, size) {
+                const r = size / 2;
+                eraserPaintReveal(ctx,
+                    function (m) {
+                        m.lineWidth = size;
+                        m.lineCap   = "round";
+                        m.lineJoin  = "round";
+                        m.beginPath();
+                        m.moveTo(p0.x, p0.y);
+                        m.lineTo(p1.x, p1.y);
+                        m.stroke();
+                    },
+                    Math.min(p0.x, p1.x) - r,
+                    Math.min(p0.y, p1.y) - r,
+                    Math.max(p0.x, p1.x) + r,
+                    Math.max(p0.y, p1.y) + r);
             }
         }
     };
@@ -655,7 +555,7 @@
        deciding which size set + palette state apply. The last four
        are Pro (their buttons carry data-pro and stay hidden on a
        locked native build — see revealProUI). */
-    const BRUSH_IDS  = ["pen", "marker", "crayon", "pencil", "paint", "glitter",
+    const BRUSH_IDS  = ["crayon", "glitter",
                         "spray", "rainbow", "glow", "smudge"];
     const TOOL_IDS   = BRUSH_IDS.concat("eraser");
 
@@ -666,14 +566,20 @@
         templateId:    null,                    /* current template */
         templateName:  "BLANK",
         currentColor:  COLOR_GROUPS.rainbow.colors[0],
-        currentTool:   "pen",
+        currentTool:   "crayon",
+        lastNonEraseTool: "crayon", /* remembers the last brush/fill/stamp
+                                       the kid used, so ERASE mode matches:
+                                       last was FILL → fill-erase (tap a
+                                       region back to what was under it);
+                                       any brush/stamp → brush-erase (drag
+                                       reveals the previous layer). */
         fillPattern:   "solid",   /* id from FILL_PATTERNS */                   /* any key in BRUSHES */
         stampId:       "heart",   /* id from STAMPS (STAMP tool) */
         stampPack:     "classics", /* active STAMP_PACKS tab */
         rainbowHue:    0,         /* per-stroke hue cursor (RAINBOW brush) */
         proUnlocked:   false,     /* native purchase flag — see isPro() */
         colorGroup:    "rainbow",               /* active palette group */
-        brushSize:     BRUSHES.pen.defaultSize, /* size for whichever brush is active */
+        brushSize:     BRUSHES.crayon.defaultSize, /* size for whichever brush is active */
         eraserSize:    BRUSHES.eraser.defaultSize,
         isDrawing:     false,
         lastX:         0,                       /* raw pointer */
@@ -1031,7 +937,7 @@
     }
 
     function currentBrush() {
-        return BRUSHES[state.currentTool] || BRUSHES.pen;
+        return BRUSHES[state.currentTool] || BRUSHES.crayon;
     }
 
     /* ---------- 1a. CAPACITOR NATIVE BRIDGE ----------
@@ -1482,6 +1388,10 @@
         ctx2d.setTransform(1, 0, 0, 1, 0, 0);
         ctx2d.clearRect(0, 0, canvas.width, canvas.height);
         ctx2d.restore();
+        /* Reset the erase-reveal buffer too — after CLEAR, "last
+           layer" IS bare paper. Without this an eraser stroke would
+           bring back pixels from before the clear. */
+        clearRevealCanvas();
         if (!keepHistory) state.history.length = 0;
         state.dirty = false;
         updateUndoButton();
@@ -2067,6 +1977,8 @@
                 return dr * dr + dg * dg + db * db + da * da <= TOL2;
             }
 
+            /* Snapshot BEFORE painting — the eraser peels back to this. */
+            captureRevealSnapshot();
             beginHistoryCapture();
 
             const seen = new Uint8Array(W * H);
@@ -2165,6 +2077,127 @@
             hideIdleScribble();
             triggerOnionReaction("drawing", 500);
             sfxTap();
+        });
+    }
+
+    /* Fill-erase — the counterpart to floodFillAt when the ERASE
+       tool is armed and the kid's last brush was FILL. Same flood
+       walk, same mask, same tolerance — but instead of painting
+       the armed color, each seen pixel gets its value from
+       revealCanvas (the state before the most recent non-erase
+       op). Effect: tapping a filled region reverts JUST that region
+       to whatever was underneath.
+
+       Does NOT call captureRevealSnapshot — this consumes the
+       reveal, it doesn't advance it. */
+    function floodFillEraseAt(p) {
+        buildFillMask().then(function (mask) {
+            const W = fillMaskW, H = fillMaskH;
+            if (!W || !H) return;
+            if (!STAGE_W || !STAGE_H) return;
+            const sx = Math.round(p.x * (W / STAGE_W));
+            const sy = Math.round(p.y * (H / STAGE_H));
+            if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
+            if (mask[sy * W + sx]) {
+                /* Tapped a printed line — nothing to unfill, but this
+                   is the classic "nothing happened" moment for the
+                   tutorial. */
+                maybeShowEraseTip();
+                return;
+            }
+
+            let image, revealImage;
+            try {
+                image = ctx2d.getImageData(0, 0, W, H);
+                ensureRevealCanvas();
+                revealImage = revealCtx.getImageData(0, 0, W, H);
+            } catch (_) { return; }
+            const data       = image.data;
+            const revealData = revealImage.data;
+
+            const si = (sy * W + sx) * 4;
+            const seedR = data[si], seedG = data[si + 1],
+                  seedB = data[si + 2], seedA = data[si + 3];
+
+            const TOL2 = 6 * 6;
+            function matches(i) {
+                if (mask[i]) return false;
+                const q = i * 4;
+                const dr = data[q]     - seedR;
+                const dg = data[q + 1] - seedG;
+                const db = data[q + 2] - seedB;
+                const da = data[q + 3] - seedA;
+                return dr * dr + dg * dg + db * db + da * da <= TOL2;
+            }
+
+            beginHistoryCapture();
+
+            const seen  = new Uint8Array(W * H);
+            const stack = [sy * W + sx];
+            while (stack.length) {
+                const seed = stack.pop();
+                const y = (seed / W) | 0;
+                let   x = seed - y * W;
+                while (x > 0 && !seen[y * W + x - 1] &&
+                       matches(y * W + x - 1)) x--;
+                let spanUp = false, spanDown = false;
+                while (x < W) {
+                    const i = y * W + x;
+                    if (seen[i] || !matches(i)) break;
+                    seen[i] = 1;
+                    growBoundsDevice(x, y);
+                    if (y > 0) {
+                        const up = i - W;
+                        const openUp = !seen[up] && matches(up);
+                        if (openUp && !spanUp) { stack.push(up); spanUp = true; }
+                        else if (!openUp)      { spanUp = false; }
+                    }
+                    if (y < H - 1) {
+                        const dn = i + W;
+                        const openDn = !seen[dn] && matches(dn);
+                        if (openDn && !spanDown) { stack.push(dn); spanDown = true; }
+                        else if (!openDn)        { spanDown = false; }
+                    }
+                    x++;
+                }
+            }
+
+            /* Paint pass: each seen pixel becomes its reveal counterpart.
+               Track pixel-level changes so a tap on an already-matching
+               region (nothing to peel) fires the tutorial. */
+            let changed = 0;
+            for (let i = 0; i < seen.length; i++) {
+                if (!seen[i]) continue;
+                const q = i * 4;
+                const rr = revealData[q],     rg = revealData[q + 1],
+                      rb = revealData[q + 2], ra = revealData[q + 3];
+                if (data[q]     !== rr || data[q + 1] !== rg ||
+                    data[q + 2] !== rb || data[q + 3] !== ra) changed++;
+                data[q]     = rr;
+                data[q + 1] = rg;
+                data[q + 2] = rb;
+                data[q + 3] = ra;
+            }
+
+            ctx2d.save();
+            ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+            ctx2d.putImageData(image, 0, 0);
+            ctx2d.restore();
+
+            sMaxX += 1; sMaxY += 1;
+            if (changed > 0) {
+                commitHistory();
+                lastOneShotCommit = Date.now();
+                state.dirty = true;
+                markInProgressDirty();
+                sfxErase();
+            } else {
+                /* No pixels actually changed — the region was already
+                   what's underneath. Skip the empty history patch and
+                   nudge the kid. */
+                maybeShowEraseTip();
+            }
+            updateStatus();
         });
     }
 
@@ -3049,6 +3082,8 @@
            effectiveSize keeps that ON-SCREEN size constant under zoom,
            so zooming in places smaller, finer stamps. */
         const size = effectiveSize() * 3.2;
+        /* Snapshot BEFORE painting — the eraser peels back to this. */
+        captureRevealSnapshot();
         beginHistoryCapture();
         ctx2d.save();
         ctx2d.globalCompositeOperation = "source-over";
@@ -3313,6 +3348,127 @@
         else                            btn.removeAttribute("disabled");
     }
 
+    /* ---------- 3b. ERASE-REVEAL SNAPSHOT ----------
+
+       Erase peels back to the LAST layer, not to bare paper. The
+       reveal snapshot is the canvas as it was JUST BEFORE the most
+       recent non-erase operation (stroke, fill, or stamp) — so
+       painting a cloud over a red sky, then erasing the cloud,
+       gives the red sky back.
+
+       Two buffers:
+       - revealCanvas: the persistent snapshot the eraser samples
+         from. Captured before every non-erase op via
+         captureRevealSnapshot().
+       - revealScratch: a per-stroke workspace used to mask the
+         reveal blit down to just the eraser's footprint. Bounded
+         by the segment's dirty rect so it stays cheap on phones.
+
+       When there is no prior layer to reveal (fresh page, first
+       stroke), revealCanvas is empty and the eraser cleanly erases
+       to bare paper — the pre-2026-08-09 behaviour. */
+
+    let revealCanvas = null, revealCtx = null;
+    let revealScratch = null, revealScratchCtx = null;
+
+    function ensureRevealCanvas() {
+        if (!revealCanvas) {
+            revealCanvas = document.createElement("canvas");
+            revealCtx = revealCanvas.getContext("2d", { willReadFrequently: true });
+        }
+        if (revealCanvas.width  !== canvas.width ||
+            revealCanvas.height !== canvas.height) {
+            revealCanvas.width  = canvas.width;
+            revealCanvas.height = canvas.height;
+        }
+        if (!revealScratch) {
+            revealScratch = document.createElement("canvas");
+            revealScratchCtx = revealScratch.getContext("2d");
+        }
+        if (revealScratch.width  !== canvas.width ||
+            revealScratch.height !== canvas.height) {
+            revealScratch.width  = canvas.width;
+            revealScratch.height = canvas.height;
+        }
+    }
+
+    /* Blit the current canvas into revealCanvas. Call this BEFORE
+       any non-erase modification (stroke start, fill, stamp) — the
+       eraser then reads from this to peel back to the pre-op state. */
+    function captureRevealSnapshot() {
+        ensureRevealCanvas();
+        revealCtx.save();
+        revealCtx.setTransform(1, 0, 0, 1, 0, 0);
+        revealCtx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
+        revealCtx.drawImage(canvas, 0, 0);
+        revealCtx.restore();
+    }
+
+    /* Reset the reveal buffer — call on CLEAR and template swap so
+       the eraser after a clear reveals bare paper, not the ghost of
+       the previous page. */
+    function clearRevealCanvas() {
+        if (!revealCanvas) return;
+        revealCtx.save();
+        revealCtx.setTransform(1, 0, 0, 1, 0, 0);
+        revealCtx.clearRect(0, 0, revealCanvas.width, revealCanvas.height);
+        revealCtx.restore();
+    }
+
+    /* Paint pixels from revealCanvas onto the main canvas, clipped
+       to a brush footprint. Two-pass:
+         1) destination-out with the mask shape → clears the footprint
+            on the main canvas
+         2) source-in the reveal pixels into a scratch mask, then
+            source-over that patch back onto the main canvas
+       Both passes are bounded by the segment's dirty rect (dx..dw,
+       dy..dh in device px) so cost scales with the segment size,
+       not the whole canvas. */
+    function eraserPaintReveal(mainCtx, drawShapeIntoMask,
+                               minLx, minLy, maxLx, maxLy) {
+        ensureRevealCanvas();
+        const dpr = state.dpr || 1;
+        const dx = Math.max(0, Math.floor(minLx * dpr));
+        const dy = Math.max(0, Math.floor(minLy * dpr));
+        const dw = Math.min(canvas.width,  Math.ceil(maxLx * dpr)) - dx;
+        const dh = Math.min(canvas.height, Math.ceil(maxLy * dpr)) - dy;
+        if (dw <= 0 || dh <= 0) return;
+
+        /* Build a dpr-scaled mask of the brush footprint into the
+           scratch's dirty rect, then use source-in to keep only the
+           reveal pixels covered by that mask. */
+        revealScratchCtx.save();
+        revealScratchCtx.setTransform(1, 0, 0, 1, 0, 0);
+        revealScratchCtx.globalCompositeOperation = "source-over";
+        revealScratchCtx.globalAlpha = 1;
+        revealScratchCtx.clearRect(dx, dy, dw, dh);
+        revealScratchCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        revealScratchCtx.fillStyle   = "#000";
+        revealScratchCtx.strokeStyle = "#000";
+        drawShapeIntoMask(revealScratchCtx);
+        revealScratchCtx.setTransform(1, 0, 0, 1, 0, 0);
+        revealScratchCtx.globalCompositeOperation = "source-in";
+        revealScratchCtx.drawImage(revealCanvas, dx, dy, dw, dh,
+                                                  dx, dy, dw, dh);
+        revealScratchCtx.restore();
+
+        /* Main canvas: clear the footprint, then lay in the masked
+           reveal patch. mainCtx enters at the dpr transform (setupCanvas
+           invariant); ctx.save/restore preserves that around the
+           identity-transform blit of the reveal patch. */
+        mainCtx.save();
+        mainCtx.globalCompositeOperation = "destination-out";
+        mainCtx.globalAlpha = 1;
+        mainCtx.fillStyle   = "#000";
+        mainCtx.strokeStyle = "#000";
+        drawShapeIntoMask(mainCtx);
+        mainCtx.setTransform(1, 0, 0, 1, 0, 0);
+        mainCtx.globalCompositeOperation = "source-over";
+        mainCtx.drawImage(revealScratch, dx, dy, dw, dh,
+                                          dx, dy, dw, dh);
+        mainCtx.restore();
+    }
+
     /* ---------- 4. IDLE SCRIBBLE ----------
        Kinetic centerpiece visible on a fresh blank canvas — Tiny
        Canvas's answer to Pootery's spinning clay. Fades out the
@@ -3385,14 +3541,14 @@
 
     /* ---------- 4b. WET STROKE LAYER ----------
 
-       Why this exists: every brush except PEN paints translucent
-       (marker .78, crayon .45, pencil .55, glitter .42), and each
-       drawSegment used to stroke a SEPARATE path straight onto the
-       canvas with round caps. Consecutive segments overlap at their
-       shared endpoint, so translucent ink landed on translucent ink and
-       compounded — leaving a visibly darker dot at every single pointer
-       sample. On pencil and glitter it read as a string of beads rather
-       than a line.
+       Why this exists: most brushes paint translucent (crayon .45,
+       glitter .55, spray .85, ...), and each drawSegment used to
+       stroke a SEPARATE path straight onto the canvas with round
+       caps. Consecutive segments overlap at their shared endpoint,
+       so translucent ink landed on translucent ink and compounded —
+       leaving a visibly darker dot at every single pointer sample.
+       On crayon and glitter it read as a string of beads rather than
+       a line.
 
        Real paint programs solve this by keeping the in-progress stroke
        on its own layer at FULL opacity — overlapping opaque ink of one
@@ -3515,6 +3671,21 @@
         /* Stamp is a one-shot tap too — places the armed shape and
            handles its own history entry. */
         if (isStampTool()) { placeStampAt(p); return; }
+        /* Fill-erase: last brush was FILL, so ERASE acts as a
+           tap-to-unfill — one-shot too, sharing the fill's flood
+           machinery but painting from revealCanvas. */
+        if (state.currentTool === "eraser" &&
+            state.lastNonEraseTool === "fill") {
+            floodFillEraseAt(p);
+            return;
+        }
+        /* Non-erase stroke → snapshot the canvas BEFORE the stroke
+           begins, so a later ERASE peels back to this state. Erase
+           strokes do NOT re-snapshot (they consume the reveal, they
+           don't advance it). */
+        if (state.currentTool !== "eraser") {
+            captureRevealSnapshot();
+        }
         beginHistoryCapture();
         state.isDrawing = true;
         state.lastX  = p.x;
@@ -3633,8 +3804,18 @@
             clearStrokeLayer();
         }
         /* Bank the stroke as one undo step, keeping only the rectangle
-           it actually touched. */
-        if (wasDrawing) commitHistory();
+           it actually touched. Skip the commit — and fire the soft
+           tutorial — when an erase stroke changed nothing (dragged over
+           printed lines or over already-blank paper). Banking an empty
+           patch would waste an undo slot on a no-op the kid never asked
+           for. */
+        if (wasDrawing) {
+            if (state.currentTool === "eraser" && eraseWasNoop()) {
+                maybeShowEraseTip();
+            } else {
+                commitHistory();
+            }
+        }
         state.isDrawing = false;
         /* Reset shared canvas state so the next stroke begins clean. */
         ctx2d.globalCompositeOperation = "source-over";
@@ -3856,7 +4037,7 @@
                 /* Picking a color switches to a brush if we were on
                    the eraser — kids expect the color to "do something". */
                 if (state.currentTool === "eraser") {
-                    state.currentTool = "pen";
+                    state.currentTool = state.lastNonEraseTool || "crayon";
                     refreshToolButtons();
                     rebuildSizeButtons();
                 }
@@ -4170,6 +4351,12 @@
                 const newTool = b.getAttribute("data-tool");
                 if (!BRUSHES[newTool]) return;
                 state.currentTool = newTool;
+                /* Remember the last non-erase tool so ERASE mode can
+                   mimic it (fill-erase vs brush-erase). See onPointerDown
+                   for the routing. */
+                if (newTool !== "eraser") {
+                    state.lastNonEraseTool = newTool;
+                }
                 /* Each brush has its own ergonomic default — adopt it
                    if the kid hasn't already set a size for this tool.
                    We just always reset to the default on tool switch;
@@ -4393,7 +4580,7 @@
                    colour while the eraser is armed means the kid wants
                    to draw, not rub out. */
                 if (state.currentTool === "eraser") {
-                    state.currentTool = "pen";
+                    state.currentTool = state.lastNonEraseTool || "crayon";
                     refreshToolButtons();
                     rebuildSizeButtons();
                 }
@@ -4727,6 +4914,59 @@
     function markFirstSaveCelebrated() {
         try { setStorage(FIRST_SAVE_KEY, "1"); }
         catch (_) {}
+    }
+
+    /* Soft tutorial fired the first time an erase gesture changes
+       nothing — the kid dragged the eraser over the printed lines,
+       or fill-erased an already-empty region. Once-ever, so it
+       teaches without nagging. */
+    function isEraseTipShown() {
+        try { return localStorage.getItem(ERASE_TIP_KEY) === "1"; }
+        catch (_) { return true; }
+    }
+    function markEraseTipShown() {
+        try { setStorage(ERASE_TIP_KEY, "1"); }
+        catch (_) {}
+    }
+    function maybeShowEraseTip() {
+        if (isEraseTipShown()) return;
+        const t = $("#eraseTipToast");
+        if (!t) return;
+        markEraseTipShown();
+        t.removeAttribute("hidden");
+        // eslint-disable-next-line no-unused-expressions
+        t.offsetHeight;
+        t.classList.add("is-show");
+        clearTimeout(maybeShowEraseTip._timer);
+        maybeShowEraseTip._timer = setTimeout(function () {
+            t.classList.remove("is-show");
+            setTimeout(function () { t.setAttribute("hidden", ""); }, 250);
+        }, 3200);
+    }
+
+    /* Compare the current dirty rect on the canvas against the
+       pre-stroke snapshot (histCanvas, blitted in beginHistoryCapture).
+       Returns true when zero pixels changed — the erase gesture did
+       nothing visible, so it's either over lines or over paper. */
+    function eraseWasNoop() {
+        if (!histCanvas || !histCtx) return false;
+        if (!isFinite(sMinX) || sMaxX < sMinX) return true;
+        const W = canvas.width, H = canvas.height;
+        const x = Math.max(0, Math.floor(sMinX));
+        const y = Math.max(0, Math.floor(sMinY));
+        const w = Math.min(W, Math.ceil(sMaxX)) - x;
+        const h = Math.min(H, Math.ceil(sMaxY)) - y;
+        if (w <= 0 || h <= 0) return true;
+        let pre, post;
+        try {
+            pre  = histCtx.getImageData(x, y, w, h).data;
+            post = ctx2d.getImageData(x, y, w, h).data;
+        } catch (_) { return false; }
+        if (pre.length !== post.length) return false;
+        for (let i = 0; i < pre.length; i++) {
+            if (pre[i] !== post[i]) return false;
+        }
+        return true;
     }
 
     /* ---------- 9. STATUS LINE ---------- */

@@ -7,8 +7,51 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=30** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=45** — bump it
   on every change to style.css / templates.js / game.js.
+- **Free tier bumped 1 → 3 reps per category (2026-08-09).** Every Pro
+  category now shows THREE `free: true` pages instead of one. Free tier
+  = BLANK + 6 basics + 33 reps = **40 pages** (was 18); Pro adds the
+  other 33. Rationale: a kid who liked ANIMALS previously saw one cat
+  and nothing else — three animals reads as a category worth returning
+  to. The picker still shows no locks — buildPicker just iterates every
+  `tpl.free` per pack in flat mode. See templates.js.
+- **Erase is now a REVEAL, not a wipe (2026-08-09).** Dragging the
+  eraser peels back to the canvas state as it was just BEFORE the most
+  recent non-erase op (stroke, fill, or stamp). Paint a cloud over a
+  red sky, erase the cloud → red sky comes back. Mode follows the
+  last brush: last was FILL → ERASE is tap-to-unfill a region; any
+  brush → ERASE is drag-to-brush-erase. Machinery: `revealCanvas`
+  (persistent snapshot) + `revealScratch` (per-segment mask); helpers
+  `captureRevealSnapshot()`, `clearRevealCanvas()`, `eraserPaintReveal()`,
+  `floodFillEraseAt()`. Snapshots fire from `onPointerDown` (non-erase
+  stroke path), `floodFillAt`, and `placeStampAt`; erase strokes don't
+  re-snapshot (they consume the reveal, they don't advance it).
+  `clearCanvas` also `clearRevealCanvas()` so an erase after CLEAR
+  reveals bare paper, not the ghost of the previous drawing.
+- **Soft tutorial on no-op erase (2026-08-09).** First time an erase
+  gesture changes zero pixels — kid dragged over printed lines, over
+  bare paper, or fill-erased an already-empty region — a one-shot
+  pink toast appears: "The printed lines stay — color around them!"
+  Flagged with `ERASE_TIP_KEY` so it never nags again. `eraseWasNoop()`
+  compares pre/post pixel data in the dirty rect; `maybeShowEraseTip()`
+  is the fire-once entry point.
+- **Four brushes retired (2026-08-09): PEN, MARKER, PENCIL, PAINT.**
+  All four were solid-color stroke variants with subtle textural
+  differences — kids couldn't tell them apart, and Onion called them
+  redundant. Surviving set: CRAYON (default), GLITTER, + the four
+  Pro brushes (SPRAY / RAINBOW / GLOW / SMUDGE). Combined with
+  STAMP + FILL that packs 8 tools cleanly as 2 rows of 4 in the
+  tool grid. `state.currentTool` defaults to `"crayon"` now; every
+  fallback to `BRUSHES.pen` was rewritten to `BRUSHES.crayon`.
+- **UNDO + CLEAR moved into the tool tray's action-row (2026-08-09).**
+  A new `.tool-row.action-row` sits directly under the tool grid where
+  the big ERASE pill used to. Three equal-width buttons — UNDO / ERASE
+  / CLEAR — so the destructive actions live together. UNDO+CLEAR were
+  deleted from `.draw-controls` at the bottom of the tray (SAVE stays
+  there as the primary CTA). Same IDs (`drawUndo`, `drawClear`) so the
+  JS bindings survived unchanged; ERASE is still `data-tool="eraser"`,
+  picked up by the standard tool-switch handler.
 - **Page catalog REWORKED AGAIN (2026-08-07, Onion's art — 72
   pages, the current model).** `TINY_CANVAS_PAGE_PACKS` in
   templates.js: a **FREE pack (pro:false — BLANK + sun, rainbow,
@@ -20,8 +63,9 @@ via Capacitor.
   music, snowflakes, space. Each category carries exactly ONE
   `free: true` representative (cat, ladybug, fish, longneck, base,
   rocket, guitar, donut, cabin, egypt, 1flake), so the **free tier
-  shows 18 cards** (BLANK + 6 basics + 11 reps) and Pro adds the
-  other 54. buildPicker: unlocked → 12 headed sections, everything;
+  shows 40 cards** (BLANK + 6 basics + 33 reps — three per category
+  after the 2026-08-09 bump; see the change-log bullets at the very
+  top for the rationale) and Pro adds the other 33. buildPicker: unlocked → 12 headed sections, everything;
   locked native → ONE flat headerless grid of the free pack + the 11
   reps. **`?free=1` forces the free tier on web** (FORCE_FREE in
   isPro) — the only way to preview it there, and what free-tier
@@ -147,11 +191,13 @@ Capacitor when you're packaging for a store.
   regions"). For SVG pages, prefer `<circle>`, `<ellipse>`, `<rect>`
   and paths ending in `Z`; an open stroke is fine only for decoration
   that isn't meant to hold colour.
-- **10 distinct brushes** — 6 free (PEN / MARKER / CRAYON / PENCIL /
-  PAINT / GLITTER) + 4 Pro (SPRAY / RAINBOW / GLOW / SMUDGE), each
-  with its own beginStroke + drawSegment + textural feel. Plus
-  ERASER, the FILL bucket, and the Pro STAMP tool (60 tap-to-place
-  shapes tinted by the armed color, in 6 themed pack tabs).
+- **6 distinct brushes** (was 10 pre-2026-08-09 — see the change-log
+  bullet up top for the four retirements) — 2 free (CRAYON default,
+  GLITTER) + 4 Pro (SPRAY / RAINBOW / GLOW / SMUDGE), each with its
+  own beginStroke + drawSegment + textural feel. Plus ERASER (now a
+  reveal, not a wipe — see up top), the FILL bucket, and the Pro
+  STAMP tool (60 tap-to-place shapes tinted by the armed color, in
+  6 themed pack tabs).
 - **FILL does MS Paint semantics**, not just template regions: it
   spreads over pixels matching the colour under the finger and stops at
   anything different, so the kid's OWN strokes bound it. The printed
@@ -637,7 +683,7 @@ App Store Connect / Play Console upload slot
   with a CSS filter or compositor blur — the edge has to be baked
   into the bitmap for save/export to capture it.
 - **Bump `?v=N` in `index.html` on EVERY change** to `style.css`,
-  `templates.js` or `game.js` (currently **v12**). Without it the
+  `templates.js` or `game.js` (currently **v45**). Without it the
   browser serves a stale `game.js` against a fresh `index.html` and the
   change reads as "did nothing" — the same trap Slip Studio and
   Florigami both hit. Note that a hard-reload which refetches

@@ -1022,16 +1022,13 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     text-shadow: 0 0 4px rgba(0, 255, 204, 0.3);
 }
 
-/* Tool row: 6 brush cards in a 3-column grid; eraser spans the
-   full width below as its own visually distinct row. Each button
+/* Tool row: 8 tools (6 brushes + STAMP + FILL) in a 4-column
+   grid, so it packs cleanly as 2 rows of 4. The action-row
+   (UNDO/ERASE/CLEAR) sits below it as its own band. Each button
    is a vertical mini-card with an SVG icon on top and a small
    label underneath — readable at any rail width, never truncates. */
 .tool-modes {
     display: grid;
-    /* 4 across, not 3. With 3 columns the seven brush tools left FILL
-       stranded alone on a third row beside two empty cells, which reads
-       as an unfinished grid. Four columns packs them 4+3 and lets the
-       full-width ERASE close the block deliberately. */
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
 }
@@ -1102,30 +1099,44 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    below fights. Without this, "hidden" Pro tools render anyway. */
 .tool-btn[hidden] { display: none !important; }
 
-/* Eraser is visually distinct from the 6 brushes — spans the full
-   width below the brush grid, gets a teal outline so "destructive"
-   reads at a glance. Active state still goes pink. */
-.tool-btn.tool-eraser {
-    grid-column: 1 / -1;
+/* Action row (UNDO / ERASE / CLEAR) — sits directly under the
+   brush grid where the big ERASE pill used to. Three equal-width
+   pills so destructive controls live together in one band. */
+.action-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+.tool-btn.action-btn {
+    /* No grid-column span — each button takes one column of the
+       action-row's own 3-column grid. */
+    grid-column: auto;
     flex-direction: row;
     min-height: 44px;
-    padding: 8px 14px;
-    gap: 10px;
+    padding: 8px 10px;
+    gap: 8px;
     border-color: var(--teal);
     background: linear-gradient(180deg, #0d2a32 0%, #07181e 100%);
     color: var(--teal);
 }
-.tool-btn.tool-eraser .tool-icon {
-    width: 22px;
-    height: 22px;
+.tool-btn.action-btn .tool-icon {
+    width: 20px;
+    height: 20px;
 }
-.tool-btn.tool-eraser:hover,
-.tool-btn.tool-eraser:focus-visible {
+.tool-btn.action-btn:hover,
+.tool-btn.action-btn:focus-visible {
     border-color: var(--pink);
     color: var(--pink-bright);
     background: linear-gradient(180deg, #14404a 0%, #0a2030 100%);
 }
-.tool-btn.tool-eraser.active {
+.tool-btn.action-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+/* The middle action-btn IS the eraser tool. Active goes pink like
+   the brush grid — this is the only .action-btn that carries the
+   .active state; UNDO/CLEAR are one-shot actions. */
+.tool-btn.action-btn.active {
     background: linear-gradient(180deg, #ff3d96 0%, #b81866 100%);
     color: #fff;
     border-color: var(--pink-bright);
@@ -2011,7 +2022,8 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 /* ----- 16. First-save + Saved toast ----- */
 
 .first-save-toast,
-.saved-toast {
+.saved-toast,
+.erase-tip-toast {
     position: fixed;
     bottom: 36px;
     left: 50%;
@@ -2109,13 +2121,37 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 }
 
 .first-save-toast.is-show,
-.saved-toast.is-show {
+.saved-toast.is-show,
+.erase-tip-toast.is-show {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
 }
 
 .first-save-toast[hidden],
-.saved-toast[hidden] { display: none; }
+.saved-toast[hidden],
+.erase-tip-toast[hidden] { display: none; }
+
+/* Erase-tip toast: pink outline so it visually differs from the
+   saved-toast confirmation (teal) — this is a nudge, not a check. */
+.erase-tip-toast {
+    background: rgba(29, 12, 24, 0.95);
+    border: 1.5px solid var(--pink);
+    color: var(--pink-bright);
+    box-shadow:
+        0 0 0 1px #000,
+        0 0 18px rgba(255, 46, 136, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    /* A first-time nudge stays a bit longer than "Saved" — the kid
+       has to read it and understand it, not just glance at a check. */
+    max-width: calc(100vw - 32px);
+    text-align: left;
+}
+
+.et-glyph {
+    font-size: 16px;
+    color: var(--pink-bright);
+}
 
 .fst-glyph {
     font-size: 20px;

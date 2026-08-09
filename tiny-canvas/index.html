@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=44" />
+    <link rel="stylesheet" href="style.css?v=45" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -335,23 +335,6 @@
 
                 <div class="tool-row tool-modes" role="tablist" aria-label="Tool">
 
-                    <button class="tool-btn" data-tool="pen" type="button">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M5 19 L18 6 L20 8 L7 21 L5 19 Z"/>
-                            <line x1="14" y1="10" x2="16" y2="12"/>
-                            <line x1="5" y1="19" x2="3" y2="21"/>
-                        </svg>
-                        <span class="tool-label">PEN</span>
-                    </button>
-
-                    <button class="tool-btn" data-tool="marker" type="button">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M13 3 L21 7 L17 15 L11 12 Z"/>
-                            <path d="M11 12 L4 19 L4 21 L6 21 L13 14"/>
-                        </svg>
-                        <span class="tool-label">MARKER</span>
-                    </button>
-
                     <button class="tool-btn" data-tool="crayon" type="button">
                         <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M9 7 L12 3 L15 7 L15 21 L9 21 Z"/>
@@ -360,26 +343,6 @@
                             <line x1="9" y1="19" x2="15" y2="19"/>
                         </svg>
                         <span class="tool-label">CRAYON</span>
-                    </button>
-
-                    <button class="tool-btn" data-tool="pencil" type="button">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M10 5 L12 2 L14 5 L14 18 L13 22 L11 22 L10 18 Z"/>
-                            <line x1="10" y1="8" x2="14" y2="8"/>
-                            <path d="M12 2 L13 5 L11 5 Z" fill="currentColor"/>
-                        </svg>
-                        <span class="tool-label">PENCIL</span>
-                    </button>
-
-                    <button class="tool-btn" data-tool="paint" type="button">
-                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M7 14 L17 14 L17 16 Q17 21 12 21 Q7 21 7 16 Z"/>
-                            <line x1="10" y1="14" x2="10" y2="10"/>
-                            <line x1="12" y1="14" x2="12" y2="9"/>
-                            <line x1="14" y1="14" x2="14" y2="10"/>
-                            <path d="M6 14 L18 14"/>
-                        </svg>
-                        <span class="tool-label">PAINT</span>
                     </button>
 
                     <button class="tool-btn" data-tool="glitter" type="button">
@@ -461,7 +424,23 @@
                         <span class="tool-label">FILL</span>
                     </button>
 
-                    <button class="tool-btn tool-eraser" data-tool="eraser" type="button">
+                </div>
+
+                <!-- Action row — sits where the big ERASE pill used to
+                     be. UNDO / ERASE / CLEAR share one horizontal band so
+                     the destructive actions live together, close to the
+                     tools, not tucked at the bottom of the tray. ERASE is
+                     a tool button (data-tool="eraser"), UNDO + CLEAR are
+                     one-shot actions wired in game.js. -->
+                <div class="tool-row action-row">
+                    <button class="tool-btn action-btn" id="drawUndo" type="button" disabled>
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M9 14 L4 9 L9 4"/>
+                            <path d="M4 9 L14 9 A6 6 0 0 1 20 15 L20 17"/>
+                        </svg>
+                        <span class="tool-label">UNDO</span>
+                    </button>
+                    <button class="tool-btn action-btn tool-eraser" data-tool="eraser" type="button">
                         <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                             <path d="M4 17 L11 10 L18 17 L14 21 L8 21 Z"/>
                             <line x1="8" y1="14" x2="14" y2="20"/>
@@ -469,7 +448,16 @@
                         </svg>
                         <span class="tool-label">ERASE</span>
                     </button>
-
+                    <button class="tool-btn action-btn" id="drawClear" type="button">
+                        <svg class="tool-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M6 7 L18 7 L17 20 L7 20 Z"/>
+                            <line x1="10" y1="10" x2="10" y2="17"/>
+                            <line x1="14" y1="10" x2="14" y2="17"/>
+                            <path d="M4 7 L20 7"/>
+                            <path d="M9 7 L9 4 L15 4 L15 7"/>
+                        </svg>
+                        <span class="tool-label">CLEAR</span>
+                    </button>
                 </div>
 
                 <!-- Shown only while FILL is armed, standing in for the
@@ -527,17 +515,10 @@
             </div>
 
             <div class="draw-controls">
-                <!-- UNDO lives in the tray, next to CLEAR and SAVE,
-                     because that is where people look for it. The
-                     floating one over the canvas stays for mid-stroke
-                     reach, but it is not the discoverable copy. -->
-                <button class="btn-control" id="drawUndo" type="button" disabled>
-                    <span class="btn-glyph" aria-hidden="true">&#x21B6;</span>
-                    <span class="btn-label">UNDO</span>
-                </button>
-                <button class="btn-control" id="drawClear" type="button">
-                    <span class="btn-label">CLEAR</span>
-                </button>
+                <!-- UNDO + CLEAR moved into the tool tray's action-row
+                     (destructive actions live together with ERASE, up
+                     with the tools). SAVE stays at the bottom of the
+                     tray as the primary CTA. -->
                 <button class="btn-control primary" id="drawSave" type="button">
                     <span class="btn-label">SAVE</span>
                     <span class="btn-glyph" aria-hidden="true">&#10003;</span>
@@ -791,6 +772,18 @@
     <span class="st-text">Saved</span>
 </div>
 
+<!-- ============================================================
+     ERASE TIP TOAST
+     One-shot soft nudge. Fires the first time an erase gesture
+     changes zero pixels (kid dragged the eraser over the printed
+     line art, or fill-erased an already-empty region). Flagged in
+     localStorage so it never nags again.
+     ============================================================ -->
+<div class="erase-tip-toast" id="eraseTipToast" hidden role="status">
+    <span class="et-glyph" aria-hidden="true">&#9998;</span>
+    <span class="et-text">The printed lines stay &mdash; color around them!</span>
+</div>
+
 <footer class="site-footer-slim" aria-label="Site info">
     <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
     <span class="sep" aria-hidden="true">&middot;</span>
@@ -802,8 +795,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=44"></script>
-<script src="game.js?v=44"></script>
+<script src="templates.js?v=45"></script>
+<script src="game.js?v=45"></script>
 
 </body>
 </html>
