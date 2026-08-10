@@ -162,6 +162,14 @@
     const STROKE_BOUNDS_SLACK  = 12;
     const SAVE_MAX           = 60;     /* gallery item cap */
     const AUTOSAVE_INTERVAL_MS = 60_000;
+
+    /* Time-lapse replay caps. Serialized alongside each gallery record
+       so a kid can play back their drawing forming. Sized to keep an
+       average drawing under ~15KB serialized while still capturing a
+       reasonable session. See §4c. */
+    const REPLAY_MAX_EVENTS       = 300;
+    const REPLAY_STROKE_SAMPLE_MS = 25;    /* min gap between stored samples */
+    const REPLAY_MAX_STROKE_PTS   = 400;   /* per stroke cap */
     const GATE_UNLOCK_MS     = 24 * 60 * 60 * 1000;  /* 24h persistent unlock */
 
     /* ---------- 0a. BRUSH DEFINITIONS ----------
@@ -588,6 +596,15 @@
         smoothY:       0,
         history:       [],                      /* ImageData snapshots */
         redoStack:     [],                      /* undone ops, ready to reapply */
+        /* Time-lapse replay recording. Each committed op appends a
+           compact event to this list; on save it serializes into the
+           gallery record and the detail panel gets a PLAY button.
+           Reset on template load and CLEAR. Erase strokes are
+           deliberately NOT recorded (their effect depends on the
+           reveal buffer, which isn't reproducible from serialized
+           events alone). See §4c REPLAY RECORDER. */
+        replayEvents:  [],
+        replayStrokePts: null,                  /* current stroke buffer */
         dirty:         false,
         savedId:       null,                    /* gallery record id if this drawing was saved */
         dpr:           1,
@@ -1399,6 +1416,10 @@
            CLEAR (keepHistory=true) pushes its own history entry via
            commitHistory, which invalidates redoStack for us. */
         if (!keepHistory) state.redoStack.length = 0;
+        /* Reset the replay recorder on template swap/resize; CLEAR
+           records a 'C' event so playback can wipe partway through. */
+        if (!keepHistory) replayReset();
+        else replayRecordClear();
         state.dirty = false;
         updateUndoButton();
         updateRedoButton();
@@ -1513,6 +1534,10 @@
             ctx2d.restore();
         }
         clearStrokeLayer();
+        /* Drop the in-flight replay stroke — no commit means nothing
+           to bank; leaving it hanging would attach its points to the
+           NEXT stroke's begin. */
+        replayCancelStroke();
     }
 
     function beginPinch() {
@@ -1986,6 +2011,10 @@
 
             /* Snapshot BEFORE painting — the eraser peels back to this. */
             captureRevealSnapshot();
+            /* Record for time-lapse replay. Fill is one event; the
+               replayer runs floodFillAt against a scratch canvas at
+               playback time. */
+            replayRecordFill(p);
             beginHistoryCapture();
 
             const seen = new Uint8Array(W * H);
@@ -3091,6 +3120,9 @@
         const size = effectiveSize() * 3.2;
         /* Snapshot BEFORE painting — the eraser peels back to this. */
         captureRevealSnapshot();
+        /* Record for time-lapse replay — the stamp definition is
+           addressed by its id at playback time. */
+        replayRecordStamp(p, size);
         beginHistoryCapture();
         ctx2d.save();
         ctx2d.globalCompositeOperation = "source-over";
@@ -3649,6 +3681,108 @@
         if (eR) eR.setAttribute("transform", t);
     }
 
+    /* ---------- 4c. TIME-LAPSE REPLAY RECORDER ----------
+
+       Every non-erase op appends a compact event to state.replayEvents.
+       On save the list is serialized alongside the PNG, and the
+       gallery detail panel gets a PLAY button that renders the
+       drawing forming.
+
+       Event shapes (short keys because localStorage is bytes):
+         { t:'S', tool, sz, col, pts: [[x,y],...] }   stroke
+         { t:'F', col, pat, sx, sy }                  fill
+         { t:'M', id, col, x, y, sz }                 stamp
+         { t:'C' }                                     clear
+
+       Erase strokes are deliberately NOT recorded — their effect
+       depends on the reveal buffer, which isn't reproducible from a
+       serialized event alone. In replay, an eraser stroke just
+       leaves the pixels from the moment before it was cast.
+
+       Rounds coordinates to 1 decimal — cuts JSON size roughly in
+       half with no visible difference at the sub-pixel scale. */
+
+    function replayReset() {
+        state.replayEvents = [];
+        state.replayStrokePts = null;
+    }
+
+    function replayIsFull() {
+        return (state.replayEvents.length >= REPLAY_MAX_EVENTS);
+    }
+
+    /* Round for storage: 1 decimal keeps ~0.05 logical-px precision,
+       which is well below one on-screen device pixel at any dpr. */
+    function r1(n) { return Math.round(n * 10) / 10; }
+
+    function replayBeginStroke(p) {
+        if (state.currentTool === "eraser") return;
+        if (replayIsFull()) return;
+        state.replayStrokePts = [[r1(p.x), r1(p.y)]];
+        state._replayLastSampleTs = 0;
+    }
+
+    function replayAddStrokePoint(p, ts) {
+        if (!state.replayStrokePts) return;
+        if (state.replayStrokePts.length >= REPLAY_MAX_STROKE_PTS) return;
+        /* Throttle by time — the digitiser fires far more samples than
+           a replay needs. Always accept the first point. */
+        if (state._replayLastSampleTs &&
+            (ts - state._replayLastSampleTs) < REPLAY_STROKE_SAMPLE_MS) return;
+        state._replayLastSampleTs = ts;
+        state.replayStrokePts.push([r1(p.x), r1(p.y)]);
+    }
+
+    function replayEndStroke() {
+        if (!state.replayStrokePts) return;
+        if (state.replayStrokePts.length < 1) {
+            state.replayStrokePts = null;
+            return;
+        }
+        state.replayEvents.push({
+            t:    "S",
+            tool: state.currentTool,
+            sz:   effectiveSize(),
+            col:  state.currentColor,
+            pts:  state.replayStrokePts
+        });
+        state.replayStrokePts = null;
+    }
+
+    /* Drop the in-flight stroke without banking it — pinch cancel,
+       WebGL context loss, etc. */
+    function replayCancelStroke() {
+        state.replayStrokePts = null;
+    }
+
+    function replayRecordFill(p) {
+        if (replayIsFull()) return;
+        state.replayEvents.push({
+            t:   "F",
+            col: state.currentColor,
+            pat: state.fillPattern,
+            sx:  r1(p.x),
+            sy:  r1(p.y)
+        });
+    }
+
+    function replayRecordStamp(p, size) {
+        if (replayIsFull()) return;
+        state.replayEvents.push({
+            t:   "M",
+            id:  state.stampId,
+            col: state.currentColor,
+            x:   r1(p.x),
+            y:   r1(p.y),
+            sz:  size
+        });
+    }
+
+    function replayRecordClear() {
+        if (replayIsFull()) return;
+        state.replayEvents.push({ t: "C" });
+    }
+
     /* ---------- 4b. WET STROKE LAYER ----------
 
        Why this exists: most brushes paint translucent (crayon .45,
@@ -3795,6 +3929,7 @@
            don't advance it). */
         if (state.currentTool !== "eraser") {
             captureRevealSnapshot();
+            replayBeginStroke(p);
         }
         beginHistoryCapture();
         state.isDrawing = true;
@@ -3896,6 +4031,13 @@
 
         growBounds(p.x, p.y, size + STROKE_BOUNDS_SLACK);
 
+        /* Sample the raw point into the replay recorder (throttled
+           there — see replayAddStrokePoint). Skipped for the eraser
+           tool since erase strokes aren't recorded at all. */
+        if (state.currentTool !== "eraser") {
+            replayAddStrokePoint(p, performance.now());
+        }
+
         state.lastX = p.x;
         state.lastY = p.y;
     }
@@ -3939,6 +4081,10 @@
                 maybeShowEraseTip();
             } else {
                 commitHistory();
+                /* Bank the completed stroke into the replay recorder.
+                   No-op for erase strokes (replayBeginStroke skipped
+                   them, so state.replayStrokePts is null). */
+                replayEndStroke();
                 /* Onion's "aha!" reaction when a brush-erase actually
                    surfaced a color from underneath — reveal worked,
                    not just wiped to paper. Skip on fill-erase (which
@@ -5447,7 +5593,16 @@
             name:      state.templateName,
             template:  state.templateId,
             date:      new Date().toISOString(),
-            png:       png
+            png:       png,
+            /* Time-lapse replay track. Copy the events list AND the
+               logical stage dims the drawing was recorded against —
+               replay renders at those coords, then the display canvas
+               scales to whatever the detail panel gives it. Omitted
+               (falsy) if the drawing has no recordable events, so old
+               records without replay behave normally in the gallery. */
+            replay:    state.replayEvents.length
+                       ? { w: STAGE_W, h: STAGE_H, ev: state.replayEvents.slice() }
+                       : null
         };
         items.unshift(record);
         /* Drop the oldest entries past the cap. */
@@ -5834,13 +5989,322 @@
         detailFrameId = "none";
         buildFrameButtons();
         refreshFrameButtons();
+        /* PLAY button appears only if this record has a replay track.
+           Records saved before 2026-08-09 have no `replay` field and
+           behave as before — the button stays hidden. */
+        const replayBtn = $("#detailReplay");
+        if (replayBtn) {
+            if (rec.replay && rec.replay.ev && rec.replay.ev.length) {
+                replayBtn.removeAttribute("hidden");
+            } else {
+                replayBtn.setAttribute("hidden", "");
+            }
+        }
         const panel = $("#picDetail");
         panel.removeAttribute("hidden");
         panel.dataset.id = rec.id;
     }
 
     function closeDetail() {
+        /* Kill any playing replay first, so its rAF loop doesn't keep
+           painting into a hidden canvas. */
+        stopReplay();
         $("#picDetail").setAttribute("hidden", "");
+    }
+
+    /* ---------- 10b. TIME-LAPSE REPLAY PLAYBACK ----------
+
+       Renders a recorded event list back into the detail canvas.
+       Uses a scratch canvas at the drawing's original logical size
+       so brush geometry (line widths, arc radii, stamp translations)
+       matches what the kid actually drew, then blits into the visible
+       display canvas each rAF frame.
+
+       Strokes replay their points in wall-clock time at REPLAY_SPEED×
+       real speed (2 = twice as fast). Fills/stamps/clears are
+       instant "beat" events with a small pause after so the kid can
+       see them land.
+
+       Uses the SAME brush table as live drawing, so the replay is a
+       faithful reconstruction — not a separate renderer that has to
+       be kept in sync. */
+
+    const REPLAY_SPEED         = 2.4;   /* strokes go this many × real time */
+    const REPLAY_POINT_MS      = 35;    /* wall time per point at 1× */
+    const REPLAY_BEAT_MS       = 240;   /* pause after a fill/stamp/clear */
+    const REPLAY_TAIL_MS       = 900;   /* pause after final event before stopping */
+
+    let replayState = null;
+
+    function stopReplay() {
+        if (!replayState) return;
+        if (replayState.raf)   cancelAnimationFrame(replayState.raf);
+        if (replayState.timer) clearTimeout(replayState.timer);
+        replayState = null;
+        const cvs = $("#detailReplayCanvas");
+        const stop = $("#detailReplayStop");
+        const img  = $("#detailImg");
+        if (cvs)  cvs.setAttribute("hidden", "");
+        if (stop) stop.setAttribute("hidden", "");
+        if (img)  img.removeAttribute("hidden");
+    }
+
+    function playCurrentReplay() {
+        const id = $("#picDetail").dataset.id;
+        if (!id) return;
+        const rec = loadGallery().find(function (r) { return r.id === id; });
+        if (!rec || !rec.replay || !rec.replay.ev || !rec.replay.ev.length) return;
+
+        stopReplay();
+
+        const displayCanvas = $("#detailReplayCanvas");
+        const stopBtn       = $("#detailReplayStop");
+        const detailImg     = $("#detailImg");
+        if (!displayCanvas) return;
+
+        /* Scratch canvas at the original stage size. All the brush
+           coords are in this logical space. */
+        const W = rec.replay.w || STAGE_W;
+        const H = rec.replay.h || STAGE_H;
+        const scratch = document.createElement("canvas");
+        scratch.width  = W;
+        scratch.height = H;
+        const sctx = scratch.getContext("2d");
+
+        /* Size the visible canvas to match the display aspect. It's
+           sized square-ish by the #detailImg rule; give it explicit
+           backing store to match the scratch's aspect. */
+        const rect = displayCanvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const dispScale = Math.min(rect.width || 400, rect.height || 400) /
+                          Math.max(W, H);
+        displayCanvas.width  = Math.max(1, Math.round(W * dispScale * dpr));
+        displayCanvas.height = Math.max(1, Math.round(H * dispScale * dpr));
+        const dctx = displayCanvas.getContext("2d");
+
+        /* Swap in the replay canvas + stop chip; hide the still image. */
+        if (detailImg) detailImg.setAttribute("hidden", "");
+        displayCanvas.removeAttribute("hidden");
+        if (stopBtn) stopBtn.removeAttribute("hidden");
+
+        replayState = {
+            events:      rec.replay.ev,
+            i:           0,
+            strokePi:    0,
+            scratch:     scratch,
+            sctx:        sctx,
+            displayCvs:  displayCanvas,
+            dctx:        dctx,
+            raf:         0,
+            timer:       0,
+            nextAtMs:    0
+        };
+
+        blitReplayFrame();
+        stepReplay();
+    }
+
+    /* Copy the current scratch state into the visible display canvas.
+       Cheap — one drawImage per rAF frame. */
+    function blitReplayFrame() {
+        if (!replayState) return;
+        const dctx = replayState.dctx;
+        const dcvs = replayState.displayCvs;
+        dctx.save();
+        dctx.setTransform(1, 0, 0, 1, 0, 0);
+        /* Paper background so bare-canvas pixels don't show through
+           as transparent. */
+        dctx.fillStyle = getComputedStyle(document.body)
+                            .getPropertyValue("--paper").trim() || "#fff5dc";
+        dctx.fillRect(0, 0, dcvs.width, dcvs.height);
+        dctx.drawImage(replayState.scratch, 0, 0, dcvs.width, dcvs.height);
+        dctx.restore();
+    }
+
+    /* Advance the replay by one atomic step, then schedule the next
+       via rAF (fast) or setTimeout (paced beats). */
+    function stepReplay() {
+        if (!replayState) return;
+        const rs = replayState;
+        if (rs.i >= rs.events.length) {
+            /* All done — hold the final frame briefly, then close. */
+            rs.timer = setTimeout(stopReplay, REPLAY_TAIL_MS);
+            return;
+        }
+        const ev = rs.events[rs.i];
+
+        if (ev.t === "S") {
+            /* Stroke: apply one point per rAF tick, honoring
+               REPLAY_POINT_MS as the target cadence. */
+            const brush = BRUSHES[ev.tool] || BRUSHES.crayon;
+            const size  = ev.sz;
+            const color = ev.col;
+            const pts   = ev.pts;
+            if (rs.strokePi === 0) {
+                /* First point: lay the initial dot. */
+                brush.beginStroke(rs.sctx,
+                                  { x: pts[0][0], y: pts[0][1] },
+                                  size, color);
+                blitReplayFrame();
+                rs.strokePi = 1;
+                rs.nextAtMs = performance.now() +
+                              (REPLAY_POINT_MS / REPLAY_SPEED);
+                rs.raf = requestAnimationFrame(function tick() {
+                    if (!replayState) return;
+                    const now = performance.now();
+                    if (now < rs.nextAtMs) {
+                        rs.raf = requestAnimationFrame(tick);
+                        return;
+                    }
+                    /* Emit as many points as the elapsed budget covers,
+                       so a browser that skipped frames still catches up
+                       instead of playing back in slow-motion. */
+                    while (rs.strokePi < pts.length && now >= rs.nextAtMs) {
+                        const p0 = { x: pts[rs.strokePi - 1][0],
+                                     y: pts[rs.strokePi - 1][1] };
+                        const p1 = { x: pts[rs.strokePi][0],
+                                     y: pts[rs.strokePi][1] };
+                        brush.drawSegment(rs.sctx, p0, p1, size, color);
+                        rs.strokePi++;
+                        rs.nextAtMs += (REPLAY_POINT_MS / REPLAY_SPEED);
+                    }
+                    blitReplayFrame();
+                    if (rs.strokePi < pts.length) {
+                        rs.raf = requestAnimationFrame(tick);
+                    } else {
+                        /* Stroke done — move on to the next event. */
+                        rs.i++;
+                        rs.strokePi = 0;
+                        rs.raf = requestAnimationFrame(stepReplay);
+                    }
+                });
+                return;
+            }
+            /* Shouldn't reach here — strokePi resets to 0 between
+               events — but guard anyway. */
+            rs.strokePi = 0;
+            rs.i++;
+            rs.raf = requestAnimationFrame(stepReplay);
+            return;
+        }
+
+        if (ev.t === "F") {
+            replayApplyFill(rs, ev);
+            blitReplayFrame();
+            rs.i++;
+            rs.timer = setTimeout(stepReplay, REPLAY_BEAT_MS);
+            return;
+        }
+        if (ev.t === "M") {
+            replayApplyStamp(rs, ev);
+            blitReplayFrame();
+            rs.i++;
+            rs.timer = setTimeout(stepReplay, REPLAY_BEAT_MS);
+            return;
+        }
+        if (ev.t === "C") {
+            rs.sctx.save();
+            rs.sctx.setTransform(1, 0, 0, 1, 0, 0);
+            rs.sctx.clearRect(0, 0, rs.scratch.width, rs.scratch.height);
+            rs.sctx.restore();
+            blitReplayFrame();
+            rs.i++;
+            rs.timer = setTimeout(stepReplay, REPLAY_BEAT_MS);
+            return;
+        }
+
+        /* Unknown event type — skip it. */
+        rs.i++;
+        rs.raf = requestAnimationFrame(stepReplay);
+    }
+
+    /* Replay fill: walk the target canvas at logical coords and
+       flood the region under (sx, sy) with the recorded color. Uses
+       a simple in-place walk on the scratch canvas — no line-art
+       boundary (the replay canvas has no template overlay), so the
+       walk stops at anything different from the seed pixel, exactly
+       like the live fill's MS-Paint semantics on BLANK. */
+    function replayApplyFill(rs, ev) {
+        const sctx = rs.sctx;
+        const W = rs.scratch.width, H = rs.scratch.height;
+        const sx = Math.round(ev.sx), sy = Math.round(ev.sy);
+        if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
+        let image;
+        try { image = sctx.getImageData(0, 0, W, H); }
+        catch (_) { return; }
+        const data = image.data;
+        const rgb = hexToRgb(ev.col);
+        const r = rgb[0], g = rgb[1], b = rgb[2];
+        const si = (sy * W + sx) * 4;
+        const seedR = data[si], seedG = data[si + 1],
+              seedB = data[si + 2], seedA = data[si + 3];
+        if (seedA === 255 && seedR === r && seedG === g && seedB === b) return;
+        const TOL2 = 6 * 6;
+        function matches(i) {
+            const q = i * 4;
+            const dr = data[q]     - seedR;
+            const dg = data[q + 1] - seedG;
+            const db = data[q + 2] - seedB;
+            const da = data[q + 3] - seedA;
+            return dr * dr + dg * dg + db * db + da * da <= TOL2;
+        }
+        const seen = new Uint8Array(W * H);
+        const stack = [sy * W + sx];
+        while (stack.length) {
+            const seed = stack.pop();
+            const y = (seed / W) | 0;
+            let x = seed - y * W;
+            while (x > 0 && !seen[y * W + x - 1] && matches(y * W + x - 1)) x--;
+            let up = false, dn = false;
+            while (x < W) {
+                const i = y * W + x;
+                if (seen[i] || !matches(i)) break;
+                seen[i] = 1;
+                if (y > 0) {
+                    const u = i - W;
+                    const openU = !seen[u] && matches(u);
+                    if (openU && !up) { stack.push(u); up = true; }
+                    else if (!openU)  up = false;
+                }
+                if (y < H - 1) {
+                    const d = i + W;
+                    const openD = !seen[d] && matches(d);
+                    if (openD && !dn) { stack.push(d); dn = true; }
+                    else if (!openD)  dn = false;
+                }
+                x++;
+            }
+        }
+        /* Solid paint pass — replay always uses solid fill (patterns
+           aren't recorded per-event yet; this is a v1 tradeoff). */
+        for (let i = 0; i < seen.length; i++) {
+            if (!seen[i]) continue;
+            const q = i * 4;
+            data[q] = r; data[q + 1] = g; data[q + 2] = b; data[q + 3] = 255;
+        }
+        sctx.putImageData(image, 0, 0);
+    }
+
+    function replayApplyStamp(rs, ev) {
+        const sctx = rs.sctx;
+        const stamps = (typeof STAMPS !== "undefined") ? STAMPS : [];
+        let def = null;
+        for (let i = 0; i < stamps.length; i++) {
+            if (stamps[i].id === ev.id) { def = stamps[i]; break; }
+        }
+        if (!def) return;
+        sctx.save();
+        sctx.globalCompositeOperation = "source-over";
+        sctx.globalAlpha = 1;
+        sctx.translate(ev.x, ev.y);
+        sctx.scale(ev.sz / 100, ev.sz / 100);
+        sctx.fillStyle   = ev.col;
+        sctx.strokeStyle = ev.col;
+        sctx.lineCap  = "round";
+        sctx.lineJoin = "round";
+        sctx.lineWidth = 7;
+        def.draw(sctx);
+        sctx.restore();
     }
 
     function deleteCurrent() {
@@ -6103,6 +6567,10 @@
         $("#detailExport").addEventListener("click", exportCurrent);
         const detailPrint = $("#detailPrint");
         if (detailPrint) detailPrint.addEventListener("click", printCurrent);
+        const detailReplayBtn  = $("#detailReplay");
+        const detailReplayStop = $("#detailReplayStop");
+        if (detailReplayBtn)  detailReplayBtn.addEventListener("click", playCurrentReplay);
+        if (detailReplayStop) detailReplayStop.addEventListener("click", stopReplay);
         const galleryStart = $("#galleryStartBtn");
         if (galleryStart) {
             galleryStart.addEventListener("click", async function () {

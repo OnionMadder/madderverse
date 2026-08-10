@@ -1694,9 +1694,11 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
 }
 
-#detailImg {
+#detailImg,
+#detailReplayCanvas {
     display: block;
     width: 100%;
     max-width: 400px;
@@ -1704,6 +1706,38 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     background: var(--paper);
     border-radius: var(--radius-sm);
     object-fit: contain;
+}
+
+#detailReplayCanvas[hidden] { display: none; }
+
+/* Stop chip pinned to the top-right of the replay canvas. Only
+   visible during playback (JS toggles the [hidden] attribute in
+   sync with the canvas). */
+.replay-stop-btn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(6, 20, 26, 0.85);
+    color: #fff;
+    border: 1.5px solid var(--teal);
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.35);
+}
+.replay-stop-btn[hidden] { display: none; }
+.replay-stop-btn:hover,
+.replay-stop-btn:focus-visible {
+    background: rgba(6, 20, 26, 0.95);
+    border-color: var(--pink);
+    outline: none;
 }
 
 .detail-actions {

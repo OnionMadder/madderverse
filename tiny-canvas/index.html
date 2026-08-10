@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=46" />
+    <link rel="stylesheet" href="style.css?v=47" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -595,6 +595,14 @@
             </div>
             <div class="detail-canvas-wrap">
                 <img id="detailImg" alt="Drawing preview" />
+                <!-- Replay display: hidden until PLAY is tapped. The
+                     recorded events render into this canvas on rAF;
+                     an overlay Play/Stop chip sits on top. -->
+                <canvas id="detailReplayCanvas" hidden></canvas>
+                <button class="replay-stop-btn" id="detailReplayStop"
+                        type="button" hidden aria-label="Stop replay">
+                    &#10005;
+                </button>
             </div>
             <!-- Export frames (Pro) — preview here, applied to the
                  EXPORTED copy only; the stored record stays clean.
@@ -606,6 +614,13 @@
             <div class="detail-actions">
                 <button class="btn-control" id="detailDelete" type="button">
                     <span class="btn-label">DELETE</span>
+                </button>
+                <!-- PLAY appears only on records with a `replay` field
+                     (recorded 2026-08-09 onward). Older drawings just
+                     stay quiet — no button, no dead state. -->
+                <button class="btn-control" id="detailReplay" type="button" hidden>
+                    <span class="btn-label">PLAY</span>
+                    <span class="btn-glyph" aria-hidden="true">&#9656;</span>
                 </button>
                 <button class="btn-control" id="detailPrint" type="button">
                     <span class="btn-label">PRINT</span>
@@ -830,8 +845,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=46"></script>
-<script src="game.js?v=46"></script>
+<script src="templates.js?v=47"></script>
+<script src="game.js?v=47"></script>
 
 </body>
 </html>
