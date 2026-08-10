@@ -587,6 +587,7 @@
         smoothX:       0,                       /* midpoint-smoothed pen tip */
         smoothY:       0,
         history:       [],                      /* ImageData snapshots */
+        redoStack:     [],                      /* undone ops, ready to reapply */
         dirty:         false,
         savedId:       null,                    /* gallery record id if this drawing was saved */
         dpr:           1,
@@ -1393,8 +1394,14 @@
            bring back pixels from before the clear. */
         clearRevealCanvas();
         if (!keepHistory) state.history.length = 0;
+        /* Full reset (new page, resize) also drops redo — those
+           patches point at coords that don't apply to a fresh page.
+           CLEAR (keepHistory=true) pushes its own history entry via
+           commitHistory, which invalidates redoStack for us. */
+        if (!keepHistory) state.redoStack.length = 0;
         state.dirty = false;
         updateUndoButton();
+        updateRedoButton();
         updateStatus();
     }
 
@@ -3319,18 +3326,47 @@
             patch = histCtx.getImageData(x, y, w, h);
         } catch (_) { return; }
         state.history.push({ x: x, y: y, patch: patch });
+        /* Any new op invalidates the redo stack — the timeline just
+           forked. Without this, an undo → new stroke → redo would
+           put back the old stroke on top of the new one. */
+        if (state.redoStack && state.redoStack.length) {
+            state.redoStack.length = 0;
+        }
         trimHistory();
         updateUndoButton();
+        updateRedoButton();
+    }
+
+    /* Snapshot the CURRENT pixels of a rect (the post-op state), so
+       an undo can push them onto the redo stack for later redo. */
+    function snapshotRect(x, y, w, h) {
+        try {
+            ctx2d.save();
+            ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+            const data = ctx2d.getImageData(x, y, w, h);
+            ctx2d.restore();
+            return data;
+        } catch (_) { return null; }
     }
 
     function undo() {
         const entry = state.history.pop();
         if (!entry) return;
+        /* Capture the current-rect BEFORE we overwrite it, so redo
+           can put it back. Cap the redo stack the same way history is
+           capped — no runaway memory on a long fiddle session. */
+        const forward = snapshotRect(entry.x, entry.y,
+                                     entry.patch.width, entry.patch.height);
+        if (forward) {
+            state.redoStack.push({ x: entry.x, y: entry.y, patch: forward });
+            while (state.redoStack.length > MAX_HISTORY) state.redoStack.shift();
+        }
         ctx2d.save();
         ctx2d.setTransform(1, 0, 0, 1, 0, 0);
         ctx2d.putImageData(entry.patch, entry.x, entry.y);
         ctx2d.restore();
         updateUndoButton();
+        updateRedoButton();
         if (state.history.length === 0) state.dirty = false;
         markInProgressDirty();
         triggerOnionReaction("undo");
@@ -3338,14 +3374,49 @@
         maybeShowIdleScribble();
     }
 
-    /* One undo control, in the tool tray beside CLEAR and SAVE. There
-       was briefly a floating twin over the canvas as well; two was one
-       too many, and the tray is where people look. */
+    /* Redo mirrors undo — pops the redo stack, snapshots the current
+       pixels (which the redo is about to overwrite) back onto the
+       undo history so a subsequent undo undoes the redo, then paints
+       the redo patch. */
+    function redo() {
+        if (!state.redoStack || !state.redoStack.length) return;
+        const entry = state.redoStack.pop();
+        if (!entry) return;
+        const backward = snapshotRect(entry.x, entry.y,
+                                      entry.patch.width, entry.patch.height);
+        if (backward) {
+            state.history.push({ x: entry.x, y: entry.y, patch: backward });
+            trimHistory();
+        }
+        ctx2d.save();
+        ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+        ctx2d.putImageData(entry.patch, entry.x, entry.y);
+        ctx2d.restore();
+        updateUndoButton();
+        updateRedoButton();
+        state.dirty = true;
+        markInProgressDirty();
+        triggerOnionReaction("redo");
+        updateStatus();
+        maybeShowIdleScribble();
+    }
+
+    /* UNDO + REDO buttons live in the action-row alongside ERASE +
+       CLEAR. Disabled state mirrors the two stacks. */
     function updateUndoButton() {
         const btn = $("#drawUndo");
         if (!btn) return;
         if (state.history.length === 0) btn.setAttribute("disabled", "");
         else                            btn.removeAttribute("disabled");
+    }
+    function updateRedoButton() {
+        const btn = $("#drawRedo");
+        if (!btn) return;
+        if (!state.redoStack || state.redoStack.length === 0) {
+            btn.setAttribute("disabled", "");
+        } else {
+            btn.removeAttribute("disabled");
+        }
     }
 
     /* ---------- 3b. ERASE-REVEAL SNAPSHOT ----------
@@ -3496,22 +3567,61 @@
        The onion has pointer-events: none so it never blocks drawing.
        All animations honor prefers-reduced-motion in CSS. */
 
+    /* All reaction classes the Onion can wear. setOnionState clears
+       the whole set and (optionally) adds one — keep this list in
+       sync with the .onion.is-* selectors in style.css or the
+       previous reaction won't come off. */
+    const ONION_STATES = [
+        "is-drawing", "is-saved", "is-cleared", "is-undo",
+        "is-redo", "is-first-stroke", "is-eureka",
+        "is-tool-swap", "is-sleepy"
+    ];
+
     function setOnionState(name) {
         const onion = $("#onion");
         if (!onion) return;
-        onion.classList.remove("is-drawing", "is-saved",
-                               "is-cleared", "is-undo");
+        for (let i = 0; i < ONION_STATES.length; i++) {
+            onion.classList.remove(ONION_STATES[i]);
+        }
         if (name) onion.classList.add("is-" + name);
     }
 
     let _onionRevertT = 0;
     function triggerOnionReaction(name, ms) {
         setOnionState(name);
-        ms = ms || (name === "saved" ? 900 :
-                    name === "cleared" ? 1000 :
-                    name === "undo" ? 400 : 600);
+        ms = ms || (name === "saved"         ? 900 :
+                    name === "cleared"       ? 1000 :
+                    name === "undo"          ? 400 :
+                    name === "redo"          ? 550 :
+                    name === "first-stroke"  ? 700 :
+                    name === "eureka"        ? 500 :
+                    name === "tool-swap"     ? 350 :
+                    600);
         clearTimeout(_onionRevertT);
         _onionRevertT = setTimeout(function () { setOnionState(null); }, ms);
+    }
+
+    /* Sleepy: after ~30s with no gesture on the draw screen, the
+       Onion nods off. Any real activity wakes her. Kept subtle so
+       parents don't read it as a bug. */
+    const SLEEPY_MS = 30 * 1000;
+    let _sleepyTimer = 0;
+    function nudgeOnionAwake() {
+        clearTimeout(_sleepyTimer);
+        const onion = $("#onion");
+        if (onion && onion.classList.contains("is-sleepy")) {
+            setOnionState(null);
+        }
+        if (state.screen === "draw") {
+            _sleepyTimer = setTimeout(function () {
+                /* Only sleep if we're STILL on draw and the kid
+                   isn't mid-stroke — waking her from a stroke would
+                   read as a glitch. */
+                if (state.screen === "draw" && !state.isDrawing) {
+                    setOnionState("sleepy");
+                }
+            }, SLEEPY_MS);
+        }
     }
 
     /* Eye tracking: as the pointer moves anywhere on the viewport,
@@ -3703,11 +3813,26 @@
             brush.beginStroke(ctx2d, p, size, color);
         }
         growBounds(p.x, p.y, size + STROKE_BOUNDS_SLACK);
+        /* First stroke on a freshly-loaded page gets the big pleased
+           hop reaction — a moment of "you started!" without any words.
+           Detected as "wasn't dirty before this stroke started". */
+        const isFirstStrokeOnPage = !state.dirty;
         state.dirty = true;
         updateStatus();
         markInProgressDirty();
         hideIdleScribble();
-        setOnionState("drawing");
+        if (isFirstStrokeOnPage && state.currentTool !== "eraser") {
+            /* Fire once, but let the drawing state take over
+               immediately after — the hop is a flourish, not a
+               replacement for the "actively drawing" mouth. */
+            triggerOnionReaction("first-stroke", 500);
+            setTimeout(function () {
+                if (state.isDrawing) setOnionState("drawing");
+            }, 500);
+        } else {
+            setOnionState("drawing");
+        }
+        nudgeOnionAwake();
         if (state.currentTool === "eraser") sfxErase();
         else                                sfxTap();
     }
@@ -3814,8 +3939,17 @@
                 maybeShowEraseTip();
             } else {
                 commitHistory();
+                /* Onion's "aha!" reaction when a brush-erase actually
+                   surfaced a color from underneath — reveal worked,
+                   not just wiped to paper. Skip on fill-erase (which
+                   takes a different pointer path) and on non-erase
+                   strokes (which fire "drawing" already). */
+                if (state.currentTool === "eraser" && eraseRevealedColor()) {
+                    triggerOnionReaction("eureka");
+                }
             }
         }
+        nudgeOnionAwake();
         state.isDrawing = false;
         /* Reset shared canvas state so the next stroke begins clean. */
         ctx2d.globalCompositeOperation = "source-over";
@@ -4042,6 +4176,7 @@
                     rebuildSizeButtons();
                 }
                 refreshPaletteActive();
+                nudgeOnionAwake();
             });
             palette.appendChild(sw);
         });
@@ -4371,6 +4506,10 @@
                 }
                 refreshToolButtons();
                 rebuildSizeButtons();
+                /* Cheeky wink at the kid — acknowledges the tap without
+                   getting in the way of what they were about to do. */
+                triggerOnionReaction("tool-swap");
+                nudgeOnionAwake();
             });
         });
     }
@@ -4499,9 +4638,16 @@
             /* After layout settles — the page <img> has to have a box
                before the fraction it covers means anything. */
             setTimeout(maybeShowRotateHint, 400);
+            /* Reset the sleepy timer whenever the kid returns to
+               drawing so the Onion starts fresh. */
+            nudgeOnionAwake();
         } else {
             dismissCoach();
             hideRotateHint();
+            /* Off the draw screen, cancel the sleepy timer and clear
+               any lingering sleepy state so re-entry looks alert. */
+            clearTimeout(_sleepyTimer);
+            setOnionState(null);
         }
     }
 
@@ -4942,6 +5088,33 @@
             t.classList.remove("is-show");
             setTimeout(function () { t.setAttribute("hidden", ""); }, 250);
         }, 3200);
+    }
+
+    /* After a brush-erase stroke that DID change pixels, decide
+       whether the reveal surfaced actual color (i.e. the reveal
+       buffer had content underneath) or just wiped to bare paper.
+       Any post-stroke pixel with alpha > 0 in the dirty rect means
+       "the erase brought back a color layer" — the eureka moment.
+       Samples strided pixels for speed; called at most once per
+       erase stroke on pointer-up. */
+    function eraseRevealedColor() {
+        if (!isFinite(sMinX) || sMaxX < sMinX) return false;
+        const W = canvas.width, H = canvas.height;
+        const x = Math.max(0, Math.floor(sMinX));
+        const y = Math.max(0, Math.floor(sMinY));
+        const w = Math.min(W, Math.ceil(sMaxX)) - x;
+        const h = Math.min(H, Math.ceil(sMaxY)) - y;
+        if (w <= 0 || h <= 0) return false;
+        let data;
+        try {
+            data = ctx2d.getImageData(x, y, w, h).data;
+        } catch (_) { return false; }
+        /* Stride 8 pixels — cheap enough on a phone, dense enough to
+           catch even a tiny slice of revealed color under a stroke. */
+        for (let i = 3; i < data.length; i += 32) {
+            if (data[i] > 0) return true;
+        }
+        return false;
     }
 
     /* Compare the current dirty rect on the canvas against the
@@ -5682,6 +5855,61 @@
         });
     }
 
+    /* Print the picture. Parent-gated (same as export). We stamp a
+       single <img> into a hidden #printWrap, wait for it to decode,
+       then call window.print(). @media print CSS hides the rest of
+       the app and reveals the wrap. Works cleanly on web and on
+       iOS/WKWebView; Android WebView's print support is weaker and
+       may need Capacitor's Print plugin later, but the same call
+       gracefully no-ops there rather than crashing. */
+    async function printPngRecord(rec) {
+        return new Promise(function (resolve) {
+            const wrap = document.createElement("div");
+            wrap.id = "printWrap";
+            const img = document.createElement("img");
+            img.alt = rec.name || "Tiny Canvas";
+            img.src = rec.png;
+            wrap.appendChild(img);
+            document.body.appendChild(wrap);
+            const finish = function () {
+                document.body.classList.add("printing");
+                try {
+                    window.print();
+                } catch (_) {}
+                /* window.print() is synchronous on web (blocks until the
+                   dialog resolves) but on iOS returns immediately while
+                   the sheet is showing. Clean up on the next tick either
+                   way; the OS holds the image internally by then. */
+                setTimeout(function () {
+                    document.body.classList.remove("printing");
+                    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+                    resolve();
+                }, 300);
+            };
+            if (img.complete && img.naturalWidth) {
+                finish();
+            } else {
+                img.onload = img.onerror = finish;
+            }
+        });
+    }
+
+    function printCurrent() {
+        const id = $("#picDetail").dataset.id;
+        if (!id) return;
+        parentGate("print", async function () {
+            let rec = loadGallery().find(function (r) { return r.id === id; });
+            if (!rec) return;
+            /* Print the framed version if the kid picked one, same rule
+               as export. */
+            if (detailFrameId !== "none") {
+                const framed = await frameRecPng(rec, detailFrameId);
+                rec = Object.assign({}, rec, { png: framed });
+            }
+            await printPngRecord(rec);
+        });
+    }
+
     function exportCurrent() {
         /* Export saves a PNG to the device — gated as a "leaves the app"
            action per Apple Kids policy.
@@ -5751,11 +5979,18 @@
 
     document.addEventListener("keydown", function (e) {
         if (state.screen !== "draw") return;
-        const isUndo = (e.ctrlKey || e.metaKey) &&
-                       e.key.toLowerCase() === "z" && !e.shiftKey;
-        if (isUndo) {
+        const mod = e.ctrlKey || e.metaKey;
+        if (!mod) return;
+        const k = e.key.toLowerCase();
+        if (k === "z" && !e.shiftKey) {
             e.preventDefault();
             undo();
+        } else if ((k === "z" && e.shiftKey) || k === "y") {
+            /* Ctrl/Cmd+Shift+Z = redo (Mac + modern Windows); Ctrl+Y
+               is the classic Windows shortcut kids' parents might
+               reach for. Both go through the same path. */
+            e.preventDefault();
+            redo();
         }
     });
 
@@ -5861,9 +6096,13 @@
         });
         const trayUndo = $("#drawUndo");
         if (trayUndo) trayUndo.addEventListener("click", undo);
+        const trayRedo = $("#drawRedo");
+        if (trayRedo) trayRedo.addEventListener("click", redo);
         $("#detailClose").addEventListener("click", closeDetail);
         $("#detailDelete").addEventListener("click", deleteCurrent);
         $("#detailExport").addEventListener("click", exportCurrent);
+        const detailPrint = $("#detailPrint");
+        if (detailPrint) detailPrint.addEventListener("click", printCurrent);
         const galleryStart = $("#galleryStartBtn");
         if (galleryStart) {
             galleryStart.addEventListener("click", async function () {

@@ -865,6 +865,37 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 .onion.is-cleared .mouth-idle    { opacity: 0; }
 .onion.is-cleared .mouth-surprise{ opacity: 1; }
 
+/* Extra reaction states — 2026-08-09.
+   redo / first-stroke / eureka use the "yes!" happy smile;
+   tool-swap winks; sleepy shows the o mouth + a floating z above. */
+.onion.is-redo         .mouth-idle { opacity: 0; }
+.onion.is-redo         .mouth-happy { opacity: 1; }
+
+.onion.is-first-stroke .mouth-idle { opacity: 0; }
+.onion.is-first-stroke .mouth-happy { opacity: 1; }
+
+.onion.is-eureka       .mouth-idle { opacity: 0; }
+.onion.is-eureka       .mouth-happy { opacity: 1; }
+
+.onion.is-tool-swap    .mouth-idle { opacity: 0; }
+.onion.is-tool-swap    .mouth-wink { opacity: 1; }
+
+.onion.is-sleepy       .mouth-idle { opacity: 0; }
+.onion.is-sleepy       .mouth-sleepy { opacity: 1; }
+
+/* Sleepy: tiny "z" floats up and away; eyes half-close via a wider
+   scaleY on the pupils. */
+.onion .onion-zzz { transition: opacity 0.4s; }
+.onion.is-sleepy .onion-zzz {
+    opacity: 1;
+    animation: onion-zzz 2.6s ease-in-out infinite;
+}
+@keyframes onion-zzz {
+    0%   { transform: translate(0, 0) scale(0.6); opacity: 0; }
+    30%  { opacity: 1; }
+    100% { transform: translate(8px, -18px) scale(1.1); opacity: 0; }
+}
+
 /* Drawing: little bouncing on top of the sway. */
 @keyframes onion-bob {
     0%, 100% { transform: rotate(-2deg) translateY(0);   }
@@ -897,17 +928,84 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     animation: onion-shudder 0.5s ease-in-out 2;
 }
 
-/* Reduced-motion users: kill the constant sway + bob.
-   Keep state transitions visible via opacity (mouth swaps still work). */
+/* Redo: tiny happy nod (shorter than a jump, warmer than idle). */
+@keyframes onion-nod {
+    0%, 100% { transform: rotate(0); }
+    30%      { transform: rotate(-4deg) translateY(-3px); }
+    60%      { transform: rotate(3deg)  translateY(0); }
+}
+.onion.is-redo {
+    animation: onion-nod 0.55s ease-in-out;
+}
+
+/* First-stroke celebration — bigger than the drawing bob because
+   this fires exactly once per page. Kids notice the difference. */
+@keyframes onion-firsthop {
+    0%   { transform: translateY(0)   rotate(0); }
+    35%  { transform: translateY(-16px) rotate(-4deg); }
+    70%  { transform: translateY(0)   rotate(3deg); }
+    100% { transform: translateY(0)   rotate(0); }
+}
+.onion.is-first-stroke {
+    animation: onion-firsthop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Eureka — "aha!" bounce when a brush-erase reveal actually
+   surfaces a color underneath. Smaller than first-stroke; happens
+   often enough that a full jump would get annoying. */
+@keyframes onion-eureka {
+    0%, 100% { transform: rotate(0)    translateY(0); }
+    40%      { transform: rotate(-3deg) translateY(-6px); }
+    70%      { transform: rotate(2deg)  translateY(0); }
+}
+.onion.is-eureka {
+    animation: onion-eureka 0.45s ease-out;
+}
+
+/* Tool swap: tiny wink flicker. No movement — just the mouth swap
+   already covered above, plus a brief squint via animation. */
+.onion.is-tool-swap .onion-eye-r .pupil,
+.onion.is-tool-swap .onion-eye-r .highlight {
+    animation: onion-wink 0.35s ease-in-out;
+}
+@keyframes onion-wink {
+    0%, 100% { transform: scaleY(1); }
+    50%      { transform: scaleY(0.1); }
+}
+
+/* Sleepy: eyes half-close, sway slows. */
+.onion.is-sleepy .pupil,
+.onion.is-sleepy .highlight {
+    animation: onion-drowsy 3.4s ease-in-out infinite;
+}
+@keyframes onion-drowsy {
+    0%, 100% { transform: scaleY(0.4); }
+    50%      { transform: scaleY(0.15); }
+}
+.onion.is-sleepy {
+    animation: onion-sway 8s ease-in-out infinite;
+}
+
+/* Reduced-motion users: kill the constant sway + bob AND the new
+   reaction animations. Mouth swaps still work via opacity, so the
+   emotional feedback survives. */
 @media (prefers-reduced-motion: reduce) {
     .onion,
     .onion.is-drawing,
     .onion.is-saved,
-    .onion.is-cleared {
+    .onion.is-cleared,
+    .onion.is-redo,
+    .onion.is-first-stroke,
+    .onion.is-eureka,
+    .onion.is-tool-swap,
+    .onion.is-sleepy {
         animation: none !important;
     }
     .onion .pupil,
-    .onion .highlight {
+    .onion .highlight,
+    .onion.is-sleepy .pupil,
+    .onion.is-sleepy .highlight,
+    .onion .onion-zzz {
         animation: none !important;
     }
 }
@@ -1099,22 +1197,26 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    below fights. Without this, "hidden" Pro tools render anyway. */
 .tool-btn[hidden] { display: none !important; }
 
-/* Action row (UNDO / ERASE / CLEAR) — sits directly under the
-   brush grid where the big ERASE pill used to. Three equal-width
-   pills so destructive controls live together in one band. */
+/* Action row (UNDO / REDO / ERASE / CLEAR) — sits directly under
+   the brush grid where the big ERASE pill used to. Four equal-width
+   pills so the timeline + destructive controls live together in
+   one band. Icons shrink a little to keep the labels readable at
+   1/4 width on phone rails. */
 .action-row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
 }
 .tool-btn.action-btn {
     /* No grid-column span — each button takes one column of the
-       action-row's own 3-column grid. */
+       action-row's own 4-column grid. Vertical stack (icon over
+       label) at this cell width so a narrow phone rail doesn't
+       crop "CLEAR" or clip the icon. */
     grid-column: auto;
-    flex-direction: row;
-    min-height: 44px;
-    padding: 8px 10px;
-    gap: 8px;
+    flex-direction: column;
+    min-height: 52px;
+    padding: 6px 4px;
+    gap: 3px;
     border-color: var(--teal);
     background: linear-gradient(180deg, #0d2a32 0%, #07181e 100%);
     color: var(--teal);
@@ -1122,6 +1224,10 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 .tool-btn.action-btn .tool-icon {
     width: 20px;
     height: 20px;
+}
+.tool-btn.action-btn .tool-label {
+    font-size: 8px;
+    letter-spacing: 1px;
 }
 .tool-btn.action-btn:hover,
 .tool-btn.action-btn:focus-visible {
@@ -2017,6 +2123,42 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 
 .parent-gate-foot.is-error {
     color: #ff8060;
+}
+
+/* ----- 15b. Print ----- */
+
+/* PRINT button in the gallery detail. #printWrap holds the picture
+   being printed — invisible in normal flow, revealed by @media print
+   below. Kept fixed so browser layout can't shift it. */
+#printWrap {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+}
+#printWrap img {
+    max-width: 100%;
+    max-height: 100vh;
+    display: block;
+}
+
+@page { margin: 12mm; }
+
+@media print {
+    /* Hide the whole app; only the print wrap and its image show. */
+    body > * { visibility: hidden; }
+    #printWrap {
+        z-index: 999999;
+        visibility: visible;
+    }
+    #printWrap * { visibility: visible; }
+    /* Onion mascot + toasts + system chrome all stay hidden. */
+    .madder-home, .site-footer-slim, .system-bar { display: none !important; }
 }
 
 /* ----- 16. First-save + Saved toast ----- */
