@@ -60,6 +60,42 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "beans",   name: "BEANS",     image: "assets/coloring-pages/free/beans.png" }
         ]
     },
+    /* Color-by-number DEMO pack (2026-08-09). One proof-of-concept
+       page so Onion can see the engine work — she'll design proper
+       CBN pages later (see tiny-canvas/CLAUDE.md and
+       scripts/process-cbn-page.py for the pipeline). The demo reuses
+       the SUNNY DAY line-art from the free pack; its ID has a
+       cbn- prefix so its in-progress key is separate. Zone-based
+       assign() maps sky→blue, sun→yellow, rays→orange, ground→green.
+       Pack is pro:false so free-tier kids see it too. */
+    {
+        id: "cbn-demo", label: "COLOR BY NUMBER", pro: false,
+        pages: [
+            {
+                id:    "cbn-sun",
+                name:  "SUNNY DAY 1-2-3",
+                image: "assets/coloring-pages/free/sun.png",
+                cbn: {
+                    /* 1..4 — kept small so a kid holds the whole
+                       palette in their head. */
+                    palette: ["#7ecfff", "#ff8b3d", "#f7d94c", "#8ac36b"],
+                    /* Coarse zones tuned for sun.png's layout:
+                       upper band = sky, lower band = grass, and a
+                       radial split in the middle for sun vs. rays.
+                       Called per detected region with (cx, cy) in
+                       [0,1]. If Onion swaps the art, retune here. */
+                    assign: function (cx, cy) {
+                        if (cy > 0.75) return 4;             /* grass */
+                        if (cy < 0.30) return 1;             /* upper sky */
+                        const d = Math.hypot(cx - 0.5, cy - 0.5);
+                        if (d < 0.18) return 3;              /* sun body */
+                        if (d < 0.32) return 2;              /* rays */
+                        return 1;                             /* rest of sky */
+                    }
+                }
+            }
+        ]
+    },
     {
         id: "animals", label: "ANIMALS", pro: true,
         pages: [

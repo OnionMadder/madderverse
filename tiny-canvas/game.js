@@ -605,6 +605,17 @@
            events alone). See §4c REPLAY RECORDER. */
         replayEvents:  [],
         replayStrokePts: null,                  /* current stroke buffer */
+        /* Color-by-number mode. Non-null when the current template
+           opts in via `cbn: {...}`. Structure:
+             { palette:   [hex, hex, ...]      // numbered colors, 1-indexed
+               regions:   [{cx, cy, ci}]       // detected on page load
+               activeIdx: 1                    // which number the kid armed
+               completed: Set<regionKey>       // regions filled correctly }
+           Regions are auto-detected from the fill mask; ci
+           (color-index into palette) is assigned by a template's
+           optional `assign` rules or by a deterministic hash of the
+           centroid for the auto-fallback. See §4d CBN ENGINE. */
+        cbn:           null,
         dirty:         false,
         savedId:       null,                    /* gallery record id if this drawing was saved */
         dpr:           1,
@@ -2111,7 +2122,21 @@
             updateStatus();
             markInProgressDirty();
             hideIdleScribble();
-            triggerOnionReaction("drawing", 500);
+            /* CBN mode: check whether the fill landed on the "right"
+               region for the armed number. Match = big Onion smile +
+               track completion; mismatch = the fill still lands (no
+               punishment) but Onion stays neutral. */
+            if (state.cbn) {
+                const outcome = cbnResolveTap(sx, sy);
+                if (outcome === "match") {
+                    cbnMarkRegionComplete(sx, sy);
+                    triggerOnionReaction("eureka");
+                } else {
+                    triggerOnionReaction("drawing", 500);
+                }
+            } else {
+                triggerOnionReaction("drawing", 500);
+            }
             sfxTap();
         });
     }
@@ -3783,6 +3808,253 @@
         state.replayEvents.push({ t: "C" });
     }
 
+    /* ---------- 4d. COLOR-BY-NUMBER ENGINE ----------
+
+       A template opts in with a `cbn` field:
+
+         cbn: {
+           palette: ["#hex", "#hex", ...],   // 1-indexed numbered
+           assign?: function(cx, cy, W, H)   // optional: colour idx per region
+         }
+
+       If `assign` is present, runtime calls it per detected region
+       (cx/cy = 0..1 normalized) and uses whatever palette index it
+       returns. If absent, regions get a deterministic centroid-hash
+       assignment — good enough to demo the mechanic, not
+       artistically curated. Onion authors the assign rules per page
+       (or the future Python pipeline emits an inline `regions`
+       array from a reference PNG; see scripts/process-cbn-page.py).
+
+       Region detection walks the fill mask (same Uint8Array the
+       fill tool uses) for connected components of non-boundary
+       pixels. Regions smaller than CBN_MIN_REGION_PX are skipped —
+       stray specks between antialiased lines shouldn't get their
+       own number.
+
+       Fill routing is patched in floodFillAt: when CBN is active, a
+       tap in a region checks the armed palette index against the
+       region's assigned index. Match = happy Onion + track
+       completion. Mismatch = fill anyway (no punishment — Onion's
+       kids-first rule), Onion stays neutral. */
+
+    const CBN_MIN_REGION_PX = 400;   /* device-px area threshold */
+    const CBN_MAX_REGIONS   = 40;    /* skip pages with runaway region counts */
+
+    function cbnReset() {
+        const wasActive = !!state.cbn;
+        state.cbn = null;
+        cbnClearLabelOverlay();
+        /* If we were in CBN mode, rebuild the normal palette + chrome
+           so the page after doesn't inherit numbered swatches. */
+        if (wasActive) {
+            buildPalette();
+        }
+    }
+
+    /* Build the CBN state for a template on load. Two modes:
+         1. Explicit `regions` array (emitted by
+            scripts/process-cbn-page.py) — normalized {cx,cy,ci} in
+            [0,1]. Trusted verbatim; scaled to mask coords for
+            cbnResolveTap. Preferred for real Onion-authored pages.
+         2. Runtime auto-detect — scan the fill mask, apply an
+            `assign` function (or the centroid hash fallback). Used
+            for demo pages and quick iteration.
+       Async because the fill mask is async; the label overlay
+       renders once the mask is ready. */
+    async function cbnMaybeActivate(tpl) {
+        cbnReset();
+        if (!tpl || !tpl.cbn || !tpl.cbn.palette) return;
+
+        const mask = await buildFillMask();
+        if (!mask) return;
+        /* Guard against a template swap that happened mid-await —
+           don't stamp CBN state onto whatever page loaded second. */
+        if (state.templateId !== tpl.id) return;
+
+        const W = fillMaskW, H = fillMaskH;
+        const palette = tpl.cbn.palette.slice();
+        let regions;
+
+        if (Array.isArray(tpl.cbn.regions) && tpl.cbn.regions.length) {
+            /* Pre-authored regions — normalized coords. */
+            regions = tpl.cbn.regions.map(function (r) {
+                const ci = (typeof r.ci === "number" &&
+                            r.ci >= 1 && r.ci <= palette.length) ? r.ci : 1;
+                return {
+                    cx:   r.cx * W,
+                    cy:   r.cy * H,
+                    area: (typeof r.area === "number")
+                          ? r.area
+                          : Math.round((W * H) / tpl.cbn.regions.length),
+                    ci:   ci
+                };
+            });
+        } else {
+            /* Runtime auto-detect + assign. */
+            regions = cbnDetectRegions(mask, W, H);
+            if (!regions.length) return;
+            const assign = (typeof tpl.cbn.assign === "function")
+                           ? tpl.cbn.assign
+                           : cbnDefaultAssign(palette.length);
+            for (let i = 0; i < regions.length; i++) {
+                const r = regions[i];
+                let ci = assign(r.cx / W, r.cy / H, W, H);
+                if (typeof ci !== "number" || ci < 1 ||
+                    ci > palette.length) ci = 1;
+                r.ci = ci;
+            }
+        }
+
+        state.cbn = {
+            palette:   palette,
+            regions:   regions,
+            activeIdx: 1,
+            completed: new Set()
+        };
+
+        cbnRenderLabelOverlay();
+        buildPalette();   /* re-render palette with numbered swatches */
+    }
+
+    /* Auto-assignment fallback: cycles palette indices in reading order,
+       so adjacent regions rarely share a number. Deterministic per
+       (cx,cy,paletteN) so a re-load of the same page shows the same
+       numbers. */
+    function cbnDefaultAssign(paletteN) {
+        return function (cx, cy) {
+            /* Small hash on the normalized centroid — Cantor-style
+               pairing then mod paletteN. Stable across sessions. */
+            const a = Math.floor(cx * 100), b = Math.floor(cy * 100);
+            const h = ((a * 73856093) ^ (b * 19349663)) >>> 0;
+            return (h % paletteN) + 1;
+        };
+    }
+
+    /* Scanline flood-fill on the mask to enumerate connected
+       non-boundary regions. Skips small components (specks between
+       antialiased strokes) and any region touching the border past
+       CBN_MAX_REGIONS (which is a runaway signal — usually a page
+       whose ink is too thin to seal). Returns [{cx,cy,area}]
+       sorted largest-first. */
+    function cbnDetectRegions(mask, W, H) {
+        const seen  = new Uint8Array(W * H);
+        const found = [];
+        for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+                const i = y * W + x;
+                if (seen[i] || mask[i]) continue;
+                /* BFS on this component. */
+                const stack = [i];
+                let area = 0, sx = 0, sy = 0;
+                while (stack.length) {
+                    const seed = stack.pop();
+                    const py = (seed / W) | 0;
+                    let px = seed - py * W;
+                    while (px > 0 && !seen[py * W + px - 1] &&
+                           !mask[py * W + px - 1]) px--;
+                    let up = false, dn = false;
+                    while (px < W) {
+                        const j = py * W + px;
+                        if (seen[j] || mask[j]) break;
+                        seen[j] = 1;
+                        area++; sx += px; sy += py;
+                        if (py > 0) {
+                            const u = j - W;
+                            const openU = !seen[u] && !mask[u];
+                            if (openU && !up) { stack.push(u); up = true; }
+                            else if (!openU)  up = false;
+                        }
+                        if (py < H - 1) {
+                            const d = j + W;
+                            const openD = !seen[d] && !mask[d];
+                            if (openD && !dn) { stack.push(d); dn = true; }
+                            else if (!openD)  dn = false;
+                        }
+                        px++;
+                    }
+                }
+                if (area < CBN_MIN_REGION_PX) continue;
+                found.push({ cx: sx / area, cy: sy / area, area: area });
+                if (found.length > CBN_MAX_REGIONS * 2) {
+                    /* Bail if the count is exploding — the page isn't
+                       CBN-suitable. Caller will see zero and skip. */
+                    return [];
+                }
+            }
+        }
+        found.sort(function (a, b) { return b.area - a.area; });
+        return found.slice(0, CBN_MAX_REGIONS);
+    }
+
+    /* Number label overlay — one absolutely-positioned <span> per
+       region, layered above the line-art but under the tool rail. */
+    function cbnClearLabelOverlay() {
+        const host = $("#cbnLabels");
+        if (host) host.innerHTML = "";
+    }
+
+    function cbnRenderLabelOverlay() {
+        const host = $("#cbnLabels");
+        if (!host || !state.cbn) return;
+        host.innerHTML = "";
+        const art = overlayArtEl();
+        if (!art) return;
+        const W = fillMaskW, H = fillMaskH;
+        const regs = state.cbn.regions;
+        for (let i = 0; i < regs.length; i++) {
+            const r = regs[i];
+            const label = document.createElement("span");
+            label.className = "cbn-label";
+            label.textContent = String(r.ci);
+            /* Position in the OVERLAY's coordinate space (percent).
+               The overlay tracks the art element's box via CSS
+               (see #cbnLabels rule), so pixel-fraction of the mask
+               = pixel-fraction of the art. */
+            label.style.left = (100 * r.cx / W).toFixed(2) + "%";
+            label.style.top  = (100 * r.cy / H).toFixed(2) + "%";
+            host.appendChild(label);
+        }
+    }
+
+    /* Called by floodFillAt when a fill lands. Returns:
+         "match"     — the armed color matched the region's target
+         "mismatch"  — a valid region, wrong color (fill anyway)
+         "no-region" — tap wasn't inside any detected region
+       Only meaningful when state.cbn is set. */
+    function cbnResolveTap(sx, sy) {
+        if (!state.cbn) return "no-region";
+        /* Find the region whose centroid is closest to the tap AND
+           whose area, projected as a circle from the centroid, would
+           plausibly contain the tap. Cheap heuristic — the fill
+           routes to the region the tap actually belongs to by mask
+           topology, so we only need a coarse lookup for reactions. */
+        let best = null, bestD2 = Infinity;
+        for (let i = 0; i < state.cbn.regions.length; i++) {
+            const r = state.cbn.regions[i];
+            const dx = sx - r.cx, dy = sy - r.cy;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < bestD2) { bestD2 = d2; best = r; }
+        }
+        if (!best) return "no-region";
+        /* Reject if the tap is far outside the region's plausible
+           radius (2× the equivalent-circle radius). */
+        const rMax = 2 * Math.sqrt(best.area / Math.PI);
+        if (Math.sqrt(bestD2) > rMax) return "no-region";
+        return (best.ci === state.cbn.activeIdx) ? "match" : "mismatch";
+    }
+
+    function cbnMarkRegionComplete(sx, sy) {
+        if (!state.cbn) return;
+        let best = null, bestD2 = Infinity;
+        for (let i = 0; i < state.cbn.regions.length; i++) {
+            const r = state.cbn.regions[i];
+            const dx = sx - r.cx, dy = sy - r.cy;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < bestD2) { bestD2 = d2; best = r; }
+        }
+        if (best) state.cbn.completed.add(best);
+    }
+
     /* ---------- 4b. WET STROKE LAYER ----------
 
        Why this exists: most brushes paint translucent (crayon .45,
@@ -4154,6 +4426,11 @@
            with no strokes; hide it otherwise (template is loaded
            or restore brought back existing strokes). */
         maybeShowIdleScribble();
+        /* Enter CBN mode if the template opts in. Async — waits on
+           the fill mask + then renders the number-label overlay and
+           swaps the palette. Templates without `cbn` deactivate any
+           lingering CBN state from the previous page. */
+        cbnMaybeActivate(tpl);
     }
 
     /* ---------- 7. UI BUILDERS ---------- */
@@ -4302,6 +4579,46 @@
         const palette = $("#colorPalette");
         if (!customSwatchEl) customSwatchEl = $("#customSwatch");
         palette.innerHTML = "";
+        /* CBN mode: swap in numbered swatches from the template's own
+           palette. The palette tabs / custom swatch are hidden by
+           refreshPaletteChrome so nothing off-palette is a tap away —
+           the whole point of color-by-number is that these N colours
+           are the alphabet. */
+        if (state.cbn) {
+            state.cbn.palette.forEach(function (hex, i) {
+                const idx = i + 1;
+                const sw = document.createElement("button");
+                sw.className = "swatch swatch-cbn";
+                sw.type = "button";
+                sw.style.background = hex;
+                sw.setAttribute("role", "option");
+                sw.setAttribute("aria-label", "Color " + idx);
+                sw.setAttribute("data-color", hex);
+                sw.setAttribute("data-cbn-idx", String(idx));
+                const num = document.createElement("span");
+                num.className = "swatch-num";
+                num.textContent = String(idx);
+                sw.appendChild(num);
+                if (idx === state.cbn.activeIdx) sw.classList.add("active");
+                sw.addEventListener("click", function () {
+                    state.cbn.activeIdx = idx;
+                    state.currentColor  = hex;
+                    /* Arm FILL so a tap on a region actually paints —
+                       CBN's play pattern is tap-to-fill, not scribble. */
+                    if (state.currentTool !== "fill") {
+                        state.currentTool = "fill";
+                        state.lastNonEraseTool = "fill";
+                        refreshToolButtons();
+                        rebuildSizeButtons();
+                    }
+                    refreshPaletteActive();
+                    nudgeOnionAwake();
+                });
+                palette.appendChild(sw);
+            });
+            refreshPaletteChrome();
+            return;
+        }
         const colors = COLOR_GROUPS[activeColorGroup()].colors;
         colors.forEach(function (hex) {
             const sw = document.createElement("button");
@@ -4328,6 +4645,28 @@
         });
         /* Custom swatch goes last, inside the same wrapping flow. */
         if (customSwatchEl) palette.appendChild(customSwatchEl);
+        refreshPaletteChrome();
+    }
+
+    /* CBN mode hides the palette-group tabs and the custom-color
+       swatch — those would let a kid step outside the numbered
+       palette, which defeats the point. Normal mode restores them.
+       Called from buildPalette AND from cbnReset so leaving a CBN
+       page brings the chrome back even if the palette doesn't
+       rebuild for other reasons. */
+    function refreshPaletteChrome() {
+        const tabs = $(".palette-tabs-row");
+        const custom = $("#customSwatch");
+        if (tabs) {
+            if (state.cbn) tabs.setAttribute("hidden", "");
+            else           tabs.removeAttribute("hidden");
+        }
+        if (custom) {
+            /* Custom lives inside #colorPalette in normal mode but
+               floats semantically — hide via style so the palette's
+               grid stays clean in CBN. */
+            custom.style.display = state.cbn ? "none" : "";
+        }
     }
 
     function refreshPaletteActive() {

@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=47" />
+    <link rel="stylesheet" href="style.css?v=48" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -161,6 +161,14 @@
                  pointer-events: none so taps go through to the canvas.
                  innerHTML swapped in by loadTemplate(). -->
             <div class="line-art" id="lineArt" aria-hidden="true"></div>
+
+            <!-- Color-by-number number labels: one absolute <span> per
+                 detected region, positioned in percent so the overlay
+                 tracks the art element under zoom. Populated by
+                 cbnRenderLabelOverlay(); empty otherwise. Also
+                 pointer-events: none — taps fall through to the canvas
+                 exactly like the line-art layer. -->
+            <div class="cbn-labels" id="cbnLabels" aria-hidden="true"></div>
 
         </div>
 
@@ -845,8 +853,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=47"></script>
-<script src="game.js?v=47"></script>
+<script src="templates.js?v=48"></script>
+<script src="game.js?v=48"></script>
 
 </body>
 </html>

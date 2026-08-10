@@ -623,6 +623,66 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     justify-content: center;
 }
 
+/* CBN number labels — one absolute span per detected region.
+   Positioned in percent of the labels container, which sits at
+   the same fixed centre + max-size as .line-art so the numbers
+   track the coloring page under zoom without a JS reflow.
+   pointer-events:none so taps still land on the canvas. */
+.cbn-labels {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width:  min(94vw, 1360px);
+    height: min(78vh, 800px);
+    pointer-events: none;
+    z-index: 11;    /* above .line-art (10) so numbers sit on top of ink */
+}
+.cbn-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 12px;
+    background: rgba(255, 245, 220, 0.9);   /* --paper at 0.9 alpha */
+    border: 1.5px solid #1c2226;
+    color: #1c2226;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 20px;
+    text-align: center;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+    /* Discourage a screen reader from stumbling into these; the
+       parent has aria-hidden already. */
+    user-select: none;
+}
+
+/* CBN swatch — normal swatch styling plus a large centred number.
+   The number reads WHITE with a black outline so it stays legible
+   over any palette colour. */
+.swatch-cbn {
+    position: relative;
+}
+.swatch-cbn .swatch-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow:
+        -1px -1px 0 #000,
+         1px -1px 0 #000,
+        -1px  1px 0 #000,
+         1px  1px 0 #000;
+    pointer-events: none;
+}
+
 /* Idle scribble — kinetic centerpiece. Three brand-color paths
    each draw themselves over 12 seconds, offset by 4s so at any
    moment one shape is "writing" and the others rest at zero

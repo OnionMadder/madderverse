@@ -7,8 +7,38 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=45** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=48** — bump it
   on every change to style.css / templates.js / game.js.
+- **Color-by-number engine shipped (2026-08-09).** A template opts in
+  with a `cbn: { palette: [hex, ...], assign?: fn, regions?: [...] }`
+  field. On load, the engine either uses explicit `regions`
+  (normalized `{cx, cy, ci}` from the pipeline script) OR
+  auto-detects connected components from the fill mask and asks
+  `assign(cx, cy)` for the palette index. Runtime swaps in numbered
+  swatches (arming FILL on tap), overlays absolutely-positioned
+  number labels at each region's centroid, and routes fill taps
+  through `cbnResolveTap`: correct number in the right region →
+  Onion eureka + tracked completion, wrong number → fills anyway,
+  no punishment, Onion stays neutral. Palette tabs and the custom
+  color swatch hide in CBN mode so the numbered palette is the whole
+  alphabet. Engine gates on `CBN_MIN_REGION_PX` (400) and
+  `CBN_MAX_REGIONS` (40) so pages whose ink is too thin to seal
+  bail out cleanly instead of painting a wall of numbers.
+- **Companion Python pipeline: `scripts/process-cbn-page.py`.**
+  Takes a line-art PNG (alpha ink) + a fully-colored reference PNG
+  → detects fillable regions, samples the reference at each
+  centroid, snaps to a target palette, emits the JSON to paste
+  into templates.js. Same INK_ALPHA + min-area rules as the runtime
+  so mask topology matches. Pillow + numpy only, no new deps beyond
+  process-coloring-pages.py.
+- **CBN needs dedicated art.** Onion's existing raster pages were
+  designed for freehand and often auto-detect as few or badly-shaped
+  regions — the shipped demo (`cbn-sun`, reusing `sun.png`) only
+  surfaces one detectable region because the sun+rays+sky don't
+  seal into distinct components at the current ink density. The
+  engine is proven; real CBN pages need their own layouts (clear,
+  well-separated regions, thick enough ink to seal) and a paired
+  reference PNG for the pipeline.
 - **Free tier bumped 1 → 3 reps per category (2026-08-09).** Every Pro
   category now shows THREE `free: true` pages instead of one. Free tier
   = BLANK + 6 basics + 33 reps = **40 pages** (was 18); Pro adds the
@@ -683,7 +713,7 @@ App Store Connect / Play Console upload slot
   with a CSS filter or compositor blur — the edge has to be baked
   into the bitmap for save/export to capture it.
 - **Bump `?v=N` in `index.html` on EVERY change** to `style.css`,
-  `templates.js` or `game.js` (currently **v45**). Without it the
+  `templates.js` or `game.js` (currently **v48**). Without it the
   browser serves a stale `game.js` against a fresh `index.html` and the
   change reads as "did nothing" — the same trap Slip Studio and
   Florigami both hit. Note that a hard-reload which refetches
