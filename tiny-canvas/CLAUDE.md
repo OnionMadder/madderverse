@@ -38,7 +38,9 @@ via Capacitor.
   seal into distinct components at the current ink density. The
   engine is proven; real CBN pages need their own layouts (clear,
   well-separated regions, thick enough ink to seal) and a paired
-  reference PNG for the pipeline.
+  reference PNG for the pipeline. **See
+  [`CBN_ART_GUIDE.md`](CBN_ART_GUIDE.md)** for the design checklist
+  Onion authors against.
 - **Free tier bumped 1 → 3 reps per category (2026-08-09).** Every Pro
   category now shows THREE `free: true` pages instead of one. Free tier
   = BLANK + 6 basics + 33 reps = **40 pages** (was 18); Pro adds the
