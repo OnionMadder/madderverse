@@ -166,7 +166,17 @@ a:focus-visible {
 .screen {
     max-width: var(--content-max);
     margin: 0 auto;
-    padding: 24px 16px 72px;
+    /* Safe-area insets are additive so a device with a status-bar / nav-bar
+       inset gets extra padding while a device with none (or Android with the
+       edge-to-edge opt-out still in place) sees the same 24/16/72/16 as
+       before. Left/right matter in landscape when the phone's punch-hole
+       moves to a side edge; top/bottom cover portrait bars once the API 36
+       bump forces edge-to-edge and the values-v35 opt-out stops working. */
+    padding:
+        calc(24px + env(safe-area-inset-top, 0px))
+        calc(16px + env(safe-area-inset-right, 0px))
+        calc(72px + env(safe-area-inset-bottom, 0px))
+        calc(16px + env(safe-area-inset-left, 0px));
     min-height: calc(100vh - 110px);
     display: flex;
     flex-direction: column;
@@ -540,7 +550,7 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
    rendered as a floating bar instead of a flow element. */
 #screen-draw .screen-titlebar {
     position: fixed;
-    top: 12px;
+    top: calc(12px + env(safe-area-inset-top, 0px));
     left: 50%;
     transform: translateX(-50%);
     width: min(640px, calc(100vw - 24px));
@@ -807,7 +817,7 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 #screen-draw .pages-btn {
     position: fixed;
     top: var(--overlay-top);
-    left: 14px;
+    left: calc(14px + env(safe-area-inset-left, 0px));
     z-index: 60;
     width: auto;
     height: 40px;
@@ -1818,13 +1828,24 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 @media (max-width: 767.98px) {
     .draw-side-rail {
         position: fixed;
-        left: 0; right: 0; bottom: 0;
+        /* Anchor above the nav bar rather than under it — moving the WHOLE
+           drawer up by the inset keeps the 54px collapsed handle visible
+           when API 36 removes the values-v35 opt-out. Just padding the
+           content wouldn't help: translateY(calc(100% - 54px)) slides by
+           the drawer's full height, so with height growth the visible strip
+           still ends at the bottom edge of the viewport (under the bar). */
+        left: 0; right: 0;
+        bottom: env(safe-area-inset-bottom, 0px);
         z-index: 80;
         max-width: none;
         max-height: 72vh;
         overflow-y: auto;
         gap: 12px;
-        padding: 0 14px 18px;
+        padding:
+            0
+            calc(14px + env(safe-area-inset-right, 0px))
+            18px
+            calc(14px + env(safe-area-inset-left, 0px));
         background: linear-gradient(180deg,
             #082028 0%, #051218 26%, #04101a 100%);
         border-top: 2px solid var(--pink);
@@ -1888,7 +1909,7 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     }
 
     #screen-draw {
-        padding-bottom: 72px;
+        padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
     }
 }
 
@@ -1898,9 +1919,9 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
        floating panel anchored to the right edge of the viewport. */
     .draw-side-rail {
         position: fixed;
-        top: 112px;                /* below the titlebar */
-        right: 12px;
-        bottom: 40px;              /* clear of slim footer */
+        top: calc(112px + env(safe-area-inset-top, 0px));    /* below the titlebar */
+        right: calc(12px + env(safe-area-inset-right, 0px));
+        bottom: calc(40px + env(safe-area-inset-bottom, 0px)); /* clear of slim footer */
         width: 320px;
         max-width: 320px;
         align-items: stretch;
@@ -1936,8 +1957,8 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 
 .settings-hook {
     position: fixed;
-    bottom: 28px;
-    right: 16px;
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px));
     z-index: 60;
     width: 40px;
     height: 40px;
@@ -2673,7 +2694,7 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 
 .zoom-ctrls {
     position: fixed;
-    left: 10px;
+    left: calc(10px + env(safe-area-inset-left, 0px));
     top: 50%;
     transform: translateY(-50%);
     display: flex;
