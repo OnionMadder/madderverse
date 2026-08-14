@@ -759,7 +759,7 @@
        build carries no dead purchase UI (Apple rejects those). Web
        never shows it either: isPro() is already true there. */
 
-    const RC_PUBLIC_API_KEY  = "goog_REPLACE_WITH_TINY_CANVAS_KEY";
+    const RC_PUBLIC_API_KEY  = "goog_ShjKvnDrLrnFmeaPhCCrNXrJXyf";
     const RC_PRO_ENTITLEMENT = "pro";
     const RC_PRO_PRODUCT_ID  = "tiny_canvas_pro";
 
