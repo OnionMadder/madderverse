@@ -260,7 +260,10 @@ delivers the real art). Generation tooling: any of —
 | 13-inch iPad Pro | 2064×2752 portrait | **Required** if you ship iPad support |
 
 Apple lets you upload 3-10 screenshots per device class. Recommended:
-**5** — Title, Picker, Mid-drawing, Gallery, Settings.
+**7** — Title, Picker, Mid-drawing, Fill+pattern, Stamps, Gallery,
+Settings. `scripts/capture-screenshots.js` produces exactly this set
+per device profile, numbered `01-title.png` … `07-settings.png`, in
+the order they read as a marketing walkthrough.
 
 ### Google Play — screenshot sizes
 

@@ -41,6 +41,12 @@ www/
 # Rasterized icon sources for @capacitor/assets, generated from icons/*.svg
 .assetsrc/
 
+# Store screenshots — 42 PNGs (~15 MB) written by
+# scripts/capture-screenshots.js from the live web build. Regenerable
+# on demand, so not worth tracking; the uploaded copies live in
+# App Store Connect / Play Console.
+screenshots/
+
 # Master coloring-page art (2816x1536 originals, ~53MB) — the shipped
 # pages in assets/coloring-pages/ are generated from these by
 # scripts/process-coloring-pages.py. Untracked like all Madderverse
