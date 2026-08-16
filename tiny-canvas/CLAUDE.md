@@ -1312,17 +1312,21 @@ Don't re-plan these — they're done and verified:
 9. ~~**More brushes**~~ — DONE 2026-08-05 (spray, rainbow, glow,
    smudge).
 10. **Edge-to-edge, before the API 36 bump — CSS DONE 2026-08-13.** The
-    values-v35 `windowOptOutEdgeToEdgeEnforcement` opt-out is still in
-    place (deprecated in API 36; still works at API 35 which is what
-    Play requires today). The CSS side is now wired in: `.screen` base
-    padding, `#screen-draw .screen-titlebar`, `.settings-hook`, both
-    `.draw-side-rail` breakpoints (mobile bottom-sheet anchored above
-    the nav bar via `bottom: env(safe-area-inset-bottom)`, not just
-    padded), `.pages-btn` and `.zoom-ctrls` all consume
-    `env(safe-area-inset-*, 0px)` additively — no-ops today (insets
-    report 0 under the opt-out), real padding the moment the opt-out is
-    dropped or targetSdk moves to 36. Remaining: when the targetSdk 36
-    bump happens, delete `android/app/src/main/res/values-v35/styles.xml`
-    entirely and verify on a device that the titlebar, drawer handle,
-    settings gear, and landscape-mode pages/zoom rail all clear the
-    system bars and the punch-hole.
+    values-v35 `windowOptOutEdgeToEdgeEnforcement` opt-out has been
+    DELETED and targetSdk is now **36** — the whole build now runs
+    edge-to-edge and the safe-area CSS is the only thing keeping
+    content out from under the system bars. The CSS covers `.screen`
+    base padding, `#screen-draw .screen-titlebar`, `.settings-hook`,
+    both `.draw-side-rail` breakpoints (mobile bottom-sheet anchored
+    above the nav bar via `bottom: env(safe-area-inset-bottom)`, not
+    just padded), `.pages-btn`, `.zoom-ctrls`, AND — added 2026-08-16
+    after Bala's report — the two per-screen padding overrides on
+    `#screen-gallery` and `#screen-settings`, which were previously
+    silently discarding `.screen`'s inset-aware padding and pinning
+    the ← TITLE back button under the phone status bar. Every one of
+    these consumes `env(safe-area-inset-*, 0px)` additively so desktop
+    web (where env is 0) is unchanged. ⚠ **New screen-level padding
+    overrides must include `env(safe-area-inset-*)`** or the button
+    will end up under a bar on edge-to-edge Android — this is the
+    trap that bit gallery + settings; grep for `padding-top:` inside
+    any `#screen-*` block before shipping.
