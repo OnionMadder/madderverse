@@ -1553,8 +1553,13 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 /* ----- 10. Gallery ----- */
 
 #screen-gallery {
-    padding-top: 12px;
-    padding-bottom: 30px;
+    /* Adds to the safe-area insets so the ← TITLE back button clears
+       the Android status bar and the gallery grid clears the nav bar
+       under edge-to-edge. The bare `12px` / `30px` was overriding
+       .screen's inset-aware padding and pinning the button under the
+       phone status bar on the paid app — Bala's report 2026-08-16. */
+    padding-top:    calc(12px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(30px + env(safe-area-inset-bottom, 0px));
 }
 
 .gallery-grid {
@@ -1991,8 +1996,11 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
 }
 
 #screen-settings {
-    padding-top: 12px;
-    padding-bottom: 60px;
+    /* Same safe-area additive pattern as #screen-gallery — the bare
+       `12px` was pinning the ← TITLE back button under the Android
+       status bar. */
+    padding-top:    calc(12px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
 }
 
 .settings-stack {
