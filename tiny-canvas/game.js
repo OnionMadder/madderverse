@@ -44,8 +44,22 @@
        add colors, re-run the pairwise check (min distance must stay
        well above 6) before shipping. */
     const COLOR_GROUPS = {
-        rainbow: {
-            label: "RAINBOW", free: true,
+        /* Renamed from "rainbow" to "brights" (2026-08-14) after Bala,
+           testing on the paid Android app, tapped the RAINBOW palette
+           tab expecting rainbow strokes and got a colour-selector swap.
+           Two things labelled RAINBOW in the same tray — one draws
+           rainbow (the brush), one just swaps swatches (this tab) —
+           was a real UX trap for early readers. The word RAINBOW is
+           now reserved for the brush; this palette gets BRIGHTS, which
+           is honest about what's in it (saturated primaries) and reads
+           at kid grade level. The RAINBOW brush moved from Pro to free
+           in the same change so tapping RAINBOW does the same thing
+           for every kid regardless of purchase. `activeColorGroup()`
+           auto-migrates existing users with `colorGroup: "rainbow"`
+           to the first available group (which is this one), so no
+           schema bump or storage migration was needed. */
+        brights: {
+            label: "BRIGHTS", free: true,
             colors: [
                 "#ff2e88", "#ff4d4d", "#ff7a1f", "#ff9d42",
                 "#ffd23f", "#9be15d", "#1ac88a", "#00ffcc",
@@ -206,8 +220,9 @@
         /* PEN, MARKER, PENCIL and PAINT were retired 2026-08-09 —
            they read as redundant variants of a solid-colour stroke.
            CRAYON kept as the textured default; GLITTER for the
-           sparkle novelty; the four Pro brushes (SPRAY / RAINBOW /
-           GLOW / SMUDGE) do the rest. */
+           sparkle novelty; RAINBOW is a free brush too (moved from Pro
+           2026-08-14 — see COLOR_GROUPS note). The three Pro brushes
+           (SPRAY / GLOW / SMUDGE) do the rest. */
         crayon: {
             /* Stippled-grain texture. Dabs along the path with small
                random offsets at moderate alpha — multiple dabs per
@@ -560,11 +575,15 @@
     };
 
     /* Brushes that draw color (everything except eraser). Used for
-       deciding which size set + palette state apply. The last four
-       are Pro (their buttons carry data-pro and stay hidden on a
-       locked native build — see revealProUI). */
-    const BRUSH_IDS  = ["crayon", "glitter",
-                        "spray", "rainbow", "glow", "smudge"];
+       deciding which size set + palette state apply. SPRAY / GLOW /
+       SMUDGE are Pro (their buttons carry data-pro and stay hidden on
+       a locked native build — see revealProUI). RAINBOW WAS Pro through
+       vc4 but moved to free 2026-08-14 (Bala's feedback — see the
+       BRIGHTS/RAINBOW rename note on COLOR_GROUPS above); its button
+       in index.html no longer carries data-pro. CRAYON, GLITTER and
+       RAINBOW are the free brush set. */
+    const BRUSH_IDS  = ["crayon", "glitter", "rainbow",
+                        "spray", "glow", "smudge"];
     const TOOL_IDS   = BRUSH_IDS.concat("eraser");
 
     /* ---------- 1. STATE ---------- */
@@ -573,7 +592,7 @@
         screen:        "title",                 /* title | picker | draw | gallery | settings */
         templateId:    null,                    /* current template */
         templateName:  "BLANK",
-        currentColor:  COLOR_GROUPS.rainbow.colors[0],
+        currentColor:  COLOR_GROUPS.brights.colors[0],
         currentTool:   "crayon",
         lastNonEraseTool: "crayon", /* remembers the last brush/fill/stamp
                                        the kid used, so ERASE mode matches:
@@ -586,7 +605,7 @@
         stampPack:     "classics", /* active STAMP_PACKS tab */
         rainbowHue:    0,         /* per-stroke hue cursor (RAINBOW brush) */
         proUnlocked:   false,     /* native purchase flag — see isPro() */
-        colorGroup:    "rainbow",               /* active palette group */
+        colorGroup:    "brights",               /* active palette group */
         brushSize:     BRUSHES.crayon.defaultSize, /* size for whichever brush is active */
         eraserSize:    BRUSHES.eraser.defaultSize,
         isDrawing:     false,
@@ -646,9 +665,11 @@
        - Billing (RevenueCat) is NOT built yet. On native the flag
          defaults false, so the unreleased native build shows the free
          tier until billing lands and sets PRO_KEY.
-       Gated content: SPRAY / RAINBOW / GLOW / SMUDGE brushes, the
-       STAMP tool, PAPER textures, export FRAMES. Pattern fills are
-       deliberately FREE — they shipped ungated and stay that way. */
+       Gated content: SPRAY / GLOW / SMUDGE brushes, the STAMP tool,
+       PAPER textures, export FRAMES. Pattern fills are deliberately
+       FREE — they shipped ungated and stay that way. RAINBOW was in
+       this list through vc4 but moved to free 2026-08-14 (Bala's
+       feedback — see COLOR_GROUPS). */
 
     /* Dev/preview override: ?free=1 shows the FREE tier on web —
        there is no other way to see it there (web is always Pro), and

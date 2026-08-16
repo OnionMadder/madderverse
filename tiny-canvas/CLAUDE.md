@@ -7,8 +7,25 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=48** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=50** — bump it
   on every change to style.css / templates.js / game.js.
+- **RAINBOW moved from Pro to free (2026-08-14) and the confusingly-
+  co-named RAINBOW palette group was renamed BRIGHTS.** Bala (5),
+  testing on the paid Android app, tapped the RAINBOW palette tab
+  expecting rainbow strokes and got a colour-selector swap; two things
+  labelled RAINBOW in the same tray (the brush *does* draw rainbow,
+  the palette tab *doesn't*) was a real UX trap for early readers. The
+  fix in one change: (1) the palette group id `rainbow` → `brights`
+  (label BRIGHTS) so the word RAINBOW no longer appears twice in the
+  tray, (2) the RAINBOW brush's `data-pro hidden` removed in
+  index.html so it shows on locked native builds, (3) `BRUSH_IDS`
+  reordered so the three remaining Pro brushes read together (SPRAY /
+  GLOW / SMUDGE). Existing users with `colorGroup: "rainbow"` in
+  localStorage auto-migrate via `activeColorGroup()`'s
+  first-available-group fallback — no schema bump. Free brush set is
+  now CRAYON / GLITTER / RAINBOW; Pro is SPRAY / GLOW / SMUDGE +
+  everything else. Every notice below that still says "4 Pro brushes"
+  is historical narrative from before this change.
 - **Color-by-number engine shipped (2026-08-09).** A template opts in
   with a `cbn: { palette: [hex, ...], assign?: fn, regions?: [...] }`
   field. On load, the engine either uses explicit `regions`
@@ -224,8 +241,8 @@ Capacitor when you're packaging for a store.
   and paths ending in `Z`; an open stroke is fine only for decoration
   that isn't meant to hold colour.
 - **6 distinct brushes** (was 10 pre-2026-08-09 — see the change-log
-  bullet up top for the four retirements) — 2 free (CRAYON default,
-  GLITTER) + 4 Pro (SPRAY / RAINBOW / GLOW / SMUDGE), each with its
+  bullet up top for the four retirements) — 3 free (CRAYON default,
+  GLITTER, RAINBOW) + 3 Pro (SPRAY / GLOW / SMUDGE), each with its
   own beginStroke + drawSegment + textural feel. Plus ERASER (now a
   reveal, not a wipe — see up top), the FILL bucket, and the Pro
   STAMP tool (60 tap-to-place shapes tinted by the armed color, in
