@@ -52,7 +52,10 @@ window.TINY_CANVAS_PAGE_PACKS = [
         id: "free", label: "FREE", pro: false,
         pages: [
             { id: "blank",   name: "BLANK",     svg: "" },
-            { id: "sun",     name: "SUNNY DAY", image: "assets/coloring-pages/free/sun.png" },
+            /* SUNNY DAY moved out of FREE 2026-08-17 — it now anchors the
+               COLOR BY NUMBER pack as `cbn-sun`, so leaving it here would
+               double-list the same page. The `free/sun.png` file stays on
+               disk because cbn-sun still references it. */
             { id: "rainbow", name: "RAINBOW",   image: "assets/coloring-pages/free/rainbow.png" },
             { id: "leaf",    name: "LEAF",      image: "assets/coloring-pages/free/leaf.png" },
             { id: "icecube", name: "ICE CUBE",  image: "assets/coloring-pages/free/icecube.png" },
@@ -60,30 +63,41 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "beans",   name: "BEANS",     image: "assets/coloring-pages/free/beans.png" }
         ]
     },
-    /* Color-by-number DEMO pack (2026-08-09). One proof-of-concept
-       page so Onion can see the engine work — she'll design proper
-       CBN pages later (see tiny-canvas/CLAUDE.md and
-       scripts/process-cbn-page.py for the pipeline). The demo reuses
-       the SUNNY DAY line-art from the free pack; its ID has a
-       cbn- prefix so its in-progress key is separate. Zone-based
-       assign() maps sky→blue, sun→yellow, rays→orange, ground→green.
-       Pack is pro:false so free-tier kids see it too. */
+    /* COLOR BY NUMBER pack (grew from a one-page demo to a real pack
+       2026-08-17). Ordered by ascending region count = ascending
+       difficulty — cbn-sun's 4-region tutorial → cbn-donkey's 22.
+
+       All eight pages fit the CBN engine's shape rules (thick
+       outlines, no interior detail, chunky sealed regions); each
+       new one was audited against CBN_MIN_REGION_PX=400 and
+       CBN_MAX_REGIONS=40 in scripts before wiring. See
+       CBN_PROMPT_GUIDE.md for the Gemini prompt kit that produced
+       this second cohort — the "cozy" art before it was too dense
+       to work as CBN and lives in its own freehand pack.
+
+       Pack stays pro:false so the CBN mechanic isn't paywalled —
+       CBN is the app's most distinctive learning moment; hiding it
+       behind Pro would undercut the "every kid can play the whole
+       game" rule (see CLAUDE.md).
+
+       ⚠ The seven new pages ship WITHOUT a `cbn` field for now —
+       Onion is colouring each one and feeding the paired reference
+       PNGs through scripts/process-cbn-page.py to auto-generate
+       the palette + regions JSON. Until that lands they behave as
+       freehand pages IN the CBN pack (they show up, tapping paints
+       normally). Replace each entry's line with a full { cbn: {
+       palette, regions } } block as references arrive. */
     {
-        id: "cbn-demo", label: "COLOR BY NUMBER", pro: false,
+        id: "cbn", label: "COLOR BY NUMBER", pro: false,
         pages: [
+            /* cbn-sun keeps the hand-written zone-assign (proof-of-
+               concept from Aug 9). The others wait on the pipeline. */
             {
                 id:    "cbn-sun",
                 name:  "SUNNY DAY 1-2-3",
                 image: "assets/coloring-pages/free/sun.png",
                 cbn: {
-                    /* 1..4 — kept small so a kid holds the whole
-                       palette in their head. */
                     palette: ["#7ecfff", "#ff8b3d", "#f7d94c", "#8ac36b"],
-                    /* Coarse zones tuned for sun.png's layout:
-                       upper band = sky, lower band = grass, and a
-                       radial split in the middle for sun vs. rays.
-                       Called per detected region with (cx, cy) in
-                       [0,1]. If Onion swaps the art, retune here. */
                     assign: function (cx, cy) {
                         if (cy > 0.75) return 4;             /* grass */
                         if (cy < 0.30) return 1;             /* upper sky */
@@ -93,7 +107,14 @@ window.TINY_CANVAS_PAGE_PACKS = [
                         return 1;                             /* rest of sky */
                     }
                 }
-            }
+            },
+            { id: "cbn-rainbow",  name: "RAINBOW",  image: "assets/coloring-pages/cbn/rainbow.png"  /* 9 regions;  TODO cbn */ },
+            { id: "cbn-tulip",    name: "TULIP",    image: "assets/coloring-pages/cbn/tulip.png"    /* 11 regions; TODO cbn */ },
+            { id: "cbn-pumpkin",  name: "PUMPKIN",  image: "assets/coloring-pages/cbn/pumpkin.png"  /* 14 regions; TODO cbn */ },
+            { id: "cbn-snowman",  name: "SNOWMAN",  image: "assets/coloring-pages/cbn/snowman.png"  /* 14 regions; TODO cbn */ },
+            { id: "cbn-cat",      name: "CAT",      image: "assets/coloring-pages/cbn/cat.png"      /* 15 regions; TODO cbn */ },
+            { id: "cbn-cactus",   name: "CACTUS",   image: "assets/coloring-pages/cbn/cactus.png"   /* 17 regions; TODO cbn */ },
+            { id: "cbn-donkey",   name: "DONKEY",   image: "assets/coloring-pages/cbn/donkey.png"   /* 22 regions; TODO cbn */ }
         ]
     },
     {
@@ -159,7 +180,8 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "truck",    name: "FIRE TRUCK",  image: "assets/coloring-pages/transportation/truck.png", free: true },
             { id: "airplane", name: "AIRPLANE",    image: "assets/coloring-pages/transportation/airplane.png" },
             { id: "ship",     name: "CRUISE SHIP", image: "assets/coloring-pages/transportation/ship.png" },
-            { id: "hover",    name: "HOVER CAR",   image: "assets/coloring-pages/transportation/hover.png" }
+            { id: "hover",    name: "HOVER CAR",   image: "assets/coloring-pages/transportation/hover.png" },
+            { id: "racecar",  name: "RACECAR",     image: "assets/coloring-pages/transportation/racecar.png" }
         ]
     },
     {
@@ -170,7 +192,8 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "bass",    name: "BASS",    image: "assets/coloring-pages/music/bass.png" },
             { id: "harp",    name: "HARP",    image: "assets/coloring-pages/music/harp.png" },
             { id: "synth",   name: "SYNTH",   image: "assets/coloring-pages/music/synth.png" },
-            { id: "maracas", name: "MARACAS", image: "assets/coloring-pages/music/maracas.png", free: true }
+            { id: "maracas", name: "MARACAS", image: "assets/coloring-pages/music/maracas.png", free: true },
+            { id: "keyboard", name: "KEYBOARD", image: "assets/coloring-pages/music/keyboard.png" }
         ]
     },
     {
@@ -181,7 +204,8 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "bananas",   name: "BANANAS",     image: "assets/coloring-pages/food/bananas.png", free: true },
             { id: "breakfast", name: "BREAKFAST",   image: "assets/coloring-pages/food/breakfast.png" },
             { id: "curry",     name: "CURRY FEAST", image: "assets/coloring-pages/food/curry.png" },
-            { id: "dinner",    name: "FISH DINNER", image: "assets/coloring-pages/food/dinner.png" }
+            { id: "dinner",    name: "FISH DINNER", image: "assets/coloring-pages/food/dinner.png" },
+            { id: "pancakes",  name: "PANCAKES",    image: "assets/coloring-pages/food/pancakes.png" }
         ]
     },
     {
