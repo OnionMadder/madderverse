@@ -789,6 +789,14 @@
                                      into N mirrored strokes; the fill and CBN
                                      paths deliberately opt out because their
                                      region semantics don't compose. */
+        /* STICKERS — every stamp placement is a movable/resizable
+           object here rather than baked canvas pixels. Flattens into
+           the exported PNG only at SAVE (composePng); before that,
+           kids can move / resize / delete each one via the selection
+           handles. See section 5b. */
+        stickers:            [],
+        selectedStickerId:   null,
+        _stickerDrag:        null, /* transient — {type, id, startPX, ...} */
         proUnlocked:   false,     /* native purchase flag — see isPro() */
         colorGroup:    "brights",               /* active palette group */
         brushSize:     BRUSHES.crayon.defaultSize, /* size for whichever brush is active */
@@ -1694,6 +1702,13 @@
         /* The mask is sized to the backing store and positioned from
            the live SVG rect, so a resize or rotate invalidates both. */
         invalidateFillMask();
+        /* Resize the sticker overlay to match the main canvas's new
+           backing store. Called AFTER ctx2d is scaled so stickers use
+           the same logical-px coord space. clearCanvas() below wipes
+           strokes but keeps stickers — they're modeled state, not
+           pixels; the render call inside resizeStickerLayer repaints
+           them at the new resolution. */
+        resizeStickerLayer();
         clearCanvas();
     }
 
@@ -1721,6 +1736,11 @@
            records a 'C' event so playback can wipe partway through. */
         if (!keepHistory) replayReset();
         else replayRecordClear();
+        /* Wipe every sticker on both paths — CLEAR expects a fully
+           blank paper (the whole reason the kid tapped it), and a
+           template swap starts a new drawing where previous stickers
+           don't apply. */
+        clearAllStickers();
         state.dirty = false;
         updateUndoButton();
         updateRedoButton();
@@ -3422,50 +3442,229 @@
         };
     });
 
-    function placeStampAt(p) {
-        let def = null;
+    /* ---------- 5b. STICKERS ("decorate-a-scene" mode) ----------
+
+       Every stamp placement becomes a MOVABLE sticker rather than
+       pixels burned into the canvas. Kids can drag to move, corner-
+       resize, or delete each one until SAVE, which flattens all
+       stickers into the exported PNG (see composePng). The sticker
+       overlay is its own canvas above the line art — pointer events
+       still land on #drawCanvas and get routed through hitTestSticker
+       before falling through to brush/fill/eraser.
+
+       Symmetry: a placement in mirror mode adds N independent
+       stickers, one per mirror. They're editable individually — kids
+       who want them to move together tap-and-drag each. */
+
+    const STICKER_MIN_SIZE = 30;   /* logical px, floor on resize */
+    const STICKER_MAX_SIZE = 480;  /* logical px, ceiling on resize */
+    const STICKER_HANDLE_R = 16;   /* handle radius, logical px */
+
+    let stickerCanvas = null;
+    let stickerCtx    = null;
+    let _nextStickerId = 1;
+
+    function ensureStickerLayer() {
+        if (stickerCanvas) return;
+        stickerCanvas = document.getElementById("stickerLayer");
+        if (!stickerCanvas) return;
+        stickerCtx = stickerCanvas.getContext("2d");
+    }
+    /* Match the sticker overlay's backing store to the main canvas so
+       coordinates in canvas logical space map 1:1. Called from
+       setupCanvas after ctx2d is scaled — reuse state.dpr rather
+       than recomputing from getBoundingClientRect (which returns a
+       stale/zoomed rect at setup time and produced a 1280x transform
+       on the first attempt, painting stickers off-canvas). */
+    function resizeStickerLayer() {
+        ensureStickerLayer();
+        if (!stickerCanvas) return;
+        stickerCanvas.width  = canvas.width;
+        stickerCanvas.height = canvas.height;
+        const dpr = state.dpr || 1;
+        stickerCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        renderStickers();
+    }
+
+    function findSticker(id) {
+        for (let i = 0; i < state.stickers.length; i++) {
+            if (state.stickers[i].id === id) return state.stickers[i];
+        }
+        return null;
+    }
+    function stampDefFor(id) {
         for (let i = 0; i < STAMPS.length; i++) {
-            if (STAMPS[i].id === state.stampId) { def = STAMPS[i]; break; }
+            if (STAMPS[i].id === id) return STAMPS[i];
         }
-        if (!def) def = STAMPS[0];
-        /* A stamp is ~3x its nominal nib — sizes 4..42 give 13..134px
-           shapes, which spans "little sticker" to "half the screen".
-           effectiveSize keeps that ON-SCREEN size constant under zoom,
-           so zooming in places smaller, finer stamps. */
-        const size = effectiveSize() * 3.2;
-        /* Snapshot BEFORE painting — the eraser peels back to this. */
-        captureRevealSnapshot();
-        /* Record for time-lapse replay — the stamp definition is
-           addressed by its id at playback time. */
-        replayRecordStamp(p, size);
-        beginHistoryCapture();
-        /* Symmetry-aware: fan the stamp draw across each mirror point.
-           Each iteration is a full save/translate/scale/restore so the
-           mirrored stamps don't share transform state. The stamp
-           itself is unaware — placeStampAt asked for a mark at p, the
-           mirror math turns that into N marks. */
-        const stampPts = symmetryPoints(p);
-        for (let mi = 0; mi < stampPts.length; mi++) {
-            const sp = stampPts[mi];
-            ctx2d.save();
-            ctx2d.globalCompositeOperation = "source-over";
-            ctx2d.globalAlpha = 1;
-            ctx2d.translate(sp.x, sp.y);
-            ctx2d.scale(size / 100, size / 100);
-            ctx2d.fillStyle   = state.currentColor;
-            ctx2d.strokeStyle = state.currentColor;
-            ctx2d.lineCap  = "round";
-            ctx2d.lineJoin = "round";
-            ctx2d.lineWidth = 7;
-            def.draw(ctx2d);
-            ctx2d.restore();
-            growBounds(sp.x, sp.y, size / 2 + STROKE_BOUNDS_SLACK);
+        return STAMPS[0];
+    }
+    /* Draw one sticker into the given context. Same paint routine as
+       the pre-refactor placeStampAt, factored out so both the sticker
+       overlay AND composePng use it — a saved sticker and an on-screen
+       sticker are always the same pixels. */
+    function drawStickerInto(ctx, s) {
+        const def = stampDefFor(s.stampId);
+        ctx.save();
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+        ctx.translate(s.x, s.y);
+        ctx.scale(s.size / 100, s.size / 100);
+        ctx.fillStyle   = s.color;
+        ctx.strokeStyle = s.color;
+        ctx.lineCap  = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 7;
+        def.draw(ctx);
+        ctx.restore();
+    }
+    /* Selection chrome — bounding box + two corner handles (delete X
+       top-right, resize arrows bottom-right). Drawn in logical px so
+       handles stay at the same on-screen size regardless of sticker
+       size. */
+    function drawSelectionChrome(ctx, s) {
+        const half = s.size / 2;
+        const x0 = s.x - half, y0 = s.y - half;
+        const x1 = s.x + half, y1 = s.y + half;
+        ctx.save();
+        ctx.strokeStyle = "#ff2e88";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(x0, y0, s.size, s.size);
+        ctx.setLineDash([]);
+        /* Delete X — top-right */
+        ctx.fillStyle = "#ff2e88";
+        ctx.beginPath();
+        ctx.arc(x1, y0, STICKER_HANDLE_R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(x1 - 6, y0 - 6); ctx.lineTo(x1 + 6, y0 + 6);
+        ctx.moveTo(x1 + 6, y0 - 6); ctx.lineTo(x1 - 6, y0 + 6);
+        ctx.stroke();
+        /* Resize — bottom-right */
+        ctx.fillStyle = "#00ffcc";
+        ctx.beginPath();
+        ctx.arc(x1, y1, STICKER_HANDLE_R, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#0a2028";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(x1 - 6, y1 - 6); ctx.lineTo(x1 + 6, y1 + 6);
+        ctx.moveTo(x1 - 6, y1 + 2); ctx.lineTo(x1 - 6, y1 - 6);
+        ctx.lineTo(x1 + 2, y1 - 6);
+        ctx.moveTo(x1 + 6, y1 - 2); ctx.lineTo(x1 + 6, y1 + 6);
+        ctx.lineTo(x1 - 2, y1 + 6);
+        ctx.stroke();
+        ctx.restore();
+    }
+    /* Repaint the sticker overlay from state.stickers. Called after
+       every add/move/resize/delete/select. Cheap: 60 stickers x cheap
+       vector draw. */
+    function renderStickers() {
+        ensureStickerLayer();
+        if (!stickerCtx) return;
+        stickerCtx.save();
+        stickerCtx.setTransform(1, 0, 0, 1, 0, 0);
+        stickerCtx.clearRect(0, 0, stickerCanvas.width, stickerCanvas.height);
+        stickerCtx.restore();
+        state.stickers.forEach(function (s) { drawStickerInto(stickerCtx, s); });
+        if (state.selectedStickerId) {
+            const sel = findSticker(state.selectedStickerId);
+            if (sel) drawSelectionChrome(stickerCtx, sel);
         }
-        commitHistory();
-        lastOneShotCommit = Date.now();
+    }
+    /* Hit-test canvas-space point (p.x, p.y) against the sticker
+       overlay. Returns {id, part} or null; iterates stickers in
+       REVERSE array order so the top-most (last-added) wins overlap.
+       Handles are only reachable on the selected sticker — a kid
+       can't accidentally delete the wrong sticker from a stack. */
+    function hitTestStickerAt(p) {
+        if (state.selectedStickerId) {
+            const sel = findSticker(state.selectedStickerId);
+            if (sel) {
+                const half = sel.size / 2;
+                const cornerX = sel.x + half;
+                const dxDel = p.x - cornerX;
+                const dyDel = p.y - (sel.y - half);
+                if (dxDel * dxDel + dyDel * dyDel <= STICKER_HANDLE_R * STICKER_HANDLE_R) {
+                    return { id: sel.id, part: "delete" };
+                }
+                const dxRes = p.x - cornerX;
+                const dyRes = p.y - (sel.y + half);
+                if (dxRes * dxRes + dyRes * dyRes <= STICKER_HANDLE_R * STICKER_HANDLE_R) {
+                    return { id: sel.id, part: "resize" };
+                }
+            }
+        }
+        for (let i = state.stickers.length - 1; i >= 0; i--) {
+            const s = state.stickers[i];
+            const half = s.size / 2;
+            if (p.x >= s.x - half && p.x <= s.x + half &&
+                p.y >= s.y - half && p.y <= s.y + half) {
+                return { id: s.id, part: "body" };
+            }
+        }
+        return null;
+    }
+    function selectSticker(id) {
+        state.selectedStickerId = id;
+        renderStickers();
+    }
+    function deselectSticker() {
+        if (state.selectedStickerId == null) return;
+        state.selectedStickerId = null;
+        renderStickers();
+    }
+    function addSticker(stampId, x, y, size, color) {
+        const s = {
+            id:      "s" + (_nextStickerId++),
+            stampId: stampId,
+            x:       x,
+            y:       y,
+            size:    size,
+            color:   color
+        };
+        state.stickers.push(s);
+        state.selectedStickerId = s.id;
         state.dirty = true;
         updateStatus();
         markInProgressDirty();
+        renderStickers();
+        return s;
+    }
+    function deleteSticker(id) {
+        state.stickers = state.stickers.filter(function (s) { return s.id !== id; });
+        if (state.selectedStickerId === id) state.selectedStickerId = null;
+        state.dirty = state.dirty || state.stickers.length > 0;
+        updateStatus();
+        markInProgressDirty();
+        renderStickers();
+    }
+    function clearAllStickers() {
+        state.stickers = [];
+        state.selectedStickerId = null;
+        renderStickers();
+    }
+
+    /* Placement entry point — called from the pointer path when the
+       stamp tool is armed and no existing sticker was hit. Symmetry
+       fans the placement into N independent stickers. */
+    function placeStampAt(p) {
+        const size = effectiveSize() * 3.2;
+        const pts  = symmetryPoints(p);
+        let firstId = null;
+        for (let i = 0; i < pts.length; i++) {
+            const s = addSticker(state.stampId, pts[i].x, pts[i].y,
+                                 size, state.currentColor);
+            if (i === 0) firstId = s.id;
+        }
+        /* Only the first mirror stays selected — that's the one the
+           kid actually touched. The mirror copies come along for the
+           ride but don't grab focus. */
+        if (firstId) state.selectedStickerId = firstId;
+        renderStickers();
+        lastOneShotCommit = Date.now();
         hideIdleScribble();
         triggerOnionReaction("drawing", 500);
         sfxTap();
@@ -4491,10 +4690,51 @@
            finished on pointerup. It pushes its own history entry once
            it knows it will actually paint something — pushing here
            would burn an undo step on a tap that landed on a line. */
-        if (isFillTool()) { floodFillAt(p); return; }
-        /* Stamp is a one-shot tap too — places the armed shape and
-           handles its own history entry. */
-        if (isStampTool()) { placeStampAt(p); return; }
+        if (isFillTool()) {
+            /* Fill anywhere deselects any wet sticker — the kid moved
+               on to a new intent. */
+            deselectSticker();
+            floodFillAt(p);
+            return;
+        }
+        /* STAMP tool is now sticker-mode: taps route through the
+           sticker overlay. Hit-testing decides: handle → delete or
+           begin resize drag; body → select + begin move drag; miss →
+           place a new sticker (auto-selected). */
+        if (isStampTool()) {
+            const hit = hitTestStickerAt(p);
+            if (hit) {
+                if (hit.part === "delete") {
+                    deleteSticker(hit.id);
+                    sfxTap();
+                } else if (hit.part === "resize") {
+                    const s = findSticker(hit.id);
+                    state.selectedStickerId = hit.id;
+                    state._stickerDrag = {
+                        type: "resize", id: hit.id,
+                        startPX: p.x, startPY: p.y,
+                        startSize: s.size
+                    };
+                    renderStickers();
+                } else {
+                    /* body */
+                    const s = findSticker(hit.id);
+                    state.selectedStickerId = hit.id;
+                    state._stickerDrag = {
+                        type: "move", id: hit.id,
+                        startPX: p.x, startPY: p.y,
+                        startX: s.x, startY: s.y
+                    };
+                    renderStickers();
+                }
+            } else {
+                placeStampAt(p);
+            }
+            return;
+        }
+        /* Any non-stamp tool tap deselects the wet sticker so the
+           handles don't linger over unrelated work. */
+        deselectSticker();
         /* Fill-erase: last brush was FILL, so ERASE acts as a
            tap-to-unfill — one-shot too, sharing the fill's flood
            machinery but painting from revealCanvas. */
@@ -4558,6 +4798,34 @@
                                { x: e.clientX, y: e.clientY });
         }
         if (pinch) { updatePinch(); return; }
+        /* Sticker drag runs BEFORE the isDrawing check — sticker
+           interaction never toggles isDrawing (it isn't a stroke),
+           so gating on it would drop every drag event. Move updates
+           x/y directly; resize maps the distance the pointer moved
+           along the diagonal to a scaled sticker.size, clamped. */
+        if (state._stickerDrag) {
+            const drag = state._stickerDrag;
+            const s = findSticker(drag.id);
+            if (!s) { state._stickerDrag = null; return; }
+            const p = getPos(e);
+            if (drag.type === "move") {
+                s.x = drag.startX + (p.x - drag.startPX);
+                s.y = drag.startY + (p.y - drag.startPY);
+            } else if (drag.type === "resize") {
+                /* Diagonal distance from sticker centre — bottom-right
+                   handle sits at (size/2, size/2), so the sticker's
+                   half-diagonal is size * sqrt(2) / 2. Invert that to
+                   get size from pointer distance. */
+                const dx = p.x - s.x;
+                const dy = p.y - s.y;
+                const targetSize = Math.max(dx, dy) * 2;
+                s.size = Math.max(STICKER_MIN_SIZE,
+                                  Math.min(STICKER_MAX_SIZE, targetSize));
+            }
+            markInProgressDirty();
+            renderStickers();
+            return;
+        }
         if (!state.isDrawing) return;
         const brush = currentBrush();
         const size  = effectiveSize();
@@ -4628,6 +4896,15 @@
         }
         if (pinch) {
             if (activePointers.size < 2) pinch = null;
+            return;
+        }
+        /* End any in-flight sticker drag before falling through to
+           stroke-completion. Nothing more to commit — moves/resizes
+           update state.stickers in place; a stroke-style history
+           snapshot isn't needed since kids can just drag back. */
+        if (state._stickerDrag) {
+            state._stickerDrag = null;
+            markInProgressDirty();
             return;
         }
         const wasDrawing = state.isDrawing;
@@ -5844,7 +6121,12 @@
                 templateId:   state.templateId,
                 templateName: state.templateName,
                 png:          png,
-                savedAt:      new Date().toISOString()
+                savedAt:      new Date().toISOString(),
+                /* Stickers ride the in-progress payload as JSON so a
+                   kid returning to a page picks them up exactly where
+                   they left off. Omitted (falsy) when empty so the
+                   pre-sticker restore path stays untouched. */
+                stickers:     state.stickers.length ? state.stickers.slice() : null
             };
             setStorage(IN_PROGRESS_KEY, JSON.stringify(rec));
             inProgressDirty = false;
@@ -5888,6 +6170,20 @@
         };
         img.onerror = function () { /* corrupt rec — ignore */ };
         img.src = rec.png;
+        /* Restore stickers alongside the canvas image. Older records
+           without a .stickers field just leave state.stickers empty,
+           which is the pre-sticker restore behaviour. Each restored
+           sticker's id is fed back into _nextStickerId so a new
+           sticker added after restore can't collide with a restored id. */
+        if (rec.stickers && rec.stickers.length) {
+            state.stickers = rec.stickers.slice();
+            state.stickers.forEach(function (s) {
+                const n = parseInt((s.id || "").slice(1), 10);
+                if (!isNaN(n) && n >= _nextStickerId) _nextStickerId = n + 1;
+            });
+            state.selectedStickerId = null;
+            renderStickers();
+        }
     }
 
     function startAutosave() {
@@ -6371,11 +6667,48 @@
                         box.w * kx, box.h * ky);
         }
 
+        /* Stickers — drawn ABOVE the line art, matching the screen
+           layer stack. Each sticker's logical-canvas coords are
+           translated into the crop's export space per-axis (same kx/ky
+           as the strokes). This is where "decorate a scene" actually
+           produces its output. Selection chrome is deliberately NOT
+           drawn — handles are on-screen UI only. */
+        if (state.stickers.length) {
+            o.save();
+            o.setTransform(1, 0, 0, 1, 0, 0);
+            o.translate(-crop.x * kx, -crop.y * ky);
+            o.scale(kx, ky);
+            state.stickers.forEach(function (s) {
+                drawStickerInto(o, s);
+            });
+            o.restore();
+        }
+
         return off.toDataURL("image/png");
     }
 
     async function saveDrawing() {
         const wasEmpty = loadGallery().length === 0;
+        /* Push a replay event per sticker at its FINAL position/size
+           so the time-lapse animation shows stickers appearing at the
+           end of the drawing, matching the saved PNG. Sticker
+           placement isn't recorded live (moves would smear the event
+           log across intermediate positions) — this snapshot at save
+           is the simple, correct alternative. Older records without
+           these events replay as strokes-only, which is what they were. */
+        if (state.stickers.length) {
+            state.stickers.forEach(function (s) {
+                if (state.replayEvents.length >= REPLAY_MAX_EVENTS) return;
+                state.replayEvents.push({
+                    t:   "M",
+                    id:  s.stampId,
+                    col: s.color,
+                    x:   s.x,
+                    y:   s.y,
+                    sz:  s.size
+                });
+            });
+        }
         const png = await composePng();
         const items = loadGallery();
         const record = {

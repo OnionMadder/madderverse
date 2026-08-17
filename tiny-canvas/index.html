@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=54" />
+    <link rel="stylesheet" href="style.css?v=55" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -213,6 +213,17 @@
                  pointer-events: none — taps fall through to the canvas
                  exactly like the line-art layer. -->
             <div class="cbn-labels" id="cbnLabels" aria-hidden="true"></div>
+
+            <!-- Sticker overlay — every stamp placement is now a
+                 movable/resizable sticker that lives here until
+                 SAVE flattens it into the exported PNG. Sized to
+                 match #drawCanvas backing store so sticker coords
+                 (canvas logical space) map 1:1. pointer-events:none —
+                 hit-testing happens on the canvas pointer path,
+                 which then knows to move/resize/delete instead of
+                 painting a stroke. See "STICKERS" section in game.js. -->
+            <canvas class="sticker-layer" id="stickerLayer"
+                    aria-hidden="true"></canvas>
 
         </div>
 
@@ -993,8 +1004,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=54"></script>
-<script src="game.js?v=54"></script>
+<script src="templates.js?v=55"></script>
+<script src="game.js?v=55"></script>
 
 </body>
 </html>

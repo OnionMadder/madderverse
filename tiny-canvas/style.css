@@ -1778,6 +1778,23 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     line-height: 1;
 }
 
+/* Sticker overlay canvas — sits above the printed line art and
+   below the floating chrome (pages/undo/etc). pointer-events:none
+   because the canvas below is the sole pointer surface — game.js
+   routes taps through hitTestSticker() before falling through to
+   brush/fill/eraser. */
+.sticker-layer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 12;
+    pointer-events: none;
+    display: block;
+    aspect-ratio: auto;
+}
+
 /* Profile pills — title-screen "who's drawing" row. Rendered only
    when >=2 profiles exist. Each pill is a large touch target (46+px)
    so a kid can tap the right one without missing; the active pill
