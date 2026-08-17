@@ -850,6 +850,118 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     line-height: 1;
 }
 
+/* Floating SYMMETRY button — top-right mirror of PAGES. Cycles
+   OFF → LEFT-RIGHT → UP-DOWN → 4-WAY through data-mode; the SVG
+   axes light up per mode via the [data-mode] selectors below, and
+   the label swaps to name the active mode. Same overlay-top offset
+   so it clears the titlebar and the notch. */
+#screen-draw .symmetry-btn {
+    position: fixed;
+    top: var(--overlay-top);
+    right: calc(14px + env(safe-area-inset-right, 0px));
+    z-index: 60;
+    width: auto;
+    height: 40px;
+    padding: 0 14px 0 10px;
+    border-radius: 20px;
+    background: rgba(12, 31, 37, 0.85);
+    border: 1px solid var(--teal-low);
+    color: var(--teal-low);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1.4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+    text-shadow: 1px 1px 0 #000;
+    transition: color 0.14s ease, border-color 0.14s ease,
+                box-shadow 0.14s ease;
+}
+#screen-draw .symmetry-btn:hover,
+#screen-draw .symmetry-btn:focus-visible {
+    outline: none;
+    color: var(--teal);
+    border-color: var(--teal);
+    box-shadow: 0 0 14px rgba(0, 255, 204, 0.35);
+}
+#screen-draw .symmetry-btn[data-mode="v"],
+#screen-draw .symmetry-btn[data-mode="h"],
+#screen-draw .symmetry-btn[data-mode="4"] {
+    color: var(--pink-bright);
+    border-color: var(--pink-bright);
+    box-shadow: 0 0 12px rgba(255, 46, 136, 0.4);
+}
+.symmetry-glyph {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 auto;
+    display: block;
+}
+/* Both axis lines are drawn every render at low opacity — the
+   "on" ones for each mode swap to full colour, so a mode change
+   is visible even without the label swap (matters at a glance). */
+.sym-axis {
+    opacity: 0.25;
+    transition: opacity 0.18s ease, stroke-width 0.18s ease;
+}
+#screen-draw .symmetry-btn[data-mode="v"] .sym-axis-v,
+#screen-draw .symmetry-btn[data-mode="h"] .sym-axis-h,
+#screen-draw .symmetry-btn[data-mode="4"] .sym-axis-v,
+#screen-draw .symmetry-btn[data-mode="4"] .sym-axis-h {
+    opacity: 1;
+    stroke-width: 2.4;
+}
+.symmetry-label {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+/* Symmetry axis guide overlay — dashed lines drawn ACROSS the
+   canvas centre so the kid knows where mirror strokes will fall.
+   Fixed inset:0 like the other overlays; z-index above line-art
+   (z=10) so the guide reads as UI, not as art. The line pair is
+   fixed at 50% width/height — the mirror is always the canvas
+   centre in logical space. Toggled via [hidden] from cycleSymmetry;
+   individual lines hidden by class body based on state.symmetry. */
+.symmetry-axis {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 12;
+}
+.sym-line {
+    position: absolute;
+    background: linear-gradient(90deg,
+        transparent 0%, rgba(255, 46, 136, 0.55) 12%,
+        rgba(255, 46, 136, 0.55) 88%, transparent 100%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.sym-line-v {
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    transform: translateX(-1px);
+    background: linear-gradient(180deg,
+        transparent 0%, rgba(255, 46, 136, 0.55) 12%,
+        rgba(255, 46, 136, 0.55) 88%, transparent 100%);
+}
+.sym-line-h {
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 2px;
+    transform: translateY(-1px);
+}
+.symmetry-axis.mode-v .sym-line-v,
+.symmetry-axis.mode-h .sym-line-h,
+.symmetry-axis.mode-4 .sym-line-v,
+.symmetry-axis.mode-4 .sym-line-h {
+    opacity: 1;
+}
+
 @media (max-width: 480px) {
     /* Compact on narrow phones — drop the label so the pill stays
        out of the kid's drawing area. The aria-label keeps it

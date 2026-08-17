@@ -604,6 +604,11 @@
         stampId:       "heart",   /* id from STAMPS (STAMP tool) */
         stampPack:     "classics", /* active STAMP_PACKS tab */
         rainbowHue:    0,         /* per-stroke hue cursor (RAINBOW brush) */
+        symmetry:      null,      /* null | "v" | "h" | "4" — mirror mode. Every
+                                     draw call fans out through symmetryPoints()
+                                     into N mirrored strokes; the fill and CBN
+                                     paths deliberately opt out because their
+                                     region semantics don't compose. */
         proUnlocked:   false,     /* native purchase flag — see isPro() */
         colorGroup:    "brights",               /* active palette group */
         brushSize:     BRUSHES.crayon.defaultSize, /* size for whichever brush is active */
@@ -988,6 +993,90 @@
 
     function currentBrush() {
         return BRUSHES[state.currentTool] || BRUSHES.crayon;
+    }
+
+    /* ---------- SYMMETRY ---------- */
+
+    /* Fan a point out into its mirror copies for the current symmetry
+       mode. Mirror axes are always the CANVAS centre in logical space,
+       so the kid can predict where the mirror falls before drawing.
+       Returns [p] when symmetry is off — every draw call site can
+       just forEach over the result and Do The Right Thing regardless
+       of mode. Mirroring is a linear operation (mirror of midpoint =
+       midpoint of mirrors), so smoothing done ONCE on the raw pointer
+       still produces smooth mirrored strokes; we mirror the smoothed
+       from/to points, not each raw sample. */
+    function symmetryPoints(p) {
+        const mode = state.symmetry;
+        if (!mode) return [p];
+        const cx = STAGE_W / 2, cy = STAGE_H / 2;
+        const out = [p];
+        if (mode === "v" || mode === "4") out.push({ x: cx * 2 - p.x, y: p.y });
+        if (mode === "h" || mode === "4") out.push({ x: p.x, y: cy * 2 - p.y });
+        if (mode === "4")                 out.push({ x: cx * 2 - p.x, y: cy * 2 - p.y });
+        return out;
+    }
+
+    /* beginStroke through every mirror. RAINBOW's per-stroke hue
+       counter resets on each beginStroke — one per mirror is fine
+       and keeps all mirrors starting from the same hue, which reads
+       as intentional symmetry rather than four random colours. */
+    function beginStrokeSymmetric(brush, ctx, p, size, color) {
+        const pts = symmetryPoints(p);
+        for (let i = 0; i < pts.length; i++) brush.beginStroke(ctx, pts[i], size, color);
+    }
+
+    /* drawSegment through every mirror. Both endpoints are mirrored
+       in the same operation so segment i connects mirror i's from
+       to mirror i's to. */
+    function drawSegmentSymmetric(brush, ctx, from, to, size, color) {
+        const froms = symmetryPoints(from);
+        const tos   = symmetryPoints(to);
+        for (let i = 0; i < froms.length; i++) {
+            brush.drawSegment(ctx, froms[i], tos[i], size, color);
+        }
+    }
+
+    /* Grow the undo-bounds rectangle to cover every mirror of a
+       point. Skipped when symmetry is off (single-point growBounds
+       is one call instead of a loop). */
+    function growBoundsSymmetric(x, y, r) {
+        const pts = symmetryPoints({ x: x, y: y });
+        for (let i = 0; i < pts.length; i++) growBounds(pts[i].x, pts[i].y, r);
+    }
+
+    /* Cycle: off → vertical (left↔right) → horizontal (top↕bottom)
+       → 4-way → off. Kept as a plain array so any future mode
+       (radial? angular?) is a one-line insert. */
+    /* Cycle: off → vertical (left↔right) → horizontal (top↕bottom)
+       → 4-way → off. Kept as a plain array so any future mode
+       (radial? angular?) is a one-line insert.
+
+       The label stays "MIRROR" in every state — the SVG icon's own
+       highlighted axes and the button's pink glow do all the work of
+       showing which mode is on. Arrow-character labels (↔ ↕ ✚) were
+       tried first and rendered inconsistently across fonts, ending
+       up as a bare "+" for 4-way. */
+    const SYMMETRY_CYCLE = [null, "v", "h", "4"];
+    function cycleSymmetry() {
+        const cur = state.symmetry;
+        const idx = SYMMETRY_CYCLE.indexOf(cur);
+        state.symmetry = SYMMETRY_CYCLE[(idx + 1) % SYMMETRY_CYCLE.length];
+        syncSymmetryUI();
+    }
+    function syncSymmetryUI() {
+        const btn  = document.getElementById("symmetryBtn");
+        const axis = document.getElementById("symmetryAxis");
+        const mode = state.symmetry;
+        if (btn) {
+            btn.setAttribute("data-mode", mode || "off");
+            btn.setAttribute("aria-pressed", mode ? "true" : "false");
+        }
+        if (axis) {
+            axis.className = "symmetry-axis" + (mode ? " mode-" + mode : "");
+            if (mode) axis.removeAttribute("hidden");
+            else      axis.setAttribute("hidden", "");
+        }
     }
 
     /* ---------- 1a. CAPACITOR NATIVE BRIDGE ----------
@@ -3170,19 +3259,28 @@
            addressed by its id at playback time. */
         replayRecordStamp(p, size);
         beginHistoryCapture();
-        ctx2d.save();
-        ctx2d.globalCompositeOperation = "source-over";
-        ctx2d.globalAlpha = 1;
-        ctx2d.translate(p.x, p.y);
-        ctx2d.scale(size / 100, size / 100);
-        ctx2d.fillStyle   = state.currentColor;
-        ctx2d.strokeStyle = state.currentColor;
-        ctx2d.lineCap  = "round";
-        ctx2d.lineJoin = "round";
-        ctx2d.lineWidth = 7;
-        def.draw(ctx2d);
-        ctx2d.restore();
-        growBounds(p.x, p.y, size / 2 + STROKE_BOUNDS_SLACK);
+        /* Symmetry-aware: fan the stamp draw across each mirror point.
+           Each iteration is a full save/translate/scale/restore so the
+           mirrored stamps don't share transform state. The stamp
+           itself is unaware — placeStampAt asked for a mark at p, the
+           mirror math turns that into N marks. */
+        const stampPts = symmetryPoints(p);
+        for (let mi = 0; mi < stampPts.length; mi++) {
+            const sp = stampPts[mi];
+            ctx2d.save();
+            ctx2d.globalCompositeOperation = "source-over";
+            ctx2d.globalAlpha = 1;
+            ctx2d.translate(sp.x, sp.y);
+            ctx2d.scale(size / 100, size / 100);
+            ctx2d.fillStyle   = state.currentColor;
+            ctx2d.strokeStyle = state.currentColor;
+            ctx2d.lineCap  = "round";
+            ctx2d.lineJoin = "round";
+            ctx2d.lineWidth = 7;
+            def.draw(ctx2d);
+            ctx2d.restore();
+            growBounds(sp.x, sp.y, size / 2 + STROKE_BOUNDS_SLACK);
+        }
         commitHistory();
         lastOneShotCommit = Date.now();
         state.dirty = true;
@@ -3785,13 +3883,20 @@
             state.replayStrokePts = null;
             return;
         }
-        state.replayEvents.push({
+        const ev = {
             t:    "S",
             tool: state.currentTool,
             sz:   effectiveSize(),
             col:  state.currentColor,
             pts:  state.replayStrokePts
-        });
+        };
+        /* Record the mirror mode ONLY when active — omitting the key
+           when off keeps the JSON small for the common case, and
+           older saves without this field just replay as unmirrored
+           which is the right behaviour (that was the only behaviour
+           when they were recorded). */
+        if (state.symmetry) ev.sym = state.symmetry;
+        state.replayEvents.push(ev);
         state.replayStrokePts = null;
     }
 
@@ -3814,14 +3919,16 @@
 
     function replayRecordStamp(p, size) {
         if (replayIsFull()) return;
-        state.replayEvents.push({
+        const ev = {
             t:   "M",
             id:  state.stampId,
             col: state.currentColor,
             x:   r1(p.x),
             y:   r1(p.y),
             sz:  size
-        });
+        };
+        if (state.symmetry) ev.sym = state.symmetry;
+        state.replayEvents.push(ev);
     }
 
     function replayRecordClear() {
@@ -4235,12 +4342,12 @@
         const color = state.currentColor;
         if (usesStrokeLayer()) {
             clearStrokeLayer();
-            brush.beginStroke(strokeCtx, p, size, color);
+            beginStrokeSymmetric(brush, strokeCtx, p, size, color);
             compositeStroke();
         } else {
-            brush.beginStroke(ctx2d, p, size, color);
+            beginStrokeSymmetric(brush, ctx2d, p, size, color);
         }
-        growBounds(p.x, p.y, size + STROKE_BOUNDS_SLACK);
+        growBoundsSymmetric(p.x, p.y, size + STROKE_BOUNDS_SLACK);
         /* First stroke on a freshly-loaded page gets the big pleased
            hop reaction — a moment of "you started!" without any words.
            Detected as "wasn't dirty before this stroke started". */
@@ -4308,21 +4415,21 @@
                event tremor. */
             const midX = (state.lastX + p.x) / 2;
             const midY = (state.lastY + p.y) / 2;
-            brush.drawSegment(ctx,
+            drawSegmentSymmetric(brush, ctx,
                 { x: state.smoothX, y: state.smoothY },
                 { x: midX,          y: midY },
                 size, color);
             state.smoothX = midX;
             state.smoothY = midY;
         } else {
-            brush.drawSegment(ctx,
+            drawSegmentSymmetric(brush, ctx,
                 { x: state.lastX, y: state.lastY },
                 p, size, color);
             state.smoothX = p.x;
             state.smoothY = p.y;
         }
 
-        growBounds(p.x, p.y, size + STROKE_BOUNDS_SLACK);
+        growBoundsSymmetric(p.x, p.y, size + STROKE_BOUNDS_SLACK);
 
         /* Sample the raw point into the replay recorder (throttled
            there — see replayAddStrokePoint). Skipped for the eraser
@@ -4350,12 +4457,13 @@
                Without this the smoothed line stops short of the kid's
                finger. */
             const brush = currentBrush();
-            brush.drawSegment(usesStrokeLayer() ? strokeCtx : ctx2d,
+            drawSegmentSymmetric(brush,
+                usesStrokeLayer() ? strokeCtx : ctx2d,
                 { x: state.smoothX, y: state.smoothY },
                 { x: state.lastX,   y: state.lastY },
                 effectiveSize(), state.currentColor);
-            growBounds(state.lastX, state.lastY,
-                       effectiveSize() + STROKE_BOUNDS_SLACK);
+            growBoundsSymmetric(state.lastX, state.lastY,
+                                effectiveSize() + STROKE_BOUNDS_SLACK);
         }
         /* Flatten the wet layer down one last time so the canvas holds
            the finished stroke before history reads it. */
@@ -6495,16 +6603,26 @@
 
         if (ev.t === "S") {
             /* Stroke: apply one point per rAF tick, honoring
-               REPLAY_POINT_MS as the target cadence. */
+               REPLAY_POINT_MS as the target cadence.
+
+               Symmetry, if recorded on the event, is applied by
+               temporarily setting state.symmetry so the shared
+               beginStrokeSymmetric / drawSegmentSymmetric helpers
+               fan the strokes out into their mirrors — exactly the
+               same code path as the live draw. Guarded prev/post so
+               a mid-replay UI read of state.symmetry stays honest. */
             const brush = BRUSHES[ev.tool] || BRUSHES.crayon;
             const size  = ev.sz;
             const color = ev.col;
             const pts   = ev.pts;
             if (rs.strokePi === 0) {
                 /* First point: lay the initial dot. */
-                brush.beginStroke(rs.sctx,
-                                  { x: pts[0][0], y: pts[0][1] },
-                                  size, color);
+                const prevSym = state.symmetry;
+                state.symmetry = ev.sym || null;
+                beginStrokeSymmetric(brush, rs.sctx,
+                                     { x: pts[0][0], y: pts[0][1] },
+                                     size, color);
+                state.symmetry = prevSym;
                 blitReplayFrame();
                 rs.strokePi = 1;
                 rs.nextAtMs = performance.now() +
@@ -6519,15 +6637,18 @@
                     /* Emit as many points as the elapsed budget covers,
                        so a browser that skipped frames still catches up
                        instead of playing back in slow-motion. */
+                    const prevSym2 = state.symmetry;
+                    state.symmetry = ev.sym || null;
                     while (rs.strokePi < pts.length && now >= rs.nextAtMs) {
                         const p0 = { x: pts[rs.strokePi - 1][0],
                                      y: pts[rs.strokePi - 1][1] };
                         const p1 = { x: pts[rs.strokePi][0],
                                      y: pts[rs.strokePi][1] };
-                        brush.drawSegment(rs.sctx, p0, p1, size, color);
+                        drawSegmentSymmetric(brush, rs.sctx, p0, p1, size, color);
                         rs.strokePi++;
                         rs.nextAtMs += (REPLAY_POINT_MS / REPLAY_SPEED);
                     }
+                    state.symmetry = prevSym2;
                     blitReplayFrame();
                     if (rs.strokePi < pts.length) {
                         rs.raf = requestAnimationFrame(tick);
@@ -6653,18 +6774,30 @@
             if (stamps[i].id === ev.id) { def = stamps[i]; break; }
         }
         if (!def) return;
-        sctx.save();
-        sctx.globalCompositeOperation = "source-over";
-        sctx.globalAlpha = 1;
-        sctx.translate(ev.x, ev.y);
-        sctx.scale(ev.sz / 100, ev.sz / 100);
-        sctx.fillStyle   = ev.col;
-        sctx.strokeStyle = ev.col;
-        sctx.lineCap  = "round";
-        sctx.lineJoin = "round";
-        sctx.lineWidth = 7;
-        def.draw(sctx);
-        sctx.restore();
+        /* Symmetry-aware replay: fan the stamp across each mirror
+           of (ev.x, ev.y). Recorded ev.sym drives symmetryPoints
+           via the temporary state.symmetry swap. Older saves without
+           a `sym` key replay as a single stamp — the pre-symmetry
+           behaviour. */
+        const prevSym = state.symmetry;
+        state.symmetry = ev.sym || null;
+        const pts = symmetryPoints({ x: ev.x, y: ev.y });
+        state.symmetry = prevSym;
+        for (let mi = 0; mi < pts.length; mi++) {
+            const sp = pts[mi];
+            sctx.save();
+            sctx.globalCompositeOperation = "source-over";
+            sctx.globalAlpha = 1;
+            sctx.translate(sp.x, sp.y);
+            sctx.scale(ev.sz / 100, ev.sz / 100);
+            sctx.fillStyle   = ev.col;
+            sctx.strokeStyle = ev.col;
+            sctx.lineCap  = "round";
+            sctx.lineJoin = "round";
+            sctx.lineWidth = 7;
+            def.draw(sctx);
+            sctx.restore();
+        }
     }
 
     function deleteCurrent() {
@@ -6897,6 +7030,21 @@
                 showScreen("picker");
             });
         }
+
+        /* Floating SYMMETRY button — cycles OFF → LEFT-RIGHT → UP-DOWN
+           → 4-WAY → OFF. Doesn't push history; changing the mirror
+           mode is a mode change, not a drawing op. syncSymmetryUI
+           mirrors the current mode into DOM (button label + axis
+           overlay visibility). */
+        const symBtn = $("#symmetryBtn");
+        if (symBtn) {
+            symBtn.addEventListener("click", function () {
+                cycleSymmetry();
+                sfxTap();
+                triggerOnionReaction("tool-swap");
+            });
+        }
+        syncSymmetryUI();
         $("#galleryBack").addEventListener("click", function () {
             showScreen("title");
         });

@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=51" />
+    <link rel="stylesheet" href="style.css?v=52" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -218,6 +218,43 @@
             <span class="pages-glyph" aria-hidden="true">&#9636;</span>
             <span class="pages-label">PAGES</span>
         </button>
+
+        <!-- Floating SYMMETRY button — top-right of viewport, mirror
+             of the PAGES pill. Cycles OFF → LEFT-RIGHT → UP-DOWN →
+             4-WAY → OFF. Icon SVG below draws four quadrants and lights
+             up the active axes; the visible label swaps to name the
+             active mode so pre-readers can spot the state at a glance.
+             Symmetry state lives in state.symmetry; wiring in game.js
+             cycleSymmetry(). -->
+        <button class="canvas-overlay-btn symmetry-btn" id="symmetryBtn"
+                type="button" data-mode="off" aria-pressed="false"
+                title="Mirror your drawing"
+                aria-label="Mirror your drawing">
+            <svg class="symmetry-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                <!-- Frame around all four quadrants -->
+                <rect x="3" y="3" width="18" height="18" rx="3"
+                      fill="none" stroke="currentColor" stroke-width="1.5"
+                      opacity="0.45"/>
+                <!-- Vertical mirror line — highlighted in modes "v" and "4" -->
+                <line class="sym-axis sym-axis-v" x1="12" y1="3" x2="12" y2="21"
+                      stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-dasharray="2 2"/>
+                <!-- Horizontal mirror line — highlighted in modes "h" and "4" -->
+                <line class="sym-axis sym-axis-h" x1="3" y1="12" x2="21" y2="12"
+                      stroke="currentColor" stroke-width="2"
+                      stroke-linecap="round" stroke-dasharray="2 2"/>
+            </svg>
+            <span class="symmetry-label">MIRROR</span>
+        </button>
+
+        <!-- Symmetry axis overlay — dashed guide line(s) drawn on top
+             of the art so kids see WHERE the mirror will fall before
+             the first stroke. Hidden while state.symmetry is null.
+             pointer-events: none — never eats a draw tap. -->
+        <div class="symmetry-axis" id="symmetryAxis" hidden aria-hidden="true">
+            <div class="sym-line sym-line-v"></div>
+            <div class="sym-line sym-line-h"></div>
+        </div>
 
         <!-- ============================================================
              ONION — friendly mascot who watches the kid draw.
@@ -860,8 +897,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=51"></script>
-<script src="game.js?v=51"></script>
+<script src="templates.js?v=52"></script>
+<script src="game.js?v=52"></script>
 
 </body>
 </html>
