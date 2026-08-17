@@ -1778,6 +1778,16 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     line-height: 1;
 }
 
+/* Dark paper mode (NEON) — inverts the printed line art so it stays
+   visible on a near-black canvas. The raster pages bake ink as a
+   near-black colour with varying alpha; invert(1) flips the RGB to
+   near-white while leaving alpha untouched, so transparent margins
+   stay transparent and only the drawn lines light up. composePng
+   applies the equivalent via source-atop for the exported PNG. */
+body.is-dark-paper .line-art img {
+    filter: invert(1);
+}
+
 /* ---------- Bring-to-life finish animation ----------
    Fires once on SAVE — the whole finished drawing gives a gentle
    wobble + breath, so a kid feels the app "sees" what they made

@@ -3732,7 +3732,13 @@
         } },
         { id: "mint",    label: "MINT",    base: "#edf7ee" },
         { id: "sky",     label: "SKY",     base: "#edf4fb" },
-        { id: "blush",   label: "BLUSH",   base: "#fdf0f4" }
+        { id: "blush",   label: "BLUSH",   base: "#fdf0f4" },
+        /* NEON — a near-black canvas where the kid's own strokes glow
+           (bright/neon palettes really pop), and the printed line art
+           gets CSS-inverted to light so it stays visible on top. The
+           GLOW brush (Pro) is the star here; every other tool still
+           works. Kids Doodle's neon canvas as our anchor reference. */
+        { id: "neon",    label: "NEON",    base: "#0a0e14", darkPaper: true }
     ];
 
     function paperDefFor(id) {
@@ -3771,6 +3777,10 @@
         } else {
             layer.style.backgroundImage = "none";
         }
+        /* Toggle a body class for dark-paper modes so the printed
+           line art can CSS-invert to stay visible on top. Any paper
+           def with darkPaper:true opts in. */
+        document.body.classList.toggle("is-dark-paper", !!def.darkPaper);
     }
 
     /* ---------- HISTORY (dirty-rect patches) ----------
@@ -6660,11 +6670,30 @@
         }
 
         /* Line art — positioned relative to the crop, so the printed
-           lines land on the kid's colour exactly as they did on screen. */
+           lines land on the kid's colour exactly as they did on screen.
+           On dark paper (NEON): draw the line-art onto a per-export
+           scratch canvas first, use source-atop THERE to recolour just
+           its non-transparent pixels light, then blit the scratch onto
+           the output. Doing source-atop directly on `o` would fill the
+           whole canvas because paper already covered every pixel — the
+           first ship of this bailed at 100% ink instead of just the
+           printed lines. */
         if (artImg) {
-            o.drawImage(artImg,
-                        (box.x - crop.x) * kx, (box.y - crop.y) * ky,
-                        box.w * kx, box.h * ky);
+            const dx = (box.x - crop.x) * kx, dy = (box.y - crop.y) * ky;
+            const dw = box.w * kx, dh = box.h * ky;
+            if (pd.darkPaper) {
+                const sc = document.createElement("canvas");
+                sc.width  = Math.max(1, Math.ceil(dw));
+                sc.height = Math.max(1, Math.ceil(dh));
+                const sctx = sc.getContext("2d");
+                sctx.drawImage(artImg, 0, 0, sc.width, sc.height);
+                sctx.globalCompositeOperation = "source-atop";
+                sctx.fillStyle = "#e6ecf2";
+                sctx.fillRect(0, 0, sc.width, sc.height);
+                o.drawImage(sc, dx, dy);
+            } else {
+                o.drawImage(artImg, dx, dy, dw, dh);
+            }
         }
 
         /* Stickers — drawn ABOVE the line art, matching the screen
