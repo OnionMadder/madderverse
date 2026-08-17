@@ -6740,6 +6740,7 @@
         flashButton("#drawSave");
         showSavedToast();
         triggerOnionReaction("saved");
+        bringToLifeCelebration();
         /* One-shot first-save celebration. Construction Paper Principle:
            a single gentle pat on the back, no streaks, never repeats. */
         if (wasEmpty && !isFirstSaveCelebrated()) {
@@ -6747,6 +6748,23 @@
             setTimeout(showFirstSaveToast, 500);
         }
         updateStatus();
+    }
+
+    /* Fires once on SAVE — a gentle wobble + breath on the whole
+       finished drawing so the kid feels the app "sees" what they
+       made. Skipped if the zoom transform is engaged (mid-drawing
+       inspection), because the CSS animation replaces the transform
+       and would snap the view back to 1x mid-animation. The class
+       auto-cleans on animationend so a re-save re-fires cleanly. */
+    function bringToLifeCelebration() {
+        const layer = document.getElementById("zoomLayer");
+        if (!layer) return;
+        if (view.s !== 1 || view.tx !== 0 || view.ty !== 0) return;
+        layer.classList.add("is-alive");
+        layer.addEventListener("animationend", function once() {
+            layer.classList.remove("is-alive");
+            layer.removeEventListener("animationend", once);
+        });
     }
 
     function flashButton(sel) {

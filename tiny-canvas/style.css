@@ -1778,6 +1778,40 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     line-height: 1;
 }
 
+/* ---------- Bring-to-life finish animation ----------
+   Fires once on SAVE — the whole finished drawing gives a gentle
+   wobble + breath, so a kid feels the app "sees" what they made
+   without the app inventing a competition or a streak they didn't
+   ask for. The class is added by bringToLifeCelebration() and
+   removed via animationend to keep the transform origin clean for
+   the ongoing zoom transform. transform-origin sits at the canvas
+   centre so the wobble pivots on the middle of the page. */
+.zoom-layer.is-alive {
+    animation: bring-to-life 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transform-origin: 50% 50%;
+}
+@keyframes bring-to-life {
+    0%   { transform: scale(1)      rotate(0deg); }
+    18%  { transform: scale(1.05)   rotate(3deg); }
+    38%  { transform: scale(0.98)   rotate(-3deg); }
+    58%  { transform: scale(1.03)   rotate(2deg); }
+    78%  { transform: scale(0.99)   rotate(-1deg); }
+    100% { transform: scale(1)      rotate(0deg); }
+}
+/* Reduced motion — a subtle scale-only pulse, no rotation. Kids
+   who need calm still get an acknowledgement that SAVE landed.
+   Keyframes live at top level (some browsers reject @keyframes
+   nested inside @media). */
+@keyframes bring-to-life-quiet {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.02); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .zoom-layer.is-alive {
+        animation: bring-to-life-quiet 0.6s ease-out;
+    }
+}
+
 /* Sticker overlay canvas — sits above the printed line art and
    below the floating chrome (pages/undo/etc). pointer-events:none
    because the canvas below is the sole pointer surface — game.js
