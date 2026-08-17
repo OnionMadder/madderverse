@@ -90,22 +90,35 @@ window.TINY_CANVAS_PAGE_PACKS = [
     {
         id: "cbn", label: "COLOR BY NUMBER", pro: false,
         pages: [
-            /* cbn-sun keeps the hand-written zone-assign (proof-of-
-               concept from Aug 9). The others wait on the pipeline. */
+            /* cbn-sun swapped from runtime `assign()` to explicit
+               `regions[]` on 2026-08-17 after Onion's colouring pass
+               exposed the runtime auto-detect placing label clusters
+               on complex outlines (two "1"s per cloud, mis-coloured
+               ray tips, cheeks labelled "3" instead of orange). The
+               explicit list guarantees one label per visible feature
+               and the ci matches Onion's colour reference exactly.
+               Palette resampled from her reference image: sky-blue /
+               white / yellow / orange. When she sends colour refs
+               for the OTHER seven CBN pages, feed each through
+               scripts/process-cbn-page.py and replace those TODOs
+               with the emitted regions blocks. */
             {
                 id:    "cbn-sun",
-                name:  "SUNNY DAY 1-2-3",
+                name:  "SUNNY DAY",
                 image: "assets/coloring-pages/free/sun.png",
                 cbn: {
-                    palette: ["#7ecfff", "#ff8b3d", "#f7d94c", "#8ac36b"],
-                    assign: function (cx, cy) {
-                        if (cy > 0.75) return 4;             /* grass */
-                        if (cy < 0.30) return 1;             /* upper sky */
-                        const d = Math.hypot(cx - 0.5, cy - 0.5);
-                        if (d < 0.18) return 3;              /* sun body */
-                        if (d < 0.32) return 2;              /* rays */
-                        return 1;                             /* rest of sky */
-                    }
+                    palette: ["#a8dcf6", "#ffffff", "#f7ce4b", "#f39a3a"],
+                    regions: [
+                        { cx: 0.08, cy: 0.60, ci: 1 },  /* sky (background) */
+                        { cx: 0.15, cy: 0.20, ci: 2 },  /* left cloud */
+                        { cx: 0.86, cy: 0.20, ci: 2 },  /* right cloud */
+                        { cx: 0.50, cy: 0.50, ci: 3 },  /* sun body / face */
+                        { cx: 0.50, cy: 0.10, ci: 4 },  /* top orange ray */
+                        { cx: 0.30, cy: 0.50, ci: 4 },  /* left orange ray */
+                        { cx: 0.72, cy: 0.50, ci: 3 },  /* right yellow ray */
+                        { cx: 0.50, cy: 0.87, ci: 3 },  /* bottom yellow ray */
+                        { cx: 0.93, cy: 0.45, ci: 4 }   /* butterfly */
+                    ]
                 }
             },
             { id: "cbn-rainbow",  name: "RAINBOW",  image: "assets/coloring-pages/cbn/rainbow.png"  /* 9 regions;  TODO cbn */ },
