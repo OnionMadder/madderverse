@@ -150,12 +150,192 @@
     const BRUSH_SIZES  = [4, 10, 18, 28, 42];
     const ERASER_SIZES = [14, 28, 50];
 
-    const STORAGE_KEY        = "tinyCanvas.gallery.v1";
+    /* ---------- 0. STORAGE KEYS ----------
+
+       Per-profile keys are `let`, not `const`, because switching kids
+       reassigns them via refreshProfileKeys() below. Every caller reads
+       the live variable, so a switch surfaces the new kid's gallery,
+       in-progress work, and coach-mark state instantly with no
+       page reload. Shared keys stay `const` — settings/parent-gate/Pro
+       are device-wide.
+
+       Migration: pre-multi-profile data lived at
+         tinyCanvas.gallery.v1   /   .inProgress.v1  /   .coach.draw.v1
+       On first boot after the update, migrateLegacyProfileData() copies
+       those bare keys into the default profile's scoped keys, then
+       leaves the originals in place as a rollback safety net until the
+       next major (they cost ~30KB total for a full gallery). */
+
+    /* eslint-disable prefer-const */
+    let STORAGE_KEY        = "tinyCanvas.gallery.v1";
+    let IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
+    let FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
+    let ERASE_TIP_KEY      = "tinyCanvas.eraseTipShown.v1";
+    /* eslint-enable prefer-const */
+
+    /* Shared / device-wide — never per-profile. */
     const SETTINGS_KEY       = "tinyCanvas.settings.v1";
-    const IN_PROGRESS_KEY    = "tinyCanvas.inProgress.v1";
-    const FIRST_SAVE_KEY     = "tinyCanvas.firstSaveCelebrated.v1";
-    const ERASE_TIP_KEY      = "tinyCanvas.eraseTipShown.v1";
     const GATE_UNLOCKED_KEY  = "tinyCanvas.parentGate.unlockedUntil.v1";
+
+    /* Multi-profile registry. */
+    const PROFILES_KEY       = "tinyCanvas.profiles.v1";
+    const ACTIVE_PROFILE_KEY = "tinyCanvas.activeProfile.v1";
+    const DEFAULT_PROFILE_ID = "p1";
+    const MAX_PROFILES       = 5;
+
+    /* ---------- 0b. MULTI-PROFILE (pass-the-tablet) ----------
+
+       One-tap "which kid is drawing right now?" without accounts,
+       cloud, or logins. Each profile owns its own gallery, in-progress
+       work, and coach-mark state via profile-scoped localStorage keys
+       (see refreshProfileKeys). Settings / parent-gate / Pro entitlement
+       stay device-wide.
+
+       Discovery is lazy: single-profile users NEVER see any of this
+       machinery. The profile pills on the title screen only render
+       when >=2 profiles exist; the Settings "family" card offers an
+       Add-a-kid button either way, parent-gated. */
+
+    let _profilesCache = null;
+    function loadProfiles() {
+        if (_profilesCache) return _profilesCache;
+        try {
+            const raw = localStorage.getItem(PROFILES_KEY);
+            const parsed = raw ? JSON.parse(raw) : null;
+            if (Array.isArray(parsed) && parsed.length) {
+                _profilesCache = parsed;
+                return parsed;
+            }
+        } catch (_) {}
+        /* No registry yet — synthesize the default so callers never
+           see an empty list. persistProfiles() commits on first write. */
+        _profilesCache = [{ id: DEFAULT_PROFILE_ID, name: "Me" }];
+        return _profilesCache;
+    }
+    function persistProfiles(list) {
+        _profilesCache = list.slice();
+        try { setStorage(PROFILES_KEY, JSON.stringify(_profilesCache)); }
+        catch (_) {}
+    }
+    function activeProfileId() {
+        try {
+            const stored = localStorage.getItem(ACTIVE_PROFILE_KEY);
+            if (stored) {
+                /* Guard against a stale id pointing at a deleted profile. */
+                const profiles = loadProfiles();
+                if (profiles.some(function (p) { return p.id === stored; })) {
+                    return stored;
+                }
+            }
+        } catch (_) {}
+        return loadProfiles()[0].id;
+    }
+    function activeProfile() {
+        const id = activeProfileId();
+        return loadProfiles().find(function (p) { return p.id === id; })
+            || loadProfiles()[0];
+    }
+    function setActiveProfileId(id) {
+        try { setStorage(ACTIVE_PROFILE_KEY, id); } catch (_) {}
+        refreshProfileKeys();
+    }
+    function nextProfileId() {
+        const profiles = loadProfiles();
+        let n = profiles.length + 1;
+        /* Guarantee uniqueness even after deletes — bump until free. */
+        while (profiles.some(function (p) { return p.id === "p" + n; })) n++;
+        return "p" + n;
+    }
+    function createProfile(name) {
+        const profiles = loadProfiles();
+        if (profiles.length >= MAX_PROFILES) return null;
+        const clean = (name || "").trim().slice(0, 16) || "Kid";
+        const p = { id: nextProfileId(), name: clean };
+        persistProfiles(profiles.concat([p]));
+        return p;
+    }
+    function renameProfile(id, name) {
+        const clean = (name || "").trim().slice(0, 16);
+        if (!clean) return false;
+        const profiles = loadProfiles().map(function (p) {
+            return p.id === id ? { id: p.id, name: clean } : p;
+        });
+        persistProfiles(profiles);
+        return true;
+    }
+    /* Delete drops the profile from the registry AND wipes its
+       scoped localStorage — a permanent, parent-gated action so
+       an accidental tap can't nuke a kid's gallery. */
+    function deleteProfile(id) {
+        const profiles = loadProfiles();
+        if (profiles.length <= 1) return false;   /* never leave zero */
+        const kept = profiles.filter(function (p) { return p.id !== id; });
+        persistProfiles(kept);
+        /* Wipe scoped keys — walk localStorage rather than track a
+           whitelist so future per-profile keys are cleaned too. */
+        const prefix = "tinyCanvas.profile." + id + ".";
+        const toRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.indexOf(prefix) === 0) toRemove.push(k);
+        }
+        toRemove.forEach(function (k) {
+            try { removeStorage(k); } catch (_) {}
+        });
+        /* If we just deleted the active profile, fall back to the
+           first surviving one before the caller reads any keys. */
+        if (activeProfileId() === id) setActiveProfileId(kept[0].id);
+        return true;
+    }
+    /* Rebind the per-profile key variables to the current active
+       profile's namespace. Called on init and on every profile switch
+       — every existing call site keeps using the same variable name,
+       so a switch surfaces the new kid's data with no other refactor. */
+    function refreshProfileKeys() {
+        const pid = activeProfileId();
+        const pre = "tinyCanvas.profile." + pid + ".";
+        STORAGE_KEY     = pre + "gallery.v1";
+        IN_PROGRESS_KEY = pre + "inProgress.v1";
+        FIRST_SAVE_KEY  = pre + "firstSaveCelebrated.v1";
+        ERASE_TIP_KEY   = pre + "eraseTipShown.v1";
+        COACH_KEY       = pre + "coach.draw.v1";
+        OFFERED_KEY     = pre + "coach.offered.v1";
+    }
+    /* One-shot migration from the pre-multi-profile bare keys into
+       the default profile's namespace. Idempotent: only runs when
+       PROFILES_KEY is absent (i.e. never migrated). Leaves the bare
+       originals in place as a rollback safety net for one release
+       cycle — the delete pass belongs to the next major bump, when
+       we're confident the migration held on real devices. */
+    function migrateLegacyProfileData() {
+        try {
+            if (localStorage.getItem(PROFILES_KEY)) return;   /* already ran */
+        } catch (_) { return; }
+        const legacyPairs = [
+            ["tinyCanvas.gallery.v1",             "gallery.v1"],
+            ["tinyCanvas.inProgress.v1",          "inProgress.v1"],
+            ["tinyCanvas.firstSaveCelebrated.v1", "firstSaveCelebrated.v1"],
+            ["tinyCanvas.eraseTipShown.v1",       "eraseTipShown.v1"],
+            ["tinyCanvas.coach.draw.v1",          "coach.draw.v1"],
+            ["tinyCanvas.coach.offered.v1",       "coach.offered.v1"]
+        ];
+        const pre = "tinyCanvas.profile." + DEFAULT_PROFILE_ID + ".";
+        legacyPairs.forEach(function (pair) {
+            try {
+                const v = localStorage.getItem(pair[0]);
+                if (v == null) return;
+                /* Don't clobber if the scoped key already exists — a
+                   partial migration on a prior boot beats overwriting
+                   fresher data with stale bare-key data. */
+                if (localStorage.getItem(pre + pair[1]) != null) return;
+                setStorage(pre + pair[1], v);
+            } catch (_) {}
+        });
+        /* Commit the default-profile registry so the migration guard
+           above stops re-triggering on subsequent boots. */
+        persistProfiles([{ id: DEFAULT_PROFILE_ID, name: "Me" }]);
+        try { setStorage(ACTIVE_PROFILE_KEY, DEFAULT_PROFILE_ID); } catch (_) {}
+    }
     /* Pro unlock flag — "1" once the one-off purchase is made. Only
        consulted on NATIVE: the web build always has everything (it is
        the showcase/trial, same call Slip Studio made). Billing will
@@ -5141,8 +5321,13 @@
        Dismissed by the first real gesture — the kid who already
        started drawing doesn't need to be told how. */
 
-    const COACH_KEY   = "tinyCanvas.coach.draw.v1";
-    const OFFERED_KEY = "tinyCanvas.coach.offered.v1";
+    /* Per-profile so a sibling meets the coach fresh — each kid deserves
+       the first-run intro on their own. refreshProfileKeys rebinds
+       these on profile switch. */
+    /* eslint-disable prefer-const */
+    let COACH_KEY   = "tinyCanvas.coach.draw.v1";
+    let OFFERED_KEY = "tinyCanvas.coach.offered.v1";
+    /* eslint-enable prefer-const */
     const COACH_TIMEOUT_MS = 9000;
 
     let coachTimer = 0;
@@ -5243,7 +5428,8 @@
         sfxSwoosh();
         if (name === "picker")   buildPicker();
         if (name === "gallery")  renderGallery();
-        if (name === "settings") syncSettingsUI();
+        if (name === "settings") { syncSettingsUI(); renderFamilyList(); }
+        if (name === "title")    buildProfilePills();
         if (name === "draw") {
             if (!coachSeen()) {
                 offerCoachButtons();
@@ -5263,6 +5449,143 @@
             clearTimeout(_sleepyTimer);
             setOnionState(null);
         }
+    }
+
+    /* ---------- 8. PROFILE UI ---------- */
+
+    /* Render the title-screen switcher pills. Hidden when only one
+       profile exists — single-kid families never see the machinery. */
+    function buildProfilePills() {
+        const host = document.getElementById("profilePills");
+        if (!host) return;
+        const profiles = loadProfiles();
+        if (profiles.length < 2) {
+            host.setAttribute("hidden", "");
+            host.innerHTML = "";
+            return;
+        }
+        const activeId = activeProfileId();
+        host.removeAttribute("hidden");
+        host.innerHTML = "";
+        profiles.forEach(function (p) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "profile-pill" + (p.id === activeId ? " is-active" : "");
+            btn.setAttribute("data-profile", p.id);
+            btn.setAttribute("role", "tab");
+            btn.setAttribute("aria-selected", p.id === activeId ? "true" : "false");
+            btn.textContent = p.name;
+            btn.addEventListener("click", function () {
+                if (p.id === activeProfileId()) return;
+                switchProfile(p.id);
+            });
+            host.appendChild(btn);
+        });
+    }
+
+    /* Settings > FAMILY card — one row per profile with rename/delete
+       buttons. Rendered every time settings opens so it reflects any
+       add/rename/delete from a prior visit. */
+    function renderFamilyList() {
+        const list = document.getElementById("familyList");
+        const addBtn = document.getElementById("btnAddProfile");
+        if (!list) return;
+        const profiles = loadProfiles();
+        const activeId = activeProfileId();
+        list.innerHTML = "";
+        profiles.forEach(function (p) {
+            const row = document.createElement("div");
+            row.className = "family-row" + (p.id === activeId ? " is-active" : "");
+            row.setAttribute("data-profile", p.id);
+
+            const name = document.createElement("span");
+            name.className = "family-name";
+            name.textContent = p.name;
+            row.appendChild(name);
+
+            const actions = document.createElement("div");
+            actions.className = "family-actions";
+
+            const renameBtn = document.createElement("button");
+            renameBtn.type = "button";
+            renameBtn.className = "family-action-btn";
+            renameBtn.textContent = "RENAME";
+            renameBtn.addEventListener("click", function () {
+                parentGate("rename", function () {
+                    const next = window.prompt("New name for " + p.name + "?",
+                                               p.name);
+                    if (next == null) return;
+                    if (renameProfile(p.id, next)) {
+                        renderFamilyList();
+                        buildProfilePills();
+                    }
+                });
+            });
+            actions.appendChild(renameBtn);
+
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.className = "family-action-btn is-delete";
+            delBtn.textContent = "DELETE";
+            /* Never let the last profile be deleted — the app needs
+               one gallery to belong to somebody. */
+            if (profiles.length <= 1) delBtn.setAttribute("disabled", "");
+            delBtn.addEventListener("click", function () {
+                parentGate("delete-profile", function () {
+                    const ok = window.confirm(
+                        "Delete " + p.name + " and all their drawings? " +
+                        "This can't be undone.");
+                    if (!ok) return;
+                    const wasActive = (activeProfileId() === p.id);
+                    if (deleteProfile(p.id)) {
+                        if (wasActive) {
+                            /* Active kid deleted — clear in-memory canvas
+                               state and reload the new active kid's data.
+                               Cheapest way is switchProfile to the id
+                               setActiveProfileId already fell back to. */
+                            switchProfile(activeProfileId());
+                        }
+                        renderFamilyList();
+                        buildProfilePills();
+                    }
+                });
+            });
+            actions.appendChild(delBtn);
+
+            row.appendChild(actions);
+            list.appendChild(row);
+        });
+
+        if (addBtn) {
+            /* Cap at MAX_PROFILES — disable Add rather than error mid-flow. */
+            if (profiles.length >= MAX_PROFILES) {
+                addBtn.setAttribute("disabled", "");
+            } else {
+                addBtn.removeAttribute("disabled");
+            }
+        }
+    }
+
+    /* Switch active profile. Saves in-progress work under the OLD
+       profile's key first (so the outgoing kid's canvas survives the
+       switch), then rebinds the per-profile key variables, clears the
+       drawing canvas + history, reloads the incoming kid's gallery,
+       and updates the title-screen pill state. */
+    function switchProfile(newId) {
+        if (!newId) return;
+        /* Bank the current canvas under the OUTGOING profile's key. */
+        if (state.dirty) persistInProgress();
+        setActiveProfileId(newId);
+        /* Wipe live canvas + history — the new kid starts fresh on
+           whatever page they had going, not with the previous kid's
+           strokes bleeding through. */
+        clearCanvas(true);
+        state.templateId = null;
+        state.templateName = "BLANK";
+        state.dirty = false;
+        /* Rebuild UI surfaces that show per-profile state. */
+        buildProfilePills();
+        updateStatus();
     }
 
     /* ---------- 8a. SETTINGS PERSISTENCE ---------- */
@@ -6958,6 +7281,18 @@
            so the first localStorage reads see the canonical native
            values, not stale web-cache values. No-op on web. */
         await rehydrateFromNativePrefs();
+        /* Multi-profile init: migrate pre-multi-profile data into the
+           default profile's namespace (one-shot, idempotent), then
+           rebind the per-profile key variables so subsequent reads
+           see the active kid's data. Must run BEFORE loadSettings /
+           gallery reads (they use the rebound keys). */
+        migrateLegacyProfileData();
+        refreshProfileKeys();
+        /* Initial paint of the title pills — showScreen("title") won't
+           fire on first load since #screen-title starts visible in HTML,
+           so a returning multi-profile family sees their pills right
+           away instead of only after the first navigation. */
+        buildProfilePills();
         loadProFlag();
         loadSettings();
         setupCanvas();
@@ -6990,6 +7325,25 @@
         const restorePro = $("#btnRestorePro");
         if (restorePro) restorePro.addEventListener("click", function () {
             parentGate("restore", restoreProPurchases);
+        });
+
+        /* Settings > FAMILY > ADD A KID — parent-gated because it
+           involves text input and reshapes the app's storage for the
+           whole family. First-add prompt is intentionally brief
+           ("What's their name?") so a distracted parent can complete
+           it in seconds; the field is capped at 16 chars by
+           createProfile so the pill stays legible. */
+        const addProfile = $("#btnAddProfile");
+        if (addProfile) addProfile.addEventListener("click", function () {
+            parentGate("add-profile", function () {
+                const name = window.prompt("What's their name?");
+                if (name == null) return;
+                const p = createProfile(name);
+                if (p) {
+                    renderFamilyList();
+                    buildProfilePills();
+                }
+            });
         });
 
         $("#btnStart").addEventListener("click", async function () {
