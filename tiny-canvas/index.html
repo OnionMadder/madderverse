@@ -42,7 +42,7 @@
          serves a stale game.js against a fresh index.html and the
          change reads as "did nothing" — the same trap Slip Studio
          and Florigami both hit. See their CLAUDE.md notes. -->
-    <link rel="stylesheet" href="style.css?v=52" />
+    <link rel="stylesheet" href="style.css?v=53" />
     <!--
         Tiny Canvas intentionally does NOT load GoatCounter (or any
         third-party analytics). Apple's Kids category forbids
@@ -97,6 +97,41 @@
                 aria-label="Settings" title="Settings">
             <span aria-hidden="true">&#9881;</span>
         </button>
+
+        <!-- Peek Onion — bottom-left corner mascot cameo, half-tucked
+             below the fold like she's climbing up out of the ground.
+             Silent, motionless except for a slow blink; pointer-events
+             none so she never eats a tap on the buttons above.
+             Companion to the same mascot on the draw screen — makes
+             the whole app feel like Onion's world before the kid ever
+             touches a page. -->
+        <svg class="peek-onion peek-onion-title" viewBox="0 0 120 140"
+             aria-hidden="true">
+            <g class="onion-leaves">
+                <path class="leaf-back"  d="M58 30 Q40 8 48 0 Q58 16 60 30 Z"
+                      fill="#7ac96b" stroke="#5ba84d" stroke-width="1.5"/>
+                <path class="leaf-front" d="M62 30 Q82 4 76 0 Q64 12 60 30 Z"
+                      fill="#9bdb8c" stroke="#5ba84d" stroke-width="1.5"/>
+            </g>
+            <ellipse class="onion-body" cx="60" cy="82" rx="44" ry="50"
+                     fill="#fff5dc" stroke="#d9c5a0" stroke-width="2"/>
+            <g class="onion-ridges" stroke="#e0d2ac" stroke-width="1.5" fill="none">
+                <path d="M28 58 Q24 80 32 116"/>
+                <path d="M45 50 Q41 80 49 124"/>
+                <path d="M75 50 Q79 80 71 124"/>
+                <path d="M92 58 Q96 80 88 116"/>
+            </g>
+            <ellipse class="onion-cheek" cx="42" cy="92" rx="8" ry="4.5"
+                     fill="#ff5cab" opacity="0.55"/>
+            <ellipse class="onion-cheek" cx="78" cy="92" rx="8" ry="4.5"
+                     fill="#ff5cab" opacity="0.55"/>
+            <circle class="peek-eye" cx="46" cy="76" r="5" fill="#1c2226"/>
+            <circle class="peek-eye" cx="74" cy="76" r="5" fill="#1c2226"/>
+            <!-- Subtle smile — the same friendly curve as the gallery
+                 peek Onion so both cameos read as the same character. -->
+            <path d="M50 99 Q60 108 70 99" stroke="#1c2226"
+                  stroke-width="2.8" fill="none" stroke-linecap="round"/>
+        </svg>
 
     </div>
 
@@ -628,7 +663,39 @@
     <div class="gallery-grid" id="galleryGrid"></div>
 
     <div class="gallery-empty" id="galleryEmpty" hidden>
-        <div class="empty-glyph" aria-hidden="true">&#x2317;</div>
+        <!-- Peek Onion — a friendly, static mascot cameo that replaces
+             the older abstract ⊗ glyph. Same visual DNA as the full
+             draw-screen mascot (bulb + leaves + cheeks) but no state
+             classes, no eye tracking; just a warm face inviting a
+             first drawing. Rendered inline so the empty state stays
+             mascot-warm even on a fresh cold-load. -->
+        <svg class="peek-onion" viewBox="0 0 120 140" aria-hidden="true">
+            <g class="onion-leaves">
+                <path class="leaf-back"  d="M58 30 Q40 8 48 0 Q58 16 60 30 Z"
+                      fill="#7ac96b" stroke="#5ba84d" stroke-width="1.5"/>
+                <path class="leaf-front" d="M62 30 Q82 4 76 0 Q64 12 60 30 Z"
+                      fill="#9bdb8c" stroke="#5ba84d" stroke-width="1.5"/>
+            </g>
+            <ellipse class="onion-body" cx="60" cy="82" rx="44" ry="50"
+                     fill="#fff5dc" stroke="#d9c5a0" stroke-width="2"/>
+            <g class="onion-ridges" stroke="#e0d2ac" stroke-width="1.5" fill="none">
+                <path d="M28 58 Q24 80 32 116"/>
+                <path d="M45 50 Q41 80 49 124"/>
+                <path d="M75 50 Q79 80 71 124"/>
+                <path d="M92 58 Q96 80 88 116"/>
+            </g>
+            <ellipse class="onion-cheek" cx="42" cy="92" rx="8" ry="4.5"
+                     fill="#ff5cab" opacity="0.55"/>
+            <ellipse class="onion-cheek" cx="78" cy="92" rx="8" ry="4.5"
+                     fill="#ff5cab" opacity="0.55"/>
+            <!-- Eyes — plain dots, no highlight offset that expects JS -->
+            <circle class="peek-eye" cx="46" cy="76" r="5" fill="#1c2226"/>
+            <circle class="peek-eye" cx="74" cy="76" r="5" fill="#1c2226"/>
+            <!-- Hopeful smile — a wider curve than the mascot's idle,
+                 to read as "waiting for you to make something" -->
+            <path d="M50 99 Q60 111 70 99" stroke="#1c2226"
+                  stroke-width="2.8" fill="none" stroke-linecap="round"/>
+        </svg>
         <h3 class="empty-title">NOTHING HERE YET</h3>
         <p class="empty-sub">Pick a page. Color it. Come back.</p>
         <button class="big-btn primary" id="galleryStartBtn" type="button">
@@ -897,8 +964,8 @@
         el.textContent = new Date().getFullYear();
     });
 </script>
-<script src="templates.js?v=52"></script>
-<script src="game.js?v=52"></script>
+<script src="templates.js?v=53"></script>
+<script src="game.js?v=53"></script>
 
 </body>
 </html>

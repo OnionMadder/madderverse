@@ -1778,6 +1778,52 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     line-height: 1;
 }
 
+/* Peek Onion — shared compact mascot cameo used outside the draw
+   screen (gallery empty state, title screen). Inherits none of the
+   draw-screen mascot's state classes; a slow idle blink is the only
+   life, driven by the peek-blink animation on the eye circles.
+   Sized here as a small SVG element; per-placement sizing overrides
+   width/height below. */
+.peek-onion {
+    display: block;
+    width: 96px;
+    height: 112px;
+}
+.peek-onion .peek-eye {
+    transform-origin: center;
+    animation: peek-blink 5.2s ease-in-out infinite;
+}
+@keyframes peek-blink {
+    0%, 92%, 100%   { transform: scaleY(1); }
+    94%, 97%        { transform: scaleY(0.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .peek-onion .peek-eye { animation: none; }
+}
+/* Gallery empty state — replaces the ⊗ glyph. Larger than the
+   default peek size so the mascot carries the card. Sits above the
+   title copy via source order. */
+.gallery-empty .peek-onion {
+    width: 120px;
+    height: 140px;
+    margin-bottom: -4px;
+}
+/* Title screen — bottom-left corner cameo, half-tucked below the
+   viewport edge like Onion is climbing up. pointer-events: none so
+   she never eats a tap on the CTA buttons above her. The negative
+   `bottom` is deliberate — it clips the lower body against the
+   viewport edge without a hard rectangle border. */
+.peek-onion-title {
+    position: fixed;
+    left: 14px;
+    bottom: -28px;
+    width: 110px;
+    height: 128px;
+    pointer-events: none;
+    z-index: 20;
+    filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.4));
+}
+
 .empty-title {
     margin: 0;
     font-family: var(--font-title);
