@@ -216,6 +216,34 @@ window.TINY_CANVAS_PAGE_PACKS = [
             { id: "5flake", name: "SNOWFLAKE 5", image: "assets/coloring-pages/snowflakes/5flake.png" },
             { id: "6flake", name: "SNOWFLAKE 6", image: "assets/coloring-pages/snowflakes/6flake.png" }
         ]
+    },
+    /* COZY — 10 detailed grown-up-leaning pages (2026-08-17). Onion
+       calls them "adult oriented" — dense scenes with lots of
+       interior line-work: whiskers, wood grain, tree textures.
+       Marketed as its own pack because the aesthetic doesn't match
+       the chunky kid-first pages in the other 11 packs. Every ID is
+       prefixed `cozy-` to stay clear of the existing `cat`, `unicorn`,
+       `butterfly`, `fish`, `rocket`, `cabin`, `rainbow` IDs — that
+       collision was the whole reason for the separate pack.
+
+       These were briefly considered as CBN candidates and rejected —
+       every page overflows the 40-region cap (rainbow was closest at
+       85 regions, butterfly densest at 614). Freehand only; CBN art
+       needs its own commission per CBN_PROMPT_GUIDE.md. */
+    {
+        id: "cozy", label: "COZY", pro: true,
+        pages: [
+            { id: "cozy-rainbow",   name: "RAINBOW SKY",       image: "assets/coloring-pages/cozy/rainbow.png",   free: true },
+            { id: "cozy-cat",       name: "NAPPING CAT",       image: "assets/coloring-pages/cozy/cat.png",       free: true },
+            { id: "cozy-unicorn",   name: "UNICORN GROVE",     image: "assets/coloring-pages/cozy/unicorn.png",   free: true },
+            { id: "cozy-butterfly", name: "BUTTERFLY GARDEN",  image: "assets/coloring-pages/cozy/butterfly.png" },
+            { id: "cozy-cabin",     name: "WOODLAND COTTAGE",  image: "assets/coloring-pages/cozy/cabin.png" },
+            { id: "cozy-duck",      name: "DUCK POND",         image: "assets/coloring-pages/cozy/duck.png" },
+            { id: "cozy-fish",      name: "SCHOOL OF FISH",    image: "assets/coloring-pages/cozy/fish.png" },
+            { id: "cozy-rocket",    name: "STAR CRUISER",      image: "assets/coloring-pages/cozy/rocket.png" },
+            { id: "cozy-sunflower", name: "SUNFLOWER FIELD",   image: "assets/coloring-pages/cozy/sunflower.png" },
+            { id: "cozy-tropical",  name: "TROPICAL PARADISE", image: "assets/coloring-pages/cozy/tropical.png" }
+        ]
     }
 ];
 
