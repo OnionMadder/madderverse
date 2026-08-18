@@ -90,35 +90,60 @@ window.TINY_CANVAS_PAGE_PACKS = [
     {
         id: "cbn", label: "COLOR BY NUMBER", pro: false,
         pages: [
-            /* cbn-sun swapped from runtime `assign()` to explicit
-               `regions[]` on 2026-08-17 after Onion's colouring pass
-               exposed the runtime auto-detect placing label clusters
-               on complex outlines (two "1"s per cloud, mis-coloured
-               ray tips, cheeks labelled "3" instead of orange). The
-               explicit list guarantees one label per visible feature
-               and the ci matches Onion's colour reference exactly.
-               Palette resampled from her reference image: sky-blue /
-               white / yellow / orange. When she sends colour refs
-               for the OTHER seven CBN pages, feed each through
-               scripts/process-cbn-page.py and replace those TODOs
-               with the emitted regions blocks. */
+            /* cbn-sun uses runtime `assign()` so EVERY auto-detected
+               region gets its own number — that's actual CBN
+               behaviour (Happy Color, Colorfy etc.: one number per
+               fillable region, kid fills each). The first cut here
+               tried "one anchor per visible feature" (2026-08-17)
+               and Onion rightly rejected it — that's a hint mode,
+               not CBN.
+
+               The assign function classifies each region by
+               (cx, cy) and returns the palette index. This is a
+               HAND-TUNED fallback for the shipped sun.png layout;
+               the correct long-term fix is a paired colour-
+               reference PNG fed through scripts/process-cbn-page.py,
+               which sample-picks the palette per region from Onion's
+               chosen colouring. Until that reference arrives, this
+               heuristic keeps CBN mechanics working end-to-end.
+
+               Palette matched to Onion's reference colours: sky /
+               cloud-white / sun-yellow / ray-and-butterfly-orange. */
             {
                 id:    "cbn-sun",
                 name:  "SUNNY DAY",
                 image: "assets/coloring-pages/free/sun.png",
                 cbn: {
                     palette: ["#a8dcf6", "#ffffff", "#f7ce4b", "#f39a3a"],
-                    regions: [
-                        { cx: 0.08, cy: 0.60, ci: 1 },  /* sky (background) */
-                        { cx: 0.15, cy: 0.20, ci: 2 },  /* left cloud */
-                        { cx: 0.86, cy: 0.20, ci: 2 },  /* right cloud */
-                        { cx: 0.50, cy: 0.50, ci: 3 },  /* sun body / face */
-                        { cx: 0.50, cy: 0.10, ci: 4 },  /* top orange ray */
-                        { cx: 0.30, cy: 0.50, ci: 4 },  /* left orange ray */
-                        { cx: 0.72, cy: 0.50, ci: 3 },  /* right yellow ray */
-                        { cx: 0.50, cy: 0.87, ci: 3 },  /* bottom yellow ray */
-                        { cx: 0.93, cy: 0.45, ci: 4 }   /* butterfly */
-                    ]
+                    assign: function (cx, cy) {
+                        /* Butterfly — far right, roughly mid-height. */
+                        if (cx > 0.85 && cy > 0.35 && cy < 0.60) return 4;
+                        /* Clouds — top band, tucked toward the sides. */
+                        if (cy < 0.28 && (cx < 0.32 || cx > 0.68)) return 2;
+                        const dx = cx - 0.50, dy = cy - 0.50;
+                        const d  = Math.hypot(dx, dy);
+                        /* Cheeks — small ovals inside the sun body,
+                           left + right of centre, below the eyes.
+                           Checked BEFORE the sun-body rule so they
+                           win. */
+                        const cheekY = cy > 0.48 && cy < 0.58;
+                        const cheekL = Math.abs(cx - 0.38) < 0.055;
+                        const cheekR = Math.abs(cx - 0.62) < 0.055;
+                        if (cheekY && (cheekL || cheekR)) return 4;
+                        /* Sun body + face features (yellow). */
+                        if (d < 0.16) return 3;
+                        /* Rays — alternate orange/yellow by angle so
+                           the CBN pattern reproduces the artwork's
+                           alternation instead of one flat colour.
+                           24 rays evenly around the sun → 24 buckets. */
+                        if (d < 0.36) {
+                            const a = Math.atan2(dy, dx);
+                            const bucket = Math.floor((a + Math.PI) * 24 / (2 * Math.PI));
+                            return (bucket % 2 === 0) ? 4 : 3;
+                        }
+                        /* Everything else = sky. */
+                        return 1;
+                    }
                 }
             },
             { id: "cbn-rainbow",  name: "RAINBOW",  image: "assets/coloring-pages/cbn/rainbow.png"  /* 9 regions;  TODO cbn */ },
