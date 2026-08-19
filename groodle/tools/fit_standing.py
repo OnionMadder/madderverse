@@ -63,7 +63,7 @@ for name, f, in (('torso', 'torso.png'), ('arm', 'arm.png'), ('leg', 'leg.png'))
 ref = solid_of(ORIGINAL)
 rs = HEAD_D / head_width(ref)
 rys, rxs = np.nonzero(ref)
-# align on the head: top of head, and the head's own horizontal centre
+# align on the head: top of head, and the head's own horizontal center
 rtop = rys.min()
 hrow = np.nonzero(ref[rtop + int(round(HEAD_D / rs / 2))])[0]
 rcx = (hrow.min() + hrow.max()) / 2

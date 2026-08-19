@@ -381,7 +381,7 @@ until the user gives the word at final launch — the silhouette, the
 face-parts bank, hats, accessories, backgrounds, icons, cover art. Use
 the **simplest** form, don't polish or art-direct fidelity, and don't
 proactively "improve" existing placeholder art. Spend effort on
-structure / behaviour / clean drop-in points instead; the user supplies
+structure / behavior / clean drop-in points instead; the user supplies
 the real assets at launch. Only lift this when the user says so.
 
 ## Adding a new coloring-book page

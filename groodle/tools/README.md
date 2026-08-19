@@ -70,7 +70,7 @@ causes, all fixed, all easy to reintroduce:
    assembled silhouette's outline filter, so keeping it in the ink layer gives
    two near-parallel lines a unit apart. `CONTOUR_BAND` discards it, per part,
    because the three drawings do not share a stroke weight.
-2. **Soft grey band.** The silhouette is five separately-antialiased paths, so
+2. **Soft gray band.** The silhouette is five separately-antialiased paths, so
    where two parts' edges nearly coincide the combined alpha lands below 1;
    eroding that and compositing it out smears it. `index.html`'s outline
    filter binarises alpha (`feFuncA slope="4"`) *before* the erode.
@@ -87,10 +87,10 @@ that mistake shipped a Groodle with saddlebags for one build.
 His arms are 217 units long, against 150 of clearance to the frame edge and
 186 of headroom above the shoulder. A flat T-pose spans 534 units in a
 400-wide frame, so it fits only if the whole doll shrinks — and the
-**colourable area shrinks with the square of that scale**, on a colouring
+**colorable area shrinks with the square of that scale**, on a coloring
 game. Measured:
 
-| pose set | scale | head r | colourable area |
+| pose set | scale | head r | colorable area |
 |---|---|---|---|
 | standing only          | 1.000 | 58.0 | 100% |
 | + dance swing to ±18°  | 1.000 | 58.0 | 100% |
@@ -103,7 +103,7 @@ the drawing untouched at full size, which is also why `HATS` needs no
 rescaling: head r is 58, the value it was always tuned to.
 
 Motion is the dance's job, not the pose picker's. Big static poses buy very
-little and cost real colouring surface.
+little and cost real coloring surface.
 
 `trace_rig.py` **re-solves the scale from whatever pose set it is given**, so
 widening one pose silently shrinks the whole doll and every hat drifts. The

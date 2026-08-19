@@ -24,7 +24,7 @@ drift from the character: redraw the torso or retune the hat, re-run, the
 icon follows.
 
 Android adaptive icons mask the outer ~1/3 of the canvas away (the safe zone
-is roughly the centre 66%), so the foreground layer is fitted inside that --
+is roughly the center 66%), so the foreground layer is fitted inside that --
 which matters more with a hat, since the group is much taller than the head.
 """
 import os
@@ -38,7 +38,7 @@ TORSO = os.path.join(REPO, 'groodle', 'art-src', 'body', 'torso.png')
 OUT = os.path.join(APP, 'assets')
 
 BG = (26, 15, 51)          # #1a0f33 -- the manifest's background_color
-WASH = (232, 232, 244)     # the pale interior the kid colours on
+WASH = (232, 232, 244)     # the pale interior the kid colors on
 INK = (26, 15, 51)
 
 # Torso-local landmarks, in the same units trace_rig.py uses (head top = 0).
@@ -172,7 +172,7 @@ def hatted(head):
 
 
 def compose(group, head_width, fit, opaque=True):
-    """Group centred on the canvas.
+    """Group centered on the canvas.
 
     Sized so the HEAD is a consistent fraction of the icon rather than the
     whole group -- otherwise a tall hat shrinks the face until it is

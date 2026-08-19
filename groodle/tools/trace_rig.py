@@ -26,10 +26,10 @@ render time, so draw one of each.
 THE FRAME CONSTRAINT -- read before changing any pose angle. His arms are
 217 units long, against 150 of clearance to the frame edge and 186 of
 headroom above the shoulder. A flat T-pose spans 534 units in a 400-wide
-frame, so it only fits if the whole doll shrinks -- and the colourable area
+frame, so it only fits if the whole doll shrinks -- and the colorable area
 shrinks with the square of that scale. Measured:
 
-    pose set                     scale   head r   colourable area
+    pose set                     scale   head r   colorable area
     with a horizontal T-pose     0.757     43.9      57%
     steep arms-up instead        0.872     50.6      76%
 
@@ -63,7 +63,7 @@ INK_TRIM = {'leg': (0.10, 1.0), 'torso': (0.0, 0.93)}
 # detail sitting close to its edge, and a wider band eats them.
 CONTOUR_BAND = {'torso': 26, 'arm': 40, 'leg': 44}
 
-# Ink shapes whose centre falls below this fraction of a part's height are
+# Ink shapes whose center falls below this fraction of a part's height are
 # dropped outright. See the note in trace().
 INK_DROP_BELOW = {'torso': 0.65}
 # Limb lengths and joint anchors are FITTED, not guessed: tools/fit_standing.py
@@ -81,7 +81,7 @@ POSES = {
     'standing': {},
     # The rest stay inside the FREE budget: up to ~18 deg costs nothing,
     # because the frame already has room for it. Past that the whole doll
-    # shrinks and takes the colourable area with it (see README).
+    # shrinks and takes the colorable area with it (see README).
     'star':     {'armL': 18, 'armR': 18, 'legL': 9, 'legR': 9},
     'cheer':    {'armL': 18, 'armR': 18, 'legL': 4, 'legR': 4},
     'groovy':   {'armL': 16, 'armR': -11, 'legL': -5, 'legR': 8},
@@ -93,8 +93,8 @@ POSES = {
 # below, so the doll is sized to hold its own dance without clipping.
 DANCE_SWING = 18
 
-# Torso-local geometry. The torso's own origin is the top-centre of the head.
-BC = -6.75                    # body centre sits left of the head-top centre
+# Torso-local geometry. The torso's own origin is the top-center of the head.
+BC = -6.75                    # body center sits left of the head-top center
 TX, TY = 200 - BC, 34.0
 ANCHOR = {'armL': (BC - 63.9, 143.0), 'armR': (BC + 63.9, 143.0),
           'legL': (BC - 47.9, 270.9), 'legR': (BC + 47.9, 270.9)}
@@ -136,7 +136,7 @@ def trace(name):
     else:
         s = (ARM_LEN if name == 'arm' else LEG_LEN) / (y1 - y0)
 
-    # Pin: centre of the part a little below its top edge -- where a brass
+    # Pin: center of the part a little below its top edge -- where a brass
     # fastener sits on the rounded shoulder / hip end.
     py = y0 + (y1 - y0) * (0.0 if name == 'torso' else 0.055)
     row = np.nonzero(solid[int(round(py))])[0]
@@ -279,7 +279,7 @@ def main():
     }
     sys.stdout.write('    const RIG = ' + json.dumps(rig, separators=(',', ':')) + ';\n')
     sys.stderr.write(
-        "scale={:.4f}  head r={:.1f}  head top y={:.1f}  colourable area={:.0f}% of full\n"
+        "scale={:.4f}  head r={:.1f}  head top y={:.1f}  colorable area={:.0f}% of full\n"
         .format(K, 58 * K, OY + K * TY, K * K * 100))
     sys.stderr.write("If head r moved, retune BODY + HEAD_CROWN_Y + every HATS "
                      "anchor.y/scale in game.js -- they are tuned to it.\n")

@@ -103,7 +103,7 @@
 
         <!-- Dance canvas (z 2, above the paint canvas): while he dances the
              artwork is redrawn here once per limb, each through that limb's
-             rotation, so the colouring swings with the arm instead of
+             rotation, so the coloring swings with the arm instead of
              sliding off it. Click-through; the paint canvas below keeps the
              pointer events. -->
         <canvas class="dance-canvas" id="danceCanvas" aria-hidden="true"></canvas>
@@ -120,7 +120,7 @@
                  load-bearing: the silhouette is five separately-antialiased
                  part paths, so where two parts' edges nearly coincide their
                  combined alpha lands below 1. Eroding that and compositing it
-                 out turned the near-coincident edges into a soft grey band.
+                 out turned the near-coincident edges into a soft gray band.
                  Edges only coincide at the hip -- the arm's top is buried deep
                  under the torso -- which is why the shoulder always looked
                  clean and the hip looked smeared. Slope 4 snaps the seam to
@@ -397,7 +397,7 @@
             <h2 id="pagesModalTitle"><span aria-hidden="true">🎨</span> Characters</h2>
             <button class="modal-close" type="button" data-close="1" aria-label="Close characters">✕</button>
         </header>
-        <div class="modal-stats">Tap a character to colour it in, or 🎨 to have it coloured for you. Hit ▶ DANCE to finish.</div>
+        <div class="modal-stats">Tap a character to color it in, or 🎨 to have it colored for you. Hit ▶ DANCE to finish.</div>
         <div class="modal-body page-grid" id="pagesGrid"></div>
     </div>
 </div>

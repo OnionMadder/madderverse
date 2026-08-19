@@ -180,7 +180,7 @@ body.dancing .currency-pill { opacity: 0; transition: opacity 0.3s; }
 .currency-value { font-variant-numeric: tabular-nums; }
 
 /* Face-zoom toggle — big round tap target on the right edge, mid-
-   height: clear of the home link (top-left), title (top-centre),
+   height: clear of the home link (top-left), title (top-center),
    currency pill (top-right) and the tool dock (bottom). Same glassy
    language as the currency pill. Hidden during dance (can't draw-zoom
    while grooving, and starting a dance exits zoom anyway). */
@@ -631,7 +631,7 @@ body.dancing .draw-canvas  { opacity: 0; }
    dance frame, and transform-box:view-box + a JS-synced
    transform-origin make that transform resolve identically to the
    body's, so the pattern reads as seen-through-a-dancing-body. */
-/* MUST occupy the exact same centred 2:3 box as .creature (NOT the
+/* MUST occupy the exact same centered 2:3 box as .creature (NOT the
    full viewport) — otherwise the SVG viewBox maps to a different
    rect than the body and the pattern lands off the figure. Same
    sizing formula as `.stage > .creature` (kept in lockstep with the
@@ -1703,9 +1703,9 @@ body:not(.dancing) .dance-dock { display: none; }
 }
 .page-card:active { transform: scale(0.97); }
 
-/* "Colour it for me" corner button on each character card. Tapping
-   it loads the pre-coloured version; tapping anywhere else on the
-   card loads the colour-it-yourself outline. Sized to clear the 44px
+/* "Color it for me" corner button on each character card. Tapping
+   it loads the pre-colored version; tapping anywhere else on the
+   card loads the color-it-yourself outline. Sized to clear the 44px
    touch-target floor. */
 .char-fill-btn {
     position: absolute;

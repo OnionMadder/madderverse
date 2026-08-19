@@ -62,8 +62,8 @@
 
            The other five stay inside the FREE angle budget: up to ~18 deg
            costs nothing because the frame already has room, while bigger
-           static poses shrink the whole doll and the colourable area with
-           it (a flat T-pose costs 41% of the colouring surface). The dance
+           static poses shrink the whole doll and the colorable area with
+           it (a flat T-pose costs 41% of the coloring surface). The dance
            is what provides real motion -- see tools/README.md. */
         standing: { id: 'standing', name: 'Standing', icon: '\uD83E\uDDCD', origin: '50% 95%',
             rig: {} },
@@ -261,7 +261,7 @@
        (SVG <g> per part, rotated by transform) and the kid's PAINT (one
        bitmap in rest-pose space). The paint is re-composited each frame by
        drawing that same bitmap once per part, through the part's rotation
-       and clipped to the part -- so colour rides its own arm instead of
+       and clipped to the part -- so color rides its own arm instead of
        sliding off it.
 
        DANCE_SWING is capped at what the frame can hold without shrinking
@@ -1507,7 +1507,7 @@
                 c.strokeRect(cx - 20, my + 4, 40, 14);
                 c.beginPath(); c.moveTo(cx - 7, my + 4); c.lineTo(cx - 7, my + 18); c.stroke();
                 c.beginPath(); c.moveTo(cx + 7, my + 4); c.lineTo(cx + 7, my + 18); c.stroke();
-                /* Control panel with 3 buttons, centred on the chest. */
+                /* Control panel with 3 buttons, centered on the chest. */
                 c.strokeRect(cx - 32, BODY.chestY - 30, 64, 60);
                 c.beginPath(); c.arc(cx - 16, BODY.chestY - 15, 5, 0, Math.PI * 2); c.stroke();
                 c.beginPath(); c.arc(cx, BODY.chestY - 15, 5, 0, Math.PI * 2); c.stroke();
@@ -1781,15 +1781,15 @@
        6 ids that have a page-* achievement (robot/princess/astronaut/
        clown/pirate/superhero) unlock anything; rockstar/disco track
        harmlessly. restampOutline holds the current character's outline
-       fn so CLEAR keeps a "colour it yourself" template on screen;
-       it's null in coloured / blank mode (CLEAR there = blank). */
+       fn so CLEAR keeps a "color it yourself" template on screen;
+       it's null in colored / blank mode (CLEAR there = blank). */
     let currentCharacterId = null;
     let restampOutline = null;
     let pagesModalEl = null;
     let pagesGridEl = null;
 
     /* Shared "make it the new drawing" reset — wipe canvas + the
-       per-drawing colour tally so Rainbow Day starts over. */
+       per-drawing color tally so Rainbow Day starts over. */
     function freshCanvasForCharacter() {
         ctx.clearRect(0, 0, STAGE_W, STAGE_H);
         if (state) trackClearDrawing();
@@ -1802,7 +1802,7 @@
         restampOutline = ch.outline;
     }
 
-    /* Coloured-for-you: pose/bg/hat/colour like the old prefab path,
+    /* Colored-for-you: pose/bg/hat/color like the old prefab path,
        then paint the filled art. No restamp (CLEAR = blank). */
     function applyFilled(ch) {
         const seed = ch.filled;
@@ -1877,8 +1877,8 @@
         });
         pagesGridEl.appendChild(blank);
 
-        /* One card per character. Tapping the card = colour-it-yourself
-           outline; the 🎨 sub-button = colour-it-for-me filled. The 🎨
+        /* One card per character. Tapping the card = color-it-yourself
+           outline; the 🎨 sub-button = color-it-for-me filled. The 🎨
            is a real <button> nested in the card; stopPropagation keeps
            the card's outline handler from also firing. */
         for (let i = 0; i < CHARACTERS.length; i++) {
@@ -1887,12 +1887,12 @@
             const card = document.createElement('button');
             card.type = 'button';
             card.className = 'page-card' + (done ? ' done' : '');
-            card.setAttribute('aria-label', 'Colour in ' + ch.label);
+            card.setAttribute('aria-label', 'Color in ' + ch.label);
             card.innerHTML =
-                '<button class="char-fill-btn" type="button" title="Colour it for me" aria-label="Colour ' + ch.label + ' for me">🎨</button>' +
+                '<button class="char-fill-btn" type="button" title="Color it for me" aria-label="Color ' + ch.label + ' for me">🎨</button>' +
                 '<div class="page-emoji" aria-hidden="true">' + ch.emoji + '</div>' +
                 '<div class="page-name">' + escapeHtml(ch.label) + '</div>' +
-                '<div class="page-action">' + (done ? '✓ Done' : 'Colour it') + '</div>';
+                '<div class="page-action">' + (done ? '✓ Done' : 'Color it') + '</div>';
             card.addEventListener('click', () => {
                 applyCharacter(ch.id, false);
                 closeModal();
@@ -1947,7 +1947,7 @@
     const BODY = {
         /* Re-derived from the paper-doll rig at scale 1.0 (2026-08-19), which
            is Onion's original drawing at full size. cx stays 200 -- the BODY
-           is centred there -- but note the HEAD sits at x=207, because she
+           is centered there -- but note the HEAD sits at x=207, because she
            drew it slightly off the body's axis. That is why HEAD_CROWN_X is
            207 and not cx. */
         cx: 200,
@@ -2278,12 +2278,12 @@
 
        One roster, one picker. Each character has BOTH an `outline`
        (navy line-art the kid colors in — the old "page") and a
-       `filled` (pre-coloured + pose/bg/hat — the old "prefab
+       `filled` (pre-colored + pose/bg/hat — the old "prefab
        Groodle"). The picker shows one card per character: tapping it
-       loads the colour-it-yourself outline; the card's 🎨 button
+       loads the color-it-yourself outline; the card's 🎨 button
        loads the done-for-you version. This collapses the old separate
        Pages modal + New-drawer starter grid into a single mental
-       model ("pick a character, optionally have it coloured for you").
+       model ("pick a character, optionally have it colored for you").
 
        4 characters reuse the existing page outline + prefab fill
        as-is; clown/superhero gain a compact `filled`, rockstar/disco
@@ -2427,7 +2427,7 @@
 
     /* (The old applyDefaultGroodle / buildStarterGrid lived here. The
        prefab "starter" path is now folded into the unified CHARACTERS
-       picker — applyFilled() above does the pose/bg/hat/colour+paint;
+       picker — applyFilled() above does the pose/bg/hat/color+paint;
        DEFAULT_GROODLES is still the art source via CHARACTER.filled.) */
 
     /* ============ GROODLE EXPORT (shared by the gallery) ============
@@ -3123,7 +3123,7 @@
     const FACE_CATS = ['hair', 'brows', 'eyes', 'nose', 'mouth'];
     const FACE_LABEL = { hair: 'Hair', brows: 'Brows', eyes: 'Eyes', nose: 'Nose', mouth: 'Mouth' };
 
-    /* Per-category grab box (logical units, centred on the part) — kept
+    /* Per-category grab box (logical units, centered on the part) — kept
        tight so the stacked face anchors don't all grab each other; the
        later-rendered part wins where they still overlap. */
     const FACE_HIT = {
@@ -3144,7 +3144,7 @@
         return { x: cx, y: BODY.headCy };
     }
 
-    /* Parts are authored centred on (0,0) in logical units; the wrapper
+    /* Parts are authored centered on (0,0) in logical units; the wrapper
        <g> translates them to the anchor (+ the kid's drag nudge). */
     const FACE_PARTS = {
         hair: [
@@ -3207,7 +3207,7 @@
     function setFacePart(cat, id) {
         if (!state.face[cat]) state.face[cat] = { id: '', dx: 0, dy: 0 };
         state.face[cat].id = id;
-        state.face[cat].dx = 0;          // re-pick always re-centres —
+        state.face[cat].dx = 0;          // re-pick always re-centers —
         state.face[cat].dy = 0;          // that's the safety net
         saveState();
         renderFaceParts();
@@ -3518,9 +3518,9 @@
            when the kid starts over. trackClearDrawing is a no-op for
            any other counters. */
         if (state) trackClearDrawing();
-        /* If a colour-it-yourself character outline is loaded, re-stamp
+        /* If a color-it-yourself character outline is loaded, re-stamp
            it so CLEAR resets to "freshly outlined" instead of fully
-           blank. (Coloured-for-you + blank modes have no restamp.) */
+           blank. (Colored-for-you + blank modes have no restamp.) */
         if (restampOutline) restampOutline(ctx);
     }
 
@@ -3711,7 +3711,7 @@
         trackDrawingFinished();
         trackBeatExperienced(BEATS[currentBeatIdx]);
         /* Pressing DANCE while a character is loaded (outline OR
-           coloured-for-you) counts as finishing it — unlocks its
+           colored-for-you) counts as finishing it — unlocks its
            page-* achievement + Coloring Master at the 6th. */
         if (currentCharacterId) trackCharacterCompleted(currentCharacterId);
         ensureAudio();
@@ -3789,7 +3789,7 @@
         const cr = canvas.getBoundingClientRect();
         const host = stageEl || creature.parentElement;
         const st = host.getBoundingClientRect();
-        /* Anchor a touch below head centre so the whole face + chin sit
+        /* Anchor a touch below head center so the whole face + chin sit
            in frame, not just the eyes. */
         const faceFracY = (BODY.headCy + BODY.headR * 0.28) / STAGE_H;
         const faceScreenY = cr.top + faceFracY * cr.height;

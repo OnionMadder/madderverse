@@ -29,7 +29,7 @@ the web. If a feature only makes sense in the app, gate it behind a
   2026-08-19, the same posture as All Munkis. *(This entry previously
   proposed a $1.99 `studio_pack`; that was dropped. Adding billing to a
   kids' app means adding a third-party SDK and weakening the "no data
-  collected" declaration, for revenue this catalogue is not chasing.
+  collected" declaration, for revenue this catalog is not chasing.
   Chunk 8 below is therefore CUT.)*
 - **Identity**: anonymous, no accounts. Save state in localStorage
   (web) + `@capacitor/preferences` (app, transparently mirrors LS).
