@@ -522,7 +522,6 @@ body.dancing .face-zoom-btn { display: none; }
 }
 body.dancing .dance-canvas { display: block; }
 body.dancing .draw-canvas  { opacity: 0; }
-.doll-ink-line   { fill: #1a0f33; }
 
 /* Hat layer sits above the outline so hats land on top of the head
    ring rather than being trimmed by it. Same absolute fill + no

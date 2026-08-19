@@ -18,7 +18,7 @@
 
 'use strict';
 
-const SHELL_VERSION = 'groodle-shell-v45';
+const SHELL_VERSION = 'groodle-shell-v46';
 
 /* Files baked into the cache during `install`. List anything the
    game absolutely needs to render the first frame. Hat sprites are
@@ -31,6 +31,12 @@ const SHELL_FILES = [
     './manifest.webmanifest',
     './assets/sprites/hats.png',
     './assets/sprites/hats.json',
+    /* The paper-doll parts ARE the character -- without them he renders as a
+       bare pale silhouette with no linework at all, so they belong in the
+       first-frame precache rather than being fetched lazily. */
+    './assets/doll/torso.png',
+    './assets/doll/arm.png',
+    './assets/doll/leg.png',
     /* Caveat is self-hosted rather than loaded from Google Fonts, so it has
        to be precached like any other shell file — otherwise the logo silently
        drops to the fallback stack the moment the player is offline. */

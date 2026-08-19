@@ -61,7 +61,9 @@ groodle/
   cover.jpg              — hub-page card art
   manifest.webmanifest   — PWA manifest (name, icons, theme, start_url)
   sw.js                  — service worker (cache-first shell for offline play)
-  tools/trace_rig.py     — traces the hand-drawn body parts into the RIG block
+  assets/doll/*.png      — the paper-doll parts as transparent ink cutouts
+  tools/cut_art.py       — cuts the part drawings into those PNGs + DOLL_ART
+  tools/trace_rig.py     — traces the parts' CLIP outlines into the RIG block
   tools/README.md        — the paper-doll rig: redraw steps + frame constraint
   PLAY_STORE_PLAN.md     — phased rollout plan to ship as a Capacitor Android app
 ```
@@ -149,6 +151,36 @@ IIFE; verify with `grep -n '^})();$' game.js` showing one match.
 | **GALLERY** | On-device only. `saveGroodleLocal()` composes the blob and `idbSaveGroodle()`s it to IndexedDB (`groodle-gallery` / `creations`), then a toast; `openLocalGallery()` renders `idbAllGroodles()` newest-first as `blob:` URL cards with a two-tap-confirm `idbDeleteGroodle`. No network, no accounts, no other users' content. |
 | **INIT** | `init()` builds everything; fires on `DOMContentLoaded`. |
 
+## Why the doll is images, not traced outlines
+
+The rig poses draw Onion's **actual artwork** — `assets/doll/{torso,arm,leg}.png`,
+transparent ink cutouts placed as `<image>` by `rigArtMarkup()`. They are not
+traced. The RIG's outlines still exist but are never drawn: they are the paint
+clip and the hit-test shape, nothing more.
+
+It used to trace her line into ~130-point Bézier rings and rebuild an outline
+with the erode filter. Three separate problems came from that, and none were
+fixable in the vector approach:
+
+* **It wasn't her line.** The trace flattened the weight and wobble that make
+  the drawing read as drawn.
+* **Five parts merged into one silhouette leaves seams.** The torso is drawn
+  ~7 units off the body axis, so a symmetric leg pin left daylight at the hip
+  that the outline traced as a dark slash. That needed a hand-placed gusset,
+  which then had to be clamped so it didn't escape as slivers.
+* **The erode filter produced gray squares at the hip, and only at size.**
+  Clean at 400px wide, visible by 620px, worse at 869px — near-coincident part
+  edges leave thin sub-1-alpha bands that erode-and-composite renders as ink.
+  A `slope="4"` alpha hardening was already in place fighting the same thing.
+
+Overlapping paper has none of it: each part carries the outline Onion drew, and
+where parts overlap the lines cross the way cut paper does. **Torso is on top**,
+and because its art is transparent between the lines, `rigArtMarkup` masks limb
+art to the torso's solid — otherwise an arm's outline shows through his chest.
+
+`cut_art.py` and `trace_rig.py` are ONE unit: both derive the pin and scale the
+same way, so the artwork and its clip land together. Regenerate both together.
+
 ## The silhouette + clip trick
 
 The same 6 shapes (head circle + torso rect + 2 angled arms + 2 angled
@@ -156,9 +188,12 @@ legs) live in **four** places that must stay in lockstep:
 
 ```
 .silhouette-fill            — pale white wash, the "coloring page" surface
-.silhouette-outline         — same shapes, fed through #innerOutlineFilter
+.silhouette-outline         — same shapes through #innerOutlineFilter
                               (feMorphology erode → composite out) to draw
-                              a dark ring sitting inside the body
+                              a dark ring inside the body. ONLY used by the
+                              hand-authored ghost / animal poses now; rig
+                              poses leave it empty (see "Why the doll is
+                              images" below) and renderPoseDom enforces that
 <clipPath id="bodyClip">    — defined in <defs>. No longer referenced by
                               CSS — kept as a legacy / fallback hook in
                               case future features (e.g. a "save your
@@ -310,9 +345,9 @@ Each entry in `POSES` is either:
   (this is how Ghost and Animal work). This is how you ship custom
   art: replace any pose's `skeleton:` with a `path:` string.
 - **Rig-driven** — `rig: { armL: 163, armR: 163 }`. The six body poses.
-  `rigPathD()` rotates each traced part about its pin and concatenates
-  them into one nonzero-fill path, so joints melt into a single
-  silhouette. Angles are frame-bounded — his arms are long enough that a
+  `rigArtMarkup()` places each part's artwork about its pin; `rigPathD()`
+  does the same with the clip outlines for the paint region. Joints are
+  overlapping paper, not a merged silhouette. Angles are frame-bounded — his arms are long enough that a
   flat T-pose does not fit. **Read [`tools/README.md`](tools/README.md)
   before changing an angle**: the scale is re-solved across the whole
   pose set, so widening one pose shrinks the doll and drifts every hat.
