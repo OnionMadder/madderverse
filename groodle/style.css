@@ -4,6 +4,19 @@
 /* Body uses a friendly humanist sans for legibility; the "chunky" font
    stack below is reserved for the kid-facing UI (title, buttons, hint,
    panel labels) where the playful Comic-Sans-ish feel does the most. */
+/* Caveat (the logo script) is SELF-HOSTED, not loaded from Google Fonts.
+   Two reasons: the Capacitor app must work with no network at all, and a
+   kids' app should not hand a third party the player's IP on every launch
+   -- the same call Tiny Canvas made. OFL licensed, so bundling is fine.
+   Latin subset only (51KB); everything else falls back down --font-cursive. */
+@font-face {
+    font-family: 'Caveat';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('assets/fonts/caveat-700.woff2') format('woff2');
+}
+
 :root {
     --font-body:   'Trebuchet MS', 'Verdana', system-ui, sans-serif;
     --font-chunky: 'Comic Sans MS', 'Marker Felt', 'Chalkboard SE',
