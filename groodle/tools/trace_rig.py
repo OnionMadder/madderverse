@@ -46,28 +46,42 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
 FILES = {'torso': 'torso.png', 'arm': 'arm.png', 'leg': 'leg.png'}
 
 INK_THRESHOLD = 120          # figure strokes are near 0; grid lines 150-230
-HEAD_D, ARM_LEN, LEG_LEN = 116.0, 217.0, 210.0   # pre-fit units
+# Limb lengths and joint anchors are FITTED, not guessed: tools/fit_standing.py
+# rasterises the assembled standing doll against the original full-figure
+# drawing and maximises IoU. Hand-guessed values scored 0.563; these score
+# 0.977. The first guess had the legs 32% too short and their pins less than
+# half far enough apart, which is exactly what read as "the legs look wrong".
+HEAD_D, ARM_LEN, LEG_LEN = 116.0, 239.8, 276.9
 
 # Joint angles per pose. Mirrored parts flip their own sign, so a pose says
 # "raise the arm N degrees" once and each side resolves it.
 POSES = {
+    # Standing IS the original drawing -- fit_standing.py matches it at
+    # IoU 0.977, so do not nudge these away from {} .
     'standing': {},
-    'cheer':    {'armL': 163, 'armR': 163},
-    'star':     {'armL': 36,  'armR': 36, 'legL': 13, 'legR': 13},
-    'groovy':   {'armL': 30,  'armR': -14, 'legL': -6, 'legR': 8},
-    'tpose':    {'armL': 40,  'armR': 40},
-    'wave':     {'armR': 166, 'armL': 8},
+    # The rest stay inside the FREE budget: up to ~18 deg costs nothing,
+    # because the frame already has room for it. Past that the whole doll
+    # shrinks and takes the colourable area with it (see README).
+    'star':     {'armL': 18, 'armR': 18, 'legL': 9, 'legR': 9},
+    'cheer':    {'armL': 18, 'armR': 18, 'legL': 4, 'legR': 4},
+    'groovy':   {'armL': 16, 'armR': -11, 'legL': -5, 'legR': 8},
+    'tpose':    {'armL': 18, 'armR': 18},
+    'wave':     {'armR': 18, 'armL': -6},
 }
+
+# How far the DANCE may swing a limb. This is folded into the scale solve
+# below, so the doll is sized to hold its own dance without clipping.
+DANCE_SWING = 18
 
 # Torso-local geometry. The torso's own origin is the top-centre of the head.
 BC = -6.75                    # body centre sits left of the head-top centre
 TX, TY = 200 - BC, 34.0
-ANCHOR = {'armL': (BC - 50, 152), 'armR': (BC + 50, 152),
-          'legL': (BC - 23, 284), 'legR': (BC + 23, 284)}
+ANCHOR = {'armL': (BC - 63.9, 143.0), 'armR': (BC + 63.9, 143.0),
+          'legL': (BC - 47.9, 270.9), 'legR': (BC + 47.9, 270.9)}
 SRC_OF = {'armL': 'arm', 'armR': 'arm', 'legL': 'leg', 'legR': 'leg'}
 MIRROR = {'armR', 'legR'}
 SIGN   = {'armL': 1, 'armR': -1, 'legL': 1, 'legR': -1}
-REST   = {'armL': 2, 'armR': -2, 'legL': 1, 'legR': -1}
+REST   = {'armL': 0.8, 'armR': -0.8, 'legL': 0.2, 'legR': -0.2}
 
 
 def trace(name):
@@ -148,7 +162,12 @@ def main():
 
     # Solve one scale + offset for ALL poses, so he never changes size between
     # them, the widest pose still fits, and the lowest foot lands on the floor.
-    pts = [p for name in POSES for ring in placed(parts, POSES[name]) for p in ring]
+    envelope = dict(POSES)
+    sw = DANCE_SWING
+    envelope['_danceA'] = {'armL': sw, 'armR': sw, 'legL': sw * 0.5, 'legR': sw * 0.5}
+    envelope['_danceB'] = {'armL': -sw, 'armR': -sw}
+    envelope['_danceC'] = {'armL': sw, 'armR': -sw}
+    pts = [p for name in envelope for ring in placed(parts, envelope[name]) for p in ring]
     x0, x1 = min(x for x, _ in pts), max(x for x, _ in pts)
     y0, y1 = min(y for _, y in pts), max(y for _, y in pts)
     K = min((400 - 16) / (x1 - x0), (570 - 14) / (y1 - y0), 1.0)

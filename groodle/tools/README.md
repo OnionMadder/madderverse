@@ -7,6 +7,15 @@ with visible brass fasteners. A pose is four joint angles.
 `trace_rig.py` turns the drawings into the `const RIG = {...};` block in
 `game.js`. Everything else about the rig is data.
 
+`fit_standing.py` is how the joint anchors and limb lengths were derived.
+Standing must be Onion's original full-figure drawing *exactly*, so it
+rasterises the assembled doll against `art-src/body/original-full-figure.png`
+and maximises IoU over the anchor offsets, rest angles and limb scales.
+Hand-guessed values scored **0.563**; the fitted ones score **0.977**. The
+guess had the legs 32% too short and their pins less than half far enough
+apart -- which is what read as "the legs look wrong". Re-run it if a part is
+redrawn, and paste the numbers into `trace_rig.py`.
+
 ## Redraw a part
 
 1. Draw/generate the part as black line art on a light background. Any size.
@@ -60,11 +69,18 @@ game. Measured:
 
 | pose set | scale | head r | colourable area |
 |---|---|---|---|
-| includes a horizontal T-pose | 0.757 | 43.9 | 57% |
-| steep arms-up instead        | 0.872 | 50.6 | 76% |
+| standing only          | 1.000 | 58.0 | 100% |
+| + dance swing to ±18°  | 1.000 | 58.0 | 100% |
+| static poses to 25°    | 0.912 | 52.9 |  83% |
+| static poses to 40°    | 0.770 | 44.7 |  59% |
 
-We ship the second: `cheer` and `wave` raise the arms to 163–166° (nearly
-vertical, so narrow), and `tpose` is a 40° half-T rather than a flat one.
+**±18° is free** — the frame already has room for it — so that is the dance
+swing, and the static poses live inside the same budget. Standing is `{}`,
+the drawing untouched at full size, which is also why `HATS` needs no
+rescaling: head r is 58, the value it was always tuned to.
+
+Motion is the dance's job, not the pose picker's. Big static poses buy very
+little and cost real colouring surface.
 
 `trace_rig.py` **re-solves the scale from whatever pose set it is given**, so
 widening one pose silently shrinks the whole doll and every hat drifts. The
