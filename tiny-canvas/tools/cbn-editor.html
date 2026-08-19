@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Tiny Canvas — Color-by-Number editor</title>
+<!--
+    ============================================================
+    CBN EDITOR — assign a colour to every region by clicking it.
+
+    Serve it (don't open via file://, the canvas reads pixels):
+        python3 -m http.server 8000        # from tiny-canvas/
+        http://localhost:8000/tools/cbn-editor.html
+
+    WHY THIS EXISTS
+    Authoring a CBN page used to mean hand-colouring a full
+    reference PNG in another app and running it through
+    scripts/process-cbn-page.py, which sampled each region's
+    centroid. Two problems: it was slow enough that 7 of the 8
+    pages never got done, and a centroid is frequently not inside
+    its own region, so the sample could read the wrong colour
+    entirely.
+
+    This loads ../cbn-core.js — the SAME module the game runs — so
+    the regions you see and click are exactly the regions the game
+    will detect. It cannot drift from the runtime, and it shows you
+    a bad page (regions too small to number, ink gaps merging
+    shapes) before it ships rather than after.
+
+    OUTPUT is a `cbn:` block to paste into ../templates.js. Region
+    entries are {x, y, ci}: a point plus a palette index. The point
+    is the region's ANCHOR, so it is guaranteed to be inside — the
+    runtime maps it back onto its own detected region. No geometry
+    is exported, so a page can never go stale against a re-detect.
+    ============================================================
+-->
+<style>
+    :root {
+        --ink:   #1c2226;
+        --paper: #fff5dc;
+        --bg:    #06141a;
+        --panel: #0e2029;
+        --line:  #2b4552;
+        --hot:   #ff2e88;
+        --ok:    #9be15d;
+        --warn:  #ffd23f;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--paper);
+        font: 14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        display: flex;
+        min-height: 100vh;
+    }
+    h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: .06em; }
+    h2 {
+        font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+        margin: 18px 0 8px; color: #7fb0c4;
+        border-bottom: 1px solid var(--line); padding-bottom: 4px;
+    }
+    .stage {
+        flex: 1; display: flex; align-items: center; justify-content: center;
+        padding: 16px; min-width: 0;
+    }
+    /* The checkerboard shows through unassigned regions, so
+       "not yet coloured" is visually obvious rather than just dark. */
+    #view {
+        max-width: 100%; max-height: calc(100vh - 32px);
+        background:
+            repeating-conic-gradient(#243b46 0 25%, #1b2f38 0 50%)
+            0 0 / 24px 24px;
+        border: 1px solid var(--line);
+        cursor: crosshair;
+    }
+    .panel {
+        width: 330px; flex: none; background: var(--panel);
+        border-left: 1px solid var(--line);
+        padding: 14px; overflow-y: auto; max-height: 100vh;
+    }
+    select, button, input[type=text] {
+        font: inherit; background: #16323e; color: var(--paper);
+        border: 1px solid var(--line); border-radius: 4px; padding: 5px 8px;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--hot); }
+    .row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .row > select, .row > input[type=text] { flex: 1; min-width: 0; }
+
+    .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+    .sw {
+        position: relative; width: 46px; height: 46px; border-radius: 6px;
+        border: 2px solid var(--line); cursor: pointer; padding: 0;
+    }
+    .sw.armed { border-color: var(--hot); box-shadow: 0 0 0 2px var(--hot); }
+    .sw span {
+        position: absolute; inset: 0; display: flex;
+        align-items: center; justify-content: center;
+        font-weight: bold; font-size: 15px; color: #fff;
+        text-shadow: -1px -1px 0 #000, 1px -1px 0 #000,
+                     -1px 1px 0 #000, 1px 1px 0 #000;
+    }
+    .sw-add {
+        width: 46px; height: 46px; border-radius: 6px;
+        border: 2px dashed var(--line); background: none;
+        color: #7fb0c4; font-size: 20px;
+    }
+    .hint { color: #7fb0c4; font-size: 12px; margin: 6px 0; }
+    .stat { display: flex; justify-content: space-between; gap: 8px; }
+    .stat b { font-weight: bold; }
+    .bad  { color: var(--hot); }
+    .good { color: var(--ok); }
+    .warn { color: var(--warn); }
+    #out {
+        width: 100%; height: 200px; font: 11px/1.35 ui-monospace, monospace;
+        background: #08181f; color: #b9e6ff;
+        border: 1px solid var(--line); border-radius: 4px; padding: 8px;
+        white-space: pre; overflow: auto;
+    }
+    #hover { min-height: 3.2em; color: #7fb0c4; font-size: 12px; }
+    label.chk { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<div class="stage"><canvas id="view"></canvas></div>
+
+<div class="panel">
+    <h1>CBN editor</h1>
+    <div class="hint">
+        Click a region to paint it with the armed number.
+        Shift-click clears it.
+    </div>
+
+    <h2>Page</h2>
+    <div class="row">
+        <select id="pageSel"></select>
+    </div>
+    <div class="row">
+        <input type="file" id="fileSel" accept="image/png,image/*" />
+    </div>
+    <div class="row">
+        <label class="chk"><input type="checkbox" id="showNums" checked /> numbers</label>
+        <label class="chk"><input type="checkbox" id="showFill" checked /> fills</label>
+        <label class="chk"><input type="checkbox" id="showIds" /> ids</label>
+    </div>
+
+    <h2>Palette</h2>
+    <div class="swatches" id="swatches"></div>
+    <div class="row" style="margin-top:8px">
+        <input type="color" id="pickColor" value="#7ecfff" />
+        <input type="text" id="hexColor" value="#7ecfff" />
+        <button id="setColor">set</button>
+    </div>
+    <div class="row">
+        <button id="dropColor">remove last</button>
+    </div>
+
+    <h2>Region</h2>
+    <div id="hover">hover a region…</div>
+
+    <h2>Fitness</h2>
+    <div id="fitness"></div>
+
+    <h2>Export</h2>
+    <div class="row">
+        <button id="copyBtn">copy cbn block</button>
+        <button id="fillRest">assign rest to armed</button>
+    </div>
+    <textarea id="out" readonly spellcheck="false"></textarea>
+</div>
+
+<!-- templates.js is loaded so the editor can PREFILL from whatever
+     a page already ships with — you edit the live assignment rather
+     than starting from a blank page every time. -->
+<script src="../templates.js"></script>
+<script src="../cbn-core.js"></script>
+<script>
+(function () {
+    "use strict";
+
+    const C = window.TinyCanvasCBN;
+    const $ = (s) => document.querySelector(s);
+
+    const view    = $("#view");
+    const vctx    = view.getContext("2d");
+
+    /* Editor state. `assign` is a plain array indexed by region id
+       holding the 1-based palette index (0 = unassigned) — the same
+       shape cbn-core's assignFromSeeds returns. */
+    let art     = null;   // HTMLImageElement
+    let model   = null;   // cbn-core model
+    let assign  = [];
+    let palette = ["#7ecfff", "#ff8b3d", "#f7d94c", "#8ac36b", "#ff8fb0", "#a67849"];
+    let armed   = 1;
+    let hoverId = -1;
+    let fillRgb = null;   // cached ImageData for the region-fill layer
+
+    /* ---------- page list ---------- */
+
+    /* Every page in templates.js that has an image, CBN pack first —
+       CBN pages are what you're normally here for, but any page can
+       be tested for suitability. */
+    function buildPageList() {
+        const sel = $("#pageSel");
+        const packs = window.TINY_CANVAS_PAGE_PACKS || [];
+        const ordered = packs.slice().sort(function (a, b) {
+            return (a.id === "cbn" ? -1 : 0) - (b.id === "cbn" ? -1 : 0);
+        });
+        ordered.forEach(function (pk) {
+            const grp = document.createElement("optgroup");
+            grp.label = pk.label;
+            pk.pages.forEach(function (tpl) {
+                if (!tpl.image) return;
+                const o = document.createElement("option");
+                o.value = tpl.id;
+                o.textContent = tpl.name;
+                grp.appendChild(o);
+            });
+            if (grp.childElementCount) sel.appendChild(grp);
+        });
+        sel.addEventListener("change", function () { loadPage(sel.value); });
+    }
+
+    function findTpl(id) {
+        const packs = window.TINY_CANVAS_PAGE_PACKS || [];
+        for (let i = 0; i < packs.length; i++) {
+            const hit = packs[i].pages.find(function (p) { return p.id === id; });
+            if (hit) return hit;
+        }
+        return null;
+    }
+
+    /* ---------- loading ---------- */
+
+    function loadPage(id) {
+        const tpl = findTpl(id);
+        if (!tpl) return;
+        const img = new Image();
+        img.onload = function () {
+            art = img;
+            buildModelFor(tpl);
+        };
+        img.onerror = function () { alert("could not load " + tpl.image); };
+        img.src = "../" + tpl.image;
+    }
+
+    function buildModelFor(tpl) {
+        model = C.buildModel(art);
+        if (!model) {
+            alert("no model — the art has no regions above the size floor, " +
+                  "or its ink is too thin to seal.");
+            return;
+        }
+        assign = new Array(model.regions.length).fill(0);
+
+        /* Prefill from whatever the template already ships. Seeds go
+           through the same assignFromSeeds the runtime uses, so what
+           you see here is what the game currently does. */
+        if (tpl && tpl.cbn && tpl.cbn.palette) {
+            palette = tpl.cbn.palette.slice();
+            if (Array.isArray(tpl.cbn.regions) && tpl.cbn.regions.length) {
+                const seeds = tpl.cbn.regions.map(function (r) {
+                    return {
+                        x:  (typeof r.x === "number") ? r.x : r.cx,
+                        y:  (typeof r.y === "number") ? r.y : r.cy,
+                        ci: r.ci
+                    };
+                });
+                const res = C.assignFromSeeds(model, seeds);
+                for (let i = 0; i < assign.length; i++) assign[i] = res.byRegion[i];
+                if (res.missed) {
+                    console.warn("[cbn-editor] " + res.missed +
+                                 " authored seeds did not land in any region");
+                }
+            } else if (typeof tpl.cbn.assign === "function") {
+                const res = C.assignFromFn(model, tpl.cbn.assign, palette.length);
+                for (let i = 0; i < assign.length; i++) assign[i] = res.byRegion[i];
+            }
+        }
+
+        armed = 1;
+        view.width  = model.w;
+        view.height = model.h;
+        fillRgb = null;
+        renderSwatches();
+        render();
+    }
+
+    /* Arbitrary PNG — for checking a page before it is in templates.js. */
+    $("#fileSel").addEventListener("change", function (e) {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const img = new Image();
+        img.onload = function () { art = img; buildModelFor(null); };
+        img.src = URL.createObjectURL(f);
+    });
+
+    /* ---------- palette ---------- */
+
+    function renderSwatches() {
+        const host = $("#swatches");
+        host.innerHTML = "";
+        palette.forEach(function (hex, i) {
+            const idx = i + 1;
+            const b = document.createElement("button");
+            b.className = "sw" + (idx === armed ? " armed" : "");
+            b.style.background = hex;
+            b.title = hex + "  (" + countAssigned(idx) + " regions)";
+            b.innerHTML = "<span>" + idx + "</span>";
+            b.addEventListener("click", function () {
+                armed = idx;
+                $("#pickColor").value = hex;
+                $("#hexColor").value = hex;
+                renderSwatches();
+            });
+            host.appendChild(b);
+        });
+        const add = document.createElement("button");
+        add.className = "sw-add";
+        add.textContent = "+";
+        add.title = "add a colour";
+        add.addEventListener("click", function () {
+            palette.push($("#pickColor").value);
+            armed = palette.length;
+            renderSwatches();
+            render();
+        });
+        host.appendChild(add);
+    }
+
+    function countAssigned(ci) {
+        let n = 0;
+        for (let i = 0; i < assign.length; i++) if (assign[i] === ci) n++;
+        return n;
+    }
+
+    $("#setColor").addEventListener("click", function () {
+        const hex = $("#hexColor").value.trim();
+        if (!/^#[0-9a-fA-F]{6}$/.test(hex)) { alert("need #rrggbb"); return; }
+        palette[armed - 1] = hex;
+        fillRgb = null;
+        renderSwatches();
+        render();
+    });
+    $("#pickColor").addEventListener("input", function () {
+        $("#hexColor").value = $("#pickColor").value;
+    });
+    $("#dropColor").addEventListener("click", function () {
+        if (palette.length <= 1) return;
+        const gone = palette.length;
+        palette.pop();
+        /* Any region pointing at the removed index becomes unassigned
+           rather than silently sliding onto a different colour. */
+        for (let i = 0; i < assign.length; i++) if (assign[i] === gone) assign[i] = 0;
+        if (armed > palette.length) armed = palette.length;
+        fillRgb = null;
+        renderSwatches();
+        render();
+    });
+
+    $("#fillRest").addEventListener("click", function () {
+        if (!model) return;
+        for (let i = 0; i < assign.length; i++) if (!assign[i]) assign[i] = armed;
+        fillRgb = null;
+        render();
+    });
+
+    /* ---------- picking ---------- */
+
+    function eventToRegion(e) {
+        if (!model) return -1;
+        const r = view.getBoundingClientRect();
+        return C.regionAt(model,
+                          (e.clientX - r.left) / r.width,
+                          (e.clientY - r.top)  / r.height);
+    }
+
+    view.addEventListener("click", function (e) {
+        const id = eventToRegion(e);
+        if (id < 0) return;
+        assign[id] = e.shiftKey ? 0 : armed;
+        fillRgb = null;
+        renderSwatches();
+        render();
+    });
+
+    view.addEventListener("mousemove", function (e) {
+        const id = eventToRegion(e);
+        if (id === hoverId) return;
+        hoverId = id;
+        renderHover();
+    });
+
+    function renderHover() {
+        const el = $("#hover");
+        if (!model || hoverId < 0) { el.textContent = "hover a region…"; return; }
+        const reg = model.regions[hoverId];
+        const ci = assign[hoverId];
+        const digits = (ci >= 10) ? 2 : 1;
+        const fit = C.labelFit(reg, 366, digits);
+        const z = C.zoomToShow(reg, 366, digits, 8);
+        const zTxt = (z === Infinity) ? "never" : z.toFixed(1) + "x";
+        const cls = (z === Infinity) ? "bad" : (z <= 1.01 ? "good" : "warn");
+        el.innerHTML =
+            "id <b>" + reg.id + "</b> &middot; number <b>" +
+            (ci || "—") + "</b><br>" +
+            "area " + reg.area + "px &middot; " +
+            (100 * reg.hw).toFixed(2) + "% wide &times; " +
+            (100 * reg.vh).toFixed(2) + "% tall (of page width)<br>" +
+            "label: <b>" + fit.mode + "</b> &middot; phone zoom needed: " +
+            "<b class='" + cls + "'>" + zTxt + "</b>";
+    }
+
+    /* ---------- rendering ---------- */
+
+    /* Region fills are painted from the LABEL MAP, one pixel at a
+       time, rather than by flood-filling the canvas — the label map
+       already knows every pixel's region, so this is a single pass
+       and it cannot disagree with what the game sees. */
+    function buildFillLayer() {
+        const w = model.w, h = model.h;
+        const img = vctx.createImageData(w, h);
+        const d = img.data;
+        const rgb = palette.map(hexToRgb);
+        const labels = model.labels;
+        for (let i = 0; i < labels.length; i++) {
+            const id = labels[i];
+            if (id < 0) continue;
+            const ci = assign[id];
+            if (!ci) continue;
+            const c = rgb[ci - 1];
+            if (!c) continue;
+            const q = i * 4;
+            d[q] = c[0]; d[q + 1] = c[1]; d[q + 2] = c[2]; d[q + 3] = 255;
+        }
+        return img;
+    }
+
+    function hexToRgb(hex) {
+        const h = hex.replace("#", "");
+        return [parseInt(h.slice(0, 2), 16),
+                parseInt(h.slice(2, 4), 16),
+                parseInt(h.slice(4, 6), 16)];
+    }
+
+    function render() {
+        if (!model || !art) return;
+        const w = model.w, h = model.h;
+        vctx.clearRect(0, 0, w, h);
+
+        if ($("#showFill").checked) {
+            if (!fillRgb) fillRgb = buildFillLayer();
+            vctx.putImageData(fillRgb, 0, 0);
+        }
+
+        /* Line art on top — same stacking order as the game, where
+           the kid colours UNDER the printed lines. */
+        vctx.drawImage(art, 0, 0, w, h);
+
+        if ($("#showNums").checked || $("#showIds").checked) drawLabels();
+        renderFitness();
+        renderExport();
+    }
+
+    function drawLabels() {
+        const showIds = $("#showIds").checked;
+        vctx.save();
+        vctx.textAlign = "center";
+        vctx.textBaseline = "middle";
+        model.regions.forEach(function (reg) {
+            const ci = assign[reg.id];
+            const text = showIds ? String(reg.id) : (ci ? String(ci) : "?");
+            /* Size the badge exactly as the runtime does, through the
+               same cbn-core call — so a number that will not fit in
+               the game does not look fine here. Drawn at the model's
+               own width, i.e. what the page looks like fully zoomed;
+               the fitness panel is what reports the phone case. */
+            const fit = C.labelFit(reg, model.w, text.length,
+                                   { fontMin: 6, fontMax: 34 });
+            if (fit.mode === "none") return;
+            const fs = fit.font;
+            const x = reg.ax * model.w, y = reg.ay * model.h;
+            vctx.font = "bold " + fs.toFixed(1) + "px ui-monospace, monospace";
+            if (fit.mode === "pill") {
+                const pad = fs * 0.34;
+                const tw = vctx.measureText(text).width;
+                const bw = Math.max(fs * 1.5, tw + pad * 2), bh = fs * 1.5;
+                vctx.fillStyle = ci ? "rgba(255,245,220,0.92)"
+                                    : "rgba(255,46,136,0.92)";
+                vctx.strokeStyle = "#1c2226";
+                vctx.lineWidth = Math.max(1, fs * 0.1);
+                roundRect(vctx, x - bw / 2, y - bh / 2, bw, bh, bh / 2);
+                vctx.fill();
+                vctx.stroke();
+            } else {
+                /* slim: halo instead of a capsule, matching the app. */
+                vctx.strokeStyle = "rgba(255,245,220,0.95)";
+                vctx.lineWidth = Math.max(1.5, fs * 0.28);
+                vctx.lineJoin = "round";
+                vctx.strokeText(text, x, y);
+            }
+            vctx.fillStyle = ci ? "#1c2226" : "#ff2e88";
+            vctx.fillText(text, x, y + fs * 0.04);
+        });
+        vctx.restore();
+    }
+
+    function roundRect(c, x, y, w, h, r) {
+        c.beginPath();
+        c.moveTo(x + r, y);
+        c.arcTo(x + w, y,     x + w, y + h, r);
+        c.arcTo(x + w, y + h, x,     y + h, r);
+        c.arcTo(x,     y + h, x,     y,     r);
+        c.arcTo(x,     y,     x + w, y,     r);
+        c.closePath();
+    }
+
+    ["showNums", "showFill", "showIds"].forEach(function (id) {
+        $("#" + id).addEventListener("change", render);
+    });
+
+    /* ---------- fitness ---------- */
+
+    /* The question this answers is "will this page work as CBN on a
+       phone?" — which is not something you can tell by looking at the
+       art. A region has to be big enough on screen to hold a digit;
+       anything still unreadable at the app's 8x ceiling can never be
+       numbered, and that is an art problem, not a code one. */
+    function renderFitness() {
+        const el = $("#fitness");
+        const fit = C.fitnessReport(model, {
+            artWidth: 366, maxZoom: 8, byRegion: assign
+        });
+        let unassigned = 0;
+        for (let i = 0; i < assign.length; i++) if (!assign[i]) unassigned++;
+        const rows = [
+            ["regions", fit.total, ""],
+            ["unassigned", unassigned, unassigned ? "bad" : "good"],
+            ["numbered at 1x (phone)", fit.fitAt1x, ""],
+            ["numbered by 8x", fit.fitAtMax, fit.fitAtMax === fit.total ? "good" : ""],
+            ["UNREACHABLE", fit.unreachable, fit.unreachable ? "bad" : "good"],
+            ["deepest zoom needed", fit.worstZoom.toFixed(1) + "x",
+             fit.worstZoom > 8 ? "bad" : fit.worstZoom > 4 ? "warn" : "good"]
+        ];
+        el.innerHTML = rows.map(function (r) {
+            return '<div class="stat"><span>' + r[0] +
+                   '</span><b class="' + r[2] + '">' + r[1] + "</b></div>";
+        }).join("");
+        if (fit.unreachable) {
+            el.innerHTML += '<div class="hint bad">' + fit.unreachable +
+                " region(s) can never hold a number, even fully zoomed. " +
+                "Thicken or simplify that part of the art.</div>";
+        }
+    }
+
+    /* ---------- export ---------- */
+
+    function renderExport() {
+        const seeds = [];
+        model.regions.forEach(function (reg) {
+            const ci = assign[reg.id];
+            if (!ci) return;
+            seeds.push("            { x: " + reg.ax.toFixed(4) +
+                       ", y: " + reg.ay.toFixed(4) + ", ci: " + ci + " }");
+        });
+        $("#out").value =
+            "cbn: {\n" +
+            "    palette: [" +
+                palette.map(function (h) { return '"' + h + '"'; }).join(", ") +
+            "],\n" +
+            "    regions: [\n" + seeds.join(",\n") + "\n    ]\n" +
+            "}";
+    }
+
+    $("#copyBtn").addEventListener("click", function () {
+        $("#out").select();
+        navigator.clipboard.writeText($("#out").value).then(function () {
+            $("#copyBtn").textContent = "copied!";
+            setTimeout(function () { $("#copyBtn").textContent = "copy cbn block"; }, 1200);
+        });
+    });
+
+    /* ---------- go ---------- */
+
+    buildPageList();
+    renderSwatches();
+    const first = $("#pageSel").value;
+    if (first) loadPage(first);
+})();
+</script>
+</body>
+</html>

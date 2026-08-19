@@ -58,3 +58,4 @@ art-src/
 *.keystore
 *.jks
 keystore.properties
+__pycache__/

@@ -633,40 +633,158 @@ body.screen-draw::before { display: none; }   /* hide scanlines on paper */
     justify-content: center;
 }
 
-/* CBN number labels — one absolute span per detected region.
-   Positioned in percent of the labels container, which sits at
-   the same fixed centre + max-size as .line-art so the numbers
-   track the coloring page under zoom without a JS reflow.
+/* CBN number labels — one absolute span per numbered region.
+
+   ⚠ This box has NO size of its own. cbnSyncOverlayBox() writes
+   left/top/width/height every time the view moves, sizing it to
+   the ARTWORK's rect (not .line-art's container rect, which is a
+   generous 94vw x 78vh frame the art letterboxes inside). Giving
+   it a CSS size here is precisely the bug that put numbers tens
+   of px away from their regions — see game.js §4d.
+
    pointer-events:none so taps still land on the canvas. */
 .cbn-labels {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width:  min(94vw, 1360px);
-    height: min(78vh, 800px);
+    position: absolute;
     pointer-events: none;
     z-index: 11;    /* above .line-art (10) so numbers sit on top of ink */
 }
+
+/* Every dimension is in `em`, so setting font-size (which
+   cbnSyncLabels does per label, derived from that region's
+   inscribed radius) scales the whole badge. A fixed-px badge was
+   the old behaviour and it drowned small regions. */
 .cbn-label {
     position: absolute;
     transform: translate(-50%, -50%);
-    min-width: 20px;
-    height: 20px;
-    padding: 0 6px;
-    border-radius: 12px;
+    min-width: 1.7em;
+    height: 1.7em;
+    padding: 0 0.3em;
+    box-sizing: border-box;
+    border-radius: 1em;
     background: rgba(255, 245, 220, 0.9);   /* --paper at 0.9 alpha */
-    border: 1.5px solid #1c2226;
+    border: 0.11em solid #1c2226;
     color: #1c2226;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 12px;             /* placeholder; JS owns this */
     font-weight: bold;
-    line-height: 20px;
+    line-height: 1.5em;
     text-align: center;
-    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.15);
+    box-shadow: 0 0.08em 0 rgba(0, 0, 0, 0.15);
+    transition: opacity 0.18s ease, transform 0.18s ease;
     /* Discourage a screen reader from stumbling into these; the
        parent has aria-hidden already. */
     user-select: none;
+}
+
+/* SLIM: the region is too narrow for the pill but wide enough for
+   the digit itself. Drop the capsule and keep legibility with a
+   paper-coloured halo instead — a ribbon (a cactus rib, a rainbow
+   band) is tall and narrow, exactly like a digit, and requiring the
+   capsule to fit is what used to hide those numbers entirely. */
+.cbn-label.is-slim {
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    background: none;
+    border: none;
+    box-shadow: none;
+    line-height: 1;
+    color: #1c2226;
+    text-shadow:
+        -0.09em -0.09em 0 rgba(255, 245, 220, 0.95),
+         0.09em -0.09em 0 rgba(255, 245, 220, 0.95),
+        -0.09em  0.09em 0 rgba(255, 245, 220, 0.95),
+         0.09em  0.09em 0 rgba(255, 245, 220, 0.95),
+         0 0 0.18em rgba(255, 245, 220, 0.95);
+}
+.cbn-label.is-slim.is-armed {
+    background: none;
+    color: #ff2e88;
+    border: none;
+    box-shadow: none;
+}
+
+/* The region is too small to carry a readable digit at the current
+   zoom, even without the capsule. Hidden rather than shrunk into an
+   illegible smudge — zooming in grows the region on screen and
+   brings it back. */
+.cbn-label.is-tiny {
+    opacity: 0;
+}
+
+/* Correctly coloured. The number has done its job and would only
+   sit on top of the colour it asked for. */
+.cbn-label.is-done {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+}
+
+/* This region wants the number currently armed in the palette —
+   so "where do the 3s go?" is answerable by looking. */
+.cbn-label.is-armed {
+    background: #1c2226;
+    color: #fff5dc;
+    border-color: #fff5dc;
+    box-shadow: 0 0 0 0.1em #1c2226;
+}
+
+/* Color-by-number progress counter. Sits under the zoom controls
+   on the left rail. Load-bearing rather than decorative: numbers
+   hide themselves when their region is too small at the current
+   zoom, so this is what tells a kid the page isn't finished. */
+.cbn-progress {
+    position: fixed;
+    left: calc(10px + env(safe-area-inset-left, 0px));
+    top: calc(50% + 92px);
+    z-index: 40;
+    padding: 6px 12px;
+    border-radius: 16px;
+    background: rgba(28, 34, 38, 0.82);
+    color: #fff5dc;
+    border: 2px solid #fff5dc;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 0.05em;
+    pointer-events: none;
+    white-space: nowrap;
+}
+.cbn-progress.is-done {
+    background: rgba(255, 46, 136, 0.92);
+    border-color: #ffd246;
+}
+
+/* CBN page-complete toast. Shares the erase-tip geometry (see
+   .erase-tip-toast) and only differs in its colours. */
+.cbn-done-toast {
+    position: fixed;
+    bottom: 36px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    z-index: 270;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    color: #fff;
+    font-family: var(--font-ui);
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 22px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    background: linear-gradient(90deg,
+        rgba(255, 210, 70, 0.95),
+        rgba(255, 46, 136, 0.95));
+    box-shadow:
+        0 0 0 2px #000,
+        0 0 24px rgba(255, 210, 70, 0.55);
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.45);
+}
+.cbn-done-toast.is-show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 /* CBN swatch — normal swatch styling plus a large centred number.

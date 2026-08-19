@@ -64,95 +64,276 @@ window.TINY_CANVAS_PAGE_PACKS = [
         ]
     },
     /* COLOR BY NUMBER pack (grew from a one-page demo to a real pack
-       2026-08-17). Ordered by ascending region count = ascending
-       difficulty — cbn-sun's 4-region tutorial → cbn-donkey's 22.
+       2026-08-17; all eight authored 2026-08-18). Ordered by ascending
+       region count = ascending difficulty: cactus 6 -> rainbow 9 ->
+       tulip 10 -> pumpkin 12 -> snowman 14 -> cat 15 -> donkey 22 ->
+       sunny day 36. Keep that order when adding a page; the first card
+       is the one a kid meets first, and 36 numbers is not a welcome.
 
-       All eight pages fit the CBN engine's shape rules (thick
-       outlines, no interior detail, chunky sealed regions); each
-       new one was audited against CBN_MIN_REGION_PX=400 and
-       CBN_MAX_REGIONS=40 in scripts before wiring. See
+       All eight fit the engine's shape rules (thick outlines, no
+       interior detail, chunky sealed regions). See
        CBN_PROMPT_GUIDE.md for the Gemini prompt kit that produced
-       this second cohort — the "cozy" art before it was too dense
-       to work as CBN and lives in its own freehand pack.
+       this cohort — the "cozy" art before it was too dense to work
+       as CBN and lives in its own freehand pack.
 
        Pack stays pro:false so the CBN mechanic isn't paywalled —
        CBN is the app's most distinctive learning moment; hiding it
        behind Pro would undercut the "every kid can play the whole
        game" rule (see CLAUDE.md).
 
-       ⚠ The seven new pages ship WITHOUT a `cbn` field for now —
-       Onion is colouring each one and feeding the paired reference
-       PNGs through scripts/process-cbn-page.py to auto-generate
-       the palette + regions JSON. Until that lands they behave as
-       freehand pages IN the CBN pack (they show up, tapping paints
-       normally). Replace each entry's line with a full { cbn: {
-       palette, regions } } block as references arrive. */
+       ── What a `cbn` block is ────────────────────────────────────
+
+       `palette` is 1-indexed: the number a kid sees IS the index.
+       `regions` are SEEDS, not geometry — `{x, y, ci}` where the
+       point is that region's anchor (guaranteed inside it) and `ci`
+       is the palette index it should be. The runtime detects the
+       regions itself via cbn-core.js and maps each seed onto
+       whichever region contains it. Nothing about the region's
+       shape, size or position is stored here, so re-running the
+       detector can never leave this data stale.
+
+       Authored with tools/cbn-editor.html — open it, click a
+       region, click a number, copy the block. It loads the same
+       cbn-core.js the game does, so what you click is what the game
+       detects. `scripts/process-cbn-page.py` audits a page and can
+       write a region map to look at.
+
+       An `assign(ax, ay)` function is still supported in place of
+       `regions` (it gets each region's anchor and returns a palette
+       index), but nothing uses it — cbn-sun's hand-tuned version
+       was retired when the pack was authored properly. */
     {
         id: "cbn", label: "COLOR BY NUMBER", pro: false,
         pages: [
-            /* cbn-sun uses runtime `assign()` so EVERY auto-detected
-               region gets its own number — that's actual CBN
-               behaviour (Happy Color, Colorfy etc.: one number per
-               fillable region, kid fills each). The first cut here
-               tried "one anchor per visible feature" (2026-08-17)
-               and Onion rightly rejected it — that's a hint mode,
-               not CBN.
+            {
+                id:    "cbn-cactus",
+                name:  "CACTUS",
+                /* ?v=2 because the ARTWORK changed on 2026-08-18, not just the
+                   code. Its rib lines were demoted from boundaries to
+                   decoration (see the CACTUS note below), which changes
+                   what the region detector sees — and the `regions`
+                   seeds below are authored against the NEW art. A
+                   browser holding the old cactus.png in cache would pair
+                   old art with new seeds and number it wrongly, and
+                   image files carry no cache-bust of their own. Bump
+                   this whenever a page's PNG is re-cut. The thumb picks
+                   the query up too (thumbSrc keeps it), which is right —
+                   the thumb was regenerated from the same alpha. */
+                image: "assets/coloring-pages/cbn/cactus.png?v=2",
+                cbn: {
+                    palette: ["#a8dcf6", "#5cae43", "#8ed968", "#d97a4a", "#8a5a3c"],
+                    regions: [
+                        { x: 0.7974, y: 0.5358, ci: 1 },
+                        { x: 0.4917, y: 0.3680, ci: 2 },
+                        { x: 0.6079, y: 0.2404, ci: 3 },
+                        { x: 0.4399, y: 0.5621, ci: 3 },
+                        { x: 0.6460, y: 0.8663, ci: 4 },
+                        { x: 0.4185, y: 0.8645, ci: 5 }
+                    ]
+                }
+            },
+            {
+                id:    "cbn-rainbow",
+                name:  "RAINBOW",
+                image: "assets/coloring-pages/cbn/rainbow.png",
+                cbn: {
+                    palette: ["#a8dcf6", "#ff5a5a", "#ff9d42", "#ffd23f", "#7ed957", "#4aa8ff", "#b47cff", "#ffffff"],
+                    regions: [
+                        { x: 0.4995, y: 0.7107, ci: 1 },
+                        { x: 0.3940, y: 0.0848, ci: 2 },
+                        { x: 0.4146, y: 0.1477, ci: 3 },
+                        { x: 0.4165, y: 0.2194, ci: 4 },
+                        { x: 0.4370, y: 0.2823, ci: 5 },
+                        { x: 0.5532, y: 0.3505, ci: 6 },
+                        { x: 0.4419, y: 0.4257, ci: 7 },
+                        { x: 0.2456, y: 0.8575, ci: 8 },
+                        { x: 0.7534, y: 0.8575, ci: 8 }
+                    ]
+                }
+            },
+            {
+                id:    "cbn-tulip",
+                name:  "TULIP",
+                image: "assets/coloring-pages/cbn/tulip.png",
+                cbn: {
+                    palette: ["#a8dcf6", "#ff5a8a", "#ffa3c4", "#7ed957", "#4f9e3f"],
+                    regions: [
+                        { x: 0.1958, y: 0.3505, ci: 1 },
+                        { x: 0.4946, y: 0.1355, ci: 3 },
+                        { x: 0.4517, y: 0.1198, ci: 3 },
+                        { x: 0.5356, y: 0.2194, ci: 3 },
+                        { x: 0.4673, y: 0.3103, ci: 2 },
+                        { x: 0.5728, y: 0.6827, ci: 4 },
+                        { x: 0.5571, y: 0.6023, ci: 5 },
+                        { x: 0.5024, y: 0.8698, ci: 4 },
+                        { x: 0.4321, y: 0.5830, ci: 5 },
+                        { x: 0.4292, y: 0.6792, ci: 4 }
+                    ]
+                }
+            },
+            {
+                id:    "cbn-pumpkin",
+                name:  "PUMPKIN",
+                image: "assets/coloring-pages/cbn/pumpkin.png",
+                cbn: {
+                    palette: ["#a8dcf6", "#ff9d42", "#e0741f", "#8ac36b", "#4f9e3f"],
+                    regions: [
+                        { x: 0.1626, y: 0.2911, ci: 1 },
+                        { x: 0.5474, y: 0.1040, ci: 4 },
+                        { x: 0.4663, y: 0.3051, ci: 4 },
+                        { x: 0.4976, y: 0.2823, ci: 4 },
+                        { x: 0.4116, y: 0.2037, ci: 5 },
+                        { x: 0.5278, y: 0.3016, ci: 4 },
+                        { x: 0.5835, y: 0.2299, ci: 5 },
+                        { x: 0.5581, y: 0.2911, ci: 5 },
+                        { x: 0.4360, y: 0.2928, ci: 5 },
+                        { x: 0.6812, y: 0.4851, ci: 3 },
+                        { x: 0.3218, y: 0.4816, ci: 3 },
+                        { x: 0.5034, y: 0.8173, ci: 2 }
+                    ]
+                }
+            },
+            {
+                id:    "cbn-snowman",
+                name:  "SNOWMAN",
+                image: "assets/coloring-pages/cbn/snowman.png",
+                cbn: {
+                    palette: ["#a8dcf6", "#ffffff", "#3a3f4a", "#ff5a5a", "#ff8b3d", "#a67849"],
+                    regions: [
+                        { x: 0.1782, y: 0.6809, ci: 1 },
+                        { x: 0.4849, y: 0.0865, ci: 3 },
+                        { x: 0.4604, y: 0.1705, ci: 4 },
+                        { x: 0.4224, y: 0.2054, ci: 3 },
+                        { x: 0.4507, y: 0.3365, ci: 2 },
+                        { x: 0.5044, y: 0.3313, ci: 5 },
+                        { x: 0.3618, y: 0.4677, ci: 6 },
+                        { x: 0.5347, y: 0.4642, ci: 4 },
+                        { x: 0.6382, y: 0.4677, ci: 6 },
+                        { x: 0.4780, y: 0.6075, ci: 2 },
+                        { x: 0.5581, y: 0.5935, ci: 4 },
+                        { x: 0.5142, y: 0.8191, ci: 2 },
+                        { x: 0.4370, y: 0.9362, ci: 6 },
+                        { x: 0.5630, y: 0.9362, ci: 6 }
+                    ]
+                }
+            },
+            {
+                id:    "cbn-cat",
+                name:  "CAT",
+                image: "assets/coloring-pages/cbn/cat.png",
+                cbn: {
+                    palette: ["#a8dcf6", "#8ac36b", "#f0a060", "#fff0d8", "#ff8fb0", "#3a3f4a"],
+                    regions: [
+                        { x: 0.1753, y: 0.4886, ci: 1 },
+                        { x: 0.3579, y: 0.1215, ci: 5 },
+                        { x: 0.5630, y: 0.1215, ci: 5 },
+                        { x: 0.4595, y: 0.1932, ci: 3 },
+                        { x: 0.3862, y: 0.4047, ci: 4 },
+                        { x: 0.4038, y: 0.3365, ci: 6 },
+                        { x: 0.5161, y: 0.3365, ci: 6 },
+                        { x: 0.7075, y: 0.3977, ci: 3 },
+                        { x: 0.4614, y: 0.3907, ci: 5 },
+                        { x: 0.4546, y: 0.4607, ci: 4 },
+                        { x: 0.6069, y: 0.7509, ci: 3 },
+                        { x: 0.4058, y: 0.6337, ci: 3 },
+                        { x: 0.4438, y: 0.7264, ci: 3 },
+                        { x: 0.4185, y: 0.8523, ci: 3 },
+                        { x: 0.2944, y: 0.8907, ci: 2 }
+                    ]
+                }
+            },
+            {
+                id:    "cbn-donkey",
+                name:  "DONKEY",
+                image: "assets/coloring-pages/cbn/donkey.png",
+                cbn: {
+                    palette: ["#a8dcf6", "#ffd23f", "#9fb6cf", "#ffe9a8", "#ff8fb0", "#a67849", "#8ac36b", "#ff9d42"],
+                    regions: [
+                        { x: 0.1997, y: 0.3575, ci: 1 },
+                        { x: 0.3853, y: 0.1058, ci: 4 },
+                        { x: 0.5093, y: 0.3295, ci: 4 },
+                        { x: 0.4038, y: 0.1879, ci: 5 },
+                        { x: 0.5562, y: 0.2019, ci: 5 },
+                        { x: 0.8638, y: 0.2334, ci: 2 },
+                        { x: 0.4702, y: 0.2351, ci: 5 },
+                        { x: 0.5562, y: 0.3523, ci: 5 },
+                        { x: 0.4312, y: 0.4712, ci: 6 },
+                        { x: 0.5483, y: 0.6267, ci: 3 },
+                        { x: 0.9663, y: 0.6233, ci: 8 },
+                        { x: 0.9829, y: 0.6635, ci: 8 },
+                        { x: 0.7153, y: 0.7579, ci: 7 },
+                        { x: 0.6548, y: 0.7177, ci: 6 },
+                        { x: 0.5679, y: 0.9816, ci: 7 },
+                        { x: 0.5640, y: 0.7841, ci: 3 },
+                        { x: 0.2104, y: 0.9659, ci: 7 },
+                        { x: 0.9448, y: 0.7893, ci: 2 },
+                        { x: 0.9390, y: 0.9030, ci: 5 },
+                        { x: 0.6089, y: 0.8645, ci: 6 },
+                        { x: 0.4722, y: 0.8890, ci: 6 },
+                        { x: 0.5220, y: 0.8925, ci: 6 }
+                    ]
+                }
+            },
+            /* cbn-sun was the original demo and until 2026-08-18 was
+               the ONLY page with CBN data — a hand-tuned assign(cx, cy)
+               that classified regions by where they sat (a circle test
+               for the sun body, an angle bucket for the rays, boxes for
+               the clouds and the butterfly). It kept the mechanic
+               working end-to-end while the engine was proven, and it is
+               retired now that the pack is authored properly: the
+               numbers below are per-region, so the eyes, cheeks and
+               butterfly get their own colours instead of falling into
+               whichever zone rule happened to catch them.
 
-               The assign function classifies each region by
-               (cx, cy) and returns the palette index. This is a
-               HAND-TUNED fallback for the shipped sun.png layout;
-               the correct long-term fix is a paired colour-
-               reference PNG fed through scripts/process-cbn-page.py,
-               which sample-picks the palette per region from Onion's
-               chosen colouring. Until that reference arrives, this
-               heuristic keeps CBN mechanics working end-to-end.
-
-               Palette matched to Onion's reference colours: sky /
-               cloud-white / sun-yellow / ray-and-butterfly-orange. */
+               Rays alternate yellow/orange around the disc, matching
+               the artwork — assigned by angle at authoring time rather
+               than by a rule at runtime. See tools/cbn-editor.html. */
             {
                 id:    "cbn-sun",
                 name:  "SUNNY DAY",
                 image: "assets/coloring-pages/free/sun.png",
                 cbn: {
-                    palette: ["#a8dcf6", "#ffffff", "#f7ce4b", "#f39a3a"],
-                    assign: function (cx, cy) {
-                        /* Butterfly — far right, roughly mid-height. */
-                        if (cx > 0.85 && cy > 0.35 && cy < 0.60) return 4;
-                        /* Clouds — top band, tucked toward the sides. */
-                        if (cy < 0.28 && (cx < 0.32 || cx > 0.68)) return 2;
-                        const dx = cx - 0.50, dy = cy - 0.50;
-                        const d  = Math.hypot(dx, dy);
-                        /* Cheeks — small ovals inside the sun body,
-                           left + right of centre, below the eyes.
-                           Checked BEFORE the sun-body rule so they
-                           win. */
-                        const cheekY = cy > 0.48 && cy < 0.58;
-                        const cheekL = Math.abs(cx - 0.38) < 0.055;
-                        const cheekR = Math.abs(cx - 0.62) < 0.055;
-                        if (cheekY && (cheekL || cheekR)) return 4;
-                        /* Sun body + face features (yellow). */
-                        if (d < 0.16) return 3;
-                        /* Rays — alternate orange/yellow by angle so
-                           the CBN pattern reproduces the artwork's
-                           alternation instead of one flat colour.
-                           24 rays evenly around the sun → 24 buckets. */
-                        if (d < 0.36) {
-                            const a = Math.atan2(dy, dx);
-                            const bucket = Math.floor((a + Math.PI) * 24 / (2 * Math.PI));
-                            return (bucket % 2 === 0) ? 4 : 3;
-                        }
-                        /* Everything else = sky. */
-                        return 1;
-                    }
+                    palette: ["#a8dcf6", "#ffffff", "#f7ce4b", "#f39a3a", "#ff8fb0", "#3a3f4a", "#b47cff"],
+                    regions: [
+                        { x: 0.1392, y: 0.7379, ci: 1 },
+                        { x: 0.5005, y: 0.0814, ci: 3 },
+                        { x: 0.8540, y: 0.1887, ci: 2 },
+                        { x: 0.1479, y: 0.1852, ci: 2 },
+                        { x: 0.3833, y: 0.1386, ci: 3 },
+                        { x: 0.6177, y: 0.1386, ci: 3 },
+                        { x: 0.4468, y: 0.1440, ci: 4 },
+                        { x: 0.5542, y: 0.1422, ci: 4 },
+                        { x: 0.3521, y: 0.2388, ci: 4 },
+                        { x: 0.6489, y: 0.2388, ci: 4 },
+                        { x: 0.4995, y: 0.3444, ci: 3 },
+                        { x: 0.2964, y: 0.2943, ci: 3 },
+                        { x: 0.7046, y: 0.2943, ci: 3 },
+                        { x: 0.8706, y: 0.4123, ci: 7 },
+                        { x: 0.2983, y: 0.4052, ci: 4 },
+                        { x: 0.7026, y: 0.4052, ci: 4 },
+                        { x: 0.8374, y: 0.4159, ci: 7 },
+                        { x: 0.4409, y: 0.4267, ci: 6 },
+                        { x: 0.5591, y: 0.4267, ci: 6 },
+                        { x: 0.8179, y: 0.4660, ci: 7 },
+                        { x: 0.8530, y: 0.4660, ci: 7 },
+                        { x: 0.2661, y: 0.5000, ci: 3 },
+                        { x: 0.7339, y: 0.5000, ci: 3 },
+                        { x: 0.4106, y: 0.5286, ci: 5 },
+                        { x: 0.5806, y: 0.5286, ci: 5 },
+                        { x: 0.2983, y: 0.5948, ci: 4 },
+                        { x: 0.7017, y: 0.5948, ci: 4 },
+                        { x: 0.2983, y: 0.7057, ci: 3 },
+                        { x: 0.7056, y: 0.7093, ci: 3 },
+                        { x: 0.3530, y: 0.7630, ci: 4 },
+                        { x: 0.6450, y: 0.7594, ci: 4 },
+                        { x: 0.3833, y: 0.8703, ci: 3 },
+                        { x: 0.6167, y: 0.8685, ci: 3 },
+                        { x: 0.4458, y: 0.8703, ci: 4 },
+                        { x: 0.5552, y: 0.8685, ci: 4 },
+                        { x: 0.5005, y: 0.9293, ci: 3 }
+                    ]
                 }
-            },
-            { id: "cbn-rainbow",  name: "RAINBOW",  image: "assets/coloring-pages/cbn/rainbow.png"  /* 9 regions;  TODO cbn */ },
-            { id: "cbn-tulip",    name: "TULIP",    image: "assets/coloring-pages/cbn/tulip.png"    /* 11 regions; TODO cbn */ },
-            { id: "cbn-pumpkin",  name: "PUMPKIN",  image: "assets/coloring-pages/cbn/pumpkin.png"  /* 14 regions; TODO cbn */ },
-            { id: "cbn-snowman",  name: "SNOWMAN",  image: "assets/coloring-pages/cbn/snowman.png"  /* 14 regions; TODO cbn */ },
-            { id: "cbn-cat",      name: "CAT",      image: "assets/coloring-pages/cbn/cat.png"      /* 15 regions; TODO cbn */ },
-            { id: "cbn-cactus",   name: "CACTUS",   image: "assets/coloring-pages/cbn/cactus.png"   /* 17 regions; TODO cbn */ },
-            { id: "cbn-donkey",   name: "DONKEY",   image: "assets/coloring-pages/cbn/donkey.png"   /* 22 regions; TODO cbn */ }
+            }
         ]
     },
     {

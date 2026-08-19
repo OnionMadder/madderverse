@@ -1791,6 +1791,14 @@
        reaching to pinch, not two intentional marks. */
 
     const ZOOM_MIN = 1, ZOOM_MAX = 4, ZOOM_STEP = 1.5;
+    /* Color-by-number pages zoom deeper than freehand ones. A number
+       has to fit inside its own region to be readable, and the
+       smallest regions on the shipped CBN art need ~6.5x on a phone
+       before they can hold a digit — at the freehand ceiling of 4x
+       those numbers would be permanently invisible. Freehand pages
+       keep 4x: nothing there needs more. */
+    const ZOOM_MAX_CBN = 8;
+    function zoomMax() { return state.cbn ? ZOOM_MAX_CBN : ZOOM_MAX; }
     const view = { s: 1, tx: 0, ty: 0 };
     let pinch = null;               /* active two-finger gesture */
     const activePointers = new Map();
@@ -1798,7 +1806,7 @@
                                        pinch-undo grace window */
 
     function applyView() {
-        view.s = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, view.s));
+        view.s = Math.min(zoomMax(), Math.max(ZOOM_MIN, view.s));
         /* Clamp pan so the content always covers the viewport — no
            bare void beyond the paper's edge. */
         const minTx = STAGE_W * (1 - view.s);
@@ -1811,13 +1819,19 @@
                 view.ty + "px) scale(" + view.s + ")";
         }
         syncZoomButtons();
+        /* CBN numbers are sized in on-screen px, so every view change
+           has to re-derive them: a number that could not fit its
+           region at 1x may fit at 3x, and one that fit at 1x must not
+           balloon at 8x. Cheap (tens of nodes, one layout read) and
+           this is the only place that knows the view moved. */
+        if (state.cbn) cbnSyncLabels();
     }
 
     /* Zoom by `factor` keeping the content under client point (cx,cy)
        stationary. */
     function zoomAt(factor, cx, cy) {
         const s0 = view.s;
-        const s1 = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, s0 * factor));
+        const s1 = Math.min(zoomMax(), Math.max(ZOOM_MIN, s0 * factor));
         if (s1 === s0) { syncZoomButtons(); return; }
         const px = (cx - view.tx) / s0;
         const py = (cy - view.ty) / s0;
@@ -1835,7 +1849,7 @@
     function syncZoomButtons() {
         const zin  = $("#zoomInBtn");
         const zout = $("#zoomOutBtn");
-        if (zin)  zin.disabled  = view.s >= ZOOM_MAX - 0.001;
+        if (zin)  zin.disabled  = view.s >= zoomMax() - 0.001;
         if (zout) zout.disabled = view.s <= ZOOM_MIN + 0.001;
     }
 
@@ -1889,7 +1903,7 @@
         const d   = Math.max(1, Math.sqrt(dx * dx + dy * dy));
         const mid = { x: (pts[0].x + pts[1].x) / 2,
                       y: (pts[0].y + pts[1].y) / 2 };
-        const s1 = Math.min(ZOOM_MAX,
+        const s1 = Math.min(zoomMax(),
                    Math.max(ZOOM_MIN, pinch.s0 * (d / pinch.d0)));
         /* Content point that was under the original midpoint follows
            the live midpoint — zoom + pan in one gesture. */
@@ -2437,9 +2451,9 @@
                track completion; mismatch = the fill still lands (no
                punishment) but Onion stays neutral. */
             if (state.cbn) {
-                const outcome = cbnResolveTap(sx, sy);
-                if (outcome === "match") {
-                    cbnMarkRegionComplete(sx, sy);
+                const rid = cbnRegionAtDevice(sx, sy);
+                if (rid >= 0 && state.cbn.byRegion[rid] === state.cbn.activeIdx) {
+                    cbnMarkDone(rid);
                     triggerOnionReaction("eureka");
                 } else {
                     triggerOnionReaction("drawing", 500);
@@ -2561,6 +2575,10 @@
                 lastOneShotCommit = Date.now();
                 state.dirty = true;
                 markInProgressDirty();
+                /* Un-filling a region that was counted as correct puts
+                   it back in play — otherwise it stays "done" while
+                   visibly blank, and the counter lies. */
+                if (state.cbn) cbnUnmarkDone(cbnRegionAtDevice(sx, sy));
                 sfxErase();
             } else {
                 /* No pixels actually changed — the region was already
@@ -4330,246 +4348,389 @@
        A template opts in with a `cbn` field:
 
          cbn: {
-           palette: ["#hex", "#hex", ...],   // 1-indexed numbered
-           assign?: function(cx, cy, W, H)   // optional: colour idx per region
+           palette: ["#hex", ...],          // 1-indexed numbers
+           regions: [{ x, y, ci }, ...]     // authored seeds, or
+           assign?: function(ax, ay, w, h)  // legacy rule form
          }
 
-       If `assign` is present, runtime calls it per detected region
-       (cx/cy = 0..1 normalized) and uses whatever palette index it
-       returns. If absent, regions get a deterministic centroid-hash
-       assignment — good enough to demo the mechanic, not
-       artistically curated. Onion authors the assign rules per page
-       (or the future Python pipeline emits an inline `regions`
-       array from a reference PNG; see scripts/process-cbn-page.py).
+       -- The region model lives in cbn-core.js --
 
-       Region detection walks the fill mask (same Uint8Array the
-       fill tool uses) for connected components of non-boundary
-       pixels. Regions smaller than CBN_MIN_REGION_PX are skipped —
-       stray specks between antialiased lines shouldn't get their
-       own number.
+       Everything geometric — where a region is, where its number
+       goes, how big that number can be — comes from
+       window.TinyCanvasCBN, which builds the model ONCE from the
+       source PNG at a fixed working width. See the header of
+       cbn-core.js for why this cannot be built on the fill mask
+       (short version: the fill mask is rasterized at viewport
+       resolution against the art's CURRENT on-screen rect, so
+       zooming redefines what a region even is).
 
-       Fill routing is patched in floodFillAt: when CBN is active, a
-       tap in a region checks the armed palette index against the
-       region's assigned index. Match = happy Onion + track
-       completion. Mismatch = fill anyway (no punishment — Onion's
-       kids-first rule), Onion stays neutral. */
+       Three consequences worth knowing here:
 
-    const CBN_MIN_REGION_PX = 400;   /* device-px area threshold */
-    const CBN_MAX_REGIONS   = 40;    /* skip pages with runaway region counts */
+       1. Region ids are stable across devices, zoom levels and
+          sessions, so completion can be persisted by id.
+       2. A tap resolves to its region by an O(1) label-map read
+          instead of the old nearest-centroid guess.
+       3. Numbers sit at each region's POLE OF INACCESSIBILITY
+          (centre of the largest inscribed circle), not its
+          centroid. A centroid is the centre of mass, and a
+          background that wraps around a subject has its centre of
+          mass sitting on the subject — that put 39 of 135 numbers
+          outside their own shape across the shipped pages.
+
+       -- Authored data is only about COLOUR --
+
+       `regions` entries are seeds: a point (which the editor emits
+       as the region's anchor, so it is guaranteed inside) plus the
+       palette index that region should be. The runtime maps each
+       seed onto its own detected region. Geometry is never
+       authored, so a page cannot go stale against a re-detect.
+
+       -- Numbers size themselves, and hide when they cannot --
+
+       Region sizes are wildly non-uniform: on cactus the median
+       region's inscribed radius is 0.63% of page width, which on a
+       phone is under 6px. A fixed-size badge on that is unreadable
+       AND covers its neighbours. So a number is drawn at the size
+       its own region can hold, and when the region is too small to
+       hold a legible one at the current zoom it is not drawn at
+       all — zooming in brings it back. Measured on the 8 shipped
+       pages, every region becomes numberable by 6.5x, which is why
+       CBN pages raise the zoom ceiling (see zoomMax()).
+
+       Fill routing: a tap in a region compares the armed palette
+       index against the region's target. Match = Onion eureka +
+       completion. Mismatch = the fill still lands, Onion stays
+       neutral. No punishment — the kids-first rule. */
+
+    const CBN = window.TinyCanvasCBN;
 
     function cbnReset() {
         const wasActive = !!state.cbn;
         state.cbn = null;
-        cbnClearLabelOverlay();
-        /* If we were in CBN mode, rebuild the normal palette + chrome
-           so the page after doesn't inherit numbered swatches. */
+        if (cbnArtObserver) { cbnArtObserver.disconnect(); cbnArtObserver = null; }
+        cbnClearLabels();
+        cbnSyncProgress();
+        /* Rebuild the normal palette + chrome so the page after a
+           CBN page doesn't inherit numbered swatches. */
         if (wasActive) {
             buildPalette();
+            applyView();   /* drop the CBN zoom ceiling back to 4 */
         }
     }
 
-    /* Build the CBN state for a template on load. Two modes:
-         1. Explicit `regions` array (emitted by
-            scripts/process-cbn-page.py) — normalized {cx,cy,ci} in
-            [0,1]. Trusted verbatim; scaled to mask coords for
-            cbnResolveTap. Preferred for real Onion-authored pages.
-         2. Runtime auto-detect — scan the fill mask, apply an
-            `assign` function (or the centroid hash fallback). Used
-            for demo pages and quick iteration.
-       Async because the fill mask is async; the label overlay
-       renders once the mask is ready. */
+    /* Build CBN state for a template on load.
+
+       Async because the artwork has to be decoded before it can be
+       rasterized into the model. The old engine fired this at a
+       possibly-unloaded <img>; awaiting decode() is what makes it
+       deterministic. */
     async function cbnMaybeActivate(tpl) {
         cbnReset();
-        if (!tpl || !tpl.cbn || !tpl.cbn.palette) return;
+        if (!CBN || !tpl || !tpl.cbn || !tpl.cbn.palette) return;
 
-        const mask = await buildFillMask();
-        if (!mask) return;
-        /* Guard against a template swap that happened mid-await —
-           don't stamp CBN state onto whatever page loaded second. */
+        const art = overlayArtEl();
+        /* CBN is raster-only. Every CBN page is a PNG; an <svg>
+           page has no bitmap to threshold. */
+        if (!art || art.tagName !== "IMG") return;
+
+        /* Wait for the bitmap, via the LOAD event — deliberately not
+           img.decode().
+
+           decode() looks like the tidier API and it is a trap here: it
+           resolves when the image is ready to PAINT, so a page that
+           isn't compositing (backgrounded app, hidden tab, a headless
+           pane) can leave it pending indefinitely. When that happened
+           the await never returned, CBN never activated, and the page
+           silently behaved as a plain freehand page — no error, no
+           label, nothing to see. `complete && naturalWidth` is the
+           condition that actually matters, because all we do with the
+           image is drawImage it into an offscreen canvas, which needs
+           no decode. */
+        if (!art.complete || !art.naturalWidth) {
+            await new Promise(function (res) {
+                art.addEventListener("load",  res, { once: true });
+                art.addEventListener("error", res, { once: true });
+            });
+        }
+        if (!art.complete || !art.naturalWidth) return;
+
+        /* The template may have been swapped while we awaited. */
         if (state.templateId !== tpl.id) return;
 
-        const W = fillMaskW, H = fillMaskH;
-        const palette = tpl.cbn.palette.slice();
-        let regions;
+        const model = CBN.buildModel(art);
+        if (!model || !model.regions.length) return;
 
+        const palette = tpl.cbn.palette.slice();
+        let assigned;
         if (Array.isArray(tpl.cbn.regions) && tpl.cbn.regions.length) {
-            /* Pre-authored regions — normalized coords. */
-            regions = tpl.cbn.regions.map(function (r) {
-                const ci = (typeof r.ci === "number" &&
-                            r.ci >= 1 && r.ci <= palette.length) ? r.ci : 1;
-                return {
-                    cx:   r.cx * W,
-                    cy:   r.cy * H,
-                    area: (typeof r.area === "number")
-                          ? r.area
-                          : Math.round((W * H) / tpl.cbn.regions.length),
-                    ci:   ci
-                };
-            });
+            assigned = CBN.assignFromSeeds(model, tpl.cbn.regions.map(
+                function (r) {
+                    /* cx/cy is the pre-2026-08-18 field naming. */
+                    const x = (typeof r.x === "number") ? r.x : r.cx;
+                    const y = (typeof r.y === "number") ? r.y : r.cy;
+                    const ci = (typeof r.ci === "number" && r.ci >= 1 &&
+                                r.ci <= palette.length) ? r.ci : 1;
+                    return { x: x, y: y, ci: ci };
+                }));
+        } else if (typeof tpl.cbn.assign === "function") {
+            assigned = CBN.assignFromFn(model, tpl.cbn.assign, palette.length);
         } else {
-            /* Runtime auto-detect + assign. */
-            regions = cbnDetectRegions(mask, W, H);
-            if (!regions.length) return;
-            const assign = (typeof tpl.cbn.assign === "function")
-                           ? tpl.cbn.assign
-                           : cbnDefaultAssign(palette.length);
-            for (let i = 0; i < regions.length; i++) {
-                const r = regions[i];
-                let ci = assign(r.cx / W, r.cy / H, W, H);
-                if (typeof ci !== "number" || ci < 1 ||
-                    ci > palette.length) ci = 1;
-                r.ci = ci;
-            }
+            return;
         }
+
+        let total = 0;
+        for (let i = 0; i < assigned.byRegion.length; i++) {
+            if (assigned.byRegion[i] > 0) total++;
+        }
+        if (!total) return;
 
         state.cbn = {
             palette:   palette,
-            regions:   regions,
+            model:     model,
+            byRegion:  assigned.byRegion,
+            total:     total,
             activeIdx: 1,
-            completed: new Set()
+            done:      new Set(),
+            labels:    []
         };
 
-        cbnRenderLabelOverlay();
-        buildPalette();   /* re-render palette with numbered swatches */
+        /* Completion rides the in-progress record, so a kid who
+           comes back to a half-finished page finds it half
+           finished. Region ids are deterministic from the artwork,
+           so a saved id still means the same shape. */
+        cbnRestoreDone(tpl.id);
+
+        cbnBuildLabels();
+        buildPalette();          /* numbered swatches */
+        applyView();             /* raise the zoom ceiling to 8 */
+        cbnSyncProgress();
+        cbnObserveArt(art);
     }
 
-    /* Auto-assignment fallback: cycles palette indices in reading order,
-       so adjacent regions rarely share a number. Deterministic per
-       (cx,cy,paletteN) so a re-load of the same page shows the same
-       numbers. */
-    function cbnDefaultAssign(paletteN) {
-        return function (cx, cy) {
-            /* Small hash on the normalized centroid — Cantor-style
-               pairing then mod paletteN. Stable across sessions. */
-            const a = Math.floor(cx * 100), b = Math.floor(cy * 100);
-            const h = ((a * 73856093) ^ (b * 19349663)) >>> 0;
-            return (h % paletteN) + 1;
-        };
+    /* Re-sync the overlay whenever the ARTWORK's layout box changes.
+
+       applyView covers zoom, but zoom is a CSS transform and does not
+       change any layout box — so it cannot cover the other half:
+       the art's box also moves when the tool drawer opens, when a
+       safe-area inset resolves, when a font finishes loading, or
+       simply when the layout settles a frame after the page is built.
+       That last one was a live bug: on a phone the labels were built
+       against a box the art had not settled into yet, and every number
+       sat outside its region until the first zoom happened to re-sync
+       them.
+
+       A ResizeObserver catches all of it and, unlike a rAF chain,
+       fires even when the page is not compositing. */
+    let cbnArtObserver = null;
+    function cbnObserveArt(art) {
+        if (cbnArtObserver) cbnArtObserver.disconnect();
+        if (typeof ResizeObserver !== "function" || !art) return;
+        cbnArtObserver = new ResizeObserver(function () {
+            if (state.cbn) cbnSyncLabels();
+        });
+        cbnArtObserver.observe(art);
     }
 
-    /* Scanline flood-fill on the mask to enumerate connected
-       non-boundary regions. Skips small components (specks between
-       antialiased strokes) and any region touching the border past
-       CBN_MAX_REGIONS (which is a runaway signal — usually a page
-       whose ink is too thin to seal). Returns [{cx,cy,area}]
-       sorted largest-first. */
-    function cbnDetectRegions(mask, W, H) {
-        const seen  = new Uint8Array(W * H);
-        const found = [];
-        for (let y = 0; y < H; y++) {
-            for (let x = 0; x < W; x++) {
-                const i = y * W + x;
-                if (seen[i] || mask[i]) continue;
-                /* BFS on this component. */
-                const stack = [i];
-                let area = 0, sx = 0, sy = 0;
-                while (stack.length) {
-                    const seed = stack.pop();
-                    const py = (seed / W) | 0;
-                    let px = seed - py * W;
-                    while (px > 0 && !seen[py * W + px - 1] &&
-                           !mask[py * W + px - 1]) px--;
-                    let up = false, dn = false;
-                    while (px < W) {
-                        const j = py * W + px;
-                        if (seen[j] || mask[j]) break;
-                        seen[j] = 1;
-                        area++; sx += px; sy += py;
-                        if (py > 0) {
-                            const u = j - W;
-                            const openU = !seen[u] && !mask[u];
-                            if (openU && !up) { stack.push(u); up = true; }
-                            else if (!openU)  up = false;
-                        }
-                        if (py < H - 1) {
-                            const d = j + W;
-                            const openD = !seen[d] && !mask[d];
-                            if (openD && !dn) { stack.push(d); dn = true; }
-                            else if (!openD)  dn = false;
-                        }
-                        px++;
-                    }
-                }
-                if (area < CBN_MIN_REGION_PX) continue;
-                found.push({ cx: sx / area, cy: sy / area, area: area });
-                if (found.length > CBN_MAX_REGIONS * 2) {
-                    /* Bail if the count is exploding — the page isn't
-                       CBN-suitable. Caller will see zero and skip. */
-                    return [];
-                }
+    /* ---------- hit testing ---------- */
+
+    /* Device mask px -> region id, or -1.
+
+       Routed through client coordinates on purpose: the canvas
+       rect and the art rect are both measured live, so the zoom
+       transform and any pan cancel out of the conversion instead
+       of having to be reasoned about. */
+    function cbnRegionAtDevice(sx, sy) {
+        if (!state.cbn) return -1;
+        const art = overlayArtEl();
+        if (!art || !fillMaskW || !fillMaskH) return -1;
+        const cR = canvas.getBoundingClientRect();
+        if (!cR.width || !cR.height) return -1;
+        const clientX = cR.left + sx * (cR.width  / fillMaskW);
+        const clientY = cR.top  + sy * (cR.height / fillMaskH);
+        const aR = art.getBoundingClientRect();
+        if (!aR.width || !aR.height) return -1;
+        return CBN.regionAt(state.cbn.model,
+                            (clientX - aR.left) / aR.width,
+                            (clientY - aR.top)  / aR.height);
+    }
+
+    /* ---------- completion ---------- */
+
+    function cbnMarkDone(id) {
+        if (!state.cbn || id < 0) return;
+        if (state.cbn.done.has(id)) return;
+        state.cbn.done.add(id);
+        cbnSyncLabels();
+        cbnSyncProgress();
+        markInProgressDirty();
+        if (state.cbn.done.size >= state.cbn.total) cbnCelebrate();
+    }
+
+    /* Fill-erasing a correctly-coloured region puts it back in
+       play — the number returns and the counter drops. Without
+       this a region stayed "done" while visibly blank. */
+    function cbnUnmarkDone(id) {
+        if (!state.cbn || id < 0) return;
+        if (!state.cbn.done.delete(id)) return;
+        cbnSyncLabels();
+        cbnSyncProgress();
+        markInProgressDirty();
+    }
+
+    function cbnRestoreDone(templateId) {
+        if (!state.cbn) return;
+        const rec = loadInProgressFor(templateId);
+        if (!rec || !rec.cbn || !Array.isArray(rec.cbn.done)) return;
+        const n = state.cbn.model.regions.length;
+        rec.cbn.done.forEach(function (id) {
+            if (typeof id === "number" && id >= 0 && id < n) {
+                state.cbn.done.add(id);
             }
-        }
-        found.sort(function (a, b) { return b.area - a.area; });
-        return found.slice(0, CBN_MAX_REGIONS);
+        });
     }
 
-    /* Number label overlay — one absolutely-positioned <span> per
-       region, layered above the line-art but under the tool rail. */
-    function cbnClearLabelOverlay() {
+    /* Serializable snapshot for the in-progress record. */
+    function cbnSnapshot() {
+        if (!state.cbn || !state.cbn.done.size) return null;
+        return { done: Array.from(state.cbn.done) };
+    }
+
+    function cbnCelebrate() {
+        triggerOnionReaction("eureka", 1400);
+        const layer = $("#zoomLayer");
+        if (layer && !prefersReducedMotion()) {
+            layer.classList.remove("is-alive");
+            void layer.offsetWidth;
+            layer.classList.add("is-alive");
+        }
+        showCbnDoneToast();
+    }
+
+    /* ---------- progress pill ---------- */
+
+    /* Numbers hide themselves when their region is too small to
+       show one at the current zoom, so a kid can be looking at a
+       page with no visible numbers left that is not finished. The
+       counter is what says "keep going" — it is load-bearing, not
+       decoration. */
+    function cbnSyncProgress() {
+        const el = $("#cbnProgress");
+        if (!el) return;
+        if (!state.cbn) { el.setAttribute("hidden", ""); return; }
+        el.removeAttribute("hidden");
+        const done = state.cbn.done.size, total = state.cbn.total;
+        el.textContent = done + " / " + total;
+        el.classList.toggle("is-done", done >= total);
+    }
+
+    /* ---------- label overlay ---------- */
+
+    function cbnClearLabels() {
         const host = $("#cbnLabels");
         if (host) host.innerHTML = "";
     }
 
-    function cbnRenderLabelOverlay() {
+    /* One <span> per numbered region, created once. Position and
+       size are then owned by cbnSyncLabels, which runs on every
+       view change. */
+    function cbnBuildLabels() {
         const host = $("#cbnLabels");
         if (!host || !state.cbn) return;
         host.innerHTML = "";
-        const art = overlayArtEl();
-        if (!art) return;
-        const W = fillMaskW, H = fillMaskH;
-        const regs = state.cbn.regions;
-        for (let i = 0; i < regs.length; i++) {
-            const r = regs[i];
-            const label = document.createElement("span");
-            label.className = "cbn-label";
-            label.textContent = String(r.ci);
-            /* Position in the OVERLAY's coordinate space (percent).
-               The overlay tracks the art element's box via CSS
-               (see #cbnLabels rule), so pixel-fraction of the mask
-               = pixel-fraction of the art. */
-            label.style.left = (100 * r.cx / W).toFixed(2) + "%";
-            label.style.top  = (100 * r.cy / H).toFixed(2) + "%";
-            host.appendChild(label);
+        state.cbn.labels = [];
+        const regions = state.cbn.model.regions;
+        for (let i = 0; i < regions.length; i++) {
+            const reg = regions[i];
+            const ci = state.cbn.byRegion[reg.id];
+            if (!ci) continue;   /* unnumbered detail — colour freely */
+            const el = document.createElement("span");
+            el.className = "cbn-label";
+            el.textContent = String(ci);
+            el.style.left = (100 * reg.ax).toFixed(3) + "%";
+            el.style.top  = (100 * reg.ay).toFixed(3) + "%";
+            host.appendChild(el);
+            state.cbn.labels.push({ el: el, reg: reg, ci: ci });
         }
+        cbnSyncLabels();
     }
 
-    /* Called by floodFillAt when a fill lands. Returns:
-         "match"     — the armed color matched the region's target
-         "mismatch"  — a valid region, wrong color (fill anyway)
-         "no-region" — tap wasn't inside any detected region
-       Only meaningful when state.cbn is set. */
-    function cbnResolveTap(sx, sy) {
-        if (!state.cbn) return "no-region";
-        /* Find the region whose centroid is closest to the tap AND
-           whose area, projected as a circle from the centroid, would
-           plausibly contain the tap. Cheap heuristic — the fill
-           routes to the region the tap actually belongs to by mask
-           topology, so we only need a coarse lookup for reactions. */
-        let best = null, bestD2 = Infinity;
-        for (let i = 0; i < state.cbn.regions.length; i++) {
-            const r = state.cbn.regions[i];
-            const dx = sx - r.cx, dy = sy - r.cy;
-            const d2 = dx * dx + dy * dy;
-            if (d2 < bestD2) { bestD2 = d2; best = r; }
-        }
-        if (!best) return "no-region";
-        /* Reject if the tap is far outside the region's plausible
-           radius (2× the equivalent-circle radius). */
-        const rMax = 2 * Math.sqrt(best.area / Math.PI);
-        if (Math.sqrt(bestD2) > rMax) return "no-region";
-        return (best.ci === state.cbn.activeIdx) ? "match" : "mismatch";
+    /* Make #cbnLabels cover the ARTWORK exactly.
+
+       This is the fix for numbers landing in the wrong place. The
+       old overlay was a fixed box the size of .line-art's CONTAINER
+       (min(94vw,1360px) x min(78vh,800px)) while the coordinates
+       written into it were fractions of the CANVAS backing store —
+       two different boxes, plus the artwork itself is letterboxed
+       inside the container by auto sizing, making three. They
+       agreed at dead centre and diverged toward the edges
+       (measured ~39px off at quarter height).
+
+       Both rects are inside #zoomLayer and therefore carry the same
+       transform, so dividing by view.s recovers untransformed
+       layout px — which is the space an absolutely-positioned child
+       of #lineArt is laid out in. */
+    function cbnSyncOverlayBox() {
+        const host = $("#cbnLabels");
+        const art  = overlayArtEl();
+        if (!host || !art || !host.parentNode) return null;
+        const aR = art.getBoundingClientRect();
+        const hR = host.parentNode.getBoundingClientRect();
+        if (!aR.width || !aR.height) return null;
+        const s = view.s || 1;
+        const w = aR.width / s, h = aR.height / s;
+        host.style.left   = ((aR.left - hR.left) / s).toFixed(2) + "px";
+        host.style.top    = ((aR.top  - hR.top)  / s).toFixed(2) + "px";
+        host.style.width  = w.toFixed(2) + "px";
+        host.style.height = h.toFixed(2) + "px";
+        return { w: w, h: h, screenW: aR.width };
     }
 
-    function cbnMarkRegionComplete(sx, sy) {
+    /* Position, size and show/hide every number for the current
+       view. Cheap enough to run on a pinch (tens of elements, and
+       the only layout read is hoisted into cbnSyncOverlayBox). */
+    function cbnSyncLabels() {
         if (!state.cbn) return;
-        let best = null, bestD2 = Infinity;
-        for (let i = 0; i < state.cbn.regions.length; i++) {
-            const r = state.cbn.regions[i];
-            const dx = sx - r.cx, dy = sy - r.cy;
-            const d2 = dx * dx + dy * dy;
-            if (d2 < bestD2) { bestD2 = d2; best = r; }
+        const box = cbnSyncOverlayBox();
+        if (!box) return;
+        const s = view.s || 1;
+        const labels = state.cbn.labels;
+        for (let i = 0; i < labels.length; i++) {
+            const L = labels[i];
+            if (state.cbn.done.has(L.reg.id)) {
+                L.el.classList.add("is-done");
+                continue;
+            }
+            L.el.classList.remove("is-done");
+            /* How big a number this region can hold at the current
+               zoom, and whether it has room for the full pill or only
+               the bare glyph. cbn-core owns the rule so the editor and
+               the audit script judge legibility identically. */
+            const fit = CBN.labelFit(L.reg, box.screenW,
+                                     L.ci >= 10 ? 2 : 1);
+            if (fit.mode === "none") {
+                /* Too small to read here. Zooming in grows the
+                   region on screen and the number comes back. */
+                L.el.classList.add("is-tiny");
+                continue;
+            }
+            L.el.classList.remove("is-tiny");
+            L.el.classList.toggle("is-slim", fit.mode === "slim");
+            /* Written in layout px: the #zoomLayer transform will
+               multiply it back up to fit.font on screen. */
+            L.el.style.fontSize = (fit.font / s).toFixed(2) + "px";
+            L.el.classList.toggle("is-armed", L.ci === state.cbn.activeIdx);
         }
-        if (best) state.cbn.completed.add(best);
+    }
+
+    /* Called when the armed number changes, so the kid can see at a
+       glance where this colour is wanted. */
+    function cbnRefreshArmed() {
+        if (!state.cbn) return;
+        const labels = state.cbn.labels;
+        for (let i = 0; i < labels.length; i++) {
+            labels[i].el.classList.toggle("is-armed",
+                labels[i].ci === state.cbn.activeIdx);
+        }
     }
 
     /* ---------- 4b. WET STROKE LAYER ----------
@@ -5208,6 +5369,10 @@
                         rebuildSizeButtons();
                     }
                     refreshPaletteActive();
+                    /* Light up every region that wants this number, so
+                       "where do the 3s go" is answerable by looking
+                       rather than by hunting. */
+                    cbnRefreshArmed();
                     nudgeOnionAwake();
                 });
                 palette.appendChild(sw);
@@ -5266,6 +5431,19 @@
     }
 
     function refreshPaletteActive() {
+        /* CBN swatches are identified by their NUMBER, not their hex.
+           Matching on hex (as the normal path does) lights up every
+           swatch sharing a colour, so a palette that repeats a shade —
+           entirely legitimate, e.g. two different numbers both green-
+           ish — would highlight two numbers at once and leave the
+           highlight disagreeing with activeIdx. */
+        if (state.cbn) {
+            $$("#colorPalette .swatch").forEach(function (sw) {
+                const idx = parseInt(sw.getAttribute("data-cbn-idx"), 10);
+                sw.classList.toggle("active", idx === state.cbn.activeIdx);
+            });
+            return;
+        }
         let matchedPreset = false;
         $$("#colorPalette .swatch").forEach(function (sw) {
             const on = sw.getAttribute("data-color") === state.currentColor;
@@ -5718,6 +5896,19 @@
         if (name === "settings") { syncSettingsUI(); renderFamilyList(); }
         if (name === "title")    buildProfilePills();
         if (name === "draw") {
+            /* Position the CBN numbers now that the screen is actually
+               on screen.
+
+               loadTemplate — and therefore cbnMaybeActivate — runs
+               while #screen-draw is still [hidden], and a hidden
+               element has NO layout box, so there is nothing to
+               measure the overlay against at that point. Without this
+               line the numbers stay unpositioned until some later
+               event (a zoom, a resize) happens to re-sync them, which
+               on a phone meant every number sat outside its region on
+               arrival. */
+            if (state.cbn) cbnSyncLabels();
+
             if (!coachSeen()) {
                 offerCoachButtons();
                 showCoach();
@@ -6136,7 +6327,13 @@
                    kid returning to a page picks them up exactly where
                    they left off. Omitted (falsy) when empty so the
                    pre-sticker restore path stays untouched. */
-                stickers:     state.stickers.length ? state.stickers.slice() : null
+                stickers:     state.stickers.length ? state.stickers.slice() : null,
+                /* Color-by-number completion, as region ids. Ids are
+                   derived deterministically from the artwork at a
+                   fixed resolution, so a saved id still means the same
+                   shape on any device. Omitted (falsy) when empty, so
+                   pre-CBN records restore exactly as before. */
+                cbn:          cbnSnapshot()
             };
             setStorage(IN_PROGRESS_KEY, JSON.stringify(rec));
             inProgressDirty = false;
@@ -6211,6 +6408,24 @@
     }
 
     /* ---------- 8d. TOASTS ---------- */
+
+    /* Fires when the last numbered region on a CBN page is filled
+       correctly. Repeatable on purpose (unlike the one-shot erase
+       tip): finishing a page is an event worth marking every single
+       time, and there are eight of them. */
+    function showCbnDoneToast() {
+        const t = $("#cbnDoneToast");
+        if (!t) return;
+        t.removeAttribute("hidden");
+        // eslint-disable-next-line no-unused-expressions
+        t.offsetHeight;
+        t.classList.add("is-show");
+        clearTimeout(showCbnDoneToast._timer);
+        showCbnDoneToast._timer = setTimeout(function () {
+            t.classList.remove("is-show");
+            setTimeout(function () { t.setAttribute("hidden", ""); }, 250);
+        }, 2600);
+    }
 
     function showSavedToast() {
         const t = $("#savedToast");
@@ -7944,6 +8159,14 @@
                    case where the kid arrived in landscape and then
                    rotated TO portrait, which is when the hint becomes
                    worth showing. */
+                /* The CBN model is in image space so a resize can't
+                   invalidate it — but the overlay box and every label
+                   size are derived from the art's on-screen rect,
+                   which just moved. setupCanvas's resetView already
+                   ran applyView, but that happened BEFORE the carry
+                   blit and the layout it settles into, so re-sync. */
+                if (state.cbn) cbnSyncLabels();
+
                 if (innerWidth > innerHeight) hideRotateHint();
                 else maybeShowRotateHint();
             });
@@ -7951,6 +8174,34 @@
 
         updateStatus();
     }
+
+    /* ---------- DEV HANDLE ----------
+
+       Every other Madderverse game exposes one (window.__slip,
+       window.__petalcraft, window.__holeup) and this app not having
+       one has cost real debugging time: the whole app is a closure,
+       so from a console or a headless harness there is no way to ask
+       it anything — a feature silently not activating looks identical
+       to a feature that is broken, with no way to tell which.
+
+       Read-only-ish and deliberately small. Not gated behind ?dev:
+       it exposes no data the page doesn't already render, and being
+       there unconditionally is what makes it useful when a bug shows
+       up somewhere you can't add a flag. */
+    window.__tinycanvas = {
+        state:        state,
+        view:         view,
+        loadTemplate: loadTemplate,
+        cbn: {
+            core:       function () { return CBN; },
+            activate:   cbnMaybeActivate,
+            syncLabels: cbnSyncLabels,
+            regionAt:   cbnRegionAtDevice,
+            markDone:   cbnMarkDone,
+            snapshot:   cbnSnapshot,
+            zoomMax:    zoomMax
+        }
+    };
 
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", init);

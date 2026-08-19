@@ -560,9 +560,20 @@ creates the RC project and pastes the key — checklist in game.js) and
 **pinch/button zoom shipped** for the detailed pages. Details +
 locked decisions in the game's CLAUDE.md.
 
+**The color-by-number engine was rebuilt 2026-08-18** and all 8 CBN
+pages are now authored. Regions are modelled in image space by a new
+shared `tiny-canvas/cbn-core.js` (also loaded by the new
+`tiny-canvas/tools/cbn-editor.html`, so the authoring tool and the game
+cannot disagree); numbers sit at each region's largest-inscribed-circle
+centre, size themselves to their region, and hide until you zoom in far
+enough to read them. The cactus page was also re-cut so its rib lines
+are decoration rather than region walls, taking it from 17 fiddly
+regions to 6 that all read without zooming. Full write-up — including the three measured bugs
+it replaced — in the game's CLAUDE.md.
+
 Its own cache-bust convention applies: **bump `?v=N` in
 `tiny-canvas/index.html` on every change** to `style.css`,
-`templates.js` or `game.js` (currently v48).
+`templates.js`, `cbn-core.js` or `game.js` (currently v71).
 
 ---
 

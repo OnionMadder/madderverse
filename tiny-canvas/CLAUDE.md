@@ -7,7 +7,7 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=50** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=71** — bump it
   on every change to style.css / templates.js / game.js.
 - **RAINBOW moved from Pro to free (2026-08-14) and the confusingly-
   co-named RAINBOW palette group was renamed BRIGHTS.** Bala (5),
@@ -26,38 +26,212 @@ via Capacitor.
   now CRAYON / GLITTER / RAINBOW; Pro is SPRAY / GLOW / SMUDGE +
   everything else. Every notice below that still says "4 Pro brushes"
   is historical narrative from before this change.
-- **Color-by-number engine shipped (2026-08-09).** A template opts in
-  with a `cbn: { palette: [hex, ...], assign?: fn, regions?: [...] }`
-  field. On load, the engine either uses explicit `regions`
-  (normalized `{cx, cy, ci}` from the pipeline script) OR
-  auto-detects connected components from the fill mask and asks
-  `assign(cx, cy)` for the palette index. Runtime swaps in numbered
-  swatches (arming FILL on tap), overlays absolutely-positioned
-  number labels at each region's centroid, and routes fill taps
-  through `cbnResolveTap`: correct number in the right region →
-  Onion eureka + tracked completion, wrong number → fills anyway,
-  no punishment, Onion stays neutral. Palette tabs and the custom
-  color swatch hide in CBN mode so the numbered palette is the whole
-  alphabet. Engine gates on `CBN_MIN_REGION_PX` (400) and
-  `CBN_MAX_REGIONS` (40) so pages whose ink is too thin to seal
-  bail out cleanly instead of painting a wall of numbers.
-- **Companion Python pipeline: `scripts/process-cbn-page.py`.**
-  Takes a line-art PNG (alpha ink) + a fully-colored reference PNG
-  → detects fillable regions, samples the reference at each
-  centroid, snaps to a target palette, emits the JSON to paste
-  into templates.js. Same INK_ALPHA + min-area rules as the runtime
-  so mask topology matches. Pillow + numpy only, no new deps beyond
-  process-coloring-pages.py.
-- **CBN needs dedicated art.** Onion's existing raster pages were
-  designed for freehand and often auto-detect as few or badly-shaped
-  regions — the shipped demo (`cbn-sun`, reusing `sun.png`) only
-  surfaces one detectable region because the sun+rays+sky don't
-  seal into distinct components at the current ink density. The
-  engine is proven; real CBN pages need their own layouts (clear,
-  well-separated regions, thick enough ink to seal) and a paired
-  reference PNG for the pipeline. **See
-  [`CBN_ART_GUIDE.md`](CBN_ART_GUIDE.md)** for the design checklist
-  Onion authors against.
+- **⭐ Color-by-number engine REBUILT (2026-08-18) and the whole
+  8-page pack is now authored.** The 2026-08-09 engine proved the
+  mechanic and then sat on three measured geometry bugs. All three are
+  fixed; if you remember anything about centroids,
+  `CBN_MIN_REGION_PX`, a 40-region cap or reference PNGs, it is gone.
+
+  **What was wrong** (measured against the shipped art, not guessed):
+  1. **Numbers were positioned in the wrong coordinate space.** Labels
+     were placed as a percentage of `#cbnLabels`, which was sized to
+     `.line-art`'s CONTAINER (94vw x 78vh), while the coordinates were
+     fractions of the CANVAS backing store — and the artwork
+     letterboxes inside that container, making three different
+     rectangles treated as one. They agreed at dead centre and drifted
+     to **~39 px off at quarter height**.
+  2. **The centroid is frequently not inside its own region.** A
+     background that wraps around a subject has its centre of mass on
+     the subject. **39 of 135 regions across the 8 pages put their
+     number outside their own shape** (12 of 17 on cactus, 6 of 9 on
+     rainbow). `cbnResolveTap` used the same anchor as a
+     nearest-centroid guess, so the "did you use the right colour"
+     check was wrong for exactly those regions.
+  3. **Every badge was a fixed 12px/20px pill.** Region sizes are not
+     remotely uniform — the median cactus region has an inscribed
+     radius of 0.63% of page width, about 6 px on a phone, wearing a
+     26x20 px badge. At 1x on a phone only 2–11 of a page's regions
+     could show a readable number; the rest were unreadable
+     overlapping pills.
+
+  **Root cause:** regions were derived at runtime from the FILL MASK,
+  which is rasterized at viewport resolution against the artwork's
+  CURRENT on-screen rect. So region identity changed with the window
+  size AND with zoom (at 4x the mask is a crop of the zoomed art). CBN
+  cannot be built on it. Two more bugs fell out of the same cause: a
+  fixed 400-device-px area floor meant **a phone and a desktop
+  detected different region sets on the same page**, and the resize
+  handler never re-synced CBN, leaving hit-testing on stale
+  coordinates while the labels still looked fine.
+
+- **`cbn-core.js` is the new shared region model** — a third top-level
+  script, loaded BEFORE game.js, and **also loaded by
+  `tools/cbn-editor.html`, so the editor and the game cannot disagree
+  about what a region is**. It rasterizes the source PNG once at a
+  FIXED working width (`WORK_W` 1024), independent of viewport, zoom
+  and device, then:
+  - labels connected components, **keeping the per-pixel label map**
+    (`Int16Array`) — that map is what makes tap lookup an exact O(1)
+    read instead of a distance heuristic;
+  - runs a chamfer 3-4 distance transform and takes each region's
+    **pole of inaccessibility** (centre of the largest inscribed
+    circle) as its anchor. **Verified 0 of 135 anchors outside their
+    own region**, against 39 with centroids;
+  - emits a normalized inscribed radius per region, which is what lets
+    the runtime size a number to its region.
+
+  The area floor is `MIN_AREA_FRAC` — a fraction of page area, not a
+  pixel count, which is what fixes the resolution dependence.
+  `MAX_REGIONS` is 120 and is a runaway guard, not a design limit; the
+  old cap of 40 silently truncated real regions off the end of a page.
+
+- **Numbers size themselves, and hide when they cannot fit.**
+  `cbnSyncLabels` derives each badge's font size from its region's
+  on-screen inscribed radius, clamped to 9–26 px, written in layout px
+  so the `#zoomLayer` transform scales it correctly. Below a
+  legibility floor the label is **not drawn at all**, and reappears as
+  the kid zooms in — which is what Onion asked for ("they should scale
+  when you zoom to color small spaces"). Measured on cbn-sun at phone
+  size: **4 of 36 numbers at 1x, 18 at 1.5x, 28 at 2.25x, 32 at 3.4x,
+  all 36 by 5x**, zero misplaced at any level, placement error
+  **0.039 px** (was ~39 px).
+- **`ZOOM_MAX_CBN` = 8; freehand pages keep 4.** Measured: the
+  smallest cactus region needs 6.5x on a phone before it can hold a
+  digit, so at the old 4x ceiling those numbers were permanently
+  invisible. `zoomMax()` picks the ceiling and
+  `applyView` / `zoomAt` / `syncZoomButtons` all route through it.
+- **A `N / M` progress pill** (`#cbnProgress`, left rail under the
+  zoom buttons) is **load-bearing, not decoration** — because small
+  numbers hide themselves, a kid can be looking at a page with no
+  visible numbers left that is not finished. Completion persists too:
+  `rec.cbn.done` rides the in-progress record as region ids (which are
+  deterministic from the artwork), restored by `cbnRestoreDone`. And
+  **fill-erasing a correct region un-completes it** and brings the
+  number back — `floodFillEraseAt` had no CBN awareness at all before.
+- **Two ordering bugs found during verification, both real and both
+  silent.** Worth knowing, because they will bite anything else that
+  measures the artwork:
+  1. **`img.decode()` can never resolve when the page is not
+     compositing** (backgrounded app, hidden tab, headless pane). The
+     await never returned, CBN never activated, and the page silently
+     behaved as a plain freehand page — no error, nothing to see. Wait
+     on `complete && naturalWidth` instead; `drawImage` needs no
+     decode.
+  2. **`loadTemplate` runs while `#screen-draw` is still `[hidden]`**,
+     and a hidden element has no layout box, so there was nothing to
+     measure the overlay against. `showScreen("draw")` now re-syncs. A
+     `ResizeObserver` on the artwork covers the rest (drawer opening,
+     safe-area insets, fonts landing) — zoom is a CSS transform and
+     changes no layout box, so `applyView` alone cannot catch those.
+- **All 8 pages are authored** (2026-08-18), in pack order: cactus 6
+  regions / 5 colours, rainbow 9/8, tulip 10/5, pumpkin 12/5,
+  snowman 14/6, cat 15/6, donkey 22/8, sunny day 36/7. Verified in the live runtime — every
+  seed lands, every region gets exactly one number, no region
+  double-assigned, **0 unreachable at 8x on any page**, and every
+  palette is fully used with a minimum colour separation of 53 (the
+  fill tolerance is 6). `cbn-sun`'s hand-tuned `assign(cx, cy)`
+  heuristic is retired; the function form is still supported, just
+  unused.
+- **Authoring is now `tools/cbn-editor.html`** — click a region, click
+  a number, copy the block. Exported entries are `{x, y, ci}`: a point
+  plus a palette index, where the point is the region's anchor.
+  **No geometry is exported**, so a page can never go stale against a
+  re-detect. The panel carries a live fitness report (regions numbered
+  at 1x, unreachable count, deepest zoom needed) plus per-region
+  hover stats, so a page that will not work as CBN is obvious before
+  it ships rather than after.
+- **`scripts/process-cbn-page.py` is now primarily an AUDIT tool**,
+  and is an exact port of cbn-core's rules — the four governing
+  constants are named identically on both sides, so change one and you
+  must change the other. Verified producing identical region counts
+  and worst-zoom figures to the JS on all 8 pages. `--map` writes a
+  region map PNG with ids drawn at each anchor, which is how you
+  decide what colour each region should be; `--reference` still
+  samples a coloured reference for bulk runs.
+  **See [`CBN_ART_GUIDE.md`](CBN_ART_GUIDE.md)**, rewritten alongside
+  this. Headline rule: **a region that must carry a number needs an
+  inscribed radius of about 2% of page width.**
+- **Numbers are judged by whether a DIGIT fits, not a circle
+  (2026-08-18, same day, second pass).** The first cut of the rebuild
+  sized every number from its region's inscribed circle, which is far
+  too strict for anything ribbon-shaped — a digit is tall and narrow,
+  and so is a rainbow band or a cactus rib. `labelFit()` in
+  cbn-core.js now measures the region's width and height through its
+  anchor and picks one of three outcomes:
+  - **pill** — the full badge (paper capsule + outline), needs ~1.7em
+    in both directions;
+  - **slim** — bare glyph with a halo instead of a capsule, needs
+    little more than the digit itself. This is what lets a narrow band
+    carry a number at all;
+  - **hidden** — no room for either at this zoom; zooming in brings it
+    back.
+
+  Free win, no art change: numbers readable at 1x on a phone went
+  **sun 4 → 22, rainbow 3 → 9 (the whole page, no zoom at all), donkey
+  7 → 10, tulip 6 → 8, snowman 8 → 9**, and every page's worst-case
+  zoom dropped. `labelFit` / `zoomToShow` live in cbn-core so the game,
+  the editor and the audit script cannot disagree about legibility —
+  verified identical region-by-region across all 8 pages.
+
+- **The cactus art was re-cut (2026-08-18) — it demanded too much
+  zooming and no code could fix it.** Its ribs were 3–7 px wide on a
+  phone; a digit needs ~7 px of width, so 12 of its 17 regions could
+  never show a number without zooming, worst case 5.8x.
+
+  The ribs are *decoration* — they say "saguaro" — but the fill mask
+  cannot tell decoration from structure, so they shattered the trunk
+  into ribbons. Fix: **demote them by dropping their alpha just below
+  INK_ALPHA.** They still render (the line art draws over the kid's
+  colour, so they still read as ribs) but fill and CBN see through
+  them. Same behaviour the pumpkin's interior rib curves already had.
+  Result: **17 regions needing 5.8x → 6 regions, all numbered at 1x,
+  worst-zoom 1.0x**, and the artwork looks the same. Colouring it now
+  reads better too — the ribs look like real folds rather than five
+  flat stripes.
+
+  New `scripts/process-cbn-page.py --soften`. Two things it got wrong
+  before it got them right, both worth keeping in mind for any future
+  page:
+  1. **Thickness alone is not a safe test.** The pot's soil ellipse is
+     the same 4–7 px as the ribs; demoting it merged the soil into the
+     pot rim. So the rule is what softening ACHIEVES: demote only a
+     stroke that separates two regions where at least one is too small
+     to number.
+  2. **That rule alone destroys the picture.** It also matches the
+     outline between a thin rib and the sky, so the whole cactus fell
+     into the background and the region count collapsed **17 → 4**.
+     A stroke touching any region that reaches the page edge is now
+     never demoted: you may dissolve a shape's internal divisions,
+     never its silhouette. The script re-checks its own output and
+     refuses if the background region grew.
+
+  ⚠ **Softening runs AFTER `process-coloring-pages.py`, on the shipped
+  PNG** (alpha ink only exists at that stage), so re-running the art
+  pipeline silently reverts it. Re-soften after any regeneration.
+
+- **⚠ `image:` paths need a `?v=` when the ART changes.** `cbn-cactus`
+  now reads `assets/coloring-pages/cbn/cactus.png?v=2`. The `?v=` on
+  index.html covers game.js / templates.js / style.css / cbn-core.js
+  but NOT the page PNGs, so a returning kid held the old cactus.png in
+  cache while templates.js handed it seeds authored against the new
+  art — the page numbered itself wrongly and quietly. It cost a
+  confusing debugging detour here (the runtime reported 17 regions
+  while the file on disk had 6). `thumbSrc()` carries the query onto
+  the thumb, which is correct — the thumb was regenerated from the
+  same alpha. **Bump it whenever a page's PNG is re-cut.**
+
+- **The CBN pack is ordered by ascending region count** = ascending
+  difficulty: cactus 6 → rainbow 9 → tulip 10 → pumpkin 12 →
+  snowman 14 → cat 15 → donkey 22 → sunny day 36. Sunny day used to be
+  first, which meant a kid's first color-by-number page was the one
+  with 36 numbers. Keep the order when adding a page.
+
+- **`window.__tinycanvas` dev handle added.** Every other Madderverse
+  game has one (`__slip`, `__petalcraft`, `__holeup`) and this app not
+  having one cost real time on this run: the whole app is a closure,
+  so from a console a feature silently not activating looks identical
+  to one that is broken. Exposes `state`, `view`, `loadTemplate` and
+  the CBN internals. Not gated behind `?dev`.
 - **Free tier bumped 1 → 3 reps per category (2026-08-09).** Every Pro
   category now shows THREE `free: true` pages instead of one. Free tier
   = BLANK + 6 basics + 33 reps = **40 pages** (was 18); Pro adds the
@@ -315,7 +489,13 @@ tiny-canvas/
                           # settings card, parent-gate modal, toasts
   game.js                 # IIFE: canvas + 6 brushes + auto-save +
                           # parent gate + settings + native bridge
-  templates.js            # window.TINY_CANVAS_TEMPLATES — 35 SVG pages
+  templates.js            # window.TINY_CANVAS_PAGE_PACKS — the page
+                          # catalog, incl. each CBN page's cbn: block
+  cbn-core.js             # window.TinyCanvasCBN — the color-by-number
+                          # region model (labeling + distance
+                          # transform + anchors). Loaded BEFORE
+                          # game.js, and ALSO by tools/cbn-editor.html
+                          # so the two cannot drift.
   manifest.webmanifest    # PWA manifest, theme-color #ff2e88
 
   assets/
@@ -347,6 +527,16 @@ tiny-canvas/
                             # at 6 device profiles into ./screenshots/
     process-coloring-pages.py  # art-src masters -> assets pages +
                                # fillable-region audit (Pillow+numpy)
+    process-cbn-page.py     # color-by-number AUDIT (is this page
+                            # usable as CBN?) + --map region maps.
+                            # Exact port of cbn-core.js's rules.
+    build-www.mjs           # stages www/ for the native build
+
+  tools/
+    cbn-editor.html         # click-to-assign CBN authoring tool.
+                            # Loads ../cbn-core.js, so what it shows
+                            # IS what the game detects. Not shipped —
+                            # build-www.mjs does not copy tools/.
 
   package.json            # Capacitor 6 + plugins
   capacitor.config.json   # appId org.madderverse.tinycanvas, webDir "www"
@@ -732,7 +922,7 @@ App Store Connect / Play Console upload slot
   with a CSS filter or compositor blur — the edge has to be baked
   into the bitmap for save/export to capture it.
 - **Bump `?v=N` in `index.html` on EVERY change** to `style.css`,
-  `templates.js` or `game.js` (currently **v48**). Without it the
+  `templates.js` or `game.js` (currently **v71**). Without it the
   browser serves a stale `game.js` against a fresh `index.html` and the
   change reads as "did nothing" — the same trap Slip Studio and
   Florigami both hit. Note that a hard-reload which refetches

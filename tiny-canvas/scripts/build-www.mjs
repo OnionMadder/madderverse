@@ -23,8 +23,13 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const WWW  = join(ROOT, "www");
 
-const FILES = ["index.html", "game.js", "templates.js", "style.css",
-               "manifest.webmanifest"];
+/* cbn-core.js is the color-by-number region model, loaded by
+   index.html before game.js. Omitting it does not fail the build — the
+   app boots and every CBN page silently degrades to a plain freehand
+   page — so it has to be listed here explicitly. tools/ is NOT copied:
+   the CBN editor is an authoring tool, not part of the app. */
+const FILES = ["index.html", "game.js", "cbn-core.js", "templates.js",
+               "style.css", "manifest.webmanifest"];
 const DIRS  = ["assets", "icons", "legal"];
 
 rmSync(WWW, { recursive: true, force: true });
