@@ -967,6 +967,80 @@ App Store Connect / Play Console upload slot
   on the canvas the app's own pinch (above) takes over. Capacitor's
   iOS WebView respects this.
 
+## ⏰ Play Billing Library 8 — HARD DEADLINE 2026-08-31
+
+**Play Console is warning on Tiny Canvas: "Update to a newer version of
+Google Play Billing Library to prevent your updates from being
+rejected", action by Aug 31 2026.** It is real and it is a *publishing*
+gate, not a runtime one: builds already on the store keep transacting,
+but **after Aug 31 you cannot upload an update** unless it uses Billing
+Library **8 or later**. Google will grant an extension to Nov 1 2026 on
+request.
+
+**Tiny Canvas ships Billing 7.1.1** (verified from the resolved Gradle
+graph, not inferred). The chain is:
+
+    @revenuecat/purchases-capacitor 9.2.2
+      -> purchases-hybrid-common 13.26.0
+        -> purchases-android 8.15.0
+          -> com.android.billingclient:billing 7.1.1
+
+**The trap: no RevenueCat build with Billing 8 runs on Capacitor 6.**
+This cannot be fixed with `npm update` — it needs a Capacitor major
+upgrade. Verified across the plugin's published versions:
+
+| RC plugin | needs Capacitor | hybrid-common | purchases-android | Billing |
+|---|---|---|---|---|
+| **9.2.2 (current)** | 6 | 13.26.0 | 8.15.0 | **7.1.1** ❌ |
+| 10.3.5 | >=7 | 13.37.0 | 8.19.2 | **7.1.1** ❌ |
+| 11.1.0 | >=7 | 16.1.0 | 9.1.2 | **8.0.0** ✅ |
+| 12.3.2 | >=8 | 17.55.1 | 9.29.0 | **8.0.0** ✅ |
+| 13.4.0 (latest) | >=8 | 18.29.0 | 10.16.0 | **8.3.0** ✅ |
+
+So the minimum compliant move is **Capacitor 7 + RC 11**; the move that
+matches Pootery (already Capacitor 8 / RC ^13) is **Capacitor 8 + RC
+13**, which also buys the most runway before the next deprecation.
+
+**Decision (Onion, 2026-08-18): ship the CBN rebuild FIRST on the
+current stack, migrate after.** Billing 7.1.1 uploads are still accepted
+until Aug 31, so vc7 is a legal upload; doing the Capacitor jump
+separately keeps the migration diff clean and leaves time to test it on
+a real device. Two uploads instead of one, deliberately.
+
+⚠ **When doing the migration, remember `android/` is untracked and
+carries two hand-applied fixes that do NOT survive a regenerate** — the
+recreated `res/values/colors.xml` and the `signingConfigs.release`
+block reading `android/keystore.properties`. See the "Android build"
+section above. Also re-check `variables.gradle` (compile/target SDK 36)
+and the AGP/Gradle pins, which a Capacitor major will want to move.
+
+Do not let this slip past Aug 31 without either the upgrade or a filed
+extension.
+
+## Play build state (2026-08-18)
+
+**`Desktop/tiny-canvas-v1.3.0-vc7.aab`** (22.0 MB, built 2026-08-18) —
+the color-by-number rebuild, ready to upload. Verified:
+
+- bundled `index.html` reads `?v=71`, and the bundled `game.js`,
+  `cbn-core.js` and `templates.js` are **byte-identical** to the shipped
+  web build;
+- `cbn-core.js` is present in `base/assets/public/` (it is a third
+  top-level script — `scripts/build-www.mjs` had to learn about it, and
+  a missing copy degrades every CBN page to freehand *silently*);
+- signed by the existing upload key — `CN=Tiny Canvas, OU=Mad Sundar
+  LLC`, SHA-256 `5B:08:5A:48:7C:05:A3:A8:…:6C:0D:84:25`, matching §F;
+- versionCode 7 / versionName 1.3.0, package `org.madderverse.tinycanvas`.
+
+Use `jarsigner -verify -certs` on an **AAB** and `apksigner verify` on
+an **APK** — apksigner rejects a bundle outright ("Missing
+AndroidManifest.xml"), which is a tooling mismatch, not a broken build.
+
+Earlier bundles on the Desktop: vc2 (1.0.1, api35), vc3 (1.1.0), vc4
+(1.1.1), vc5 (1.1.2), vc6 (1.2.0). The RevenueCat key in `game.js` is a
+**real `goog_` key**, so billing is configured, not inert — the
+"placeholder / inert" language elsewhere in this file is stale.
+
 ---
 
 # v1.0 SHIPPING CHECKLIST
