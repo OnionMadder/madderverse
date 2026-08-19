@@ -494,6 +494,21 @@ body.dancing .face-zoom-btn { display: none; }
    as the body outline so it reads as one drawing. The joints are NOT marked:
    visible brass pins were tried and cut. */
 .doll-ink-layer  { z-index: 4; }
+
+/* Dance canvas: only present while dancing. The paint canvas underneath is
+   made transparent rather than hidden, so it still receives pointer events
+   and drawing-while-dancing keeps working. */
+.dance-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+    display: none;
+}
+body.dancing .dance-canvas { display: block; }
+body.dancing .draw-canvas  { opacity: 0; }
 .doll-ink-line   { fill: #1a0f33; }
 
 /* Hat layer sits above the outline so hats land on top of the head

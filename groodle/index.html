@@ -104,6 +104,13 @@
 
         <canvas class="draw-canvas" id="drawCanvas"></canvas>
 
+        <!-- Dance canvas (z 2, above the paint canvas): while he dances the
+             artwork is redrawn here once per limb, each through that limb's
+             rotation, so the colouring swings with the arm instead of
+             sliding off it. Click-through; the paint canvas below keeps the
+             pointer events. -->
+        <canvas class="dance-canvas" id="danceCanvas" aria-hidden="true"></canvas>
+
         <!-- Outline layer (z-index 3): SVG filter renders one unified
              dark ring inside the union of the body shapes. -->
         <!-- Outline layer (z-index 3). Children populated from JS same

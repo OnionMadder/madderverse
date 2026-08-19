@@ -23,6 +23,13 @@ to `groodle/`.
 - 8 background presets (studio, disco, outdoors, night, sunset,
   underwater, stadium, candy) chosen via thumbnail buttons in the Stage
   drawer.
+- **The dance articulates the limbs.** Pressing DANCE swings each pinned
+  limb on a two-beat cycle (`limbAngles` / `applyLimbAngles`), on top of
+  the whole-body bounce `applyMove` already did. The kid's artwork rides
+  its own limb: the paint canvas stays in rest-pose space and a sibling
+  `#danceCanvas` re-composites it once per part each frame, through that
+  part's rotation and clipped to it. Drawing keeps working mid-dance --
+  `getPos` un-rotates the pointer via `unposePoint`.
 - 8 poses in the Pose picker. Six of them are the **paper-doll rig**
   (standing / cheer / star / groovy / tpose / wave) — five hand-drawn
   parts pinned at the shoulders and hips with visible brass fasteners,
@@ -232,6 +239,15 @@ to the logical `400×600` space so JS only ever thinks in those units.
   then loops; `currentBar` increments 0..3. `applyMove` runs on RAF and
   reads `audioCtx.currentTime - danceStartTime` for the beat phase, so the
   dance stays locked to the music even if frames drop.
+- **The torso must never be rotated by the dance.** Limb pivots are
+  absolute points in the frame, not children of the torso, so swaying the
+  torso slides it out from under its own shoulders and hips. Whole-body
+  motion belongs in `applyMove` (which transforms `.creature`); `limbAngles`
+  only ever returns limb keys. This was written, seen to detach, and cut.
+- **`DANCE_SWING` (game.js) and `DANCE_SWING` (tools/trace_rig.py) must
+  match.** The tracer folds the swing into the scale solve so the doll is
+  sized to hold its own dance without clipping; raising it in one place
+  only means limbs leave the frame, or the doll silently shrinks.
 - **`transform-origin` on `.creature` is `50% 95%`** (rig poses) so the feet stay
   planted. If you change pose dimensions, re-check this — a different pose
   height shifts where 92% lands and the feet will lift off / sink through

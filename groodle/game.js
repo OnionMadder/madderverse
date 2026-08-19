@@ -252,6 +252,114 @@
 
     const RIG = {"parts":{"torso":{"solid":[[2.1,0.0,-7.3,0.2,-15.2,1.4,-21.1,3.0,-26.0,4.6,-33.8,8.5,-40.8,13.2,-44.1,16.1,-47.8,19.9,-52.2,25.8,-55.6,32.5,-57.1,37.2,-58.3,43.4,-58.3,52.5,-57.7,56.5,-56.6,60.7,-53.8,67.5,-48.1,76.3,-44.1,84.3,-41.4,89.1,-36.9,94.6,-31.0,99.8,-30.1,105.9,-30.1,116.6,-31.1,118.5,-34.1,120.9,-41.7,125.2,-54.4,131.4,-58.1,134.7,-61.9,140.7,-64.6,148.3,-66.4,155.5,-67.1,160.7,-67.3,164.9,-67.1,172.5,-66.0,180.2,-65.4,181.6,-64.7,185.0,-63.2,189.1,-62.9,190.4,-63.1,194.0,-62.6,198.4,-61.6,200.2,-59.8,209.0,-57.2,218.8,-55.7,228.1,-55.1,235.3,-55.1,244.4,-56.0,254.7,-55.3,258.6,-55.0,259.5,-54.2,259.7,-52.9,266.5,-49.8,275.9,-47.1,281.7,-43.5,287.4,-41.3,290.2,-37.1,296.6,-27.8,307.9,-22.2,312.9,-17.6,316.1,-13.5,317.5,-9.6,317.7,-7.6,318.2,-0.8,318.0,3.3,316.6,5.1,315.6,8.3,313.3,10.7,311.2,16.0,305.7,18.8,302.4,28.6,287.4,34.5,277.5,38.6,268.7,41.0,262.4,42.9,255.5,42.8,253.2,42.2,251.2,41.6,240.0,42.2,228.5,43.9,218.4,46.5,208.4,48.2,199.7,48.9,197.7,49.0,195.9,49.6,193.7,49.5,190.4,49.8,188.6,51.4,184.5,52.9,177.3,53.5,173.0,53.7,168.4,53.4,159.9,53.1,157.4,50.0,146.3,48.7,143.7,46.5,138.4,43.8,134.0,42.0,132.0,40.3,130.9,34.0,128.0,24.2,123.0,20.7,120.9,17.3,118.3,16.7,117.4,16.6,109.0,17.0,108.4,24.8,105.5,29.6,102.8,33.9,99.6,37.8,95.6,40.0,92.9,44.2,85.9,45.9,82.5,49.2,74.3,54.7,64.1,55.7,61.6,56.9,56.9,57.6,49.9,57.5,43.8,56.9,39.4,55.2,33.7,53.5,29.7,50.8,24.9,48.2,21.2,45.4,18.1,41.4,14.3,38.1,11.7,32.8,8.3,25.2,4.6,20.4,3.0,14.4,1.4,6.8,0.2]],"ink":[[-28.9,304.2,-24.4,308.9,-17.1,314.4,-12.9,316.0,-7.2,316.6,-1.0,316.3,2.7,315.0,8.4,311.1,12.9,306.6,6.8,311.8,2.6,314.5,-3.6,316.2,-9.5,316.2,-14.5,315.1,-17.8,313.5],[50.3,181.6,46.0,192.1,41.9,197.5,34.7,202.9,25.3,207.1,30.5,206.2,36.1,204.0,40.3,201.4,46.3,195.4,46.6,195.7,40.2,226.8,39.6,244.1,40.9,256.9,41.3,255.1,40.0,240.0,40.6,228.5,42.3,217.8,47.2,197.6,48.3,188.1],[-64.6,178.2,-61.5,189.1,-60.9,198.3,-60.1,199.6,-54.5,224.4,-53.4,235.3,-53.4,244.4,-54.4,254.7,-53.4,258.3,-54.0,254.2,-52.9,240.8,-53.5,228.2,-54.7,220.3,-60.2,195.7,-59.7,195.3,-55.9,199.6,-49.6,204.0,-43.9,206.2,-40.2,206.5,-44.8,204.7,-49.8,201.9,-56.7,195.9,-61.6,187.8],[38.3,139.5,12.1,141.7,5.5,143.9,2.1,146.8,9.9,143.7,16.6,142.7,26.9,142.1],[-51.7,139.6,-41.0,142.0,-23.3,143.7,-15.5,146.8,-18.9,143.9,-25.7,141.7],[13.8,71.2,12.6,70.4,7.4,73.6,2.9,74.6,-3.3,73.6,-8.4,70.5,-9.7,70.9,-9.8,71.8,-4.2,75.5,2.7,76.7,9.5,75.0,12.8,72.9],[24.8,48.8,27.3,49.1,29.0,50.0,30.8,51.9,31.6,54.3,30.8,58.8,28.6,61.0,25.9,61.9,23.5,61.7,21.4,60.5,19.5,58.1,18.9,56.2,18.9,54.3,20.4,51.1,22.0,49.7],[-22.1,48.8,-19.4,49.1,-17.3,50.3,-15.4,52.9,-14.9,54.7,-15.3,57.4,-16.5,59.5,-19.1,61.6,-20.9,61.9,-23.0,61.7,-25.1,60.6,-26.9,58.7,-27.8,56.0,-27.5,53.0,-26.3,51.0,-24.5,49.5],[24.4,46.7,21.1,47.6,18.0,50.5,16.9,53.1,16.7,56.9,18.0,60.0,20.4,62.5,22.9,63.7,26.1,64.1,29.5,63.0,32.3,60.4,33.5,58.0,33.9,54.2,32.8,51.1,30.5,48.4,28.2,47.0],[-22.0,46.6,-25.5,47.6,-27.8,49.5,-29.4,52.0,-30.0,56.0,-28.8,59.8,-26.9,62.0,-24.2,63.6,-20.9,64.1,-17.2,63.0,-14.7,60.9,-13.3,58.2,-12.8,54.2,-13.9,51.0,-15.9,48.6,-18.3,47.2],[-0.1,21.2,4.6,21.3,7.1,22.5,9.6,24.9,11.3,28.2,11.5,31.4,10.7,34.8,8.4,37.8,4.8,39.9,1.3,40.3,-2.4,39.2,-5.2,36.9,-7.3,33.2,-7.7,29.7,-6.1,25.4,-3.6,22.9],[1.8,18.9,-2.8,19.9,-7.2,23.2,-9.2,26.9,-9.8,30.8,-8.8,35.4,-5.5,39.7,-1.6,41.8,2.7,42.4,7.0,41.3,10.1,39.2,12.7,35.5,13.8,30.4,12.8,26.1,9.3,21.6,5.1,19.3],[-16.6,3.9,-6.3,2.3,5.9,2.3,16.0,3.9,25.5,7.1,33.2,11.1,41.6,17.4,48.3,25.0,53.2,34.5,55.3,43.5,55.4,50.9,54.7,56.7,52.1,64.7,46.7,74.7,41.7,86.0,37.5,92.5,32.9,97.5,25.2,102.9,19.0,105.6,8.9,107.9,-5.5,107.9,-15.1,105.6,-25.5,100.8,-34.2,94.2,-38.8,89.1,-46.5,74.7,-51.9,66.5,-54.0,61.7,-56.2,52.0,-56.2,43.8,-54.0,34.7,-49.6,25.8,-42.5,17.5,-34.7,11.6,-27.7,7.7],[38.5,14.1,27.1,7.3,15.9,3.5,4.8,1.8,-8.5,2.0,-20.5,4.5,-30.3,8.5,-39.8,14.5,-48.3,23.1,-52.9,30.7,-56.0,39.8,-56.7,47.8,-56.0,56.3,-52.9,65.5,-46.5,75.7,-41.0,86.5,-36.5,92.5,-29.5,99.2,-28.4,105.9,-28.4,116.6,-29.8,119.5,-33.5,122.4,-52.9,132.4,-55.7,134.6,-36.1,124.6,-31.1,121.4,-30.4,121.7,-31.1,127.0,-30.8,128.3,-29.1,124.0,-28.0,117.7,-28.2,101.7,-19.7,106.1,-9.6,109.3,4.7,110.4,14.1,109.1,14.6,109.7,15.2,122.0,17.4,128.6,17.0,121.2,42.1,134.6,39.8,132.6,20.1,122.4,15.8,119.0,14.9,116.5,14.9,109.0,15.4,107.7,24.2,104.0,30.3,100.3,36.0,95.2,39.8,90.2,52.6,64.8,55.2,56.8,55.9,49.9,55.7,42.4,53.2,33.0,51.0,28.5,46.9,22.2]]},"arm":{"solid":[[18.2,-13.2,10.2,-10.2,1.7,-7.8,-5.0,-4.6,-8.3,-2.3,-12.6,1.4,-15.8,5.2,-18.4,9.2,-20.7,13.7,-23.0,20.1,-24.0,24.4,-25.1,31.0,-25.8,40.5,-29.5,49.8,-32.4,59.2,-32.7,59.7,-34.9,67.3,-38.2,81.7,-46.9,99.2,-48.6,103.4,-50.2,108.6,-52.4,119.6,-54.7,140.8,-56.4,153.6,-56.7,154.7,-57.4,161.8,-59.6,172.6,-61.6,180.6,-63.3,189.6,-63.6,197.4,-63.3,202.6,-62.2,207.5,-61.1,210.4,-59.5,213.1,-52.4,222.9,-50.8,224.8,-48.4,226.4,-46.6,226.6,-45.0,226.3,-43.2,224.7,-41.3,224.6,-40.0,224.0,-38.5,222.2,-38.0,220.2,-38.0,217.9,-38.5,215.6,-41.1,209.1,-41.7,206.0,-41.6,201.2,-41.1,197.3,-39.9,194.0,-39.5,193.7,-38.8,193.9,-36.7,201.1,-35.5,203.3,-33.3,205.6,-31.4,206.6,-28.8,206.6,-27.6,206.1,-26.9,205.4,-25.8,203.5,-25.9,199.3,-28.1,191.5,-28.2,184.6,-28.7,181.5,-29.8,178.5,-31.4,175.4,-36.0,168.9,-36.1,166.4,-35.6,163.7,-33.5,156.9,-30.8,150.4,-26.9,142.1,-21.1,131.5,-17.8,124.7,-15.7,119.2,-13.4,110.6,-12.3,103.3,-12.2,99.8,-11.0,95.7,-1.4,80.0,5.1,67.9,7.8,61.6,11.2,52.2,11.5,49.0,12.2,46.8,12.3,45.5,9.6,38.9,8.2,33.6,7.1,25.6,7.1,16.6,8.2,9.5,9.8,3.4,11.9,-2.5,13.7,-5.8,16.6,-10.1]],"ink":[[14.6,-10.1,2.3,-6.3,-5.1,-2.6,-12.0,3.2,-17.5,10.9,-20.3,17.2,-22.5,25.1,-24.3,41.1,-31.2,60.3,-36.7,82.3,-45.4,99.8,-48.6,109.2,-50.8,119.6,-55.8,161.8,-61.6,189.6,-62.0,197.4,-61.1,205.0,-59.1,210.6,-50.6,222.6,-47.8,224.8,-46.0,224.8,-43.8,223.2,-40.9,222.6,-39.7,220.2,-40.0,216.2,-42.7,209.7,-43.4,206.0,-42.8,197.3,-41.2,193.1,-39.5,192.0,-37.5,193.0,-35.1,200.5,-32.5,204.2,-29.4,205.0,-27.5,203.2,-27.6,199.5,-29.8,191.5,-30.4,181.8,-32.9,176.3,-37.5,169.5,-37.8,166.4,-37.2,163.1,-32.4,149.8,-20.9,127.5,-17.2,118.6,-15.6,112.9,-13.9,99.8,-12.6,95.1,1.4,71.5,8.9,53.9,10.7,45.7,8.1,39.5,6.7,34.3,10.0,46.0,9.6,49.6,7.9,55.3,0.3,72.5,-13.2,95.1,-14.3,98.7,-15.4,109.6,-17.7,118.5,-20.9,126.3,-32.3,148.2,-37.6,162.8,-38.2,166.1,-37.6,170.4,-33.0,177.0,-30.7,182.2,-30.1,192.0,-27.7,202.3,-28.3,203.7,-29.6,204.5,-30.8,204.5,-32.9,203.2,-34.5,200.6,-37.5,191.4,-39.5,188.9,-41.3,188.2,-40.5,190.7,-43.1,196.7,-43.7,201.6,-43.6,207.6,-40.1,218.4,-40.5,221.4,-41.8,222.6,-43.0,222.4,-44.8,220.8,-49.2,212.1,-50.4,207.3,-51.6,196.5,-52.2,194.8,-52.8,194.9,-51.8,209.4,-50.2,214.9,-45.4,223.4,-46.8,224.5,-49.0,223.6,-50.9,221.4,-54.7,214.3,-56.4,208.1,-57.6,196.5,-58.3,194.6,-58.9,195.8,-58.9,201.0,-57.8,210.0,-58.2,210.7,-60.2,207.0,-61.4,200.1,-60.8,187.5,-55.4,162.9,-50.4,120.7,-48.3,109.9,-44.9,100.1,-35.7,81.1,-31.3,62.6,-23.8,41.3,-22.0,25.2,-19.9,17.5,-17.1,11.3,-11.8,3.6,-6.7,-0.9,-0.1,-4.7,13.9,-9.1]]},"leg":{"solid":[[-0.9,-15.2,-6.1,12.3,-7.8,19.1,-10.8,28.7,-14.1,40.6,-14.7,44.1,-16.2,50.1,-16.3,51.9,-16.8,53.3,-18.3,62.1,-20.0,75.7,-20.5,82.2,-20.6,98.9,-20.0,107.2,-20.1,113.3,-21.6,121.9,-25.3,134.2,-26.9,141.2,-29.0,154.2,-29.6,162.6,-29.7,194.4,-30.8,206.9,-31.9,212.1,-33.0,215.3,-35.2,218.8,-44.9,229.1,-49.3,233.2,-56.1,238.6,-59.6,240.7,-65.0,243.1,-67.4,244.6,-68.8,246.3,-69.5,247.8,-69.5,251.0,-68.9,252.3,-63.4,256.3,-61.7,256.4,-58.4,258.4,-54.6,258.5,-51.5,260.0,-47.0,259.8,-44.9,261.0,-42.3,261.7,-39.0,261.7,-36.7,261.1,-32.0,258.5,-28.6,257.8,-25.7,256.8,-22.8,255.1,-19.4,252.0,-17.6,251.0,-8.3,248.7,-5.9,247.6,-3.6,246.0,-2.6,245.0,-1.4,243.1,-0.8,241.1,-0.6,237.6,-0.9,233.7,-2.4,227.2,-2.8,223.5,-2.9,216.3,-2.4,210.1,-1.3,204.8,0.2,199.6,2.4,194.1,13.1,170.7,15.8,162.8,17.4,155.6,18.3,147.6,18.5,130.6,19.2,124.3,20.7,119.5,24.9,110.6,27.6,104.0,33.5,87.4,40.0,65.3,44.2,47.7,43.7,47.1,42.1,47.0,38.6,45.8,36.4,44.6,32.6,41.8,24.3,34.3,18.1,26.6,14.0,20.4,12.3,18.4,8.9,13.0,6.6,8.3,3.2,-1.7,1.1,-11.6]],"ink":[[-0.2,-9.8,-5.2,15.5,-14.1,48.1,-17.3,66.5,-18.9,85.7,-18.5,113.3,-20.1,122.5,-25.4,141.9,-27.4,154.3,-28.0,162.6,-28.1,194.4,-29.2,206.9,-30.3,212.6,-31.5,215.9,-33.9,219.7,-44.0,230.4,-55.1,239.9,-66.4,245.9,-68.0,248.7,-67.5,251.4,-62.7,254.7,-61.1,254.9,-57.8,256.8,-54.0,257.0,-51.3,258.4,-46.4,258.3,-42.3,260.0,-37.3,259.6,-32.6,257.0,-26.3,255.3,-18.2,249.4,-10.6,247.7,-6.7,246.1,-4.6,244.7,-2.9,242.5,-2.4,235.7,-4.5,223.5,-4.6,216.3,-2.8,204.2,0.8,193.5,11.5,170.1,14.2,162.2,15.8,155.6,16.7,147.6,16.8,130.6,17.6,123.7,19.2,118.9,26.1,103.4,32.0,86.8,38.3,65.1,42.2,48.7,38.0,47.3,34.1,45.0,24.9,37.1,28.9,41.3,34.9,46.1,41.5,49.1,36.8,68.6,30.5,89.7,25.5,103.5,17.6,121.8,16.5,129.2,15.9,151.7,12.7,165.4,-1.2,197.0,-3.9,206.1,-5.3,214.6,-6.7,211.9,-5.6,223.8,-9.3,231.8,-5.3,227.3,-4.6,227.3,-2.8,235.8,-2.8,240.0,-3.5,242.4,-5.3,244.6,-7.8,246.1,-17.2,248.6,-17.6,248.0,-16.1,245.6,-25.2,254.1,-27.6,255.3,-32.9,256.5,-38.9,259.6,-41.7,259.7,-44.0,259.0,-45.9,257.2,-46.2,255.0,-45.4,252.7,-39.2,248.7,-38.1,246.9,-45.0,250.1,-47.4,252.1,-48.4,255.0,-48.1,257.2,-48.8,257.9,-52.4,257.4,-53.4,256.4,-53.6,253.9,-52.4,251.6,-46.7,246.5,-46.7,245.8,-52.0,249.0,-54.4,251.2,-56.2,256.4,-57.7,256.4,-59.4,255.1,-59.8,253.9,-59.4,251.9,-57.8,249.8,-53.5,246.4,-53.1,245.2,-59.6,249.1,-61.3,251.7,-61.6,253.9,-62.8,254.1,-64.2,252.5,-63.6,249.9,-58.3,244.9,-60.2,245.2,-64.0,247.3,-65.1,248.5,-66.4,251.4,-67.5,250.4,-67.5,248.4,-66.8,247.0,-64.4,245.1,-55.3,240.6,-46.6,233.7,-32.7,219.0,-30.9,215.8,-29.4,211.1,-27.7,196.1,-27.5,166.0,-26.6,151.9,-23.9,137.4,-20.3,125.7,-19.6,126.0,-18.3,132.0,-16.9,134.8,-18.2,123.2,-18.0,106.1,-18.6,97.1,-18.5,85.1,-16.9,67.2,-12.1,41.7,-4.1,13.2,0.1,-8.6]]}},"anchor":{"armL":[136.1,177.8],"armR":[263.9,177.8],"legL":[152.1,305.7],"legR":[247.9,305.7]},"torsoAt":[206.8,34.8],"rest":{"armL":0.8,"armR":-0.8,"legL":0.2,"legR":-0.2},"sign":{"armL":1,"armR":-1,"legL":1,"legR":-1},"mirror":["armR","legR"],"srcOf":{"armL":"arm","armR":"arm","legL":"leg","legR":"leg"},"poses":{"standing":{},"star":{"armL":18,"armR":18,"legL":9,"legR":9},"cheer":{"armL":18,"armR":18,"legL":4,"legR":4},"groovy":{"armL":16,"armR":-11,"legL":-5,"legR":8},"tpose":{"armL":18,"armR":18},"wave":{"armR":18,"armL":-6}}};
 
+
+    /* ---- Dance articulation --------------------------------------------
+       The creature used to bounce as one rigid block. Now each pinned limb
+       swings on the beat, paper-doll style.
+
+       Two things have to move together or it falls apart: the SILHOUETTE
+       (SVG <g> per part, rotated by transform) and the kid's PAINT (one
+       bitmap in rest-pose space). The paint is re-composited each frame by
+       drawing that same bitmap once per part, through the part's rotation
+       and clipped to the part -- so colour rides its own arm instead of
+       sliding off it.
+
+       DANCE_SWING is capped at what the frame can hold without shrinking
+       the doll; tools/trace_rig.py folds the same number into its scale
+       solve, so the two must be changed together. */
+    const DANCE_SWING = 18;
+    let rigGroupEls = null;      // every .rig-part <g>, across all 3 layers
+    let rigClip = null;          // Path2D per part, rest-pose space
+    let danceCanvas = null, danceCtx = null;
+
+    function cacheRigEls() {
+        rigGroupEls = Array.prototype.slice.call(
+            document.querySelectorAll('.creature .rig-part'));
+        rigClip = {};
+        const pose = getCurrentPose();
+        if (!pose.rig) return;
+        const parts = rigPartsD(pose, 'solid');
+        for (let i = 0; i < parts.length; i++) {
+            rigClip[parts[i].key] = { path: new Path2D(parts[i].d), pivot: parts[i].pivot };
+        }
+    }
+
+    /* Per-limb angle for this instant of the groove. Legs counter the arms
+       so he reads as shifting weight rather than flapping. */
+    function limbAngles(phase, move) {
+        const sw = DANCE_SWING * (move === 'BOUNCE' ? 0.55
+                                : move === 'TWIST' ? 0.8 : 1);
+        const a = Math.sin(phase * Math.PI * 2);
+        /* The torso deliberately does NOT rotate. Limb pivots are absolute
+           points in the frame, not children of the torso, so swaying the
+           torso would slide it out from under its own shoulders and hips.
+           Whole-body motion is applyMove's job (it transforms .creature);
+           this function only ever moves limbs. */
+        return {
+            armL: sw * a,
+            armR: sw * (move === 'TWIST' ? -a : a),
+            legL: sw * 0.45 * -a,
+            legR: sw * 0.45 * (move === 'TWIST' ? a : -a)
+        };
+    }
+
+    let _lastLimbAngles = null;
+
+    function applyLimbAngles(ang) {
+        _lastLimbAngles = ang;
+        if (!rigGroupEls) return;
+        for (let i = 0; i < rigGroupEls.length; i++) {
+            const el = rigGroupEls[i], k = el.getAttribute('data-part');
+            const c = rigClip[k];
+            if (!c) continue;
+            const a = ang ? (ang[k] || 0) : 0;
+            if (a) el.setAttribute('transform',
+                'rotate(' + a.toFixed(2) + ' ' + c.pivot[0] + ' ' + c.pivot[1] + ')');
+            else el.removeAttribute('transform');
+        }
+        paintDanceCanvas(ang);
+    }
+
+    /* Re-composite the kid's artwork under the current limb angles. One
+       clipped drawImage per part; the source is always the untouched paint
+       bitmap, so this never accumulates error. */
+    function paintDanceCanvas(ang) {
+        if (!danceCtx || !canvas) return;
+        const dpr = danceCanvas.width / STAGE_W;
+        danceCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        danceCtx.clearRect(0, 0, STAGE_W, STAGE_H);
+        if (!ang) return;
+        for (const k in rigClip) {
+            const c = rigClip[k], a = ang[k] || 0;
+            danceCtx.save();
+            if (a) {
+                danceCtx.translate(c.pivot[0], c.pivot[1]);
+                danceCtx.rotate(a * Math.PI / 180);
+                danceCtx.translate(-c.pivot[0], -c.pivot[1]);
+            }
+            danceCtx.clip(c.path);
+            danceCtx.drawImage(canvas, 0, 0, STAGE_W, STAGE_H);
+            danceCtx.restore();
+        }
+    }
+
+    /* Pointer -> rest-pose coords while a limb is rotated: find the part
+       under the finger (topmost first) and undo just that part's rotation,
+       so painting on a swinging arm still lands where the kid aimed. */
+    function unposePoint(x, y, ang) {
+        if (!ang || !rigClip || !danceCtx) return { x: x, y: y };
+        const keys = Object.keys(rigClip).reverse();
+        for (let i = 0; i < keys.length; i++) {
+            const c = rigClip[keys[i]], a = (ang[keys[i]] || 0) * Math.PI / 180;
+            const co = Math.cos(-a), si = Math.sin(-a);
+            const dx = x - c.pivot[0], dy = y - c.pivot[1];
+            const rx = c.pivot[0] + dx * co - dy * si;
+            const ry = c.pivot[1] + dx * si + dy * co;
+            if (danceCtx.isPointInPath(c.path, rx, ry)) return { x: rx, y: ry };
+        }
+        return { x: x, y: y };
+    }
+
     /* ---- Paper-doll rig ------------------------------------------------
        Groodle's body is five hand-drawn parts -- torso+head, two arms, two
        legs -- pinned at the joints like a brass-fastener paper doll. A pose
@@ -267,45 +375,56 @@
     const RIG_LIMBS = ['legL', 'legR', 'armL', 'armR'];
     const _rigCache = {};
 
-    function rigPathD(pose, which) {
+    function rigRingsD(rings, a, deg, mir) {
+        const t = deg * Math.PI / 180, co = Math.cos(t), si = Math.sin(t);
+        let d = '';
+        for (let r = 0; r < rings.length; r++) {
+            const f = rings[r], n = f.length / 2;
+            if (n < 3) continue;
+            const px = new Array(n), py = new Array(n);
+            for (let i = 0; i < n; i++) {
+                const x = mir ? -f[i * 2] : f[i * 2], y = f[i * 2 + 1];
+                px[i] = a[0] + x * co - y * si;
+                py[i] = a[1] + x * si + y * co;
+            }
+            d += 'M' + px[0].toFixed(1) + ' ' + py[0].toFixed(1);
+            for (let i = 0; i < n; i++) {
+                const i0 = (i + n - 1) % n, i2 = (i + 1) % n, i3 = (i + 2) % n;
+                d += 'C' + (px[i] + (px[i2] - px[i0]) / 6).toFixed(1) + ' '
+                   + (py[i] + (py[i2] - py[i0]) / 6).toFixed(1) + ' '
+                   + (px[i2] - (px[i3] - px[i]) / 6).toFixed(1) + ' '
+                   + (py[i2] - (py[i3] - py[i]) / 6).toFixed(1) + ' '
+                   + px[i2].toFixed(1) + ' ' + py[i2].toFixed(1);
+            }
+            d += 'Z';
+        }
+        return d;
+    }
+
+    /* One entry per part, in paint order (limbs first, torso on top). Each
+       carries the pivot it rotates about, which is what the dance drives. */
+    function rigPartsD(pose, which) {
         const key = (pose.id || '') + '|' + which;
         if (_rigCache[key]) return _rigCache[key];
         const ang = pose.rig || {};
-        const jobs = [];
+        const out = [];
         for (let i = 0; i < RIG_LIMBS.length; i++) {
-            const k = RIG_LIMBS[i];
-            jobs.push([RIG.parts[RIG.srcOf[k]][which], RIG.anchor[k],
-                       RIG.rest[k] + RIG.sign[k] * (ang[k] || 0),
-                       RIG.mirror.indexOf(k) !== -1]);
+            const k = RIG_LIMBS[i], a = RIG.anchor[k];
+            out.push({ key: k, pivot: a,
+                       d: rigRingsD(RIG.parts[RIG.srcOf[k]][which], a,
+                                    RIG.rest[k] + RIG.sign[k] * (ang[k] || 0),
+                                    RIG.mirror.indexOf(k) !== -1) });
         }
-        jobs.push([RIG.parts.torso[which], RIG.torsoAt, 0, false]);
+        out.push({ key: 'torso', pivot: RIG.torsoAt,
+                   d: rigRingsD(RIG.parts.torso[which], RIG.torsoAt, 0, false) });
+        _rigCache[key] = out;
+        return out;
+    }
+
+    function rigPathD(pose, which) {
+        const parts = rigPartsD(pose, which);
         let d = '';
-        for (let j = 0; j < jobs.length; j++) {
-            const rings = jobs[j][0], a = jobs[j][1];
-            const t = jobs[j][2] * Math.PI / 180, mir = jobs[j][3];
-            const co = Math.cos(t), si = Math.sin(t);
-            for (let r = 0; r < rings.length; r++) {
-                const f = rings[r], n = f.length / 2;
-                if (n < 3) continue;
-                const px = new Array(n), py = new Array(n);
-                for (let i = 0; i < n; i++) {
-                    const x = mir ? -f[i * 2] : f[i * 2], y = f[i * 2 + 1];
-                    px[i] = a[0] + x * co - y * si;
-                    py[i] = a[1] + x * si + y * co;
-                }
-                d += 'M' + px[0].toFixed(1) + ' ' + py[0].toFixed(1);
-                for (let i = 0; i < n; i++) {
-                    const i0 = (i + n - 1) % n, i2 = (i + 1) % n, i3 = (i + 2) % n;
-                    d += 'C' + (px[i] + (px[i2] - px[i0]) / 6).toFixed(1) + ' '
-                       + (py[i] + (py[i2] - py[i0]) / 6).toFixed(1) + ' '
-                       + (px[i2] - (px[i3] - px[i]) / 6).toFixed(1) + ' '
-                       + (py[i2] - (py[i3] - py[i]) / 6).toFixed(1) + ' '
-                       + px[i2].toFixed(1) + ' ' + py[i2].toFixed(1);
-                }
-                d += 'Z';
-            }
-        }
-        _rigCache[key] = d;
+        for (let i = 0; i < parts.length; i++) d += parts[i].d;
         return d;
     }
 
@@ -315,7 +434,27 @@
        its own knuckle lines with it. */
     function rigInkMarkup(pose) {
         if (!pose.rig) return '';
-        return '<path class="doll-ink-line" d="' + rigPathD(pose, 'ink') + '"/>';
+        const ink = rigPartsD(pose, 'ink');
+        const solid = rigPartsD(pose, 'solid');
+        let torsoSolid = '';
+        for (let i = 0; i < solid.length; i++) {
+            if (solid[i].key === 'torso') torsoSolid = solid[i].d;
+        }
+        /* The torso paints over the limbs, so limb ink must be cut where the
+           torso covers it -- otherwise an arm's inner contour draws across
+           the chest. One mask does it: the torso is the only part on top. */
+        let s = '<defs><mask id="dollInkMask" maskUnits="userSpaceOnUse"' +
+                ' x="0" y="0" width="' + STAGE_W + '" height="' + STAGE_H + '">' +
+                '<rect x="0" y="0" width="' + STAGE_W + '" height="' + STAGE_H +
+                '" fill="#fff"/><path d="' + torsoSolid + '" fill="#000"/></mask></defs>';
+        for (let i = 0; i < ink.length; i++) {
+            const p = ink[i];
+            if (!p.d) continue;
+            const masked = p.key !== 'torso' ? ' mask="url(#dollInkMask)"' : '';
+            s += '<g class="rig-part" data-part="' + p.key + '"' + masked +
+                 '><path class="doll-ink-line" d="' + p.d + '"/></g>';
+        }
+        return s;
     }
 
     function posePathD(pose) {
@@ -2820,7 +2959,17 @@
        <g> / <clipPath> groups inside the silhouette layers on init
        and on every pose change. */
     function renderPoseSvg(pose) {
-        return '<path d="' + posePathD(pose) + '"/>';
+        /* Rig poses render as one <g> per part so the dance can rotate each
+           limb independently. The outline filter still sees the union alpha
+           of the parent group, so it keeps drawing ONE ring, not five. */
+        if (!pose.rig) return '<path d="' + posePathD(pose) + '"/>';
+        const parts = rigPartsD(pose, 'solid');
+        let s = '';
+        for (let i = 0; i < parts.length; i++) {
+            s += '<g class="rig-part" data-part="' + parts[i].key + '">' +
+                 '<path d="' + parts[i].d + '"/></g>';
+        }
+        return s;
     }
 
     /* Updates the three silhouette groups (clipPath / fill / outline)
@@ -2840,6 +2989,10 @@
            ghost / animal poses, which carry no rig. */
         const dollInk = document.querySelector('.doll-ink');
         if (dollInk) dollInk.innerHTML = rigInkMarkup(pose);
+        /* The <g> list just got replaced -- re-cache it and the clip paths,
+           or the dance would drive detached elements. */
+        cacheRigEls();
+        applyLimbAngles(null);
         if (creature && pose.origin) {
             creature.style.transformOrigin = pose.origin;
         }
@@ -3188,6 +3341,17 @@
         canvas.height = STAGE_H * dpr;
         ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
+        /* Sibling canvas that shows the artwork re-composited per limb while
+           he dances. The paint canvas itself keeps holding the artwork in
+           rest-pose space and keeps receiving the pointer events -- it is
+           only made transparent during the dance, never hidden, or drawing
+           while dancing would stop working. */
+        danceCanvas = document.getElementById('danceCanvas');
+        if (danceCanvas) {
+            danceCanvas.width = STAGE_W * dpr;
+            danceCanvas.height = STAGE_H * dpr;
+            danceCtx = danceCanvas.getContext('2d');
+        }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         // Hard-clip the drawing surface to the silhouette so strokes outside
@@ -3255,10 +3419,15 @@
        read for one-off uses. */
     function getPos(e) {
         const rect = cachedRect || canvas.getBoundingClientRect();
-        return {
-            x: (e.clientX - rect.left) * (STAGE_W / rect.width),
-            y: (e.clientY - rect.top) * (STAGE_H / rect.height)
-        };
+        const x = (e.clientX - rect.left) * (STAGE_W / rect.width);
+        const y = (e.clientY - rect.top) * (STAGE_H / rect.height);
+        /* While a limb is rotated the kid is aiming at the DANCING body, but
+           the bitmap underneath is in rest-pose space -- undo the rotation of
+           whichever part is under the finger. */
+        if (isPlaying && _lastLimbAngles) {
+            return unposePoint(x, y, _lastLimbAngles);
+        }
+        return { x: x, y: y };
     }
 
     function attachDrawing() {
@@ -3590,6 +3759,7 @@
         if (danceDockEl) danceDockEl.hidden = true;
         setPlayBtnState(false);
         creature.style.transform = '';
+        applyLimbAngles(null);          // limbs back to the resting pose
         /* Snap the static-pattern window back to the resting body. */
         if (patternWinPathEl) patternWinPathEl.style.transform = '';
         if (floorEl) {
@@ -3689,6 +3859,8 @@
         const t = audioCtx.currentTime - danceStartTime;
         const beats = t * (TEMPO / 60);
         applyMove(MOVES[currentMoveIdx], beats);
+        /* Limbs swing on a two-beat cycle -- one beat reads as a twitch. */
+        applyLimbAngles(limbAngles(beats / 2, MOVES[currentMoveIdx]));
         requestAnimationFrame(danceFrame);
     }
 
