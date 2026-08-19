@@ -25,8 +25,12 @@ the web. If a feature only makes sense in the app, gate it behind a
   existing static `groodle/` directory bundled INTO the app (not
   loaded over the network from madderverse.org). Lets the game launch
   with no internet; only the gallery requires connectivity.
-- **Monetization**: free base game, optional IAPs for theme/beat/
-  accessory packs via Google Play Billing. No ads, ever.
+- **Monetization**: **FREE. No IAP, no billing SDK, no ads** — confirmed
+  2026-08-19, the same posture as All Munkis. *(This entry previously
+  proposed a $1.99 `studio_pack`; that was dropped. Adding billing to a
+  kids' app means adding a third-party SDK and weakening the "no data
+  collected" declaration, for revenue this catalogue is not chasing.
+  Chunk 8 below is therefore CUT.)*
 - **Identity**: anonymous, no accounts. Save state in localStorage
   (web) + `@capacitor/preferences` (app, transparently mirrors LS).
 - **Backend**: **none.** The public Supabase gallery was removed
@@ -42,17 +46,13 @@ the web. If a feature only makes sense in the app, gate it behind a
   domain — keeps room for `org.madderverse.<other-game>` later if
   more Madderverse games ship as apps).
 - **App display name**: "Groodle".
-- **First-release IAP catalog**: a single `studio_pack` at **$1.99**.
-  Contents proposed: 4 extra backgrounds + 2 extra moves + 2 extra
-  beats. One product on launch proves the IAP flow without splitting
-  attention; we add more packs in follow-up updates once it's
-  working.
-- **Privacy policy hosting**: extend the existing site-wide
-  `madderverse.org/legal.html` rather than create a Groodle-specific
-  page. The Play Store listing's "Privacy Policy" field points at
-  the same URL all other Madderverse games already use; the page
-  gains a new Groodle-specific section covering the public gallery,
-  IAP, and any data the app collects beyond the web version.
+- **First-release IAP catalog**: none — the app is free. *(Superseded;
+  see Monetization above.)*
+- **Privacy policy hosting**: **`madderverse.org/groodle/privacy/`** — a
+  Groodle-specific page, matching how Cookie Cache and Slip Studio do it
+  rather than the shared page this doc originally proposed. Written
+  2026-08-19. It has no "gallery" or "purchases" caveats to make, because
+  there is neither.
 
 ## Open decisions
 
