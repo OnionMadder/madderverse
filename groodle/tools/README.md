@@ -59,6 +59,29 @@ redrawn, and paste the numbers into `trace_rig.py`.
   vanishes. It comes from the full ink mask, restricted to the part's
   interior and minus a band along the outer contour.
 
+## Seams
+
+The shoulder looks clean because the arm's top is buried ~175 units under the
+torso. The hip has only ~47 units of cover before the torso tapers away, so
+everything that can go wrong at a joint goes wrong there. Three separate
+causes, all fixed, all easy to reintroduce:
+
+1. **Doubled contours.** A part's own outer edge is already drawn by the
+   assembled silhouette's outline filter, so keeping it in the ink layer gives
+   two near-parallel lines a unit apart. `CONTOUR_BAND` discards it, per part,
+   because the three drawings do not share a stroke weight.
+2. **Soft grey band.** The silhouette is five separately-antialiased paths, so
+   where two parts' edges nearly coincide the combined alpha lands below 1;
+   eroding that and compositing it out smears it. `index.html`'s outline
+   filter binarises alpha (`feFuncA slope="4"`) *before* the erode.
+3. **A real hole.** The torso and legs simply do not touch at the right hip.
+   `hip_gusset()` bridges it. Read its docstring before resizing it -- three
+   shapes were tried and each broke something different.
+
+After any change here, check **both**: enclosed holes in the hip band, and
+that the outline did not move. Point probes pass while the outline bulges --
+that mistake shipped a Groodle with saddlebags for one build.
+
 ## The frame constraint (read before touching an angle)
 
 His arms are 217 units long, against 150 of clearance to the frame edge and

@@ -117,13 +117,27 @@
              as the fill layer; filter renders one unified dark ring
              inside the union of the body shapes. -->
         <svg class="silhouette-outline-layer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-            <!-- radius tuned to the paper-doll rig: the parts are drawn at
-                 0.872x, so the old radius 6 read as a heavy blob and buried
-                 the hand-drawn line weight. -->
+            <!-- Inner outline ring.
+
+                 feFuncA binarises the alpha BEFORE the erode, and that step is
+                 load-bearing: the silhouette is five separately-antialiased
+                 part paths, so where two parts' edges nearly coincide their
+                 combined alpha lands below 1. Eroding that and compositing it
+                 out turned the near-coincident edges into a soft grey band.
+                 Edges only coincide at the hip -- the arm's top is buried deep
+                 under the torso -- which is why the shoulder always looked
+                 clean and the hip looked smeared. Slope 4 snaps the seam to
+                 solid while leaving the outer edge antialiased.
+
+                 radius is tuned to the drawing's line weight; 6 read as a
+                 heavy blob and buried it. -->
             <defs>
                 <filter id="innerOutlineFilter" x="-2%" y="-2%" width="104%" height="104%">
-                    <feMorphology operator="erode" radius="4" in="SourceAlpha" result="inner"/>
-                    <feComposite operator="out" in="SourceAlpha" in2="inner" result="ring"/>
+                    <feComponentTransfer in="SourceAlpha" result="hard">
+                        <feFuncA type="linear" slope="4" intercept="0"/>
+                    </feComponentTransfer>
+                    <feMorphology operator="erode" radius="4" in="hard" result="inner"/>
+                    <feComposite operator="out" in="hard" in2="inner" result="ring"/>
                     <feFlood flood-color="#1a0f33" result="ink"/>
                     <feComposite operator="in" in="ink" in2="ring"/>
                 </filter>

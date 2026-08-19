@@ -85,11 +85,15 @@ def raster(rings, K, OX, OY):
 
 
 def assemble(p):
-    """p = (armDX, armDY, legDX, legDY, armRest, legRest, armScale, legScale)."""
-    aDX, aDY, lDX, lDY, aR, lR, aS, lS = p
+    """(armDXL, armDXR, armDY, legDXL, legDXR, legDY, armRest, legRest,
+    armScale, legScale). Left and right are solved SEPARATELY: the torso is
+    drawn ~7 units off the body axis, so symmetric pins leave the right leg
+    short of it -- a real gap in the union, which the outline then traces as
+    a stray dark slash at the right hip."""
+    aDXL, aDXR, aDY, lDXL, lDXR, lDY, aR, lR, aS, lS = p
     SC = {'arm': aS, 'leg': lS}
-    anchor = {'armL': (BC - aDX, aDY), 'armR': (BC + aDX, aDY),
-              'legL': (BC - lDX, lDY), 'legR': (BC + lDX, lDY)}
+    anchor = {'armL': (BC - aDXL, aDY), 'armR': (BC + aDXR, aDY),
+              'legL': (BC - lDXL, lDY), 'legR': (BC + lDXR, lDY)}
     rest = {'armL': aR, 'armR': -aR, 'legL': lR, 'legR': -lR}
     out = []
     for k in ('legL', 'legR', 'armL', 'armR'):
@@ -118,12 +122,12 @@ def score(p):
     return inter / union if union else 0.0
 
 
-start = np.array([50.0, 152.0, 23.0, 284.0, 2.0, 1.0, 1.0, 1.0])
+start = np.array([63.9, 63.9, 143.0, 47.9, 47.9, 270.9, 0.8, 0.2, 1.105, 1.319])
 print("start IoU: %.4f  %s" % (score(start), start))
 
 # coordinate descent -- small parameter space, no optimiser dependency
 best, bs = start.copy(), score(start)
-steps = np.array([6.0, 8.0, 6.0, 10.0, 4.0, 4.0, 0.06, 0.06])
+steps = np.array([4.0, 4.0, 5.0, 4.0, 4.0, 6.0, 2.0, 2.0, 0.04, 0.04])
 for it in range(60):
     improved = False
     for i in range(len(best)):
@@ -137,8 +141,8 @@ for it in range(60):
         if steps.max() < 0.25:
             break
 print("fitted IoU: %.4f" % bs)
-print("armDX=%.1f armDY=%.1f legDX=%.1f legDY=%.1f armRest=%.1f legRest=%.1f armScale=%.3f legScale=%.3f" % tuple(best))
-json.dump({'armDX': best[0], 'armDY': best[1], 'legDX': best[2], 'legDY': best[3],
-           'armRest': best[4], 'legRest': best[5],
-           'armScale': best[6], 'legScale': best[7], 'iou': bs},
+print("armDXL=%.1f armDXR=%.1f armDY=%.1f legDXL=%.1f legDXR=%.1f legDY=%.1f "
+      "armRest=%.1f legRest=%.1f armScale=%.3f legScale=%.3f" % tuple(best))
+json.dump(dict(zip(['armDXL','armDXR','armDY','legDXL','legDXR','legDY',
+                    'armRest','legRest','armScale','legScale'], best.tolist()), iou=bs),
           open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fit.json'), 'w'))

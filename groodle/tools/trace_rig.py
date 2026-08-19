@@ -46,6 +46,26 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
 FILES = {'torso': 'torso.png', 'arm': 'arm.png', 'leg': 'leg.png'}
 
 INK_THRESHOLD = 120          # figure strokes are near 0; grid lines 150-230
+
+# Fraction of each part's height whose interior ink is kept. The excluded
+# slivers are CUT edges -- where the part was severed from the whole figure --
+# not drawn lines. See the note in trace() for why only the hip needs this.
+INK_TRIM = {'leg': (0.10, 1.0), 'torso': (0.0, 0.93)}
+
+# Width of the band along a part's own outer contour whose ink is discarded.
+# That contour is already drawn by the assembled silhouette's outline filter,
+# so keeping it means two near-parallel lines a unit apart -- a smudged seam.
+# Per part because the three drawings do not share a stroke weight. At the
+# shared 26 both the leg's and the arm's own inner edges survived and doubled
+# the outline; the arm's showed only on the RIGHT, because the torso is drawn
+# ~7 units right of the body axis and so covers the left arm but not the right.
+# The torso stays at 26: its collarbone and chest lines are genuine interior
+# detail sitting close to its edge, and a wider band eats them.
+CONTOUR_BAND = {'torso': 26, 'arm': 40, 'leg': 44}
+
+# Ink shapes whose centre falls below this fraction of a part's height are
+# dropped outright. See the note in trace().
+INK_DROP_BELOW = {'torso': 0.65}
 # Limb lengths and joint anchors are FITTED, not guessed: tools/fit_standing.py
 # rasterises the assembled standing doll against the original full-figure
 # drawing and maximises IoU. Hand-guessed values scored 0.563; these score
@@ -104,7 +124,7 @@ def trace(name):
     # eating the toe and knuckle lines that sit near the edge).
     cs, _ = cv2.findContours(solid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     band = np.zeros_like(solid)
-    cv2.drawContours(band, cs, -1, 1, thickness=26)
+    cv2.drawContours(band, cs, -1, 1, thickness=CONTOUR_BAND.get(name, 26))
     detail = (ink & cv2.erode(solid, np.ones((3, 3), np.uint8)) & (1 - band)).astype(np.uint8)
 
     ys, xs = np.nonzero(solid)
@@ -134,8 +154,40 @@ def trace(name):
                 out.append([((x - px) * s, (y - py) * s) for x, y in p])
         return out
 
-    return {'solid': rings(solid, 1.6, 60, True),
-            'ink':   rings(detail, 3.4, 150, False)}
+    # Trim ink at the CUT edge, on the BITMAP before contouring -- a part's
+    # interior ink is often one continuous ring spanning its whole length, so
+    # dropping whole rings is a no-op.
+    #
+    # Where a part was severed from the figure the drawing carries an edge that
+    # is not a line Onion drew, and after assembly it lands right on top of the
+    # union outline: two near-parallel lines a unit apart, which reads as a
+    # smudged seam. The shoulder never shows it because the arm's top is buried
+    # ~175 units under the torso; the hip has only ~47 units of cover before the
+    # torso tapers away, so both cut edges are exposed.
+    lo, hi = INK_TRIM.get(name, (0.0, 1.0))
+    if (lo, hi) != (0.0, 1.0):
+        span = y1 - y0
+        detail[:int(round(y0 + lo * span)), :] = 0
+        detail[int(round(y0 + hi * span)):, :] = 0
+    ink_rings = rings(detail, 3.4, 150, False)
+
+    # Drop whole ink shapes that sit below a part's cutoff. The torso's pelvic
+    # crease lines live here: they are real lines Onion drew, but in the
+    # assembly the legs cover most of that area, so each survives only as an
+    # isolated stub -- and her drawing is not quite symmetric, so one stub
+    # showed and the other did not, which reads as a stray mark rather than
+    # anatomy. Ring-level, because unlike the leg's single full-length contour
+    # the torso's ink really is many separate shapes.
+    cut = INK_DROP_BELOW.get(name)
+    if cut is not None:
+        span = y1 - y0
+        keep = []
+        for r in ink_rings:
+            mid = sum(y for _, y in r) / len(r)          # part-local units
+            if (mid / s + py - y0) / span <= cut:
+                keep.append(r)
+        ink_rings = keep
+    return {'solid': rings(solid, 1.6, 60, True), 'ink': ink_rings}
 
 
 def placed(parts, pose):
@@ -157,8 +209,48 @@ def placed(parts, pose):
     return out
 
 
+def hip_gusset(rx=13.0, ry=21.0, steps=28):
+    """A small disc bridging the torso-to-leg gap, in TORSO-local coords,
+    merged into the torso's solid rings.
+
+    The torso and legs were drawn separately and, at the right hip, do not
+    quite touch: the torso is drawn ~7 units right of the body axis, so a
+    symmetric leg pin leaves a few units of daylight around y=325. That is a
+    real hole in the union and the outline filter faithfully traced it as a
+    stray dark slash -- what made the hip read as broken while the shoulder
+    read as clean.
+
+    Fitting cannot fix it: a gap that small barely moves IoU, so the solver is
+    indifferent (given the freedom it widened the gap slightly). This is the
+    paper-doll answer instead: the tab that makes a joint overlap.
+
+    Kept SMALL, placed in the gap itself rather than at the pin, and shaped as
+    a TALL NARROW ellipse: the daylight runs vertically down the joint, so the
+    patch needs height, and every unit of width risks the two things that broke
+    earlier attempts. Three tries failed and are worth not repeating:
+      * a big disc at the pin reached the armpit and closed the arm/torso gap,
+        which is the gap that makes an arm read as its own limb (contract
+        rule 2 -- the exact regression this whole rebuild was fixing);
+      * dropping that disc lower to clear the armpit made it protrude past the
+        hip as a visible bulge;
+      * a small circle covered the lower half of the gap but not the top.
+    Check BOTH after changing it: enclosed holes in the hip band, and that the
+    outline did not move. Point probes alone pass while the outline bulges.
+    Wind it the SAME way OpenCV returns contours -- under nonzero fill an
+    opposite winding subtracts where it overlaps, punching new holes.
+    """
+    out = []
+    for sx in (-1, 1):
+        cx, cy = BC + sx * 32.0, 285.0
+        out.append([(cx + rx * math.cos(-2 * math.pi * i / steps),
+                     cy + ry * math.sin(-2 * math.pi * i / steps))
+                    for i in range(steps)])
+    return out
+
+
 def main():
     parts = {n: trace(n) for n in FILES}
+    parts['torso']['solid'] = parts['torso']['solid'] + hip_gusset()
 
     # Solve one scale + offset for ALL poses, so he never changes size between
     # them, the widest pose still fits, and the lowest foot lands on the floor.
