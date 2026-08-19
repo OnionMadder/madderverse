@@ -29,8 +29,12 @@ the web. If a feature only makes sense in the app, gate it behind a
   accessory packs via Google Play Billing. No ads, ever.
 - **Identity**: anonymous, no accounts. Save state in localStorage
   (web) + `@capacitor/preferences` (app, transparently mirrors LS).
-- **Backend**: existing Supabase project for the public gallery.
-  Anonymous PNG uploads with a kid-safe name field, same as today.
+- **Backend**: **none.** The public Supabase gallery was removed
+  2026-08-18; the gallery is on-device IndexedDB on web and app alike.
+  Groodle is a pure static site with no API, no accounts, and no
+  network requests beyond fonts + analytics (both stripped from the
+  app bundle). This keeps Data Safety at *no data collected* and the
+  age band at the floor. Do not reintroduce a network gallery.
 - **Platform scope (v1)**: Android only. iOS is on hold — Apple's kid
   app + IAP rules are stricter and Capacitor handles it the same way
   whenever we're ready.
@@ -204,8 +208,8 @@ real app.
   documents directory so kids find them in their phone's gallery
   alongside other photos. Optional "Save to phone" button next to
   "Save to gallery".
-- Local "My Groodles" tab in the gallery modal — a list of PNGs saved
-  locally on this device, even if not posted to the Supabase gallery.
+- (DONE) The on-device "My Groodles" gallery is now the *only*
+  gallery — IndexedDB, two-tap delete, no network.
 - Use `@capacitor/preferences` as a drop-in replacement for
   `localStorage` in the app build. Wrapper in `game.js` that picks
   the right backend at runtime.
@@ -245,31 +249,16 @@ yet — packs are owned-by-default this chunk; chunk 8 gates ownership.
 everything is unlocked since IAP isn't wired yet.
 **Depends on**: chunks 2 + 3 (content to bundle).
 
-## Chunk 7 — Backend hardening for the gallery
+## Chunk 7 — ~~Backend hardening for the gallery~~ (CUT 2026-08-18)
 
-Before we ship to thousands of kids via Play, tighten Supabase RLS +
-add minimal moderation.
+**This chunk no longer exists.** It described moderation, rate-limiting
+and Play-Integrity-signed JWTs for the public Supabase gallery — all of
+which was work to make a risky feature survivable. The feature was
+removed instead, which deletes the entire problem class: no uploads, no
+moderation queue, no abuse surface, no PII question, no backend to
+harden or pay for.
 
-- New `groodle_reports` table — anonymous report POSTs with `(groodle_id,
-  reason, created_at)`, INSERT-only public, SELECT admin-only. Report
-  button on each gallery card; a Groodle gets auto-hidden client-side
-  after N reports.
-- Storage upload rate-limit: a Supabase Edge Function fronting the
-  upload that enforces "1 submission per device per 60 seconds" via a
-  device fingerprint (Capacitor `App.getInfo().id`-style anonymous
-  install id). No PII.
-- Move from anon JWT to a per-install Supabase JWT minted by a Play
-  Integrity-verified Edge Function (so only legit app installs can
-  POST). Web build keeps anon JWT.
-- Gallery client side: paginated, lazy-load images, "Show more"
-  button. Today's `limit(48)` becomes the page size with offset.
-- Optional: a one-time client-side ML profanity / NSFW check on the
-  composed PNG before upload (TensorFlow.js with a tiny model). Adds
-  ~500 KB to the bundle; opt-in.
-
-**Effort**: 1–2 sessions.
-**Deliverable**: safer gallery that resists spam and abuse.
-**Depends on**: existing Supabase setup (`SUPABASE_SETUP.md`).
+The gallery is on-device IndexedDB. Nothing to secure.
 
 ## Chunk 8 — IAP integration (Google Play Billing)
 
@@ -422,8 +411,6 @@ The chunks below run in parallel if you ever want to split work:
   no Android dependency. Could be a separate person / session.
 - **Mobile shell track** (chunks 4, 5, 9) — requires Android Studio
   and a phone.
-- **Backend track** (chunk 7) — pure Supabase / SQL work, parallel
-  to everything.
 - **Storefront track** (chunks 10, 11) — content + policy writing,
   no engineering.
 - **Billing track** (chunk 8) — depends on chunks 4 + 6.

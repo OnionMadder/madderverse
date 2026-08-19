@@ -18,7 +18,7 @@
 
 'use strict';
 
-const SHELL_VERSION = 'groodle-shell-v27';
+const SHELL_VERSION = 'groodle-shell-v28';
 
 /* Files baked into the cache during `install`. List anything the
    game absolutely needs to render the first frame. Hat sprites are
@@ -76,13 +76,13 @@ self.addEventListener('fetch', (event) => {
 
     const url = new URL(req.url);
 
-    /* Network-only bypasses. Supabase and GoatCounter must hit the
-       wire fresh every time (the gallery + analytics depend on live
-       responses; caching them is wrong). The browser handles these
-       fetches normally when we don't call respondWith. */
-    if (url.hostname.endsWith('supabase.co') ||
-        url.hostname.endsWith('supabase.in') ||
-        url.hostname.endsWith('goatcounter.com')) {
+    /* Network-only bypass. GoatCounter must hit the wire fresh every
+       time (caching an analytics beacon is wrong). The browser handles
+       these fetches normally when we don't call respondWith.
+
+       There is no gallery bypass any more — the gallery is on-device
+       IndexedDB and makes no network requests at all. */
+    if (url.hostname.endsWith('goatcounter.com')) {
         return;
     }
 

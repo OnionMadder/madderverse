@@ -1808,63 +1808,6 @@ body:not(.dancing) .dance-dock { display: none; }
     border: 1px solid rgba(0, 255, 204, 0.35);
 }
 
-/* ============ SAVE DIALOG ============
-
-   Narrower than the achievement / hat / pages modals (single-column
-   form). The sheet is centered; the body holds the name field, status
-   line, primary submit button, and a one-line safety hint. */
-
-.save-sheet { max-width: 380px; }
-
-.save-body {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 4px 2px;
-}
-
-.save-label {
-    font-size: 12px;
-    letter-spacing: 1.2px;
-    text-transform: uppercase;
-    color: #d6bdff;
-    font-weight: bold;
-}
-
-.save-input {
-    width: 100%;
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.4);
-    border: 2px solid rgba(0, 255, 204, 0.5);
-    color: #fff;
-    font-size: 16px;
-    font-family: inherit;
-    -webkit-tap-highlight-color: transparent;
-}
-.save-input:focus {
-    outline: none;
-    border-color: #ff6ec7;
-    box-shadow: 0 0 0 3px rgba(255, 110, 199, 0.25);
-}
-
-.save-status {
-    font-size: 13px;
-    color: #d6bdff;
-    min-height: 18px;
-    text-align: center;
-}
-
-.save-submit { align-self: stretch; }
-
-.save-hint {
-    margin: 4px 0 0;
-    font-size: 11px;
-    line-height: 1.4;
-    text-align: center;
-    color: rgba(255, 255, 255, 0.55);
-}
-
 /* ============ GALLERY GRID ============ */
 
 .gallery-grid {
@@ -1899,18 +1842,9 @@ body:not(.dancing) .dance-dock { display: none; }
     border-radius: 10px;
 }
 
-.gallery-name {
-    font-size: 13px;
-    font-weight: bold;
-    text-align: center;
-    color: #fff;
-    word-break: break-word;
-}
-
-/* Local-gallery delete: corner trash button with a two-tap confirm.
+/* Gallery delete: corner trash button with a two-tap confirm.
    .gallery-card is flex; relative positioning lets the button overlay
-   the thumbnail. Harmless to web (Supabase) cards — they have no
-   .gallery-del child. */
+   the thumbnail. */
 .gallery-card { position: relative; }
 .gallery-del {
     position: absolute;

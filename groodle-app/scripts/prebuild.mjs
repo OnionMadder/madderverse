@@ -18,10 +18,10 @@
  * app, and external scrapers/PWA installers still want them pointed
  * at the live site.
  *
- * Network resources (Google Fonts, the Supabase CDN + API,
- * GoatCounter) are left as-is — they degrade gracefully offline
- * (the font falls back to the chunky stack; the gallery shows its
- * "not set up / offline" state; analytics simply no-ops). */
+ * Network resources (Google Fonts, GoatCounter) are left as-is —
+ * they degrade gracefully offline (the font falls back to the chunky
+ * stack; analytics simply no-ops). The gallery needs no network at
+ * all: it is on-device IndexedDB. */
 
 import { existsSync, rmSync, mkdirSync, cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -36,7 +36,7 @@ const www = join(appRoot, 'www');
 
 /* Files in groodle/ that are dev-only — never ship them in the APK. */
 const SKIP = new Set([
-    'CLAUDE.md', 'PLAY_STORE_PLAN.md', 'SUPABASE_SETUP.md', 'cover.jpg'
+    'CLAUDE.md', 'PLAY_STORE_PLAN.md', 'cover.jpg'
 ]);
 
 function reset() {

@@ -2217,77 +2217,22 @@
        picker — applyFilled() above does the pose/bg/hat/colour+paint;
        DEFAULT_GROODLES is still the art source via CHARACTER.filled.) */
 
-    /* ============ PUBLIC GALLERY (Supabase) ============
+    /* ============ GROODLE EXPORT (shared by the gallery) ============
 
-       Optional feature: kids can SAVE their finished Groodle to a shared
-       public gallery hosted on Supabase. The credentials below are
-       placeholders; see groodle/SUPABASE_SETUP.md for the SQL schema +
-       Row Level Security policies that must be in place before this
-       works end-to-end. While the placeholders are unchanged, the SAVE
-       button shows a "not configured" toast and the GALLERY modal shows
-       an empty state — the rest of the game keeps working unaffected.
+       Renders the finished creature to a PNG blob. Used by the
+       on-device gallery below; kept separate from it so any future
+       "save to photos / share sheet" path can reuse the same compose.
 
        Compose strategy: the offscreen export canvas is painted from the
        same primitives the game uses on screen — buildBodyPath + the
        in-stage draw canvas + a stroked outline ring — instead of
        serializing SVG with embedded sprite refs. This sidesteps the
        cross-origin / blob-relative-path issues SVG serialization runs
-       into and keeps the export tiny. */
+       into and keeps the export tiny.
 
-    /* Public-by-design: the publishable key is meant to ship in client
-       code; Row Level Security (see SUPABASE_SETUP.md §3) is the actual
-       guard. NOT a secret — do not put the sb_secret_/service_role key
-       here. Web build only; the native app uses the on-device gallery. */
-    const SUPABASE_URL = 'https://rzciqdsxbklshsgrftgp.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_nz4x4l_VHsbVtntLc3f8cA_8IyJW3hh';
-    const GROODLE_BUCKET = 'groodle-art';
-    const GROODLE_TABLE = 'groodles';
-
-    let _supabaseClient = null;
-    function getSupabaseClient() {
-        if (_supabaseClient) return _supabaseClient;
-        if (typeof window.supabase === 'undefined') return null;
-        if (SUPABASE_URL === 'YOUR_SUPABASE_URL' ||
-            SUPABASE_ANON_KEY === 'YOUR_SUPABASE_ANON_KEY') return null;
-        _supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        return _supabaseClient;
-    }
-
-    /* ---- Kid-safe random display-name generator + profanity check ---- */
-
-    const NAME_ADJ = ['Purple', 'Sparkly', 'Mighty', 'Brave', 'Silly', 'Wiggly',
-        'Zoomy', 'Cosmic', 'Bouncy', 'Sneaky', 'Fancy', 'Rad', 'Funky', 'Loud',
-        'Tiny', 'Giant', 'Magic', 'Speedy', 'Glowing', 'Wild'];
-    const NAME_NOUN = ['Tiger', 'Otter', 'Panda', 'Dragon', 'Owl', 'Fox',
-        'Robot', 'Comet', 'Pickle', 'Noodle', 'Banana', 'Squid', 'Wizard',
-        'Ninja', 'Astronaut', 'Yeti', 'Goblin', 'Frog', 'Penguin', 'Llama'];
-
-    function randomDisplayName() {
-        const a = NAME_ADJ[Math.floor(Math.random() * NAME_ADJ.length)];
-        const n = NAME_NOUN[Math.floor(Math.random() * NAME_NOUN.length)];
-        const num = Math.floor(Math.random() * 99) + 1;
-        return a + n + num;
-    }
-
-    /* Minimal client-side filter. Server-side validation in the RLS
-       insert policy is the real safety net — this only stops the most
-       obvious slips before they ever reach the database. The list is
-       intentionally short + ASCII; Supabase-side enforcement should
-       cover the variations. */
-    const BAD_WORDS = [
-        'fuck','shit','bitch','cunt','nigger','faggot','slut','whore',
-        'asshole','dick','penis','vagina','sex','porn','nazi','kill',
-        'rape','retard'
-    ];
-    function isNameClean(name) {
-        if (!name) return false;
-        const lower = name.toLowerCase();
-        for (let i = 0; i < BAD_WORDS.length; i++) {
-            if (lower.indexOf(BAD_WORDS[i]) !== -1) return false;
-        }
-        return true;
-    }
-
+       NOTE: there is deliberately NO network gallery. A public,
+       anonymous-upload gallery was removed in favour of a purely
+       on-device one — see the LOCAL GALLERY block below for why. */
     /* Render the whole creature to an offscreen 800×1200 (DPR-2) PNG.
        Background is left transparent — the gallery card frames each
        Groodle on its own neutral surface so background presets don't
@@ -2396,130 +2341,30 @@
             });
     }
 
-    let saveModalEl = null;
-    let saveModalInputEl = null;
-    let saveModalSubmitEl = null;
-    let saveModalStatusEl = null;
     let galleryModalEl = null;
     let galleryGridEl = null;
 
-    function openSaveDialog() {
-        if (!saveModalEl) return;
-        const client = getSupabaseClient();
-        if (saveModalInputEl) saveModalInputEl.value = randomDisplayName();
-        if (saveModalStatusEl) {
-            saveModalStatusEl.textContent = client
-                ? 'Sign your Groodle, then tap Save.'
-                : 'Gallery is not set up yet — see SUPABASE_SETUP.md.';
-        }
-        if (saveModalSubmitEl) saveModalSubmitEl.disabled = !client;
-        openModal(saveModalEl);
-    }
+    /* ============ ON-DEVICE GALLERY ============
 
-    async function submitGroodle() {
-        const client = getSupabaseClient();
-        if (!client) return;
-        const rawName = (saveModalInputEl && saveModalInputEl.value || '').trim();
-        const name = rawName.slice(0, 24);
-        if (!name || !isNameClean(name)) {
-            saveModalStatusEl.textContent = 'Pick a different name, please.';
-            return;
-        }
-        saveModalSubmitEl.disabled = true;
-        saveModalStatusEl.textContent = 'Saving…';
-        try {
-            const blob = await composeGroodleBlob();
-            if (!blob) throw new Error('Could not capture drawing');
-            const filename = 'groodle-' + Date.now() + '-' +
-                Math.random().toString(36).slice(2, 8) + '.png';
-            const up = await client.storage
-                .from(GROODLE_BUCKET)
-                .upload(filename, blob, { contentType: 'image/png' });
-            if (up.error) throw up.error;
-            const pub = client.storage.from(GROODLE_BUCKET).getPublicUrl(filename);
-            const ins = await client.from(GROODLE_TABLE).insert({
-                name: name,
-                image_url: pub.data.publicUrl,
-                page_id: currentCharacterId
-            });
-            if (ins.error) throw ins.error;
-            saveModalStatusEl.textContent = 'Saved! Find it in the Gallery.';
-            setTimeout(closeModal, 1100);
-        } catch (e) {
-            saveModalStatusEl.textContent = 'Save failed — try again later.';
-            saveModalSubmitEl.disabled = false;
-        }
-    }
+       The ONLY gallery. SAVE composes the PNG and writes it to
+       IndexedDB on this device; the Gallery modal reads it back.
+       Nothing ever leaves the device — no uploads, no accounts, no
+       other users' content, no network call of any kind.
 
-    async function loadRecentGroodles() {
-        const client = getSupabaseClient();
-        if (!client) return null;
-        const { data, error } = await client
-            .from(GROODLE_TABLE)
-            .select('id, name, image_url, page_id, created_at')
-            .order('created_at', { ascending: false })
-            .limit(48);
-        if (error) return null;
-        return data;
-    }
+       This is deliberate, and it is the same on web and in the
+       Capacitor app:
 
-    async function openGallery() {
-        if (!galleryModalEl) return;
-        openModal(galleryModalEl);
-        /* Web (public) path keeps the public copy explicitly, so the two
-           paths stay self-consistent if a context ever toggles. */
-        const gs = document.getElementById('galleryStats');
-        if (gs) gs.textContent = 'Latest Groodles from around the world';
-        if (galleryGridEl) {
-            galleryGridEl.innerHTML = '<div class="gallery-empty">Loading…</div>';
-        }
-        const client = getSupabaseClient();
-        if (!client) {
-            galleryGridEl.innerHTML =
-                '<div class="gallery-empty">Gallery is not set up yet.<br>' +
-                'See <code>SUPABASE_SETUP.md</code> for instructions.</div>';
-            return;
-        }
-        const rows = await loadRecentGroodles();
-        if (!rows) {
-            galleryGridEl.innerHTML = '<div class="gallery-empty">Could not load gallery.</div>';
-            return;
-        }
-        if (rows.length === 0) {
-            galleryGridEl.innerHTML = '<div class="gallery-empty">Be the first to share a Groodle!</div>';
-            return;
-        }
-        galleryGridEl.innerHTML = '';
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            const card = document.createElement('div');
-            card.className = 'gallery-card';
-            card.innerHTML =
-                '<img class="gallery-img" src="' + row.image_url + '" alt="Groodle by ' + escapeHtml(row.name) + '" loading="lazy"/>' +
-                '<div class="gallery-name">' + escapeHtml(row.name) + '</div>';
-            galleryGridEl.appendChild(card);
-        }
-    }
+       - Play Store age rating: any user-content sharing / network
+         gallery pushes the app into a higher age band and pulls in
+         COPPA scrutiny. An on-device gallery keeps the Data Safety
+         form at "no data collected", which is the Madderverse promise
+         anyway.
+       - A public bucket taking anonymous uploads from a kids' site is
+         a moderation burden and an abuse target with no upside.
 
-    /* ============ LOCAL (ON-DEVICE) GALLERY ============
-
-       Play Store age-rating safety: the Capacitor app must have NO
-       user-content sharing / network gallery (that forces a higher age
-       band + COPPA scrutiny). So in the native app, SAVE writes the
-       composed PNG to on-device IndexedDB and the Gallery reads it back
-       — nothing ever leaves the device, no accounts, no other users.
-       On the plain web build the existing Supabase path above is left
-       intact (kept for a possible future website-only public gallery).
-
-       isNativeApp() is checked at click time (not load) so the
-       __groodleForceLocal QA seam can exercise the local path in a
-       desktop browser / headless Chrome where Capacitor is absent. */
-    function isNativeApp() {
-        if (window.__groodleForceLocal) return true;
-        return !!(window.Capacitor &&
-                  typeof window.Capacitor.isNativePlatform === 'function' &&
-                  window.Capacitor.isNativePlatform());
-    }
+       Do not reintroduce a network gallery. If sharing is ever wanted,
+       the right shape is an explicit parent-driven export (share sheet
+       / download), not a shared public feed. */
 
     const IDB_NAME = 'groodle-gallery';
     const IDB_STORE = 'creations';
@@ -3892,25 +3737,13 @@
         document.getElementById('openHatShopBtn').addEventListener('click', openHatShop);
         const pagesBtn = document.getElementById('openPagesBtn');
         if (pagesBtn) pagesBtn.addEventListener('click', openCharacterPicker);
-        /* Native app → on-device local gallery (no network/UGC, keeps
-           the Play Store age band low). Web → existing Supabase path,
-           preserved for a possible future website-only public gallery. */
+        /* Gallery + SAVE are on-device only, on web and in the app
+           alike — see the ON-DEVICE GALLERY block in the gallery
+           section. No network, no upload, no name prompt. */
         const galleryBtn = document.getElementById('openGalleryBtn');
-        if (galleryBtn) galleryBtn.addEventListener('click', function () {
-            if (isNativeApp()) openLocalGallery(); else openGallery();
-        });
+        if (galleryBtn) galleryBtn.addEventListener('click', openLocalGallery);
         const saveBtn = document.getElementById('saveBtn');
-        if (saveBtn) saveBtn.addEventListener('click', function () {
-            if (isNativeApp()) saveGroodleLocal(); else openSaveDialog();
-        });
-        if (saveModalSubmitEl) {
-            saveModalSubmitEl.addEventListener('click', submitGroodle);
-        }
-        if (saveModalInputEl) {
-            saveModalInputEl.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') submitGroodle();
-            });
-        }
+        if (saveBtn) saveBtn.addEventListener('click', saveGroodleLocal);
 
         document.getElementById('eraserBtn').addEventListener('click', () => {
             isErasing = !isErasing;
@@ -3976,17 +3809,12 @@
         accessoryShopGridEl = document.getElementById('accessoryShopGrid');
         pagesModalEl = document.getElementById('pagesModal');
         pagesGridEl = document.getElementById('pagesGrid');
-        saveModalEl = document.getElementById('saveModal');
-        saveModalInputEl = document.getElementById('saveNameInput');
-        saveModalSubmitEl = document.getElementById('saveSubmitBtn');
-        saveModalStatusEl = document.getElementById('saveModalStatus');
         galleryModalEl = document.getElementById('galleryModal');
         galleryGridEl = document.getElementById('galleryGrid');
         drawerHostEl = document.getElementById('drawerHost');
         if (achievementsModalEl) attachModalDismissers(achievementsModalEl);
         if (hatShopModalEl) attachModalDismissers(hatShopModalEl);
         if (pagesModalEl) attachModalDismissers(pagesModalEl);
-        if (saveModalEl) attachModalDismissers(saveModalEl);
         if (galleryModalEl) attachModalDismissers(galleryModalEl);
         attachDrawerHostDismissers();
         attachDockButtons();

@@ -32,12 +32,13 @@ to `groodle/`.
   the lines. Pressing DANCE while a page is loaded unlocks that page's
   achievement + Doodles reward. The body silhouette is the *outer*
   fence; the page template adds an *inner* structure.
-- **Public Gallery** (optional, Supabase-backed): the 💾 SAVE button in
-  the New drawer composites the silhouette + drawing + outline into a
-  PNG and uploads it to a public Supabase bucket; the 🖼️ Gallery dock
-  button shows the most recent submissions. Anonymous + kid-safe name
-  field. While the Supabase credentials in `game.js` are placeholders,
-  both buttons render but display a setup hint — see `SUPABASE_SETUP.md`.
+- **On-device Gallery**: the 💾 SAVE button composites the silhouette +
+  drawing + deco layers into an 800×1200 PNG and writes it to
+  **IndexedDB on this device** (`groodle-gallery` / `creations`); the
+  🖼️ Gallery dock button reads it back, with a two-tap-confirm delete
+  per card. One tap to save — no dialog, no name, no upload.
+  **Nothing leaves the device and the game makes no network request of
+  any kind.** See "No network gallery" below.
 
 ## File layout
 
@@ -49,15 +50,42 @@ groodle/
   cover.jpg              — hub-page card art
   manifest.webmanifest   — PWA manifest (name, icons, theme, start_url)
   sw.js                  — service worker (cache-first shell for offline play)
-  SUPABASE_SETUP.md      — one-shot SQL + RLS setup for the public gallery
   PLAY_STORE_PLAN.md     — phased rollout plan to ship as a Capacitor Android app
 ```
 
 All runtime files are loaded directly by the browser. Path conventions
 match the rest of the hub (relative for in-game assets, absolute for SEO
-/ favicon). The Supabase JS SDK is loaded from jsDelivr in `index.html`
-and only does work once the placeholder credentials in `game.js` are
-filled in.
+/ favicon). **There are no third-party script or API dependencies** —
+the only external requests the page makes at all are the Google Fonts
+stylesheet and the GoatCounter beacon (both stripped from the app
+bundle by `groodle-app/scripts/prebuild.mjs`).
+
+### No network gallery (deliberate — do not reintroduce)
+
+Groodle used to ship a **public gallery**: anonymous PNG uploads to a
+Supabase bucket with a kid-chosen display name, browsable by everyone.
+It was **removed on 2026-08-18** and replaced everywhere — web and app
+alike — by the on-device IndexedDB gallery. Reasons, in order:
+
+1. **Play Store age band.** Any user-content sharing / network gallery
+   pushes the app out of the lowest age band and pulls in COPPA
+   scrutiny. On-device keeps the Data Safety form at *no data
+   collected*, which is what every other Madderverse app declares.
+2. **A public anonymous-upload bucket on a kids' site is an abuse
+   target** with a permanent moderation burden and no real upside — a
+   client-side `BAD_WORDS` list on the *name* field never protected the
+   *images* at all.
+3. It was the game's only backend, so removing it makes Groodle a pure
+   static site again.
+
+If sharing is ever wanted, the right shape is an **explicit
+parent-driven export** (share sheet / download of a single PNG), not a
+shared public feed. Do not add a network gallery back.
+
+The Supabase project itself (`rzciqdsxbklshsgrftgp`, bucket
+`groodle-art`, table `groodles`) is **not touched by this repo** — tear
+it down from the Supabase dashboard so the old public URLs stop
+resolving.
 
 ## PWA / service worker
 
@@ -70,8 +98,9 @@ testing.
 
 The SW uses a **cache-first** strategy for the game shell (HTML, CSS,
 JS, hat sprites, favicons, footer CSS one directory up) and bypasses
-everything cross-origin that needs live responses (`*.supabase.co`,
-`goatcounter.com`). Bump `SHELL_VERSION` in `sw.js` whenever any
+`goatcounter.com` (an analytics beacon must hit the wire fresh). There
+is no gallery bypass — the gallery is on-device and never makes a
+request. Bump `SHELL_VERSION` in `sw.js` whenever any
 precached file changes — the `activate` handler deletes every cache
 that doesn't match the current version so stale assets can't linger.
 
@@ -103,7 +132,8 @@ IIFE; verify with `grep -n '^})();$' game.js` showing one match.
 | `drawSurprise()` | Goofy default character (skin fill, green shirt, blue pants, red star, eyes, smile, purple hair tufts) so kids can hit DANCE without drawing first. Relies on the clip to trim everything outside the silhouette. Nulls `currentPageId` before clearing so SURPRISE doesn't fight with a stamped page template. |
 | **DANCE** | `startDance` / `stopDance` toggle audio + `body.dancing` class; `togglePlay` is the unified click handler on `#playBtn`. `setPlayBtnState(playing)` flips the button between "▶ Dance" and "■ Stop" labels. The draw canvas pointer-events stay live the whole time — drawing while dancing is intentional. `danceFrame` runs the RAF loop; `applyMove(move, beats)` computes the per-move transform; `scheduleBubblePulse` flashes the corner bubble on quarter notes. |
 | **PAGES** | `PAGES` is a static catalog of coloring-book templates; each has its own `draw(ctx)` that strokes line-art on the same clipped 2D context the kid draws on. `applyPage(id)` clears the canvas and stamps in the chosen page; `clearCanvas()` re-stamps the active template so CLEAR resets to "freshly outlined" instead of fully blank. `startDance()` calls `trackPageCompleted(currentPageId)` so pressing DANCE with a page loaded unlocks its achievement. SURPRISE explicitly nulls `currentPageId` first so it doesn't fight with the template re-stamp. |
-| **GALLERY** | `composeGroodleBlob()` re-renders the kid's drawing into an offscreen 800×1200 PNG using the same `buildBodyPath` the live canvas uses — silhouette fill, draw canvas, outline ring, no SVG serialization. `submitGroodle()` uploads to the `groodle-art` bucket then inserts a `groodles` row; `loadRecentGroodles()` pulls the latest 48 rows for the gallery modal. Both bail to a friendly empty state when `SUPABASE_URL`/`SUPABASE_ANON_KEY` are still placeholders. |
+| **EXPORT** | `composeGroodleBlob()` re-renders the kid's drawing into an offscreen 800×1200 PNG using the same `buildBodyPath` the live canvas uses — silhouette fill, pattern, draw canvas, outline ring, then the face-parts / hat / accessory deco layers in on-screen z-order (each rasterised via `rasterizeDecoLayer`; the hat sheet is inlined as a data URL or `toBlob` throws on a tainted canvas). No SVG serialization of the whole stage. Kept separate from the gallery so a future share/download path can reuse it. |
+| **GALLERY** | On-device only. `saveGroodleLocal()` composes the blob and `idbSaveGroodle()`s it to IndexedDB (`groodle-gallery` / `creations`), then a toast; `openLocalGallery()` renders `idbAllGroodles()` newest-first as `blob:` URL cards with a two-tap-confirm `idbDeleteGroodle`. No network, no accounts, no other users' content. |
 | **INIT** | `init()` builds everything; fires on `DOMContentLoaded`. |
 
 ## The silhouette + clip trick

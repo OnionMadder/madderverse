@@ -83,7 +83,7 @@ the web preview — only re-sync when you want to test in the app.)
 - Audio plays on DANCE; the beefed-up dance animates
 - Achievements + hats persist after force-killing the app
 - 🖼️ Gallery shows its "not set up / offline" state gracefully
-  (Supabase is online-only by design)
+  (the gallery is on-device IndexedDB — it works offline too)
 
 ## Known deviations from PLAY_STORE_PLAN.md Chunk 4
 
