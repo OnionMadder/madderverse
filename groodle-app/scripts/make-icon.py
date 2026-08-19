@@ -1,19 +1,31 @@
-"""Generate the Groodle launcher icon from the game's own art.
+"""Generate the Groodle app icon from the game's own art.
 
     python groodle-app/scripts/make-icon.py
 
-Writes groodle-app/assets/icon.png (1024x1024) and icon-foreground.png, then
-run `npx @capacitor/assets generate --android --assetPath assets` to fan them
-out across the mipmap densities.
+Writes into groodle-app/assets/:
+    icon.png             1024x1024, the launcher icon source
+    icon-foreground.png  adaptive-icon foreground (transparent)
+    icon-background.png  adaptive-icon background (flat)
+    icon-512.png         the Play Console storefront icon
 
-The icon is Groodle's head -- cropped straight out of the tracked source
-drawing, not redrawn -- on the app's own background colour. Cropping rather
-than illustrating means the icon cannot drift from the character: redraw the
-torso, re-run this, and the icon follows.
+Then run `npx @capacitor/assets generate --android --assetPath assets` to fan
+icon.png out across the mipmap densities.
+
+icon-512.png is generated from the SAME composition as the launcher icon, on
+purpose: the icon on the store page and the icon under the app on the phone
+must be the same picture. Slip Studio's drifted apart -- its storefront art
+was refreshed while the launcher kept deriving from an older source -- and
+nobody noticed for a month.
+
+Nothing here is illustrated. The head is cropped out of the tracked source
+drawing and the hat is the game's own sprite, placed with the same geometry
+game.js uses (HEAD_CROWN + the hat's anchor and scale). So the icon cannot
+drift from the character: redraw the torso or retune the hat, re-run, the
+icon follows.
 
 Android adaptive icons mask the outer ~1/3 of the canvas away (the safe zone
-is the centre 66%), so the head is scaled to sit inside that and the
-foreground layer is generated with the padding it expects.
+is roughly the centre 66%), so the foreground layer is fitted inside that --
+which matters more with a hat, since the group is much taller than the head.
 """
 import os
 import numpy as np
@@ -31,8 +43,20 @@ INK = (26, 15, 51)
 
 # Torso-local landmarks, in the same units trace_rig.py uses (head top = 0).
 NECK_Y, TORSO_H = 114.0, 318.0
+
+# Which hat he wears. Any id from HATS in game.js; the sprite and its
+# placement are read from there, not duplicated here.
+HAT_ID = 'the-worminal'
+
+# Game-space constants the hat placement needs, matching game.js.
+HEAD_D = 116.0                   # head width in Groodle units
+CROWN_X, CROWN_Y = 207.0, 43.0   # HEAD_CROWN_X / HEAD_CROWN_Y
+HEAD_TOP = 35.0                  # BODY.headTop
+
 SIZE = 1024
-SAFE = 0.62                # fraction of the canvas the head may occupy
+HEAD_FRAC = 0.58   # head width as a fraction of the icon -- keep the face big
+FIT = 0.88         # ceiling: the whole group must fit the square icon
+SAFE = 0.66        # tighter ceiling for the adaptive foreground's safe zone
 
 
 def head_rgba():
@@ -107,35 +131,81 @@ def head_rgba():
     return Image.fromarray(rgba, 'RGBA')
 
 
-def compose(head, pad_fraction):
-    """Head centred on the canvas, occupying `pad_fraction` of it."""
-    canvas = Image.new('RGBA', (SIZE, SIZE), (*BG, 255))
-    target = SIZE * pad_fraction
-    s = min(target / head.width, target / head.height)
-    hw, hh = int(head.width * s), int(head.height * s)
-    resized = head.resize((hw, hh), Image.LANCZOS)
-    canvas.alpha_composite(resized, ((SIZE - hw) // 2, (SIZE - hh) // 2))
+def hatted(head):
+    """Head wearing HAT_ID, placed with the game's own geometry.
+
+    game.js draws a hat at HEAD_CROWN + the hat's anchor, sized frame*scale
+    and bottom-aligned. Reading HAT_FRAMES and HATS straight out of game.js
+    means a retuned hat moves here too, instead of this script carrying a
+    second copy of the numbers that silently goes stale.
+    """
+    import json, re
+    g = open(os.path.join(REPO, 'groodle', 'game.js'), encoding='utf-8').read()
+
+    i = g.index('const HAT_FRAMES = {')
+    frames = json.loads(re.sub(r'(\w+):', r'"\1":',
+                               g[i + len('const HAT_FRAMES = '):g.index('};', i) + 1]
+                               ).replace("'", '"'))
+    i = g.index('const HATS = [')
+    m = re.search(r"\{ id: '" + HAT_ID + r"'.*?anchor: \{ x: (-?\d+), y:\s*(\d+) \}, scale: ([\d.]+) \}",
+                  g[i:g.index('\n    ];', i)])
+    if not m:
+        raise SystemExit('hat %r not found in HATS' % HAT_ID)
+    ax, ay, sc = int(m.group(1)), int(m.group(2)), float(m.group(3))
+    sprite = re.search(r"\{ id: '" + HAT_ID + r"'.*?sprite: '([\w-]+)'", g[i:]).group(1)
+    f = frames[sprite]
+
+    upp = head.width / HEAD_D                    # px per Groodle unit
+    hw, hh = f['w'] * sc, f['h'] * sc            # hat size, Groodle units
+    hx, hy = CROWN_X + ax - hw / 2.0, CROWN_Y + ay - hh
+    head_left = CROWN_X - (head.width / upp) / 2.0
+
+    sheet = Image.open(os.path.join(REPO, 'groodle', 'assets', 'sprites', 'hats.png')).convert('RGBA')
+    hat = sheet.crop((f['x'], f['y'], f['x'] + f['w'], f['y'] + f['h'])).resize(
+        (max(1, int(hw * upp)), max(1, int(hh * upp))), Image.LANCZOS)
+
+    pad = int(max(0, (HEAD_TOP - hy)) * upp) + 10
+    c = Image.new('RGBA', (head.width + 80, head.height + pad + 10), (0, 0, 0, 0))
+    c.alpha_composite(head, (40, pad))
+    c.alpha_composite(hat, (int(40 + (hx - head_left) * upp), int(pad + (hy - HEAD_TOP) * upp)))
+    return c.crop(c.getbbox())
+
+
+def compose(group, head_width, fit, opaque=True):
+    """Group centred on the canvas.
+
+    Sized so the HEAD is a consistent fraction of the icon rather than the
+    whole group -- otherwise a tall hat shrinks the face until it is
+    unreadable at launcher size -- but never so large that the group clips.
+    """
+    canvas = Image.new('RGBA', (SIZE, SIZE), (*BG, 255) if opaque else (0, 0, 0, 0))
+    s = min((SIZE * HEAD_FRAC) / head_width,
+            (SIZE * fit) / group.width, (SIZE * fit) / group.height)
+    gw, gh = int(group.width * s), int(group.height * s)
+    canvas.alpha_composite(group.resize((gw, gh), Image.LANCZOS),
+                           ((SIZE - gw) // 2, (SIZE - gh) // 2))
     return canvas
 
 
 def main():
     os.makedirs(OUT, exist_ok=True)
     head = head_rgba()
-    print('head crop: %dx%d' % (head.width, head.height))
-    # square icon: head fills more of the frame
-    compose(head, 0.74).convert('RGB').save(os.path.join(OUT, 'icon.png'))
-    # adaptive foreground: smaller, so the launcher's mask cannot clip it
-    fg = Image.new('RGBA', (SIZE, SIZE), (0, 0, 0, 0))
-    inner = compose(head, SAFE)
-    inner_head = inner.crop((0, 0, SIZE, SIZE))
-    fg.alpha_composite(inner_head)
-    # drop the background from the foreground layer -- Android supplies it
-    arr = np.array(fg)
-    bgmask = (arr[:, :, 0] == BG[0]) & (arr[:, :, 1] == BG[1]) & (arr[:, :, 2] == BG[2])
-    arr[bgmask] = (0, 0, 0, 0)
-    Image.fromarray(arr, 'RGBA').save(os.path.join(OUT, 'icon-foreground.png'))
+    group = hatted(head)
+    print('head crop: %dx%d   with %s: %dx%d'
+          % (head.width, head.height, HAT_ID, group.width, group.height))
+
+    icon = compose(group, head.width, FIT).convert('RGB')
+    icon.save(os.path.join(OUT, 'icon.png'))
+    # Play's storefront icon: same picture, just the size Play wants, so the
+    # store and the home screen can never show two different Groodles.
+    icon.resize((512, 512), Image.LANCZOS).save(os.path.join(OUT, 'icon-512.png'))
+
+    # Adaptive foreground: fitted well inside the safe zone, because the
+    # launcher's mask crops the outer third and the worm rides high.
+    fg = compose(group, head.width, SAFE, opaque=False)
+    Image.fromarray(np.array(fg), 'RGBA').save(os.path.join(OUT, 'icon-foreground.png'))
     Image.new('RGB', (SIZE, SIZE), BG).save(os.path.join(OUT, 'icon-background.png'))
-    print('wrote icon.png, icon-foreground.png, icon-background.png ->', OUT)
+    print('wrote icon.png, icon-512.png, icon-foreground.png, icon-background.png ->', OUT)
 
 
 if __name__ == '__main__':

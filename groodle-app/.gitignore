@@ -17,6 +17,10 @@ android/captures/
 *.keystore
 *.jks
 
+# python bytecode from scripts/
+__pycache__/
+*.pyc
+
 # misc
 .DS_Store
 *.log
