@@ -479,7 +479,8 @@ body.dancing .face-zoom-btn { display: none; }
                                           visually at the boundary instead
                                           of being clipped 5 px before it. */
 .silhouette-fill-layer,
-.silhouette-outline-layer {
+.silhouette-outline-layer,
+.doll-ink-layer {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -488,6 +489,13 @@ body.dancing .face-zoom-btn { display: none; }
 }
 .silhouette-fill-layer    { z-index: 1; }
 .silhouette-outline-layer { z-index: 3; }
+
+/* Paper-doll interior linework + joint pins. The ink is the same dark as
+   the body outline so it reads as one drawing; the pins are brass so the
+   articulation announces itself as construction rather than as a seam. */
+.doll-ink-layer  { z-index: 4; }
+.doll-ink-line   { fill: #1a0f33; }
+.doll-pin        { fill: #c8a24a; stroke: #7a5f22; stroke-width: 1.4; }
 
 /* Hat layer sits above the outline so hats land on top of the head
    ring rather than being trimmed by it. Same absolute fill + no

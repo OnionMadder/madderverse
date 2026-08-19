@@ -23,9 +23,13 @@ to `groodle/`.
 - 8 background presets (studio, disco, outdoors, night, sunset,
   underwater, stadium, candy) chosen via thumbnail buttons in the Stage
   drawer.
-- 4 poses (standing, cheer, star, groovy) chosen from the Pose picker in
-  the Stage drawer. Each pose is data-driven via `POSES` and re-renders
-  the SVG silhouette groups + the canvas clip when selected.
+- 8 poses in the Pose picker. Six of them are the **paper-doll rig**
+  (standing / cheer / star / groovy / tpose / wave) — five hand-drawn
+  parts pinned at the shoulders and hips with visible brass fasteners,
+  posed by joint angle. Ghost and Animal remain hand-authored single
+  `path:` silhouettes. All are data-driven via `POSES` and re-render the
+  SVG silhouette groups + the canvas clip when selected. See
+  **[`tools/README.md`](tools/README.md)** before changing any of it.
 - **Coloring-book pages** ("freedom inside a fence"): the kid can pick
   a pre-made line-art template (Robot, Princess, Astronaut, Clown,
   Pirate, Superhero) from the 📖 Pages dock button and color inside
@@ -50,6 +54,8 @@ groodle/
   cover.jpg              — hub-page card art
   manifest.webmanifest   — PWA manifest (name, icons, theme, start_url)
   sw.js                  — service worker (cache-first shell for offline play)
+  tools/trace_rig.py     — traces the hand-drawn body parts into the RIG block
+  tools/README.md        — the paper-doll rig: redraw steps + frame constraint
   PLAY_STORE_PLAN.md     — phased rollout plan to ship as a Capacitor Android app
 ```
 
@@ -226,7 +232,7 @@ to the logical `400×600` space so JS only ever thinks in those units.
   then loops; `currentBar` increments 0..3. `applyMove` runs on RAF and
   reads `audioCtx.currentTime - danceStartTime` for the beat phase, so the
   dance stays locked to the music even if frames drop.
-- **`transform-origin` on `.creature` is `50% 92%`** so the feet stay
+- **`transform-origin` on `.creature` is `50% 95%`** (rig poses) so the feet stay
   planted. If you change pose dimensions, re-check this — a different pose
   height shifts where 92% lands and the feet will lift off / sink through
   the floor.
@@ -287,6 +293,13 @@ Each entry in `POSES` is either:
 - **Hand-drawn** — `path: 'M … Z'`. The generator is bypassed entirely
   (this is how Ghost and Animal work). This is how you ship custom
   art: replace any pose's `skeleton:` with a `path:` string.
+- **Rig-driven** — `rig: { armL: 163, armR: 163 }`. The six body poses.
+  `rigPathD()` rotates each traced part about its pin and concatenates
+  them into one nonzero-fill path, so joints melt into a single
+  silhouette. Angles are frame-bounded — his arms are long enough that a
+  flat T-pose does not fit. **Read [`tools/README.md`](tools/README.md)
+  before changing an angle**: the scale is re-solved across the whole
+  pose set, so widening one pose shrinks the doll and drifts every hat.
 
 To hand-draw / replace a pose silhouette:
 
@@ -330,13 +343,20 @@ all three:
 2. **Arms distinctly separate from the torso.** The standing hands
    must sit *outside* the torso silhouette so an arm reads as its own
    limb (the chibi melted the arms into a slab — the cardinal sin).
-3. **A head sized for the hats.** `HATS` anchors/scales are tuned to
-   `head.r ≈ 58`. Grow the head and every hat floats off or shrinks
-   wrong. Resize the head only if you also retune every `HATS` entry.
+3. **A head sized for the hats.** `HATS` anchors/scales are tuned to the
+   head. Resize the head only if you also retune every `HATS` entry plus
+   `BODY` and `HEAD_CROWN_Y`. **As of 2026-08-19 `head.r ≈ 50.6`, not 58**
+   — the paper-doll rig is drawn at 0.872x so its widest pose fits the
+   400x600 frame, and all 17 hats were rescaled by that factor.
 
-Until bespoke custom assets land, the skeleton-driven lanky build at
-git `c6ab9f8` is the intended Groodle. "Intentionally kinda weird" is
-the brief, not a defect.
+**The skeleton generator is retired for the body poses** (2026-08-19).
+It produced a mannequin, and the smooth single-path rework had melted
+the arms into the torso — breaking rule 2 above, the exact failure the
+contract was written to prevent. The body is now Onion's own drawing,
+traced. `groodleBodyPath()`/`hum()` are still present and still used by
+nothing; leave them until the rig is proven on device.
+"Intentionally kinda weird" is still the brief — the anatomically drawn
+body under a blank three-dot alien head IS the joke. Do not resolve it.
 
 ### Placeholders only until launch
 

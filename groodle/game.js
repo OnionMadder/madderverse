@@ -56,27 +56,24 @@
     }
 
     const POSES = {
-        standing: { name: 'Standing', icon: '🧍', origin: '50% 92%',
-            /* Hands hang close to the body (just outside the torso, ~hip
-               level) so the arms read as relaxed at the sides — far-out
-               low hands made the whole figure a bottom-heavy pear. */
-            skeleton: hum({ x: 152, y: 346 }, { x: 248, y: 346 },
-                          { x: 164, y: 566 }, { x: 236, y: 566 }) },
-        cheer: { name: 'Cheering', icon: '🙌', origin: '50% 92%',
-            skeleton: hum({ x: 122, y: 70 }, { x: 278, y: 70 },
-                          { x: 176, y: 566 }, { x: 224, y: 566 }) },
-        star: { name: 'Star', icon: '⭐', origin: '50% 90%',
-            skeleton: hum({ x: 92, y: 150 }, { x: 308, y: 150 },
-                          { x: 138, y: 556 }, { x: 262, y: 556 }) },
-        groovy: { name: 'Groovy', icon: '💃', origin: '50% 92%',
-            skeleton: hum({ x: 120, y: 78 }, { x: 286, y: 330 },
-                          { x: 168, y: 566 }, { x: 232, y: 560 }) },
-        tpose: { name: 'T-Pose', icon: '✋', origin: '50% 92%',
-            skeleton: hum({ x: 86, y: 196 }, { x: 314, y: 196 },
-                          { x: 182, y: 566 }, { x: 218, y: 566 }) },
-        wave: { name: 'Waving', icon: '👋', origin: '50% 92%',
-            skeleton: hum({ x: 120, y: 372 }, { x: 286, y: 70 },
-                          { x: 176, y: 566 }, { x: 224, y: 566 }) },
+        /* The six body poses are the paper-doll rig: hand-drawn parts pinned
+           at shoulders and hips, posed by joint angle. Angles are bounded by
+           the frame -- his arms are long (217 units against 150 of clearance
+           to the frame edge), so a flat T-pose will not fit without shrinking
+           the whole doll, and the colourable area with it. See
+           groodle/tools/README.md before widening any angle. */
+        standing: { id: 'standing', name: 'Standing', icon: '\uD83E\uDDCD', origin: '50% 95%',
+            rig: {} },
+        cheer: { id: 'cheer', name: 'Cheering', icon: '\uD83D\uDE4C', origin: '50% 95%',
+            rig: { armL: 163, armR: 163 } },
+        star: { id: 'star', name: 'Star', icon: '\u2B50', origin: '50% 93%',
+            rig: { armL: 36, armR: 36, legL: 13, legR: 13 } },
+        groovy: { id: 'groovy', name: 'Groovy', icon: '\uD83D\uDC83', origin: '50% 95%',
+            rig: { armL: 30, armR: -14, legL: -6, legR: 8 } },
+        tpose: { id: 'tpose', name: 'T-Pose', icon: '\u270B', origin: '50% 95%',
+            rig: { armL: 40, armR: 40 } },
+        wave: { id: 'wave', name: 'Waving', icon: '\uD83D\uDC4B', origin: '50% 95%',
+            rig: { armR: 166, armL: 8 } },
         ghost: { name: 'Ghost', icon: '👻', origin: '50% 88%',
             /* Bell-shaped body with a 3-bump wavy hem + two stubby
                drifting arms. One closed path, hand-authored. */
@@ -250,7 +247,81 @@
         return head + ' ' + neck + torsoTop + torsoBot + armR + armL + legR + legL;
     }
 
+    const RIG = {"parts":{"torso":{"solid":[[1.8,0.0,-6.4,0.2,-13.2,1.2,-18.4,2.6,-22.7,4.0,-29.4,7.4,-35.6,11.5,-38.5,14.0,-41.7,17.3,-45.5,22.5,-48.4,28.3,-49.8,32.4,-50.8,37.8,-50.8,45.8,-50.3,49.2,-49.4,52.9,-46.9,58.9,-41.9,66.5,-38.5,73.5,-36.1,77.7,-32.1,82.4,-27.0,87.0,-26.2,92.3,-26.2,101.6,-27.1,103.3,-29.7,105.4,-36.4,109.1,-47.4,114.5,-50.6,117.4,-53.9,122.6,-56.3,129.2,-57.9,135.6,-58.5,140.0,-58.7,143.8,-58.5,150.3,-57.6,157.1,-57.0,158.3,-56.4,161.2,-55.1,164.9,-54.9,166.0,-55.0,169.1,-54.6,173.0,-53.7,174.5,-52.2,182.2,-49.9,190.7,-48.5,198.8,-48.0,205.1,-48.0,213.0,-48.8,222.1,-48.2,225.4,-47.9,226.2,-47.3,226.4,-46.1,232.3,-43.4,240.5,-41.1,245.5,-37.9,250.5,-36.0,253.0,-32.3,258.5,-24.2,268.4,-19.4,272.7,-15.3,275.5,-11.8,276.8,-8.4,277.0,-6.6,277.4,-0.7,277.2,2.9,275.9,4.4,275.1,7.2,273.1,9.3,271.3,14.0,266.5,16.4,263.6,25.0,250.5,30.1,241.9,33.7,234.2,35.8,228.7,37.4,222.7,37.3,220.7,36.8,218.9,36.3,209.2,36.8,199.2,38.3,190.4,40.5,181.7,42.0,174.1,42.6,172.3,42.7,170.8,43.2,168.8,43.1,166.0,43.4,164.4,44.8,160.8,46.1,154.6,46.7,150.8,46.8,146.8,46.6,139.4,46.2,137.2,43.5,127.5,42.4,125.3,40.5,120.6,38.2,116.8,36.6,115.0,35.1,114.1,29.6,111.6,21.1,107.2,18.0,105.4,15.1,103.1,14.6,102.4,14.5,95.0,14.8,94.5,21.6,92.0,25.8,89.6,29.5,86.8,33.0,83.4,34.8,81.0,38.6,74.8,40.0,71.9,42.9,64.8,47.7,55.9,48.5,53.7,49.6,49.6,50.2,43.5,50.1,38.2,49.6,34.4,48.1,29.4,46.7,25.8,44.3,21.7,42.0,18.5,39.6,15.8,36.1,12.5,33.2,10.2,28.6,7.3,22.0,4.0,17.8,2.6,12.5,1.2,6.0,0.2]],"ink":[[-25.2,265.1,-21.2,269.3,-14.9,274.1,-11.3,275.4,-6.3,275.9,-0.9,275.7,2.3,274.6,7.3,271.2,11.3,267.2,6.0,271.8,2.2,274.2,-3.2,275.6,-8.3,275.6,-12.6,274.7,-15.5,273.2],[43.9,158.3,40.1,167.4,36.5,172.1,30.3,176.9,22.1,180.5,26.6,179.7,31.5,177.8,35.1,175.5,40.3,170.4,40.6,170.6,35.0,197.7,34.5,212.8,35.7,223.9,36.0,222.4,34.8,209.2,35.3,199.2,36.9,189.9,41.2,172.2,42.1,163.9],[-56.3,155.3,-53.6,164.9,-53.1,172.8,-52.4,174.0,-47.5,195.6,-46.6,205.1,-46.6,213.0,-47.4,222.1,-46.6,225.2,-47.1,221.5,-46.1,209.9,-46.7,198.9,-47.7,192.1,-52.5,170.6,-52.1,170.3,-48.7,174.0,-43.2,177.8,-38.3,179.7,-35.0,180.0,-39.1,178.5,-43.4,176.0,-49.5,170.8,-53.7,163.7],[33.4,121.6,10.5,123.5,4.8,125.4,1.8,128.0,8.7,125.3,14.5,124.4,23.4,123.8],[-45.1,121.7,-35.8,123.7,-20.3,125.3,-13.5,128.0,-16.5,125.4,-22.4,123.5],[12.0,62.1,11.0,61.4,6.5,64.2,2.5,65.0,-2.9,64.2,-7.3,61.5,-8.5,61.8,-8.6,62.6,-3.7,65.8,2.3,66.9,8.3,65.4,11.2,63.5],[21.6,42.6,23.8,42.8,25.3,43.6,26.8,45.3,27.6,47.3,26.8,51.3,25.0,53.2,22.6,54.0,20.5,53.8,18.6,52.7,17.0,50.7,16.5,49.0,16.5,47.3,17.8,44.5,19.2,43.3],[-19.3,42.6,-16.9,42.8,-15.1,43.8,-13.4,46.1,-13.0,47.6,-13.3,50.0,-14.4,51.9,-16.7,53.7,-18.2,54.0,-20.1,53.8,-21.9,52.8,-23.4,51.2,-24.2,48.8,-23.9,46.2,-22.9,44.4,-21.3,43.2],[21.2,40.7,18.4,41.5,15.7,44.0,14.7,46.3,14.6,49.6,15.7,52.3,17.8,54.5,20.0,55.5,22.8,55.9,25.7,54.9,28.2,52.6,29.2,50.6,29.5,47.2,28.6,44.5,26.6,42.1,24.6,41.0],[-19.2,40.6,-22.3,41.5,-24.2,43.2,-25.6,45.4,-26.1,48.8,-25.1,52.1,-23.4,54.1,-21.1,55.4,-18.2,55.9,-15.0,54.9,-12.8,53.0,-11.6,50.8,-11.2,47.2,-12.1,44.4,-13.9,42.4,-15.9,41.1],[-0.1,18.5,4.0,18.6,6.2,19.6,8.4,21.7,9.8,24.6,10.0,27.4,9.3,30.3,7.3,32.9,4.2,34.8,1.1,35.1,-2.1,34.2,-4.5,32.2,-6.4,29.0,-6.7,25.8,-5.3,22.1,-3.2,19.9],[1.6,16.5,-2.4,17.3,-6.3,20.2,-8.0,23.5,-8.6,26.9,-7.6,30.8,-4.8,34.6,-1.4,36.4,2.3,37.0,6.1,36.0,8.8,34.2,11.1,30.9,12.0,26.5,11.2,22.7,8.1,18.8,4.4,16.8],[-14.5,3.4,-5.5,2.0,5.1,2.0,14.0,3.4,22.3,6.2,28.9,9.7,36.3,15.2,42.1,21.8,46.4,30.1,48.2,37.9,48.3,44.3,47.7,49.4,45.4,56.4,40.7,65.1,36.4,75.0,32.6,80.7,28.7,85.0,22.0,89.7,16.6,92.1,7.7,94.1,-4.8,94.1,-13.1,92.1,-22.3,87.8,-29.8,82.1,-33.8,77.7,-40.5,65.1,-45.2,57.9,-47.1,53.8,-48.9,45.4,-48.9,38.2,-47.1,30.2,-43.2,22.5,-37.0,15.3,-30.3,10.1,-24.1,6.7],[33.6,12.2,23.6,6.3,13.9,3.0,4.2,1.6,-7.4,1.8,-17.9,3.9,-26.4,7.4,-34.7,12.7,-42.1,20.1,-46.1,26.8,-48.8,34.7,-49.5,41.6,-48.8,49.1,-46.1,57.1,-40.5,66.0,-35.8,75.4,-31.8,80.7,-25.7,86.5,-24.8,92.3,-24.8,101.6,-26.0,104.1,-29.2,106.7,-46.1,115.4,-48.5,117.3,-31.5,108.6,-27.1,105.8,-26.5,106.1,-27.1,110.7,-26.8,111.8,-25.4,108.1,-24.4,102.6,-24.6,88.7,-17.2,92.5,-8.4,95.3,4.1,96.2,12.3,95.1,12.7,95.6,13.2,106.3,15.2,112.1,14.8,105.7,36.7,117.3,34.7,115.5,17.5,106.7,13.8,103.7,13.0,101.5,13.0,95.0,13.4,93.8,21.1,90.6,26.4,87.4,31.4,82.9,34.7,78.6,45.8,56.5,48.1,49.5,48.7,43.5,48.5,37.0,46.4,28.8,44.5,24.8,40.8,19.3]]},"arm":{"solid":[[14.4,-10.4,8.0,-8.1,1.4,-6.2,-3.9,-3.6,-6.5,-1.8,-9.9,1.1,-12.5,4.1,-14.5,7.3,-16.3,10.8,-18.1,15.9,-19.0,19.2,-19.8,24.4,-20.4,31.9,-23.3,39.3,-25.5,46.7,-25.8,47.1,-27.5,53.1,-30.2,64.4,-37.0,78.2,-38.3,81.5,-39.6,85.7,-41.4,94.3,-43.1,111.1,-44.5,121.2,-44.7,122.0,-45.3,127.6,-47.0,136.1,-48.6,142.4,-49.9,149.6,-50.2,155.7,-49.9,159.8,-49.1,163.7,-48.2,165.9,-46.9,168.1,-41.4,175.8,-40.0,177.3,-38.2,178.6,-36.7,178.7,-35.5,178.5,-34.1,177.2,-32.6,177.1,-31.6,176.7,-30.3,175.3,-30.0,173.7,-30.0,171.9,-30.3,170.1,-32.4,164.9,-32.9,162.5,-32.8,158.7,-32.4,155.6,-31.5,153.1,-31.2,152.8,-30.6,153.0,-28.9,158.6,-28.0,160.4,-26.3,162.2,-24.8,162.9,-22.7,162.9,-21.8,162.6,-21.2,162.0,-20.4,160.5,-20.5,157.2,-22.2,151.1,-22.3,145.6,-22.6,143.2,-23.5,140.8,-24.8,138.4,-28.4,133.2,-28.5,131.2,-28.1,129.2,-26.4,123.8,-24.3,118.6,-21.2,112.1,-16.6,103.7,-14.1,98.4,-12.4,94.1,-10.6,87.3,-9.7,81.4,-9.6,78.7,-8.7,75.5,-1.1,63.1,4.0,53.6,6.2,48.6,8.8,41.2,9.1,38.6,9.6,36.9,9.7,35.9,7.6,30.7,6.4,26.5,5.6,20.2,5.6,13.1,6.4,7.5,7.8,2.7,9.4,-1.9,10.8,-4.6,13.1,-8.0]],"ink":[[11.5,-8.0,1.8,-4.9,-4.0,-2.0,-9.5,2.5,-13.8,8.6,-16.0,13.6,-17.7,19.8,-19.2,32.4,-24.6,47.6,-28.9,64.9,-35.8,78.7,-38.3,86.1,-40.0,94.3,-44.0,127.6,-48.6,149.6,-48.9,155.7,-48.2,161.7,-46.6,166.1,-39.9,175.5,-37.7,177.3,-36.3,177.3,-34.6,176.0,-32.2,175.5,-31.3,173.7,-31.6,170.6,-33.6,165.4,-34.2,162.5,-33.7,155.6,-32.5,152.3,-31.2,151.5,-29.6,152.2,-27.7,158.1,-25.6,161.1,-23.2,161.7,-21.7,160.3,-21.8,157.4,-23.5,151.1,-23.9,143.4,-25.9,139.0,-29.6,133.7,-29.8,131.2,-29.3,128.7,-25.5,118.1,-16.5,100.5,-13.6,93.6,-12.3,89.1,-11.0,78.7,-9.9,75.0,1.1,56.4,7.0,42.5,8.4,36.1,6.4,31.2,5.3,27.1,7.9,36.3,7.6,39.1,6.3,43.6,0.2,57.2,-10.4,75.0,-11.2,77.9,-12.2,86.4,-14.0,93.5,-16.5,99.6,-25.5,116.9,-29.7,128.4,-30.2,131.0,-29.7,134.4,-26.0,139.6,-24.2,143.7,-23.8,151.5,-21.9,159.5,-22.3,160.7,-23.4,161.3,-24.3,161.3,-25.9,160.3,-27.2,158.2,-29.6,151.0,-31.2,149.0,-32.6,148.4,-31.9,150.4,-34.0,155.1,-34.5,159.0,-34.4,163.8,-31.7,172.3,-31.9,174.6,-33.0,175.5,-33.9,175.5,-35.3,174.1,-38.8,167.3,-39.8,163.5,-40.7,155.0,-41.2,153.6,-41.6,153.7,-40.9,165.2,-39.6,169.5,-35.8,176.2,-36.9,177.1,-38.6,176.4,-40.1,174.6,-43.1,169.1,-44.5,164.2,-45.4,155.0,-46.0,153.5,-46.4,154.5,-46.4,158.5,-45.6,165.7,-45.9,166.2,-47.5,163.3,-48.4,157.9,-47.9,147.9,-43.7,128.5,-39.8,95.2,-38.1,86.7,-35.4,79.0,-28.2,63.9,-24.7,49.4,-18.8,32.6,-17.4,19.9,-15.7,13.8,-13.5,8.9,-9.3,2.9,-5.3,-0.7,-0.0,-3.7,11.0,-7.2]]},"leg":{"solid":[[-0.6,-10.1,-4.0,8.1,-5.1,12.6,-7.2,19.0,-9.3,26.9,-9.7,29.2,-10.7,33.1,-10.8,34.3,-11.1,35.2,-12.1,41.1,-13.2,50.0,-13.5,54.4,-13.6,65.4,-13.2,70.8,-13.3,74.9,-14.3,80.6,-16.7,88.7,-17.8,93.3,-19.2,101.9,-19.6,107.5,-19.7,128.5,-20.4,136.8,-21.1,140.2,-21.8,142.4,-23.2,144.6,-29.7,151.5,-32.6,154.2,-37.1,157.7,-39.4,159.1,-43.0,160.7,-44.5,161.7,-45.5,162.8,-45.9,163.8,-45.9,165.9,-45.5,166.8,-41.9,169.4,-40.8,169.5,-38.6,170.8,-36.1,170.9,-34.0,171.9,-31.1,171.7,-29.7,172.5,-28.0,173.0,-25.8,173.0,-24.3,172.6,-21.1,170.9,-18.9,170.4,-17.0,169.8,-15.1,168.6,-12.8,166.6,-11.7,165.9,-5.5,164.4,-3.9,163.7,-2.4,162.6,-1.7,161.9,-0.9,160.7,-0.5,159.4,-0.4,157.0,-0.6,154.5,-1.6,150.2,-1.9,147.7,-1.9,143.0,-1.6,138.9,-0.9,135.4,0.2,131.9,1.6,128.3,8.6,112.8,10.4,107.6,11.5,102.9,12.1,97.6,12.2,86.3,12.7,82.2,13.7,79.0,16.5,73.1,18.3,68.7,22.2,57.8,26.4,43.2,29.2,31.5,28.9,31.1,27.8,31.1,25.5,30.3,24.1,29.5,21.5,27.6,16.1,22.7,12.0,17.6,9.2,13.5,8.2,12.2,5.9,8.6,4.4,5.5,2.1,-1.1,0.7,-7.7]],"ink":[[-0.2,-6.5,-3.4,10.2,-9.3,31.8,-11.4,44.0,-12.5,56.6,-12.2,74.9,-13.3,81.0,-16.8,93.8,-18.1,102.0,-18.5,107.5,-18.6,128.5,-19.3,136.8,-20.1,140.6,-20.8,142.7,-22.4,145.2,-29.1,152.3,-36.5,158.6,-43.9,162.6,-44.9,164.4,-44.6,166.2,-41.4,168.4,-40.4,168.5,-38.2,169.8,-35.7,169.9,-33.9,170.8,-30.7,170.7,-28.0,171.9,-24.6,171.6,-21.5,169.9,-17.4,168.8,-12.0,164.9,-7.0,163.7,-4.4,162.7,-3.0,161.8,-1.9,160.3,-1.6,155.8,-3.0,147.7,-3.0,143.0,-1.9,135.0,0.5,127.9,7.6,112.4,9.4,107.2,10.4,102.9,11.0,97.6,11.1,86.3,11.7,81.8,12.7,78.6,17.3,68.4,21.1,57.4,25.3,43.0,27.9,32.2,25.1,31.3,22.5,29.7,16.5,24.5,19.1,27.3,23.1,30.5,27.4,32.4,24.3,45.4,20.1,59.3,16.9,68.4,11.7,80.5,10.9,85.4,10.5,100.3,8.4,109.3,-0.8,130.2,-2.6,136.2,-3.5,141.9,-4.4,140.1,-3.7,148.0,-6.1,153.2,-3.5,150.3,-3.0,150.3,-1.9,155.9,-1.9,158.7,-2.3,160.2,-3.5,161.7,-5.1,162.7,-11.3,164.4,-11.7,164.0,-10.6,162.3,-16.6,168.0,-18.3,168.8,-21.8,169.6,-25.7,171.6,-27.6,171.7,-29.1,171.2,-30.3,170.0,-30.5,168.6,-30.0,167.1,-25.9,164.4,-25.2,163.2,-29.8,165.4,-31.3,166.7,-32.0,168.6,-31.8,170.0,-32.3,170.5,-34.7,170.2,-35.3,169.5,-35.4,167.9,-34.7,166.3,-30.9,163.0,-30.9,162.5,-34.4,164.6,-36.0,166.1,-37.2,169.5,-38.2,169.5,-39.3,168.6,-39.6,167.9,-39.3,166.5,-38.2,165.1,-35.4,162.9,-35.1,162.1,-39.4,164.7,-40.5,166.4,-40.7,167.9,-41.5,168.0,-42.4,166.9,-42.1,165.2,-38.6,161.9,-39.8,162.1,-42.3,163.5,-43.1,164.3,-43.9,166.2,-44.6,165.5,-44.6,164.2,-44.1,163.3,-42.6,162.0,-36.5,159.1,-30.8,154.5,-21.6,144.8,-20.4,142.7,-19.4,139.6,-18.3,129.6,-18.2,109.7,-17.6,100.4,-15.8,90.8,-13.4,83.1,-13.0,83.3,-12.1,87.2,-11.2,89.1,-12.0,81.4,-11.9,70.1,-12.3,64.2,-12.2,56.2,-11.2,44.4,-8.0,27.6,-2.7,8.7,0.1,-5.7]]}},"anchor":{"armL":[156.4,280.2],"armR":[243.6,280.2],"legL":[180.0,395.2],"legR":[220.0,395.2]},"torsoAt":[205.9,147.7],"rest":{"armL":2,"armR":-2,"legL":1,"legR":-1},"sign":{"armL":1,"armR":-1,"legL":1,"legR":-1},"mirror":["armR","legR"],"srcOf":{"armL":"arm","armR":"arm","legL":"leg","legR":"leg"},"poses":{"standing":{},"cheer":{"armL":163,"armR":163},"wave":{"armR":166,"armL":8},"star":{"armL":36,"armR":36,"legL":13,"legR":13},"groovy":{"armL":30,"armR":-14,"legL":-6,"legR":8},"tpose":{"armL":40,"armR":40}}};
+
+    /* ---- Paper-doll rig ------------------------------------------------
+       Groodle's body is five hand-drawn parts -- torso+head, two arms, two
+       legs -- pinned at the joints like a brass-fastener paper doll. A pose
+       is just four joint angles; rigPathD() rotates each part about its pin
+       and concatenates the results into ONE nonzero-fill path, so overlaps
+       at the joints melt into a single silhouette and every downstream
+       consumer (canvas clip, silhouette fill/outline, pattern window, PNG
+       export) still receives a single `d` string and needs no change.
+
+       Parts are stored ONCE as point rings rather than baked per pose: six
+       baked poses would be ~285KB of path data, this is ~10KB, and it is
+       the same machinery live limb animation would drive. */
+    const RIG_LIMBS = ['legL', 'legR', 'armL', 'armR'];
+    const _rigCache = {};
+
+    function rigPathD(pose, which) {
+        const key = (pose.id || '') + '|' + which;
+        if (_rigCache[key]) return _rigCache[key];
+        const ang = pose.rig || {};
+        const jobs = [];
+        for (let i = 0; i < RIG_LIMBS.length; i++) {
+            const k = RIG_LIMBS[i];
+            jobs.push([RIG.parts[RIG.srcOf[k]][which], RIG.anchor[k],
+                       RIG.rest[k] + RIG.sign[k] * (ang[k] || 0),
+                       RIG.mirror.indexOf(k) !== -1]);
+        }
+        jobs.push([RIG.parts.torso[which], RIG.torsoAt, 0, false]);
+        let d = '';
+        for (let j = 0; j < jobs.length; j++) {
+            const rings = jobs[j][0], a = jobs[j][1];
+            const t = jobs[j][2] * Math.PI / 180, mir = jobs[j][3];
+            const co = Math.cos(t), si = Math.sin(t);
+            for (let r = 0; r < rings.length; r++) {
+                const f = rings[r], n = f.length / 2;
+                if (n < 3) continue;
+                const px = new Array(n), py = new Array(n);
+                for (let i = 0; i < n; i++) {
+                    const x = mir ? -f[i * 2] : f[i * 2], y = f[i * 2 + 1];
+                    px[i] = a[0] + x * co - y * si;
+                    py[i] = a[1] + x * si + y * co;
+                }
+                d += 'M' + px[0].toFixed(1) + ' ' + py[0].toFixed(1);
+                for (let i = 0; i < n; i++) {
+                    const i0 = (i + n - 1) % n, i2 = (i + 1) % n, i3 = (i + 2) % n;
+                    d += 'C' + (px[i] + (px[i2] - px[i0]) / 6).toFixed(1) + ' '
+                       + (py[i] + (py[i2] - py[i0]) / 6).toFixed(1) + ' '
+                       + (px[i2] - (px[i3] - px[i]) / 6).toFixed(1) + ' '
+                       + (py[i2] - (py[i3] - py[i]) / 6).toFixed(1) + ' '
+                       + px[i2].toFixed(1) + ' ' + py[i2].toFixed(1);
+                }
+                d += 'Z';
+            }
+        }
+        _rigCache[key] = d;
+        return d;
+    }
+
+    /* Interior linework (face circles, smile, collarbone, knees, toes) plus
+       the brass pins, as markup for the doll-ink layer. The ink rides the
+       same per-part transforms as the silhouette, so a rotated arm carries
+       its own knuckle lines with it. */
+    function rigInkMarkup(pose) {
+        if (!pose.rig) return '';
+        let s = '<path class="doll-ink-line" d="' + rigPathD(pose, 'ink') + '"/>';
+        for (let i = 0; i < RIG_LIMBS.length; i++) {
+            const a = RIG.anchor[RIG_LIMBS[i]];
+            s += '<circle class="doll-pin" cx="' + a[0] + '" cy="' + a[1] + '" r="5.2"/>';
+        }
+        return s;
+    }
+
     function posePathD(pose) {
+        if (pose.rig) return rigPathD(pose, 'solid');
         if (pose.path) return pose.path;
         if (pose.skeleton) return groodleBodyPath(pose.skeleton);
         return '';
@@ -845,8 +916,8 @@
        extend outside the body silhouette. Hats follow the dance
        transforms because the SVG element is a child of .creature. */
 
-    const HEAD_CROWN_X = 200;
-    const HEAD_CROWN_Y = 42;
+    const HEAD_CROWN_X = 206;
+    const HEAD_CROWN_Y = 148;
 
     const HAT_SHEET_URL = 'assets/sprites/hats.png';
     const HAT_SHEET_W = 874;
@@ -888,23 +959,23 @@
          - cool-kids: cap + sunglasses, anchored deeper so the lenses
            land at the eye line. */
     const HATS = [
-        { id: 'no-hat',          name: 'No Hat',          price:   0, sprite: null,              anchor: { x: 0, y:   0 }, scale: 1.00 },
-        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y:  80 }, scale: 0.65 },
-        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y:  65 }, scale: 0.65 },
-        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y:  55 }, scale: 0.70 },
-        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 5, y:  80 }, scale: 0.65 },
-        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y:  80 }, scale: 0.70 },
-        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y:  45 }, scale: 0.55 },
-        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y:  65 }, scale: 0.65 },
-        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y:  55 }, scale: 0.70 },
-        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y:  50 }, scale: 0.70 },
-        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y:  65 }, scale: 0.50 },
-        { id: 'gross-out',       name: 'Gross-Out',       price:  80, sprite: 'gross-out',       anchor: { x: 0, y:  85 }, scale: 0.70 },
-        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 120 }, scale: 0.65 },
-        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y:  60 }, scale: 0.60 },
-        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y:  75 }, scale: 0.65 },
-        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y: 120 }, scale: 0.65 },
-        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y: 120 }, scale: 0.70 }
+        { id: 'no-hat',          name: 'No Hat',          price:   0, sprite: null,              anchor: { x: 0, y:   0 }, scale: 0.87 },
+        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y:  70 }, scale: 0.57 },
+        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y:  57 }, scale: 0.57 },
+        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y:  48 }, scale: 0.61 },
+        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 5, y:  70 }, scale: 0.57 },
+        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y:  70 }, scale: 0.61 },
+        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y:  39 }, scale: 0.48 },
+        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y:  57 }, scale: 0.57 },
+        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y:  48 }, scale: 0.61 },
+        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y:  44 }, scale: 0.61 },
+        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y:  57 }, scale: 0.44 },
+        { id: 'gross-out',       name: 'Gross-Out',       price:  80, sprite: 'gross-out',       anchor: { x: 0, y:  74 }, scale: 0.61 },
+        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 105 }, scale: 0.57 },
+        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y:  52 }, scale: 0.52 },
+        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y:  65 }, scale: 0.57 },
+        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y: 105 }, scale: 0.57 },
+        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y: 105 }, scale: 0.61 }
     ];
 
     const HAT_BY_ID = {};
@@ -1737,20 +1808,24 @@
        trims them to whatever pose silhouette is active, so only their
        vertical extents matter.) */
     const BODY = {
+        /* Retuned for the paper-doll rig (2026-08-19). The doll is drawn at
+           0.872x so its widest pose still fits the 400x600 frame, which puts
+           the head at r=50.6 centred on y=190. Every landmark below was
+           re-derived from the traced parts, not scaled by eye. */
         cx: 200,
-        headCy: 92, headR: 58, headTop: 34,
-        eyeY: 86, eyeDX: 18,          // eyes at cx ± eyeDX
-        browY: 68,
-        mouthY: 110,
-        cheekY: 114, cheekDX: 30,
-        hairTipY: 28, hairBaseY: 56,  // crown tuft band
-        neckY: 150,
-        shirtTop: 158, shirtBot: 392, // torso band
-        chestY: 234,                  // logo / badge / button cluster
-        waistY: 384,
-        pantsTop: 374, pantsBot: 600, // legs band
-        bootY: 532,
-        handY: 344                    // standing hand height
+        headCy: 190, headR: 50, headTop: 148,
+        eyeY: 185, eyeDX: 16,         // eyes at cx +/- eyeDX
+        browY: 166,
+        mouthY: 211,
+        cheekY: 214, cheekDX: 26,
+        hairTipY: 142, hairBaseY: 168,
+        neckY: 247,
+        shirtTop: 254, shirtBot: 430, // torso band
+        chestY: 310,
+        waistY: 424,
+        pantsTop: 395, pantsBot: 600, // legs band
+        bootY: 540,
+        handY: 466                    // standing hand height
     };
 
     const DEFAULT_GROODLES = [
@@ -2762,6 +2837,10 @@
         if (clip) clip.innerHTML = svg;
         if (fill) fill.innerHTML = svg;
         if (outline) outline.innerHTML = svg;
+        /* Interior linework + brass pins. Empty for the hand-authored
+           ghost / animal poses, which carry no rig. */
+        const dollInk = document.querySelector('.doll-ink');
+        if (dollInk) dollInk.innerHTML = rigInkMarkup(pose);
         if (creature && pose.origin) {
             creature.style.transformOrigin = pose.origin;
         }
