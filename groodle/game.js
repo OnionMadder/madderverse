@@ -553,11 +553,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
            cleanly. id '' = none; dx/dy = the kid's drag-nudge from the
            anchor in logical 400x600 units. */
         face: {
-            hair:  { id: '', dx: 0, dy: 0 },
-            brows: { id: '', dx: 0, dy: 0 },
-            eyes:  { id: '', dx: 0, dy: 0 },
-            nose:  { id: '', dx: 0, dy: 0 },
-            mouth: { id: '', dx: 0, dy: 0 }
+            hair: { id: '', dx: 0, dy: 0 }
         },
         pose: 'standing'
     };
@@ -3167,27 +3163,28 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
     let facePartsInnerEl = null;
     let faceBankEl = null;
 
-    const FACE_CATS = ['hair', 'brows', 'eyes', 'nose', 'mouth'];
-    const FACE_LABEL = { hair: 'Hair', brows: 'Brows', eyes: 'Eyes', nose: 'Nose', mouth: 'Mouth' };
+    /* HAIR ONLY, deliberately. Groodle's face is drawn -- the three circles
+       and the smile are part of Onion's artwork, not something the kid adds --
+       so a bank of eyes/brows/noses/mouths stamped a SECOND face on top of the
+       one he already has. Hair is the only category that adds to him instead
+       of competing with him.
+
+       Old saves may still carry brows/eyes/nose/mouth entries. Nothing reads
+       them (every consumer iterates FACE_CATS), so they are inert rather than
+       broken, and mergeDefaults leaves them alone. */
+    const FACE_CATS = ['hair'];
+    const FACE_LABEL = { hair: 'Hair' };
 
     /* Per-category grab box (logical units, centered on the part) — kept
        tight so the stacked face anchors don't all grab each other; the
        later-rendered part wins where they still overlap. */
     const FACE_HIT = {
-        hair:  { x: -52, y: -32, w: 104, h: 50 },
-        brows: { x: -30, y: -12, w: 60, h: 24 },
-        eyes:  { x: -32, y: -16, w: 64, h: 32 },
-        nose:  { x: -12, y: -12, w: 24, h: 26 },
-        mouth: { x: -22, y: -14, w: 44, h: 30 }
+        hair:  { x: -52, y: -32, w: 104, h: 50 }
     };
 
     function faceAnchor(cat) {
         const cx = BODY.cx;
-        if (cat === 'hair')  return { x: cx, y: BODY.headTop + 4 };
-        if (cat === 'brows') return { x: cx, y: BODY.browY };
-        if (cat === 'eyes')  return { x: cx, y: BODY.eyeY };
-        if (cat === 'nose')  return { x: cx, y: (BODY.eyeY + BODY.mouthY) / 2 };
-        if (cat === 'mouth') return { x: cx, y: BODY.mouthY };
+        if (cat === 'hair') return { x: cx, y: BODY.headTop + 4 };
         return { x: cx, y: BODY.headCy };
     }
 
@@ -3199,30 +3196,6 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
             { id: 'spikes', svg: '<path d="M -44 10 L -34 -24 L -22 6 L -11 -28 L 2 6 L 14 -25 L 26 6 L 36 -22 L 46 10 Z" fill="#5b3a29"/>' },
             { id: 'curls',  svg: '<g fill="#5b3a29"><circle cx="-36" cy="-2" r="13"/><circle cx="-13" cy="-13" r="15"/><circle cx="13" cy="-13" r="15"/><circle cx="36" cy="-2" r="13"/></g>' },
             { id: 'swoop',  svg: '<path d="M -46 12 Q -54 -28 -8 -24 Q 34 -22 46 8 Q 30 -8 4 -6 Q -22 -4 -46 12 Z" fill="#5b3a29"/>' }
-        ],
-        brows: [
-            { id: 'flat',   svg: '<g stroke="#1a0f33" stroke-width="4" stroke-linecap="round"><line x1="-27" y1="0" x2="-9" y2="0"/><line x1="9" y1="0" x2="27" y2="0"/></g>' },
-            { id: 'raised', svg: '<g fill="none" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"><path d="M -27 3 Q -18 -7 -9 3"/><path d="M 9 3 Q 18 -7 27 3"/></g>' },
-            { id: 'angry',  svg: '<g stroke="#1a0f33" stroke-width="4" stroke-linecap="round"><line x1="-27" y1="-4" x2="-9" y2="5"/><line x1="9" y1="5" x2="27" y2="-4"/></g>' }
-        ],
-        eyes: [
-            { id: 'dots',   svg: '<g fill="#1a0f33"><circle cx="-18" cy="0" r="6"/><circle cx="18" cy="0" r="6"/></g>' },
-            { id: 'big',    svg: '<g><circle cx="-18" cy="0" r="11" fill="#fff" stroke="#1a0f33" stroke-width="2.5"/><circle cx="18" cy="0" r="11" fill="#fff" stroke="#1a0f33" stroke-width="2.5"/><circle cx="-15" cy="2" r="4.5" fill="#1a0f33"/><circle cx="21" cy="2" r="4.5" fill="#1a0f33"/></g>' },
-            { id: 'happy',  svg: '<g fill="none" stroke="#1a0f33" stroke-width="3.5" stroke-linecap="round"><path d="M -26 2 Q -18 -8 -10 2"/><path d="M 10 2 Q 18 -8 26 2"/></g>' },
-            { id: 'sleepy', svg: '<g fill="none" stroke="#1a0f33" stroke-width="3.5" stroke-linecap="round"><path d="M -26 0 Q -18 6 -10 0"/><path d="M 10 0 Q 18 6 26 0"/></g>' },
-            { id: 'wink',   svg: '<g fill="none" stroke="#1a0f33" stroke-width="3.5" stroke-linecap="round"><circle cx="-18" cy="0" r="6" fill="#1a0f33"/><path d="M 10 0 Q 18 6 26 0"/></g>' }
-        ],
-        nose: [
-            { id: 'dot',    svg: '<circle cx="0" cy="0" r="3.6" fill="#1a0f33"/>' },
-            { id: 'button', svg: '<ellipse cx="0" cy="0" rx="6" ry="4.6" fill="#1a0f33"/>' },
-            { id: 'L',      svg: '<path d="M 0 -8 L 0 6 L 7 6" fill="none" stroke="#1a0f33" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' }
-        ],
-        mouth: [
-            { id: 'smile',   svg: '<path d="M -16 0 Q 0 16 16 0" fill="none" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"/>' },
-            { id: 'grin',    svg: '<g><path d="M -18 -3 Q 0 21 18 -3 Z" fill="#1a0f33"/><path d="M -12 1 Q 0 8 12 1" fill="none" stroke="#fff" stroke-width="3"/></g>' },
-            { id: 'o',       svg: '<circle cx="0" cy="2" r="9" fill="#1a0f33"/>' },
-            { id: 'tongue',  svg: '<g><path d="M -16 -1 Q 0 15 16 -1" fill="none" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"/><ellipse cx="3" cy="9" rx="6" ry="7" fill="#e8607a"/></g>' },
-            { id: 'neutral', svg: '<line x1="-14" y1="0" x2="14" y2="0" stroke="#1a0f33" stroke-width="4" stroke-linecap="round"/>' }
         ]
     };
 
