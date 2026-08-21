@@ -53,7 +53,7 @@ Other top-level entries:
 The hub grid lists only finished, shipping games. **Every game directory that is NOT on the hub grid is a work-in-progress** — present on disk and sometimes reachable by direct URL, but deliberately not advertised, and intentionally excluded from `sitemap.xml`, `llms.txt`, and the hub's JSON-LD `ItemList`. Do not add a WIP game to the hub / sitemap / schema until the user says it's ready.
 
 - **Advertised (on the hub, in grid order, as of 2026-07-24):** Slip Studio, All Munkis, Pootery, Groodle, Tub's Cookie Cache, George's Jump, Friend Picker, **Florigami**. *(Florigami was added to the grid / sitemap / llms / JSON-LD when it went live — see its section at the very bottom. Slip Studio was **relisted 2026-07-02** after earning Google Play's Teacher Approved badge — it had been unlisted 2026-07-01 when it migrated to nodehole; it's now effectively dual-listed like George's Jump. George's Jump is also published on nodehole — deliberately dual-listed, it's an all-audiences game. See "The nodehole sister site" below for games migrated off the hub. Glass Gallery and Tonehouse were unlisted from the hub 2026-07-02 — dirs kept on disk, reachable by direct URL.)*
-- **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `spoiler-alert/`, `smash-studio/`, `sua-sponte/`, `misfile/` (and any future dir not yet on the grid). *(`tiny-canvas/` was **listed on the hub 2026-08-04** — grid card, JSON-LD `ItemList` position 9, `sitemap.xml`, `llms.txt` — and is no longer WIP for web purposes; its store release is still outstanding.)* The last four were committed to `main` on 2026-07-24 as WIP — reachable by direct URL but deliberately off the hub/sitemap/llms/JSON-LD. `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
+- **Unlisted / WIP (on disk, NOT advertised):** `munki-madness/`, `bala-draws/`, `eat-worms/`, `giggle-gears/`, `spoiler-alert/`, `smash-studio/`, `sua-sponte/`, `misfile/`, `solder-sanity/` (and any future dir not yet on the grid). *(`tiny-canvas/` was **listed on the hub 2026-08-04** — grid card, JSON-LD `ItemList` position 9, `sitemap.xml`, `llms.txt` — and is no longer WIP for web purposes; its store release is still outstanding.)* The last four were committed to `main` on 2026-07-24 as WIP — reachable by direct URL but deliberately off the hub/sitemap/llms/JSON-LD. `giggle-gears/` in particular still carries stale FYMZ branding and is not launch-ready.
 - **Migrated to nodehole (unlisted from the hub, but `dir kept on disk`):** `krazy-kritters/` (removed 2026-06-30, dir deleted), `hole-up/` + `gazonionaire/` (2026-07-01, dirs kept, web-only). These are pulled from the grid / JSON-LD / `sitemap.xml` / `llms.txt` but stay reachable by direct URL. See below. *(`slip-studio/` was also migrated here 2026-07-01 but was **relisted on the hub 2026-07-02** after Teacher Approved — it's back in the grid / JSON-LD / sitemap / llms while its nodehole copy also stands, so treat it as dual-listed, not migrated-away.)*
 
 ## The nodehole sister site
@@ -619,3 +619,58 @@ Output: `all-munkis-app/android/app/build/outputs/bundle/release/app-release.aab
 **Privacy strip is mandatory** for every rebuild — Play Data Safety declares "no data collected," so GoatCounter MUST NOT ship in the app copy, and `.madder-home` + `.site-footer-slim` must be hidden (they link to `../` on madderverse.org and 404 in a WebView).
 
 **Current staged AAB (uploaded? or pending Onion):** `Desktop/all-munkis-v1.1.2-vc2-onionmadder.aab` (14.1 MB, built 2026-07-31, signed with the Onion Madder keystore). vc1 was built 2026-07-30 at ~28 MB but never uploaded (superseded by vc2 after the backdrop-optimization pass shrunk the 5 CSS-backdrop assets from ~15.6 MB to ~0.8 MB). First-upload paperwork on Onion's side: create the app in Play Console under the Onion Madder account, enrol Play App Signing on first upload, back up the returned upload certificate PEM, adapt store listing from `all-munkis/PLAY_STORE_LISTING.md` (Mad Sundar draft), Data Safety = no data collected, privacy URL **`https://onionmadder.com/apps/all-munkis/privacy/`** (matches the Onion Madder dev identity — better fit than the old madderverse.org path).
+
+---
+
+## Solder Sanity — a calm soldering bench (WIP, unlisted)
+
+Lives at `solder-sanity/` (flat shape: `index.html` + `game.js` + `style.css`, no
+assets folder at all). Built 2026-08-20. **NOT on the hub** — no grid card, not in
+`sitemap.xml` / `llms.txt` / the JSON-LD `ItemList` — until Onion says it ships.
+
+**The whole game is one gesture: press and HOLD a pad.** The iron comes down, the
+pad heats, and past `FLOW_TEMP` the solder feeds and the fillet grows against an arc
+gauge with a green sweet band. Let go and it cools and sets; how full it was at
+release decides the joint — cold / good / perfect / blobby. **Nothing fails and there
+is no timer anywhere in the file.** Any joint can be reheated (holding again just
+adds more solder) or wiped back to bare copper with the **wick** tool, free. Finish
+every joint and the board powers up: traces animate, LEDs light per the board's
+`power` mode, and a bench report tallies the joints and offers a real soldering tip.
+
+Things worth knowing before editing:
+
+- **No assets, at all.** Parts are drawn procedurally to one canvas and every sound
+  is synthesised in `audio` (room tone, a gated sizzle loop, pings, chime). That is
+  deliberate — the game is ~70KB total and works offline with nothing to load.
+- **Two coordinate spaces, and mixing them up is the bug you will hit.** Anything ON
+  the board (PCB, traces, parts, joints) is drawn in **board units** (240x160) via
+  `boardTransform()`. Anything held OVER it (iron, solder wire, gauge, smoke, sparks,
+  floating labels) is drawn in **screen pixels**, because on a portrait screen the
+  board is turned a quarter turn (`view.portrait`, set in `resize()` when the
+  available height exceeds the width by 1.2x) and an iron drawn in board space would
+  come in sideways. Use `toScreen(x, y)` / `toBoard(ev)` — never hand-roll the
+  mapping. The portrait turn is what makes phones playable: it takes the chip's pad
+  pitch from 22px to 33px on a 375px-wide screen, and the touch target to 58px.
+- **Pad pitch must clear `2 * PAD_R`.** Every entry in `PARTS.pads` is a real touch
+  target; the first cut had chip pads 8 units apart with a 14-unit pad diameter and
+  they drew on top of each other. If you add a part, check its pitch and check its
+  body does not cover its own pads.
+- **Boards are data** in `BOARDS` — parts (type + board-space centre), `nets` as pad
+  reference pairs (auto-routed by `route()` with a 45-degree dogleg, the way a
+  hand-routed board breaks), a `power` mode and an optional `tune`. Board 6,
+  `practice`, is `endless: true`: it generates a fresh scatter each time via
+  `makePracticeDef()`, shows no report, and regenerates ~2.6s after it lights.
+- **`progress.unlocked` is a COUNT of open boards, not an index** — finishing board
+  `i` sets it to `i + 2`. The practice bench is always open.
+- **`init()` is called from the bottom of the file** and wrapped so a startup failure
+  logs with a `[Solder Sanity]` prefix instead of failing silently. Same reasoning as
+  Slip Studio's v189 fix — do not move the call up.
+- **Cache-bust:** `index.html` loads `game.js?v=N` + `style.css?v=N`; bump `N` on
+  every web change (currently **v1**).
+- **Dev handle `window.__solder`**: `state`, `view`, `load(i)`, `tally()`,
+  `screenOf(i)`, `fillAll(f)`, and **`tick(dt, times)`** — step the sim by hand.
+  That last one matters: the preview pane pauses rAF, so tests that wait on frames
+  read a frozen state and invent bugs. Step time explicitly instead. For the same
+  reason CSS animations sit at frame 0 in a headless capture, so a modal that looks
+  like it is painting *behind* the board is usually just a frozen `fadeIn` — check
+  `document.elementFromPoint()` before "fixing" the z-order.

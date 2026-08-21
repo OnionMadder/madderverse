@@ -1,0 +1,371 @@
+/* ============================================================
+   SOLDER SANITY — a calm soldering bench
+   Warm workbench palette (walnut + brass + lamp light), which is
+   deliberately NOT the neon hub palette: the whole point of the
+   game is that it feels quiet.
+   ============================================================ */
+
+:root {
+    --bg:      #17140f;
+    --panel:   rgba(34, 27, 20, 0.92);
+    --ink:     #f3e9dc;
+    --ink-dim: rgba(243, 233, 220, 0.6);
+    --brass:   #d8a24a;
+    --sweet:   #7fd39a;
+    --line:    rgba(216, 162, 74, 0.28);
+    --radius:  14px;
+    --font:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+}
+
+#bench {
+    position: fixed;
+    inset: 0;
+    /* A pool of lamp light falling on the bench. */
+    background:
+        radial-gradient(120% 90% at 50% 22%, #3a2e21 0%, #241d15 45%, #17140f 100%);
+}
+
+#scene {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+    cursor: crosshair;
+}
+
+/* ---------- shared floating control pills ---------- */
+.ctl-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(216, 162, 74, 0.38);
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: rgba(243, 233, 220, 0.88);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.08s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.ctl-btn:hover  { border-color: var(--brass); color: #fff; }
+.ctl-btn:active { transform: scale(0.93); }
+.ctl-btn.is-off { opacity: 0.5; }
+
+/* ---------- HUD ---------- */
+#hud {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(280px, 54vw);
+    text-align: center;
+    pointer-events: none;
+    user-select: none;
+}
+
+.hud-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+
+.hud-bar {
+    margin: 7px auto 5px;
+    height: 4px;
+    width: 100%;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+}
+.hud-bar span {
+    display: block;
+    height: 100%;
+    width: 0%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--brass), var(--sweet));
+    transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hud-sub {
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+}
+
+/* ---------- tool tray ---------- */
+#tray {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(var(--mv-slim-h, 22px) + max(12px, env(safe-area-inset-bottom, 0px)));
+    display: flex;
+    gap: 10px;
+    padding: 7px;
+    border-radius: 999px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.tool {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 44px;
+    padding: 0 16px 0 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink-dim);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.tool svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.tool:hover { color: var(--ink); }
+.tool.is-on {
+    color: #2a2016;
+    background: var(--brass);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ---------- first-run coach ---------- */
+#coach {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(var(--mv-slim-h, 22px) + 84px);
+    max-width: min(420px, 86vw);
+    padding: 11px 16px;
+    border-radius: var(--radius);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+    font-size: 0.82rem;
+    line-height: 1.45;
+    text-align: center;
+    pointer-events: none;
+    animation: coachIn 0.6s ease both;
+}
+#coach b { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+#coach[hidden] { display: none; }
+
+@keyframes coachIn {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ---------- modals ---------- */
+.modal {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px;
+    background: rgba(12, 9, 6, 0.72);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    animation: fadeIn 0.25s ease both;
+}
+.modal[hidden] { display: none; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet {
+    width: min(440px, 100%);
+    max-height: 82vh;
+    overflow-y: auto;
+    padding: 22px 22px 18px;
+    border-radius: 20px;
+    background: linear-gradient(180deg, #2c241a, #221b14);
+    border: 1px solid var(--line);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+    text-align: center;
+    animation: sheetIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sheetIn {
+    from { opacity: 0; transform: translateY(16px) scale(0.97); }
+    to   { opacity: 1; transform: none; }
+}
+
+.sheet h2 {
+    margin: 0 0 4px;
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+.stamp {
+    display: inline-block;
+    margin-bottom: 10px;
+    padding: 5px 14px;
+    border: 2px solid var(--brass);
+    border-radius: 999px;
+    color: var(--brass);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    transform: rotate(-2deg);
+}
+
+.tally {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 16px 0 6px;
+}
+.tally .cell {
+    min-width: 78px;
+    padding: 10px 8px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.26);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.tally .cell b {
+    display: block;
+    font-size: 1.4rem;
+    font-weight: 700;
+    line-height: 1.1;
+}
+.tally .cell small {
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+}
+.tally .perfect b { color: var(--sweet); }
+.tally .good b    { color: var(--brass); }
+.tally .rough b   { color: rgba(243, 233, 220, 0.55); }
+
+.tip {
+    margin: 14px 4px 4px;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--ink-dim);
+}
+
+.sheet-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+}
+.sheet-actions button {
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+.sheet-actions button:hover { border-color: var(--brass); background: rgba(216, 162, 74, 0.1); }
+.sheet-actions button:active { transform: scale(0.97); }
+.sheet-actions .primary {
+    background: var(--brass);
+    border-color: var(--brass);
+    color: #2a2016;
+}
+.sheet-actions .primary:hover { background: #e8b45e; }
+
+/* ---------- board picker ---------- */
+.board-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 14px 0 4px;
+    text-align: left;
+}
+
+.board-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 60px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--ink);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, transform 0.08s ease;
+}
+.board-card:hover  { border-color: var(--brass); background: rgba(216, 162, 74, 0.08); }
+.board-card:active { transform: scale(0.99); }
+.board-card.is-current { border-color: var(--brass); }
+
+.board-card .n {
+    flex: 0 0 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(216, 162, 74, 0.16);
+    color: var(--brass);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+.board-card .t { flex: 1 1 auto; }
+.board-card .t b { display: block; font-size: 0.92rem; font-weight: 600; }
+.board-card .t small { font-size: 0.72rem; color: var(--ink-dim); }
+.board-card .done { color: var(--sweet); font-size: 0.95rem; }
+
+@media (max-width: 420px) {
+    #hud { width: 60vw; }
+    .tool span { display: none; }
+    .tool { padding: 0 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}

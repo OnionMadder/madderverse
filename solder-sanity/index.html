@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <title>Solder Sanity</title>
+
+    <link rel="canonical" href="https://madderverse.org/solder-sanity/" />
+    <meta property="og:url" content="https://madderverse.org/solder-sanity/" />
+    <meta name="twitter:url" content="https://madderverse.org/solder-sanity/" />
+    <meta name="title" content="Solder Sanity — A Calm Soldering Bench. From Madderverse." />
+    <meta name="description" content="Hold the iron, let the pad get hot, watch the solder flow into a shiny little joint. A relaxing soldering minigame. No timers, no failing, no ads." />
+    <meta name="keywords" content="solder sanity, soldering game, relaxing game, calm game, circuit board game, electronics for kids, satisfying game, Madderverse, Onion Madder, free ad-free games" />
+    <meta name="author" content="Onion Madder" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Solder Sanity — A Calm Soldering Bench" />
+    <meta property="og:description" content="Hold the iron, let the pad get hot, watch the solder flow into a shiny little joint. No timers, no failing." />
+    <meta property="og:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Solder Sanity — A Calm Soldering Bench" />
+    <meta name="twitter:description" content="Hold the iron, let the pad get hot, watch the solder flow. No timers, no failing." />
+    <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
+
+    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
+    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
+    <meta name="theme-color" content="#17140f" />
+    <meta name="apple-mobile-web-app-title" content="Solder Sanity" />
+    <meta name="application-name" content="Solder Sanity" />
+
+    <link rel="stylesheet" href="../assets/css/site-footer.css" />
+    <link rel="stylesheet" href="style.css?v=1" />
+    <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+
+<body>
+    <a class="madder-home" href="../" aria-label="Back to Madderverse" title="Back to Madderverse">&#x2302;</a>
+    <div class="madder-controls">
+        <button id="boardsBtn" type="button" class="ctl-btn" aria-label="Choose a board" title="Boards">&#9636;</button>
+        <button id="muteBtn" type="button" class="ctl-btn" aria-label="Mute or unmute" title="Sound">&#128266;</button>
+    </div>
+
+    <main id="bench">
+        <canvas id="scene" aria-label="Soldering bench" role="img"></canvas>
+
+        <header id="hud">
+            <div class="hud-name" id="boardName">First Light</div>
+            <div class="hud-bar"><span id="progFill"></span></div>
+            <div class="hud-sub" id="boardSub">0 of 4 joints</div>
+        </header>
+
+        <div id="tray" role="group" aria-label="Tools">
+            <button class="tool is-on" type="button" data-tool="iron" aria-pressed="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M20 3.5 15.5 8" />
+                    <path d="M16.8 4.8 19.2 7.2" />
+                    <path d="M15.5 8 9.5 14" />
+                    <path d="M9.5 14 5 20 4 19l5.5-6.5" />
+                </svg>
+                <span>Iron</span>
+            </button>
+            <button class="tool" type="button" data-tool="wick" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="16" cy="8" r="4.5" />
+                    <path d="M12.5 10.5 4 19" />
+                    <path d="M6 15.5 8.5 18" />
+                    <path d="M4.2 17.3 6.7 19.8" />
+                </svg>
+                <span>Wick</span>
+            </button>
+        </div>
+
+        <div id="coach" hidden>
+            <b>Press and hold a silver pad.</b>
+            Let it glow, let the solder flow &mdash; then let go.
+        </div>
+
+        <div id="report" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="reportTitle">
+            <div class="sheet">
+                <div class="stamp" id="reportStamp">Good bench</div>
+                <h2 id="reportTitle">Bench report</h2>
+                <div class="tally" id="reportTally"></div>
+                <p class="tip" id="reportTip"></p>
+                <div class="sheet-actions">
+                    <button id="nextBtn" type="button" class="primary">Next board</button>
+                    <button id="redoBtn" type="button">Do it again</button>
+                    <button id="closeReport" type="button">Keep tinkering</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="boards" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="boardsTitle">
+            <div class="sheet">
+                <h2 id="boardsTitle">Boards</h2>
+                <div class="board-list" id="boardList"></div>
+                <div class="sheet-actions">
+                    <button id="closeBoards" type="button">Back to the bench</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="game.js?v=1"></script>
+
+    <footer class="site-footer-slim" aria-label="Site info">
+        <span>&copy; <span data-year></span> <a href="https://madsundar.com/" target="_blank" rel="noopener">Mad Sundar LLC</a></span>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../">Madderverse</a>
+        <span class="sep" aria-hidden="true">&middot;</span>
+        <a href="../about.html">About</a>
+    </footer>
+    <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
+</body>
+</html>
