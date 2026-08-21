@@ -177,7 +177,9 @@
         smoke: [],
         sparks: [],
         labels: [],
-        muted: false
+        muted: false,
+        reported: false,       // the report only interrupts once per board
+        wickOffered: false
     };
 
     var cv, ctx, bench, dpr = 1;
@@ -415,6 +417,7 @@
         state.board = buildBoard(def);
         state.active = null;
         state.completed = false;
+        state.reported = false;
         state.powerT = -1;
         state.smoke.length = 0;
         state.sparks.length = 0;
@@ -488,7 +491,9 @@
                 j.fill = 0; j.grade = null; j.heat = Math.max(j.heat, 0.25); j.pop = 1;
                 audio.wick(); buzz(12);
                 float(j, "Clean", "#cfd6dc");
+                reopenBoard();
                 updateHud();
+                dismissCoach();
             }
             return;
         }
@@ -496,6 +501,7 @@
         state.active = j;
         j.contact = 1;
         j.grade = null;          // reflowing an existing joint re-opens it
+        reopenBoard();
         updateHud();
         audio.contact();
         buzz(8);
@@ -509,6 +515,16 @@
         var p = toBoard(ev);
         var dx = state.active.x - p.x, dy = state.active.y - p.y;
         if (dx * dx + dy * dy > LIFT_R * LIFT_R) lift();
+    }
+
+    /* Touching a joint on a board that is already lit takes the board
+       back apart — it stays powered otherwise, cheerfully running on a
+       joint that is no longer there. */
+    function reopenBoard() {
+        if (!state.completed) return;
+        state.completed = false;
+        state.powerT = -1;
+        state.board.leds.forEach(function (l) { l.lit = 0; });
     }
 
     function lift() {
@@ -555,6 +571,7 @@
                     j.pop = 1;
                     audio.set(j.grade);
                     float(j, GRADES[j.grade].label, GRADES[j.grade].color);
+                    if (j.grade === "blob") offerWick();
                     updateHud();
                     checkComplete();
                 }
@@ -631,7 +648,7 @@
             if (!prev || t.perfect > prev.perfect) progress.done[id] = { perfect: t.perfect, total: t.total };
             if (state.boardIndex + 2 > progress.unlocked) progress.unlocked = state.boardIndex + 2;
             lsSet(PROGRESS_KEY, progress);
-            setTimeout(showReport, 1700);
+            if (!state.reported) { state.reported = true; setTimeout(showReport, 1700); }
         } else {
             float({ x: BOARD_W / 2, y: 26 }, "Nice bench.", "#7fd39a");
         }
@@ -1204,6 +1221,19 @@
         });
     }
 
+    /* A blob is the one mistake with a tool behind it, and nothing on
+       screen says so. Offer the wick the first time one sets. */
+    function offerWick() {
+        if (state.wickOffered || lsGet("solder-sanity-wick-offered", 0)) return;
+        state.wickOffered = true;
+        lsSet("solder-sanity-wick-offered", 1);
+        els.coach.innerHTML = "<b>Too much solder?</b> Tap <em>Wick</em>, " +
+            "then tap the joint to wipe it back to bare copper. It costs nothing.";
+        els.coach.hidden = false;
+        var wick = document.querySelector('.tool[data-tool="wick"]');
+        if (wick) wick.classList.add("is-new");
+    }
+
     function dismissCoach() {
         if (els.coach.hidden) return;
         els.coach.hidden = true;
@@ -1289,6 +1319,7 @@
         Array.prototype.forEach.call(document.querySelectorAll(".tool"), function (btn) {
             btn.addEventListener("click", function () {
                 state.tool = btn.getAttribute("data-tool");
+                btn.classList.remove("is-new");
                 Array.prototype.forEach.call(document.querySelectorAll(".tool"), function (b) {
                     var on = b === btn;
                     b.classList.toggle("is-on", on);
