@@ -626,7 +626,24 @@ Output: `all-munkis-app/android/app/build/outputs/bundle/release/app-release.aab
 
 Lives at `solder-sanity/` (flat shape: `index.html` + `game.js` + `style.css`, no
 assets folder at all). Built 2026-08-20. **NOT on the hub** — no grid card, not in
-`sitemap.xml` / `llms.txt` / the JSON-LD `ItemList` — until Onion says it ships.
+`sitemap.xml` / `llms.txt` / the JSON-LD `ItemList`.
+
+**⭐ Audience: OLDER SKEW — this one is nodehole-bound, not a kids-hub game**
+(Onion's call, 2026-08-21). It stays in this repo and at
+`madderverse.org/solder-sanity/` as its development home and direct-URL build, but
+it is **never going on the madderverse grid**; when it ships it gets staged to
+`Desktop/solder-sanity-nodehole/play/` for NFSN upload like every other migrated
+game (see "The nodehole sister site" above for the /play/ subpath rule and the
+chrome-stripping checklist). The kid-facing keyword was pulled from the meta on the
+same day; the rest of the copy is audience-neutral already. Do NOT add it to the
+hub, sitemap, llms.txt or JSON-LD even after it is finished.
+
+What the older skew licenses in the polish pass: forgiveness can tighten, boards can
+get genuinely fiddly (fine pitch, dense parts), the tips can be dry rather than
+teacherly, and **solder bridges between adjacent pads become fair game** — the
+authentic mistake the wick exists to fix, deliberately left out of the first cut
+because it would have been pure frustration on a kids' hub. None of that touches the
+core promise: still no timer, still nothing that can fail.
 
 **The whole game is one gesture: press and HOLD a pad.** The iron comes down, the
 pad heats, and past `FLOW_TEMP` the solder feeds and the fillet grows against an arc
