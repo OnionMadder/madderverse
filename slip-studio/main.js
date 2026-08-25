@@ -5077,6 +5077,16 @@ function setFiring(id) {
     haptic(8);
     updateFiringBar();
 }
+// The firing the user last CHOSE (setFiring / refirePot write it). Distinct
+// from state.firingType, which loadPot and kiln loads overwrite to describe
+// the piece on the wheel — a fresh pot goes back to this.
+function storedFiringPref() {
+    try {
+        const saved = localStorage.getItem("slip-firing");
+        if (saved && FIRINGS[saved]) return saved;
+    } catch (_) {}
+    return DEFAULT_FIRING;
+}
 
 // --- Fire it again -----------------------------------------------
 // A finished pot can go back through the kiln in a different firing. This
@@ -5268,10 +5278,18 @@ async function openKilnPick(slot) {
     if (title) title.textContent = slotLabel(slot);
     let all = [];
     try { all = await dbAll(); } catch (_) {}
-    // One entry per set — a set fires as its pot member, like everywhere else.
-    const seen = new Set();
+    // One entry per set — and a set fires as its POT member, like everywhere
+    // else. savePot writes whichever piece was ACTIVE first, so "first in db
+    // order" could be the lid; pick the non-lid half explicitly or a shelf
+    // slot would fire (and copy) a standalone lid.
+    const rep = new Map();
+    for (const e of all) {
+        if (!e.setId) continue;
+        const prev = rep.get(e.setId);
+        if (!prev || (lookupIsLid(prev) && !lookupIsLid(e))) rep.set(e.setId, e);
+    }
     const pots = all.filter((e) => {
-        if (e.setId) { if (seen.has(e.setId)) return false; seen.add(e.setId); }
+        if (e.setId && rep.get(e.setId) !== e) return false;
         return !kilnLoad.includes(e.id);            // already on the shelf
     }).reverse();
     if (list) {
@@ -5599,8 +5617,13 @@ function resetPot() {
     dipPreview = null;
     // Explicit, not left to cancelFiringMoment: that early-returns when the
     // sequence has already FINISHED, so a fresh pot would otherwise inherit
-    // the ash off the last one. firingType is a preference and stays.
+    // the ash off the last one.
     state.kiln = null;
+    // Back to the CHOSEN firing. state.firingType may be describing a loaded
+    // pot or the last kiln-load member — without this, viewing a raku pot
+    // made the next new pot fire raku while the chips still said Electric.
+    state.firingType = storedFiringPref();
+    updateFiringBar();
     renderDips();
     clearDeco();
     resetDecoHistory(); // fresh pot → no undo carryover
@@ -7884,6 +7907,10 @@ function corePieceFields() {
         handleThickness: !state.isLid && state.handle.on ? state.handle.thickness : DEFAULT_HANDLE_THICKNESS,
         handleCount:  !state.isLid && state.handle.on ? state.handle.count : 2,
         heightScale:  state.heightScale,
+        // The rim fit this lid was cut for (see seedLidForRim). Like the
+        // capturePieceState comment says: it can't be recomputed from the
+        // silhouette, so it has to travel with the save.
+        lidBaseRatio: state.lidBaseRatio || 1,
     };
 }
 
@@ -7896,13 +7923,14 @@ async function savePot() {
     // using the live canvases; the partner is restored briefly so its
     // thumb captures the right look, then the active piece is put back.
     const partner = state.savedPot || state.savedLid;
-    // A set that's already saved and unchanged mustn't be written again on
-    // a second tap — that would duplicate both pieces in the gallery. We
-    // now KEEP the partner refs after saving (so the assembled view keeps
-    // its continuous-gradient lid — see below), so unlike the old flow the
-    // partner is still present on a re-tap. Nothing dirty → already saved.
-    // (Also correctly no-ops re-saving a freshly loaded, unedited set.)
-    if (partner && !state.dirty) { flashSaved(); return; }
+    // An already-saved, unchanged piece mustn't be written again on a second
+    // tap — that would duplicate it in the gallery (both pieces, for a set).
+    // We KEEP the partner refs after saving (so the assembled view keeps
+    // its continuous-gradient lid — see below), so the partner is still
+    // present on a re-tap. Nothing dirty → already saved. Also covers
+    // re-saving a freshly loaded, unedited pot or set; the flash still
+    // answers the tap so it never reads as a dead button.
+    if (!state.dirty) { flashSaved(); return; }
     let setId = state.pendingSetId || null;
     if (partner && !setId) {
         setId = "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6);
@@ -8776,9 +8804,12 @@ async function loadPot(entry, opts) {
     state.finish = entry.finish || DEFAULT_FINISH;
     // A loaded pot shows the firing it actually got. cancelFiringMoment ran
     // at the top of loadPot and cleared any in-flight roll, so this is the
-    // only thing setting it.
+    // only thing setting it. Re-sync the firing chips so they describe this
+    // piece, not whatever was selected before — resetPot restores the user's
+    // stored preference when they start a new pot.
     state.firingType = entry.firingType || DEFAULT_FIRING;
     state.kiln = entry.kiln ? { ...entry.kiln } : null;
+    updateFiringBar();
     // Glaze dips. Back-compat: pots saved with the old whole-pot "rainbow"
     // glaze had no dips — turn that into a rainbow dip preset instead.
     state.dips = Array.isArray(entry.dips) ? entry.dips.map((d) => ({ ...d })) : [];
@@ -8800,6 +8831,10 @@ async function loadPot(entry, opts) {
     if (targetPack && targetPack !== state.glazePack) setGlazePack(targetPack);
     state.isLid = lookupIsLid(entry);
     state.lidMaxY = state.isLid ? lidCapFromProfile(profile) : null;
+    // The rim fit this lid was cut for. Older saves predate the field — 1
+    // keeps their existing (flush) behaviour. Without this, Match rim on a
+    // loaded lid used whatever ratio the last in-session lid left behind.
+    state.lidBaseRatio = entry.lidBaseRatio || 1;
     // Old gallery saves predate the apex-smoothing pass — re-apply so
     // loaded lids don't render with the sharp pinprick they were
     // saved with.
@@ -8947,6 +8982,14 @@ async function loadAsCapturedState(entry) {
         glaze: entry.glaze || null,
         glazeGradient: entry.glazeGradient || null,
         finish: entry.finish || DEFAULT_FINISH,
+        // What the kiln did to this piece. Without these the loaded partner
+        // of a wood-fired set renders clean (syncPartnerMesh paints from
+        // saved.kiln) and a swap-then-save writes the piece back with its
+        // firing stripped.
+        firingType: entry.firingType || DEFAULT_FIRING,
+        kiln: entry.kiln ? { ...entry.kiln } : null,
+        heightScale: entry.heightScale != null ? entry.heightScale : 1.0,
+        lidBaseRatio: entry.lidBaseRatio || 1,
         dips: Array.isArray(entry.dips) ? entry.dips.map((d) => ({ ...d })) : [],
         decoCanvas,
         bumpCanvas,
