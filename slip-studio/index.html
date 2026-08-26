@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=242" />
+    <link rel="stylesheet" href="style.css?v=243" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -208,6 +208,14 @@
     <button class="gallery-open" id="galleryBtn" type="button" aria-label="Your pots" title="Your pots">&#x25A6;</button>
     <button class="gallery-open requests-open" id="requestsBtn" type="button" aria-label="The noticeboard" title="The noticeboard — people asking for pots">&#x2709;</button>
 
+    <!-- Study meter: visible only while throwing a study at the wet stage.
+         The number is a rib held against the wall — information, never a
+         grade. Nothing stores or reads it. -->
+    <div id="studyMeter" class="study-meter" hidden>
+        <span id="studyMeterText"></span>
+        <button id="ghostBtn" type="button" class="study-ghost-btn is-active" aria-pressed="true" title="Show or hide the ghost silhouette">Ghost</button>
+    </div>
+
     <canvas id="scene" aria-label="Pottery scene"></canvas>
 
     <!-- Display mode: full-screen calm showcase. Captures drag-to-turn +
@@ -247,6 +255,7 @@
         <button id="resumeBtn" class="landing-btn landing-btn-resume" type="button" hidden>Continue your pot</button>
         <button id="landingGallery" class="landing-link" type="button">Your pots</button>
         <button id="landingRecipes" class="landing-link" type="button">The wall</button>
+        <button id="landingStudy" class="landing-link" type="button">The study shelf</button>
         <button id="landingHowto" class="landing-link" type="button">How to play</button>
         <a id="landingAppLink" class="landing-link landing-app-link" href="https://play.google.com/store/apps/details?id=org.madderverse.slipstudio" target="_blank" rel="noopener">Get the Android app &#x2197;</a>
     </div>
@@ -513,6 +522,20 @@
         </div>
     </div>
 
+    <!-- The study shelf: classic forms from real ceramic traditions, offered
+         as things to study at the wheel. A saved study counts however it
+         came out — no stars, no pass/fail, no locked forms. -->
+    <div class="gallery" id="studyModal" role="dialog" aria-label="The study shelf" hidden>
+        <div class="gallery-bar">
+            <span class="gallery-title">The study shelf</span>
+            <span class="gallery-bar-right">
+                <button class="tool-btn" id="studyClose" type="button">Close</button>
+            </span>
+        </div>
+        <p class="recipe-intro">Pots that potters have made for centuries, from all over the world. Pick one and throw alongside its ghost &mdash; follow it closely or wander off on purpose. However it comes out, it's your study.</p>
+        <div class="study-list" id="studyList"></div>
+    </div>
+
     <!-- The reply: the payoff, so it gets a modal rather than a toast. -->
     <div id="replyModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="A letter back" hidden>
         <div class="confirm-modal-card letter-card">
@@ -614,7 +637,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=242"></script>
+    <script type="module" src="main.js?v=243"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

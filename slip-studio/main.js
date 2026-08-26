@@ -1921,6 +1921,8 @@ function init() {
         if (e.target && e.target.id === "requestPickModal") closeRequestPick();
     });
     document.getElementById("replyClose")?.addEventListener("click", closeReply);
+    document.getElementById("studyClose")?.addEventListener("click", closeStudyShelf);
+    document.getElementById("ghostBtn")?.addEventListener("click", () => setGhostVisible(!state.studyGhostOn));
     document.getElementById("tileAdd")?.addEventListener("click", addRackTile);
     document.getElementById("rackFire")?.addEventListener("click", fireRack);
     document.getElementById("rackClear")?.addEventListener("click", emptyRack);
@@ -2048,6 +2050,10 @@ function init() {
         dismissLanding();
         openWall("wall");
     });
+    document.getElementById("landingStudy")?.addEventListener("click", () => {
+        dismissLanding();
+        openStudyShelf();
+    });
     // "How to play": start the studio and replay the coach hands stage by stage.
     document.getElementById("landingHowto")?.addEventListener("click", () => {
         dismissLanding();
@@ -2150,6 +2156,18 @@ function init() {
             REQUESTS, openRequestsBoard, closeRequestsBoard, setRequestsTab,
             openRequestPick, givePotTo, openRequestIds,
             commissions: () => loadCommissions(),
+            STUDY_FORMS, startStudy, openStudyShelf, closeStudyShelf,
+            studyCloseness, setGhostVisible, markStudied,
+            studies: () => loadStudies(),
+            // tick() drives this; exposed because the preview pane pauses
+            // rAF, so tests must be able to step the meter by hand.
+            updateStudyMeter,
+            studyTargetInfo: () => studyTarget && {
+                len: studyTarget.length,
+                min: Math.min(...studyTarget), max: Math.max(...studyTarget),
+                foot: studyTarget[1], mid: studyTarget[Math.floor(studyTarget.length / 2)],
+                top: studyTarget[studyTarget.length - 1],
+            },
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
             // the picker. installedPacks() returns a Set of category names.
@@ -3751,8 +3769,16 @@ function seedProfile(shapeId) {
 // per-row profile array. Shared by seedProfile (preset silhouettes)
 // and seedLidForRim (parametric lid generation).
 function applyControlsToProfile(controls) {
+    const arr = controlsToProfileArray(controls);
+    for (let r = 0; r <= ROWS; r++) profile[r] = arr[r];
+    clampProfile(); // seed must obey the (possibly relaxed) envelope
+}
+// The pure half: resample controls into a fresh array without touching the
+// live profile. The study shelf uses this for ghost targets and closeness.
+function controlsToProfileArray(controls) {
     const ctrl = controls.map(([x, y]) => new THREE.Vector2(x, y));
     const curve = new THREE.SplineCurve(ctrl).getPoints(600);
+    const out = new Array(ROWS + 1);
     let j = 0;
     for (let r = 0; r <= ROWS; r++) {
         const y = (r / ROWS) * TOP;
@@ -3761,9 +3787,9 @@ function applyControlsToProfile(controls) {
         const b = curve[j + 1];
         const span = b.y - a.y;
         const t = span > 1e-6 ? THREE.MathUtils.clamp((y - a.y) / span, 0, 1) : 0;
-        profile[r] = a.x + (b.x - a.x) * t;
+        out[r] = a.x + (b.x - a.x) * t;
     }
-    clampProfile(); // seed must obey the (possibly relaxed) envelope
+    return out;
 }
 
 // Generate a lid silhouette whose base radius matches the source
@@ -5609,6 +5635,7 @@ function resetPot() {
     cancelFiringMoment();
     state.isLid = false; // back to regular pot rules — wheel constrains the foot
     setShowWax(true);    // fresh pot: wax is visible again when applied
+    state.studyId = null; // a fresh pot isn't a study (startStudy re-sets it)
     state.lidMaxY = null;
     state.savedPot = null;
     state.savedLid = null;
@@ -5699,7 +5726,10 @@ function updateShapePicker() {
 function shapeIconSVG(shapeId) {
     const sh = SHAPES[shapeId];
     if (!sh) return "";
-    const pts = sh.controls;
+    return controlsIconSVG(sh.controls);
+}
+// Silhouette icon from any control-point set (shape picker + study shelf).
+function controlsIconSVG(pts) {
     const VW = 60, VH = 70, CX = 30, SY = 48, SX = 28, MY = 4;
     const left  = pts.map(([r, y]) => `${(CX - r * SX).toFixed(1)},${(VH - MY - y * SY).toFixed(1)}`);
     const right = [...pts].reverse().map(([r, y]) => `${(CX + r * SX).toFixed(1)},${(VH - MY - y * SY).toFixed(1)}`);
@@ -7959,10 +7989,17 @@ async function savePot() {
         setId,
         title: defaultPotTitle(), // pre-named; user can rename in the gallery
         assemblyThumb,
+        // Provenance like commissionId, deliberately NOT in corePieceFields:
+        // kiln-load copies and partner entries don't claim the study.
+        studyId: state.studyId || null,
     };
     try {
         await dbPut(entry);
         flashSaved();
+        // Saving IS completing a study — no threshold, no closeness check.
+        // The pot may have wandered far from the ghost on purpose; a study
+        // after the moon jar is a study however it came out.
+        if (state.studyId) markStudied(state.studyId, entry.id);
         state.pendingSetId = null;
         state.dirty = false; // the gallery now reflects everything in view
         draftClear();        // the work is in the gallery — nothing to recover
@@ -8799,6 +8836,10 @@ async function loadPot(entry, opts) {
     state.savedPot = null;
     state.savedLid = null;
     state.dirty = false; // loaded piece reflects the gallery snapshot
+    // The loaded ENTRY keeps its studyId for the gallery card, but the live
+    // session doesn't inherit it — a re-save of a loaded pot is a copy, not
+    // a new study, so the shelf thumbnail stays with the original.
+    state.studyId = null;
     resetDecoHistory();  // a loaded pot starts with a clean undo history
     resetShapeHistory();
 
@@ -9532,6 +9573,13 @@ function renderGalleryTile(grid, members) {
             home.className = "pot-home";
             home.textContent = req.note;
             meta.appendChild(home);
+        }
+        const study = primary.studyId ? STUDY_FORMS[primary.studyId] : null;
+        if (study) {
+            const line = document.createElement("div");
+            line.className = "pot-home";
+            line.textContent = "A study after the " + study.name.toLowerCase() + ".";
+            meta.appendChild(line);
         }
         item.appendChild(meta);
     }
@@ -10329,6 +10377,273 @@ function closeReply() {
     if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
 }
 
+// --- The study shelf ----------------------------------------------
+// Classic forms from real ceramic traditions, offered as things to STUDY:
+// a ghost silhouette to throw against and a live closeness readout. See
+// STUDY_SHELF.md. The load-bearing rule: the meter is information, and
+// nothing reads it — it's never stored, never shown on the shelf, never
+// compared. Any pot begun as a study and saved counts as having studied
+// the form, the way an artist's "study after Hokusai" is a study no
+// matter how far it wandered. No stars, no pass/fail, no locked forms,
+// no rewards, no nagging.
+//
+// Blurbs are Claude drafts in the noticeboard's voice (what the pot was
+// FOR, never "try to match it") — Onion rewrites freely.
+
+const STUDIES_KEY = "slip-studies";
+
+// A plain cylinder: the starting lump for every study. The throwing IS
+// the study, so it doesn't seed from a starter shape.
+const STUDY_SEED = [[0, 0], [0.34, 0], [0.36, 0.06], [0.36, 0.70], [0.36, 1.40]];
+
+const STUDY_FORMS = {
+    moonjar: {
+        name: "Moon jar", origin: "Korea · Joseon dynasty",
+        blurb: "Korean potters threw these in two halves and joined them, so no two are ever quite round. The little wobble is the beloved part.",
+        controls: [[0, 0], [0.30, 0], [0.44, 0.10], [0.60, 0.32], [0.66, 0.60], [0.62, 0.90], [0.48, 1.14], [0.32, 1.30], [0.30, 1.36], [0.32, 1.40]],
+    },
+    meiping: {
+        name: "Meiping", origin: "China · Song dynasty",
+        blurb: "A vase made to hold a single branch of plum blossom. The high shoulder does all the talking; the small mouth just steadies the stem.",
+        controls: [[0, 0], [0.24, 0], [0.28, 0.10], [0.36, 0.40], [0.48, 0.80], [0.56, 1.05], [0.55, 1.20], [0.42, 1.32], [0.30, 1.36], [0.28, 1.40]],
+    },
+    gingerjar: {
+        name: "Ginger jar", origin: "China · Qing dynasty",
+        blurb: "A storage jar for spices and preserves that travelled the whole world. The lid sat on that short neck — you can add one after.",
+        controls: [[0, 0], [0.34, 0], [0.46, 0.10], [0.58, 0.40], [0.62, 0.75], [0.58, 1.05], [0.46, 1.24], [0.36, 1.32], [0.36, 1.40]],
+    },
+    chawan: {
+        name: "Chawan", origin: "Japan",
+        blurb: "A tea bowl made to sit in two cupped hands. In a tea ceremony, guests turn it slowly to admire the glaze before they drink.",
+        controls: [[0, 0], [0.22, 0], [0.26, 0.06], [0.44, 0.20], [0.62, 0.50], [0.74, 0.85], [0.80, 1.15], [0.82, 1.40]],
+    },
+    tokkuri: {
+        name: "Tokkuri", origin: "Japan",
+        blurb: "A sake bottle with a narrow neck that gurgles when it pours. That sound has its own word in Japanese — tokutoku.",
+        controls: [[0, 0], [0.26, 0], [0.34, 0.08], [0.46, 0.30], [0.50, 0.55], [0.42, 0.80], [0.24, 0.98], [0.16, 1.12], [0.15, 1.28], [0.18, 1.40]],
+    },
+    amphora: {
+        name: "Amphora", origin: "Ancient Greece",
+        blurb: "The shipping container of the ancient world — oil, wine and olives crossed whole seas in these. Its two handles are yours to add at Decorate.",
+        controls: [[0, 0], [0.16, 0], [0.20, 0.06], [0.34, 0.25], [0.50, 0.55], [0.54, 0.80], [0.46, 1.02], [0.30, 1.18], [0.24, 1.28], [0.26, 1.36], [0.28, 1.40]],
+    },
+    olla: {
+        name: "Olla", origin: "San Ildefonso Pueblo, New Mexico",
+        blurb: "A water jar balanced for carrying. Maria Martinez of San Ildefonso made jars like this so remarkable that museums keep them like paintings.",
+        controls: [[0, 0], [0.30, 0], [0.48, 0.08], [0.68, 0.28], [0.72, 0.50], [0.60, 0.78], [0.42, 1.02], [0.30, 1.22], [0.28, 1.34], [0.30, 1.40]],
+    },
+    ukhamba: {
+        name: "Ukhamba", origin: "South Africa · Zulu",
+        blurb: "A pot for sharing food and drink between friends, passed from hand to hand around the circle. The sharing is the point.",
+        controls: [[0, 0], [0.26, 0], [0.40, 0.08], [0.58, 0.30], [0.66, 0.60], [0.64, 0.90], [0.56, 1.16], [0.48, 1.32], [0.46, 1.40]],
+    },
+    albarello: {
+        name: "Albarello", origin: "Italy · Renaissance",
+        blurb: "An apothecary's jar with a pinched waist, so it could be plucked one-handed off a crowded pharmacy shelf.",
+        controls: [[0, 0], [0.34, 0], [0.40, 0.06], [0.42, 0.20], [0.36, 0.50], [0.34, 0.70], [0.36, 0.95], [0.42, 1.16], [0.40, 1.26], [0.34, 1.32], [0.36, 1.40]],
+    },
+    kylix: {
+        name: "Kylix", origin: "Ancient Greece",
+        blurb: "A wide, shallow wine cup on a stem. Painters hid a picture inside the bowl that only appeared as you finished your drink.",
+        controls: [[0, 0], [0.34, 0], [0.36, 0.04], [0.12, 0.12], [0.10, 0.45], [0.14, 0.60], [0.44, 0.78], [0.72, 0.95], [0.84, 1.10], [0.88, 1.25], [0.90, 1.40]],
+    },
+};
+const STUDY_IDS = Object.keys(STUDY_FORMS);
+
+function loadStudies() {
+    try {
+        const s = JSON.parse(localStorage.getItem(STUDIES_KEY) || "{}");
+        return (s && typeof s === "object" && !Array.isArray(s)) ? s : {};
+    } catch (_) { return {}; }
+}
+function saveStudies(s) {
+    try { localStorage.setItem(STUDIES_KEY, JSON.stringify(s)); } catch (_) {}
+}
+// Latest study of a form replaces its shelf thumbnail; nothing stacks and
+// nothing leaves the gallery. The closeness number is deliberately NOT here.
+function markStudied(formId, potId) {
+    if (!STUDY_FORMS[formId]) return;
+    const s = loadStudies();
+    s[formId] = { potId, at: Date.now() };
+    saveStudies(s);
+}
+
+// --- Ghost + closeness --------------------------------------------
+let studyTarget = null;      // resampled target profile, rows 0..ROWS
+let studyGhostMesh = null;
+let studyMeterLast = "";     // last rendered pill text (DOM write gate)
+
+function ensureStudyGhost(formId) {
+    removeStudyGhost();
+    const form = STUDY_FORMS[formId];
+    if (!form || !state.turntable) return;
+    studyTarget = controlsToProfileArray(form.controls);
+    // Baseline for the progress metric: how far the seed cylinder is from
+    // this form. Deterministic (both are resampled control sets), so the
+    // meter starts at 0% on every form.
+    const seed = controlsToProfileArray(STUDY_SEED);
+    let sum = 0;
+    for (let r = 1; r <= ROWS; r++) sum += Math.abs(seed[r] - studyTarget[r]);
+    studyBaseMad = sum / ROWS;
+    const pts = [];
+    for (let r = 0; r <= ROWS; r++) {
+        pts.push(new THREE.Vector2(Math.max(studyTarget[r], 0.004), (r / ROWS) * TOP));
+    }
+    const geo = new THREE.LatheGeometry(pts, 64);
+    const mat = new THREE.MeshBasicMaterial({
+        color: 0xf5e9d4, transparent: true, opacity: 0.16,
+        depthWrite: false, side: THREE.DoubleSide,
+    });
+    studyGhostMesh = new THREE.Mesh(geo, mat);
+    studyGhostMesh.renderOrder = 3;   // over the clay, under the UI
+    // Beside potGroup, NOT inside it — the ghost stands at the target's own
+    // height, so pulling the pot taller visibly diverges from it instead of
+    // dragging the target along.
+    state.turntable.add(studyGhostMesh);
+}
+function removeStudyGhost() {
+    if (studyGhostMesh) {
+        studyGhostMesh.parent?.remove(studyGhostMesh);
+        studyGhostMesh.geometry.dispose();
+        studyGhostMesh.material.dispose();
+        studyGhostMesh = null;
+    }
+    studyTarget = null;
+}
+
+// The mirror, not the grade: silhouette difference from the target,
+// measured as PROGRESS FROM THE STARTING LUMP — the seed cylinder reads
+// 0%, the form itself 100%, and every form behaves identically (a fixed
+// spread punished wide bowls, which start much farther from a cylinder
+// than a jar does). A gentle term for height drift; never stored.
+let studyBaseMad = 0;   // mad of the seed cylinder vs the target, set per study
+function studyMadTo(target) {
+    let sum = 0;
+    for (let r = 1; r <= ROWS; r++) sum += Math.abs(profile[r] - target[r]);
+    return sum / ROWS;
+}
+function studyCloseness() {
+    if (!studyTarget || studyBaseMad < 1e-4) return 0;
+    const mad = studyMadTo(studyTarget);
+    let pct = Math.round(100 * (1 - mad / studyBaseMad));
+    pct -= Math.round(Math.abs(state.heightScale - 1) * 40);
+    return Math.max(0, Math.min(100, pct));
+}
+
+// Runs every frame from tick(); cheap float math, and the DOM only moves
+// when the rounded number (or visibility) changes.
+function updateStudyMeter() {
+    const live = !!(state.studyId && state.clayState === "wet" && !state.isLid && !state.displayMode);
+    if (studyGhostMesh) studyGhostMesh.visible = live && state.studyGhostOn !== false;
+    const pill = document.getElementById("studyMeter");
+    if (!pill) return;
+    if (!live) {
+        if (studyMeterLast !== "") { pill.hidden = true; studyMeterLast = ""; }
+        return;
+    }
+    const form = STUDY_FORMS[state.studyId];
+    const text = `${form ? form.name : "Study"} · ${studyCloseness()}% close`;
+    if (text !== studyMeterLast) {
+        studyMeterLast = text;
+        pill.hidden = false;
+        const t = document.getElementById("studyMeterText");
+        if (t) t.textContent = text;
+    }
+}
+function setGhostVisible(on) {
+    state.studyGhostOn = !!on;
+    const b = document.getElementById("ghostBtn");
+    if (b) {
+        b.classList.toggle("is-active", state.studyGhostOn);
+        b.setAttribute("aria-pressed", state.studyGhostOn ? "true" : "false");
+    }
+}
+
+// --- Starting and finishing a study --------------------------------
+async function startStudy(formId) {
+    if (!STUDY_FORMS[formId]) return;
+    if (state.dirty && !(await showConfirm(
+        "Starting a study will clear the pot you're working on. Discard it?",
+        { confirmLabel: "Discard", cancelLabel: "Keep editing" }))) return;
+    closeStudyShelf();
+    resetPot();
+    // resetPot seeds the user's starter shape (and a mug/teapot preset
+    // auto-fits its handle/spout) — a study starts from a plain cylinder
+    // with none of that.
+    if (state.handle.on) setHandleOn(false);
+    if (state.spout.on) setSpoutOn(false);
+    applyControlsToProfile(STUDY_SEED);
+    profileDirty = true;
+    state.studyId = formId;
+    setGhostVisible(true);
+    ensureStudyGhost(formId);
+    haptic(12);
+}
+
+function renderStudyShelf() {
+    const list = document.getElementById("studyList");
+    if (!list) return;
+    list.innerHTML = "";
+    const studies = loadStudies();
+    STUDY_IDS.forEach((id) => {
+        const f = STUDY_FORMS[id];
+        const done = studies[id];
+        const card = document.createElement("div");
+        card.className = "study-card" + (done ? " is-studied" : "");
+        const icon = document.createElement("div");
+        icon.className = "study-icon";
+        icon.innerHTML = controlsIconSVG(f.controls);
+        const meta = document.createElement("div");
+        meta.className = "study-meta";
+        const name = document.createElement("p");
+        name.className = "study-name";
+        name.textContent = f.name;
+        const origin = document.createElement("p");
+        origin.className = "study-origin";
+        origin.textContent = f.origin;
+        const blurb = document.createElement("p");
+        blurb.className = "study-blurb";
+        blurb.textContent = f.blurb;
+        meta.append(name, origin, blurb);
+        const act = document.createElement("div");
+        act.className = "study-act";
+        if (done) {
+            const mark = document.createElement("span");
+            mark.className = "study-mark";
+            mark.textContent = "Studied ✓";
+            act.appendChild(mark);
+            // The pot that studied it, if it's still in the gallery.
+            dbAll().then((all) => {
+                const pot = all.find((e) => e.id === done.potId);
+                if (pot && pot.thumb) {
+                    const img = document.createElement("img");
+                    img.className = "study-pot";
+                    img.alt = pot.title || f.name;
+                    stageThumb(pot.thumb).then((u) => { img.src = u; });
+                    act.prepend(img);
+                }
+            }).catch(() => {});
+        }
+        const go = document.createElement("button");
+        go.className = "tool-btn study-go";
+        go.type = "button";
+        go.textContent = done ? "Study again" : "Study this";
+        go.addEventListener("click", () => startStudy(id));
+        act.appendChild(go);
+        card.append(icon, meta, act);
+        list.appendChild(card);
+    });
+}
+function openStudyShelf() {
+    renderStudyShelf();
+    const m = document.getElementById("studyModal");
+    if (m) { m.hidden = false; trapFocus(m); }
+}
+function closeStudyShelf() {
+    const m = document.getElementById("studyModal");
+    if (m) { m.hidden = true; releaseFocus(m); }
+}
+
 // Minimal transient toast (recipe discoveries + future gentle notices).
 let toastHideT = 0, toastGoneT = 0;
 function showToast(msg) {
@@ -10410,6 +10725,7 @@ function tick() {
     } else {
         stopSfx("wheel");
     }
+    updateStudyMeter();   // study ghost visibility + closeness pill (cheap, gated)
     // The kiln sequence drives the dark-edge vignette opacity, the
     // warm inner glow, the backdrop fade and the music ducking each
     // frame. The slowed material tween (see tickMaterial) lets the
@@ -10775,6 +11091,8 @@ function onDialogEscape(e) {
     if (refire && !refire.hidden)      { closeRefire();     return; }
     if (kilnLoadM && !kilnLoadM.hidden){ closeKilnLoad();   return; }
     if (board && !board.hidden)        { closeRequestsBoard(); return; }
+    const shelf = document.getElementById("studyModal");
+    if (shelf && !shelf.hidden)        { closeStudyShelf(); return; }
     if (photo && !photo.hidden)        { closePhotoModal(); return; }
     if (wall && !wall.hidden)          { closeWall();       return; }
     if (gallery && !gallery.hidden)    { closeGallery();    return; }
