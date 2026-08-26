@@ -3,7 +3,13 @@
 A spec for the merchant system, with the merchant taken out: people who ask for
 pots, and tell you where the pot ended up. No currency, no deadlines, no grading.
 
-Written against **web v224**. Nothing here is built yet.
+Written against **web v224**. **Phases 1 + 2 were built 2026-08-25 (web v242)**
+as "The noticeboard": the board + give-a-pot + reply modal + gallery note +
+the Letters tab, with 12 Claude-drafted request/reply pairs **for Onion to
+rewrite in her own voice** — they're plain strings in `REQUESTS` in main.js.
+Onion's calls at build time: recurring cast (no stats), board lives as a ✉
+corner button under the gallery button. Phases 3 (more writing) and 4 (set
+requests) remain open.
 
 ---
 

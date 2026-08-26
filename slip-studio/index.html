@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=241" />
+    <link rel="stylesheet" href="style.css?v=242" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -206,6 +206,7 @@
     <a class="home" href="../" aria-label="Back to Madderverse" title="Back to Madderverse">&#x2302;</a>
     <button class="title-btn" id="titleBtn" type="button" aria-label="Back to title" title="Title screen">&#x21A9;</button>
     <button class="gallery-open" id="galleryBtn" type="button" aria-label="Your pots" title="Your pots">&#x25A6;</button>
+    <button class="gallery-open requests-open" id="requestsBtn" type="button" aria-label="The noticeboard" title="The noticeboard — people asking for pots">&#x2709;</button>
 
     <canvas id="scene" aria-label="Pottery scene"></canvas>
 
@@ -470,6 +471,59 @@
         </div>
     </div>
 
+    <!-- The noticeboard: people who'd like a pot. No currency, no deadlines,
+         no grading — a request is a prompt, not a rubric. The pot you give
+         STAYS in your gallery and gains a line about where it lives now;
+         the reply is kept under Letters. Requests wait indefinitely and
+         the board is never more insistent than the gallery button. -->
+    <div class="gallery" id="requestsModal" role="dialog" aria-label="The noticeboard" hidden>
+        <div class="gallery-bar">
+            <span class="gallery-title">The noticeboard</span>
+            <span class="gallery-bar-right">
+                <button class="tool-btn" id="requestsClose" type="button">Close</button>
+            </span>
+        </div>
+        <div class="wall-tabs" role="tablist" aria-label="Noticeboard view">
+            <button class="wall-tab is-active" id="reqTabOpen" type="button" role="tab" aria-selected="true">Requests</button>
+            <button class="wall-tab" id="reqTabLetters" type="button" role="tab" aria-selected="false">Letters</button>
+        </div>
+
+        <div class="wall-panel" id="reqPanelOpen">
+            <p class="recipe-intro">People who'd like a pot. There's no hurry and no wrong pot &mdash; give any piece from your gallery, whenever you feel like it, and it stays yours.</p>
+            <div class="request-list" id="requestList"></div>
+            <p class="wall-empty" id="requestsEmpty" hidden>Everyone has a pot. The whole board is thank-you letters now &mdash; new requests will turn up in an update.</p>
+        </div>
+
+        <div class="wall-panel" id="reqPanelLetters" hidden>
+            <p class="recipe-intro">Letters from the people your pots live with now.</p>
+            <div class="letter-list" id="letterList"></div>
+            <p class="wall-empty" id="lettersEmpty" hidden>Give a pot from a request, and the reply that comes back is kept here.</p>
+        </div>
+    </div>
+
+    <!-- Pot chooser for a request. -->
+    <div id="requestPickModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="Choose a pot to give" hidden>
+        <div class="confirm-modal-card">
+            <p class="confirm-modal-message" id="requestPickTitle">Give a pot</p>
+            <p class="refire-note">It stays in your gallery &mdash; giving a pot never loses it.</p>
+            <div class="kiln-pick-list" id="requestPickList"></div>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn" id="requestPickCancel" type="button">Not yet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- The reply: the payoff, so it gets a modal rather than a toast. -->
+    <div id="replyModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="A letter back" hidden>
+        <div class="confirm-modal-card letter-card">
+            <p class="letter-from" id="replyFrom"></p>
+            <p class="letter-body" id="replyBody"></p>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn confirm-modal-yes" id="replyClose" type="button">Keep the letter</button>
+            </div>
+        </div>
+    </div>
+
     <div class="gallery" id="gallery" role="dialog" aria-label="Your pots" hidden>
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
@@ -560,7 +614,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=241"></script>
+    <script type="module" src="main.js?v=242"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

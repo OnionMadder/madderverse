@@ -1912,6 +1912,15 @@ function init() {
     document.getElementById("wallClose")?.addEventListener("click", closeWall);
     document.getElementById("wallTabWall")?.addEventListener("click", () => setWallTab("wall"));
     document.getElementById("wallTabRecipes")?.addEventListener("click", () => setWallTab("recipes"));
+    document.getElementById("requestsBtn")?.addEventListener("click", () => openRequestsBoard());
+    document.getElementById("requestsClose")?.addEventListener("click", closeRequestsBoard);
+    document.getElementById("reqTabOpen")?.addEventListener("click", () => setRequestsTab("open"));
+    document.getElementById("reqTabLetters")?.addEventListener("click", () => setRequestsTab("letters"));
+    document.getElementById("requestPickCancel")?.addEventListener("click", () => closeRequestPick());
+    document.getElementById("requestPickModal")?.addEventListener("click", (e) => {
+        if (e.target && e.target.id === "requestPickModal") closeRequestPick();
+    });
+    document.getElementById("replyClose")?.addEventListener("click", closeReply);
     document.getElementById("tileAdd")?.addEventListener("click", addRackTile);
     document.getElementById("rackFire")?.addEventListener("click", fireRack);
     document.getElementById("rackClear")?.addEventListener("click", emptyRack);
@@ -2138,6 +2147,9 @@ function init() {
             clearTiles: () => { wallTiles = []; saveTiles(wallTiles); renderWallTiles(); },
             fireMs: () => (reduceMotion ? 0 : TILE_FIRE_MS),
             loadCollections, createCollection, assignToCollection, setGalleryFilter, getGalleryFilter, chooseCollection,
+            REQUESTS, openRequestsBoard, closeRequestsBoard, setRequestsTab,
+            openRequestPick, givePotTo, openRequestIds,
+            commissions: () => loadCommissions(),
             // Pack-download surface: drive install/uninstall from the
             // console (or a future debug sheet) without going through
             // the picker. installedPacks() returns a Set of category names.
@@ -9512,6 +9524,15 @@ function renderGalleryTile(grid, members) {
         const glaze = glazeNameFor(primary);
         sub.textContent = isSet ? `Lid set · ${glaze} · ${dateStr}` : `${glaze} · ${dateStr}`;
         meta.appendChild(sub);
+        // Where the pot lives now, if it was given to a request. A dangling
+        // commissionId (request retired in an update) degrades to no line.
+        const req = primary.commissionId ? REQUESTS[primary.commissionId] : null;
+        if (req) {
+            const home = document.createElement("div");
+            home.className = "pot-home";
+            home.textContent = req.note;
+            meta.appendChild(home);
+        }
         item.appendChild(meta);
     }
 
@@ -10017,6 +10038,297 @@ function closeWall() {
 function openRecipes()  { openWall("recipes"); }
 function closeRecipes() { closeWall(); }
 
+// --- The noticeboard (commissions) --------------------------------
+// The merchant system with the merchant taken out: people who ask for
+// pots, and tell you where the pot ended up. See COMMISSIONS.md.
+//
+// The load-bearing rule: the pot is NEVER checked against the request.
+// No matching, no validation, no rejection — a request exists to give
+// the player an idea, not to grade them against it, so every reply is
+// written to work with any pot (it responds to the act, not the pot's
+// properties). And the pot is never consumed: giving links it to the
+// request and it stays in the gallery with a line about where it lives.
+//
+// Non-goals, deliberately: no timer or expiry, no currency or unlocks,
+// no rating, no badge or counter nagging about open requests, and no
+// affinity/relationship meters on the cast. Ignorable forever.
+//
+// Requests and letters are curated content (Onion's voice — rewrite
+// freely, they're just strings); only the player's answers are state.
+// `after` holds a sequel back until its earlier request was answered,
+// so the tea house doesn't ask twice at once. NOT time-gated — "come
+// back tomorrow for new requests" is the exact mechanic we refuse.
+
+const COMMISSIONS_KEY = "slip-commissions";
+const REQUESTS_OPEN = 3;    // visible at a time, drawn in table order
+
+const REQUESTS = {
+    teahouse: {
+        from: "The tea house on the hill",
+        ask: "We've been serving out of mismatched cups for a year and I've stopped pretending it's charming. Anything you make would be an improvement, and I mean that as a compliment.",
+        reply: "It doesn't match a single thing we own, which I did not ask for and now cannot imagine the place without. It sits on the counter. Nobody else is allowed to touch it.",
+        note: "This one lives in the tea house on the hill.",
+    },
+    ines: {
+        from: "Ines, who is seven",
+        ask: "my bean plant is too big for its old pot. it needs a BIG one. it can be any colour except brown, brown is boring.",
+        reply: "the bean plant moved in and grew a whole new leaf the SAME DAY. mama says that is a coincidence. it is not a coincidence.",
+        note: "Ines's bean plant lives in this one.",
+    },
+    bakery: {
+        from: "Marisol, at the bakery",
+        ask: "My sourdough starter keeps climbing out of whatever I put it in, like it has somewhere better to be. I need something with more patience than the last jar had.",
+        reply: "The starter has settled down, or as close to settled as it gets. This morning's loaves rose like they were showing off for the new house. I take no credit and give it all to the pot.",
+        note: "The bakery's starter lives in this one.",
+    },
+    wim: {
+        from: "Mr. Wim, two doors down",
+        ask: "Sixty years of gardening and I have never once had enough pots. My rosemary cuttings are sharing quarters and they've begun to squabble. Anything with a bottom and sides will be treated kindly.",
+        reply: "The cuttings stopped squabbling the moment they had their own address. I've put it where the morning sun lands first, which is the best spot I own, for whatever that's worth.",
+        note: "Mr. Wim's rosemary lives in this one.",
+    },
+    library: {
+        from: "The library on Frist Street",
+        ask: "Flowers appear on our front desk every Monday and nobody has ever seen who brings them. They have been standing in a tin can for two years. The mystery deserves better.",
+        reply: "Monday came, the flowers appeared, and the whole front desk sat up straighter. Whoever brings them lingered a moment longer than usual. We are all pretending not to have noticed.",
+        note: "This one holds the Monday flowers at the library.",
+    },
+    keeper: {
+        from: "The keeper at Point Alder",
+        ask: "Everything on this rock gets knocked over by the wind eventually, so I stopped keeping nice things. I would like to try keeping one nice thing.",
+        reply: "The wind has had three good tries at it and given up. It sits in the window where the light sweeps past it every ninety seconds, all night. Good company, as it turns out.",
+        note: "This one keeps watch at Point Alder.",
+    },
+    tomas: {
+        from: "Tomas, who didn't explain",
+        ask: "It should be blue, if you can manage blue. It's for somebody. That's all I'd like to say about it.",
+        reply: "She kept it. That's all I'd like to say about it, except thank you.",
+        note: "This one is with somebody, thanks to Tomas.",
+    },
+    teahouse2: {
+        after: "teahouse",
+        from: "The tea house on the hill, again",
+        ask: "The regulars have noticed the counter, and now they all want something to look at while they wait. I have created a monster. One more, whenever the wheel is willing.",
+        reply: "It went straight to the window table, which is where the arguments about whose turn it is to sit there happen. The arguments have gotten worse. Thank you, sincerely.",
+        note: "This one sits at the window table of the tea house.",
+    },
+    odile: {
+        from: "Captain Odile, of the morning ferry",
+        ask: "I spend ten hours a day on the water and my shelf at home has nothing on it that stays still. I'd like something that has never once moved on its own.",
+        reply: "It has not moved. I check when I get home, every evening, and it is exactly where I left it. You'd have to work a boat to know what that's worth.",
+        note: "This one stays perfectly still on Captain Odile's shelf.",
+    },
+    eleven: {
+        from: "The new people at number 11",
+        ask: "We unpacked everything, and the shelf over the stove is still empty, and somehow that one shelf makes the whole house feel borrowed. It needs a first thing.",
+        reply: "It's the first thing you see when the kitchen light comes on. The house stopped feeling borrowed that same evening. We're calling that the moment we actually moved in.",
+        note: "This one was the first thing at number 11.",
+    },
+    ines2: {
+        after: "ines",
+        from: "Ines, who is seven and a half now",
+        ask: "my brother saw my bean plant's pot and now he wants one for HIS plant. his plant is a rock with a face drawn on it. the pot should still be good, the rock doesn't know.",
+        reply: "the rock moved in. my brother waters it anyway, which is too much water for a rock. i am monitoring the situation.",
+        note: "Ines's brother's rock lives in this one.",
+    },
+    petra: {
+        from: "Miss Petra's classroom",
+        ask: "Twenty-six children hand me small treasures every day — acorns, buttons, one alarming beetle — and my desk drawer has surrendered. The treasures need somewhere official.",
+        reply: "It sits on the corner of my desk, and the treasures go in with great ceremony. Being asked to fetch it is now a classroom honor. The beetle, mercifully, has moved on.",
+        note: "The class treasures live in this one.",
+    },
+};
+const REQUEST_IDS = Object.keys(REQUESTS);
+
+function loadCommissions() {
+    try {
+        const c = JSON.parse(localStorage.getItem(COMMISSIONS_KEY) || "{}");
+        return { given: (c && typeof c.given === "object" && c.given) ? c.given : {} };
+    } catch (_) { return { given: {} }; }
+}
+function saveCommissions(c) {
+    try { localStorage.setItem(COMMISSIONS_KEY, JSON.stringify(c)); } catch (_) {}
+}
+
+// The open board: the first few unanswered requests, in table order.
+// Selection is deliberately not clever and never time-gated.
+function openRequestIds() {
+    const given = loadCommissions().given;
+    return REQUEST_IDS.filter((id) => {
+        if (given[id]) return false;
+        const seq = REQUESTS[id].after;
+        if (seq && !given[seq]) return false;   // sequels wait their turn
+        return true;
+    }).slice(0, REQUESTS_OPEN);
+}
+
+function renderRequests() {
+    const list = document.getElementById("requestList");
+    const empty = document.getElementById("requestsEmpty");
+    if (!list) return;
+    list.innerHTML = "";
+    const open = openRequestIds();
+    if (empty) empty.hidden = open.length > 0;
+    open.forEach((id) => {
+        const r = REQUESTS[id];
+        const card = document.createElement("div");
+        card.className = "request-card";
+        const from = document.createElement("p");
+        from.className = "request-from";
+        from.textContent = r.from;
+        const ask = document.createElement("p");
+        ask.className = "request-ask";
+        ask.textContent = "“" + r.ask + "”";
+        const give = document.createElement("button");
+        give.className = "tool-btn request-give";
+        give.type = "button";
+        give.textContent = "Give a pot";
+        give.addEventListener("click", () => openRequestPick(id));
+        card.append(from, ask, give);
+        list.appendChild(card);
+    });
+}
+
+function renderLetters() {
+    const list = document.getElementById("letterList");
+    const empty = document.getElementById("lettersEmpty");
+    if (!list) return;
+    list.innerHTML = "";
+    const given = loadCommissions().given;
+    const entries = Object.entries(given)
+        .filter(([id]) => REQUESTS[id])           // retired requests degrade quietly
+        .sort((a, b) => (b[1].at || 0) - (a[1].at || 0));
+    if (empty) empty.hidden = entries.length > 0;
+    for (const [id] of entries) {
+        const r = REQUESTS[id];
+        const card = document.createElement("div");
+        card.className = "letter-item";
+        const from = document.createElement("p");
+        from.className = "letter-item-from";
+        from.textContent = r.from;
+        const body = document.createElement("p");
+        body.className = "letter-item-body";
+        body.textContent = "“" + r.reply + "”";
+        card.append(from, body);
+        list.appendChild(card);
+    }
+}
+
+function setRequestsTab(which) {
+    const isOpen = which !== "letters";
+    const po = document.getElementById("reqPanelOpen");
+    const pl = document.getElementById("reqPanelLetters");
+    if (po) po.hidden = !isOpen;
+    if (pl) pl.hidden = isOpen;
+    const to = document.getElementById("reqTabOpen");
+    const tl = document.getElementById("reqTabLetters");
+    if (to) { to.classList.toggle("is-active", isOpen);  to.setAttribute("aria-selected", isOpen ? "true" : "false"); }
+    if (tl) { tl.classList.toggle("is-active", !isOpen); tl.setAttribute("aria-selected", isOpen ? "false" : "true"); }
+}
+function openRequestsBoard(tab) {
+    renderRequests();
+    renderLetters();
+    setRequestsTab(tab || "open");
+    const m = document.getElementById("requestsModal");
+    if (m) { m.hidden = false; trapFocus(m); }
+}
+function closeRequestsBoard() {
+    const m = document.getElementById("requestsModal");
+    if (m) { m.hidden = true; releaseFocus(m); }
+}
+
+// --- Giving a pot -------------------------------------------------
+let requestPickId = null;
+
+async function openRequestPick(reqId) {
+    if (!REQUESTS[reqId]) return;
+    requestPickId = reqId;
+    const title = document.getElementById("requestPickTitle");
+    if (title) title.textContent = "A pot for " + REQUESTS[reqId].from;
+    let all = [];
+    try { all = await dbAll(); } catch (_) {}
+    // One entry per set, represented by its pot member (same rule as the
+    // kiln shelf); a pot that already lives somewhere isn't offered again.
+    const rep = new Map();
+    for (const e of all) {
+        if (!e.setId) continue;
+        const prev = rep.get(e.setId);
+        if (!prev || (lookupIsLid(prev) && !lookupIsLid(e))) rep.set(e.setId, e);
+    }
+    const givable = all.filter((e) => {
+        if (e.setId && rep.get(e.setId) !== e) return false;
+        return !e.commissionId;
+    }).reverse();
+    const list = document.getElementById("requestPickList");
+    if (list) {
+        list.innerHTML = "";
+        if (!givable.length) {
+            const p = document.createElement("p");
+            p.className = "kiln-pick-empty";
+            p.textContent = all.length
+                ? "Every pot you've made already lives somewhere. Make another — there's no hurry."
+                : "Fire and save a pot first — then you'll have something to give.";
+            list.appendChild(p);
+        }
+        givable.forEach((e) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "kiln-pick-item";
+            const img = document.createElement("img");
+            img.src = e.thumb; img.alt = "";
+            const cap = document.createElement("span");
+            cap.textContent = e.title || "Pot";
+            b.append(img, cap);
+            b.addEventListener("click", () => givePotTo(reqId, e));
+            list.appendChild(b);
+        });
+    }
+    const m = document.getElementById("requestPickModal");
+    if (m) { m.hidden = false; m.classList.add("is-open"); trapFocus(m); }
+}
+function closeRequestPick() {
+    const m = document.getElementById("requestPickModal");
+    if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
+    requestPickId = null;
+}
+
+async function givePotTo(reqId, entry) {
+    const r = REQUESTS[reqId];
+    if (!r || !entry) return;
+    closeRequestPick();
+    // Link every member of a set — the gallery tile fronts its pot member,
+    // and the note should survive whichever half is read. `commissionId`
+    // lives on the ENTRY (where the object went), never in corePieceFields
+    // (how it was made), so re-fires and kiln loads don't inherit it.
+    try {
+        const all = await dbAll();
+        const members = entry.setId ? all.filter((e) => e.setId === entry.setId) : [entry];
+        for (const m of members) { m.commissionId = reqId; await dbPut(m); }
+    } catch (_) { return; }   // gallery write failed — don't record a give that didn't land
+    const c = loadCommissions();
+    c.given[reqId] = { potId: entry.id, at: Date.now() };
+    saveCommissions(c);
+    renderRequests();
+    renderLetters();
+    haptic(20);
+    showReply(reqId);
+}
+
+function showReply(reqId) {
+    const r = REQUESTS[reqId];
+    if (!r) return;
+    const from = document.getElementById("replyFrom");
+    const body = document.getElementById("replyBody");
+    if (from) from.textContent = r.from + " writes back:";
+    if (body) body.textContent = "“" + r.reply + "”";
+    const m = document.getElementById("replyModal");
+    if (m) { m.hidden = false; m.classList.add("is-open"); trapFocus(m); }
+}
+function closeReply() {
+    const m = document.getElementById("replyModal");
+    if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
+}
+
 // Minimal transient toast (recipe discoveries + future gentle notices).
 let toastHideT = 0, toastGoneT = 0;
 function showToast(msg) {
@@ -10451,11 +10763,18 @@ function onDialogEscape(e) {
     const refire  = document.getElementById("refireModal");
     const kilnPick = document.getElementById("kilnPickModal");
     const kilnLoadM = document.getElementById("kilnLoadModal");
+    const reply   = document.getElementById("replyModal");
+    const reqPick = document.getElementById("requestPickModal");
+    const board   = document.getElementById("requestsModal");
     // Innermost first: photo and the wall can both open over the gallery,
-    // and the piece picker opens over the kiln shelf.
+    // the piece pickers open over the kiln shelf / the noticeboard, and
+    // the reply letter sits over everything on the board.
+    if (reply && !reply.hidden)        { closeReply();       return; }
+    if (reqPick && !reqPick.hidden)    { closeRequestPick(); return; }
     if (kilnPick && !kilnPick.hidden)  { closeKilnPick();   return; }
     if (refire && !refire.hidden)      { closeRefire();     return; }
     if (kilnLoadM && !kilnLoadM.hidden){ closeKilnLoad();   return; }
+    if (board && !board.hidden)        { closeRequestsBoard(); return; }
     if (photo && !photo.hidden)        { closePhotoModal(); return; }
     if (wall && !wall.hidden)          { closeWall();       return; }
     if (gallery && !gallery.hidden)    { closeGallery();    return; }

@@ -3087,3 +3087,69 @@ body.display-mode #coach { display: none !important; }
 body.capacitor-app .home,
 body.capacitor-app .footer,
 body.capacitor-app .landing-app-link { display: none; }
+
+/* ---------- The noticeboard (commissions) ---------- */
+/* Second corner button, stacked under the gallery one. Shares .gallery-open
+   (and therefore its display-mode hide); only the offset + glyph differ. */
+.requests-open {
+    top: calc(max(16px, env(safe-area-inset-top, 0px)) + 54px);
+    font-size: 17px;
+}
+
+.request-list, .letter-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 560px;
+    padding-bottom: 24px;
+}
+.request-card, .letter-item {
+    border: 1px solid var(--g-card-line);
+    background: var(--g-card);
+    box-shadow: var(--g-card-shadow);
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+.request-from, .letter-item-from {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--ink);
+    margin: 0 0 6px;
+}
+.request-ask, .letter-item-body {
+    color: var(--ink-dim);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0;
+}
+.request-give {
+    margin-top: 10px;
+    pointer-events: auto;
+}
+
+/* The line under a given pot's title: where it lives now. */
+.pot-home {
+    font-size: 0.72rem;
+    color: var(--ink-dim);
+    font-style: italic;
+    margin-top: 2px;
+    line-height: 1.35;
+}
+
+/* The reply letter — the payoff, so it gets a little more room and the
+   serif voice of the request cards. */
+.letter-card { max-width: 420px; }
+.letter-card .letter-from {
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 15px;
+    margin: 0 0 10px;
+}
+.letter-card .letter-body {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--ink-dim);
+    margin: 0 0 6px;
+    text-align: left;
+}
