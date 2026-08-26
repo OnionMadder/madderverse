@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=243" />
+    <link rel="stylesheet" href="style.css?v=244" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -536,6 +536,41 @@
         <div class="study-list" id="studyList"></div>
     </div>
 
+    <!-- Pot sharing: a pot travels as a small file through the family's own
+         share sheet — no accounts, no server, nothing collected. The file
+         carries no identity; see POT_SHARING.md. -->
+    <div id="shareModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="Share pots" hidden>
+        <div class="confirm-modal-card">
+            <p class="confirm-modal-message">Share pots</p>
+            <p class="refire-note">A pot travels as a little file &mdash; send it however you like. Your copy always stays on your shelf.</p>
+            <div class="collection-list refire-list">
+                <button class="collection-option refire-option" id="shareSendBtn" type="button">
+                    <span class="refire-name">Send a pot</span>
+                    <span class="refire-blurb">Pick a pot and share its file with a friend.</span>
+                </button>
+                <button class="collection-option refire-option" id="shareOpenBtn" type="button">
+                    <span class="refire-name">Open a pot</span>
+                    <span class="refire-blurb">Load a pot file a friend sent you.</span>
+                </button>
+            </div>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn" id="shareCancel" type="button">Not now</button>
+            </div>
+            <input type="file" id="shareFileInput" accept=".slippot,.json,application/json" hidden />
+        </div>
+    </div>
+
+    <!-- Pot chooser for sending. -->
+    <div id="sharePickModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="Choose a pot to send" hidden>
+        <div class="confirm-modal-card">
+            <p class="confirm-modal-message">Send a pot</p>
+            <div class="kiln-pick-list" id="sharePickList"></div>
+            <div class="confirm-modal-actions">
+                <button class="confirm-modal-btn" id="sharePickCancel" type="button">Not now</button>
+            </div>
+        </div>
+    </div>
+
     <!-- The reply: the payoff, so it gets a modal rather than a toast. -->
     <div id="replyModal" class="confirm-modal" role="dialog" aria-modal="true" aria-label="A letter back" hidden>
         <div class="confirm-modal-card letter-card">
@@ -553,6 +588,7 @@
             <span class="gallery-bar-right">
                 <button class="tool-btn" id="galleryKilnLoad" type="button" title="Pack a kiln shelf and fire several pots together">Kiln load</button>
                 <button class="tool-btn" id="galleryRecipes" type="button" title="Test tiles and the glaze recipes you've found">The wall</button>
+                <button class="tool-btn" id="galleryShareBtn" type="button" title="Send a pot to a friend, or open one they sent you">Share</button>
                 <button class="tool-btn" id="galleryShelfBtn" type="button" title="Save all your pots as one shelf photo">Shelf photo</button>
                 <button class="tool-btn" id="galleryViewToggle" type="button">Grid</button>
                 <button class="tool-btn" id="galleryClose" type="button">Close</button>
@@ -637,7 +673,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=243"></script>
+    <script type="module" src="main.js?v=244"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>

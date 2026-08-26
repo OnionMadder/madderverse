@@ -1923,6 +1923,16 @@ function init() {
     document.getElementById("replyClose")?.addEventListener("click", closeReply);
     document.getElementById("studyClose")?.addEventListener("click", closeStudyShelf);
     document.getElementById("ghostBtn")?.addEventListener("click", () => setGhostVisible(!state.studyGhostOn));
+    document.getElementById("galleryShareBtn")?.addEventListener("click", openShareModal);
+    document.getElementById("shareCancel")?.addEventListener("click", closeShareModal);
+    document.getElementById("shareSendBtn")?.addEventListener("click", () => { openSharePick(); });
+    document.getElementById("shareOpenBtn")?.addEventListener("click", () => document.getElementById("shareFileInput")?.click());
+    document.getElementById("shareFileInput")?.addEventListener("change", (e) => {
+        const f = e.target.files && e.target.files[0];
+        e.target.value = "";   // allow re-picking the same file
+        if (f) handleShareFile(f);
+    });
+    document.getElementById("sharePickCancel")?.addEventListener("click", closeSharePick);
     document.getElementById("tileAdd")?.addEventListener("click", addRackTile);
     document.getElementById("rackFire")?.addEventListener("click", fireRack);
     document.getElementById("rackClear")?.addEventListener("click", emptyRack);
@@ -2162,6 +2172,8 @@ function init() {
             // tick() drives this; exposed because the preview pane pauses
             // rAF, so tests must be able to step the meter by hand.
             updateStudyMeter,
+            exportPotFile, importPotData, sanitizePiece, openShareModal,
+            closeShareModal, openSharePick, closeSharePick, handleShareFile,
             studyTargetInfo: () => studyTarget && {
                 len: studyTarget.length,
                 min: Math.min(...studyTarget), max: Math.max(...studyTarget),
@@ -7837,10 +7849,10 @@ function syncPhotoChips() {
 
 // Share a PNG blob via the Web Share sheet, falling back to an anchor
 // download. Shared by the single-pot photo and the whole-shelf photo.
-async function shareOrDownloadBlob(blob, filename, title) {
+async function shareOrDownloadBlob(blob, filename, title, mime) {
     try {
         if (blob && navigator.canShare) {
-            const file = new File([blob], filename, { type: "image/png" });
+            const file = new File([blob], filename, { type: mime || "image/png" });
             if (navigator.canShare({ files: [file] })) {
                 await navigator.share({ files: [file], title });
                 return true;
@@ -9581,6 +9593,12 @@ function renderGalleryTile(grid, members) {
             line.textContent = "A study after the " + study.name.toLowerCase() + ".";
             meta.appendChild(line);
         }
+        if (primary.gifted) {
+            const line = document.createElement("div");
+            line.className = "pot-home";
+            line.textContent = "This one came from a friend.";
+            meta.appendChild(line);
+        }
         item.appendChild(meta);
     }
 
@@ -10644,6 +10662,225 @@ function closeStudyShelf() {
     if (m) { m.hidden = true; releaseFocus(m); }
 }
 
+// --- Pot sharing (send a pot to a friend) --------------------------
+// Serverless: a pot travels as a small .slippot.json file through the
+// family's own share sheet. See POT_SHARING.md for why a file beats a
+// data-in-the-photo trick (messaging apps recompress images) and a
+// server gallery (kids' rating + no-data-collected posture).
+//
+// An imported file is UNTRUSTED INPUT. Everything crosses through the
+// SHARE_FIELDS whitelist below — both directions, so an export can't
+// leak provenance (id/ts/collections/commissions/studies) and an import
+// can't smuggle junk into the DB. Nothing identity-shaped exists in the
+// format at all: the channel (a text from grandma) carries the who.
+
+const SHARE_KIND = "pot-gift";
+const SHARE_MAX_BYTES = 8 * 1024 * 1024;
+const SHARE_MAX_STRING = 2 * 1024 * 1024;   // per canvas layer
+
+const _isDataPng = (v) => typeof v === "string" && v.length <= SHARE_MAX_STRING &&
+    /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(v);
+// Enum check that refuses prototype keys — a bare TABLE[v] would accept
+// "__proto__" or "constructor" as a valid glaze/firing/rim style.
+const _inTable = (table, v) => typeof v === "string" && Object.prototype.hasOwnProperty.call(table, v);
+const _num = (lo, hi, dflt) => (v) =>
+    (typeof v === "number" && isFinite(v)) ? Math.max(lo, Math.min(hi, v)) : dflt;
+const _bool = (v) => v === true;
+// Short id-ish strings (motif/pattern ids, dip fields): no protocols, no
+// path escapes — they end up in relative img srcs and table lookups.
+const _cleanStr = (v, max) => (typeof v === "string" && v.length <= (max || 120) &&
+    !v.includes(":") && !v.includes("..")) ? v : null;
+// Small plain object of primitives (dip entries, placements): strip
+// anything nested or oversized rather than trusting its shape.
+function _cleanFlat(obj, maxStr) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+    const out = {};
+    let n = 0;
+    for (const k of Object.keys(obj)) {
+        if (++n > 24) return null;
+        const v = obj[k];
+        if (typeof v === "number" && isFinite(v)) out[k] = v;
+        else if (typeof v === "boolean") out[k] = v;
+        else if (typeof v === "string") {
+            const s = _cleanStr(v, maxStr || 200);
+            if (s === null) return null;
+            out[k] = s;
+        } else if (v === null) out[k] = null;
+        else return null; // nested structure — not part of any piece format
+    }
+    return out;
+}
+
+const SHARE_FIELDS = {
+    profile: (v) => (Array.isArray(v) && v.length <= 400 &&
+        v.every((x) => typeof x === "number" && isFinite(x)))
+        ? v.map((x) => Math.max(0, Math.min(2, x))) : null,
+    displace: (v) => (v == null) ? null :
+        (typeof v === "string" && v.length <= 400000 && /^[A-Za-z0-9+/=]*$/.test(v)) ? v : null,
+    facetCount: _num(0, 24, 0),
+    rimScallop: _num(0, 24, 0),
+    rimStyle: (v) => _inTable(RIM_STYLES, v) ? v : "cut",
+    glaze: (v) => _inTable(GLAZES, v) ? v : null,
+    glazeGradient: (v) => _inTable(GLAZES, v) ? v : null,
+    finish: (v) => _inTable(FINISHES, v) ? v : DEFAULT_FINISH,
+    firingType: (v) => _inTable(FIRINGS, v) ? v : DEFAULT_FIRING,
+    kiln: (v) => {
+        if (!v || typeof v !== "object" || !_inTable(FIRINGS, v.type) || v.type === "electric") return null;
+        const k = { type: v.type, seed: (typeof v.seed === "number" && isFinite(v.seed)) ? (v.seed >>> 0) : 0 };
+        if (typeof v.slot === "number" && isFinite(v.slot)) k.slot = Math.max(0, Math.min(KILN_SLOTS - 1, Math.round(v.slot)));
+        return k;
+    },
+    // A hand-poured dip carries one nested array: its baked drips, each a
+    // flat object of numbers (see makeDrips). Everything else stays flat.
+    dips: (v) => Array.isArray(v) ? v.slice(0, 200).map((d) => {
+        if (!d || typeof d !== "object" || Array.isArray(d)) return null;
+        const { drips, ...rest } = d;
+        const flat = _cleanFlat(rest);
+        if (!flat) return null;
+        if (Array.isArray(drips)) {
+            flat.drips = drips.slice(0, 80).map((x) => _cleanFlat(x)).filter(Boolean);
+        }
+        return flat;
+    }).filter(Boolean) : [],
+    deco: (v) => _isDataPng(v) ? v : null,
+    paintDeco: (v) => _isDataPng(v) ? v : null,
+    placements: (v) => Array.isArray(v) ? v.slice(0, 200).map((p) => _cleanFlat(p)).filter(Boolean) : [],
+    bump: (v) => _isDataPng(v) ? v : null,
+    sgraffito: (v) => _isDataPng(v) ? v : null,
+    resist: (v) => _isDataPng(v) ? v : null,
+    frozenDip: (v) => _isDataPng(v) ? v : null,
+    isLid: _bool,
+    handle: _bool,
+    spout: _bool,
+    handleBulge: _num(-2, 2, 0),
+    handleTop: _num(-2, 2, 0),
+    handleBottom: _num(-2, 2, 0),
+    handleThickness: _num(0.01, 0.4, DEFAULT_HANDLE_THICKNESS),
+    handleCount: (v) => (v === 1 ? 1 : 2),
+    heightScale: _num(MIN_HEIGHT_SCALE, MAX_HEIGHT_SCALE, 1),
+    lidBaseRatio: _num(0.5, 2, 1),
+    thumb: (v) => _isDataPng(v) ? v : null,
+    assemblyThumb: (v) => _isDataPng(v) ? v : null,
+    title: (v) => (typeof v === "string" && v.trim()) ? v.trim().slice(0, 60) : null,
+};
+
+// One function, both directions: pick exactly the whitelisted fields and
+// run each through its validator. Export leaks nothing; import trusts nothing.
+function sanitizePiece(src) {
+    if (!src || typeof src !== "object") return null;
+    const out = {};
+    for (const k of Object.keys(SHARE_FIELDS)) out[k] = SHARE_FIELDS[k](src[k]);
+    if (!out.profile || out.profile.length < 8) return null; // not a pot
+    return out;
+}
+
+async function exportPotFile(entry) {
+    let pieces = [entry];
+    if (entry.setId) {
+        try {
+            const all = await dbAll();
+            const members = all.filter((e) => e.setId === entry.setId);
+            if (members.length) pieces = members.sort((a, b) => (a.isLid ? 1 : 0) - (b.isLid ? 1 : 0));
+        } catch (_) {}
+    }
+    const clean = pieces.map(sanitizePiece).filter(Boolean);
+    if (!clean.length) return false;
+    const payload = { app: "slip-studio", kind: SHARE_KIND, v: 1, pieces: clean };
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    const slug = (entry.title || "pot").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "pot";
+    return shareOrDownloadBlob(blob, `${slug}.slippot.json`, "A pot from Slip Studio", "application/json");
+}
+
+async function importPotData(data) {
+    if (!data || typeof data !== "object" || data.app !== "slip-studio" ||
+        data.kind !== SHARE_KIND || !Array.isArray(data.pieces) ||
+        data.pieces.length < 1 || data.pieces.length > 2) return 0;
+    const clean = data.pieces.slice(0, 2).map(sanitizePiece).filter(Boolean);
+    if (!clean.length) return 0;
+    // Fresh identity on OUR shelf: ids, timestamps and (for a set) a new
+    // shared setId are minted here, never read from the file. `gifted` is
+    // set by the importer for the same reason.
+    const setId = clean.length > 1
+        ? "set-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6)
+        : null;
+    let n = 0;
+    for (const piece of clean) {
+        await dbPut({ ...piece, id: (Date.now() + n).toString(36) + "g", ts: Date.now() + n, setId, gifted: true });
+        n++;
+    }
+    return n;
+}
+
+async function handleShareFile(file) {
+    if (!file) return;
+    if (file.size > SHARE_MAX_BYTES) { showToast("That file is too big to be a pot"); return; }
+    let data = null;
+    try { data = JSON.parse(await file.text()); } catch (_) {}
+    const n = data ? await importPotData(data) : 0;
+    if (n) {
+        closeShareModal();
+        haptic(20);
+        showToast(n > 1 ? "A pot and its lid, from a friend" : "A pot from a friend is on your shelf");
+        await openGallery();
+    } else {
+        showToast("That doesn't look like a pot file");
+    }
+}
+
+function openShareModal() {
+    const m = document.getElementById("shareModal");
+    if (m) { m.hidden = false; m.classList.add("is-open"); trapFocus(m); }
+}
+function closeShareModal() {
+    const m = document.getElementById("shareModal");
+    if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
+}
+
+// Pick which pot to send — the kiln-pick pattern: one item per set,
+// fronted by its pot member.
+async function openSharePick() {
+    let all = [];
+    try { all = await dbAll(); } catch (_) {}
+    const rep = new Map();
+    for (const e of all) {
+        if (!e.setId) continue;
+        const prev = rep.get(e.setId);
+        if (!prev || (lookupIsLid(prev) && !lookupIsLid(e))) rep.set(e.setId, e);
+    }
+    const items = all.filter((e) => !e.setId || rep.get(e.setId) === e).reverse();
+    const list = document.getElementById("sharePickList");
+    if (list) {
+        list.innerHTML = "";
+        if (!items.length) {
+            const p = document.createElement("p");
+            p.className = "kiln-pick-empty";
+            p.textContent = "Fire and save a pot first — then you'll have something to send.";
+            list.appendChild(p);
+        }
+        items.forEach((e) => {
+            const b = document.createElement("button");
+            b.type = "button";
+            b.className = "kiln-pick-item";
+            const img = document.createElement("img");
+            img.src = e.thumb; img.alt = "";
+            const cap = document.createElement("span");
+            cap.textContent = (e.title || "Pot") + (e.setId ? " (set)" : "");
+            b.append(img, cap);
+            b.addEventListener("click", async () => {
+                closeSharePick();
+                if (await exportPotFile(e)) { closeShareModal(); showToast("Pot sent — your copy stays on your shelf"); }
+            });
+            list.appendChild(b);
+        });
+    }
+    const m = document.getElementById("sharePickModal");
+    if (m) { m.hidden = false; m.classList.add("is-open"); trapFocus(m); }
+}
+function closeSharePick() {
+    const m = document.getElementById("sharePickModal");
+    if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
+}
+
 // Minimal transient toast (recipe discoveries + future gentle notices).
 let toastHideT = 0, toastGoneT = 0;
 function showToast(msg) {
@@ -11087,6 +11324,10 @@ function onDialogEscape(e) {
     // the reply letter sits over everything on the board.
     if (reply && !reply.hidden)        { closeReply();       return; }
     if (reqPick && !reqPick.hidden)    { closeRequestPick(); return; }
+    const sharePick = document.getElementById("sharePickModal");
+    if (sharePick && !sharePick.hidden) { closeSharePick();  return; }
+    const share = document.getElementById("shareModal");
+    if (share && !share.hidden)        { closeShareModal();  return; }
     if (kilnPick && !kilnPick.hidden)  { closeKilnPick();   return; }
     if (refire && !refire.hidden)      { closeRefire();     return; }
     if (kilnLoadM && !kilnLoadM.hidden){ closeKilnLoad();   return; }
