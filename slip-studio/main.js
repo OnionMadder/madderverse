@@ -1923,6 +1923,8 @@ function init() {
     document.getElementById("replyClose")?.addEventListener("click", closeReply);
     document.getElementById("studyClose")?.addEventListener("click", closeStudyShelf);
     document.getElementById("ghostBtn")?.addEventListener("click", () => setGhostVisible(!state.studyGhostOn));
+    document.getElementById("galleryShowroom")?.addEventListener("click", () => openShowroom());
+    document.getElementById("showroomClose")?.addEventListener("click", closeShowroom);
     document.getElementById("galleryShareBtn")?.addEventListener("click", openShareModal);
     document.getElementById("shareCancel")?.addEventListener("click", closeShareModal);
     document.getElementById("shareSendBtn")?.addEventListener("click", () => { openSharePick(); });
@@ -2174,6 +2176,7 @@ function init() {
             updateStudyMeter,
             exportPotFile, importPotData, sanitizePiece, openShareModal,
             closeShareModal, openSharePick, closeSharePick, handleShareFile,
+            openShowroom, closeShowroom, renderShowroom, potCutoutURL,
             studyTargetInfo: () => studyTarget && {
                 len: studyTarget.length,
                 min: Math.min(...studyTarget), max: Math.max(...studyTarget),
@@ -10881,6 +10884,108 @@ function closeSharePick() {
     if (m) { m.hidden = true; m.classList.remove("is-open"); releaseFocus(m); }
 }
 
+// --- The showroom --------------------------------------------------
+// A room the pots stand in — the payoff view the management gallery isn't.
+// See SHOWROOM.md: display is the reward (Master of Pottery's showroom,
+// AC's museum), so the pots stand large on shelf boards, oldest at the
+// top, filling downward as the body of work grows. No empty slots begging
+// to be filled, no capacity, no captions — tap a pot to admire it in
+// Display mode.
+
+// The pot-isolation half of stageThumb: the cutout standing on nothing,
+// so the DOM can put it on a CSS shelf. Legacy opaque thumbs keyed out.
+async function potCutoutURL(thumbURL) {
+    if (!thumbURL) return null;
+    const img = await loadImageEl(thumbURL);
+    if (!img) return null;
+    const S = 360;
+    const c = document.createElement("canvas"); c.width = c.height = S;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(img, 0, 0, S, S);
+    if (!/^data:image\/png/.test(thumbURL)) keyOutThumbBg(ctx, S);
+    return c.toDataURL("image/png");
+}
+
+async function renderShowroom() {
+    const wrap = document.getElementById("showroomShelves");
+    const countEl = document.getElementById("showroomCount");
+    const empty = document.getElementById("showroomEmpty");
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    let pots = [];
+    try { pots = await dbAll(); } catch (_) {}
+    pots.sort((a, b) => a.ts - b.ts);   // oldest first — the room fills downward
+    // One stand per piece; a set stands assembled (same collapse rule as
+    // the shelf photo, preferring the pot half as the loadable target).
+    const seen = new Set();
+    const tiles = [];
+    for (const p of pots) {
+        if (p.setId) {
+            if (seen.has(p.setId)) continue;
+            seen.add(p.setId);
+            const members = pots.filter((q) => q.setId === p.setId);
+            const rep = members.find((m) => !m.isLid) || members[0];
+            tiles.push({ entry: rep, thumb: rep.assemblyThumb || rep.thumb,
+                         foot: rep.assemblyThumb ? ASSEMBLY_FOOT_FRAC : POT_FOOT_FRAC });
+        } else {
+            tiles.push({ entry: p, thumb: p.thumb, foot: POT_FOOT_FRAC });
+        }
+    }
+    if (empty) empty.hidden = tiles.length > 0;
+    if (countEl) countEl.textContent = tiles.length
+        ? (tiles.length === 1 ? "One piece." : tiles.length + " pieces.") : "";
+    if (!tiles.length) return;
+    // Discrete shelf rows, chunked from the width the room actually has.
+    // clipW crops the square thumb's empty margins; the chunk width leaves
+    // breathing room so a full row never overflows its board.
+    const clipW = 150, potH = 190, slotW = clipW + 24;
+    const perRow = Math.max(2, Math.floor((wrap.clientWidth || innerWidth) / slotW));
+    const cuts = await Promise.all(tiles.map((t) => potCutoutURL(t.thumb)));
+    for (let i = 0; i < tiles.length; i += perRow) {
+        const shelf = document.createElement("div");
+        shelf.className = "room-shelf";
+        for (let j = i; j < Math.min(i + perRow, tiles.length); j++) {
+            const t = tiles[j];
+            if (!cuts[j]) continue;
+            const slot = document.createElement("button");
+            slot.type = "button";
+            slot.className = "room-slot";
+            slot.setAttribute("aria-label", t.entry.title || "Pot");
+            slot.title = t.entry.title || "";
+            const clip = document.createElement("div");
+            clip.className = "room-clip";
+            clip.style.height = Math.round(t.foot * potH) + "px";
+            clip.style.width = clipW + "px";
+            const img = document.createElement("img");
+            img.src = cuts[j];
+            img.alt = "";
+            img.style.height = potH + "px";
+            img.loading = "lazy";
+            clip.appendChild(img);
+            const shadow = document.createElement("div");
+            shadow.className = "room-shadow";
+            slot.append(clip, shadow);
+            slot.addEventListener("click", async () => {
+                await loadPot(t.entry);
+                closeShowroom();
+                closeGallery();
+                enterDisplayMode();
+            });
+            shelf.appendChild(slot);
+        }
+        wrap.appendChild(shelf);
+    }
+}
+async function openShowroom() {
+    const m = document.getElementById("showroomModal");
+    if (m) { m.hidden = false; trapFocus(m); }
+    await renderShowroom();   // after unhide — the chunking measures the room
+}
+function closeShowroom() {
+    const m = document.getElementById("showroomModal");
+    if (m) { m.hidden = true; releaseFocus(m); }
+}
+
 // Minimal transient toast (recipe discoveries + future gentle notices).
 let toastHideT = 0, toastGoneT = 0;
 function showToast(msg) {
@@ -11328,6 +11433,8 @@ function onDialogEscape(e) {
     if (sharePick && !sharePick.hidden) { closeSharePick();  return; }
     const share = document.getElementById("shareModal");
     if (share && !share.hidden)        { closeShareModal();  return; }
+    const room = document.getElementById("showroomModal");
+    if (room && !room.hidden)          { closeShowroom();    return; }
     if (kilnPick && !kilnPick.hidden)  { closeKilnPick();   return; }
     if (refire && !refire.hidden)      { closeRefire();     return; }
     if (kilnLoadM && !kilnLoadM.hidden){ closeKilnLoad();   return; }

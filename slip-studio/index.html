@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=244" />
+    <link rel="stylesheet" href="style.css?v=245" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -536,6 +536,22 @@
         <div class="study-list" id="studyList"></div>
     </div>
 
+    <!-- The showroom: every piece standing on shelf boards, oldest at the
+         top, filling downward. Display is the reward — no capacity, no
+         empty slots, no captions. See SHOWROOM.md. -->
+    <div class="gallery" id="showroomModal" role="dialog" aria-label="The showroom" hidden>
+        <div class="gallery-bar">
+            <span class="gallery-title">The showroom <span class="recipe-count" id="showroomCount"></span></span>
+            <span class="gallery-bar-right">
+                <button class="tool-btn" id="showroomClose" type="button">Close</button>
+            </span>
+        </div>
+        <div class="room-scroll">
+            <div id="showroomShelves"></div>
+            <p class="wall-empty room-empty" id="showroomEmpty" hidden>Your first fired pot will stand here.</p>
+        </div>
+    </div>
+
     <!-- Pot sharing: a pot travels as a small file through the family's own
          share sheet — no accounts, no server, nothing collected. The file
          carries no identity; see POT_SHARING.md. -->
@@ -586,6 +602,7 @@
         <div class="gallery-bar">
             <span class="gallery-title">Your pots</span>
             <span class="gallery-bar-right">
+                <button class="tool-btn" id="galleryShowroom" type="button" title="See all your pieces standing in one room">Showroom</button>
                 <button class="tool-btn" id="galleryKilnLoad" type="button" title="Pack a kiln shelf and fire several pots together">Kiln load</button>
                 <button class="tool-btn" id="galleryRecipes" type="button" title="Test tiles and the glaze recipes you've found">The wall</button>
                 <button class="tool-btn" id="galleryShareBtn" type="button" title="Send a pot to a friend, or open one they sent you">Share</button>
@@ -673,7 +690,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=244"></script>
+    <script type="module" src="main.js?v=245"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
