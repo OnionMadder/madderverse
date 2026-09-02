@@ -10935,11 +10935,15 @@ async function renderShowroom() {
     if (countEl) countEl.textContent = tiles.length
         ? (tiles.length === 1 ? "One piece." : tiles.length + " pieces.") : "";
     if (!tiles.length) return;
-    // Discrete shelf rows, chunked from the width the room actually has.
-    // clipW crops the square thumb's empty margins; the chunk width leaves
-    // breathing room so a full row never overflows its board.
-    const clipW = 150, potH = 190, slotW = clipW + 24;
-    const perRow = Math.max(2, Math.floor((wrap.clientWidth || innerWidth) / slotW));
+    // Discrete shelf rows sized to the room. A FIXED slot width put only two
+    // pots on a phone shelf — half the screen each, and fifteen pieces became
+    // a very long scroll of very large pots. Derive the count from the width
+    // instead: three across on a handset, more on a tablet, and let the pot
+    // size follow, so a shelf reads as a shelf at any size.
+    const roomW = wrap.clientWidth || innerWidth || 360;
+    const perRow = Math.max(3, Math.min(6, Math.floor(roomW / 118)));
+    const clipW = Math.max(64, Math.floor(roomW / perRow) - 10);
+    const potH = Math.round(clipW * 1.3);
     const cuts = await Promise.all(tiles.map((t) => potCutoutURL(t.thumb)));
     for (let i = 0; i < tiles.length; i += perRow) {
         const shelf = document.createElement("div");

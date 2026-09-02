@@ -3205,6 +3205,21 @@ body.capacitor-app .landing-app-link { display: none; }
     flex-shrink: 0;
 }
 .study-pot { width: 52px; height: 52px; object-fit: contain; }
+
+/* On a phone the three-column card squeezed the blurb into ~150px and each
+   entry grew into a wall of two-word lines. Below 520px the action drops to
+   its own full-width row so the text gets the whole card. */
+@media (max-width: 520px) {
+    .study-card { flex-wrap: wrap; gap: 10px 12px; }
+    .study-act {
+        flex: 1 0 100%;
+        flex-direction: row;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 10px;
+    }
+    .study-pot { width: 44px; height: 44px; }
+}
 .study-mark { font-size: 11px; color: var(--ink-dim); }
 
 /* Closeness pill: fixed top-center at the wet stage of a study. */
@@ -3226,6 +3241,11 @@ body.capacitor-app .landing-app-link { display: none; }
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
 }
+/* [hidden] is a UA rule (display:none) and the display above outranks it, so
+   without this guard the empty pill paints on every screen — it shipped that
+   way in v243 and a real render is what caught it. */
+.study-meter[hidden] { display: none; }
+
 .study-ghost-btn {
     border: 1px solid var(--ink-faint);
     background: transparent;
