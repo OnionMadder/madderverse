@@ -43,81 +43,80 @@ A calm 3D pottery studio. No ads, no upsells, no internet needed.
 
 ## Full description  (max 4000 chars)
 
-> Written against **web v235 / v2.8.0 (vc23)**. Every count below was read out
-> of `main.js`, not estimated — see the full feature list at the bottom for the
-> source of each number. **If you change the feature set, change this copy in
+> Written against **web v245 / v2.8.0 (vc26)** - the noticeboard, study shelf,
+> pot sharing and showroom are all included. Every count was read out of
+> main.js, not estimated. **If you change the feature set, change this copy in
 > the same commit.** Promising a tool that isn't in the build is a refund.
 >
-> ⚠ **What is live right now is only the first two paragraphs of this block**
-> (verified on the store page 2026-08-04): the "calm place to shape clay" opener
-> and the "Pull a vase, a bowl, a cup, or a bottle…" paragraph, and nothing
-> after it. That is ~470 characters out of Play's 4,000. Everything below —
-> the ad-free/no-IAP/offline promise, the feature words search runs on, and the
-> entire v2.3–v2.8 surface — has never been on the listing. With 10+ lifetime
-> downloads, discovery is the bigger problem than retention, and this is the
-> cheapest lever on it: no build, no upload, just a paste.
+> **3,934 characters** (3,991 worst case if the paste converts newlines to
+> CRLF, which is why it does not run right up to 4,000). Recount rather than
+> eyeball if you add to it.
+>
+> WARNING: the live listing still carries only the first two paragraphs of
+> this block - about 470 characters out of 4,000 - so the ad-free/no-IAP/
+> offline promise and every feature word search runs on have never been on the
+> store page. With 10+ lifetime downloads, discovery is a bigger problem than
+> retention, and this paste is the cheapest lever on it.
 
 ```
 Slip Studio is a calm place to shape clay.
 
 Pull a pot from a slow-turning wheel with your finger. Glaze it, decorate it, fire it, and keep it on a shelf that lives on your device — not on a server.
 
-No score, no timer, no daily quest, no streak, no notification. Slip Studio is a studio, not a game. If you want goals and levels, this isn't that.
+No score, no timer, no daily quest, no streak, no notification. Slip Studio is a studio, not a game. If you want goals and levels, this isn't it.
 
 TRY IT FREE FIRST
-The whole studio runs in any browser at madderverse.org/slip-studio — no download, no account, nothing to buy. Try it before you pay. The app adds offline play and fullscreen.
+The whole studio runs in any browser at madderverse.org/slip-studio — no download, no account, nothing to buy. The app adds offline play and fullscreen.
 
 SHAPING
-• 11 starter forms: vase, bowl, cup, bottle, jar, egg, planter, goblet, bud vase, mug, and teapot with a pouring spout
-• Grab the wall to push clay in or out, the rim to raise or flare it. Clay lags your finger like real wet stoneware.
+• 11 starter forms: vase, bowl, cup, bottle, jar, egg, planter, goblet, bud vase, mug, and teapot with a spout
+• Grab the wall to push clay in or out, the rim to raise or flare it — clay lags your finger like wet stoneware
 • Alter the form off-round — dent, oval, or bulge one side
-• Facet the wall or scallop the rim, 6, 8 or 12 around
-• Five rim finishes: cut, rounded, flared, rolled, collared
-• Pull one or two handles onto the pot and drag to reshape
-• Trim the foot at leather-hard
-• Undo while shaping, trimming, glazing and decorating
+• Facet the wall or scallop the rim, 6, 8 or 12 around; five rim finishes: cut, rounded, flared, rolled, collared
+• Pull one or two handles on and drag to reshape
+• Trim the foot at leather-hard; undo at every stage
+
+THE STUDY SHELF
+Ten classic forms from potters around the world — a Korean moon jar, a Japanese tea bowl, a Greek amphora, a Zulu ukhamba, a Pueblo olla — each with a note on what it was for. Pick one and its silhouette stands on the wheel to throw against. Nothing is graded and no pot is wrong: follow it closely or wander off, it's your study either way.
 
 GLAZING
-• 48 glazes in six palettes — Studio, Modern, Garden, Jewel, Sorbet, and Stoneware (speckled and crackle surfaces)
-• Dip from the rim down and let the drips run, or pour one of 30 ready-made gradients from five themed sets
-• Real glaze chemistry: overlap two dips and the overlap fires as a third colour you didn't pick. 72 reactions to find, each one logged in a recipe journal.
-• A wall of test tiles for trying pairs without using up a pot — dip, fire a rack of six, pin the results up
-• Three fired finishes: glossy, matte, or lustre
-• Wax resist — mask an area and it keeps the colour underneath while later dips run off it
+• 48 glazes in six palettes — Studio, Modern, Garden, Jewel, Sorbet, Stoneware (speckled and crackle)
+• Dip from the rim down and let the drips run, or pour one of 30 gradients
+• Real chemistry: overlap two dips and the overlap fires as a third colour you didn't pick — 72 reactions to find, each logged in a recipe journal.
+• A wall of test tiles for trying pairs without using up a pot
+• Three fired finishes: glossy, matte, lustre
+• Wax resist — mask an area and it keeps the colour underneath
 
 DECORATING
-• Paint and splatter in 32 colours across four palettes
-• Carve sgraffito through the glaze, with real groove depth
-• Slip trailing: pipe a raised bead of clay
-• 42 motifs in seven packs — sumi-e animals and plants, dogs, Dutch berries, Roman figures, Egyptian hieroglyphs, mythical creatures. Place one as a silhouette or in full colour.
-• 25 repeating patterns in four packs: enamel, frescoes, shima-shima, art nouveau
-• Six friezes that wrap the pot
-• Or bring in your own picture — it becomes a silhouette on your device and is never uploaded
+• Paint and splatter in 32 colours; carve sgraffito through the glaze; pipe a raised bead of slip
+• 42 motifs in seven packs — sumi-e animals and plants, dogs, Dutch berries, Roman figures, Egyptian hieroglyphs, mythical creatures
+• 25 repeating patterns, plus six friezes that wrap the pot
+• Or bring your own picture — it becomes a silhouette on your device, never uploaded
 
 THE KILN
-The chamber closes around the scene, glows warm, and melts the raw chalky coat into a finished surface.
-
-• Fire electric for exactly what you glazed, or let the kiln have a say: wood lays ash and flame-marks down the side that faced the fire, soda blushes the surface, raku smokes and crazes.
-• Fire it again: put a finished pot back through in a different firing. Your original is kept, so nothing you like is ever at risk.
-• Pack a shelf and fire up to six pots together. Where each one stands changes how it comes out: the front catches nearly twice the marking of the back.
+The chamber closes in, glows warm, and melts the raw chalky coat into a finished surface.
+• Fire electric for exactly what you glazed, or let the kiln have a say: wood lays ash down the side that faced the fire, soda blushes, raku smokes and crazes.
+• Fire it again in a different firing. Your original is kept, so nothing you like is at risk.
+• Pack a shelf and fire six together — where each stands changes how it comes out.
 
 LIDS AND SETS
-Add a lid in four styles — flat, domed, tall or pointed — shape it against the pot and fire the two as a set. A gradient poured over a set runs unbroken from the lid's top to the pot's foot.
+Add a lid in four styles, shape it against the pot, and fire the two as a set. A gradient poured over a set runs unbroken from lid to foot.
 
 KEEPING WHAT YOU MAKE
-• A portfolio on your device, sorted onto shelves you name yourself
+• A showroom where everything you've made stands on shelves in one room
 • Display mode — full screen, no interface, turning slowly on its backdrop
-• Photo export in five framings and three shapes: square, feed, or phone wallpaper
-• Export a whole shelf as one keepsake photo
-• 18 backdrops in six categories — three installed, the rest free opt-in downloads
+• Photo export in five framings and three shapes, or a whole shelf at once
+• A noticeboard of people who'd like a pot — a tea house tired of mismatched cups, a child whose bean plant outgrew its old one. Give any pot and they write back about where it lives now. It stays yours.
+• Send a pot to a friend — it travels as a small file through your own messages. No account, no server, no strangers.
+• 18 backdrops in six categories — three installed, the rest free downloads
 
 PAID ONCE. NOTHING ELSE.
-No ads. No subscription, no in-app purchases, nothing to unlock. No account, no sign-in, no analytics, no third-party code, no advertising ID. Everything you make stays on your device, and it all works offline.
+No ads. No subscription, no in-app purchases, nothing to unlock. No account, no analytics, no third-party code, no advertising ID. Everything you make stays on your device, and it works offline.
 
 MADE BY MAD SUNDAR LLC
-Part of The Madderverse, a small collection of ad-free apps made by a parent tired of creative apps stuffed with timers and upsells. We don't do engagement traps. We do pots.
+Part of The Madderverse, ad-free apps made by a parent tired of creative apps stuffed with timers and upsells. We don't do engagement traps — we do pots.
 
-Questions or data requests: hello@madderverse.org
+hello@madderverse.org
 ```
 
 
@@ -178,7 +177,26 @@ Slip Studio v2.5 — glaze chemistry, wax resist, and a gallery for your pots.
 Still ad-free. No purchases. No internet needed.
 ```
 
-## What's new  (v2.8.0 / vc23 — THIS RELEASE, paste into Play Console "What's new")
+## What's new  (v2.8.0 / vc26 — THIS RELEASE, paste into Play Console "What's new")
+
+Covers web **v225 → v245** — the whole replayability run in one release: the
+kiln that answers back (v229–232), then the four features that give a session
+a reason to start and a pot somewhere to go (v242–245). 479 chars of Play's 500 (488 worst case with CRLF).
+
+```
+Slip Studio v2.8 — the kiln gets a say, and your pots get somewhere to go.
+
+• Wood, soda and raku firings — ash, flashing, smoke, crackle.
+• Fire it again, or fire six at once. Originals are kept.
+• The study shelf: ten classic forms to throw against, none graded.
+• A noticeboard of people who'd like a pot. Give one, they write back, it stays yours.
+• A showroom where everything you've made stands in one room.
+• Send a pot to a friend as a file.
+
+Still ad-free. No purchases.
+```
+
+## What's new  (v2.8.0 / vc23 — superseded by vc26 below, for history)
 
 The replayability release: web **v225 → v232**. Everything here is about
 having a reason to open the app again — a place to experiment cheaply, and a
