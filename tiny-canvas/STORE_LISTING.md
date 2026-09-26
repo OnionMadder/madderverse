@@ -37,10 +37,10 @@ Color, no ads, no fuss.
 ## 3. Google Play — Short description (max 80 chars)
 
 ```
-A polished kids coloring app. Ad-free. No accounts. Nothing leaves the device.
+Ad-free coloring book for kids: color by number, glitter, stickers, offline.
 ```
 
-(78 chars.)
+(76 chars. Rewritten 2026-09-25: leads with "coloring book" + the features parents search for.)
 
 ---
 
@@ -54,38 +54,64 @@ A polished kids coloring app. Ad-free. No accounts. Nothing leaves the device.
 
 ---
 
-## 5. Full description — App Store Connect AND Google Play (both ~4000 char limit; this clocks ~1700)
+## 5. Full description — Google Play (4000 char limit; this is 2639, 2680 with CRLF)
+
+Rewritten 2026-09-25 against the code (every count verified from templates.js / game.js). The LIVE listing until then still said "No in-app purchases" — false since Pro shipped, and Play shows an IAP badge on the same page — plus "20 hand-drawn pages" and four retired brushes. Apple lines dropped: there is no App Store build.
 
 ```
-Tiny Canvas is a polished coloring app for kids that gets out of the way and lets them color. Pick a page, choose a brush, color it in, save it to the gallery. That's it.
+Tiny Canvas is a calm, ad-free coloring book for kids. Pick a page, grab a crayon, tap to fill, save it to the gallery. No ads, no accounts, no pop-ups asking your child to buy anything. It just lets them color.
 
-✦ WHAT'S INSIDE
-• 14 richly detailed coloring scenes: a cat in a cozy kitchen, a puppy in the forest, a unicorn glade, a rocket on the moon, a robot workshop, an underwater world, and more — plus a blank page for free drawing.
-• 6 distinct brush types — pen, marker, crayon, pencil, paint, glitter — each with its own feel and texture. Plus a tap-to-fill paint bucket with 8 fun patterns.
-• 42 colors organized in 5 friendly groups: rainbow, pastels, neons, earth tones, and metallics — plus a custom color picker.
-• Brush smoothing for little hands. Eraser, undo, clear.
-• A personal gallery where every saved drawing lives. Auto-save means nothing gets lost.
-• Sweet little sound effects you can turn off in Settings.
+✦ WHAT'S INSIDE (FREE)
+• 49 coloring pages plus a blank page for free drawing: a kitchen cat, a puppy, a unicorn, dinosaurs, rockets, sea creatures, bugs, snowflakes, trucks, food, music, cozy rooms and more.
+• 8 color-by-number pages, ordered from easy to tricky. Numbers size themselves to fit, and zoom in close for the little spaces.
+• Tap-to-fill paint bucket that stays inside the lines, with 8 fill patterns: dots, stripes, checks, stars, hearts, scales, zigzags and grids.
+• Crayon, glitter and rainbow brushes, plus an eraser that gently uncovers what was underneath.
+• 42 colors in 5 groups (brights, pastels, neons, earth and metallic) and a custom color picker.
+• Stickers: tap to place, then drag them anywhere on the picture.
+• Mirror mode: draw on one side and it paints the other. Left-right, up-down or four ways, great for butterflies and snowflakes.
+• Pinch to zoom for the tiny details.
+• A gallery where every saved picture lives, with a little "comes to life" moment when you save.
+• Profiles for up to 5 kids on one tablet, so everyone keeps their own gallery.
+• Auto-save, so nothing gets lost if the tablet goes to sleep.
+• Undo, gentle sounds, and optional calm background music.
+• Works completely offline.
+
+✦ TINY CANVAS PRO (optional, one-time $0.99)
+A single purchase for grown-ups, behind a parent gate in Settings. It adds:
+• 43 more coloring pages (92 in all)
+• Spray, glow and smudge brushes
+• 50 more stickers (60 in all)
+• 7 more paper styles, including a glowing NEON dark paper
+• 10 more picture frames for saved drawings
+
+Everything in the free app stays free forever. There are no locked pages or padlocks in your child's view, no subscriptions, and no coins. Kids never see a sales pitch.
 
 ✦ WHAT'S NOT INSIDE
 • No ads. Ever.
-• No subscriptions, no coins, nothing aimed at kids. The only purchase is one optional, one-time Pro upgrade for grown-ups, behind a parent gate — and everything the free app does stays free forever.
-• No accounts, no sign-in, no social features.
+• No accounts, no sign-in, no chat, no social features.
 • No data collection, no analytics, no advertising IDs.
 • No links out of the app without a parent gate.
+• No streaks, daily quotas or "come back tomorrow!" nagging.
 
 ✦ MADE FOR KIDS
-Tiny Canvas is built around the idea that a kid's gallery is sacred. There are no streaks, daily quotas, or "come back tomorrow!" prompts. The drawing stays on the device — we never see it.
-
-Apple App Store Kids category compliant. Google Play Designed for Families compliant. COPPA and GDPR-K aligned.
+Tiny Canvas is built around one idea: a kid's gallery is theirs. Drawings stay on the device, and we never see them. Designed to follow Google Play's Families Policy.
 
 ✦ FROM THE MADDERVERSE
-Tiny Canvas is part of The Madderverse, a small constellation of free, ad-free, kid-friendly games and apps made by indie developers at Mad Sundar LLC.
+Tiny Canvas is part of The Madderverse, a small collection of ad-free games and apps for kids from Mad Sundar LLC. More at madderverse.org.
 
 Privacy: https://madderverse.org/tiny-canvas/privacy/
-Terms: https://madderverse.org/tiny-canvas/legal/terms.html
 Questions? support@madderverse.org
 ```
+
+---
+
+## 5b. Google Play — What's new (vc8 / 1.3.1, max 500)
+
+```
+Behind-the-scenes update so the optional Pro unlock keeps working with the latest Google Play billing. Your child's drawings and galleries carry over untouched. Tiny Canvas now needs Android 7.0 or newer.
+```
+
+(204 chars.)
 
 ---
 
