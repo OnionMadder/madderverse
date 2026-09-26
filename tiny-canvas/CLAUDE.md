@@ -967,7 +967,35 @@ App Store Connect / Play Console upload slot
   on the canvas the app's own pinch (above) takes over. Capacitor's
   iOS WebView respects this.
 
-## ⏰ Play Billing Library 8 — HARD DEADLINE 2026-08-31
+## ✅ Play Billing Library 8 — MIGRATED 2026-09-25 (was due 2026-08-31)
+
+**Done: Capacitor 6 → 8 and RevenueCat 9 → 13.6.1**, matching Pootery.
+The resolved Gradle graph now reads `purchases-hybrid-common 19.3.1 ->
+com.android.billingclient:billing 8.3.0`. What changed, so the next
+migration knows the shape of it:
+
+- `package.json`: every `@capacitor/*` to `^8`, RC to `^13`.
+- `android/variables.gradle` copied from `pootery-app/android/`
+  (**minSdk 22 → 24** — Capacitor 8's floor, drops Android 5.x/6.0;
+  androidx bumps; cordova-android 14.0.1).
+- AGP `8.8.2 → 8.13.0`, Gradle wrapper `8.11.1 → 8.13`.
+- `npx cap sync android` regenerated `capacitor.build.gradle` (now
+  Java 21). The two hand fixes (`colors.xml`, signing block) survived
+  because this was an in-place upgrade, not a regenerate.
+- **No `game.js` changes** — `configure` / `getOfferings().current` /
+  `getCustomerInfo().customerInfo` / `purchasePackage({aPackage})` /
+  `restorePurchases` keep the same shapes in RC 13 (Pootery uses the
+  identical calls).
+- Pre-migration `android/` backed up at `Desktop/tc-android-backup-cap6/`.
+- `npm audit` flags `@xmldom/xmldom` — it's in `@capacitor/cli`'s
+  build-time tooling, never shipped in the app.
+
+Built as **vc8 / 1.3.1** (web `?v=71`, same content as vc7). Needs a
+real-device check before upload: launch, status/nav bars (Capacitor 8
+changed edge-to-edge handling), Pro purchase with a license tester,
+Restore.
+
+### Historical: the deadline notes as written 2026-08-18
 
 **Play Console is warning on Tiny Canvas: "Update to a newer version of
 Google Play Billing Library to prevent your updates from being
@@ -1017,7 +1045,17 @@ and the AGP/Gradle pins, which a Capacitor major will want to move.
 Do not let this slip past Aug 31 without either the upgrade or a filed
 extension.
 
-## Play build state (2026-08-18)
+## Play build state (2026-09-25)
+
+**`Desktop/tiny-canvas-v1.3.1-vc8.aab`** (23.1 MB) + a signed sideload
+**`Desktop/tiny-canvas-v1.3.1-vc8-TEST.apk`** — the Billing 8 migration
+(see above). Verified: manifest versionCode 8 / 1.3.1, minSdk 24,
+targetSdk 36, `com.android.vending.BILLING` present; bundled
+`index.html` reads `?v=71` and bundled `game.js` is byte-identical to
+web; signed by the same upload key (SHA-256 `5b085a48…6c0d8425`).
+**Awaiting Onion's on-device test, then upload.**
+
+### Earlier: vc7 (2026-08-18)
 
 **`Desktop/tiny-canvas-v1.3.0-vc7.aab`** (22.0 MB, built 2026-08-18) —
 the color-by-number rebuild, ready to upload. Verified:

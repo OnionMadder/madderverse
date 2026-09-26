@@ -16,18 +16,18 @@
         "cap:run:android": "cap run android"
     },
     "dependencies": {
-        "@capacitor/android": "^6.1.0",
-        "@capacitor/core": "^6.1.0",
-        "@capacitor/filesystem": "^6.0.0",
-        "@capacitor/ios": "^6.1.0",
-        "@capacitor/preferences": "^6.0.0",
-        "@capacitor/share": "^6.0.0",
-        "@capacitor/splash-screen": "^6.0.0",
-        "@capacitor/status-bar": "^6.0.0",
-        "@revenuecat/purchases-capacitor": "^9.0.0"
+        "@capacitor/android": "^8.5.2",
+        "@capacitor/core": "^8.5.2",
+        "@capacitor/filesystem": "^8.1.3",
+        "@capacitor/ios": "^8.5.2",
+        "@capacitor/preferences": "^8.0.1",
+        "@capacitor/share": "^8.0.2",
+        "@capacitor/splash-screen": "^8.0.2",
+        "@capacitor/status-bar": "^8.0.3",
+        "@revenuecat/purchases-capacitor": "^13.6.1"
     },
     "devDependencies": {
-        "@capacitor/cli": "^6.1.0",
+        "@capacitor/cli": "^8.5.2",
         "playwright": "^1.62.1"
     }
 }
