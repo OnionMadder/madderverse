@@ -1045,6 +1045,34 @@ and the AGP/Gradle pins, which a Capacitor major will want to move.
 Do not let this slip past Aug 31 without either the upgrade or a filed
 extension.
 
+## ⚠ RevenueCat server-side setup — fixed 2026-09-26
+
+**Pro purchases had NEVER worked, from Aug 14 until 2026-09-26.** The
+code and the RC product/entitlement were fine; the Tiny Canvas RC app
+had **no service-account credentials**, so RC could not validate any
+purchase with Google (product status "Could not check", Restore → "No
+previous purchase found", Play → "You already own this item").
+Unacknowledged Play purchases auto-refund after 3 days, so any buyer in
+that window was charged and then refunded.
+
+Fixed by reusing Pootery's service account
+`revenuecat@pootery.iam.gserviceaccount.com` (GCP project `pootery`):
+1. Play Console → Users and permissions → that account → Add app →
+   Tiny Canvas with the same 4 perms as Pootery (view app info, app
+   quality, **view financial data**, **manage orders and subscriptions**).
+2. A new JSON key uploaded to RC → Tiny Canvas (Play Store) app →
+   Service Account Credentials. Now "Valid credentials"; product
+   `tiny_canvas_pro` shows "Published".
+
+**Any future RC-billed app needs BOTH steps** — the SDK key in the app
+is not enough, and nothing in the app fails loudly without them.
+Google developer notifications (RTDN) are still not connected for Tiny
+Canvas; optional but recommended.
+
+**Diagnosing sideload purchases:** a sideloaded APK can't buy — Play
+rejects billing for a build it didn't sign/serve. Test purchases from a
+Play-installed copy (internal track) with a license tester.
+
 ## Play build state (2026-09-25)
 
 **`Desktop/tiny-canvas-v1.3.1-vc8.aab`** (23.1 MB) + a signed sideload
