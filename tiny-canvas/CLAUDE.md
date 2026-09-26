@@ -1066,8 +1066,13 @@ Fixed by reusing Pootery's service account
 
 **Any future RC-billed app needs BOTH steps** — the SDK key in the app
 is not enough, and nothing in the app fails loudly without them.
-Google developer notifications (RTDN) are still not connected for Tiny
-Canvas; optional but recommended.
+Google developer notifications (RTDN) connected the same day, SHARING
+Pootery's Pub/Sub topic `projects/pootery/topics/Play-Store-Notifications`
+(RC's picker can't create topics; messages carry the package name, so
+one topic serves both apps). Play Console → Tiny Canvas → Monetization
+setup has RTDN on with **"Subscriptions, voided purchases, and all
+one-time products"** — the default excludes one-time purchases, which
+is all Pro is. Test notification confirmed received in RC.
 
 **Diagnosing sideload purchases:** a sideloaded APK can't buy — Play
 rejects billing for a build it didn't sign/serve. Test purchases from a
