@@ -1053,7 +1053,7 @@ extension.
 targetSdk 36, `com.android.vending.BILLING` present; bundled
 `index.html` reads `?v=71` and bundled `game.js` is byte-identical to
 web; signed by the same upload key (SHA-256 `5b085a48…6c0d8425`).
-**Awaiting Onion's on-device test, then upload.**
+**Device-tested by Onion 2026-09-26 (launch, system bars, Pro purchase, Restore all pass) and SUBMITTED to Play production the same day.**
 
 ### Earlier: vc7 (2026-08-18)
 
