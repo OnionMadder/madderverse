@@ -37,10 +37,10 @@ Color, no ads, no fuss.
 ## 3. Google Play — Short description (max 80 chars)
 
 ```
-Ad-free coloring book for kids: color by number, glitter, stickers, offline.
+A calm coloring book for kids: color by number, glitter, stickers. No ads.
 ```
 
-(76 chars. Rewritten 2026-09-25: leads with "coloring book" + the features parents search for.)
+(74 chars. 2026-10-05: "Ad-free" was flagged by Play Console — "may not be promoted… should not use keywords that indicate price or promotion"; the word "free" trips it. Keep "free" OUT of the short description; "No ads" says the same thing.)
 
 ---
 
