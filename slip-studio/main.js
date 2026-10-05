@@ -945,10 +945,11 @@ function bgAssetUrl(bg) {
 // every category in Capacitor — see buildBgPicker — so the user has a
 // surface to install from; this filter governs which swatches appear.
 function visibleBackgrounds() {
-    if (!window.Capacitor) return BACKGROUNDS;
+    const cats = availableBgCategories();
+    if (!window.Capacitor) return BACKGROUNDS.filter((b) => cats.includes(b.category));
     const installed = installedPacks();
-    return BACKGROUNDS.filter((b) =>
-        b.folder === STUDIO_FOLDER || installed.has(b.category)
+    return BACKGROUNDS.filter((b) => cats.includes(b.category) &&
+        (b.folder === STUDIO_FOLDER || installed.has(b.category))
     );
 }
 const DEFAULT_BG = "paintswatch"; // one of the preload-bundled starters
@@ -1355,6 +1356,44 @@ const SHAPE_IDS = ["vase", "bowl", "cup", "bottle", "jar", "egg",
     "planter", "goblet", "budvase", "mug", "teapot"]; // picker order; lid is set-only
 const DEFAULT_SHAPE = "vase";
 
+// --- Free / Pro -------------------------------------------------
+// The store app is a free download with one parent-gated $1.99 Pro
+// unlock (slip-studio/FREE_PRO_PLAN.md). Pro is content abundance only:
+// every tool and mechanic is free, and Pro packs are simply ABSENT from
+// the free app's pickers — no padlocks, no greyed rows. Gating limits
+// what can be CHOSEN, never what already exists: a saved, shared or
+// gifted pot that uses Pro content still loads and renders. The web
+// build is the showcase and always has everything.
+// (Above `state` because state's initializers validate against it.)
+const PRO_KEY             = "slip-pro";
+const FREE_SHAPES         = ["vase", "bowl", "cup", "bottle", "jar", "mug", "teapot"];
+const FREE_GLAZE_PACKS    = ["studio", "modern", "stoneware"];
+const FREE_DIP_PACKS      = ["sky", "sea"];
+const FREE_MOTIF_PACKS    = ["sumieAnimals", "berries"];
+const FREE_PATTERN_PACKS  = ["shima"];
+const FREE_BG_CATEGORIES  = ["Studio"];
+function readFlag(key) {
+    try { return localStorage.getItem(key) === "1"; } catch (_) { return false; }
+}
+let proUnlocked = readFlag(PRO_KEY);
+// Web: always Pro, except `slip-sim-free` = "1" previews the free tier
+// (set it via __slip.simulateFree(true) to test gating in a browser).
+function isPro() {
+    if (!window.Capacitor) return !readFlag("slip-sim-free");
+    return proUnlocked;
+}
+function freeOnly(ids, free) { return isPro() ? ids : ids.filter((id) => free.includes(id)); }
+function availableShapeIds()       { return freeOnly(SHAPE_IDS, FREE_SHAPES); }
+function availableGlazePackIds()   { return freeOnly(Object.keys(GLAZE_PACKS), FREE_GLAZE_PACKS); }
+function availableDipPackIds()     { return freeOnly(DIP_SET_PACK_IDS, FREE_DIP_PACKS); }
+function availableMotifPackIds()   { return freeOnly(MOTIF_PACK_IDS, FREE_MOTIF_PACKS); }
+function availablePatternPackIds() { return freeOnly(PATTERN_PACK_IDS, FREE_PATTERN_PACKS); }
+function availableBgCategories()   { return freeOnly(BG_CATEGORIES, FREE_BG_CATEGORIES); }
+// A remembered choice that the current tier can't pick falls back.
+function pickAvailable(saved, available, fallback) {
+    return available.includes(saved) ? saved : (available.includes(fallback) ? fallback : available[0]);
+}
+
 const state = {
     renderer: null,
     scene: null,
@@ -1510,13 +1549,13 @@ const state = {
     glazePack: (() => {
         try {
             const saved = localStorage.getItem("slip-glaze-pack");
-            return (saved && GLAZE_PACKS[saved]) ? saved : DEFAULT_GLAZE_PACK;
+            return pickAvailable(saved, availableGlazePackIds(), DEFAULT_GLAZE_PACK);
         } catch (_) { return DEFAULT_GLAZE_PACK; }
     })(),
     dipPack: (() => {
         try {
             const saved = localStorage.getItem("slip-dip-pack");
-            return (saved && DIP_SET_PACKS[saved]) ? saved : DEFAULT_DIP_PACK;
+            return pickAvailable(saved, availableDipPackIds(), DEFAULT_DIP_PACK);
         } catch (_) { return DEFAULT_DIP_PACK; }
     })(),
     decoPack: (() => {
@@ -1534,7 +1573,7 @@ const state = {
     musicOn: true,
     sfxOn: true,
     shape: (() => {
-        try { const s = localStorage.getItem("slip-shape"); return s && SHAPES[s] ? s : DEFAULT_SHAPE; }
+        try { return pickAvailable(localStorage.getItem("slip-shape"), availableShapeIds(), DEFAULT_SHAPE); }
         catch (_) { return DEFAULT_SHAPE; }
     })(),
     clock: new THREE.Clock(),
@@ -2005,6 +2044,12 @@ function init() {
     buildHandleCountPicker();
     let savedBg = DEFAULT_BG, savedMusic = true, savedSfx = true;
     try { savedBg = localStorage.getItem("slip-bg") || DEFAULT_BG; } catch (_) {}
+    // A backdrop the current tier can't pick falls back to the default.
+    if (!visibleBackgrounds().some((b) => b.id === savedBg) &&
+        !(window.Capacitor && BACKGROUNDS.some((b) => b.id === savedBg &&
+            availableBgCategories().includes(b.category)))) {
+        savedBg = DEFAULT_BG;
+    }
     try { savedMusic = localStorage.getItem("slip-music") !== "0"; } catch (_) {}
     try { savedSfx = localStorage.getItem("slip-sfx") !== "0"; } catch (_) {}
     // Restore a backdrop immediately. In Capacitor a non-preload saved
@@ -2084,6 +2129,10 @@ function init() {
     // and inspect the sculpt during testing across the build.
     if (location.search.includes("dev")) {
         window.__slip = {
+            // Free/Pro: simulateFree(true) + reload previews the free tier on web.
+            isPro, availableShapeIds, availableGlazePackIds, availableDipPackIds,
+            availableMotifPackIds, availablePatternPackIds, availableBgCategories,
+            simulateFree: (on) => { try { localStorage.setItem("slip-sim-free", on ? "1" : "0"); } catch (_) {} },
             state, profile, radiusAt, sculptToward, trimToward, maxRadiusAt,
             displace, displaceInfo: () => ({ active: displaceActive }),
             setAlterMode, alterToward, applyFacets, clearDisplace, writeProfileToGeometry,
@@ -5471,7 +5520,7 @@ function buildDipBar() {
     const packRow = document.createElement("div");
     packRow.className = "dip-pack-tabs";
     packRow.id = "dipPackTabs";
-    DIP_SET_PACK_IDS.forEach((pid) => {
+    availableDipPackIds().forEach((pid) => {
         const t = document.createElement("button");
         t.type = "button";
         t.className = "dip-pack-tab";
@@ -5553,7 +5602,7 @@ function renderDipPresetChips() {
     });
 }
 function setDipPack(id) {
-    if (!DIP_SET_PACKS[id]) return;
+    if (!availableDipPackIds().includes(id)) return;
     state.dipPack = id;
     try { localStorage.setItem("slip-dip-pack", id); } catch (_) {}
     renderDipPresetChips();
@@ -5731,8 +5780,8 @@ function setShape(id) {
 function updateShapePicker() {
     const wrap = document.getElementById("shapePicker");
     if (!wrap) return;
-    Array.from(wrap.children).forEach((el, i) => {
-        el.classList.toggle("is-active", SHAPE_IDS[i] === state.shape);
+    Array.from(wrap.children).forEach((el) => {
+        el.classList.toggle("is-active", el.dataset.shape === state.shape);
     });
 }
 
@@ -5756,10 +5805,11 @@ function buildShapePicker() {
     const wrap = document.getElementById("shapePicker");
     if (!wrap) return;
     wrap.innerHTML = "";
-    SHAPE_IDS.forEach((id) => {
+    availableShapeIds().forEach((id) => {
         const b = document.createElement("button");
         b.type = "button";
         b.className = "shape-swatch";
+        b.dataset.shape = id;
         b.innerHTML = shapeIconSVG(id) + `<span>${SHAPES[id].label}</span>`;
         b.setAttribute("aria-label", SHAPES[id].label + " starter shape");
         b.setAttribute("aria-pressed", "false");
@@ -6096,7 +6146,8 @@ function buildGlazePackTabs() {
     const wrap = document.getElementById("glazePackTabs");
     if (!wrap) return;
     wrap.innerHTML = "";
-    for (const [id, pack] of Object.entries(GLAZE_PACKS)) {
+    for (const id of availableGlazePackIds()) {
+        const pack = GLAZE_PACKS[id];
         const tab = document.createElement("button");
         tab.type = "button";
         tab.className = "glaze-pack-tab";
@@ -6113,7 +6164,7 @@ function syncGlazePackTabs() {
     });
 }
 function setGlazePack(id) {
-    if (!GLAZE_PACKS[id]) return;
+    if (!availableGlazePackIds().includes(id)) return;
     if (state.glazePack === id) return;
     state.glazePack = id;
     try { localStorage.setItem("slip-glaze-pack", id); } catch (_) {}
@@ -6293,12 +6344,12 @@ function setDecoTab(name) {
 // Pick which stamp shape to place.
 // Switch the active motif pack (rebuilds the thumbnail row).
 function setMotifPack(id) {
-    if (!MOTIF_PACKS[id]) return;
+    if (!availableMotifPackIds().includes(id)) return;
     motifPack = id;
     updateDecoSub();
 }
 function setPatternPack(id) {
-    if (!PATTERN_PACKS[id]) return;
+    if (!availablePatternPackIds().includes(id)) return;
     patternPack = id;
     updateDecoSub();
 }
@@ -6332,10 +6383,10 @@ function updateDecoSub() {
     const decoColorsEl = document.getElementById("decoColors");
     if (decoColorsEl) decoColorsEl.hidden = isPattern || isBand || (isMotif && motifFullColor);
     if (isPattern) {
-        if (!PATTERN_PACKS[patternPack]) patternPack = PATTERN_PACK_IDS[0];
+        patternPack = pickAvailable(patternPack, availablePatternPackIds(), PATTERN_PACK_IDS[0]);
         if (packTabs) {
             packTabs.innerHTML = "";
-            PATTERN_PACK_IDS.forEach((pid) => {
+            availablePatternPackIds().forEach((pid) => {
                 const b = document.createElement("button");
                 b.type = "button";
                 b.className = "motif-pack-tab";
@@ -6388,11 +6439,11 @@ function updateDecoSub() {
         return;
     }
     if (isMotif) {
-        if (!MOTIF_PACKS[motifPack]) motifPack = MOTIF_PACK_IDS[0];
+        motifPack = pickAvailable(motifPack, availableMotifPackIds(), MOTIF_PACK_IDS[0]);
         // Pack selector chips.
         if (packTabs) {
             packTabs.innerHTML = "";
-            MOTIF_PACK_IDS.forEach((pid) => {
+            availableMotifPackIds().forEach((pid) => {
                 const b = document.createElement("button");
                 b.type = "button";
                 b.className = "motif-pack-tab";
@@ -9947,7 +9998,8 @@ function buildTilePicker() {
     const tabs = document.getElementById("tilePackTabs");
     if (tabs) {
         tabs.innerHTML = "";
-        for (const [id, pack] of Object.entries(GLAZE_PACKS)) {
+        for (const id of availableGlazePackIds()) {
+            const pack = GLAZE_PACKS[id];
             const tab = document.createElement("button");
             tab.type = "button";
             tab.className = "glaze-pack-tab";
@@ -9960,7 +10012,7 @@ function buildTilePicker() {
     buildTileBars();
 }
 function setTilePack(id) {
-    if (!GLAZE_PACKS[id] || state.glazePack === id) return;
+    if (!availableGlazePackIds().includes(id) || state.glazePack === id) return;
     state.glazePack = id;
     try { localStorage.setItem("slip-glaze-pack", id); } catch (_) {}
     syncGlazePackTabs();
@@ -11614,11 +11666,12 @@ function buildBgPicker() {
 // (true for every category here, but kept so adding an empty category
 // definition doesn't break the picker).
 function categoryAvailable(cat) {
-    return BACKGROUNDS.some((b) => b.category === cat);
+    return availableBgCategories().includes(cat) &&
+        BACKGROUNDS.some((b) => b.category === cat);
 }
 
 function setBgCategory(cat) {
-    if (!BG_CATEGORIES.includes(cat)) return;
+    if (!availableBgCategories().includes(cat)) return;
     state.bgCategory = cat;
     renderBgRow();
 }
