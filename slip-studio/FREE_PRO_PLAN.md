@@ -1,7 +1,7 @@
 # Slip Studio — free download + one-time Pro unlock (DRAFT for Onion)
 
-**Status:** proposal, 2026-10-05. Nothing built. Every split below is a
-suggestion — mark it up and I'll build to whatever you decide.
+**Status:** split + price DECIDED by Onion 2026-10-05 (see "Decisions").
+Nothing built yet.
 
 ## Why
 
@@ -49,13 +49,13 @@ trial — but nobody on Play sees it.
 | Gallery, Display mode, showroom, collections, pot sharing | — | **all** | — |
 | Test-tile wall + recipe journal | — | **all** | — |
 | Noticeboard letters | 12 | **all** (it's story, not content) | — |
-| **Starter shapes** | 11 | vase, bowl, cup, bottle, jar, mug (6) | egg, planter, goblet, bud vase, teapot (5) |
+| **Starter shapes** | 11 | vase, bowl, cup, bottle, jar, mug, **teapot** (7) | egg, planter, goblet, bud vase (4) |
 | **Glaze packs** (8 each) | 6 / 48 | Studio, Modern, Stoneware (24) | Garden, Jewel, Sorbet (24) |
 | **Dip gradient packs** (6 each) | 5 / 30 | Sky, Sea (12) | Ember, Garden, Earth (18) |
 | **Motif packs** (6 each) | 7 / 42 | Sumi-e Animals, Dutch Berries (12) | Sumi-e Plants, Dogs, Roman, Egyptian, Mythical (30) |
 | **Allover pattern packs** | 4 / 25 | Shima-shima (6) | Enamel, Frescoes, Art Nouveau (19) |
 | Band friezes | 1 pack / 6 | **all** (only one pack; the Band tool needs something) | future band packs |
-| **Study shelf forms** | 10 | moon jar, chawan, amphora, olla (4) | meiping, ginger jar, tokkuri, ukhamba, albarello, kylix (6) |
+| Study shelf forms | 10 | **all** (it's a system) | — |
 | **Backdrops** | 6 cats / 18 | Studio (3, already bundled) | Art, Botanical, Digital, Paper, Motion (the on-demand downloads) |
 
 Roughly **half the content free, all of the craft free.** A free user can
@@ -63,15 +63,12 @@ throw, alter, handle, lid, dip, carve, wax, fire in a wood kiln, re-fire,
 pack a kiln, answer letters, study forms and share pots — they just have
 fewer glazes, motifs and starting shapes to do it with.
 
-**Decisions for you:**
-1. **Price.** Pro as a feature-rich unlock can carry more than the old
-   99¢ app did. Suggest **$1.99**; 99¢ keeps it identical to Tiny Canvas.
-2. **Shapes.** Is the teapot (newest, most distinctive) the right Pro
-   headline, or should it be free as the hook?
-3. **Stoneware free?** It's where most of the curated glaze chemistry
-   lives (12 named reactions), so I put it free to keep the test-tile
-   wall rewarding. Swap with Jewel if you'd rather Pro carry it.
-4. **Study shelf** — content (gate 6 forms) or a system (all free)?
+**Decisions (Onion, 2026-10-05) — don't relitigate:**
+1. **Pro price: $1.99**, one-time.
+2. **Teapot is FREE** — the distinctive shape is the hook, not the paywall.
+3. **Stoneware glazes are FREE** — they carry most of the named glaze
+   chemistry, so the test-tile wall stays rewarding for free players.
+4. **Study shelf is ALL FREE** — treated as a system, not content.
 
 ## Existing buyers keep everything — the hard part
 
