@@ -2116,6 +2116,8 @@ function init() {
         dismissLanding();
         replayCoaching();
     });
+    // Parent gate + Pro unlock + billing (app only; inert on the web).
+    initGrownups();
     // Web-only chrome — hidden inside the Capacitor Android wrap (Capacitor
     // injects window.Capacitor). Setting a body class instead of hiding each
     // element by hand lets CSS decide what belongs to the web build; the JS
@@ -2132,6 +2134,7 @@ function init() {
             // Free/Pro: simulateFree(true) + reload previews the free tier on web.
             isPro, availableShapeIds, availableGlazePackIds, availableDipPackIds,
             availableMotifPackIds, availablePatternPackIds, availableBgCategories,
+            openGrownups, proExtras, renderProCard,
             simulateFree: (on) => { try { localStorage.setItem("slip-sim-free", on ? "1" : "0"); } catch (_) {} },
             state, profile, radiusAt, sculptToward, trimToward, maxRadiusAt,
             displace, displaceInfo: () => ({ active: displaceActive }),
@@ -11513,6 +11516,214 @@ function releaseFocus(root) {
     if (prev && document.contains(prev) && typeof prev.focus === "function") {
         try { prev.focus(); } catch (_) {}
     }
+}
+
+// --- Pro unlock: billing, past buyers, parent gate --------------
+// One product, one entitlement (`pro`), modelled on Tiny Canvas's working
+// RevenueCat module. Server-side setup that MUST exist or purchases fail
+// silently (cost Tiny Canvas six weeks — see FREE_PRO_PLAN.md step 5):
+// the RC app's service-account JSON, that account's access to Slip Studio
+// in Play Console, and RTDN with "all one-time products".
+const RC_PUBLIC_API_KEY  = "REPLACE_SLIP_RC_KEY";   // goog_… from the RC Slip Studio app
+const RC_PRO_ENTITLEMENT = "pro";
+const RC_PRO_PRODUCT_ID  = "slip_studio_pro";
+// Installs that existed before the paid→free switch were bought. Set to the
+// switch date (UTC ms) in the release build; null = the check is off.
+const LEGACY_CUTOFF_MS   = null;
+let rcReady = false;
+let rcPriceString = "";
+
+function rcPlugin() {
+    return window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Purchases;
+}
+function rcConfigured() { return RC_PUBLIC_API_KEY.indexOf("REPLACE_") < 0; }
+// getOfferings() resolves to PurchasesOfferings DIRECTLY ({ current, all }) —
+// there is no `.offerings` wrapper (the Pootery bug). Prefer current, then
+// scan all so a missing "current" pointer can't hide the product.
+function findProPackage(off) {
+    const match = (p) => p && p.product && p.product.identifier === RC_PRO_PRODUCT_ID;
+    let pkgs = (off && off.current && off.current.availablePackages) || [];
+    if (!pkgs.some(match) && off && off.all) {
+        Object.values(off.all).forEach((o) => { if (o && o.availablePackages) pkgs = pkgs.concat(o.availablePackages); });
+    }
+    return pkgs.find(match) || null;
+}
+async function initBilling() {
+    await checkLegacyBuyer();
+    const P = rcPlugin();
+    if (!P || !rcConfigured()) { syncGrownupsLink(); return; }
+    try {
+        await P.configure({ apiKey: RC_PUBLIC_API_KEY });
+        rcReady = true;
+        await syncEntitlements();
+        try {
+            const pkg = findProPackage(await P.getOfferings());
+            if (pkg && pkg.product && pkg.product.priceString) rcPriceString = pkg.product.priceString;
+        } catch (_) { /* price is cosmetic */ }
+    } catch (e) {
+        console.warn("[Slip Studio] billing init failed", e);
+    }
+    syncGrownupsLink();
+}
+// Never auto-relocks: a refund leaving a stale local unlock is rare and
+// harmless next to pulling glazes out from under a kid mid-pot.
+async function syncEntitlements() {
+    const P = rcPlugin();
+    if (!P || !rcReady) return;
+    try {
+        const res = await P.getCustomerInfo();
+        const active = (res && res.customerInfo && res.customerInfo.entitlements &&
+                        res.customerInfo.entitlements.active) || {};
+        if (active[RC_PRO_ENTITLEMENT]) unlockPro();
+    } catch (e) { console.warn("[Slip Studio] entitlement sync failed", e); }
+}
+// Past buyers of the paid app: Android's firstInstallTime survives every
+// update, so an install from before the switch was a purchase. Native side
+// is a tiny plugin in MainActivity (FREE_PRO_PLAN.md step 4).
+async function checkLegacyBuyer() {
+    if (proUnlocked || LEGACY_CUTOFF_MS == null) return;
+    const L = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SlipInstall;
+    if (!L) return;
+    try {
+        const r = await L.info();
+        if (r && r.firstInstallTime && r.firstInstallTime < LEGACY_CUTOFF_MS) unlockPro();
+    } catch (_) {}
+}
+// The one switch everything flips. Rebuilds every picker that gating
+// filtered, so new packs appear without a restart.
+function unlockPro() {
+    if (proUnlocked) return;
+    proUnlocked = true;
+    try { localStorage.setItem(PRO_KEY, "1"); } catch (_) {}
+    [buildShapePicker, buildGlazePackTabs, buildGlazeBar, buildDipBar,
+     buildTilePicker, buildBgPicker, updateDecoSub].forEach((fn) => {
+        try { fn(); } catch (e) { console.warn("[Slip Studio] rebuild after unlock", e); }
+    });
+    syncGrownupsLink();
+    renderProCard();
+}
+async function purchasePro() {
+    const P = rcPlugin();
+    if (!P || !rcReady) { alert("Couldn't reach the store just now. Check your connection and try again."); return; }
+    try {
+        const pkg = findProPackage(await P.getOfferings());
+        if (!pkg) { alert("The upgrade isn't available right now. Try again later."); return; }
+        const res = await P.purchasePackage({ aPackage: pkg });
+        const active = (res && res.customerInfo && res.customerInfo.entitlements &&
+                        res.customerInfo.entitlements.active) || {};
+        if (active[RC_PRO_ENTITLEMENT]) unlockPro();
+    } catch (e) {
+        if (e && e.userCancelled) return;
+        // Play says "already owned" when this account bought Pro before —
+        // restore instead of reporting a failure.
+        const code = e && (e.code || (e.data && e.data.code));
+        if (String(code) === "6" || /already/i.test((e && e.message) || "")) {
+            await restorePro(true);
+            if (proUnlocked) return;
+        }
+        console.warn("[Slip Studio] purchase failed", e);
+        alert("The purchase didn't go through, and nothing was charged. (" + (code || "error") + ")");
+    }
+}
+async function restorePro(quiet) {
+    const P = rcPlugin();
+    if (!P || !rcReady) { if (!quiet) alert("Couldn't reach the store just now."); return; }
+    try {
+        await P.restorePurchases();
+        await syncEntitlements();
+        if (!quiet) alert(proUnlocked ? "Restored. Pro is unlocked." : "No earlier purchase was found for this Google account.");
+    } catch (e) {
+        if (!quiet) alert("Restore didn't work. Make sure you're signed in to the Google account that bought Pro.");
+    }
+}
+
+// Shown only in the app, and only when it can do something: the store is
+// reachable, or Pro is already owned (a thank-you + Restore).
+function syncGrownupsLink() {
+    const link = document.getElementById("landingGrownups");
+    if (link) link.hidden = !(window.Capacitor && (rcReady || proUnlocked));
+}
+// What Pro adds, counted from the tables so the card can't drift.
+function proExtras() {
+    const notFree = (ids, free) => ids.filter((id) => !free.includes(id));
+    const proGlaze = notFree(Object.keys(GLAZE_PACKS), FREE_GLAZE_PACKS);
+    const proDip = notFree(DIP_SET_PACK_IDS, FREE_DIP_PACKS);
+    const proMotif = notFree(MOTIF_PACK_IDS, FREE_MOTIF_PACKS);
+    const proPattern = notFree(PATTERN_PACK_IDS, FREE_PATTERN_PACKS);
+    const proShapes = notFree(SHAPE_IDS, FREE_SHAPES);
+    const count = (packs, table, key) => packs.reduce((n, id) => n + table[id][key].length, 0);
+    const bgs = BACKGROUNDS.filter((b) => !FREE_BG_CATEGORIES.includes(b.category)).length;
+    return [
+        `${proShapes.length} more starter shapes (${proShapes.map((id) => SHAPES[id].label.toLowerCase()).join(", ")})`,
+        `${count(proGlaze, GLAZE_PACKS, "ids")} more glazes: ${proGlaze.map((id) => GLAZE_PACKS[id].label).join(", ")}`,
+        `${count(proDip, DIP_SET_PACKS, "ids")} more dip gradients`,
+        `${count(proMotif, MOTIF_PACKS, "ids")} more motifs: ${proMotif.map((id) => MOTIF_PACKS[id].label).join(", ")}`,
+        `${count(proPattern, PATTERN_PACKS, "files")} more allover patterns`,
+        `${bgs} more backdrops`,
+    ];
+}
+function renderProCard() {
+    const body = document.getElementById("proBody");
+    const list = document.getElementById("proList");
+    const buy  = document.getElementById("proBuy");
+    if (!body || !list || !buy) return;
+    list.innerHTML = "";
+    if (proUnlocked) {
+        body.textContent = "Pro is unlocked on this device. Thank you for supporting Slip Studio.";
+        buy.hidden = true;
+        return;
+    }
+    body.textContent = "Every tool in Slip Studio is free. Pro adds more to make with:";
+    proExtras().forEach((t) => { const li = document.createElement("li"); li.textContent = t; list.appendChild(li); });
+    buy.hidden = false;
+    buy.textContent = "Unlock Pro" + (rcPriceString ? " · " + rcPriceString : "");
+}
+let gateAnswer = 0;
+function openGrownups() {
+    const modal = document.getElementById("grownupsModal");
+    if (!modal) return;
+    // Two-digit addition: easy for a parent, past most early readers.
+    const a = 11 + Math.floor(Math.random() * 30), b = 11 + Math.floor(Math.random() * 30);
+    gateAnswer = a + b;
+    document.getElementById("gateQuestion").textContent = `What is ${a} + ${b}?`;
+    const input = document.getElementById("gateAnswer");
+    input.value = "";
+    document.getElementById("gateError").hidden = true;
+    document.getElementById("grownupsGate").hidden = false;
+    document.getElementById("grownupsPro").hidden = true;
+    modal.hidden = false;
+    requestAnimationFrame(() => modal.classList.add("is-open"));
+    trapFocus(modal, input);
+}
+function closeGrownups() {
+    const modal = document.getElementById("grownupsModal");
+    if (!modal || modal.hidden) return;
+    modal.classList.remove("is-open");
+    setTimeout(() => { modal.hidden = true; }, 200);
+    releaseFocus(modal);
+}
+function submitGate() {
+    const v = parseInt(document.getElementById("gateAnswer").value, 10);
+    if (v !== gateAnswer) { document.getElementById("gateError").hidden = false; return; }
+    document.getElementById("grownupsGate").hidden = true;
+    document.getElementById("grownupsPro").hidden = false;
+    renderProCard();
+    const first = document.getElementById(proUnlocked ? "proClose" : "proBuy");
+    if (first) first.focus();
+}
+function initGrownups() {
+    document.getElementById("landingGrownups")?.addEventListener("click", openGrownups);
+    document.getElementById("gateOk")?.addEventListener("click", submitGate);
+    document.getElementById("gateCancel")?.addEventListener("click", closeGrownups);
+    document.getElementById("proClose")?.addEventListener("click", closeGrownups);
+    document.getElementById("proBuy")?.addEventListener("click", purchasePro);
+    document.getElementById("proRestore")?.addEventListener("click", () => restorePro(false));
+    document.getElementById("gateAnswer")?.addEventListener("keydown", (e) => { if (e.key === "Enter") submitGate(); });
+    const modal = document.getElementById("grownupsModal");
+    modal?.addEventListener("click", (e) => { if (e.target === modal) closeGrownups(); });
+    modal?.addEventListener("keydown", (e) => { if (e.key === "Escape") closeGrownups(); });
+    syncGrownupsLink();
+    initBilling();
 }
 
 // Generic confirm dialog — a centered card over a dimmed backdrop,

@@ -28,7 +28,7 @@
     <meta name="apple-mobile-web-app-title" content="Slip Studio" />
     <meta name="application-name" content="Slip Studio" />
 
-    <link rel="stylesheet" href="style.css?v=249" />
+    <link rel="stylesheet" href="style.css?v=250" />
 
     <!-- Three.js, vendored locally so the app runs fully offline. -->
     <script type="importmap">
@@ -257,6 +257,9 @@
         <button id="landingRecipes" class="landing-link" type="button">The wall</button>
         <button id="landingStudy" class="landing-link" type="button">The study shelf</button>
         <button id="landingHowto" class="landing-link" type="button">How to play</button>
+        <!-- App only, and only once the store is reachable (main.js
+             syncGrownupsLink) — never a dead purchase button. -->
+        <button id="landingGrownups" class="landing-link landing-grownups" type="button" hidden>For grown-ups</button>
         <a id="landingAppLink" class="landing-link landing-app-link" href="https://play.google.com/store/apps/details?id=org.madderverse.slipstudio" target="_blank" rel="noopener">Get the Android app &#x2197;</a>
     </div>
 
@@ -413,6 +416,34 @@
             <div class="confirm-modal-actions">
                 <button class="confirm-modal-btn" id="confirmModalCancel" type="button">Keep editing</button>
                 <button class="confirm-modal-btn confirm-modal-btn-primary" id="confirmModalConfirm" type="button">Discard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Grown-ups: a parent gate, then the one-time Pro unlock (app only).
+         Kids never see a price — the gate comes first. -->
+    <div id="grownupsModal" class="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="grownupsTitle" hidden>
+        <div class="confirm-modal-card grownups-card">
+            <div id="grownupsGate">
+                <p class="confirm-modal-message" id="grownupsTitle">For grown-ups</p>
+                <p class="grownups-q" id="gateQuestion"></p>
+                <input id="gateAnswer" class="grownups-input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="Answer">
+                <p class="grownups-err" id="gateError" hidden>Not quite. Ask a grown-up for help.</p>
+                <div class="confirm-modal-actions">
+                    <button class="confirm-modal-btn" id="gateCancel" type="button">Back</button>
+                    <button class="confirm-modal-btn confirm-modal-btn-primary" id="gateOk" type="button">Continue</button>
+                </div>
+            </div>
+            <div id="grownupsPro" hidden>
+                <p class="confirm-modal-message">Slip Studio Pro</p>
+                <p class="grownups-body" id="proBody"></p>
+                <ul class="grownups-list" id="proList"></ul>
+                <p class="grownups-note">One purchase, no subscription. Everything in the free app stays free.</p>
+                <div class="confirm-modal-actions">
+                    <button class="confirm-modal-btn" id="proRestore" type="button">Restore purchase</button>
+                    <button class="confirm-modal-btn confirm-modal-btn-primary" id="proBuy" type="button">Unlock Pro</button>
+                </div>
+                <button class="grownups-close" id="proClose" type="button">Close</button>
             </div>
         </div>
     </div>
@@ -690,7 +721,7 @@
         <a href="../">Madderverse</a>
     </footer>
 
-    <script type="module" src="main.js?v=249"></script>
+    <script type="module" src="main.js?v=250"></script>
     <script>document.querySelectorAll('[data-year]').forEach(function(el){el.textContent=new Date().getFullYear();});</script>
 </body>
 </html>
