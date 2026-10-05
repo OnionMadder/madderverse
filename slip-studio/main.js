@@ -11524,7 +11524,7 @@ function releaseFocus(root) {
 // silently (cost Tiny Canvas six weeks — see FREE_PRO_PLAN.md step 5):
 // the RC app's service-account JSON, that account's access to Slip Studio
 // in Play Console, and RTDN with "all one-time products".
-const RC_PUBLIC_API_KEY  = "REPLACE_SLIP_RC_KEY";   // goog_… from the RC Slip Studio app
+const RC_PUBLIC_API_KEY  = "goog_ldMuEioVnKcNXDItjcVtlQeFVuz";   // RC project "Slip Studio" (0caf9922), app appf0357fc910
 const RC_PRO_ENTITLEMENT = "pro";
 const RC_PRO_PRODUCT_ID  = "slip_studio_pro";
 // Installs that existed before the paid→free switch were bought. Set to the
