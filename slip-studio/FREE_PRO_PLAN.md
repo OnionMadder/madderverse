@@ -1,7 +1,23 @@
 # Slip Studio — free download + one-time Pro unlock (DRAFT for Onion)
 
 **Status:** split + price DECIDED by Onion 2026-10-05 (see "Decisions").
-Nothing built yet.
+
+**Build progress (2026-10-05):**
+- ✅ Phase 1 gating — web v249. `FREE_*` lists + `available*()` above
+  `state`; `__slip.simulateFree(true)` + reload previews the free tier.
+- ✅ Phase 2 parent gate + Phase 3 billing JS — web v250. "For grown-ups"
+  landing link (app-only, hidden until RC answers), Pro card counted from
+  the tables, purchase / restore / already-owned auto-restore.
+- ✅ Phase 4 native — `SlipInstallPlugin.java` (firstInstallTime) registered
+  in `MainActivity`, BILLING permission, `@revenuecat/purchases-capacitor`
+  13.7 in `slip-studio-app/` (outside git). Debug build compiles; Billing
+  **8.3.0** resolved.
+- ⏳ Phase 5 — RC "Slip Studio" app + Play product `slip_studio_pro`
+  ($1.99) + service-account access + JSON key + RTDN. Then paste the
+  `goog_` key into `RC_PUBLIC_API_KEY` in main.js.
+- ⏳ Phase 6 — set `LEGACY_CUTOFF_MS` to the switch date, re-sync www,
+  bump versionCode, build, test a purchase from an internal-testing
+  install, release, flip price to Free.
 
 ## Why
 
