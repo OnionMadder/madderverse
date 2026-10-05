@@ -619,7 +619,10 @@ async function captureProfile(browser, profile) {
 (async () => {
     await ensureDir(OUT_ROOT);
     const browser = await chromium.launch();
+    /* ONLY=android-phone,android-10in-tablet captures just those. */
+    const only = (process.env.ONLY || "").split(",").filter(Boolean);
     for (const profile of PROFILES) {
+        if (only.length && only.indexOf(profile.label) < 0) continue;
         process.stdout.write("[capture] " + profile.label +
             " " + profile.w + "x" + profile.h +
             " @" + profile.dpr + "x ... ");
