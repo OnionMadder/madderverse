@@ -1,3 +1,104 @@
+# ⭐ v3.0.0 / vc29 — FREE + PRO (paste these on release day)
+
+Written against **web v252**. The model changed: free download, one optional
+parent-gated **$1.99** `slip_studio_pro` unlock (see `FREE_PRO_PLAN.md`).
+Everything below the next horizontal rule is the old PAID-app copy, kept for
+history — its "no in-app purchases / no third-party code" lines are now FALSE.
+
+**Release-day order:** vc29 approved and live on Production → Play Console
+→ Monetize → App pricing → **Free** (same day, before Mon Oct 13 — the
+past-buyer cutoff in main.js) → paste the listing below.
+
+⚠ **Data safety needs a re-check before submitting:** RevenueCat now ships in
+the app (anonymous app-user ID + purchase history, used only to validate the
+purchase). Match whatever Tiny Canvas declared, and review it honestly.
+
+## Short description (unchanged — no "free" in it, per the Play guideline)
+
+```
+A calm 3D pottery studio. Shape, glaze, fire, and keep what you make.
+```
+
+## Full description (3872 chars; 3938 with CRLF)
+
+```
+Slip Studio is a calm place to shape clay.
+
+Pull a pot from a slow-turning wheel with your finger. Glaze it, decorate it, fire it, and keep it on a shelf that lives on your device — not on a server.
+
+No score, no timer, no daily quest, no streak, no notification. Slip Studio is a studio, not a game. If you want goals and levels, this isn't it.
+
+EVERY TOOL IS YOURS
+The download costs nothing and every tool and mechanic is in it — sculpting, altering, glaze chemistry, wax resist, carving, every kiln, the showroom, sharing. Nothing is a demo and nothing is crossed out. An optional one-time Pro unlock adds more to make with (see below).
+
+SHAPING
+• 7 starter forms: vase, bowl, cup, bottle, jar, mug, and teapot with a spout
+• Grab the wall to push clay in or out, the rim to raise or flare it — clay lags your finger like wet stoneware
+• Alter the form off-round — dent, oval, or bulge one side
+• Facet the wall or scallop the rim, 6, 8 or 12 around; five rim finishes: cut, rounded, flared, rolled, collared
+• Pull one or two handles on and drag to reshape
+• Add a lid in four styles and fire the pair as a set
+• Trim the foot at leather-hard; undo at every stage
+
+THE STUDY SHELF
+Ten classic forms from potters around the world — a Korean moon jar, a Greek amphora, a Zulu ukhamba — to throw against. Nothing is graded and no pot is wrong.
+
+GLAZING
+• 24 glazes in three palettes — Studio, Modern, and Stoneware (speckled and crackle)
+• Dip from the rim down and let the drips run, or pour one of 12 gradients
+• Real chemistry: overlap two dips and the overlap fires as a third colour you didn't pick, each discovery logged in a recipe journal
+• A wall of test tiles for trying pairs without using up a pot
+• Three fired finishes: glossy, matte, lustre
+• Wax resist — mask an area and it keeps the colour underneath
+
+DECORATING
+• Paint and splatter in 32 colours; carve sgraffito through the glaze; pipe a raised bead of slip
+• Motifs (sumi-e animals, Dutch berries), allover patterns, and friezes that wrap the pot
+• Or bring your own picture — it becomes a silhouette on your device, never uploaded
+
+THE KILN
+The chamber closes in, glows warm, and melts the raw chalky coat into a finished surface.
+• Fire electric for exactly what you glazed, or let the kiln have a say: wood lays ash down the side that faced the fire, soda blushes, raku smokes and crazes
+• Fire it again in a different firing — your original is kept
+• Pack a shelf and fire six together — where each stands changes how it comes out
+
+KEEPING WHAT YOU MAKE
+• A showroom where everything you've made stands on shelves in one room
+• Display mode — full screen, turning slowly on its backdrop
+• Photo export in five framings
+• A noticeboard of people who'd like a pot. Give one and they write back about where it lives now. It stays yours.
+• Send a pot to a friend as a small file through your own messages. No account, no server, no strangers.
+
+SLIP STUDIO PRO — OPTIONAL, ONE-TIME $1.99
+For grown-ups, behind a parent gate on the title screen. It adds:
+• 4 more starter forms: egg, planter, goblet, bud vase
+• 24 more glazes: Garden, Jewel, Sorbet — with their own reactions to find
+• 18 more dip gradients
+• 30 more motifs: sumi-e plants, dogs, Roman figures, Egyptian hieroglyphs, mythical creatures
+• 19 more allover patterns
+• 15 more backdrops
+No subscription, no coins, no timers, and nothing in the free studio ever gets taken away.
+
+BOUGHT SLIP STUDIO BEFORE?
+You keep everything. If you installed it before it went free, Pro unlocks by itself. On a new phone, email us and we'll send you a code.
+
+WHAT'S NOT INSIDE
+No ads. No account. No analytics, no advertising ID. Everything you make stays on your device, and it works offline.
+
+MADE BY MAD SUNDAR LLC
+Part of The Madderverse: ad-free apps made by a parent tired of creative apps stuffed with timers and upsells.
+
+hello@madderverse.org
+```
+
+## What's new — v3.0.0 (377 chars)
+
+```
+Slip Studio is now free to download, with every tool included: sculpting, glaze chemistry, every kiln, the showroom and sharing. An optional one-time Pro unlock ($1.99, behind a parent gate) adds more shapes, glazes, gradients, motifs, patterns and backdrops. Bought Slip Studio before? Pro unlocks for you automatically. On a new phone, email hello@madderverse.org for a code.
+```
+
+---
+
 # Slip Studio — v2.8.0 release notes + Google Play Store listing
 
 Copy-paste source for the **Play Console Main store listing** and the public

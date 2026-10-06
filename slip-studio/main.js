@@ -11527,9 +11527,11 @@ function releaseFocus(root) {
 const RC_PUBLIC_API_KEY  = "goog_ldMuEioVnKcNXDItjcVtlQeFVuz";   // RC project "Slip Studio" (0caf9922), app appf0357fc910
 const RC_PRO_ENTITLEMENT = "pro";
 const RC_PRO_PRODUCT_ID  = "slip_studio_pro";
-// Installs that existed before the paid→free switch were bought. Set to the
-// switch date (UTC ms) in the release build; null = the check is off.
-const LEGACY_CUTOFF_MS   = null;
+// Installs that existed before the paid→free switch were bought, so they get
+// Pro forever. End of Mon 2026-10-13, Pacific (= 07:00 UTC on the 14th) —
+// deliberately AFTER the planned price flip: a little late hands a few free
+// installs Pro for nothing; too early would strand someone who paid.
+const LEGACY_CUTOFF_MS   = Date.UTC(2026, 9, 14, 7, 0, 0);
 let rcReady = false;
 let rcPriceString = "";
 
