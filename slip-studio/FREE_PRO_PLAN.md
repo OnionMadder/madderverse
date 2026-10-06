@@ -12,9 +12,18 @@
   in `MainActivity`, BILLING permission, `@revenuecat/purchases-capacitor`
   13.7 in `slip-studio-app/` (outside git). Debug build compiles; Billing
   **8.3.0** resolved.
-- ⏳ Phase 5 — RC "Slip Studio" app + Play product `slip_studio_pro`
-  ($1.99) + service-account access + JSON key + RTDN. Then paste the
-  `goog_` key into `RC_PUBLIC_API_KEY` in main.js.
+- ✅ Phase 5 store setup (2026-10-06) — RC project **Slip Studio**
+  (`0caf9922`), Play Store app `appf0357fc910`, public key in main.js
+  (web v251). Play product `slip_studio_pro` $1.99 (purchase option
+  `buy`) ACTIVE — Play only allowed creating it after **vc28 / 2.9.0 went
+  to Internal testing** with the BILLING permission. RC product
+  (non-consumable) → entitlement `pro` → offering `default`
+  (`$rc_lifetime` package). Service account
+  `revenuecat@pootery.iam.gserviceaccount.com` granted Slip Studio (4 perms).
+  Play RTDN on → `projects/pootery/topics/Play-Store-Notifications`, all
+  one-time products. ⏳ Remaining: Onion uploads the JSON key to the RC
+  app, then RC-side "Connect to Google", then a license-tester purchase
+  from the Play-installed internal build.
 - ⏳ Phase 6 — set `LEGACY_CUTOFF_MS` to the switch date, re-sync www,
   bump versionCode, build, test a purchase from an internal-testing
   install, release, flip price to Free.
