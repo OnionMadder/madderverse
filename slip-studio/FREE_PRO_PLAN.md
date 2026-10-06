@@ -21,9 +21,10 @@
   (`$rc_lifetime` package). Service account
   `revenuecat@pootery.iam.gserviceaccount.com` granted Slip Studio (4 perms).
   Play RTDN on → `projects/pootery/topics/Play-Store-Notifications`, all
-  one-time products. ⏳ Remaining: Onion uploads the JSON key to the RC
-  app, then RC-side "Connect to Google", then a license-tester purchase
-  from the Play-installed internal build.
+  one-time products. JSON key uploaded → RC **Valid credentials**,
+  product **Published**; RC connected to the topic and a Play test
+  notification was received (2026-10-06 01:58 UTC). ⏳ Remaining: a
+  license-tester purchase from the Play-installed internal build.
 - ⏳ Phase 6 — set `LEGACY_CUTOFF_MS` to the switch date, re-sync www,
   bump versionCode, build, test a purchase from an internal-testing
   install, release, flip price to Free.
