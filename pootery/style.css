@@ -1240,6 +1240,11 @@ a:focus-visible {
     -webkit-user-select: none;
 }
 
+/* The decorate frame is part of the pinch surface (see
+   attachDecoratePointer), so the browser must not claim a finger
+   that lands on it. */
+#screen-decorate .canvas-wrap { touch-action: none; }
+
 /* Floating overlay button on the canvas frame (undo lives here).
    Sits in the top-right corner of the canvas-wrap, slightly inset.
    overflow: hidden lets the canvas zoom + pan inside the wrap
@@ -5645,9 +5650,12 @@ a:focus-visible {
 /* ----- 14b. Side-rail layout (tablet+) -----
    Mobile-first: shape + decorate become fixed bottom-sheet
    drawers, kiln stays stacked (its controls only appear post-
-   reveal). At >=768px the layout flips to canvas-left +
+   reveal). At >=900px the layout flips to canvas-left +
    side-rail-right so all tools are reachable without
-   scrolling. */
+   scrolling. (Was 768px — but a portrait iPad is 768-834 wide,
+   where canvas + rail didn't fit: the canvas overflowed its
+   frame and got clipped. Portrait iPads now get the same pop-up
+   tray as phones; landscape iPads still get the rail.) */
 
 .shape-side-rail,
 .decorate-side-rail,
@@ -5666,7 +5674,7 @@ a:focus-visible {
     display: none;
 }
 
-@media (max-width: 767.98px) {
+@media (max-width: 899.98px) {
     /* Phone — turn shape + decorate side-rails into bottom-
        sheet drawers. Kiln rail stays stacked since the controls
        only show up post-reveal and don't compete for space. */
@@ -5768,7 +5776,33 @@ a:focus-visible {
     }
 }
 
-@media (min-width: 768px) {
+/* Tablet in drawer mode (portrait iPad): the phone layout capped
+   the canvas at 400px, which left the pot small in the middle of a
+   big screen and made zooming the only way to paint detail. Grow it
+   to fit the height above the collapsed tray, and keep the tray a
+   comfortable width instead of stretching edge to edge. */
+@media (min-width: 600px) and (max-width: 899.98px) {
+    #shapeCanvas,
+    #decorateCanvas {
+        width: clamp(280px, min(88vw, calc((100vh - 270px) * 2 / 3)), 560px);
+        width: clamp(280px, min(88vw, calc((100dvh - 270px) * 2 / 3)), 560px);
+    }
+    .shape-side-rail,
+    .decorate-side-rail {
+        left: max(0px, calc((100vw - 640px) / 2));
+        right: max(0px, calc((100vw - 640px) / 2));
+        width: auto;
+    }
+}
+
+/* Touch screens: the zoom buttons were 32px — fine for a mouse,
+   a miss for a kid's finger. 44px is Apple's minimum target. */
+@media (pointer: coarse) {
+    .zoom-btn { width: 44px; height: 44px; font-size: 18px; }
+    .zoom-badge { min-width: 52px; font-size: 12px; }
+}
+
+@media (min-width: 900px) {
     .shape-stack,
     .decorate-stack,
     .kiln-stack {

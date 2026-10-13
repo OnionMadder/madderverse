@@ -8228,9 +8228,24 @@
             applyDecorateTransform();
         };
 
-        c.addEventListener("pointerdown", function (e) {
+        /* Listen on the whole canvas-wrap, not just the canvas, so a
+           pinch still zooms when the second finger lands on the frame
+           around the pot. On iPad Safari a finger off the canvas used
+           to hand the whole gesture to the browser, which zoomed the
+           PAGE instead of the pot. The FIRST finger still has to land
+           on the canvas (a tap on the frame paints nothing), and the
+           buttons floating in the wrap keep their own taps. */
+        const el = c.parentElement || c;
+        const onCanvasControl = function (e) {
+            return !!(e.target && e.target.closest &&
+                e.target.closest("button, input, select, .zoom-controls, .canvas-cmd-ribbon"));
+        };
+
+        el.addEventListener("pointerdown", function (e) {
+            if (onCanvasControl(e)) return;
+            if (e.target !== c && D.activePointers.size === 0) return;
             e.preventDefault();
-            try { c.setPointerCapture(e.pointerId); } catch (_) {}
+            try { el.setPointerCapture(e.pointerId); } catch (_) {}
             D.activePointers.set(e.pointerId,
                 { clientX: e.clientX, clientY: e.clientY });
 
@@ -8259,7 +8274,7 @@
             }
         });
 
-        c.addEventListener("pointermove", function (e) {
+        el.addEventListener("pointermove", function (e) {
             if (!D.activePointers.has(e.pointerId)) return;
             const ref = D.activePointers.get(e.pointerId);
             ref.clientX = e.clientX;
@@ -8312,8 +8327,9 @@
         });
 
         const endPointer = function (e) {
+            if (!D.activePointers.has(e.pointerId)) return;
             D.activePointers.delete(e.pointerId);
-            try { c.releasePointerCapture(e.pointerId); } catch (_) {}
+            try { el.releasePointerCapture(e.pointerId); } catch (_) {}
 
             if (D.activePointers.size === 0) {
                 /* All fingers lifted. A clean single-finger TAP — one
@@ -8380,9 +8396,9 @@
                 beginGesture();
             }
         };
-        c.addEventListener("pointerup",     endPointer);
-        c.addEventListener("pointercancel", endPointer);
-        c.addEventListener("pointerleave",  endPointer);
+        el.addEventListener("pointerup",     endPointer);
+        el.addEventListener("pointercancel", endPointer);
+        el.addEventListener("pointerleave",  endPointer);
 
         /* Desktop wheel -> zoom around cursor */
         c.addEventListener("wheel", function (e) {
@@ -15502,7 +15518,26 @@
         });
     }
 
+    /* iPad / iPhone Safari ignores the viewport's user-scalable=no,
+       so a pinch anywhere it doesn't recognise as ours zoomed the
+       whole PAGE: the pot shrank out of reach, the fixed tool tray
+       slid off-screen and the kid was stuck. Android honours the
+       meta tag, which is why the same build felt fine there. Block
+       the browser's own pinch so the only zoom is the pot's (pointer
+       events still fire, so the decorate pinch keeps working). */
+    function blockPagePinchZoom() {
+        const stop = function (e) { e.preventDefault(); };
+        /* gesture* events are Safari-only; harmless elsewhere. */
+        document.addEventListener("gesturestart",  stop, { passive: false });
+        document.addEventListener("gesturechange", stop, { passive: false });
+        document.addEventListener("gestureend",    stop, { passive: false });
+        document.addEventListener("touchmove", function (e) {
+            if (e.touches && e.touches.length > 1) e.preventDefault();
+        }, { passive: false });
+    }
+
     function init() {
+        blockPagePinchZoom();
         initTitle();
         initEggs();
         showScreen("title");
