@@ -1281,7 +1281,9 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         'funky-fresh':     { x: 656, y: 739, w: 216, h: 196 }
     };
 
-    /* Prices ramp from 20 → 130 roughly with visual complexity. anchor.y
+    /* Prices ramp from 10 → 60 roughly with visual complexity (halved
+       2026-10 so every hat and accessory together, 880 Doodles, fits
+       inside what the achievements pay out, 1,260). anchor.y
        values are calibrated for the sheet shipped at assets/sprites/
        hats.json, which is trimmed: false — each frame carries built-in
        transparent bottom padding (where the wearer's head sits in the
@@ -1297,22 +1299,22 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
            land at the eye line. */
     const HATS = [
         { id: 'no-hat',          name: 'No Hat',          price:   0, sprite: null,              anchor: { x: 0, y:   0 }, scale: 1.00 },
-        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  20, sprite: 'funky-fresh',     anchor: { x: 0, y:  80 }, scale: 0.65 },
-        { id: 'graph-paper',     name: 'Graph Paper',     price:  25, sprite: 'graph-paper',     anchor: { x: 0, y:  65 }, scale: 0.65 },
-        { id: 'friend-picker',   name: 'Friend Picker',   price:  30, sprite: 'friend-picker',   anchor: { x: 0, y:  55 }, scale: 0.70 },
-        { id: 'cool-kids',       name: 'Cool Kids',       price:  35, sprite: 'cool-kids',       anchor: { x: 5, y:  80 }, scale: 0.65 },
-        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  45, sprite: 'slime-rancher',   anchor: { x: 0, y:  80 }, scale: 0.70 },
-        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  50, sprite: 'giggle-boot',     anchor: { x: 0, y:  45 }, scale: 0.55 },
-        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  55, sprite: 'candy-bowl',      anchor: { x: 0, y:  65 }, scale: 0.65 },
-        { id: 'metal-gears',     name: 'Metal Gears',     price:  60, sprite: 'metal-gears',     anchor: { x: 0, y:  55 }, scale: 0.70 },
-        { id: 'the-worminal',    name: 'The Worminal',    price:  65, sprite: 'the-worminal',    anchor: { x: 0, y:  50 }, scale: 0.70 },
-        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  75, sprite: 'rocket-ship',     anchor: { x: 0, y:  65 }, scale: 0.50 },
-        { id: 'gross-out',       name: 'Gross-Out',       price:  80, sprite: 'gross-out',       anchor: { x: 0, y:  85 }, scale: 0.70 },
-        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  90, sprite: 'gelatinous-cube', anchor: { x: 0, y: 120 }, scale: 0.65 },
-        { id: 'haunted-house',   name: 'Haunted House',   price:  95, sprite: 'haunted-house',   anchor: { x: 0, y:  60 }, scale: 0.60 },
-        { id: 'scanner-chic',    name: 'Scanner Chic',    price: 105, sprite: 'scanner-chic',    anchor: { x: 0, y:  75 }, scale: 0.65 },
-        { id: 'circuit-board',   name: 'Circuit Board',   price: 115, sprite: 'circuit-board',   anchor: { x: 0, y: 120 }, scale: 0.65 },
-        { id: 'tower-defense',   name: 'Tower Defense',   price: 130, sprite: 'tower-defense',   anchor: { x: 0, y: 120 }, scale: 0.70 }
+        { id: 'funky-fresh',     name: 'Funky Fresh',     price:  10, sprite: 'funky-fresh',     anchor: { x: 0, y:  80 }, scale: 0.65 },
+        { id: 'graph-paper',     name: 'Graph Paper',     price:  10, sprite: 'graph-paper',     anchor: { x: 0, y:  65 }, scale: 0.65 },
+        { id: 'friend-picker',   name: 'Friend Picker',   price:  15, sprite: 'friend-picker',   anchor: { x: 0, y:  55 }, scale: 0.70 },
+        { id: 'cool-kids',       name: 'Cool Kids',       price:  15, sprite: 'cool-kids',       anchor: { x: 5, y:  80 }, scale: 0.65 },
+        { id: 'slime-rancher',   name: 'Slime Rancher',   price:  20, sprite: 'slime-rancher',   anchor: { x: 0, y:  80 }, scale: 0.70 },
+        { id: 'giggle-boot',     name: 'Giggle Boot',     price:  25, sprite: 'giggle-boot',     anchor: { x: 0, y:  45 }, scale: 0.55 },
+        { id: 'candy-bowl',      name: 'Candy Bowl',      price:  25, sprite: 'candy-bowl',      anchor: { x: 0, y:  65 }, scale: 0.65 },
+        { id: 'metal-gears',     name: 'Metal Gears',     price:  30, sprite: 'metal-gears',     anchor: { x: 0, y:  55 }, scale: 0.70 },
+        { id: 'the-worminal',    name: 'The Worminal',    price:  30, sprite: 'the-worminal',    anchor: { x: 0, y:  50 }, scale: 0.70 },
+        { id: 'rocket-ship',     name: 'Rocket Ship',     price:  35, sprite: 'rocket-ship',     anchor: { x: 0, y:  65 }, scale: 0.50 },
+        { id: 'gross-out',       name: 'Gross-Out',       price:  40, sprite: 'gross-out',       anchor: { x: 0, y:  85 }, scale: 0.70 },
+        { id: 'gelatinous-cube', name: 'Gelatinous Cube', price:  45, sprite: 'gelatinous-cube', anchor: { x: 0, y: 120 }, scale: 0.65 },
+        { id: 'haunted-house',   name: 'Haunted House',   price:  45, sprite: 'haunted-house',   anchor: { x: 0, y:  60 }, scale: 0.60 },
+        { id: 'scanner-chic',    name: 'Scanner Chic',    price:  50, sprite: 'scanner-chic',    anchor: { x: 0, y:  75 }, scale: 0.65 },
+        { id: 'circuit-board',   name: 'Circuit Board',   price:  55, sprite: 'circuit-board',   anchor: { x: 0, y: 120 }, scale: 0.65 },
+        { id: 'tower-defense',   name: 'Tower Defense',   price:  60, sprite: 'tower-defense',   anchor: { x: 0, y: 120 }, scale: 0.70 }
     ];
 
     const HAT_BY_ID = {};
@@ -1513,113 +1515,113 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         { id: 'no-accessory', name: 'Nothing', price: 0, slot: null, svg: '' },
 
         /* ---- eyes ---- */
-        { id: 'sunglasses', name: 'Sunglasses', price: 15, slot: 'eyes', anchor: 'eyes',
+        { id: 'sunglasses', name: 'Sunglasses', price:  5, slot: 'eyes', anchor: 'eyes',
           svg: '<g ' + INK + ' stroke-linejoin="round">' +
                '<path d="M -36,-9 L -4,-9 L -6,4 C -7,11 -12,13 -19,13 C -27,13 -32,10 -34,3 Z" fill="#1a0f33"/>' +
                '<path d="M 36,-9 L 4,-9 L 6,4 C 7,11 12,13 19,13 C 27,13 32,10 34,3 Z" fill="#1a0f33"/>' +
                '<path d="M -4,-6 Q 0,-9 4,-6" fill="none"/>' +
                '<line x1="-36" y1="-8" x2="-46" y2="-12"/><line x1="36" y1="-8" x2="46" y2="-12"/></g>' +
                '<g fill="#ffffff" opacity="0.55"><path d="M -29,-5 L -22,-5 L -27,4 Z"/><path d="M 11,-5 L 18,-5 L 13,4 Z"/></g>' },
-        { id: 'round-specs', name: 'Round Specs', price: 20, slot: 'eyes', anchor: 'eyes',
+        { id: 'round-specs', name: 'Round Specs', price: 10, slot: 'eyes', anchor: 'eyes',
           svg: '<g stroke="#1a0f33" stroke-width="3" fill="none">' +
                '<circle cx="-18" cy="0" r="13"/><circle cx="18" cy="0" r="13"/>' +
                '<line x1="-5" y1="0" x2="5" y2="0"/></g>' },
-        { id: 'eye-patch', name: 'Pirate Patch', price: 25, slot: 'eyes', anchor: 'eyes',
+        { id: 'eye-patch', name: 'Pirate Patch', price: 10, slot: 'eyes', anchor: 'eyes',
           svg: '<line x1="-46" y1="-16" x2="44" y2="8" stroke="#1a0f33" stroke-width="3"/>' +
                '<path d="M 4,-12 C 30,-15 36,6 19,14 C 10,18 4,10 4,0 Z" fill="#1a0f33"/>' },
-        { id: '3d-glasses', name: '3-D Glasses', price: 30, slot: 'eyes', anchor: 'eyes',
+        { id: '3d-glasses', name: '3-D Glasses', price: 15, slot: 'eyes', anchor: 'eyes',
           svg: '<g ' + INK + '><rect x="-37" y="-11" width="74" height="22" rx="5" fill="#ffffff"/>' +
                '<rect x="-32" y="-7" width="25" height="14" rx="3" fill="#e63946"/>' +
                '<rect x="7" y="-7" width="25" height="14" rx="3" fill="#3a86ff"/></g>' },
-        { id: 'star-shades', name: 'Star Shades', price: 40, slot: 'eyes', anchor: 'eyes',
+        { id: 'star-shades', name: 'Star Shades', price: 20, slot: 'eyes', anchor: 'eyes',
           svg: '<g fill="#ffd23f" stroke="#1a0f33" stroke-width="2.5">' +
                '<polygon points="-18,-12 -14,-3 -4,-3 -12,4 -8,13 -18,7 -28,13 -24,4 -32,-3 -22,-3"/>' +
                '<polygon points="18,-12 22,-3 32,-3 24,4 28,13 18,7 8,13 12,4 4,-3 14,-3"/>' +
                '<line x1="-5" y1="0" x2="5" y2="0"/></g>' },
-        { id: 'heart-shades', name: 'Heart Shades', price: 40, slot: 'eyes', anchor: 'eyes',
+        { id: 'heart-shades', name: 'Heart Shades', price: 20, slot: 'eyes', anchor: 'eyes',
           svg: '<g fill="#ff6ec7" stroke="#1a0f33" stroke-width="2.5">' +
                '<path d="M -18,-6 C -22,-12 -32,-10 -32,-2 C -32,5 -18,12 -18,12 C -18,12 -4,5 -4,-2 C -4,-10 -14,-12 -18,-6 Z"/>' +
                '<path d="M 18,-6 C 14,-12 4,-10 4,-2 C 4,5 18,12 18,12 C 18,12 32,5 32,-2 C 32,-10 22,-12 18,-6 Z"/></g>' },
 
         /* ---- nose ---- */
-        { id: 'clown-nose', name: 'Clown Nose', price: 10, slot: 'nose', anchor: 'nose',
+        { id: 'clown-nose', name: 'Clown Nose', price:  5, slot: 'nose', anchor: 'nose',
           svg: '<circle cx="0" cy="0" r="10" fill="#e63946" ' + INK + '/>' +
                '<circle cx="-3" cy="-3" r="3" fill="#ffffff" opacity="0.7"/>' },
-        { id: 'piggy-nose', name: 'Piggy Nose', price: 15, slot: 'nose', anchor: 'nose',
+        { id: 'piggy-nose', name: 'Piggy Nose', price:  5, slot: 'nose', anchor: 'nose',
           svg: '<ellipse cx="0" cy="0" rx="13" ry="9" fill="#ff9ecf" ' + INK + '/>' +
                '<ellipse cx="-4" cy="0" rx="2" ry="3.5" fill="#1a0f33"/><ellipse cx="4" cy="0" rx="2" ry="3.5" fill="#1a0f33"/>' },
 
         /* ---- mouth ---- */
-        { id: 'bunny-teeth', name: 'Bunny Teeth', price: 20, slot: 'mouth', anchor: 'mouth',
+        { id: 'bunny-teeth', name: 'Bunny Teeth', price: 10, slot: 'mouth', anchor: 'mouth',
           svg: '<g fill="#ffffff" ' + INK + '><rect x="-9" y="-2" width="9" height="13" rx="2"/>' +
                '<rect x="0" y="-2" width="9" height="13" rx="2"/></g>' },
-        { id: 'mustache', name: 'Mustache', price: 25, slot: 'mouth', anchor: 'mouth',
+        { id: 'mustache', name: 'Mustache', price: 10, slot: 'mouth', anchor: 'mouth',
           svg: '<path d="M 0,0 C -8,-6 -22,-4 -28,2 C -22,8 -10,6 -4,3 L 0,3 C -4,3 -10,6 -22,8 ' +
                'M 0,0 C 8,-6 22,-4 28,2 C 22,8 10,6 4,3 L 0,3 C 4,3 10,6 22,8" ' +
                'fill="#3b1f6b" stroke="#1a0f33" stroke-width="2"/>' },
-        { id: 'long-beard', name: 'Long Beard', price: 35, slot: 'mouth', anchor: 'chin',
+        { id: 'long-beard', name: 'Long Beard', price: 15, slot: 'mouth', anchor: 'chin',
           svg: '<g fill="#6f4e37" ' + INK + '>' +
                '<path d="M -28,-8 C -28,18 -16,40 0,42 C 16,40 28,18 28,-8 C 16,-2 -16,-2 -28,-8 Z"/></g>' },
 
         /* ---- neck ---- */
-        { id: 'scarf', name: 'Cozy Scarf', price: 20, slot: 'neck', anchor: 'chin',
+        { id: 'scarf', name: 'Cozy Scarf', price: 10, slot: 'neck', anchor: 'chin',
           svg: '<g ' + INK + ' stroke-linejoin="round" fill="#43aa8b">' +
                '<path d="M -40,-6 C -20,6 20,6 40,-6 L 40,8 C 20,20 -20,20 -40,8 Z"/>' +
                '<path d="M 14,10 L 30,60 L 16,64 L 4,14 Z"/></g>' +
                '<g stroke="#fcbf49" stroke-width="4"><line x1="-20" y1="6" x2="-20" y2="17"/>' +
                '<line x1="0" y1="9" x2="0" y2="19"/><line x1="20" y1="6" x2="20" y2="17"/>' +
                '<line x1="18" y1="40" x2="26" y2="38"/></g>' },
-        { id: 'bow-tie', name: 'Bow Tie', price: 25, slot: 'neck', anchor: 'chin',
+        { id: 'bow-tie', name: 'Bow Tie', price: 10, slot: 'neck', anchor: 'chin',
           svg: '<g fill="#e63946" ' + INK + '>' +
                '<polygon points="0,0 -24,-12 -24,12"/><polygon points="0,0 24,-12 24,12"/>' +
                '<rect x="-5" y="-7" width="10" height="14" rx="2"/></g>' },
-        { id: 'pearl-necklace', name: 'Pearl Necklace', price: 30, slot: 'neck', anchor: 'chin',
+        { id: 'pearl-necklace', name: 'Pearl Necklace', price: 15, slot: 'neck', anchor: 'chin',
           svg: '<g fill="#ffffff" stroke="#1a0f33" stroke-width="1.5">' +
                [-36, -27, -18, -9, 0, 9, 18, 27, 36].map(x =>
                    '<circle cx="' + x + '" cy="' + (26 * (1 - (x / 36) * (x / 36))).toFixed(1) + '" r="5"/>').join('') +
                '</g>' },
-        { id: 'gold-medal', name: 'Gold Medal', price: 35, slot: 'neck', anchor: 'chin',
+        { id: 'gold-medal', name: 'Gold Medal', price: 15, slot: 'neck', anchor: 'chin',
           svg: '<g ' + INK + ' stroke-linejoin="round">' +
                '<path d="M -26,-6 L -6,40 L 6,40 L 26,-6 L 14,-6 L 0,28 L -14,-6 Z" fill="#3a86ff"/>' +
                '<circle cx="0" cy="52" r="15" fill="#ffd23f"/></g>' +
                '<polygon points="0,43 3,50 10,50 4,54 6,61 0,57 -6,61 -4,54 -10,50 -3,50" fill="#f4a261"/>' },
 
         /* ---- chest ---- */
-        { id: 'flower-pin', name: 'Flower Pin', price: 15, slot: 'chest', anchor: 'chest',
+        { id: 'flower-pin', name: 'Flower Pin', price:  5, slot: 'chest', anchor: 'chest',
           svg: '<g fill="#ff6ec7" stroke="#1a0f33" stroke-width="2">' +
                '<circle cx="0" cy="-12" r="8"/><circle cx="11" cy="-4" r="8"/><circle cx="7" cy="10" r="8"/>' +
                '<circle cx="-7" cy="10" r="8"/><circle cx="-11" cy="-4" r="8"/></g>' +
                '<circle cx="0" cy="0" r="7" fill="#fcbf49" stroke="#1a0f33" stroke-width="2"/>' },
-        { id: 'heart-pin', name: 'Heart Pin', price: 15, slot: 'chest', anchor: 'chest',
+        { id: 'heart-pin', name: 'Heart Pin', price:  5, slot: 'chest', anchor: 'chest',
           svg: '<path d="M 0,-6 C -4,-14 -18,-14 -18,-3 C -18,6 0,16 0,16 C 0,16 18,6 18,-3 C 18,-14 4,-14 0,-6 Z" ' +
                'fill="#e63946" ' + INK + '/>' },
-        { id: 'sheriff-badge', name: 'Sheriff Badge', price: 45, slot: 'chest', anchor: 'chest',
+        { id: 'sheriff-badge', name: 'Sheriff Badge', price: 20, slot: 'chest', anchor: 'chest',
           svg: '<g fill="#ffd23f" ' + INK + '>' +
                '<polygon points="0,-22 5,-7 22,-7 9,3 14,18 0,9 -14,18 -9,3 -22,-7 -5,-7"/>' +
                '<circle cx="0" cy="0" r="4" fill="#1a0f33"/></g>' },
 
         /* ---- back (drawn BEHIND the body) ---- */
-        { id: 'superhero-cape', name: 'Hero Cape', price: 40, slot: 'back', anchor: 'shoulders',
+        { id: 'superhero-cape', name: 'Hero Cape', price: 20, slot: 'back', anchor: 'shoulders',
           svg: '<g fill="#e63946" ' + INK + ' stroke-linejoin="round">' +
                '<path d="M -55,-10 L -85,200 L 0,170 L 85,200 L 55,-10 L 25,0 L 0,8 L -25,0 Z"/></g>' },
-        { id: 'bat-wings', name: 'Bat Wings', price: 45, slot: 'back', anchor: 'shoulders',
+        { id: 'bat-wings', name: 'Bat Wings', price: 20, slot: 'back', anchor: 'shoulders',
           svg: '<path d="M -20,10 C -50,-40 -110,-40 -130,10 C -112,4 -100,14 -96,28 C -84,16 -70,20 -64,34 ' +
                'C -54,22 -38,24 -30,36 Z M 20,10 C 50,-40 110,-40 130,10 C 112,4 100,14 96,28 C 84,16 70,20 64,34 ' +
                'C 54,22 38,24 30,36 Z" fill="#3b1f6b" ' + INK + ' stroke-linejoin="round"/>' },
-        { id: 'royal-cape', name: 'Royal Cape', price: 55, slot: 'back', anchor: 'shoulders',
+        { id: 'royal-cape', name: 'Royal Cape', price: 25, slot: 'back', anchor: 'shoulders',
           svg: '<g ' + INK + ' stroke-linejoin="round">' +
                '<path d="M -60,-10 L -92,215 L 92,215 L 60,-10 L 0,10 Z" fill="#7209b7"/>' +
                '<path d="M -92,205 L 92,205 L 92,222 L -92,222 Z" fill="#ffffff"/></g>' +
                '<g fill="#1a0f33"><circle cx="-60" cy="213" r="2.5"/><circle cx="-20" cy="213" r="2.5"/>' +
                '<circle cx="20" cy="213" r="2.5"/><circle cx="60" cy="213" r="2.5"/></g>' },
-        { id: 'jetpack', name: 'Jetpack', price: 65, slot: 'back', anchor: 'shoulders',
+        { id: 'jetpack', name: 'Jetpack', price: 30, slot: 'back', anchor: 'shoulders',
           svg: '<g ' + INK + ' stroke-linejoin="round">' +
                '<rect x="-92" y="10" width="34" height="96" rx="15" fill="#adb5bd"/>' +
                '<rect x="58" y="10" width="34" height="96" rx="15" fill="#adb5bd"/>' +
                '<path d="M -86,106 L -64,106 L -75,146 Z" fill="#f4a261"/>' +
                '<path d="M 64,106 L 86,106 L 75,146 Z" fill="#f4a261"/></g>' +
                '<g fill="#fcbf49"><path d="M -81,108 L -69,108 L -75,128 Z"/><path d="M 69,108 L 81,108 L 75,128 Z"/></g>' },
-        { id: 'fairy-wings', name: 'Fairy Wings', price: 70, slot: 'back', anchor: 'shoulders',
+        { id: 'fairy-wings', name: 'Fairy Wings', price: 35, slot: 'back', anchor: 'shoulders',
           svg: '<g fill="rgba(255, 110, 199, 0.55)" stroke="#ff6ec7" stroke-width="2.5">' +
                '<ellipse cx="-50" cy="0" rx="40" ry="55" transform="rotate(-25 -50 0)"/>' +
                '<ellipse cx="50" cy="0" rx="40" ry="55" transform="rotate(25 50 0)"/>' +
@@ -1627,24 +1629,24 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
                '<ellipse cx="45" cy="60" rx="32" ry="40" transform="rotate(15 45 60)"/></g>' },
 
         /* ---- hand (origin = the fist, up = -y) ---- */
-        { id: 'balloon', name: 'Balloon', price: 10, slot: 'hand',
+        { id: 'balloon', name: 'Balloon', price:  5, slot: 'hand',
           svg: '<path d="M 0,0 C 6,-30 -6,-60 2,-90" fill="none" stroke="#1a0f33" stroke-width="2"/>' +
                '<ellipse cx="2" cy="-115" rx="22" ry="27" fill="#e63946" ' + INK + '/>' +
                '<path d="M -3,-88 L 7,-88 L 2,-83 Z" fill="#e63946" stroke="#1a0f33" stroke-width="1.5"/>' +
                '<ellipse cx="-6" cy="-124" rx="5" ry="8" fill="#ffffff" opacity="0.5"/>' },
-        { id: 'lollipop', name: 'Lollipop', price: 15, slot: 'hand',
+        { id: 'lollipop', name: 'Lollipop', price:  5, slot: 'hand',
           svg: '<line x1="0" y1="10" x2="0" y2="-40" stroke="#1a0f33" stroke-width="5" stroke-linecap="round"/>' +
                '<line x1="0" y1="10" x2="0" y2="-40" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>' +
                '<circle cx="0" cy="-58" r="20" fill="#ff6ec7" ' + INK + '/>' +
                '<path d="M 0,-58 m -12,0 a 12,12 0 1 1 24,0 a 8,8 0 1 1 -16,0 a 4,4 0 1 1 8,0" fill="none" stroke="#ffffff" stroke-width="3"/>' },
-        { id: 'ice-cream', name: 'Ice Cream', price: 15, slot: 'hand',
+        { id: 'ice-cream', name: 'Ice Cream', price:  5, slot: 'hand',
           svg: '<path d="M -12,-20 L 12,-20 L 0,14 Z" fill="#f4a261" ' + INK + ' stroke-linejoin="round"/>' +
                '<circle cx="0" cy="-30" r="14" fill="#ff9ecf" ' + INK + '/>' +
                '<circle cx="5" cy="-44" r="3.5" fill="#e63946" stroke="#1a0f33" stroke-width="1.5"/>' },
-        { id: 'microphone', name: 'Microphone', price: 20, slot: 'hand',
+        { id: 'microphone', name: 'Microphone', price: 10, slot: 'hand',
           svg: '<rect x="-5" y="-30" width="10" height="44" rx="4" fill="#495057" ' + INK + '/>' +
                '<circle cx="0" cy="-40" r="13" fill="#adb5bd" ' + INK + '/>' },
-        { id: 'magic-wand', name: 'Magic Wand', price: 25, slot: 'hand',
+        { id: 'magic-wand', name: 'Magic Wand', price: 10, slot: 'hand',
           svg: '<line x1="0" y1="12" x2="0" y2="-48" stroke="#1a0f33" stroke-width="5" stroke-linecap="round"/>' +
                '<polygon points="0,-74 6,-60 21,-60 9,-51 14,-37 0,-45 -14,-37 -9,-51 -21,-60 -6,-60" fill="#ffd23f" ' + INK + '/>' }
     ];

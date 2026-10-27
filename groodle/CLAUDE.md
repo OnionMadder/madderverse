@@ -202,9 +202,12 @@ wardrobe change, `trackGroove()` only while music plays. A backlog of
 unlock toasts plays faster so a returning player isn't stuck watching
 ten in a row.
 
-The full shop (16 hats + 27 accessories) costs ~1,900 Doodles, more
-than all achievements pay — a kid can't own everything from
-achievements alone. Lower prices or add achievements if that bites.
+**Prices were halved (2026-10) so a kid can own everything:** the
+full shop (16 hats + 27 accessories) costs **880** Doodles against
+**1,260** paid by achievements, ~380 of headroom so the long goals
+aren't required. Hats 10–60, accessories 5–35 (sunglasses 5, Hero
+Cape 20). If you add items, keep the shop total under the
+achievement total.
 
 ## Why the doll is images, not traced outlines
 
