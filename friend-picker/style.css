@@ -11,6 +11,7 @@ body {
     display: flex;
     justify-content: center;
     min-height: 100vh;
+    min-height: 100dvh;
 }
 
 #friend-picker-app {
@@ -909,3 +910,8 @@ body.in-game #game-container { cursor: none; }
 
 /* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
 * { touch-action: manipulation; }
+
+/* Touch screens (iPad): finger-sized targets (Apple's 44pt minimum). */
+@media (pointer: coarse) {
+    #end-btn, #reset-btn, #mute-btn { min-height: 44px; }
+}

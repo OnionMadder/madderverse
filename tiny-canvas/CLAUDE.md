@@ -7,7 +7,7 @@ via Capacitor.
 ## Where things stand (2026-08-05)
 
 - **Web build is LIVE and advertised** at madderverse.org/tiny-canvas/,
-  on the hub grid since 2026-08-04. Cache-bust is at **?v=71** — bump it
+  on the hub grid since 2026-08-04. Cache-bust is at **?v=72** — bump it
   on every change to style.css / templates.js / game.js.
 - **RAINBOW moved from Pro to free (2026-08-14) and the confusingly-
   co-named RAINBOW palette group was renamed BRIGHTS.** Bala (5),
@@ -922,7 +922,7 @@ App Store Connect / Play Console upload slot
   with a CSS filter or compositor blur — the edge has to be baked
   into the bitmap for save/export to capture it.
 - **Bump `?v=N` in `index.html` on EVERY change** to `style.css`,
-  `templates.js` or `game.js` (currently **v71**). Without it the
+  `templates.js` or `game.js` (currently **v72**). Without it the
   browser serves a stale `game.js` against a fresh `index.html` and the
   change reads as "did nothing" — the same trap Slip Studio and
   Florigami both hit. Note that a hard-reload which refetches

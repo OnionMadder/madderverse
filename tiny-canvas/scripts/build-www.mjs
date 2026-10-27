@@ -30,7 +30,7 @@ const WWW  = join(ROOT, "www");
    the CBN editor is an authoring tool, not part of the app. */
 const FILES = ["index.html", "game.js", "cbn-core.js", "templates.js",
                "style.css", "manifest.webmanifest"];
-const DIRS  = ["assets", "icons", "legal"];
+const DIRS  = ["assets", "icons", "legal", "pwa"];
 
 rmSync(WWW, { recursive: true, force: true });
 mkdirSync(WWW, { recursive: true });
@@ -45,6 +45,15 @@ for (const d of DIRS) {
     if (!existsSync(src)) throw new Error(`missing required dir: ${d}/`);
     cpSync(src, join(WWW, d), { recursive: true });
 }
+
+/* Shared iPad/touch kid-proofing lives OUTSIDE this directory, at the
+   site root. index.html loads it as ../assets/js/touch-guard.js, which
+   inside the WebView clamps to /assets/js/ — so it only has to land at
+   www/assets/js/. Required: without it iPad pinch zooms the whole page. */
+const TOUCH_GUARD = join(ROOT, "..", "assets", "js", "touch-guard.js");
+if (!existsSync(TOUCH_GUARD)) throw new Error("missing shared file: ../assets/js/touch-guard.js");
+mkdirSync(join(WWW, "assets", "js"), { recursive: true });
+cpSync(TOUCH_GUARD, join(WWW, "assets", "js", "touch-guard.js"));
 
 /* ---- strip web-only chrome from the app's index.html ---- */
 let html = readFileSync(join(WWW, "index.html"), "utf8");

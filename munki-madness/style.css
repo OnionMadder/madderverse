@@ -28,7 +28,9 @@ html, body {
 .stage {
     position: relative;
     width: min(100vw, 100vh, 720px);
+    width: min(100vw, 100dvh, 720px);
     height: min(100vw, 100vh, 720px);
+    height: min(100vw, 100dvh, 720px);
 }
 
 #game {

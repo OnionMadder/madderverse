@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Shared iPad/touch kid-proofing: page pinch + double-tap zoom, long-press callouts, sticky hover, 100vh. -->
+    <script src="../assets/js/touch-guard.js?v=3"></script>
+    <!-- Home-screen app (iPad standalone): see scripts/make-pwa.py -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>Bala Draws</title>
     <link rel="canonical" href="https://madderverse.org/bala-draws/" />
     <meta property="og:url" content="https://madderverse.org/bala-draws/" />
@@ -19,10 +25,10 @@
     <meta name="twitter:title" content="Bala Draws - Doodle, drum, dazzle." />
     <meta name="twitter:description" content="Free, ad-free drawing toy that bounces your art to a beat." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/twitter-card.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="pwa/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
-    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
     <meta name="theme-color" content="#00ffcc" />
     <meta name="apple-mobile-web-app-title" content="Bala Draws" />

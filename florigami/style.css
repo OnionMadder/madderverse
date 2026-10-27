@@ -1726,3 +1726,10 @@ body.reduce-motion .garden.just-grew { animation: none; }
     box-shadow: inset 0 0 0 1.5px rgba(126, 176, 196, 0.55);
 }
 .garden-wrap.has-photo .tile:not(.watered)::before { display: none; }  /* no dew over the scene */
+
+/* Touch screens (iPad): finger-sized targets for the controls a kid
+   taps most. Apple's minimum is 44pt; the chips were 29px tall. */
+@media (pointer: coarse) {
+    .seed-chip { min-height: 44px; padding: 8px 16px; }
+    .coach-skip { min-height: 44px; min-width: 56px; }
+}

@@ -1811,3 +1811,9 @@ footer a { color: var(--accent-cyan); pointer-events: auto; }
 
 /* iOS: kill double-tap-to-zoom (Safari ignores user-scalable=no). Keeps taps/scroll/pinch; canvas touch-action:none wins on specificity. */
 * { touch-action: manipulation; }
+
+/* Touch screens (iPad): finger-sized targets (Apple's 44pt minimum). */
+@media (pointer: coarse) {
+    #btn-return { min-height: 44px; }
+    #btn-mute { min-width: 44px; min-height: 44px; }
+}

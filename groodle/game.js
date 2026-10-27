@@ -322,6 +322,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
                 'rotate(' + a.toFixed(2) + ' ' + c.pivot[0] + ' ' + c.pivot[1] + ')');
             else el.removeAttribute('transform');
         }
+        syncHeldItem(ang);
         paintDanceCanvas(ang);
     }
 
@@ -538,15 +539,32 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
             hasUsedSurprise: false,
             lastVisitDate: null,
             longestDanceSec: 0,
-            pagesCompleted: []
+            pagesCompleted: [],
+            /* Added with the big achievement set (Bala, 2026-10). All are
+               "have you tried X" lists or plain tallies — nothing here is
+               time-gated, so nothing nags a kid to come back. */
+            posesTried: [],
+            bgsTried: [],
+            patternsTried: [],
+            sizesUsed: [],
+            movesTried: [],
+            groovesTried: [],
+            savesMade: 0,
+            outfitChanges: 0,
+            mostWorn: 0,
+            slotsWorn: [],
+            drewWhileDancing: false
         },
         hats: {
             owned: ['no-hat'],
             equipped: 'no-hat'
         },
+        /* worn = { slot: accessoryId } — one item per slot, many slots at
+           once. Replaced the single `equipped` id; migrateState() moves an
+           old save's equipped accessory into its slot. */
         accessories: {
             owned: ['no-accessory'],
-            equipped: 'no-accessory'
+            worn: {}
         },
         /* Face-parts bank — the "I can't draw" safety net. Each category
            is an object (NOT null) so mergeDefaults deep-merges old saves
@@ -596,12 +614,26 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         try {
             const raw = localStorage.getItem(STATE_KEY);
             if (!raw) return clone(DEFAULT_STATE);
-            return mergeDefaults(JSON.parse(raw), DEFAULT_STATE);
+            return migrateState(mergeDefaults(JSON.parse(raw), DEFAULT_STATE));
         } catch (e) {
             /* localStorage disabled, full quota, or corrupt JSON — fall
                back to defaults so the game still works (in-memory only). */
             return clone(DEFAULT_STATE);
         }
+    }
+
+    /* Single-accessory saves ({ equipped: 'id' }) become one worn slot.
+       ACCESSORY_BY_ID isn't built yet when this runs at load, so the slot
+       is looked up lazily from the raw catalog. */
+    function migrateState(s) {
+        const acc = s.accessories;
+        if (acc && typeof acc.equipped === 'string') {
+            if (!acc.worn || typeof acc.worn !== 'object') acc.worn = {};
+            const item = ACCESSORIES.find(a => a.id === acc.equipped);
+            if (item && item.slot && acc.owned.indexOf(item.id) !== -1) acc.worn[item.slot] = item.id;
+            delete acc.equipped;
+        }
+        return s;
     }
 
     function saveState() {
@@ -626,6 +658,8 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
 
     function trackStroke() {
         state.counters.strokes += 1;
+        if (state.counters.sizesUsed.indexOf(currentSize) === -1) state.counters.sizesUsed.push(currentSize);
+        if (isPlaying) state.counters.drewWhileDancing = true;
         saveState();
         checkAchievements();
     }
@@ -682,6 +716,37 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
             checkAchievements();
         }
     }
+    /* Generic "tried it" tracker for the list counters above: adds value
+       to state.counters[name] once, then re-checks achievements. */
+    function trackTried(name, value) {
+        const list = state.counters[name];
+        if (!Array.isArray(list) || list.indexOf(value) !== -1) return;
+        list.push(value);
+        saveState();
+        checkAchievements();
+    }
+    function trackCount(name, n) {
+        state.counters[name] = (state.counters[name] || 0) + (n || 1);
+        saveState();
+        checkAchievements();
+    }
+    /* Called after every wardrobe change. */
+    function trackOutfit() {
+        const c = state.counters;
+        const worn = Object.keys(state.accessories.worn);
+        c.outfitChanges += 1;
+        if (worn.length > c.mostWorn) c.mostWorn = worn.length;
+        worn.forEach(s => { if (c.slotsWorn.indexOf(s) === -1) c.slotsWorn.push(s); });
+        saveState();
+        checkAchievements();
+    }
+    /* Only counts while the music is actually playing, so cycling MOVE
+       on the draw screen doesn't tick off grooves the kid never heard. */
+    function trackGroove() {
+        trackTried('movesTried', MOVES[currentMoveIdx]);
+        trackTried('groovesTried', MOVES[currentMoveIdx] + '+' + BEATS[currentBeatIdx]);
+    }
+
     function trackVisit() {
         const today = todayKey();
         const last = state.counters.lastVisitDate;
@@ -777,8 +842,102 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         { id: 'page-superhero',   title: 'Caped Coloring',   desc: 'Color the Superhero page.',            reward: 15, icon: '🦸',
           check: () => state.counters.pagesCompleted.indexOf('superhero') !== -1 },
         { id: 'page-master',      title: 'Coloring Master',  desc: 'Finish every coloring-book page.',     reward: 50, icon: '📖',
-          check: () => state.counters.pagesCompleted.length >= 6 }
+          check: () => state.counters.pagesCompleted.length >= 6 },
+
+        /* ---- The big set (Bala, 2026-10): "how can he get more Doodles?"
+           Achievements are the ONLY source, by design (no real money, per
+           PROMISE.md), so there are lots of small, frequent ones a 5-year-
+           old trips over just by playing, plus a few long goals. Nothing
+           is time-gated: no streaks, no daily rewards, no "come back". */
+
+        /* Drawing */
+        { id: 'first-scribble',   title: 'First Scribble',   desc: 'Make your very first brush stroke.',   reward:  5, icon: '✏️',
+          check: () => state.counters.strokes >= 1 },
+        { id: 'scribbler',        title: 'Scribbler',        desc: 'Make 25 brush strokes.',               reward: 10, icon: '🖍️',
+          check: () => state.counters.strokes >= 25 },
+        { id: 'color-mix',        title: 'Color Mix',        desc: 'Use 3 colors in one drawing.',         reward: 10, icon: '🎨',
+          check: () => state.counters.colorsUsedThisDrawing.length >= 3 },
+        { id: 'every-crayon',     title: 'Every Crayon',     desc: 'Try every color in the box.',          reward: 25, icon: '🖍️',
+          check: () => state.counters.colorsUsedEver.length >= COLORS.length },
+        { id: 'tiny-brush',       title: 'Tiny Brush',       desc: 'Draw with the smallest brush.',        reward:  5, icon: '🤏',
+          check: () => state.counters.sizesUsed.indexOf(SIZES[0]) !== -1 },
+        { id: 'big-brush',        title: 'Big Brush',        desc: 'Draw with the biggest brush.',         reward:  5, icon: '🖌️',
+          check: () => state.counters.sizesUsed.indexOf(SIZES[SIZES.length - 1]) !== -1 },
+        { id: 'ten-groodles',     title: 'Ten Groodles',     desc: 'Finish ten drawings.',                 reward: 40, icon: '🖼️',
+          check: () => state.counters.drawingsFinished >= 10 },
+        { id: 'groodle-museum',   title: 'Groodle Museum',   desc: 'Finish 25 drawings.',                  reward: 75, icon: '🏛️',
+          check: () => state.counters.drawingsFinished >= 25 },
+        { id: 'doodle-machine',   title: 'Doodle Machine',   desc: 'Make 1,000 brush strokes.',            reward: 75, icon: '⚙️',
+          check: () => state.counters.strokes >= 1000 },
+        { id: 'keeper',           title: 'Keeper',           desc: 'Save a Groodle to your gallery.',      reward: 10, icon: '💾',
+          check: () => state.counters.savesMade >= 1 },
+        { id: 'art-show',         title: 'Art Show',         desc: 'Save 5 Groodles to your gallery.',     reward: 30, icon: '🗂️',
+          check: () => state.counters.savesMade >= 5 },
+
+        /* Dancing */
+        { id: 'all-the-moves',    title: 'All the Moves',    desc: 'Dance every MOVE.',                    reward: 20, icon: '💃',
+          check: () => state.counters.movesTried.length >= MOVES.length },
+        { id: 'groove-explorer',  title: 'Groove Explorer',  desc: 'Dance 8 different MOVE + BEAT mixes.', reward: 30, icon: '🎶',
+          check: () => state.counters.groovesTried.length >= 8 },
+        { id: 'groove-master',    title: 'Groove Master',    desc: 'Dance all 16 MOVE + BEAT mixes.',      reward: 60, icon: '🎧',
+          check: () => state.counters.groovesTried.length >= MOVES.length * BEATS.length },
+        { id: 'dance-and-doodle', title: 'Dance & Doodle',   desc: 'Draw while your Groodle dances.',      reward: 15, icon: '🕺',
+          check: () => state.counters.drewWhileDancing },
+
+        /* Stage */
+        { id: 'strike-a-pose',    title: 'Strike a Pose',    desc: 'Pick a new pose.',                     reward:  5, icon: '🧍',
+          check: () => state.counters.posesTried.some(p => p !== 'standing') },
+        { id: 'pose-pro',         title: 'Pose Pro',         desc: 'Try every pose.',                      reward: 25, icon: '🤸',
+          check: () => state.counters.posesTried.length >= Object.keys(POSES).length },
+        { id: 'new-scene',        title: 'New Scene',        desc: 'Pick a new background.',               reward:  5, icon: '🏞️',
+          check: () => state.counters.bgsTried.some(b => b !== 'studio') },
+        { id: 'world-traveler',   title: 'World Traveler',   desc: 'Try every background.',                reward: 25, icon: '🌍',
+          check: () => state.counters.bgsTried.length >= Math.max(2, bgCount()) },
+        { id: 'patterned',        title: 'Patterned',        desc: 'Give your Groodle a pattern.',         reward: 10, icon: '🔷',
+          check: () => state.counters.patternsTried.length >= 1 },
+        { id: 'pattern-party',    title: 'Pattern Party',    desc: 'Try 3 different patterns.',            reward: 15, icon: '🎉',
+          check: () => state.counters.patternsTried.length >= 3 },
+
+        /* Wardrobe — tied to stacking accessories */
+        { id: 'dress-up',         title: 'Dress Up',         desc: 'Wear an accessory.',                   reward: 10, icon: '👓',
+          check: () => state.counters.mostWorn >= 1 },
+        { id: 'double-up',        title: 'Double Up',        desc: 'Wear 2 accessories at once.',          reward: 10, icon: '✌️',
+          check: () => state.counters.mostWorn >= 2 },
+        { id: 'triple-stack',     title: 'Triple Stack',     desc: 'Wear 3 accessories at once.',          reward: 15, icon: '🥞',
+          check: () => state.counters.mostWorn >= 3 },
+        { id: 'fashion-show',     title: 'Fashion Show',     desc: 'Wear 5 accessories at once.',          reward: 30, icon: '🌟',
+          check: () => state.counters.mostWorn >= 5 },
+        { id: 'head-to-toe',      title: 'Head to Toe',      desc: 'Wear something in EVERY spot at once.', reward: 60, icon: '👑',
+          check: () => state.counters.mostWorn >= ACCESSORY_SLOTS.length },
+        { id: 'super-cool',       title: 'Super Cool',       desc: 'Wear a cape and sunglasses together.', reward: 20, icon: '😎',
+          check: () => isWearing('sunglasses') && (isWearing('superhero-cape') || isWearing('royal-cape')) },
+        { id: 'hat-trick',        title: 'Hat Trick',        desc: 'Wear a hat and an accessory together.', reward: 10, icon: '🎩',
+          check: () => state.hats.equipped !== 'no-hat' && Object.keys(state.accessories.worn).length >= 1 },
+        { id: 'quick-change',     title: 'Quick Change',     desc: 'Change your outfit 10 times.',         reward: 15, icon: '🔄',
+          check: () => state.counters.outfitChanges >= 10 },
+        { id: 'try-every-spot',   title: 'Try Every Spot',   desc: 'Wear something in every spot (one at a time is fine).', reward: 30, icon: '🧩',
+          check: () => state.counters.slotsWorn.length >= ACCESSORY_SLOTS.length },
+        { id: 'new-look',         title: 'New Look',         desc: 'Get your first accessory.',            reward: 10, icon: '🛍️',
+          check: () => ownedAccessoryCount() >= 1 },
+        { id: 'collector',        title: 'Collector',        desc: 'Own 5 accessories.',                   reward: 25, icon: '🧺',
+          check: () => ownedAccessoryCount() >= 5 },
+        { id: 'super-collector',  title: 'Super Collector',  desc: 'Own 12 accessories.',                  reward: 50, icon: '🏆',
+          check: () => ownedAccessoryCount() >= 12 },
+        { id: 'new-hat',          title: 'New Hat',          desc: 'Get your first hat.',                  reward: 10, icon: '🧢',
+          check: () => state.hats.owned.length >= 2 },
+        { id: 'hat-rack',         title: 'Hat Rack',         desc: 'Own 5 hats.',                          reward: 30, icon: '🎩',
+          check: () => state.hats.owned.length >= 6 }
     ];
+
+    function bgCount() { return document.querySelectorAll('.bg-thumb').length; }
+    function ownedAccessoryCount() {
+        return state.accessories.owned.filter(id => id !== 'no-accessory').length;
+    }
+    function isWearing(id) {
+        const worn = state.accessories.worn;
+        for (const s in worn) if (worn[s] === id) return true;
+        return false;
+    }
 
     const ACHIEVEMENT_BY_ID = {};
     ACHIEVEMENTS.forEach(a => { ACHIEVEMENT_BY_ID[a.id] = a; });
@@ -853,6 +1012,9 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         requestAnimationFrame(() => {
             requestAnimationFrame(() => el.classList.add('show'));
         });
+        /* A backlog (e.g. a returning player unlocking several of the new
+           achievements at once) moves faster so it doesn't take a minute. */
+        const holdMs = toastQueue.length >= 2 ? 1300 : 2800;
         setTimeout(() => {
             el.classList.remove('show');
             el.classList.add('hide');
@@ -860,7 +1022,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
                 el.remove();
                 drainToastQueue();
             }, 400);
-        }, 2800);
+        }, holdMs);
     }
 
     /* ============ MODAL ============
@@ -1208,6 +1370,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         renderCurrency();
         renderEquippedHat();
         buildHatShopGrid();
+        checkAchievements();
     }
 
     function equipHat(id) {
@@ -1216,6 +1379,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         saveState();
         renderEquippedHat();
         buildHatShopGrid();
+        checkAchievements();
     }
 
     /* ============ HAT SHOP UI ============ */
@@ -1296,141 +1460,351 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
 
     /* ============ ACCESSORIES ============
 
-       Second wardrobe layer above hats — glasses, mustaches, capes,
-       bow ties, etc. Same buy-with-Doodles + equip flow as hats; same
-       SVG-overlay rendering pattern except each accessory is INLINE
-       SVG (no shared sprite atlas to ship). The accessory's local
-       coordinate space is centered on (0,0); render code translates
-       to the named anchor point on the figure and applies the
-       accessory's scale.
+       The wardrobe layer beyond hats. Accessories STACK: Groodle wears one
+       item per SLOT (eyes, nose, mouth, neck, chest, back, hand) and as
+       many slots at once as the kid likes -- "he should be able to wear
+       more than one at a time" (Bala, 5). Slots are what keep stacking
+       from clashing: picking new sunglasses swaps the old specs out, but
+       never touches the cape.
 
-       Anchors are absolute coordinates that line up with the standard
-       humanoid silhouette (standing / cheer / star / groovy / t-pose /
-       wave). For non-humanoid poses (ghost, animal) the accessory
-       still renders at the anchor coordinate but may not land on a
-       meaningful body part — accept that as v1 and revisit if it
-       comes up. */
+       Each accessory is INLINE SVG (no sprite atlas), drawn in a local
+       space centred on (0,0) and translated to its anchor. Three layers:
+
+         * BACK items (capes, wings, jetpack) go in #accessoryBackInner,
+           which sits BEHIND the body (z 0). A cape in front would cover
+           the kid's drawing.
+         * everything else goes in #accessoryLayerInner, above the hat,
+           painted in FRONT_ORDER so glasses sit on a beard, not under it.
+         * HAND items ride Groodle's right hand: handPoint() puts them at
+           the fist for the current pose, and applyLimbAngles() spins them
+           about the shoulder pin with the arm, so they dance along. The
+           hand-authored ghost / animal poses have no hand, so hand items
+           simply don't show there.
+
+       Placeholder art, per the standing directive: simple shapes in the
+       game's ink (#1a0f33) until real art lands at launch. */
 
     const ACCESSORY_ANCHORS = {
         eyes:      { x: 200, y:  92 },
+        nose:      { x: 200, y: 108 },
         mouth:     { x: 200, y: 122 },
         chin:      { x: 200, y: 150 },
         shoulders: { x: 200, y: 175 },
         chest:     { x: 200, y: 250 }
     };
 
+    /* Display order in the shop. */
+    const ACCESSORY_SLOTS = [
+        { id: 'eyes',  label: 'Eyes',  icon: '👓' },
+        { id: 'nose',  label: 'Nose',  icon: '👃' },
+        { id: 'mouth', label: 'Mouth', icon: '👄' },
+        { id: 'neck',  label: 'Neck',  icon: '🎀' },
+        { id: 'chest', label: 'Chest', icon: '⭐' },
+        { id: 'back',  label: 'Back',  icon: '🦸' },
+        { id: 'hand',  label: 'Hand',  icon: '✋' }
+    ];
+    /* Paint order on the front layer (back has its own layer). */
+    const FRONT_ORDER = ['chest', 'neck', 'mouth', 'nose', 'eyes', 'hand'];
+    const INK = 'stroke="#1a0f33" stroke-width="2.5"';
+
     const ACCESSORIES = [
-        { id: 'no-accessory', name: 'Nothing',          price:   0, emoji: '🚫', anchor: 'eyes',      scale: 1, svg: '' },
-        {
-            id: 'round-specs', name: 'Round Specs',     price:  20, emoji: '🤓', anchor: 'eyes',      scale: 1,
-            svg: '<g stroke="#1a0f33" stroke-width="3" fill="none">' +
-                 '<circle cx="-18" cy="0" r="13"/>' +
-                 '<circle cx="18" cy="0" r="13"/>' +
-                 '<line x1="-5" y1="0" x2="5" y2="0"/>' +
-                 '</g>'
-        },
-        {
-            id: 'star-shades', name: 'Star Shades',     price:  40, emoji: '⭐', anchor: 'eyes',      scale: 1,
-            svg: '<g fill="#ffd23f" stroke="#1a0f33" stroke-width="2.5">' +
-                 '<polygon points="-18,-12 -14,-3 -4,-3 -12,4 -8,13 -18,7 -28,13 -24,4 -32,-3 -22,-3"/>' +
-                 '<polygon points="18,-12 22,-3 32,-3 24,4 28,13 18,7 8,13 12,4 4,-3 14,-3"/>' +
-                 '<line x1="-5" y1="0" x2="5" y2="0"/>' +
-                 '</g>'
-        },
-        {
-            id: 'heart-shades', name: 'Heart Shades',   price:  40, emoji: '💖', anchor: 'eyes',      scale: 1,
-            svg: '<g fill="#ff6ec7" stroke="#1a0f33" stroke-width="2.5">' +
-                 '<path d="M -18,-6 C -22,-12 -32,-10 -32,-2 C -32,5 -18,12 -18,12 C -18,12 -4,5 -4,-2 C -4,-10 -14,-12 -18,-6 Z"/>' +
-                 '<path d="M 18,-6 C 14,-12 4,-10 4,-2 C 4,5 18,12 18,12 C 18,12 32,5 32,-2 C 32,-10 22,-12 18,-6 Z"/>' +
-                 '</g>'
-        },
-        {
-            id: 'mustache', name: 'Mustache',           price:  25, emoji: '🥸', anchor: 'mouth',     scale: 1,
-            svg: '<path d="M 0,0 C -8,-6 -22,-4 -28,2 C -22,8 -10,6 -4,3 L 0,3 C -4,3 -10,6 -22,8 ' +
-                 'M 0,0 C 8,-6 22,-4 28,2 C 22,8 10,6 4,3 L 0,3 C 4,3 10,6 22,8" ' +
-                 'fill="#3b1f6b" stroke="#1a0f33" stroke-width="2"/>'
-        },
-        {
-            id: 'bow-tie', name: 'Bow Tie',             price:  25, emoji: '🎀', anchor: 'chin',      scale: 1,
-            svg: '<g fill="#e63946" stroke="#1a0f33" stroke-width="2.5">' +
-                 '<polygon points="0,0 -24,-12 -24,12"/>' +
-                 '<polygon points="0,0 24,-12 24,12"/>' +
-                 '<rect x="-5" y="-7" width="10" height="14" rx="2"/>' +
-                 '</g>'
-        },
-        {
-            id: 'long-beard', name: 'Long Beard',       price:  35, emoji: '🧔', anchor: 'chin',      scale: 1,
-            svg: '<g fill="#6f4e37" stroke="#1a0f33" stroke-width="2.5">' +
-                 '<path d="M -28,-8 C -28,18 -16,40 0,42 C 16,40 28,18 28,-8 C 16,-2 -16,-2 -28,-8 Z"/>' +
-                 '</g>'
-        },
-        {
-            id: 'superhero-cape', name: 'Hero Cape',    price:  60, emoji: '🦸', anchor: 'shoulders', scale: 1,
-            svg: '<g fill="#e63946" stroke="#1a0f33" stroke-width="2.5" stroke-linejoin="round">' +
-                 '<path d="M -55,-10 L -85,200 L 0,170 L 85,200 L 55,-10 L 25,0 L 0,8 L -25,0 Z"/>' +
-                 '</g>'
-        },
-        {
-            id: 'fairy-wings', name: 'Fairy Wings',     price:  70, emoji: '🧚', anchor: 'shoulders', scale: 1,
-            svg: '<g fill="rgba(255, 110, 199, 0.55)" stroke="#ff6ec7" stroke-width="2.5">' +
-                 '<ellipse cx="-50" cy="0" rx="40" ry="55" transform="rotate(-25 -50 0)"/>' +
-                 '<ellipse cx="50" cy="0" rx="40" ry="55" transform="rotate(25 50 0)"/>' +
-                 '<ellipse cx="-45" cy="60" rx="32" ry="40" transform="rotate(-15 -45 60)"/>' +
-                 '<ellipse cx="45" cy="60" rx="32" ry="40" transform="rotate(15 45 60)"/>' +
-                 '</g>'
-        },
-        {
-            id: 'sheriff-badge', name: 'Sheriff Badge', price:  45, emoji: '🌟', anchor: 'chest',     scale: 1,
-            svg: '<g fill="#ffd23f" stroke="#1a0f33" stroke-width="2.5">' +
-                 '<polygon points="0,-22 5,-7 22,-7 9,3 14,18 0,9 -14,18 -9,3 -22,-7 -5,-7"/>' +
-                 '<circle cx="0" cy="0" r="4" fill="#1a0f33"/>' +
-                 '</g>'
-        }
+        /* Kept so old saves that list it in `owned` still resolve. It is
+           not shown in the shop: "Take all off" replaced it. */
+        { id: 'no-accessory', name: 'Nothing', price: 0, slot: null, svg: '' },
+
+        /* ---- eyes ---- */
+        { id: 'sunglasses', name: 'Sunglasses', price: 15, slot: 'eyes', anchor: 'eyes',
+          svg: '<g ' + INK + ' stroke-linejoin="round">' +
+               '<path d="M -36,-9 L -4,-9 L -6,4 C -7,11 -12,13 -19,13 C -27,13 -32,10 -34,3 Z" fill="#1a0f33"/>' +
+               '<path d="M 36,-9 L 4,-9 L 6,4 C 7,11 12,13 19,13 C 27,13 32,10 34,3 Z" fill="#1a0f33"/>' +
+               '<path d="M -4,-6 Q 0,-9 4,-6" fill="none"/>' +
+               '<line x1="-36" y1="-8" x2="-46" y2="-12"/><line x1="36" y1="-8" x2="46" y2="-12"/></g>' +
+               '<g fill="#ffffff" opacity="0.55"><path d="M -29,-5 L -22,-5 L -27,4 Z"/><path d="M 11,-5 L 18,-5 L 13,4 Z"/></g>' },
+        { id: 'round-specs', name: 'Round Specs', price: 20, slot: 'eyes', anchor: 'eyes',
+          svg: '<g stroke="#1a0f33" stroke-width="3" fill="none">' +
+               '<circle cx="-18" cy="0" r="13"/><circle cx="18" cy="0" r="13"/>' +
+               '<line x1="-5" y1="0" x2="5" y2="0"/></g>' },
+        { id: 'eye-patch', name: 'Pirate Patch', price: 25, slot: 'eyes', anchor: 'eyes',
+          svg: '<line x1="-46" y1="-16" x2="44" y2="8" stroke="#1a0f33" stroke-width="3"/>' +
+               '<path d="M 4,-12 C 30,-15 36,6 19,14 C 10,18 4,10 4,0 Z" fill="#1a0f33"/>' },
+        { id: '3d-glasses', name: '3-D Glasses', price: 30, slot: 'eyes', anchor: 'eyes',
+          svg: '<g ' + INK + '><rect x="-37" y="-11" width="74" height="22" rx="5" fill="#ffffff"/>' +
+               '<rect x="-32" y="-7" width="25" height="14" rx="3" fill="#e63946"/>' +
+               '<rect x="7" y="-7" width="25" height="14" rx="3" fill="#3a86ff"/></g>' },
+        { id: 'star-shades', name: 'Star Shades', price: 40, slot: 'eyes', anchor: 'eyes',
+          svg: '<g fill="#ffd23f" stroke="#1a0f33" stroke-width="2.5">' +
+               '<polygon points="-18,-12 -14,-3 -4,-3 -12,4 -8,13 -18,7 -28,13 -24,4 -32,-3 -22,-3"/>' +
+               '<polygon points="18,-12 22,-3 32,-3 24,4 28,13 18,7 8,13 12,4 4,-3 14,-3"/>' +
+               '<line x1="-5" y1="0" x2="5" y2="0"/></g>' },
+        { id: 'heart-shades', name: 'Heart Shades', price: 40, slot: 'eyes', anchor: 'eyes',
+          svg: '<g fill="#ff6ec7" stroke="#1a0f33" stroke-width="2.5">' +
+               '<path d="M -18,-6 C -22,-12 -32,-10 -32,-2 C -32,5 -18,12 -18,12 C -18,12 -4,5 -4,-2 C -4,-10 -14,-12 -18,-6 Z"/>' +
+               '<path d="M 18,-6 C 14,-12 4,-10 4,-2 C 4,5 18,12 18,12 C 18,12 32,5 32,-2 C 32,-10 22,-12 18,-6 Z"/></g>' },
+
+        /* ---- nose ---- */
+        { id: 'clown-nose', name: 'Clown Nose', price: 10, slot: 'nose', anchor: 'nose',
+          svg: '<circle cx="0" cy="0" r="10" fill="#e63946" ' + INK + '/>' +
+               '<circle cx="-3" cy="-3" r="3" fill="#ffffff" opacity="0.7"/>' },
+        { id: 'piggy-nose', name: 'Piggy Nose', price: 15, slot: 'nose', anchor: 'nose',
+          svg: '<ellipse cx="0" cy="0" rx="13" ry="9" fill="#ff9ecf" ' + INK + '/>' +
+               '<ellipse cx="-4" cy="0" rx="2" ry="3.5" fill="#1a0f33"/><ellipse cx="4" cy="0" rx="2" ry="3.5" fill="#1a0f33"/>' },
+
+        /* ---- mouth ---- */
+        { id: 'bunny-teeth', name: 'Bunny Teeth', price: 20, slot: 'mouth', anchor: 'mouth',
+          svg: '<g fill="#ffffff" ' + INK + '><rect x="-9" y="-2" width="9" height="13" rx="2"/>' +
+               '<rect x="0" y="-2" width="9" height="13" rx="2"/></g>' },
+        { id: 'mustache', name: 'Mustache', price: 25, slot: 'mouth', anchor: 'mouth',
+          svg: '<path d="M 0,0 C -8,-6 -22,-4 -28,2 C -22,8 -10,6 -4,3 L 0,3 C -4,3 -10,6 -22,8 ' +
+               'M 0,0 C 8,-6 22,-4 28,2 C 22,8 10,6 4,3 L 0,3 C 4,3 10,6 22,8" ' +
+               'fill="#3b1f6b" stroke="#1a0f33" stroke-width="2"/>' },
+        { id: 'long-beard', name: 'Long Beard', price: 35, slot: 'mouth', anchor: 'chin',
+          svg: '<g fill="#6f4e37" ' + INK + '>' +
+               '<path d="M -28,-8 C -28,18 -16,40 0,42 C 16,40 28,18 28,-8 C 16,-2 -16,-2 -28,-8 Z"/></g>' },
+
+        /* ---- neck ---- */
+        { id: 'scarf', name: 'Cozy Scarf', price: 20, slot: 'neck', anchor: 'chin',
+          svg: '<g ' + INK + ' stroke-linejoin="round" fill="#43aa8b">' +
+               '<path d="M -40,-6 C -20,6 20,6 40,-6 L 40,8 C 20,20 -20,20 -40,8 Z"/>' +
+               '<path d="M 14,10 L 30,60 L 16,64 L 4,14 Z"/></g>' +
+               '<g stroke="#fcbf49" stroke-width="4"><line x1="-20" y1="6" x2="-20" y2="17"/>' +
+               '<line x1="0" y1="9" x2="0" y2="19"/><line x1="20" y1="6" x2="20" y2="17"/>' +
+               '<line x1="18" y1="40" x2="26" y2="38"/></g>' },
+        { id: 'bow-tie', name: 'Bow Tie', price: 25, slot: 'neck', anchor: 'chin',
+          svg: '<g fill="#e63946" ' + INK + '>' +
+               '<polygon points="0,0 -24,-12 -24,12"/><polygon points="0,0 24,-12 24,12"/>' +
+               '<rect x="-5" y="-7" width="10" height="14" rx="2"/></g>' },
+        { id: 'pearl-necklace', name: 'Pearl Necklace', price: 30, slot: 'neck', anchor: 'chin',
+          svg: '<g fill="#ffffff" stroke="#1a0f33" stroke-width="1.5">' +
+               [-36, -27, -18, -9, 0, 9, 18, 27, 36].map(x =>
+                   '<circle cx="' + x + '" cy="' + (26 * (1 - (x / 36) * (x / 36))).toFixed(1) + '" r="5"/>').join('') +
+               '</g>' },
+        { id: 'gold-medal', name: 'Gold Medal', price: 35, slot: 'neck', anchor: 'chin',
+          svg: '<g ' + INK + ' stroke-linejoin="round">' +
+               '<path d="M -26,-6 L -6,40 L 6,40 L 26,-6 L 14,-6 L 0,28 L -14,-6 Z" fill="#3a86ff"/>' +
+               '<circle cx="0" cy="52" r="15" fill="#ffd23f"/></g>' +
+               '<polygon points="0,43 3,50 10,50 4,54 6,61 0,57 -6,61 -4,54 -10,50 -3,50" fill="#f4a261"/>' },
+
+        /* ---- chest ---- */
+        { id: 'flower-pin', name: 'Flower Pin', price: 15, slot: 'chest', anchor: 'chest',
+          svg: '<g fill="#ff6ec7" stroke="#1a0f33" stroke-width="2">' +
+               '<circle cx="0" cy="-12" r="8"/><circle cx="11" cy="-4" r="8"/><circle cx="7" cy="10" r="8"/>' +
+               '<circle cx="-7" cy="10" r="8"/><circle cx="-11" cy="-4" r="8"/></g>' +
+               '<circle cx="0" cy="0" r="7" fill="#fcbf49" stroke="#1a0f33" stroke-width="2"/>' },
+        { id: 'heart-pin', name: 'Heart Pin', price: 15, slot: 'chest', anchor: 'chest',
+          svg: '<path d="M 0,-6 C -4,-14 -18,-14 -18,-3 C -18,6 0,16 0,16 C 0,16 18,6 18,-3 C 18,-14 4,-14 0,-6 Z" ' +
+               'fill="#e63946" ' + INK + '/>' },
+        { id: 'sheriff-badge', name: 'Sheriff Badge', price: 45, slot: 'chest', anchor: 'chest',
+          svg: '<g fill="#ffd23f" ' + INK + '>' +
+               '<polygon points="0,-22 5,-7 22,-7 9,3 14,18 0,9 -14,18 -9,3 -22,-7 -5,-7"/>' +
+               '<circle cx="0" cy="0" r="4" fill="#1a0f33"/></g>' },
+
+        /* ---- back (drawn BEHIND the body) ---- */
+        { id: 'superhero-cape', name: 'Hero Cape', price: 40, slot: 'back', anchor: 'shoulders',
+          svg: '<g fill="#e63946" ' + INK + ' stroke-linejoin="round">' +
+               '<path d="M -55,-10 L -85,200 L 0,170 L 85,200 L 55,-10 L 25,0 L 0,8 L -25,0 Z"/></g>' },
+        { id: 'bat-wings', name: 'Bat Wings', price: 45, slot: 'back', anchor: 'shoulders',
+          svg: '<path d="M -20,10 C -50,-40 -110,-40 -130,10 C -112,4 -100,14 -96,28 C -84,16 -70,20 -64,34 ' +
+               'C -54,22 -38,24 -30,36 Z M 20,10 C 50,-40 110,-40 130,10 C 112,4 100,14 96,28 C 84,16 70,20 64,34 ' +
+               'C 54,22 38,24 30,36 Z" fill="#3b1f6b" ' + INK + ' stroke-linejoin="round"/>' },
+        { id: 'royal-cape', name: 'Royal Cape', price: 55, slot: 'back', anchor: 'shoulders',
+          svg: '<g ' + INK + ' stroke-linejoin="round">' +
+               '<path d="M -60,-10 L -92,215 L 92,215 L 60,-10 L 0,10 Z" fill="#7209b7"/>' +
+               '<path d="M -92,205 L 92,205 L 92,222 L -92,222 Z" fill="#ffffff"/></g>' +
+               '<g fill="#1a0f33"><circle cx="-60" cy="213" r="2.5"/><circle cx="-20" cy="213" r="2.5"/>' +
+               '<circle cx="20" cy="213" r="2.5"/><circle cx="60" cy="213" r="2.5"/></g>' },
+        { id: 'jetpack', name: 'Jetpack', price: 65, slot: 'back', anchor: 'shoulders',
+          svg: '<g ' + INK + ' stroke-linejoin="round">' +
+               '<rect x="-92" y="10" width="34" height="96" rx="15" fill="#adb5bd"/>' +
+               '<rect x="58" y="10" width="34" height="96" rx="15" fill="#adb5bd"/>' +
+               '<path d="M -86,106 L -64,106 L -75,146 Z" fill="#f4a261"/>' +
+               '<path d="M 64,106 L 86,106 L 75,146 Z" fill="#f4a261"/></g>' +
+               '<g fill="#fcbf49"><path d="M -81,108 L -69,108 L -75,128 Z"/><path d="M 69,108 L 81,108 L 75,128 Z"/></g>' },
+        { id: 'fairy-wings', name: 'Fairy Wings', price: 70, slot: 'back', anchor: 'shoulders',
+          svg: '<g fill="rgba(255, 110, 199, 0.55)" stroke="#ff6ec7" stroke-width="2.5">' +
+               '<ellipse cx="-50" cy="0" rx="40" ry="55" transform="rotate(-25 -50 0)"/>' +
+               '<ellipse cx="50" cy="0" rx="40" ry="55" transform="rotate(25 50 0)"/>' +
+               '<ellipse cx="-45" cy="60" rx="32" ry="40" transform="rotate(-15 -45 60)"/>' +
+               '<ellipse cx="45" cy="60" rx="32" ry="40" transform="rotate(15 45 60)"/></g>' },
+
+        /* ---- hand (origin = the fist, up = -y) ---- */
+        { id: 'balloon', name: 'Balloon', price: 10, slot: 'hand',
+          svg: '<path d="M 0,0 C 6,-30 -6,-60 2,-90" fill="none" stroke="#1a0f33" stroke-width="2"/>' +
+               '<ellipse cx="2" cy="-115" rx="22" ry="27" fill="#e63946" ' + INK + '/>' +
+               '<path d="M -3,-88 L 7,-88 L 2,-83 Z" fill="#e63946" stroke="#1a0f33" stroke-width="1.5"/>' +
+               '<ellipse cx="-6" cy="-124" rx="5" ry="8" fill="#ffffff" opacity="0.5"/>' },
+        { id: 'lollipop', name: 'Lollipop', price: 15, slot: 'hand',
+          svg: '<line x1="0" y1="10" x2="0" y2="-40" stroke="#1a0f33" stroke-width="5" stroke-linecap="round"/>' +
+               '<line x1="0" y1="10" x2="0" y2="-40" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>' +
+               '<circle cx="0" cy="-58" r="20" fill="#ff6ec7" ' + INK + '/>' +
+               '<path d="M 0,-58 m -12,0 a 12,12 0 1 1 24,0 a 8,8 0 1 1 -16,0 a 4,4 0 1 1 8,0" fill="none" stroke="#ffffff" stroke-width="3"/>' },
+        { id: 'ice-cream', name: 'Ice Cream', price: 15, slot: 'hand',
+          svg: '<path d="M -12,-20 L 12,-20 L 0,14 Z" fill="#f4a261" ' + INK + ' stroke-linejoin="round"/>' +
+               '<circle cx="0" cy="-30" r="14" fill="#ff9ecf" ' + INK + '/>' +
+               '<circle cx="5" cy="-44" r="3.5" fill="#e63946" stroke="#1a0f33" stroke-width="1.5"/>' },
+        { id: 'microphone', name: 'Microphone', price: 20, slot: 'hand',
+          svg: '<rect x="-5" y="-30" width="10" height="44" rx="4" fill="#495057" ' + INK + '/>' +
+               '<circle cx="0" cy="-40" r="13" fill="#adb5bd" ' + INK + '/>' },
+        { id: 'magic-wand', name: 'Magic Wand', price: 25, slot: 'hand',
+          svg: '<line x1="0" y1="12" x2="0" y2="-48" stroke="#1a0f33" stroke-width="5" stroke-linecap="round"/>' +
+               '<polygon points="0,-74 6,-60 21,-60 9,-51 14,-37 0,-45 -14,-37 -9,-51 -21,-60 -6,-60" fill="#ffd23f" ' + INK + '/>' }
     ];
 
     const ACCESSORY_BY_ID = {};
     ACCESSORIES.forEach(a => { ACCESSORY_BY_ID[a.id] = a; });
 
     let accessoryLayerInnerEl = null;
+    let accessoryBackInnerEl = null;
     let accessoryShopGridEl = null;
+    let heldItemEl = null;
 
+    /* The fist of the right arm, in stage coords, for a rig pose. The tip
+       is found once from the arm's own outline (the average of its lowest
+       points), then placed exactly the way rigRingsD places the part:
+       mirror, rotate by rest + sign*pose about the pin. */
+    let _armTip = null;
+    function handPoint(pose) {
+        if (!pose || !pose.rig) return null;
+        const k = 'armR';
+        if (!_armTip) {
+            const ring = RIG.parts[RIG.srcOf[k]].solid[0];
+            let maxY = -Infinity;
+            for (let i = 1; i < ring.length; i += 2) maxY = Math.max(maxY, ring[i]);
+            let sx = 0, sy = 0, n = 0;
+            for (let i = 0; i < ring.length; i += 2) {
+                if (ring[i + 1] > maxY - 28) { sx += ring[i]; sy += ring[i + 1]; n++; }
+            }
+            _armTip = [sx / n, sy / n - 6];
+        }
+        const mir = RIG.mirror.indexOf(k) !== -1;
+        const lx = mir ? -_armTip[0] : _armTip[0], ly = _armTip[1];
+        const deg = RIG.rest[k] + RIG.sign[k] * ((pose.rig && pose.rig[k]) || 0);
+        const t = deg * Math.PI / 180, co = Math.cos(t), si = Math.sin(t);
+        const a = RIG.anchor[k];
+        return { x: a[0] + lx * co - ly * si, y: a[1] + lx * si + ly * co, pivot: a };
+    }
+
+    function placedMarkup(acc, x, y) {
+        return '<g transform="translate(' + x.toFixed(1) + ',' + y.toFixed(1) + ')">' + acc.svg + '</g>';
+    }
+
+    /* Markup for one accessory at its anchor on the full-size figure. */
     function accessoryMarkup(acc) {
-        if (!acc || !acc.svg || acc.id === 'no-accessory') return '';
+        if (!acc || !acc.svg || !acc.slot || acc.slot === 'hand') return '';
         const anchor = ACCESSORY_ANCHORS[acc.anchor] || ACCESSORY_ANCHORS.eyes;
-        const s = acc.scale || 1;
-        return '<g transform="translate(' + anchor.x + ',' + anchor.y + ') scale(' + s + ')">' +
-               acc.svg +
-               '</g>';
+        return placedMarkup(acc, anchor.x, anchor.y);
+    }
+
+    function wornItem(slot) {
+        const id = state.accessories.worn[slot];
+        const acc = id && ACCESSORY_BY_ID[id];
+        return (acc && acc.slot === slot) ? acc : null;
     }
 
     function renderEquippedAccessory() {
-        if (!accessoryLayerInnerEl) return;
-        const acc = ACCESSORY_BY_ID[state.accessories.equipped] || ACCESSORY_BY_ID['no-accessory'];
-        accessoryLayerInnerEl.innerHTML = accessoryMarkup(acc);
+        if (!accessoryLayerInnerEl || !state) return;
+        const back = wornItem('back');
+        if (accessoryBackInnerEl) accessoryBackInnerEl.innerHTML = back ? accessoryMarkup(back) : '';
+        let front = '';
+        for (let i = 0; i < FRONT_ORDER.length; i++) {
+            const slot = FRONT_ORDER[i], acc = wornItem(slot);
+            if (!acc) continue;
+            if (slot === 'hand') {
+                const hp = handPoint(getCurrentPose());
+                if (!hp) continue;
+                front += '<g class="held-item" data-pivot="' + hp.pivot[0] + ' ' + hp.pivot[1] + '">' +
+                         placedMarkup(acc, hp.x, hp.y) + '</g>';
+            } else {
+                front += accessoryMarkup(acc);
+            }
+        }
+        accessoryLayerInnerEl.innerHTML = front;
+        heldItemEl = accessoryLayerInnerEl.querySelector('.held-item');
+        syncHeldItem(_lastLimbAngles);
     }
 
-    function buyAccessory(id) {
-        const acc = ACCESSORY_BY_ID[id];
-        if (!acc) return;
-        const alreadyOwned = state.accessories.owned.indexOf(id) !== -1;
-        if (alreadyOwned) { equipAccessory(id); return; }
-        if (acc.price > 0 && state.doodles < acc.price) return;
-        state.doodles -= acc.price;
-        state.accessories.owned.push(id);
-        state.accessories.equipped = id;
+    /* Spin the held item with the right arm during the dance. */
+    function syncHeldItem(ang) {
+        if (!heldItemEl) return;
+        const a = ang ? (ang.armR || 0) : 0;
+        if (a) heldItemEl.setAttribute('transform',
+            'rotate(' + a.toFixed(2) + ' ' + heldItemEl.getAttribute('data-pivot') + ')');
+        else heldItemEl.removeAttribute('transform');
+    }
+
+    function afterOutfitChange() {
         saveState();
         renderCurrency();
         renderEquippedAccessory();
+        trackOutfit();
         buildAccessoryShopGrid();
-        buildHatShopGrid();
     }
 
-    function equipAccessory(id) {
-        if (state.accessories.owned.indexOf(id) === -1) return;
-        state.accessories.equipped = id;
-        saveState();
-        renderEquippedAccessory();
-        buildAccessoryShopGrid();
+    /* The one action behind every accessory card: put it on, take it off,
+       or buy it (and put it on). Wearing an item in an occupied slot swaps
+       it -- that's what stops two pairs of glasses at once. */
+    function tapAccessory(id) {
+        const acc = ACCESSORY_BY_ID[id];
+        if (!acc || !acc.slot) return;
+        const worn = state.accessories.worn;
+        const owned = state.accessories.owned.indexOf(id) !== -1;
+        if (!owned) {
+            if (state.doodles < acc.price) return;
+            state.doodles -= acc.price;
+            state.accessories.owned.push(id);
+            worn[acc.slot] = id;
+            sfxWardrobe(true);
+        } else if (worn[acc.slot] === id) {
+            delete worn[acc.slot];
+            sfxWardrobe(false);
+        } else {
+            worn[acc.slot] = id;
+            sfxWardrobe(true);
+        }
+        afterOutfitChange();
+    }
+
+    function clearAccessories() {
+        if (!Object.keys(state.accessories.worn).length) return;
+        state.accessories.worn = {};
+        sfxWardrobe(false);
+        afterOutfitChange();
+    }
+
+    /* Tiny pop on / plop off. Reuses the game's AudioContext only if the
+       kid has already started audio (we never create one from a tap in
+       a modal just for this). */
+    function sfxWardrobe(on) {
+        try {
+            if (!audioCtx || audioCtx.state !== 'running') return;
+            const t = audioCtx.currentTime;
+            const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(on ? 520 : 420, t);
+            o.frequency.exponentialRampToValueAtTime(on ? 880 : 240, t + 0.12);
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.exponentialRampToValueAtTime(0.18, t + 0.01);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+            o.connect(g); g.connect(masterGain || audioCtx.destination);
+            o.start(t); o.stop(t + 0.18);
+        } catch (e) { /* sound is a nicety */ }
+    }
+
+    /* Card preview. Head slots crop to the head, like the hat shop; body
+       slots show a little paper-doll body so a cape reads as a cape. */
+    const PREVIEW_HEAD = '<circle cx="200" cy="100" r="58" fill="rgba(232, 232, 244, 0.94)" stroke="#1a0f33" stroke-width="3"/>';
+    const PREVIEW_BODY = PREVIEW_HEAD +
+        '<rect x="148" y="152" width="104" height="190" rx="44" fill="rgba(232, 232, 244, 0.94)" stroke="#1a0f33" stroke-width="3"/>' +
+        '<path d="M 248,190 L 290,282" stroke="#1a0f33" stroke-width="16" stroke-linecap="round"/>' +
+        '<path d="M 248,190 L 290,282" stroke="rgba(232, 232, 244, 1)" stroke-width="10" stroke-linecap="round"/>';
+    function previewMarkup(acc) {
+        if (acc.slot === 'eyes' || acc.slot === 'nose' || acc.slot === 'mouth') {
+            return '<svg class="hat-preview" viewBox="60 -10 280 280" aria-hidden="true">' +
+                   PREVIEW_HEAD + accessoryMarkup(acc) + '</svg>';
+        }
+        const item = acc.slot === 'hand' ? placedMarkup(acc, 292, 292) : accessoryMarkup(acc);
+        const vb = acc.slot === 'hand' ? '40 40 320 320' : acc.slot === 'back' ? '20 30 360 420' : '60 40 280 300';
+        return '<svg class="hat-preview" viewBox="' + vb + '" aria-hidden="true">' +
+               (acc.slot === 'back' ? item + PREVIEW_BODY : PREVIEW_BODY + item) + '</svg>';
     }
 
     function buildAccessoryShopGrid() {
@@ -1438,54 +1812,62 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         if (hatShopBalanceEl) {
             hatShopBalanceEl.textContent = '🪙 ' + state.doodles + ' Doodles';
         }
+        const worn = state.accessories.worn;
+        const wornCount = Object.keys(worn).filter(s => wornItem(s)).length;
         accessoryShopGridEl.innerHTML = '';
-        for (let i = 0; i < ACCESSORIES.length; i++) {
-            const acc = ACCESSORIES[i];
-            const owned = state.accessories.owned.indexOf(acc.id) !== -1;
-            const equipped = state.accessories.equipped === acc.id;
-            const affordable = state.doodles >= acc.price;
 
-            const card = document.createElement('div');
-            card.className = 'hat-card';
-            if (equipped) card.classList.add('equipped');
-            else if (owned) card.classList.add('owned');
-            else if (!affordable && acc.price > 0) card.classList.add('locked');
+        /* Toolbar: what he has on + one big "take it all off". */
+        const bar = document.createElement('div');
+        bar.className = 'acc-toolbar';
+        bar.innerHTML = '<span class="acc-wearing"></span>' +
+            '<button class="acc-clear" type="button">Take all off</button>';
+        bar.querySelector('.acc-wearing').textContent = wornCount
+            ? 'Wearing ' + wornCount + (wornCount === 1 ? ' thing' : ' things')
+            : 'Tap something to try it on!';
+        const clearBtn = bar.querySelector('.acc-clear');
+        clearBtn.disabled = !wornCount;
+        clearBtn.addEventListener('click', clearAccessories);
+        accessoryShopGridEl.appendChild(bar);
 
-            /* Preview: mini-Groodle head + the accessory rendered at its
-               configured anchor. Same viewBox / wash as the hat shop so
-               the two tabs feel uniform. */
-            const previewSvg =
-                '<svg class="hat-preview" viewBox="60 -10 280 280" aria-hidden="true">' +
-                    '<circle cx="200" cy="100" r="58" fill="rgba(232, 232, 244, 0.94)" stroke="#1a0f33" stroke-width="3"/>' +
-                    accessoryMarkup(acc) +
-                '</svg>';
+        for (let s = 0; s < ACCESSORY_SLOTS.length; s++) {
+            const slot = ACCESSORY_SLOTS[s];
+            const head = document.createElement('div');
+            head.className = 'acc-slot-head';
+            head.textContent = slot.icon + ' ' + slot.label;
+            accessoryShopGridEl.appendChild(head);
 
-            let actionHtml;
-            if (equipped) {
-                actionHtml = '<button class="hat-action equipped-tag" type="button" disabled>✓ Equipped</button>';
-            } else if (owned) {
-                actionHtml = '<button class="hat-action own" type="button" data-action="equip">Wear</button>';
-            } else if (acc.price === 0) {
-                actionHtml = '<button class="hat-action own" type="button" data-action="buy">Wear</button>';
-            } else if (affordable) {
-                actionHtml = '<button class="hat-action buy" type="button" data-action="buy">Buy &nbsp;' + acc.price + ' 🪙</button>';
-            } else {
-                actionHtml = '<button class="hat-action locked-tag" type="button" disabled>🔒 ' + acc.price + ' 🪙</button>';
+            const items = ACCESSORIES.filter(a => a.slot === slot.id);
+            for (let i = 0; i < items.length; i++) {
+                const acc = items[i];
+                const owned = state.accessories.owned.indexOf(acc.id) !== -1;
+                const wearing = worn[slot.id] === acc.id;
+                const affordable = state.doodles >= acc.price;
+
+                const card = document.createElement('div');
+                card.className = 'hat-card acc-card';
+                if (wearing) card.classList.add('equipped');
+                else if (owned) card.classList.add('owned');
+                else if (!affordable) card.classList.add('locked');
+
+                let actionHtml;
+                if (wearing) {
+                    actionHtml = '<button class="hat-action equipped-tag" type="button">✓ Take off</button>';
+                } else if (owned) {
+                    actionHtml = '<button class="hat-action own" type="button">Wear</button>';
+                } else if (affordable) {
+                    actionHtml = '<button class="hat-action buy" type="button">Buy &nbsp;' + acc.price + ' 🪙</button>';
+                } else {
+                    actionHtml = '<button class="hat-action locked-tag" type="button" disabled>🔒 ' + acc.price + ' 🪙</button>';
+                }
+                card.innerHTML = previewMarkup(acc) +
+                    '<div class="hat-name">' + escapeHtml(acc.name) + '</div>' + actionHtml;
+                /* The whole card is the target, not just the little button:
+                   bigger for small fingers. */
+                if (owned || affordable) {
+                    card.addEventListener('click', () => tapAccessory(acc.id));
+                }
+                accessoryShopGridEl.appendChild(card);
             }
-
-            card.innerHTML = previewSvg +
-                '<div class="hat-name">' + escapeHtml(acc.name) + '</div>' +
-                actionHtml;
-
-            const btn = card.querySelector('button[data-action]');
-            if (btn) {
-                btn.addEventListener('click', () => {
-                    if (btn.dataset.action === 'equip') equipAccessory(acc.id);
-                    else buyAccessory(acc.id);
-                });
-            }
-
-            accessoryShopGridEl.appendChild(card);
         }
     }
 
@@ -2539,6 +2921,10 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         c.scale(2, 2);
         c.lineCap = 'round'; c.lineJoin = 'round';
         const body = buildBodyPath();
+        /* Back accessories (cape, wings) go down FIRST, behind the body,
+           matching #accessoryBackLayer's place on screen. */
+        const backLayer = rasterizeDecoLayer(accessoryBackInnerEl && accessoryBackInnerEl.innerHTML, c);
+        return backLayer.then(function () {
         /* Pale interior wash — always the base (and the fallback if a
            pattern raster fails). */
         c.save();
@@ -2590,6 +2976,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
             .then(function () {
                 return new Promise(function (resolve) { out.toBlob(resolve, 'image/png'); });
             });
+        });
     }
 
     let galleryModalEl = null;
@@ -2694,6 +3081,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
             if (!blob) { flashToast('Could not save — try again.'); return; }
             return idbSaveGroodle(blob).then(function () {
                 flashToast('Saved to your gallery! 🎨');
+                trackCount('savesMade');
             });
         }).catch(function () { flashToast('Could not save — try again.'); });
     }
@@ -3036,6 +3424,8 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
            or the dance would drive detached elements. */
         cacheRigEls();
         applyLimbAngles(null);
+        /* Hand items sit at this pose's fist; re-place them. */
+        if (state) renderEquippedAccessory();
         if (creature && pose.origin) {
             creature.style.transformOrigin = pose.origin;
         }
@@ -3123,6 +3513,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         buildPatternDefs();
         syncPatternWindow();
         patternFillEl.setAttribute('fill', 'url(#pat-' + id + ')');
+        trackTried('patternsTried', id);
         patternWinPathEl.style.transform = creature ? creature.style.transform : '';
         /* removeAttribute (not .hidden=false): #patternLayer is an SVG
            element, where the `hidden` IDL setter does NOT reflect to
@@ -3417,6 +3808,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         if (!POSES[poseId]) return;
         state.pose = poseId;
         saveState();
+        trackTried('posesTried', poseId);
         /* trackClearDrawing — switching pose clears the drawing surface,
            so the per-drawing color tally needs to reset along with it
            (matches the same reset that clearCanvas does). */
@@ -3598,6 +3990,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
                 document.querySelectorAll('.bg-thumb').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 bgLayer.className = 'bg-layer bg-' + name;
+                trackTried('bgsTried', name);
             });
         });
     }
@@ -3756,6 +4149,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
             closeDrawer();
             setPlayBtnState(true);
             updateMoveBeatLabels();
+            trackGroove();
             startAudio();
             danceStartTime = audioCtx.currentTime;
             requestAnimationFrame(danceFrame);
@@ -4044,11 +4438,13 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         document.getElementById('moveBtn').addEventListener('click', () => {
             currentMoveIdx = (currentMoveIdx + 1) % MOVES.length;
             updateMoveBeatLabels();
+            if (isPlaying) trackGroove();
         });
         document.getElementById('beatBtn').addEventListener('click', () => {
             currentBeatIdx = (currentBeatIdx + 1) % BEATS.length;
             trackBeatExperienced(BEATS[currentBeatIdx]);
             updateMoveBeatLabels();
+            if (isPlaying) trackGroove();
         });
     }
 
@@ -4069,6 +4465,7 @@ const DOLL_ART = {"torso":{"x":-67.71,"y":-0.36,"w":125.77,"h":319.06},"arm":{"x
         hatShopBalanceEl = document.getElementById('hatShopBalance');
         hatLayerInnerEl = document.getElementById('hatLayerInner');
         accessoryLayerInnerEl = document.getElementById('accessoryLayerInner');
+        accessoryBackInnerEl = document.getElementById('accessoryBackInner');
         patternLayerEl = document.getElementById('patternLayer');
         patternDefsEl = document.getElementById('patternDefs');
         patternFillEl = document.getElementById('patternFill');

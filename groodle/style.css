@@ -550,6 +550,60 @@ body.dancing .draw-canvas  { opacity: 0; }
     z-index: 5;
 }
 
+/* Back accessories (capes, wings, jetpack) sit BEHIND the body so they
+   never cover the kid's drawing. Same box as every other layer. */
+.accessory-back-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Accessory shop: stacked by slot. The toolbar and slot headings span
+   the whole grid row. */
+.acc-toolbar,
+.acc-slot-head {
+    grid-column: 1 / -1;
+}
+.acc-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 2px 2px;
+}
+.acc-wearing {
+    font-weight: 700;
+    font-size: 15px;
+}
+.acc-clear {
+    min-height: 44px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 2px solid #1a0f33;
+    background: #ffd23f;
+    color: #1a0f33;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+.acc-clear:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.acc-slot-head {
+    margin-top: 10px;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+    border-bottom: 2px dashed rgba(26, 15, 51, 0.2);
+    padding-bottom: 4px;
+}
+.acc-card { cursor: pointer; }
+.acc-card.locked { cursor: default; }
+
 /* Face-parts layer: above the outline ring, below hats. Click-through
    (pointer-events:none) so freehand drawing passes straight through;
    only placed parts re-enable events so they can be dragged. Sits

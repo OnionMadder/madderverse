@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <!-- Shared iPad/touch kid-proofing: page pinch + double-tap zoom, long-press callouts, sticky hover, 100vh. -->
+    <script src="../assets/js/touch-guard.js?v=3"></script>
     <title>Pootery: Throw, Glaze, Fire — Free, Ad-Free Pottery Game</title>
     <link rel="canonical" href="https://madderverse.org/pootery/" />
     <meta property="og:url" content="https://madderverse.org/pootery/" />
@@ -30,7 +32,7 @@
          installed standalone. Now bookmarks + PWA installs get
          the pot+POOT lockup. -->
     <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
-    <link rel="apple-touch-icon" href="icons/icon-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="pwa/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="shortcut icon" href="icons/icon-192.png" />
@@ -54,7 +56,7 @@
     <!-- ?v= cache-buster: bump this every release that ships a
          style.css change so browsers don't hold the old file.
          Keep in sync with sw.js CACHE_VERSION. -->
-    <link rel="stylesheet" href="style.css?v=95" />
+    <link rel="stylesheet" href="style.css?v=96" />
     <script data-goatcounter="https://madderverse.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
     <script>
         /* Standalone-app detection + web-chrome strip.
@@ -1537,7 +1539,7 @@
 <!-- ?v= cache-buster: bump every release alongside the stylesheet
      so browsers grab the new game.js. Keep in sync with sw.js
      CACHE_VERSION + the style.css ?v=. -->
-<script src="game.js?v=95"></script>
+<script src="game.js?v=96"></script>
 
 </body>
 </html>

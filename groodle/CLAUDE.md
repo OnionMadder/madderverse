@@ -119,12 +119,16 @@ request. Bump `SHELL_VERSION` in `sw.js` whenever any
 precached file changes — the `activate` handler deletes every cache
 that doesn't match the current version so stale assets can't linger.
 
-Icons in `manifest.webmanifest` currently reuse
-`../assets/favi/android-chrome-{192,512}x{192,512}.png` (the
-site-wide Madderverse logo). Both are `"purpose": "any"`; **no
-maskable variant ships yet**. Chunk 9 in `PLAY_STORE_PLAN.md` covers
-swapping to Groodle-branded icons + commissioning maskable layouts
-for Android adaptive icon shapes.
+Icons in `manifest.webmanifest` are Groodle's own, in `pwa/`
+(192 / 512 / 512-maskable + a 180px `apple-touch-icon`), generated
+from `groodle-app/assets/icon-512.png` by the repo-root
+`scripts/make-pwa.py` — don't hand-edit the `icons` list, re-run the
+script. The SW precaches them plus `../assets/js/touch-guard.js`.
+
+**The SW install fetches with `cache: 'reload'`.** Without it, a
+`SHELL_VERSION` bump re-precached whatever `game.js` was still in the
+browser's HTTP cache (GitHub Pages sends `max-age=600`), so a deploy
+could ship the new version number wrapped around the old code.
 
 **`game.js` is a single IIFE.** If you ever see `})();` appear twice in
 the file (e.g. after a sloppy paste), the whole game initializes twice
@@ -150,6 +154,57 @@ IIFE; verify with `grep -n '^})();$' game.js` showing one match.
 | **EXPORT** | `composeGroodleBlob()` re-renders the kid's drawing into an offscreen 800×1200 PNG using the same `buildBodyPath` the live canvas uses — silhouette fill, pattern, draw canvas, outline ring, then the face-parts / hat / accessory deco layers in on-screen z-order (each rasterised via `rasterizeDecoLayer`; the hat sheet is inlined as a data URL or `toBlob` throws on a tainted canvas). No SVG serialization of the whole stage. Kept separate from the gallery so a future share/download path can reuse it. |
 | **GALLERY** | On-device only. `saveGroodleLocal()` composes the blob and `idbSaveGroodle()`s it to IndexedDB (`groodle-gallery` / `creations`), then a toast; `openLocalGallery()` renders `idbAllGroodles()` newest-first as `blob:` URL cards with a two-tap-confirm `idbDeleteGroodle`. No network, no accounts, no other users' content. |
 | **INIT** | `init()` builds everything; fires on `DOMContentLoaded`. |
+
+## Wardrobe: stacking accessories (2026-10, Bala's feedback)
+
+"He should be able to wear more than one at a time." Accessories are
+worn **one per slot, many slots at once**:
+`state.accessories.worn = { slot: id }` (replaced the old single
+`equipped` id; `migrateState()` moves an old save's item into its
+slot on load). Slots, in shop order: **eyes, nose, mouth, neck,
+chest, back, hand** (`ACCESSORY_SLOTS`). Wearing an item in an
+occupied slot swaps it — that is what stops clashes. One tap on a card
+does everything (`tapAccessory`: buy+wear / wear / take off), and the
+shop has a **Take all off** button. The old `no-accessory` "Nothing"
+card is gone (the id is kept so old `owned` lists still resolve).
+Hats stay single — there's only one head.
+
+Three render layers:
+- **back** (capes, wings, jetpack) → `#accessoryBackLayer`, z 0,
+  BEHIND the body, so a cape never covers the drawing. The gallery
+  export draws it first, before the body wash.
+- everything else → `#accessoryLayer` (above the hat), painted in
+  `FRONT_ORDER` (chest → neck → mouth → nose → eyes → hand).
+- **hand** items sit at the right fist: `handPoint(pose)` derives it
+  from the arm rig exactly like `rigRingsD` places the arm, and
+  `applyLimbAngles` → `syncHeldItem` spins it about the shoulder pin
+  so it dances with the arm. Ghost / animal poses have no rig, so
+  hand items don't show there.
+
+28 items (placeholder SVG, same ink as the rest). Adding one = one
+entry in `ACCESSORIES` with `slot`, `anchor` (not for hand) and `svg`
+drawn around (0,0); hand items draw with the fist at (0,0), up = −y.
+Bala's acceptance test — **cape + sunglasses at once** — is also the
+`super-cool` achievement.
+
+## Achievements = the only Doodle income (by design)
+
+No real money, no ads (PROMISE.md), so achievements are the whole
+economy. 57 of them, 1,260 Doodles total (was 22 / 455). Most are
+small and land in the first session just by playing (first stroke,
+3 colors, new pose, new background, wear 2 things…); a few are long
+goals (25 drawings, 1,000 strokes, all 16 grooves, Head to Toe).
+**Nothing is time-gated** — no streaks, no daily rewards, no "come
+back tomorrow" (the older `bedhead` one stays, but nothing new like
+it). Generic trackers: `trackTried(listName, value)` for "tried X"
+lists, `trackCount(name)` for tallies, `trackOutfit()` after every
+wardrobe change, `trackGroove()` only while music plays. A backlog of
+unlock toasts plays faster so a returning player isn't stuck watching
+ten in a row.
+
+The full shop (16 hats + 27 accessories) costs ~1,900 Doodles, more
+than all achievements pay — a kid can't own everything from
+achievements alone. Lower prices or add achievements if that bites.
 
 ## Why the doll is images, not traced outlines
 

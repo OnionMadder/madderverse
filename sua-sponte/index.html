@@ -3,6 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <!-- Shared iPad/touch kid-proofing: page pinch + double-tap zoom, long-press callouts, sticky hover, 100vh. -->
+  <script src="../assets/js/touch-guard.js?v=3"></script>
+  <!-- Home-screen app (iPad standalone): see scripts/make-pwa.py -->
+  <link rel="apple-touch-icon" sizes="180x180" href="pwa/apple-touch-icon.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-title" content="Sua Sponte" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
   <title>Sua Sponte</title>
   <style>
     :root {
@@ -19,11 +28,13 @@
       color: var(--paper);
       font-family: "Courier New", Courier, monospace;
       min-height: 100vh;
+      min-height: 100dvh;
       overflow: hidden;
     }
     body {
       display: flex; flex-direction: column;
       height: 100vh;
+      height: 100dvh;
       align-items: center;
     }
     header {

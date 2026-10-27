@@ -3,6 +3,12 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Shared iPad/touch kid-proofing: page pinch + double-tap zoom, long-press callouts, sticky hover, 100vh. -->
+    <script src="../assets/js/touch-guard.js?v=3"></script>
+    <!-- Home-screen app (iPad standalone): see scripts/make-pwa.py -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <title>Giggle Gears</title>
     <link rel="canonical" href="https://madderverse.org/giggle-gears/" />
     <meta property="og:url" content="https://madderverse.org/giggle-gears/" />
@@ -18,12 +24,12 @@
     <meta name="twitter:title" content="Giggle Gears - Madderverse" />
     <meta name="twitter:description" content="Safe, free, and ad-free games for curious kids. Discover Madderverse." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/logo.jpg" />
-    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="pwa/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
-    <link rel="manifest" href="https://madderverse.org/assets/favi/site.webmanifest" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="shortcut icon" href="https://madderverse.org/assets/favi/favicon.ico" />
-    <meta name="theme-color" content="#00ffcc" /> <meta name="apple-mobile-web-app-title" content="Madderverse" />
+    <meta name="theme-color" content="#00ffcc" /> <meta name="apple-mobile-web-app-title" content="Giggle Gears" />
     <meta name="application-name" content="Madderverse" />
     <link rel="stylesheet" href="https://madderverse.org/giggle-gears/assets/css/sprites.css" />
     <link rel="stylesheet" href="https://madderverse.org/giggle-gears/assets/css/style.css" />

@@ -3596,6 +3596,7 @@ a:focus-visible {
     width: 100%;
     max-width: 420px;
     max-height: calc(100vh - 40px);
+    max-height: calc(100dvh - 40px);
     overflow-y: auto;
     box-sizing: border-box;
     padding: 22px 22px 18px;

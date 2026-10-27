@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Shared iPad/touch kid-proofing: page pinch + double-tap zoom, long-press callouts, sticky hover, 100vh. -->
+    <script src="../assets/js/touch-guard.js?v=3"></script>
     <title>Groodle</title>
     <link rel="canonical" href="https://madderverse.org/groodle/" />
     <meta property="og:url" content="https://madderverse.org/groodle/" />
@@ -20,7 +22,7 @@
     <meta name="twitter:title" content="Groodle - Doodle a Dancer, Watch It Come Alive" />
     <meta name="twitter:description" content="Scribble your own little character inside the silhouette and watch your doodle come alive and groove to the beat." />
     <meta name="twitter:image" content="https://madderverse.org/assets/img/madderverse-logo.jpg" />
-    <link rel="apple-touch-icon" sizes="180x180" href="https://madderverse.org/assets/favi/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="pwa/apple-touch-icon.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="https://madderverse.org/assets/favi/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="https://madderverse.org/assets/favi/favicon-16x16.png" />
     <!-- Groodle-specific PWA manifest (not the site-wide one) so installs
@@ -87,6 +89,13 @@
     </svg>
 
     <div class="creature" id="creature">
+        <!-- Back-accessory layer (z 0, BEHIND the body): capes, wings,
+             jetpack. Everything else is worn in front (#accessoryLayer).
+             renderEquippedAccessory() fills #accessoryBackInner. -->
+        <svg class="accessory-back-layer" id="accessoryBackLayer" viewBox="0 0 400 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <g id="accessoryBackInner"></g>
+        </svg>
+
         <!-- Fill layer: pale interior wash that becomes the "coloring
              page" surface (z-index 1). -->
         <!-- Silhouette fill layer. Shape children are populated from JS

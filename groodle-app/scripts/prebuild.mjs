@@ -89,6 +89,13 @@ function copyParentAssets() {
     if (existsSync(faviSrc)) {
         cpSync(faviSrc, join(www, 'assets', 'favi'), { recursive: true });
     }
+    /* Shared iPad/touch kid-proofing (pinch/double-tap zoom, callouts,
+       sticky hover). Loaded by every game as ../assets/js/touch-guard.js. */
+    const tgSrc = join(assetsSrc, 'js', 'touch-guard.js');
+    if (existsSync(tgSrc)) {
+        mkdirSync(join(www, 'assets', 'js'), { recursive: true });
+        cpSync(tgSrc, join(www, 'assets', 'js', 'touch-guard.js'));
+    }
 }
 
 function rewrite(file) {

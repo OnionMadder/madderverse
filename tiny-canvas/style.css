@@ -178,6 +178,7 @@ a:focus-visible {
         calc(72px + env(safe-area-inset-bottom, 0px))
         calc(16px + env(safe-area-inset-left, 0px));
     min-height: calc(100vh - 110px);
+    min-height: calc(100dvh - 110px);
     display: flex;
     flex-direction: column;
 }
@@ -2712,6 +2713,7 @@ body.is-dark-paper .line-art img {
 #printWrap img {
     max-width: 100%;
     max-height: 100vh;
+    max-height: 100dvh;
     display: block;
 }
 

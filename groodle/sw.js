@@ -18,7 +18,7 @@
 
 'use strict';
 
-const SHELL_VERSION = 'groodle-shell-v47';
+const SHELL_VERSION = 'groodle-shell-v49';
 
 /* Files baked into the cache during `install`. List anything the
    game absolutely needs to render the first frame. Hat sprites are
@@ -42,6 +42,11 @@ const SHELL_FILES = [
        drops to the fallback stack the moment the player is offline. */
     './assets/fonts/caveat-700.woff2',
     '../assets/css/site-footer.css',
+    /* Shared iPad kid-proofing + this game's own home-screen icons. */
+    '../assets/js/touch-guard.js?v=3',
+    './pwa/apple-touch-icon.png',
+    './pwa/icon-192.png',
+    './pwa/icon-512.png',
     '../assets/favi/favicon.ico',
     '../assets/favi/favicon-16x16.png',
     '../assets/favi/favicon-32x32.png',
@@ -58,7 +63,11 @@ self.addEventListener('install', (event) => {
                is individually addAll'd via Promise.all for clearer error
                surfaces during dev. */
             return Promise.all(SHELL_FILES.map((url) =>
-                cache.add(url).catch(() => {
+                /* cache: 'reload' skips the HTTP cache. Without it a version
+                   bump could precache the PREVIOUS game.js still sitting in
+                   the browser's HTTP cache (GitHub Pages sends max-age=600),
+                   and the "new" shell would ship old code. */
+                cache.add(new Request(url, { cache: 'reload' })).catch(() => {
                     /* Don't block the install on a single optional asset
                        (e.g. a renamed favicon). The fetch handler will
                        still cache it on first request. */
